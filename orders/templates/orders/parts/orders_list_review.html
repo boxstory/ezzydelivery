@@ -1,0 +1,45 @@
+<div class="container p-0 m-0">
+    <div class="row table-responsive">
+
+        {% if not orders %}
+        <p> No orders</p>
+        {%else%}
+
+        <table class="table table-striped table-hover ">
+            <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Ref No</th>
+
+                <th>Status</th>
+                <th>DMS Status</th>
+                <th>COD</th>
+
+
+
+            </tr>
+            {% for order in orders %}
+            <tr data-order-id="{{ order.id }}" class="data-order-row">
+                <td>{{ order.id }}</td>
+                <td>{{ order.order_date }}</td>
+                <td>{{ order.client_order_code }}</td>
+                <td>
+                    <select class="status-dropdown form-select form-select-md " id="floatingSelectGrid">
+                        <option value="{{ order.order_status }} ">{{ order.order_status }}</option>
+                        <option value="ready_to_pickup">Ready to pickup</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+
+
+                </td>
+                <td>{{ order.dl_task.id }}</td>
+                <td>{{ order.task_created }}</td>
+
+
+            </tr>
+
+            {% endfor %}
+        </table>
+        {% endif %}
+    </div>
+</div>

@@ -1,0 +1,63 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+<div class="p-3 col-12 col-lg-10 col-md-10">
+  <div class="container align-content-center">
+    <div class="row">
+      <div class="col-md-12 pb-3">
+        <div class="col p-2">
+          <h2 class="m-0 text-center">Add Order</h2>
+        </div>
+        <div class="col d-flex justify-content-between rounded-2 bg-light">
+          <a class="btn pe-3 text-dark" href="{% url 'business:pickup_location_list' %}">
+            <div class="btn btn-dark my-2">Pickup locations</div>
+          </a>
+          <a class="btn pe-3 text-dark" href="{% url 'business:pickup_location_list' %}">
+            <div class="btn btn-dark my-2">Pick and Delivery</div>
+          </a>
+          <a class="btn pe-3 text-dark d-none d-md-block" href="{% url 'orders:order_upload_file' %}">
+            <div class="btn btn-dark my-2">Upload bulk</div>
+          </a><a class="btn pe-3 text-dark d-none d-md-block" href="{% url 'orders:orders_all_list' %}">
+            <div class="btn btn-dark my-2">Back</div>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-12">
+        <form method="POST">
+          {% if form.non_field_errors %}
+          <!-- extra css -->
+          {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+          {% endif %}
+          {% csrf_token %} {{ form | crispy }}
+          <div class="text-end">
+            <button type="submit" class="btn btn-dark w-100 w-md-50" href="{% url 'orders:add_order' %}">Save & Add
+              Products</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+{% block extra_js %}
+<script>
+  $(document).ready(function () {
+    // Get references to the input fields
+    const id_customer_phone = $("#id_customer_phone");
+    const id_customer_whatsapp = $("#id_customer_whatsapp");
+
+    // Add event listeners for the driverIdField
+    id_customer_phone.on("input", function () {
+      const phoneNumberValue = id_customer_phone.val();
+      id_customer_whatsapp.val(974 + phoneNumberValue);
+    });
+  });
+  // Initialize select2 in pickuplocation search field
+  $("#id_pickup_location").select2();
+  $("#id_product_list").select2();
+
+</script>
+{% endblock extra_js %}

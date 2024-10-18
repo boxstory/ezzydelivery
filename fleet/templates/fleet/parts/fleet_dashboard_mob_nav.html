@@ -1,0 +1,181 @@
+{% load static %}
+<nav class="navbar navbar-expand-lg navbar-light bg-light d-block d-md-none col-12">
+    <div class="p-3 p-md-3 text-dark container-fluid">
+        <div class="text-center">
+            <p class="fw-bolder fs-sm text-uppercase">{{ business.business_name }} Dashboard</p>
+        </div>
+        <hr />
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav2"
+            aria-controls="navbarNav2" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+    <div class="collapse navbar-collapse mx-4" id="navbarNav2">
+        <hr class="mt-0" />
+        <ul class="navbar-nav ms-auto text-center">
+            <li
+                class="nav-item {% if request.resolver_match.url_name == 'assigned_tasks' or request.resolver_match.url_name == 'all_delivery_tasks' %}active{% endif %}">
+                <a class="nav-link  flex-fill " data-bs-toggle="collapse" data-bs-target="#submenu-deliveries"
+                    href="{% url 'fleet:fleet_dashboard' %}">
+                    <div
+                        class="nav-link btn btn-outline-dark collapsed d-flex justify-content-evenly align-items-center ">
+                        <i class="fa-solid fa-truck-fast px-4"></i>
+                        <p class="flex-fill pt-3">Deliveries</p>
+                        <i class=" fa-solid fa-caret-down px-4"></i>
+                    </div>
+                </a>
+                <div class="multi-level collapse bg-white rounded-3" role="list" id="submenu-deliveries"
+                    aria-expanded="false">
+                    <ul class="flex-column nav text-black">
+                        <li class="nav-item">
+                            <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
+                                <a class="nav-link flex-fill p-0 py-2 text-start"
+                                    href="{% url 'delivery:all_delivery_tasks' %}"> <i
+                                        class="fa-solid fa-hourglass-half my-2 pt-1 pe-2" style="color: #004080"></i>All
+                                    Tasks
+                                    List</a>
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
+                                <a class="nav-link flex-fill p-0 py-2 text-start"
+                                    href="{% url 'delivery:assigned_tasks' %}"> <i
+                                        class="fa-solid fa-spinner my-2 pt-1 pe-2"></i>Assigned Jobs</a>
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
+                                <a class="nav-link flex-fill p-0 py-2 text-start"
+                                    href="{% url 'delivery:assigned_tasks' %}"> <i
+                                        class="fa-solid fa-check-double my-2 pt-1 pe-2"
+                                        style="color: #00ff00"></i>Accepted
+                                    List</a>
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
+                                <a class="nav-link flex-fill p-0 py-2 text-start"
+                                    href="{% url 'delivery:assigned_tasks' %}"> <i
+                                        class="fa-solid fa-road my-2 pt-1 pe-2" style="color: #e8b417"></i>InTransit</a>
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
+                                <a class="nav-link flex-fill p-0 py-2 text-start"
+                                    href="{% url 'delivery:assigned_tasks' %}"> <i
+                                        class="fa-solid fa-circle-check my-2 pt-1 pe-2"
+                                        style="color: #008000"></i>Succesful</a>
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
+                                <a class="nav-link flex-fill p-0 py-2 text-start"
+                                    href="{% url 'delivery:assigned_tasks' %}"> <i
+                                        class="fa-solid fa-circle-xmark my-2 pt-1 pe-2"
+                                        style="color: #ff0000"></i>UnSuccesful</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+            <li
+                class="nav-item {% if request.resolver_match.url_name == 'cod_collection' or request.resolver_match.url_name == 'driver_documents' %}active{% endif %}">
+                <a class="nav-link  flex-fill " data-bs-toggle="collapse" data-bs-target="#submenu-accounts"
+                    href="{% url 'fleet:fleet_dashboard' %}">
+                    <div
+                        class="nav-link btn btn-outline-dark collapsed d-flex justify-content-evenly align-items-center ">
+                        <i class="fa-solid fa-wallet px-4"></i>
+                        <p class="flex-fill pt-3">Accounts</p>
+                        <i class=" fa-solid fa-caret-down px-4"></i>
+                    </div>
+                </a>
+                <div class="multi-level collapse bg-white rounded-3" role="list" id="submenu-accounts"
+                    aria-expanded="false">
+                    <ul class="flex-column nav text-black ps-2">
+                        <li class="nav-item">
+                            <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
+                                <a class="nav-link flex-fill p-0 py-2 text-start"
+                                    href="{% url 'fleet:cod_collection' %}"><i
+                                        class="fa-solid fa-sack-dollar my-2 pt-1 pe-2"></i>COD In Hand</a>
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
+                                <a class="nav-link flex-fill p-0 py-2 text-start"
+                                    href="{% url 'fleet:cod_collection' %}"> <i
+                                        class="fa-solid fa-wallet my-2 pt-1 pe-2"></i>DLs Earnigns</a>
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
+                                <a class="nav-link flex-fill p-0 py-2 text-start"
+                                    href="{% url 'fleet:cod_collection' %}"> <i
+                                        class="fa-solid fa-money-bill-transfer my-2 pt-1 pe-2"></i>Transactions</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+            <li
+                class="nav-item {% if request.resolver_match.url_name == 'driver_documents' or request.resolver_match.url_name == 'vehicle_own' %}active{% endif %}">
+                <a class="nav-link  flex-fill " data-bs-toggle="collapse" data-bs-target="#submenu-documents"
+                    href="{% url 'fleet:fleet_dashboard' %}">
+
+                    <div
+                        class="nav-link btn btn-outline-dark collapsed d-flex justify-content-evenly align-items-center ">
+                        <i class="fa-solid fa-id-card px-4"></i>
+                        <p class="flex-fill pt-3">Documents</p>
+                        <i class=" fa-solid fa-caret-down px-4"></i>
+                    </div>
+                </a>
+                <div class="multi-level collapse bg-white rounded-3" role="list" id="submenu-documents"
+                    aria-expanded="false">
+                    <ul class="flex-column nav text-black ps-2">
+                        <li class="nav-item">
+                            <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
+                                <a class="nav-link flex-fill p-0 py-2 text-start"
+                                    href="{% url 'fleet:driver_documents' %}"><i
+                                        class="fa-solid fa-address-card my-2 pt-1 pe-2"></i>ID Cards</a>
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
+                                <a class="nav-link flex-fill p-0 py-2 text-start"
+                                    href="{% url 'fleet:vehicle_own' %}"><i
+                                        class="fa-solid fa-car my-2 pt-1 pe-2"></i>Vehicels</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+            <hr />
+            <li class="nav-item">
+                <a class="nav-link " href="{% url 'fleet:fleet_dashboard' %}">
+                    <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3">
+                        <i class="fa-solid fa-chart-bar m-2 pe-2 pb-1"></i>
+                        <p class="flex-fill ">Report</p>
+
+                    </div>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'fleet:fleet_dashboard' %}">
+                    <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+                        <i class="fa-solid fa-address-book px-4"></i>
+                        <p class="flex-fill ">Contacts</p>
+
+                    </div>
+                </a>
+            </li>
+            <hr />
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'fleet:driver_profile' request.user.profile.id %}">
+                    <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+                        <i class="fa-solid fa-store px-4 pb-1"></i>
+                        <p class="flex-fill ">Profile</p>
+                    </div>
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>

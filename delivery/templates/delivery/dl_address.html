@@ -1,0 +1,65 @@
+{% extends "fleet_dashboard_base.html" %}
+{% load static %}
+{% load
+crispy_forms_tags %}
+{% block content %}
+    <div class="flex-fill p-2">
+        <div class="container">
+            <section class="py-5">
+                <div class="container">
+                    <div class="row justify-content-center">
+                        <div class="col-12 col-lg-6">
+                            <form action="" method="post">
+                                {% csrf_token %} {{ form|crispy }}
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-primary">
+                                        {% if form.instance.pk %}
+                                            Update
+                                        {% else %}
+                                            Create
+                                        {% endif %}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+{% endblock content %}
+{% block extra_js %}
+    <!-- extra js -->
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script>
+  $("#zone_number").change(function () {
+    const url = $("#delivery_address_form").attr("get_zone_name"); // get the url of the `load_cities` view
+    console.log(url);
+    const zoneId = $(this).val(); // get the selected country ID from the HTML input
+    console.log(zoneId);
+
+    $.ajax({
+      // initialize an AJAX request
+      url: url, // set the url of the request (= /persons/ajax/load-cities/ )
+      data: {
+        zone_number: zone_number, // add the country id to the GET parameters
+      },
+      success: function (data) {
+        // `data` is the return of the `load_cities` view function
+        console.log(data);
+        $("#zone_name").html(data); // replace the contents of the city input with the data that came from the server
+        /*
+
+                let html_data = '<option value="">---------</option>';
+                data.forEach(function (city) {
+                    html_data += `<option value="${city.id}">${city.name}</option>`
+                });
+                console.log(html_data);
+                $("#id_city").html(html_data);
+
+                */
+      },
+    });
+  });
+    </script>
+{% endblock extra_js %}

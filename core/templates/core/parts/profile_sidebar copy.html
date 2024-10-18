@@ -1,0 +1,39 @@
+{% load static %}
+
+<!-- <div class="row"> -->
+<!-- profile left side section -->
+<div class="col-lg-4">
+    <div class="card mb-4 ">
+        <div class="card-body text-center">
+            <img src="/media/core/user/avatar.png" alt="avatar" class="rounded-circle img-fluid" style="width: 180px;">
+            <h5 class="my-3">{{joinusform.first_name}} {{joinusform.last_name}}</h5>
+            <p class="text-muted mb-1">{{joinusform.profile_picture}}</p>
+            <p class="text-muted mb-4">{{joinusform.zone_name}}</p>
+            <div class="d-flex justify-content-center mb-2">
+                {% if profile.is_business %}
+                <a type="button" class="btn btn-dark" href="{% url 'business:business_dashboard' %}">
+                    Dashboard
+                </a>
+                <p>{{profile.is_business}}</p>
+
+
+                {% elif profile.is_driver %}
+                <a type="button" class="btn btn-dark" href="{% url 'fleet:fleet_dashboard' %}">
+                    Dashboard
+                </a>
+                {% else %}
+                <a type="button" class="btn btn-dark" href="{% url 'core:join_us' %}">
+                    SELECT ROLE
+                </a>
+                {% endif %}
+
+                <button type="button" class="btn btn-outline-dark ms-1">Message</button>
+            </div>
+            <div class="d-flex justify-content-center p-3">
+                <a href="#!"><i class="fa-brands fa-facebook fa-2xl me-3 text-dark"></i></a>
+                <a href="#!"><i class="fa-brands fa-whatsapp fa-2xl me-3 text-dark"></i></a>
+                <a href="#!"><i class="fa-brands fa-instagram fa-2xl text-dark"></i></a>
+            </div>
+        </div>
+    </div>
+</div>

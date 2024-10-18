@@ -1,0 +1,57 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+{% block content %}
+<div class="p-3 col-12 col-lg-10 col-md-10">
+  <div class="h4 p-3 text-center">
+    <h2>list of store locations</h2>
+  </div>
+  <section>
+    <div class="col-12">
+      <table class="table table-striped table-hover my-3">
+        <thead class="table-dark">
+          <tr>
+            <th>Landmark</th>
+            <th>Zone No</th>
+            <th>Street No</th>
+            <th>Building No</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody hx-target="closest tr" hx-swap="outerHTML swap:1s">
+          {% if pickup_location %}
+          {% for loc in pickup_location %}
+          <tr>
+            <td>
+              <span>{{ loc.id }}--</span>{{ loc.pickup_location_title }}
+            </td>
+            <td>{{ loc.pickup_zone_no }}</td>
+            <td>{{ loc.pickup_street_no }}</td>
+            <td>{{ loc.pickup_building_no }}</td>
+            <td>
+              <a href="{% url 'business:pickup_location_update' loc.id %}" class="btn pe-3 text-dark"><i
+                  class="fa fa-lg fa-edit"></i></a>
+              <a class="btn pe-3 text-dark" hx-confirm="Are you sure you wish to delete?" hx-target="#dasboard_div"
+                hx-swap="innerHTML swap:1s" hx-delete="{% url 'business:pickup_location_delete' loc.id %}"><i
+                  class="fa fa-lg fa-trash"></i></a>
+            </td>
+          </tr>
+          {% endfor %}
+          {% else %}
+          <tr>
+            <td colspan="5" class="py-2">No Locations Added</td>
+          </tr>
+          {% endif %}
+          <tr>
+            <td colspan="5" class="py-2">
+              <a class="btn pe-3 text-dark" href="{% url 'business:pickup_location_add' %}"><i
+                  class="fa fa-lg fa-add me-2"></i>
+                Pickup Locations
+              </a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock content %}

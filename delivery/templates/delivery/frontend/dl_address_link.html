@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block extra_css %}
+<!-- extra css -->
+<link
+    type="text/css"
+    rel="stylesheet"
+    href="{% static 'delivery/css/delivery_main.css' %}"
+>
+
+<script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+<link
+    href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css'
+    rel='stylesheet'
+/>
+
+{% endblock extra_css %}
+
+{% block content %}
+
+<section class="py-3">
+
+
+    <div class="container p-0">
+        <div class="card card-glassmorphic p-1">
+
+            <div class="card-body">
+                <h5 class="card-title fw-bold">Delivery Drop off Details</h5>
+                <hr class="hr p-0">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><strong>Full Name:</strong> {{ task.full_name }}</li>
+                    <div class="d-flex justify-content-between p-2 px-3 ">
+
+                        <p class="align-middle disabled m-0"><strong>Mobile Number:</strong> {{ task.mobile_no }}
+                        </p>
+                        <p class=" disabled m-0"><strong>Job Code:</strong> {{ task.dl_task_number }}</p>
+                    </div>
+
+
+
+
+                    <hr class="p-0 m-0">
+                    <li class="list-group-item"><strong>Area Name : </strong> {{ task.area_name }}</li>
+                    <div class="card card-glassmorphic addressboard p-3 m-2 mt-1 rounded-3">
+
+
+                        <div class="row justify-content-between m-0 ">
+                            <div class="col-6 col-md-6 m-0 ps-0">
+                                <p class="list-group-item rounded-3"><strong>Zone : </strong> {{ task.dl_zone }}</p>
+                                <p class="list-group-item  m-0 rounded-3"><strong>Building : </strong>
+                                    {{ task.dl_building }}</p>
+                            </div>
+                            <div class="col-6 col-md-6 pe-0">
+                                <p class="list-group-item rounded-3"><strong>Street : </strong> {{ task.dl_street }}</p>
+                                <p class="list-group-item m-0 rounded-3"><strong>Unit : </strong> {{ task.dl_unit }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <li class="list-group-item"><strong>Is Villa Compound: </strong>
+                        {% if task.is_villa_compound %}<i
+                            class="fa-solid fa-square-check fa-xl"
+                            style="color: #008000;"
+                        ></i>
+                        {% else %} <i
+                            class="fa-solid fa-square-xmark fa-xl"
+                            style="color: #a80000;"
+                        ></i>
+                        {% endif %}
+                    </li>
+                    <li class="list-group-item"><strong>Is Flat: </strong>
+                        {% if task.is_flat %}<i
+                            class="fa-solid fa-square-check fa-xl"
+                            style="color: #008000;"
+                        ></i>
+                        {% else %}<i
+                            class="fa-solid fa-square-xmark fa-xl"
+                            style="color: #a80000;"
+                        ></i>
+                        {% endif %}
+                    <li class="list-group-item"><strong>Is Office: </strong>
+                        {% if task.is_office %}<i
+                            class="fa-solid fa-square-check fa-xl"
+                            style="color: #008000;"
+                        ></i>
+                        {% else %}<i
+                            class="fa-solid fa-square-xmark fa-xl"
+                            style="color: #a80000;"
+                        ></i>
+                        {% endif %}
+                    <li class="list-group-item"><strong>Time Slot:</strong> {{ task.time_slot }}</li> <button
+                        class="btn btn-success  assign-driver-btn"
+                        data-task-id="{{ task.id }}"
+                    >Updae</button>
+                </ul>
+            </div>
+            <div class="col-12 p-3  d-flex justify-content-center">
+
+
+
+
+
+            </div>
+            <div class="p-0 m-0">
+                <div class="px-2">LongLat: {{address}}--------------{{ task.dl_latitude }}{{ task.dl_longitude }}</div>
+                <div class="px-2">Address: {{g.json.address}}</div>
+                <div class="px-2 updatedlatlong"></div>
+
+
+
+                <div
+                    id='map'
+                    style='width: w-100; height: 300px;'
+                ></div>
+
+            </div>
+            <div class="col-12 p-3  d-flex justify-content-center">
+
+                <button
+                    class="btn btn-success assign-driver-btn me-3"
+                    data-task-id="{{ task.id }}"
+                    onclick="getLocation()"
+                >Find my palce</button>
+
+                <button
+                    class="btn btn-success  assign-driver-btn me-3"
+                    data-task-id="confirm-loc-{{ task.id }}"
+                >Confirm</button>
+
+
+            </div>
+
+
+
+        </div>
+    </div>
+</section>
+
+{% endblock content %}
+{% block extra_js %}
+<!-- extra css -->
+<script>
+    const centerLatitude = {{ task.dl_latitude }};
+    const centerLongitude = {{ task.dl_longitude }};
+    // Define the getLocation function in the global scope
+    function getLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(showPosition);
+        } else {
+            // Handle geolocation not supported
+            console.error("Geolocation is not supported by this browser.");
+        }
+    }
+
+    function showPosition(position) {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        // Update the map and marker with the user's current location
+        map.setCenter([longitude, latitude]);
+        marker1.setLngLat([longitude, latitude]);
+
+        // Update the content of the div with the new latitude and longitude
+        const updatedLatLongDiv = document.querySelector('.updatedlatlong');
+        updatedLatLongDiv.textContent = `Latitude: ${latitude}, Longitude: ${longitude}`;
+
+        // Save the data to the Django database
+        saveToDatabase(latitude, longitude);
+    }
+
+    // Rest of your existing JavaScript code here
+    mapboxgl.accessToken = '{{MAPBOX_API_KEY}}';
+    const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [centerLongitude, centerLatitude],
+        zoom: 14,
+    });
+
+    const marker1 = new mapboxgl.Marker({ color: 'black', rotation: 20 })
+        .setLngLat([centerLongitude, centerLatitude])
+        .addTo(map);
+
+    // Add a click event listener to the map
+    map.on('click', function (event) {
+        // Get the clicked coordinates
+        const clickedLngLat = event.lngLat;
+
+        // Update the marker's position
+        marker1.setLngLat(clickedLngLat);
+
+        // Update the content of the div with the new latitude and longitude
+        const updatedLatLongDiv = document.querySelector('.updatedlatlong');
+        updatedLatLongDiv.textContent = `Latitude: ${clickedLngLat.lat}, Longitude: ${clickedLngLat.lng}`;
+
+        // Save the data to the Django database
+        saveToDatabase(clickedLngLat.lat, clickedLngLat.lng);
+    });
+
+    function saveToDatabase(latitude, longitude) {
+        // Make an AJAX request to save the data
+        const csrfToken = '{{ csrf_token }}';
+        const dl_task_number = '{{ task.dl_task_number }}';
+
+        // Construct the URL with dl_task_number
+        const url = `/delivery/address_link/${dl_task_number}/update/`;
+
+        const data = {
+            dl_latitude: latitude,
+            dl_longitude: longitude,
+            csrfmiddlewaretoken: csrfToken,
+        };
+        console.log(JSON.stringify(data))
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify(data),
+        })
+            .then(response => response.json())
+            .then(data => {
+
+                console.log('Data saved to database:', data);
+            })
+            .catch(error => {
+                console.error('Error saving data:', error);
+            });
+    }
+
+
+</script>
+
+{% endblock extra_js %}

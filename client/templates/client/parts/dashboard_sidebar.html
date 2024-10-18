@@ -1,0 +1,124 @@
+{% load static %}
+{% block extra_css %}
+{% endblock extra_css %}
+<div class="min-vh-100 d-none d-md-flex flex-column flex-shrink-0 p-3 bg-light col-md-2 the-sidebar">
+  <div class="text-center fw-bold">
+    <a class="nav-link p-3 my-0 btn btn-outline-dark" href="{% url 'business:business_dashboard' %}">Clients Dashboard
+    </a>
+  </div>
+  <hr />
+  <div class="navbar-collapse" id="navbarNav">
+    <ul class="navbar-nav ms-auto text-center">
+      <li class="nav-item"></li>
+      <li
+        class="nav-item {% if request.resolver_match.url_name == 'orders_list' or request.resolver_match.url_name == 'orders_pending_list' or request.resolver_match.url_name == 'orders_unsuccessfull_list' or request.resolver_match.url_name == 'orders_successfull_list' or request.resolver_match.url_name == 'add_order' %}active{% endif %}">
+        <div class="nav-link btn btn-outline-dark collapsed d-flex justify-content-start align-items-center"
+          data-bs-toggle="collapse" data-bs-target="#submenu-orders">
+          <i class="fa-solid fa-basket-shopping p-2"></i>
+          <a class="nav-link my-0 flex-fill text-start ps-2" href="{% url 'business:business_dashboard' %}">Orders</a><i
+            class="flex-fill fa-solid fa-caret-down"></i>
+        </div>
+        <div class="multi-level collapse bg-white rounded-3" role="list" id="submenu-orders" aria-expanded="false">
+          <ul class="flex-column nav text-black">
+            <li class="nav-item">
+              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+                <i class="fa-solid fa-bars my-2 pt-1 pe-2"></i>
+                <a class="nav-link" href="{% url 'orders:orders_all_list' %}">All Orders</a>
+              </div>
+            </li>
+            <li class="nav-item">
+              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+                <i class="fa-solid fa-add my-2 pt-1 pe-2"></i>
+                <a class="nav-link" href="{% url 'orders:add_order' %}">Add Orders</a>
+              </div>
+            </li>
+            <li class="nav-item">
+              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+                <i class="fa-solid fa-check my-2 pt-1 pe-2"></i>
+                <a class="nav-link" href="{% url 'orders:orders_successfull_list' %}">Successfull</a>
+              </div>
+            </li>
+            <li class="nav-item">
+              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+                <i class="fa-solid fa-spinner my-2 pt-1 pe-2"></i>
+                <a class="nav-link" href="{% url 'orders:orders_pending_list' %}">Pendings</a>
+              </div>
+            </li>
+            <li class="nav-item">
+              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+                <i class="fa-solid fa-xmark my-2 pt-1 pe-2"></i>
+                <a class="nav-link" href="{% url 'orders:orders_unsuccessfull_list' %}">UnSuccessfull</a>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </li>
+      <hr />
+      <li
+        class="nav-item {% if request.resolver_match.url_name == 'product_all_list' or request.resolver_match.url_name == 'product_single_add' or request.resolver_match.url_name == 'product_categories' or request.resolver_match.url_name == 'product_all_list_card' %}active{% endif %}">
+        <div class="nav-link btn btn-outline-dark collapsed d-flex justify-content-start align-items-center"
+          data-bs-toggle="collapse" data-bs-target="#submenu-product">
+          <i class="fa-solid fa-box-open p-2"></i>
+          <a class="nav-link my-0 flex-fill text-start ps-2"
+            href="{% url 'business:business_dashboard' %}">Products</a><i class="flex-fill fa-solid fa-caret-down"></i>
+        </div>
+        <div class="multi-level collapse bg-white rounded-3" role="list" id="submenu-product" aria-expanded="false">
+          <ul class="flex-column nav text-black ps-2">
+            <li class="nav-item">
+              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+                <i class="fa-solid fa-bars my-2 pt-1 pe-2"></i>
+                <a class="nav-link ps-1" href="{% url 'product:product_all_list' %}">All Products</a>
+              </div>
+            </li>
+            <li class="nav-item">
+              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+                <i class="fa-solid fa-add my-2 pt-1 pe-2"></i>
+                <a class="nav-link ps-1" href="{% url 'product:product_single_add' %}">Add Product</a>
+              </div>
+            </li>
+            <li class="nav-item">
+              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+                <i class="fa-solid fa-barcode my-2 pt-1 pe-2"></i>
+                <a class="nav-link ps-1" href="{% url 'product:product_all_list_card' %}">Cards</a>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </li>
+      <hr />
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'product:product_inventory' %}">
+          <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+            <i class="fa-solid fa-chart-bar m-2 pe-2 pb-1"></i>
+            <span class="pt-1">Inventory Report</span>
+          </div>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'business:driver_directory' %}">
+          <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+            <i class="fa-solid fa-address-book m-2 pe-2 pb-1"></i>
+            <span class="pt-1">Fleet List</span>
+          </div>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'business:pickup_location_list' %}">
+          <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+            <i class="fa-solid fa-store m-2 pe-2 pb-1"></i>
+            <span class="pt-1">Stores</span>
+          </div>
+        </a>
+      </li>
+      <hr />
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'business:business_profile' request.user.profile.id %}">
+          <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
+            <i class="fa-solid fa-store m-2 pe-2 pb-1"></i>
+            <span class="pt-1">Business Profile</span>
+          </div>
+        </a>
+      </li>
+    </ul>
+  </div>
+</div>

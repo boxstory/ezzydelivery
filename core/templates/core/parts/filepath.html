@@ -1,0 +1,50 @@
+<section class="mb-3">
+    <div class="row rounded-3 m-1" style="background-color: #f1d100; ">
+        <nav aria-label="breadcrumb"
+             class=" rounded-3 p-3 "
+             style="--bs-breadcrumb-divider: '_'"
+             aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0 ">
+                <li class="breadcrumb-item  ">
+                    <a class=" btn btn-small  text-decoration-none text-black fw-bold px-2 "
+                       href="/">Home</a>
+                </li>
+                <li class="breadcrumb-item ">
+                    <a href="{% url 'core:profile_view' %}"
+                       class="btn btn-small text-decoration-none  fw-bold px-4 {% if '/profile/' in request.path %}active btn-dark{% endif %}">
+                        User
+                    </a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a class="btn  text-decoration-none  fw-bold px-2 {% if '/join_us/' == request.path %}active btn-dark{% endif %}"
+                       href="{% url 'core:join_us' %}">Role select</a>
+                </li>
+                {% if profile.is_business %}
+                    <li class="breadcrumb-item ">
+                        <a href="{% url 'business:business_profile_update' request.user.id %}"
+                           class="btn btn-small  text-decoration-none  fw-bold px-2 {% if '/join_us/business/' in request.path %}active btn-dark{% endif %}">Update Business Info
+                        </a>
+                    </li>
+                {% elif profile.is_driver %}
+                    <li class="breadcrumb-item ">
+                        <a href="{% url 'core:update_driver' %}"
+                           class="btn btn-small  text-decoration-none  fw-bold px-2 {% if '/dashboard/' in request.path %}active btn-dark{% endif %}">Update Driver Info
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item ">
+                        <a href="{% url 'fleet:vehicle_add' %}"
+                           class="btn btn-small  text-decoration-none  fw-bold px-2 {% if '/vehicle_add/' in request.path %}active btn-dark{% endif %}">Add vehicle
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item ">
+                        <a href="{% url 'fleet:driver_documents_upload' request.user.id %}"
+                           class="btn btn-small  text-decoration-none  fw-bold px-2 {% if '/documents/' in request.path %}active btn-dark{% endif %}">Add Documents
+                        </a>
+                    </li>
+                {% else %}
+                {% endif %}
+            </li>
+        </ol>
+    </nav>
+</div>
+</section>

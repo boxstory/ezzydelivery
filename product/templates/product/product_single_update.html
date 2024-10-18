@@ -1,0 +1,39 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+<!-- extra title -->
+{% block extra_head %}
+    Products Update
+{% endblock extra_head %}
+<!-- extra css -->
+{% load crispy_forms_tags %}
+{% block content %}
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12 pb-3 d-flex justify-content-between">
+                <h2>Update Product</h2>
+                <a class="text-decoration-none text-light" href="">
+                    <div class="btn btn-dark my-2">Back</div>
+                </a>
+            </div>
+        </div>
+        <div class="row ">
+            <div class="col-md-12">
+                <form method="POST">
+                    {% csrf_token %}
+                    {{ form | crispy }}
+                    <div class="submit my-3 text-center">
+                        <button type="submit" value="submit" class="btn btn-primary-fill">Submit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block extra_js %}
+    <!-- extra js -->
+    <script>
+        $("#id_color").select2();
+        $("#id_unit").select2();
+        $("#id_product_category").select2();
+    </script>
+{% endblock extra_js %}

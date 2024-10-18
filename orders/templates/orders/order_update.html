@@ -1,0 +1,48 @@
+{% extends "base.html" %} {% load crispy_forms_tags %}
+
+<head>
+  <title>{% block head_title %}Update Orders{% endblock %}</title>
+  {% block extra_head %} {% endblock %}
+</head>
+
+{% block content %}
+<div class="container col-md-8 align-content-center">
+  <div class="row">
+    <div class="col-md-12 pb-3 d-flex justify-content-between">
+      <h2 class="my-2">Update Order</h2>
+      <a class="text-decoration-none text-light" href="{% url 'business:business_dashboard' %}">
+        <div class="btn btn-dark my-2">Back</div>
+      </a>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-12">
+      <form method="POST">
+        {% csrf_token %} {% if form.non_field_errors %}
+        {% for error in form.non_field_errors %}
+        <div>{{error}}</div>
+        {% endfor %} {% endif %} {{ form | crispy }}
+        {% if order.order_status == 'publish' %}
+        <div class="submit my-3 text-center">
+          <button class="btn btn-success w-25 align-content-center">
+
+            <P class="m-0"> Already Published</P>
+          </button>
+        </div>
+        {% else %}
+
+
+
+        <div class="submit my-3 text-center">
+          <button type="submit" class="btn btn-dark w-25 align-content-center">
+            Update Order
+          </button>
+          <a href="{% url 'orders:add_order_product' order.id %} " class="btn btn-dark w-25 align-content-center me-2 ">
+            <i class="me-2 fa-brands fa-plus"></i>Product
+          </a>
+        </div>{% endif %}
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock content %}

@@ -1,0 +1,69 @@
+{% load static %}
+<!-- profile left side section -->
+<div class="card-body text-center bg-white p-3">
+    <img src="{{ profile_picture.profile_picture.url }}" alt="avatar" class="rounded-circle img-fluid"
+        style="width: 180px">
+    <br class="p-0 m-0">
+    <!-- Button trigger modal -->
+    <button type="button " class="btn btn-dark mt-2" data-bs-toggle="modal" data-bs-target="#exampleModal">Update
+        Photo</button>
+    <!-- Modal -->
+    <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Modal title</h5>
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">{% include "core/parts/profile_picture_update.html" %}</div>
+
+            </div>
+        </div>
+    </div>
+    <h5 class="my-3">{{ profile.first_name }} {{ profile.last_name }}</h5>
+    <p class="text-muted mb-1">Nationlity: {{ profile.nationlity }}</p>
+    <p class="text-muted mb-4">Qatar Location: {{ profile.zone_name }}</p>
+    {% if profile.is_business %}
+    <div class="form-check d-flex justify-content-center form-switch ">
+        <input class="form-check-input me-3" type="checkbox" role="switch" checked disabled>
+        <label class="form-check-label fw-bold">Business Admin</label>
+    </div>
+    <div class="form-check form-switch d-flex justify-content-center">
+        <input class="form-check-input me-3" type="checkbox" role="switch" id="flexSwitchCheckDisabled" disabled>
+        <label class="form-check-label" for="flexSwitchCheckDisabled">Driver</label>
+    </div>
+    <div class="d-flex justify-content-center mb-2">
+        <a type="button" class="btn btn-dark me-2" href="{% url 'core:main_dashboard' %}">BUSINESS DASHBOARD</a>
+        <a type="button" class="btn btn-light btn-outline-dark "
+            href="{% url 'business:business_profile' profile.id %}">BUSINESS PROFILE</a>
+    </div>
+    {% elif profile.is_driver %}
+    <div class="form-check d-flex justify-content-center form-switch ">
+        <input class="form-check-input me-3" type="checkbox" role="switch" id="flexSwitchCheckCheckedDisabled" disabled>
+        <label class="form-check-label" for="flexSwitchCheckDisabled">Business Admin</label>
+    </div>
+    <div class="form-check form-switch d-flex justify-content-center">
+        <input class="form-check-input me-3" type="checkbox" role="switch" id="flexSwitchCheckDisabled" disabled
+            checked>
+        <label class="form-check-label" for="flexSwitchCheckCheckedDisabled">Driver</label>
+    </div>
+    <div class="d-flex justify-content-center mb-2">
+        <a type="button" class="btn btn-dark me-2" href="{% url 'core:main_dashboard' %}">DRIVER DASHBOARD</a>
+        <a type="button" class="btn btn-light btn-outline-dark " href="{% url 'fleet:driver_profile' profile.id %}">MY
+            PROFILE</a>
+    </div>
+    {% else %}
+    <a type="button" class="btn btn-dark pb-2" href="{% url 'core:join_us' %}">SELECT ROLE</a>
+    <a type="button" class="btn btn-light btn-outline-dark" href="#">MY PROFILE</a>
+    {% endif %}
+</div>
+<div class="d-flex justify-content-evenly p-3 bg-light rounded-3">
+    <a href="#"><i class="fa-brands fa-facebook fa-2xl me-3 text-dark"></i></a>
+    <a href="http://wa.me/974{{ profile.whatsapp }}"><i class="fa-brands fa-whatsapp fa-2xl me-3 text-dark"></i></a>
+    <a href="http://www.instagram.com/{{ profile.instagram }}"><i
+            class="fa-brands fa-instagram fa-2xl text-dark"></i></a>
+</div>
+</div>

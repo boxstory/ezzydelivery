@@ -1,0 +1,89 @@
+{% extends "wf_dashboard_base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+<!-- extra css -->
+{% block extra_css %}
+<link href="{% static 'orders/css/orders_main.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+{% block content %}
+<div class="col-md-10 col-lg-10 col-12 p-0">
+
+    <table class="table table-hover  ">
+        <thead>
+            <tr>
+                <th scope="col">DL_Code</th>
+                <th scope="col">C_Code</th>
+                <th scope="col">Dms_Code</th>
+                <th scope="col">Date</th>
+                <th scope="col">Mobile</th>
+                <th scope="col">C_status</th>
+                <th scope="col">DMS_status</th>
+            </tr>
+        </thead>
+        <tbody>{% if items_page %}
+            {% for order in items_page %}
+            <tr>
+                <th scope="row" class="border-right border-bottom-0">{{ order.dl_task}}</th>
+                <td class="border-right border-bottom-0">{{ order.client_order_code }}</td>
+                <td class="border-right border-bottom-0">{{ order.customer_name }}</td>
+                <td class="border-right border-bottom-0">{{ order.customer_phone }}</td>
+                <td class="border-right border-bottom-0">{{ order.order_status }}</td>
+                <td class="border-right border-bottom-0">{{ order.dl_task.dl_task_status_dms }}</td>
+            </tr>
+            <tr>
+                <td></td>
+                <td colspan="2"><i class="fa-solid fa-location-pin" style="color: #008000;"></i>
+                    {{ order.pickup_location }}</td>
+                <td colspan="2"><i class="fa-solid fa-location-pin" style="color: #ff0000;"></i>
+                    {{ order.customer_address }}</td>
+                <td>{{ order.dl_task.dl_task_status_dms }}</td>
+            </tr> {% endfor %}
+        </tbody>
+    </table>
+
+
+    {% if items_page.has_other_pages %}
+    <ul class="pagination justify-content-center text-dark">
+        {% if items_page.has_previous %}
+        <li class="page-item pe-2">
+            <a class="page-link text-dark" href="?page={{ items_page.previous_page_number }}">Previous</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled pe-2">
+            <a class="page-link text-dark" href="#">Previous</a>
+        </li>
+        {% endif %}
+
+        {% for page_number in items_page.paginator.page_range %}
+        {% if items_page.number == page_number %}
+        <li class="page-item  btn btn-outline-dark active me-2">
+            {{ page_number }}
+
+        </li>
+
+        {% else %}
+        <li class="page-item me-2"><a class="page-link text-dark" href="?page={{ page_number }}">
+                {{ page_number }}
+            </a>
+        </li>
+        {% endif %}
+        {% endfor %}
+
+        {% if items_page.has_next %}
+        <li class="page-item pe-2"><a class="page-link text-dark"
+                href="?page={{ items_page.next_page_number }}">Next</a>
+        </li> {% endif %}
+    </ul>
+    {% endif %}
+    {% else %}
+    <p>No items found.</p>
+    {% endif %}
+
+
+
+</div>
+{% endblock content %}
+{% block extra_js %}
+<script type="text/javascript" language="JavaScript" charset="UTF-8"
+    src="{%static 'orders/js/orders_main.js' %}"></script>
+{% endblock extra_js %}

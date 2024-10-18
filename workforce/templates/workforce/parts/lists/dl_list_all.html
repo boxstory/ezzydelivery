@@ -1,0 +1,125 @@
+{% extends "wf_dashboard_base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+<!-- extra css -->
+{% block extra_css %}
+<link href="{% static 'orders/css/orders_main.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+{% block content %}
+<div class="col-md-9 col-lg-10 col-12 p-0">
+    <!-- Filter Form -->
+    <form class="mb-3 w-100 p-2" id="filterForm">
+        <div class="row ">
+            <div class="col-md-2 mb-2">
+                <input type="text" class="form-control" id="dlCode" placeholder="DL_Code">
+            </div>
+            <div class="col-md-2 mb-2">
+                <input type="text" class="form-control" id="cCode" placeholder="C_Code">
+            </div>
+
+            <div class="col-md-2 mb-2">
+                <input type="text" class="form-control" id="mobile" placeholder="Mobile">
+            </div>
+            <div class="col-md-2 mb-2">
+                <select class="form-control" id="cStatus">
+                    <option value="">C_status</option>
+                    <option value="to_review">To Review</option>
+                    <option value="ready_to_pickup">Ready to Pickup</option>
+                    <option value="publish">Publish</option>
+                </select>
+            </div>
+            <div class="col-md-2 mb-2">
+                <select class="form-control" id="dmsStatus">
+                    <option value="">DMS_status</option>
+                    <!-- Add options as needed -->
+                </select>
+            </div>
+            <div class="col-md-2 mb-2 text-center">
+                <button type="submit" class="btn btn-dark px-3 w-50">Filter</button>
+            </div>
+        </div>
+    </form>
+    <table class="table table-hover  ">
+        <thead>
+            <tr>
+                <th scope="col">DL_Code</th>
+                <th scope="col">Loc</th>
+                <th scope="col">Name</th>
+                <th scope="col">Status</th>
+                <th scope="col">C_status</th>
+                <th scope="col">DMS_status</th>
+            </tr>
+        </thead>
+        <tbody>{% if dl_tasks %}
+            {% for dl in dl_tasks %}
+            {{ dl.order }}
+            <tr>
+                <th scope="row" class="border-right border-bottom-0">{{ dl.dl_task_number}}</th>
+                <td class="border-right border-bottom-0" colspan="1"><i class="fa-solid fa-user"
+                        style="color: #008000;"></i>
+                    {{ dl.pickup_location }}</td>
+                <td class="border-right border-bottom-0">{{ dl.order.customer_phone }}</td>
+                <td class="border-right border-bottom-0">{{ dl.order_status }}</td>
+                <td class="border-right border-bottom-0">{{ dl.dl_task_number_dms }}</td>
+                <td class="border-right border-bottom-0">{{ dl.dl_task_date }}</td>
+            </tr>
+            <tr>
+                <td class="border-right border-bottom-0">{{ dl.order.dl_task_status_dms }}</td>
+
+                <td class="border-right border-bottom-0"></td>
+                <td class="border-right border-bottom-0">{{ dl.order.customer_name }}</td>
+                <td class="border-right border-bottom-0">{{ dl.dl_task.dl_task_status_dms }}</td>
+                <td class="border-right border-bottom-0" colspan="1"><i class="fa-solid fa-bar"
+                        style="color: #ff0000;"></i>
+                    {{ dl.dl_task_status_client }}</td>
+                <td class="border-right border-bottom-0">{{ dl.dl_task_status_dms }}</td>
+            </tr>
+            <tr>
+                <td class="">{{ dl.order.dl_task_status_dms }}</td>
+
+                <td class=""></td>
+                <td class="">{{ dl.delivery_task.full_name }}</td>
+                <td class="">{{ dl.dl_task.dl_task_status_dms }}</td>
+                <td class="" colspan="1"><i class="fa-solid fa-bar" style="color: #ff0000;"></i>
+                    {{ dl.dl_task_status_client }}</td>
+                <td class="">{{ dl.dl_task_status_dms }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if dl_tasks.has_other_pages %}
+    <ul class="pagination justify-content-center text-dark">
+        {% if dl_tasks.has_previous %}
+        <li class="page-item pe-2">
+            <a class="page-link text-dark" href="?page={{ dl_tasks.previous_page_number }}">Previous</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled pe-2">
+            <a class="page-link text-dark" href="#">Previous</a>
+        </li>
+        {% endif %}
+        {% for page_number in dl_tasks.paginator.page_range %}
+        {% if dl_tasks.number == page_number %}
+        <li class="page-item  btn btn-outline-dark active me-2">{{ page_number }}</li>
+        {% else %}
+        <li class="page-item me-2">
+            <a class="page-link text-dark" href="?page={{ page_number }}">{{ page_number }}</a>
+        </li>
+        {% endif %}
+        {% endfor %}
+        {% if dl_tasks.has_next %}
+        <li class="page-item pe-2">
+            <a class="page-link text-dark" href="?page={{ dl_tasks.next_page_number }}">Next</a>
+        </li>
+        {% endif %}
+    </ul>
+    {% endif %}
+    {% else %}
+    <p>No items found.</p>
+    {% endif %}
+</div>
+{% endblock content %}
+{% block extra_js %}
+<script type="text/javascript" language="JavaScript" charset="UTF-8"
+    src="{%static 'orders/js/orders_main.js' %}"></script>
+{% endblock extra_js %}

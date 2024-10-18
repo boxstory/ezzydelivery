@@ -1,0 +1,60 @@
+{% extends "account/base.html" %}
+{% load crispy_forms_tags %}
+{% load account socialaccount %}
+{% load i18n %}
+
+{% block head_title %}{% trans "Signup" %}{% endblock %}
+
+{% block account_content %}
+<div class="row mt-5 justify-content-center">
+  <div class="col-10 col-md-12">
+    <div class=" text-center ">
+
+      <h1>{% trans "Sign Up" %}</h1>
+
+      <p>{% blocktrans %}Already have an account? Then please <a class="text-decoration-none text-dark"
+          href="{{ login_url }}">
+          <button class="btn p-0 btn-primary-fill text-uppercase ">
+            Sign in
+        </a>
+        </button>
+        .{% endblocktrans %}</p>
+    </div>
+
+    <form class="signup" id="signup_form" method="post" action="{% url 'account_signup' %}">
+      {% csrf_token %}
+      {{ form | crispy }}
+
+      {% if redirect_field_value %}
+      <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+      {% endif %}
+      <div class=" text-center ">
+        <button class=" primaryAction  btn btn-primary-fill text-uppercase mb-4" type="submit">
+          {% trans "Sign Up" %} &raquo;</button>
+      </div>
+    </form>
+
+
+    {% get_providers as socialaccount_providers %}
+
+    {% if socialaccount_providers %}
+
+    <div class="socialaccount_ballot justify-content-center">
+
+      <ul class="socialaccount_providers text-center p-0">
+        <br>OR JOIN WITH : <br>
+        <!-- <div class="login-or text-left">{% trans 'or' %}</div> -->
+        {% include "socialaccount/snippets/provider_list.html" with process="login" %}
+      </ul>
+
+
+
+    </div>{% include "socialaccount/snippets/login_extra.html" %}
+  </div>
+</div>
+
+
+
+{% endif %}
+
+{% endblock %}

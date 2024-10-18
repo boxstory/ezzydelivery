@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block extra_css %}
+{% endblock extra_css %}
+{% block title %}
+Cateloges
+{% endblock title %}
+{% block content %}
+<div class="p-md-5 p-2 col-12 ">
+  <div class="h2 pt-3 mx-3">Qatar Business Cateloges</div>
+  <hr class="pt-0" />
+  <div class="row row-cols-1 row-cols-md-2">
+    {% for business in all_business %}
+    <div class="p-2" onclick="window.location='/business/{{ business.business_id }}/'">
+      <div class="d-flex border border-1 bg-light rounded-3">
+        <!-- Add your card image here -->
+        <div class="col-8 p-3">
+          <h5 class="card-title fw-bold pb-3">{{ business.business_name }}</h5>
+          <div class="d-flex justify-content-between">
+            <h6 class="card-text">{{ business.business_code }}</h6>
+            <h6 class="card-text">
+              <span class="fw-bold">Speaks :</span>
+              {{ business.business_languages }}
+            </h6>
+          </div>
+          <h6>
+            <span class="fw-bold">Category :</span>
+            {{ business.business_product_category }}
+          </h6>
+          <h6 class="card-text">
+            <span class="fw-bold">Bio :</span>{{ business.business_bio }}
+          </h6>
+          <div class="d-flex justify-content-between mt-auto">
+            <div class="align-bottom pt-1">
+              <span class="fw-bold">Status :</span>{{ business.business_status }}
+            </div>
+            <a href="/business/{{ business.business_id }}/" class="btn btn-dark btn-sm">More</a>
+          </div>
+        </div>
+        <div class="col-4">
+          {% if business.business_logo is not None %}
+          <img src="{{ business.business_logo.all.0.business_logo.url }}" alt="" title="{{ business.business_name }}"
+            class="img-fluid text-center" />
+          {% else %}
+          <img src="/media/business/avatar.png" title="{{ business.business_name }}" alt=""
+            class="img-fluid text-center" />
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% if forloop.counter|divisibleby:2 %}
+  </div>
+  <div class="row row-cols-1 row-cols-md-2">
+    {% endif %}
+    {% endfor %}
+  </div>
+  <hr class="p-0 text-dark" />
+  <div class="pt-2 text-end">
+    <a href="{% url 'business:all_business' %}">
+      <div class="btn btn-dark">
+        <i class="fa-solid fa-chevron-left me-2"></i> Back
+      </div>
+    </a>
+    <a href="{% url 'core:main_dashboard' %}">
+      <div class="btn btn-dark">
+        <i class="fa-solid fa-chart-line"></i> Dashboard
+      </div>
+    </a>
+    <a href="{% url 'core:join_business' %}">
+      <div class="btn btn-dark">
+        <i class="fa fa-add me-2"></i> Add Business
+      </div>
+    </a>
+  </div>
+</div>
+{% endblock content %}

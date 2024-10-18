@@ -1,0 +1,105 @@
+{% extends "base.html" %} {% load static %} {% load crispy_forms_tags %}
+{% block content %}
+
+
+<section style="background-color: #eee; " class="h-100">
+    <div class="container py-3">
+        <!-- file path section -->
+        {% include "core/parts/filepath.html" %}
+        <div class="row">
+            <!-- profile left side section -->
+            <div class="col-lg-4">
+                <div class="card mb-4 ">
+                    <div class="card-body text-center">
+                        <img src="/media/core/user/avatar.png" alt="avatar" class="rounded-circle img-fluid"
+                            style="width: 180px;">
+                        <h5 class="my-3">{{joinusform.first_name}} {{joinusform.last_name}}</h5>
+                        <p class="text-muted mb-1">{{joinusform.profile_pic}}</p>
+                        <p class="text-muted mb-4">{{joinusform.zone_name}}</p>
+                        <div class="d-flex justify-content-center mb-2">
+                            {% if profile.is_business %}
+                            <a type="button" class="btn btn-dark" href="{% url 'business:business_dashboard' %}">
+                                Business Dashboard
+                            </a>
+
+
+                            {% elif profile.is_driver %}
+                            <a type="button" class="btn btn-dark" href="{% url 'fleet:fleet_dashboard' %}">
+                                Driver Dashboard
+                            </a>
+                            {% else %}
+                            <a type="button" class="btn btn-dark" href="{% url 'core:join_us' %}">
+                                SELECT ROLE
+                            </a>
+                            {% endif %}
+
+                            <button type="button" class="btn btn-outline-dark ms-1">Update</button>
+                        </div>
+                        <div class="d-flex justify-content-center p-3">
+                            <a href="#!"><i class="fa-brands fa-facebook fa-2xl me-3 text-dark"></i></a>
+                            <a href="#!"><i class="fa-brands fa-whatsapp fa-2xl me-3 text-dark"></i></a>
+                            <a href="#!"><i class="fa-brands fa-instagram fa-2xl text-dark"></i></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- profile join form section -->
+            <div class="col-lg-8">
+                <div class="card-body bg-light  p-3">
+                    <!-- join buttons -->
+                    {% if form.errors %}
+
+                    <!-- For each field in form -->
+                    {% for field in form %}
+                    <!-- For each error in field -->
+                    {% for error in field.errors %}
+                    <!-- Output error text message only -->
+                    <div>{{error}}</div>
+                    {% endfor %}
+                    {% endfor %}
+
+                    {% endif %}
+                    <ul class="  mb-3  justify-content-center text-decoration-none" id="pills-tab"
+                        style="list-style: none;" role="tablist">
+
+                        {% if profile.is_business or profile.is_driver %}
+                        <div class="">
+
+                            <span class="h4 fw-bold mb-3"> Already joined as</span>
+                            <hr>
+                            {% if profile.is_business %}
+                            <div class="h4 fw-bold">Business Admin</div>
+                            {% else %}
+                            <div class="h4 fw-bold">Driver</div>
+                            {% endif %}
+
+
+                            <a type="button" class="btn btn-dark mt-3" href="/dashboard/">
+                                Go To Dashboard
+                            </a>
+                        </div>
+
+                        {% else %}
+                        <li class="pb-2 h3 fw-bold">
+
+                            Select your job title:
+                        </li>
+                        <li class="col-4  mb-5 me-lg-0" role="presentation">
+                            <a href="{%url 'core:join_business'%} " class="text-decoration-none">
+                                <button class="nav-link  btn joinbtn  me-5">BUSINESS ADMIN</button></a>
+                        </li>
+                        <li class="col-4  " role="presentation"><a href="{%url 'core:join_driver'%}"
+                                class="text-decoration-none">
+                                <button class="nav-link  btn joinbtn ">JOIN AS DRIVER</button>
+                            </a>
+
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock content %}

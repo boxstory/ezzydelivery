@@ -1,0 +1,72 @@
+{% load static %}
+<script
+  src="https://unpkg.com/htmx.org@1.7.0"
+  integrity="sha384-EzBXYPt0/T6gxNp0nuPtLkmRpmDBbjg6WmCUZRLXBBwYYmwAUxzlSGej0ARHX0Bo"
+  crossorigin="anonymous"
+  defer
+></script>
+
+<script>
+  document.body.addEventListener("htmx:configRequest", (event) => {
+    event.detail.headers["X-CSRFToken"] = "{{ csrf_token }}"; //insert csrf token when performing AJAX request
+  });
+</script>
+<!-- <script src="{% static 'volte/js/volte.js' %}"></script> -->
+
+<script>
+  const dropdowns = document.querySelectorAll(".status-dropdown");
+  dropdowns.forEach((dropdown) => {
+    dropdown.addEventListener("change", () => {
+      const selectedOption = dropdown.options[dropdown.selectedIndex].value;
+      const selectedRow = dropdown.closest("tr");
+      const order_id = selectedRow.dataset.orderId;
+
+      // get with the csrf
+      const csrftoken = getCookie("csrftoken");
+
+      // Send a POST request to the server using AJAX
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/orders/update_order_status/", true);
+      xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+      xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+      xhr.setRequestHeader("X-CSRFToken", csrftoken);
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const response = JSON.parse(xhr.responseText);
+          if (response.status === "success") {
+            console.log("Status changed successfully.");
+          } else {
+            // Handle the error response
+            console.error("Error changing status:", response.error);
+          }
+        } else {
+          // Handle non-200 HTTP status
+          console.error("Unexpected HTTP status:", xhr.status);
+        }
+      };
+
+      // Send the request with the selected option and object ID
+      const data = `status=${selectedOption}&order_id=${order_id}`;
+      xhr.send(data);
+    });
+  });
+
+  // Helper function to get the CSRF token value from the cookie
+  function getCookie(name) {
+    const cookieValue = document.cookie.match(
+      "(^|;)\\s*" + name + "\\s*=\\s*([^;]+)"
+    );
+    return cookieValue ? cookieValue.pop() : "";
+  }
+</script>
+
+<script>
+  $(document).ready(function () {
+    // Get the active menu item and open its submenu
+    const activeMenuItem = $(".nav-item.active");
+    activeMenuItem.find(".multi-level").addClass("show");
+    activeMenuItem
+      .find('[data-bs-toggle="collapse"]')
+      .attr("aria-expanded", "true");
+  });
+</script>

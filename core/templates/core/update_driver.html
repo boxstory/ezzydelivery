@@ -1,0 +1,52 @@
+{% extends "base.html" %} {% load static %}
+
+{% block content %}
+
+
+<section style="background-color: #eee;" class="h-100">
+    <div class="container py-3 h-100">
+        <!-- file path section -->
+        {% include "core/parts/filepath.html" %}
+        <div class="row">
+            <div class=" col-12 col-lg-4">
+
+                {% include "core/parts/profile_sidebar.html" %}
+
+                <!-- profile join form section -->
+                <div class="col-lg-8">
+                    <div class="card-body bg-light">
+                        <!-- join buttons -->
+
+                        <!-- form section -->
+                        <div class="tab-content" id="pills-tabContent">
+
+                            <div class="tab-pane fade active show p-0 ">
+                                <div class="container">
+                                    <div class="row p-4   pt-lg-5 align-items-center rounded-3 border shadow-lg">
+                                        <div class="col-12 ">
+
+                                            <div class="row">
+                                                <div class="col-12 ">
+                                                    <form method="POST" name="driver_join"
+                                                        enctype="multipart/form-data">{% csrf_token %}
+                                                        <div class="row g-3">
+                                                            {{ driverjoinform | crispy }}
+
+                                                            <button class="w-100 btn btn-dark btn-lg"
+                                                                name="join_as_driver" type="submit"
+                                                                value="submit">UPDATE</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+</section>
+
+{% endblock content %}

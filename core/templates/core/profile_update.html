@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+<section style="background-color: #eee">
+    <div class="container py-3">
+        {% include "core/parts/filepath.html" %}
+        <form method="POST">
+            <div class="row">
+                {% csrf_token %}
+                <div class="col-lg-4">
+                    <div class="card mb-4">
+                        <div class="card-body text-center">
+                            <img src="{{ instance.profile_picture.url }}" alt="avatar" class="rounded-circle img-fluid"
+                                style="width: 180px">
+                            <div class="text-muted my-2 col-10  d-inline-block px-2"></div>
+                            {% include "core/parts/profile_picture_update.html" %}
+                            <div class="d-flex justify-content-center mb-2">
+                                {% if profileform.is_business %}
+                                <a type="button" class="btn btn-dark"
+                                    href="{% url 'core:business_dashboard' %}">DASHBOARD</a>
+                                {% elif profileform.is_driver %}
+                                <a type="button" class="btn btn-dark"
+                                    href="{% url 'core:fleet_dashboard' %}">DASHBOARD</a>
+                                {% else %}
+                                <a type="button" class="btn btn-dark" href="/dashboard/">DASHBOARD</a>
+                                {% endif %}
+                                <button type="button" class="btn btn-outline-dark ms-1">Message</button>
+                            </div>
+                            <div class="d-flex justify-content-center p-3">
+                                <a href="#!"><i class="fa-brands fa-facebook fa-2xl me-3 text-dark"></i></a>
+                                <a href="#!"><i class="fa-brands fa-whatsapp fa-2xl me-3 text-dark"></i></a>
+                                <a href="#!"><i class="fa-brands fa-instagram fa-2xl text-dark"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            {% if profileform.errors %}
+                            {% for field in profileform %}
+                            {% for error in field.errors %}
+                            <div class="alert alert-danger">
+                                <p>{{ field }}</p>
+                                <strong>{{ error|escape }}{{ field }}</strong>
+                            </div>
+                            {% endfor %}
+                            {% endfor %}
+                            {% for error in profileform.non_field_errors %}
+                            <div class="alert alert-danger">
+                                <strong>{{ error|escape }}{{ field }}</strong>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <p class="mb-0">Name:</p>
+                                </div>
+                                <div class="col-sm-4">
+                                    <p class="text-muted mb-0">{{ profileform.first_name | as_crispy_field }}</p>
+                                </div>
+                                <div class="col-sm-5">
+                                    <p class="text-muted mb-0">{{ profileform.last_name | as_crispy_field }}</p>
+                                </div>
+                            </div>
+                            <hr />
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <p class="mb-0">Email</p>
+                                </div>
+                                <div class="col-sm-9">
+                                    <p class="text-muted mb-0">{{ profileform.email | as_crispy_field }}</p>
+                                </div>
+                            </div>
+                            <hr />
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <p class="mb-0">nationlity</p>
+                                </div>
+                                <div class="col-sm-9">
+                                    <p class="text-muted mb-0">{{ profileform.nationlity | as_crispy_field }}</p>
+                                </div>
+                            </div>
+                            <hr />
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <p class="mb-0">Birthday</p>
+                                </div>
+                                <div class="col-sm-5">
+                                    <p class="text-muted mb-0">{{ profileform.date_of_birth | as_crispy_field }}</p>
+                                </div>
+                            </div>
+                            <hr />
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <p class="mb-0">Mobile</p>
+                                </div>
+                                <div class="col-sm-9">
+                                    <p class="mb-0">{{ profileform.phone | as_crispy_field }}</p>
+                                </div>
+                            </div>
+                            <hr />
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <p class="mb-0">Whatsapp</p>
+                                </div>
+                                <div class="col-sm-9">
+                                    <p class="text-muted mb-0">{{ profileform.whatsapp | as_crispy_field }}</p>
+                                </div>
+                            </div>
+                            <hr />
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <p class="mb-0">Instagram ID</p>
+                                </div>
+                                <div class="col-sm-9">
+                                    <p class="text-muted mb-0">{{ profileform.instagram | as_crispy_field }}</p>
+                                </div>
+                            </div>
+                            <hr />
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <p class="mb-0">Zone Name</p>
+                                </div>
+                                <div class="col-sm-9">
+                                    <p class="text-muted mb-0">{{ profileform.zone_name | as_crispy_field }}</p>
+                                </div>
+                            </div>
+                            <hr />
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <p class="mb-0">Address</p>
+                                </div>
+                                <div class="col-sm-9">
+                                    <p class="text-muted mb-0">{{ profileform.address | as_crispy_field }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-grid gap-2 col-6 align-content-end">
+                        <button class="btn btn-primary btn-dark" type="submit" value="submit">Submit</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock content %}

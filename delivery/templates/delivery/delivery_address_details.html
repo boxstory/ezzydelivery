@@ -1,0 +1,87 @@
+{% extends "fleet_dashboard_base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block extra_css %}
+    <!-- extra css -->
+    <link type="text/css"
+          rel="stylesheet"
+          href="{% static 'delivery/css/delivery_main.css' %}">
+{% endblock extra_css %}
+{% block content %}
+    <div class="flex-fill p-2">
+        <div class="container">
+            <section class="py-5">
+                <div class="container">
+                    <div class="row justify-content-center">
+                        <div class="col-12 col-lg-6">
+                            <form method="POST"
+                                  data-dashlane-rid="7c1f8a453a645a1a"
+                                  data-form-type="contact">
+                                {% csrf_token %}
+                                <div class="form-group row ">
+                                    <div class="col-6">
+                                        {{ form.order_id.errors }}
+                                        {{ form.order_id | as_crispy_field }}
+                                    </div>
+                                    <div class="col-6">
+                                        {{ form.mobile_no.errors }}
+                                        {{ form.mobile_no | as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-12">
+                                        {{ form.full_name.errors }}
+                                        {{ form.full_name | as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-12">
+                                        {{ form.unit_no.errors }}
+                                        {{ form.unit_no | as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="blueboardaddress px-5 py-4 my-3">
+                                    <div class="form-group row">
+                                        <div class="col-12">
+                                            {{ form.building_no.errors }}
+                                            {{ form.building_no | as_crispy_field }}
+                                        </div>
+                                    </div>
+                                    <div class="form-group row">
+                                        <div class="col-6">
+                                            {{ form.zone_number.errors }}
+                                            {{ form.zone_number | as_crispy_field }}
+                                        </div>
+                                        <div class="col-6">
+                                            {{ form.street_no.errors }}
+                                            {{ form.street_no | as_crispy_field }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-12 mt-2">
+                                        {{ form.zone_name.errors }}
+                                        {{ form.zone_name | as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-12">
+                                        {{ form.is_villa_compound.errors }}
+                                        {{ form.is_flat.errors }}
+                                        {{ form.is_office.errors }}
+                                    </div>
+                                    <div class="col-5">{{ form.is_villa_compound | as_crispy_field }}</div>
+                                    <div class="col-3">{{ form.is_flat | as_crispy_field }}</div>
+                                    <div class="col-4">{{ form.is_office | as_crispy_field }}</div>
+                                </div>
+                                <button class="btn btn-dark w-100"
+                                        data-dashlane-rid="d7f5d4425d0a9f42"
+                                        data-form-type="action">SUBMIT</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+{% endblock content %}

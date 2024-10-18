@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+    <div class="container">
+        <div class="container my-5">
+            <div class="row p-4   pt-lg-5 align-items-center rounded-3 border shadow-lg">
+                <div class="col-12 ">
+                    <h1 class="display-5 fw-bold lh-1  pb-3">Looking for delivery driver jobs?</h1>
+                    <br>
+                    <div class="row">
+                        <div class="col-12 ">
+                            <form method="POST">
+                                {% csrf_token %}
+                                <div class="row g-3">
+                                    <div class="col-12 mt-md-4 mt-3">{{ driverjobform.full_name | as_crispy_field }}</div>
+                                    <div class="col-sm-6">{{ driverjobform.mobile_no | as_crispy_field }}</div>
+                                    <div class="col-sm-6">{{ driverjobform.whatsapp_no | as_crispy_field }}</div>
+                                    <div class="col-sm-6">{{ driverjobform.zone_name | as_crispy_field }}</div>
+                                    <div class="col-sm-6">{{ driverjobform.landmark | as_crispy_field }}</div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-lg-6 m-2 ">{{ driverjobform.is_in_qatar | as_crispy_field }}</div>
+                                    <div class="col-lg-6 m-2 ">{{ driverjobform.job_type | as_crispy_field }}</div>
+                                    <div class="col-lg-6 m-2 ">{{ driverjobform.licence | as_crispy_field }}</div>
+                                    <div class="col-lg-6 m-2 ">{{ driverjobform.own_vehicle | as_crispy_field }}</div>
+                                </div>
+                                {% if form.driverjobform.errors %}
+                                    <ol>
+                                        {% for error in form.driverjobform.errors %}
+                                            <li>
+                                                <strong>{{ error|escape }}</strong>
+                                            </li>
+                                        {% endfor %}
+                                    </ol>
+                                {% endif %}
+                                <button class="w-100 btn btn-dark btn-lg" type="submit" value="submit">JOIN AS DRIVER</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
+{% block extra_js %}
+    <!-- extra js -->
+    <script type="text/javascript" src="{% static '/js/driver_join.js' %}"></script>
+{% endblock extra_js %}

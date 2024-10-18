@@ -1,0 +1,65 @@
+{% extends "fleet_dashboard_base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+<div class="flex-fill p-2">
+  <div class=" h4 p-3"> Documents Listings</div>
+  <div class="table-responsive m-2 m-md-3">
+    <table class="table table-responsive table-striped table-hover">
+      <thead>
+        <tr class="bg-dark text-light">
+          <th scope="col">Type</th>
+          <th scope="col">Doc No</th>
+          <th scope="col">Expiry</th>
+          <th scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for document in documents %}
+        <tr class="py-2">
+          <td>{{ document.document_type }}</td>
+          <td>**{{ document.document_no|slice:"-5:" }}</td>
+          <td>{{ document.document_expiry_date|date:'M-y' }}</td>
+          <td class="px-0 px-md-2">
+            <!-- delete link neeeds to setup later ********************************************************* -->
+            <button type="button " class="btn btn-dark  w-md-25 " data-bs-toggle="modal"
+              data-bs-target="#LogoModal{{ document.id }}">
+              <i class="fa-solid fa-image"></i>
+            </button>
+            <a href="{% url 'fleet:driver_documents_update' fleet_id=request.user.id doc_id=document.id %}"
+              class="btn btn-outline-dark">
+              <i class="fa-solid fa-pen"></i></a>
+            <a href="{% url 'fleet:driver_documents_delete' fleet_id=request.user.id doc_id=document.id %}"
+              class="btn btn-outline-dark">
+              <i class="fa-solid fa-remove"></i></a>
+          </td>
+
+          <!-- Button trigger modal -->
+
+          <!-- Modal -->
+          <div class="modal fade" id="LogoModal{{ document.id }}" tabindex="-1" role="dialog"
+            aria-labelledby="LogoModalLabel{{ document.id }}" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="LogoModalLabel">Image Update</h5>
+                  <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                  </button>
+                </div>
+                <div class="modal-body">
+                  <img class='col-12' src="{{ document.document_file.url }}" alt="">
+                </div>
+              </div>
+            </div>
+          </div>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <a href="{% url 'fleet:driver_documents_upload' fleet_id=request.user.id %}" class="">
+      <div class="btn btn-outline-dark text-decoration-none">ADD DOCUMENTS</div>
+    </a>
+  </div>
+</div>
+{% endblock content %}

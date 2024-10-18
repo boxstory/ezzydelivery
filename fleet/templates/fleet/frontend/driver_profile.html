@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block title %}
+FLEET {{ driver.driver_code }}
+{% endblock title %}
+{% block content %}
+<!-- frontend driver Profile pge section -->
+<h2 class="text-center  fw-bolder bg-light py-3 m-0 w-100">Driver Profile</h2>
+<section class="section about-section bg-light" id="about">
+    <div class="container">
+        <div class="row align-items-center flex-row-reverse p-2">
+            <div class="col-md-6">
+                <div class="about-text p-2">
+                    <h3 class="dark-color">
+                        {{ profile.user.first_name }} {{ profile.user.last_name }}
+                        ({{ driver.driver_code }})
+                    </h3>
+                    <hr>
+                    <h6 class="theme-color lead">
+                        {% if profile.is_driver == True %}
+                        <b>Role : Driver</b>
+                        {% elif profile.is_business == True %}
+                        <b>Business Details</b>
+                        {% else %}
+                        <b>User</b>
+                        {% endif %}
+                    </h6>
+
+                    <div class="row about-list pt-3">
+                        <div class="col-6 col-md-6">
+                            <div class="media">
+                                <i class="fa-solid fa-cake-candles  pe-2"></i><label>Birthday</label>
+                                <p>{{ profile.date_of_birth }}</p>
+                            </div>
+                            <div class="media">
+                                <i class="fa-solid fa-gauge pe-2"></i><label>Birth year</label>
+                                <p>{{ profile.date_of_birth|date:'Y' }}</p>
+                            </div>
+                            <div class="media">
+                                <i class="fa-solid fa-location-pin pe-2"></i><label>Location</label>
+                                <p>{{ profile.zone_name }}</p>
+                            </div>
+                            <div class="media">
+                                <i class="fa-solid fa-address-book pe-2"></i><label>Address</label>
+                                <p>{{ profile.address }}</p>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-6">
+                            <div class="media">
+                                <i class="fa-solid fa-envelope pe-2"></i><label>E-mail</label>
+                                <p>Add me to see</p>
+                            </div>
+                            <div class="media">
+                                <i class="fa-solid fa-phone pe-2"></i><label>Phone</label>
+                                <p>Add me to see</p>
+                            </div>
+                            <div class="media">
+                                <i class="fa-solid fa-globe pe-2"></i><label>Nationality</label>
+                                <p>{{ profile.nationlity }}</p>
+                            </div>
+                            <div class="media">
+                                <i class="fa-solid fa-layer-group pe-2"></i><label>Freelance</label>
+                                {% if profile.is_driver == True %}
+                                <p>Driver</p>
+                                {% elif profile.is_business == True %}
+                                <p>Business</p>
+                                {% else %}
+                                <p>User</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <p class="p-0 m-0">Bio : </p>
+                    <p>{{ driver.driver_bio }}</p>
+                </div>
+            </div>
+            <div class="col-md-6 my-3">
+                <div class="about-avatar  d-flex justify-content-center">
+                    {% if profile.profile_picture %}
+                    <img src="{{ profile_picture.profile_picture.url }}" alt="" class=" img-fluid text-center" />
+                    {% else %}
+                    <img src="https://bootdey.com/img/Content/avatar/avatar7.png" title="avatar" alt="avatar">
+                    {% endif %}
+                </div>
+                <div class="m-3  btn-block ">
+                    {% if user.profile.is_business == True %}
+                    <!-- #chatgpt -->
+                    <form id="favorite-form" action="{% url 'business:driver_directory_add' %}" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="driver_id" value="{{ profile.id }}">
+                        <input type="hidden" name="business_id" value="{{ user.id }}">
+                        <button type="submit" class="btn btn-dark  w-100">
+                            Add to
+                            directory
+                        </button>
+                    </form>
+                    <div id="form-messages" class="alert  py-1 d-none"></div>
+                    <div id="success-message" class="alert alert-success py-1 d-none"></div>
+                    <div id="error-message" class="alert alert-danger py-1 d-none"></div>
+                    {% endif %}
+                    <div id="alert-message" class="alert alert-info mt-3  py-2 text-center d-none"></div>
+                </div>
+            </div>
+            <!-- countersssss   -->
+            <div class="counter p-3">
+                <div class="row">
+                    <div class="col-6 col-lg-3">
+                        <div class="count-data text-center">
+                            <h6 class="count h2" data-to="500" data-speed="500">200</h6>
+                            <p class="m-0px font-w-600">Rides Requested</p>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="count-data text-center">
+                            <h6 class="count h2" data-to="150" data-speed="150">170</h6>
+                            <p class="m-0px font-w-600">Rides Completed</p>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="count-data text-center">
+                            <h6 class="count h2" data-to="850" data-speed="850">2{{ driver_vehicle.id }}</h6>
+                            <p class="m-0px font-w-600">Vehicles</p>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="count-data text-center">
+                            <h6 class="count h2" data-to="190" data-speed="190">68 (M)</h6>
+                            <p class="m-0px font-w-600">Qatar Experiance</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- documents section -----------  -->
+            <div class="counter bg-light p-4">
+                <h3 class="fw-bold">AVAILABLE DOCUMENTS</h3>
+                <hr>
+                <table class="table table-borderless">
+                    <thead>
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Doc No</th>
+                            <th scope="col">Expiry Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for doc in driver_documents %}
+                        <tr>
+                            <th>{{ forloop.counter }}</th>
+                            <td>{{ doc.document_type }}</td>
+                            <td>***{{ doc.document_no|slice:"-5:" }}</td>
+                            <td>{{ doc.document_expiry_date|date:'M-y' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <!-- vehicle section   -->
+            <div class="counter bg-light p-4 my-3">
+                <div class="row">
+                    <h3 class="fw-bold">OWNED VEHICLE DETAILS</h3>
+                    <hr>
+                    <table class="table table-borderless">
+                        <thead>
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Model</th>
+                                <th scope="col">Added on</th>
+                                <th scope="col">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if not driver_vehicle %}
+                            <th scope="col"></th>
+                            <td>No Vehicles Added</td>
+                            {% else %}
+                            {% for vehicle in driver_vehicle %}
+                            <tr>
+                                <th scope="row">{{ forloop.counter }}</th>
+                                <td>{{ vehicle.vehicle_type }}</td>
+                                <td>{{ vehicle.vehicle_model }}</td>
+                                <td>{{ vehicle.vehicle_date }}</td>
+                                <td>{{ vehicle.vehicle_status }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock content %}
+{% block extra_js %}
+<script>
+    $(document).ready(function () {
+        $('#favorite-form').submit(function (e) {
+            e.preventDefault(); // Prevent the default form submission
+
+            $.ajax({
+                type: 'POST',
+                url: $(this).attr('action'),
+                data: $(this).serialize(),
+                success: function (response) {
+                    if (response.success) {
+                        // Show the success message in the alert div
+                        $('#alert-message').removeClass('alert-danger').addClass('alert-success').text('Driver successfully added to the directory!').fadeIn();
+
+                        // Optional: Hide the form after successful submission
+                        $('#favorite-form').hide();
+                    } else {
+                        // Show an error message in the alert div
+                        $('#alert-message').removeClass('alert-success').addClass('alert-danger').text(response.error).fadeIn();
+                    }
+                },
+                error: function (xhr, status, error) {
+                    console.log('An error occurred during form submission.');
+                }
+            });
+        });
+    });
+</script>
+{% endblock extra_js %}

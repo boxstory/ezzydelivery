@@ -1,0 +1,20 @@
+{% extends "dashboard_base.html" %} {% load static %}
+<!-- extra css -->
+{% load crispy_forms_tags %} {% block content %}
+<div class="p-3 col-12 col-lg-10 col-md-10">
+  <div class="h4 p-3 text-center">
+    <h2>Add Drivers to directory</h2>
+    <form method="POST" htmx-post>
+      {% csrf_token %} {{ form | crispy }}
+      <button
+        type="submit"
+        class="btn pe-3 text-dark"
+        href="{% url 'business:driver_directory_add'  %}"
+      >
+        Add
+      </button>
+    </form>
+
+    {% endblock content %}
+  </div>
+</div>

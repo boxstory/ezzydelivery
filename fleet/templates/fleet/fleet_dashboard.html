@@ -1,0 +1,66 @@
+{% extends "fleet_dashboard_base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+  <!-- Your content here -->
+  <div class="flex-fill p-2">
+    <div class="col-12 py-2">
+      <section class="m-0 p-0">
+        <div class="pt-3 pt-md-3 pb-0 text-dark d-none d-md-block">
+          <div class="text-center">
+            <h3 class="fw-bolder text-uppercase">
+              Driver Dashboard
+              <br />
+              <span class="fw-light text-lowercase h5">{{ profile.first_name }} {{ profile.last_name }}</span>
+            </h3>
+          </div>
+        </div>
+        <div class="pt-md-3 m-0" id="dasboard_div">
+          {% block widget %}
+            <div class="d-flex mb-3">
+              <section class="col-12 col-md-5 p-3 px-md-5 mx-3 flex-fill fw-medium fs-4 bg-light">
+                <p class="pt-2 m-0 fw-bolder fs-5 text-center text-md-start">Total Asigned</p>
+                <p class="pb-0 m-0 d-flex justify-content-center justify-content-md-end fw-bold">16</p>
+              </section>
+              <section class="col-12 col-md-5 p-3 px-md-5 mx-3 flex-fill fw-medium fs-4 bg-light">
+                <p class="pt-2 m-0 fw-bolder fs-5 text-center text-md-start">No of Delivered</p>
+                <p class="pb-0 m-0 d-flex justify-content-center justify-content-md-end fw-bold">37</p>
+              </section>
+            </div>
+            <div class="d-flex mb-3">
+              <section class="col-12 col-md-5 p-3 px-md-5 mx-3 flex-fill fw-medium fs-4 bg-light">
+                <p class="pt-2 m-0 fw-bolder fs-5 text-center text-md-start">Total Amount COD</p>
+                <p class="pb-0 m-0 d-flex justify-content-center justify-content-md-end fw-bold">2700 Qr</p>
+              </section>
+              <section class="col-12 col-md-5 p-3 px-md-5 mx-3 flex-fill fw-medium fs-4 bg-light">
+                <p class="pt-2 m-0 fw-bolder fs-5 text-center text-md-start">No of COD collected</p>
+                <p class="pb-0 m-0 d-flex justify-content-center justify-content-md-end fw-bold">34</p>
+              </section>
+            </div>
+            <div class="d-flex mb-3">
+              <section class="col-12 col-md-5 flex-fill p-3 px-md-5 mx-3 fw-medium fs-4 bg-light">
+                <p class="pt-2 m-0 fw-bolder fs-5 text-center text-md-start">Pending jobs</p>
+                <p class="pb-0 m-0 d-flex justify-content-center justify-content-md-end fw-bold">17</p>
+              </section>
+              <section class="col-12 col-md-5 flex-fill p-3 px-md-5 mx-3 fw-medium fs-4 bg-light">
+                <p class="pt-2 m-0 fw-bolder fs-5 text-center text-md-start">Jobs To do FollowUp</p>
+                <p class="pb-0 m-0 d-flex justify-content-center justify-content-md-end fw-bold">15</p>
+              </section>
+            </div>
+            <div>
+              <section class="p-3 m-3 fw-medium fs-4 bg-light">
+                <p class="pb-2 m-0 fw-bolder fs-5 text-center text-md-start">Latest jobs list</p>
+                <p>{{ order.id }}</p>
+                {% include "orders/parts/orders_list_review.html" %}
+              </section>
+            </div>
+          {% endblock widget %}
+        </div>
+      </section>
+    </div>
+  </div>
+{% endblock content %}
+{% block extra_js %}
+  <!-- extra js -->
+  <script src="https://unpkg.com/htmx.org@1.3.3"></script>
+{% endblock extra_js %}

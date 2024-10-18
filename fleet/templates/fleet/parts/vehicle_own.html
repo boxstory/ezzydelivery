@@ -1,0 +1,47 @@
+{% extends "fleet_dashboard_base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+  <div class="flex-fill p-2">
+    <div class=" h4 p-3">Own Vehicels</div>
+    <div class="table-responsive m-2 m-md-3">
+      <table class="table table-responsive table-striped table-hover">
+        <thead>
+          <tr class="bg-dark text-light">
+            <th scope="col">Type</th>
+            <th scope="col d-flex">
+              <span class="d-none d-md-inline">Plate</span> No
+            </th>
+            <th scope="col">Model</th>
+            <th scope="col">Color</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for vehicle in vehicles %}
+            <tr>
+              <td scope="row">{{ vehicle.vehicle_type }}</td>
+              <td>{{ vehicle.vehicle_no }}</td>
+              <td scope="row">{{ vehicle.vehicle_model }}</td>
+              <td scope="row">{{ vehicle.vehicle_color }}</td>
+              <td scope="row">{{ vehicle.vehicle_status }}</td>
+              <td class="text-center p-0">
+                <!-- delete link neeeds to setup later ********************************************************* -->
+                <a href="{% url 'fleet:vehicle_update' vehicle_id=vehicle.id %}"
+                   class="btn btn-outline-dark btn-sm me-1">
+                  <i class="fa-solid fa-pen"></i></a>
+                <a href="{% url 'fleet:vehicle_delete' fleet_id=request.user.id vehicle_id=vehicle.id %}"
+                   class="btn btn-outline-dark btn-sm">
+                  <i class="fa-solid fa-remove"></i></a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <a href="{% url 'fleet:vehicle_add' %}" class="justify-content-end">
+        <div class="btn btn-outline-dark text-decoration-none">ADD VEHICLE</div>
+      </a>
+    </div>
+  </div>
+{% endblock content %}
