@@ -38,5 +38,9 @@ urlpatterns = [
     path('update_order_status/', 
          orders_views.update_order_status, name='update_order_status'),
 
+
+     # orders by API
+     path('api/all/', orders_views.get_order_by_api, name='get_order_by_api'),
+
 ]
 

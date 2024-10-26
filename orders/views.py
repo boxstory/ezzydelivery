@@ -1,3 +1,4 @@
+import json
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
@@ -6,6 +7,7 @@ from datetime import timezone
 
 import pandas as pd
 from django.contrib import messages
+import requests
 
 from core import models as core_models
 from orders import forms, models as orders_models
@@ -440,3 +442,23 @@ def update_order_status(request):
 
     # Return a JSON response indicating failure
     return JsonResponse({'status': 'error'})
+
+
+
+#get_by_api from shopify
+
+def get_order_by_api(request):
+    headers = {'Content-Type': 'application/json', 'Authorization': 'Basic XXXXXXXXXX='}
+    body = { "Order" : "devED" }
+    Order = requests.post('https://url_name.com/api/GetQuestions', headers=headers, json=body).json()
+    
+    # Parse message as json
+    GetQuestion_response = json.loads(GetQuestion_response['Message'])
+    
+    GetQuestion_dict={
+        'GetQuestion_response' : GetQuestion_response,
+    }
+    return render(request, 'app\GetQuestion.html', GetQuestion_dict)
+
+
+
