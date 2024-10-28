@@ -21,6 +21,8 @@ urlpatterns = [
          business_views.pickup_location_delete, name='pickup_location_delete'),
     path('pickup_locations/',
          business_views.pickup_location_list, name='pickup_location_list'),
+    path('<int:business_id>/settings/', business_views.business_settings,
+         name='business_settings'),
 
     # frontend
     path('<int:business_id>/', business_views.business_profile,

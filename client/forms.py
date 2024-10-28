@@ -1,6 +1,8 @@
 
+from urllib import request
 from django import forms
 from django.contrib.auth.models import User
+
 from crispy_forms.helper import FormHelper
 from django.forms import ModelForm
 from core import models as core_models
@@ -51,6 +53,33 @@ class businessRegisterForm(forms.ModelForm):
             "business_qid": "Passport/QID/CR No",
 
         }
+
+class businessApiSettingsForm(forms.ModelForm):
+    class Meta:
+        model = business_models.BusinessApiSettings
+        fields = '__all__'
+        exclude = ['verify_api']
+
+        def __init__(self, *args, **kwargs):
+            user = kwargs.pop('user', None)
+            super().__init__(*args, **kwargs)
+            print(" businessApiSettingsForm")
+            print(user)
+            print(user.business)
+
+            self.fields['business'].queryset = business_models.Business.objects.filter(business_id=request.user.user_business.first().business_id)
+        
+        
+        labels = {
+            "api_type": "API Type",
+            "api_key": "API Key",
+            "api_secret": "API Secret",
+            "site_api_url": "Site API URL",
+            "order_api_url": "Order API URL",
+            "product_api_url": "Product API URL",
+        }
+        
+
 
  # PICKUP LOCATIONS FORM ----------------------------------------------------------------------------------------------------------------------
 

@@ -24,13 +24,15 @@ from client import forms as business_forms
 
 @login_required(login_url='account_login')
 def business_dashboard(request):
+    print('business id', request.user.user_business.first().business_id)
     try:
         business = business_models.Business.objects.get(
-            user_id=request.user.id)
+            business_id=request.user.user_business.first().business_id)
+        
         profile = core_models.Profile.objects.get(user_id=business.user_id)
         location = business_models.PickupLocation.objects.filter(
             business_id=business.business_id).all()
-        print(business, "latest 10 order list")
+        
         orders = orders_models.Order.objects.filter(
             business=business.business_id).order_by('-id')[:10]
 
@@ -192,6 +194,18 @@ def business_profile(request, business_id):
 
         return redirect("/join_us/")
 
+def all_business(request):
+    business = business_models.Business.objects.all()
+    
+    
+
+    context = {
+        'all_business': business,
+    }
+    return render(request, 'client/frontend/all_business.html', context)
+
+#business_settings---------------------------------------------------------------------------------------------------------------------
+
 
 def business_profile_update(request, business_id):
     if request.user.id == business_id:
@@ -229,16 +243,39 @@ def business_profile_update(request, business_id):
     else:
         return redirect("business:business_dashboard")
 
+def business_settings(request, business_id):
+    if request.user.id == request.user.user_business.first().user_id:
+        
+        business =  business_models.Business.objects.filter(business_id=business_id).first()
+        print('business', business)
+        print('user_id', request.user.user_business.first().user_id)
+        print('business_id', request.user.user_business.first().business_id)
+        form = business_forms.businessApiSettingsForm(instance=business)
+        print('form')
+        if request.method == 'POST':
+            print('businessSettingsForm')
+            form = business_forms.businessApiSettingsForm(
+                request.POST, instance=business)
+            if form.is_valid():
+                f = form.save(commit=False)
 
-def all_business(request):
-    business = business_models.Business.objects.all()
-    
-    
 
-    context = {
-        'all_business': business,
-    }
-    return render(request, 'client/frontend/all_business.html', context)
+                form.save()
+                print('businessSettingsForm ok')
+                messages.success(request, "Successful Submission")
+                return redirect("business:business_dashboard")
+            else:
+                print('businessSettingsForm_update not valid')
+                messages.error(request, "Error")
+        context = {
+            'form': form,
+            'business_id': business.business_id,
+            'form_title': 'Business API Settings'
+        }
+
+        return render(request, 'client/frontend/business_profile_update.html', context)
+    else:
+        return redirect("business:business_dashboard")
 
 
 def business_logo_update(request , business_id):
@@ -285,6 +322,7 @@ def business_logo_update(request , business_id):
             
     context = {
             'form': form,
+            'form_title': 'Business logo Update',
         }   
   
         

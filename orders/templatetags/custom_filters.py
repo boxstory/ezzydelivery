@@ -1,5 +1,6 @@
 # your_app/templatetags/custom_filters.py
 from django import template
+from datetime import datetime, timedelta
 
 register = template.Library()
 
@@ -15,3 +16,9 @@ def product_qty(index):
 @register.filter
 def get_field(obj, field_name):
     return getattr(obj, field_name, '')
+
+
+
+@register.filter
+def days_ago(days):
+    return (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')

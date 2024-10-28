@@ -1,46 +1,117 @@
 {% extends "dashboard_base.html" %}
-{% load crispy_forms_tags %}
+{% load custom_filters %}
+{% load
+crispy_forms_tags %}
 {% load static %}
 <!-- extra css -->
 {% block extra_css %}
-<link href="{% static 'orders/css/orders_main.css' %}" rel="stylesheet" type="text/css" />
+  <link href="{% static 'orders/css/orders_main.css' %}"
+        rel="stylesheet"
+        type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-<!-- orders_list.html -->
-<div class="col-12 col-md-9 col-lg-10">
-  <section class="d-none d-md-block ">
-    <div class="flex-fill pb-2">
-      <div class="p-3 col-12">
-        <div class="col-md-12 d-flex flex-row justify-content-between pb-md-4">
-          <h2 class="m-0">Orders Added list({{len}})</h2>
-          <div>
-            <a class="btn btn-dark pe-3 text-white" href="{% url 'orders:get_by_api' %}">
-              <i class="fa fa-add me-3"></i> Upload bulk
-            </a>
-            <a class="btn btn-dark pe-3 text-white" href="{% url 'orders:order_upload_file' %}">
-              <i class="fa fa-add me-3"></i> Upload bulk
-            </a>
-            <a class="btn btn-dark pe-3 text-white" href="{% url 'orders:add_order' %}">
-              <i class="fa fa-add me-3"></i> Add Orders
-            </a>
+  <!-- orders_list.html -->
+  <div class="col-12 col-md-9 col-lg-10">
+    <section class="d-none d-md-block">
+      <div class="flex-fill pb-2">
+        <div class="p-3 col-12">
+          <div class="col-md-12 d-flex flex-row justify-content-between pb-md-4">
+            <h2 class="m-0">New Orders list({{ orders|length }})</h2>
+            <div>
+              <a class="btn btn-dark pe-3 text-white"
+                 href="{% url 'orders:get_order_by_api' %}">
+                <i class="fa fa-add me-3"></i> API Upload
+              </a>
+              <a class="btn btn-dark pe-3 text-white"
+                 href="{% url 'orders:order_upload_file' %}">
+                <i class="fa fa-add me-3"></i> Upload bulk
+              </a>
+              <a class="btn btn-dark pe-3 text-white"
+                 href="{% url 'orders:add_order' %}">
+                <i class="fa fa-add me-3"></i> Add Orders
+              </a>
+            </div>
           </div>
-        </div>
-
-        <div class="section">
-
-          get_order_by_api
-
-
+          <div class="section">
+            <h3>Orders List</h3>
+            <!-- Date Selection Form -->
+             {% csrf_token %}
+            <form method="get" action="{% url 'orders:get_order_by_api' %}">
+              <label for="start_date">Start Date:</label>
+              <input class="px-3 py-1 fw-bold rounded-3"
+                     type="date"
+                     id="start_date"
+                     name="start_date"
+                     required
+                     value="{{ 30|days_ago }}" />
+              <label for="end_date">End Date:</label>
+              <input class="px-3 py-1 fw-bold rounded-3"
+                     type="date"
+                     id="end_date"
+                     name="end_date"
+                     required
+                     value="{% now 'Y-m-d' %}" />
+              <button type="submit" class="btn btn-sm btn-dark">Filter Orders</button>
+            </form>
+          </div>
+          <h1>Orders</h1>
+          {% if orders %}
+            <ul>
+              {% for order in orders %}
+                <li>
+                  <strong>Order ID:</strong> {{ order.id }}
+                  <br />
+                  <strong>Date:</strong> {{ order.created_at|slice:":10" }}
+                  <br />
+                  <strong>Customer:</strong> {{ order.customer.first_name }} {{                  order.customer.last_name }}
+                  <br />
+                  <strong>Total Price:</strong> {{ order.total_price }}
+                  <br />
+                  <strong>Status:</strong> {{ order.financial_status }}
+                  <br />
+                  <strong>Shipping Address:</strong> {{order.shipping_address.province }}, {{                  order.shipping_address.country }}
+                  <br />
+                  <strong>Billing Address:</strong> {{ order.billing_address.province }}, {{ order.billing_address.country }}
+                  <br />
+                  <strong>Payment Terms:</strong> {{ order.payment_terms }}
+                  <br />
+                  <strong>Payment Method:</strong> {{ order.payment_gateway_names.0}}
+                  <br />
+                  <strong>Order Number:</strong> {{ order.order_number }}
+                  <br />
+                  <strong>Subtotal Price:</strong> {{ order.subtotal_price }}
+                  <br />
+                  <strong>Total Tax:</strong> {{ order.total_tax }}
+                  <br />
+                  <strong>Line Items:</strong>
+                  <ul>
+                    {% for item in order.line_items %}
+                      <li>
+                        <strong>Product Name:</strong> {{ item.name }}
+                        <br />
+                        <strong>Quantity:</strong> {{ item.quantity }}
+                        <br />
+                        <strong>Price:</strong> {{ item.price }}
+                        <br />
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>No orders found.</p>
+          {% endif %}
         </div>
       </div>
-  </section>
-  <section class="d-block d-md-none">
-
-    {% include "orders/parts/orders_list_mob.html" %}
-  </section>
-</div>
+    </section>
+    <section class="d-block d-md-none">
+    </section>
+  </div>
 {% endblock content %}
 {% block extra_js %}
-<script type="text/javascript" language="JavaScript" charset="UTF-8"
-  src="{%static 'orders/js/orders_main.js' %}"></script>
+  <script type="text/javascript"
+          language="JavaScript"
+          charset="UTF-8"
+          src="{%static 'orders/js/orders_main.js' %}"></script>
 {% endblock extra_js %}

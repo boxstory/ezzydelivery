@@ -22,9 +22,10 @@ def upload_path_handler(instance, filename):
 
 class Business(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='business')
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='user_business')
+    
     profile = models.ForeignKey(
-        core_models.Profile, on_delete=models.SET_NULL, blank=True, null=True, related_name='business')
+        core_models.Profile, on_delete=models.SET_NULL, blank=True, null=True, related_name='profile_business')
     business_id = models.PositiveIntegerField(primary_key=True)
     business_name = models.CharField(
         max_length=100, blank=True, null=True)
@@ -55,6 +56,39 @@ class Business(models.Model):
 
     def __str__(self):
         return self.business_name
+
+class BusinessApiSettings(models.Model):
+    type_choices = (
+        ('shopify', 'Shopify'),
+        ('woocommerce', 'Woocommerce'),
+        ('magento', 'Magento'),
+        ('opencart', 'Opencart'),
+        ('prestashop', 'Prestashop'),
+        ('bigcommerce', 'Bigcommerce'),
+        ('custom', 'Custom'),
+    )
+    api_type = models.CharField(
+        max_length=100, choices=type_choices, default='custom')
+    api_key = models.CharField(max_length=100, blank=True, null=True)
+    api_secret = models.CharField(max_length=100, blank=True, null=True)
+    site_api_url = models.CharField(max_length=100, blank=True, null=True)
+    order_api_url = models.CharField(max_length=100, blank=True, null=True)
+    product_api_url = models.CharField(max_length=100, blank=True, null=True)
+    verify_api = models.BooleanField(default=False)
+    business = models.ForeignKey(
+        Business, on_delete=models.CASCADE, related_name='business_settings')
+    business_languages = models.CharField(
+        max_length=100, default='english')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Business Settings"
+
+    def __str__(self):
+        return self.business.business_name
+    
 
 
 class BusinessLogo(models.Model):
@@ -101,12 +135,12 @@ class PickupLocation(models.Model):
     business = models.ForeignKey(
         Business, on_delete=models.CASCADE, related_name='pickup_location')
     pickup_location_title = models.CharField(max_length=100)
-    pickup_zone_no = models.PositiveIntegerField(blank=True)
-    pickup_street_no = models.PositiveIntegerField(blank=True)
+    pickup_zone_no = models.PositiveIntegerField(blank=True, null=True)
+    pickup_street_no = models.PositiveIntegerField(blank=True, null=True)
     pickup_building_no = models.PositiveIntegerField(
-        blank=True)
-    pickup_lat = models.PositiveIntegerField(blank=True)
-    pickup_lon = models.PositiveIntegerField(blank=True)
+        blank=True, null=True)
+    pickup_lat = models.PositiveIntegerField(blank=True, null=True)
+    pickup_lon = models.PositiveIntegerField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

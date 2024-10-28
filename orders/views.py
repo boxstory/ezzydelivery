@@ -3,7 +3,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from datetime import timezone
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 from django.contrib import messages
@@ -448,17 +448,47 @@ def update_order_status(request):
 #get_by_api from shopify
 
 def get_order_by_api(request):
-    headers = {'Content-Type': 'application/json', 'Authorization': 'Basic XXXXXXXXXX='}
-    body = { "Order" : "devED" }
-    Order = requests.post('https://url_name.com/api/GetQuestions', headers=headers, json=body).json()
-    
-    # Parse message as json
-    GetQuestion_response = json.loads(GetQuestion_response['Message'])
-    
-    GetQuestion_dict={
-        'GetQuestion_response' : GetQuestion_response,
+    headers = {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': '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'
     }
-    return render(request, 'app\GetQuestion.html', GetQuestion_dict)
+    get_orders = requests.get('https://hn0d1z-qe.myshopify.com/admin/api/2024-10/orders.json?status=any', headers=headers)
+    # Parse message as json
+    GetQuestion_response = "json.loads(GetQuestion_response['Message'])"
+    print(request.POST.get('start_date'))
+    if request.method == 'POST':
+        order_list_start_date = request.POST.get('start_date')
+        order_list_end_date = request.POST.get('end_date')
+        print( "posted dates")
+    else:
+        order_list_start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        order_list_end_date = datetime.now().strftime('%Y-%m-%d')
+        print( "default dates")
+    
+    print(order_list_start_date)
+    print(order_list_end_date)
+
+    if get_orders.status_code == 200:
+        order_data = get_orders.json()
+        orders = order_data.get('orders', [])
+        filtered_orders = [
+            order for order in orders
+            if order_list_start_date <= order['created_at'][:10] <= order_list_end_date
+        ]
+        filtered_orders.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        data={
+            'GetQuestion_response' : GetQuestion_response,
+            "order_data": order_data,
+            "orders": orders
+        }
+        return render(request, 'orders\get_order_by_api.html', data)
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Failed to fetch orders from Shopify'})
+
+
+
+
 
 
 
