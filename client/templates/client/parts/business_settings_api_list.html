@@ -2,10 +2,10 @@
 {% load static %}
 {% block content %}
   <div class="p-3 col-12 col-lg-10 col-md-10">
-    <div class="h4 py-3 d-flex justify-content-between  my-4 mx-auto col-6">
-      <div class=" my-auto fs-2 fw-bolder">API SETTINGS</div>
+    <div class="h4 py-1 d-flex bg-light justify-content-between  mx-auto">
+      <div class=" my-auto fs-3 fw-bolder">API SETTINGS</div>
       <a href="{% url 'business:business_settings_api_add'  business.business_id %}"
-         class=" text-center bg-dark text-white btn ms-2 col-3">New</a>
+         class=" text-center btn-primary-fill">New</a>
     </div>
     <section>
       <div class="col-12">
@@ -14,17 +14,17 @@
           <div class="row px-3 d-flex flex-wrap">
             {% if business_apis %}
               {% for api in  business_apis %}
-                <div class="col-md-4">
+                <div class="col-md-6 col-12">
                   <div class="card mb-4">
                     <div class="card-header">
-                      <h5 class="card-title">API SETTINGS</h5>
+                      <p class="card-title   ">{{ api.api_type }} API SETTINGS</p>
                     </div>
                     <div class="card-body ps-3">
                       <p>
-                        <strong>Code:</strong> {{ api.api_type }}
+                        <strong>Platform :</strong> {{ api.api_type }}
                       </p>
                       <p>
-                        <strong>Contry:</strong> {{ api.site_contry }}
+                        <strong>Contry :</strong> {{ api.site_contry }}
                       </p>
                       <p>
                         <strong>Site:</strong> {{ api.site_api_url }}
@@ -34,7 +34,7 @@
                         {% if api.verify_api == True %}
                           <i class="fa-solid fa-circle-check" style="color: #14cc0e;">Verified</i>
                         {% elif api.verify_api == False %}
-                          <span class="text-danger fs-4 fw-bold">Not Verified
+                          <span class="text-danger fs-5 fw-bold">Not Verified
                             <i class="fa-solid fa-circle-xmark" style="color: #ff0000;"></i>
                           </span>
                         {% else %}
