@@ -12,17 +12,33 @@ urlpatterns = [
     path('dashboard/', business_views.business_dashboard,
          name='business_dashboard'),
 
-    # PICKUP LOCATIONS
-    path('pickup_location/add/',
-         business_views.pickup_location_add, name='pickup_location_add'),
-    path('pickup_location/<int:pickup_location_id>/update/',
-         business_views.pickup_location_update, name='pickup_location_update'),
-    path('pickup_location/<int:pickup_location_id>/delete/',
-         business_views.pickup_location_delete, name='pickup_location_delete'),
-    path('pickup_locations/',
-         business_views.pickup_location_list, name='pickup_location_list'),
+     # BUSINESS settings
     path('<int:business_id>/settings/', business_views.business_settings,
          name='business_settings'),
+    # PICKUP LOCATIONS settings
+    path('settings/pickup_location/add/',
+         business_views.pickup_location_add, name='pickup_location_add'),
+    path('settings/pickup_location/<int:pickup_location_id>/update/',
+         business_views.pickup_location_update, name='pickup_location_update'),
+    path('settings/pickup_location/<int:pickup_location_id>/delete/',
+         business_views.pickup_location_delete, name='pickup_location_delete'),
+    path('settings/pickup_locations/',
+         business_views.pickup_location_list, name='pickup_location_list'),
+     # api settings       
+    path('<int:business_id>/settings/api/list/', business_views.business_settings_api_list,
+         name='business_settings_api_list'),
+    path('<int:business_id>/settings/api/add/', business_views.business_settings_api_add,
+         name='business_settings_api_add'),
+    path('<int:business_id>/settings/api/<int:api_id>/update/', business_views.business_settings_api_update,
+         name='business_settings_api_update'),
+     
+     # teams settings
+     path('<int:business_id>/teams/', business_views.business_teams,
+           name='business_teams'),
+     path('<int:business_id>/teams/add/', business_views.business_teams_add,
+               name='business_teams_add'),
+     path('<int:business_id>/teams/<int:team_id>/update/', business_views.business_teams_update,
+               name='business_teams_update'),
 
     # frontend
     path('<int:business_id>/', business_views.business_profile,

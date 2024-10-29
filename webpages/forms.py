@@ -63,7 +63,7 @@ class PricingEnquiryForm(forms.ModelForm):
     is_personalized_product = forms.ChoiceField(choices=[ (False, 'No'),(True, 'Yes')])
     is_registered_company_in_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
     is_located_in_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
-    is_staff_available_in_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
+    is_team_available_in_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
     is_required_COD_service = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
     speed_delivery_offer_to_customers = forms.MultipleChoiceField(choices=[('5Days', '6: 5 Days Delivery'), ('NextDay48', '5: Next 48 Hrs Delivery'),('NextDay24', '4: Next 24 Hrs Delivery'),('SameDay', '3: Same Day Delivery'),('WithIn6Hr', '2: With In 6Hrs'),('WithIn2Hr', '1: With In 2Hrs'), ('None', 'None') ]) 
     is_required_fulfillment_service_for_operate_from_outside_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')]) 
@@ -91,7 +91,7 @@ class PricingEnquiryForm(forms.ModelForm):
             Field('is_personalized_product'),
             Field('is_registered_company_in_qatar'),
             Field('is_located_in_qatar'),
-            Field('is_staff_available_in_qatar'),
+            Field('is_team_available_in_qatar'),
             Field('is_required_COD_service'),
             Field('is_required_COD_service'),
             Field('is_required_fulfillment_service_for_operate_from_outside_qatar'),

@@ -1,64 +1,80 @@
 {% extends "dashboard_base.html" %}
 {% load static %}
 {% block content %}
-<div class="p-3 col-12 col-lg-10 col-md-10">
-  <div class="h4 p-3 text-center">
-    <h2>list of store locations</h2>
-  </div>
-  <section>
-    <div class="col-12">
-      <div class="alert alert-info" role="alert">
-        <h4 class="alert-heading">Note:</h4>
-        <p class="mb-0">You can add multiple pickup locations for your store. You can also update or delete the
-          locations.</p>
-      </div>
-    
-    <div class="col-12">
-      <table class="table table-striped table-hover my-3">
-        <thead class="table-dark">
-          <tr>
-            <th>Landmark</th>
-            <th>Zone No</th>
-            <th>Street No</th>
-            <th>Building No</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody hx-target="closest tr" hx-swap="outerHTML swap:1s">
-          {% if pickup_location %}
-          {% for loc in pickup_location %}
-          <tr>
-            <td>
-              <span>{{ loc.id }}--</span>{{ loc.pickup_location_title }}
-            </td>
-            <td>{{ loc.pickup_zone_no }}</td>
-            <td>{{ loc.pickup_street_no }}</td>
-            <td>{{ loc.pickup_building_no }}</td>
-            <td>
-              <a href="{% url 'business:pickup_location_update' loc.id %}" class="btn pe-3 text-dark"><i
-                  class="fa fa-lg fa-edit"></i></a>
-              <a class="btn pe-3 text-dark" hx-confirm="Are you sure you wish to delete?" hx-target="#dasboard_div"
-                hx-swap="innerHTML swap:1s" hx-delete="{% url 'business:pickup_location_delete' loc.id %}"><i
-                  class="fa fa-lg fa-trash"></i></a>
-            </td>
-          </tr>
-          {% endfor %}
-          {% else %}
-          <tr>
-            <td colspan="5" class="py-2">No Locations Added</td>
-          </tr>
-          {% endif %}
-          <tr>
-            <td colspan="5" class="py-2">
-              <a class="btn pe-3 text-dark" href="{% url 'business:pickup_location_add' %}"><i
-                  class="fa fa-lg fa-add me-2"></i>
-                Pickup Locations
-              </a>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+  <div class="p-3 col-12 col-lg-10 col-md-10">
+    <div class="h4 p-3 text-center">
+      <h2>list of store locations</h2>
     </div>
-  </section>
-</div>
-{% endblock content %}
+    <section>
+      <div class="col-12">
+        <div class="alert alert-info" role="alert">
+          <h4 class="alert-heading">Note:</h4>
+          <p class="mb-0">
+            You can add multiple pickup locations for your store. You can also update or delete the
+            locations.
+          </p>
+        </div>
+        <!-- Stores Lisings -->
+        <div class=" col-12 ">
+          <div class="h4 py-1 d-flex bg-light justify-content-between  mx-auto">
+            <div class=" my-auto">Stores Lisings</div>
+            <a href="{% url 'business:pickup_location_add' %}"
+               class=" text-center btn-primary-fill">New</a>
+          </div>
+          <div class="row px-3 d-flex flex-wrap">
+            {% if stores %}
+              {% for store in stores %}
+                <div class="col-md-4 ">
+                  <div class="card mb-4">
+                    <div class="card-header">
+                      <h3 class="  m-0 ">{{ store.pickup_location_title }}</h3>
+                    </div>
+                    <div class="card-body ps-2">
+                      <p>
+                        <a href="https://maps.app.goo.gl/JmKFfjAiLhm28LUSA" target="_blank"
+                           class=" btn btn-dark  btn-lg "><strong>{{ store.locality }}</strong>
+                          <i class="fa-solid  fa-location-arrow ps-3" style="color: #ff0000;"></i></a>
+                      </p>
+                      <p>
+                        <strong>Building No : </strong>{{ storepickup_building_no }}
+                      </p>
+                      <p>
+                        <strong>Zone No : </strong>{{ store.pickup_zone_no }}
+                      </p>
+                      <p>
+                        <strong>Status:</strong>
+                        {% if store.pickup_status == 'active' %}
+                          <span class="text-success fs-5 fw-bold">{{ store.pickup_status }}</span><i class="fa fa-check-circle text-success" aria-hidden="true"></i>
+                        {% else %}
+                          <span class="text-danger fs-5 fw-bold">{{ store.pickup_status }}
+                            <i class="fa-solid fa-circle-xmark" style="color: #ff0000;"></i>
+                          </span>
+                        {% endif %}
+                      </p>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                      <a href="{% url 'orders:deliver_to_here' store.id %}"
+                         class="card-footer text-center bg-primary fw-bold btn col-6">Deliver to Here</a>
+                         
+                         <a href="{% url 'business:pickup_location_update' store.id %}"
+                         class="card-footer text-center bg-dark text-white btn">Update</a>
+                         <a href="{% url 'business:pickup_location_delete' store.id %}"
+                             class="card-footer text-center bg-danger text-white btn">Delete</a>
+                  </div></div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="col-12 d-flex flex-wrap justify-content-center pb-3">
+                <div class="alert alert-warning m-0" role="alert">No stores Listed</div>
+                <div class="card-footer text-center my-auto">
+                  <a href="{% url 'business:pickup_location_add' %}">
+                    <button class="btn btn-dark">Add</button>
+                  </a>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </section>
+    </div>
+  {% endblock content %}

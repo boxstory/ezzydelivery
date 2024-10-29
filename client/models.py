@@ -46,8 +46,15 @@ class Business(models.Model):
     business_languages = models.CharField(
         max_length=100,  default='english')
     business_qid = models.CharField(max_length=11, blank=True, null=True)
+    status_choices = (
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('aproval pending', 'Aproval Pending'),
+        ('suspended', 'Suspended'),
+    )
+    
     business_status = models.CharField(
-        max_length=100, default='aproval pending')
+        max_length=100,  choices=status_choices, default='aproval pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -72,11 +79,12 @@ class BusinessApiSettings(models.Model):
     api_key = models.CharField(max_length=100, blank=True, null=True)
     api_secret = models.CharField(max_length=100, blank=True, null=True)
     site_api_url = models.CharField(max_length=100, blank=True, null=True)
+    site_contry = models.CharField(max_length=100, blank=True, null=True, default='Qatar')
     order_api_url = models.CharField(max_length=100, blank=True, null=True)
     product_api_url = models.CharField(max_length=100, blank=True, null=True)
     verify_api = models.BooleanField(default=False)
     business = models.ForeignKey(
-        Business, on_delete=models.CASCADE, related_name='business_settings')
+        Business, on_delete=models.CASCADE, related_name='business_settings_api')
     business_languages = models.CharField(
         max_length=100, default='english')
     
@@ -106,41 +114,62 @@ class BusinessLogo(models.Model):
         return str(self.business.business_name)
 
 
-# @todo: link staff profile with business
+# @todo: link team profile with business
 
 
-class StaffProfile(models.Model):
+class BusinessTeamProfile(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='staff_profile')
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='team_profile')
     profile = models.ForeignKey(
-        core_models.Profile, on_delete=models.SET_NULL, blank=True, null=True, related_name='staff_profile')
+        core_models.Profile, on_delete=models.SET_NULL, blank=True, null=True, related_name='team_profile')
     business = models.ForeignKey(
-        Business, on_delete=models.CASCADE, related_name='staff_profile')
+        Business, on_delete=models.CASCADE, related_name='team_profile')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    staff_code = models.CharField(max_length=100, blank=True, null=True)
-    staff_name = models.CharField(max_length=100, blank=True, null=True)
-    staff_phone = models.CharField(max_length=100, blank=True, null=True)
-    staff_email = models.CharField(max_length=100, blank=True, null=True)
-    staff_bio = models.CharField(max_length=225, blank=True, null=True)
-    staff_logo = models.ImageField(
+    team_code = models.CharField(max_length=100, blank=True, null=True)
+    team_role = models.CharField(max_length=100, blank=True, null=True)
+    team_name = models.CharField(max_length=100, blank=True, null=True)
+    team_phone = models.CharField(max_length=100, blank=True, null=True)
+    team_email = models.CharField(max_length=100, blank=True, null=True)
+    team_bio = models.CharField(max_length=225, blank=True, null=True)
+    team_logo = models.ImageField(
         upload_to=upload_path_handler, default="business/avatar.png", blank=True, null=True)
+    team_verifed = models.BooleanField(default=False)
+    team_status_choices = (
+        ('aproval pending', 'Aproval Pending'),
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('suspended', 'Suspended'),
 
+    )
+
+    team_status = models.CharField(
+        max_length=100, choices=team_status_choices, default='aproval pending')
+    
     class Meta:
         verbose_name_plural = "Staff Profile"
-        unique_together = ('business', 'staff_code')
+        unique_together = ('business', 'team_code')
 
 
 class PickupLocation(models.Model):
     business = models.ForeignKey(
         Business, on_delete=models.CASCADE, related_name='pickup_location')
     pickup_location_title = models.CharField(max_length=100)
+    locality = models.CharField(max_length=100)
     pickup_zone_no = models.PositiveIntegerField(blank=True, null=True)
     pickup_street_no = models.PositiveIntegerField(blank=True, null=True)
     pickup_building_no = models.PositiveIntegerField(
         blank=True, null=True)
     pickup_lat = models.PositiveIntegerField(blank=True, null=True)
     pickup_lon = models.PositiveIntegerField(blank=True, null=True)
+    status_choices = (
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('aproval pending', 'Aproval Pending'),
+        ('suspended', 'Suspended'),
+    )
+    pickup_status = models.CharField(
+        max_length=100, choices=status_choices, default='active')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

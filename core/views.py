@@ -46,7 +46,7 @@ def join_business(request):
                 f = form.save(commit=False)
                 f.profile = request.user.profile
                 f.user_id = request.user.id
-                f.business_id = request.user.id
+                f.business_id = random.randint(100000, 999999)
                 f.save()
                 form1 = joinusform.save(commit=False)
                 user = User.objects.get(id=request.user.id)

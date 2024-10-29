@@ -274,8 +274,8 @@ def add_order(request):
             #print(form)
 
             # @todo
-            # form.fields['product_list'].queryset = orders_models.Items.objects.filter(
-            #     business=request.user.business)
+            form.fields['product_list'].queryset = orders_models.Items.objects.filter(
+                 business=request.user.user_business.first().business_id)
             if form.is_valid():
                 print("valid form")
                 order = form.save(commit=False)
@@ -295,6 +295,27 @@ def add_order(request):
             form = orders_forms.AddOrderForm(business_id=business.business_id)
     return render(request, 'orders/add_order.html', {'form': form, 'business': business, })
 
+
+@login_required(login_url='account_login')
+def deliver_to_here(request, pickup_id):
+    pickup_location = business_models.PickupLocation.objects.filter(
+        id=pickup_id).first()
+    if request.method == 'POST':
+        form = orders_forms.UpdateOrderForm(request.POST, )
+        print('form valid checking')
+        if form.is_valid():
+            print('form valid')
+            form.save()
+            form.business = business_models.Business.objects.get(
+                    business_id=request.user.id)
+            return  redirect('orders:orders_all_list')
+    else:
+        form = orders_forms.UpdateOrderForm()
+
+    context = {
+        'form': form, 
+    }
+    return render(request, 'orders/order_update.html', context)
 
 @login_required(login_url='account_login')
 def order_update(request, order_id):

@@ -1,0 +1,71 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+{% block content %}
+  <div class="p-3 col-12 col-lg-10 col-md-10">
+    <div class="h4 py-3 d-flex justify-content-between  my-4 mx-auto col-6">
+      <div class=" my-auto fs-2 fw-bolder">API SETTINGS</div>
+      <a href="{% url 'business:business_settings_api_add'  business.business_id %}"
+         class=" text-center bg-dark text-white btn ms-2 col-3">New</a>
+    </div>
+    <section>
+      <div class="col-12">
+        <!-- API SETTINGS -->
+        <div class=" col-12 ">
+          <div class="row px-3 d-flex flex-wrap">
+            {% if business_apis %}
+              {% for api in  business_apis %}
+                <div class="col-md-4">
+                  <div class="card mb-4">
+                    <div class="card-header">
+                      <h5 class="card-title">API SETTINGS</h5>
+                    </div>
+                    <div class="card-body ps-3">
+                      <p>
+                        <strong>Code:</strong> {{ api.api_type }}
+                      </p>
+                      <p>
+                        <strong>Contry:</strong> {{ api.site_contry }}
+                      </p>
+                      <p>
+                        <strong>Site:</strong> {{ api.site_api_url }}
+                      </p>
+                      <p>
+                        <strong>Status:</strong>
+                        {% if api.verify_api == True %}
+                          <i class="fa-solid fa-circle-check" style="color: #14cc0e;">Verified</i>
+                        {% elif api.verify_api == False %}
+                          <span class="text-danger fs-4 fw-bold">Not Verified
+                            <i class="fa-solid fa-circle-xmark" style="color: #ff0000;"></i>
+                          </span>
+                        {% else %}
+                        {% endif %}
+                      </p>
+                    </div>
+                    <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
+                       class="card-footer text-center bg-dark ps-0 text-white btn">Update</a>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="col-12 d-flex flex-wrap justify-content-center pb-3">
+                <div class="alert alert-warning m-0" role="alert">No API Listed</div>
+                <div class="card-footer text-center my-auto">
+                  <a href="{% url 'business:business_settings_api_add' business.business_id %}">
+                    <button class="btn btn-dark">Add</button>
+                  </a>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="alert alert-info" role="alert">
+        <h4 class="alert-heading">Note:</h4>
+        <p class="mb-0">
+          You can't add multiple APIs for your one store. You can also update or delete the
+          APIs.
+        </p>
+      </div>
+    </section>
+  </div>
+{% endblock content %}

@@ -1,0 +1,172 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+{% block content %}
+    <div class="flex-fill pb-2">
+        <div class="p-3 col-12 ">
+            <div class="h4 p-3 ">
+                <h2>BUSINESS SETTINGS</h2>
+                <hr class="py-2 m-0 bg-black">
+                <!-- Stores Lisings -->
+                <div class=" col-12 ">
+                    <div class="h4 py-1 d-flex bg-light justify-content-between  mx-auto">
+                        <div class=" my-auto">Stores Lisings</div>
+                        <a href="{% url 'business:pickup_location_add' %}"
+                           class=" text-center bg-dark text-white btn">New</a>
+                    </div>
+                    <div class="row px-3 d-flex flex-wrap">
+                        {% if stores %}
+                            {% for store in stores %}
+                                <div class="col-md-4 ">
+                                    <div class="card mb-4">
+                                        <div class="card-header">
+                                            <h3 class="  m-0 ">{{ store.pickup_location_title }}</h3>
+                                        </div>
+                                        <div class="card-body ps-2">
+                                            <p>
+                                                <a href="https://maps.app.goo.gl/JmKFfjAiLhm28LUSA" class=" btn btn-dark  btn-lg "><strong> {{ store.locality }}  </strong>
+                                                <i class="fa-solid  fa-location-arrow ps-3" style="color: #ff0000;"></i></a>
+                                            </p>
+                                            <p>
+                                                <strong>Building No:</strong>{{ storepickup_building_no }}
+                                            </p>
+                                            <p>
+                                                <strong>Zone No:</strong>{{ store.pickup_zone_no }}
+                                            </p>
+                                            <p >
+                                                <strong>Status:</strong>
+                                                {% if store.pickup_status == 'active' %}
+                                                    <span class="text-success fs-5 fw-bold">{{ store.pickup_status }}</span><i class="fa fa-check-circle text-success" aria-hidden="true"></i>
+                                                {% else %}
+                                                    <span class="text-danger fs-5 fw-bold">{{ store.pickup_status }}
+                                                        <i class="fa-solid fa-circle-xmark" style="color: #ff0000;"></i>
+                                                    </span>
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                        <a href="{% url 'business:pickup_location_update' store.id %}"
+                                           class="card-footer text-center bg-dark text-white btn">Update</a>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="col-12 d-flex flex-wrap justify-content-center pb-3">
+                                <div class="alert alert-warning m-0" role="alert">No stores Listed</div>
+                                <div class="card-footer text-center my-auto">
+                                    <a href="{% url 'business:pickup_location_add'  %}">
+                                        <button class="btn btn-dark">Add</button>
+                                    </a>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <hr class="py-2 m-0 bg-black">
+                <!-- Teams Lisings -->
+                <div class=" col-12 ">
+                    <div class="h4 py-1 d-flex justify-content-between  mx-auto">
+                        <div class=" my-auto">Teams Lisings</div>
+                        <a href="{% url 'business:pickup_location_add' %}"
+                           class=" text-center bg-dark text-white btn">New</a>
+                    </div>
+                    <div class="row px-3 d-flex flex-wrap">
+                        {% if teams %}
+                            {% for team in teams %}
+                                <div class="col-md-4">
+                                    <div class="card mb-4">
+                                        <div class="card-header">
+                                            <h5 class="card-title">Teams</h5>
+                                        </div>
+                                        <div class="card-body ps-2">
+                                            <p>
+                                                <strong>Id:</strong> {{ team.team_profile.id }}
+                                            </p>
+                                            <p>
+                                                <strong>Name:</strong> {{ team.team_name }}
+                                            </p>
+                                            <p>
+                                                <strong>Phone:</strong> {{ team.team_phone }}
+                                            </p>
+                                            <p>
+                                                <strong>Status:</strong>
+                                                {% if team.team_status == 'active' %}
+                                                    <span class="text-success fw-bold">{{ team.team_status }}</span>
+                                                {% else %}
+                                                    <span class="text-danger fs-4 fw-bold">{{ team.team_status }}
+                                                        <i class="fa-solid fa-circle-xmark" style="color: #ff0000;"></i>
+                                                    </span>
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                        <a href="{% url 'business:business_teams_update'  business.business_id team.id %}"
+                                           class="card-footer text-center bg-dark text-white btn">Update</a>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="col-12 d-flex flex-wrap justify-content-center pb-3">
+                                <div class="alert alert-warning m-0" role="alert">No Staffs Listed</div>
+                                <div class="card-footer text-center my-auto">
+                                    <a href="{% url 'business:business_settings_api_add' business.business_id %}">
+                                        <button class="btn btn-dark">Add</button>
+                                    </a>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <hr class="py-2 m-0 bg-black">
+                <!-- API SETTINGS -->
+                <div class=" col-12 ">
+                    <div class="h4 py-1 d-flex justify-content-between  mx-auto">
+                        <div class=" my-auto">API SETTINGS</div>
+                        <a href="{% url 'business:business_settings_api_add'  business.business_id %}"
+                           class=" text-center bg-dark text-white btn">New</a>
+                    </div>
+                    <div class="row px-3 d-flex flex-wrap">
+                        {% if business_apis %}
+                            {% for api in  business_apis %}
+                                <div class="col-md-4">
+                                    <div class="card mb-4">
+                                        <div class="card-header">
+                                            <h5 class="card-title">API SETTINGS</h5>
+                                        </div>
+                                        <div class="card-body ps-3">
+                                            <p>
+                                                <strong>Code:</strong> {{ api.api_type }}
+                                            </p>
+                                            <p>
+                                                <strong>Site: </strong> {{ api.site_api_url }}
+                                            </p> 
+                                            <p>
+                                                <strong>Status:</strong>
+                                                {% if api.verify_api == True %}
+                                                    <i class="fa-solid fa-circle-check" style="color: #14cc0e;">Verified</i>
+                                                {% elif api.verify_api == False %}
+                                                    <span class="text-danger fs-4 fw-bold">Not Verified
+                                                        <i class="fa-solid fa-circle-xmark" style="color: #ff0000;"></i>
+                                                    </span>
+                                                {% else %}
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                        <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
+                                           class="card-footer text-center bg-dark ps-0 text-white btn">Update</a>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="col-12 d-flex flex-wrap justify-content-center pb-3">
+                                <div class="alert alert-warning m-0" role="alert">No API Listed</div>
+                                <div class="card-footer text-center my-auto">
+                                    <a href="{% url 'business:business_settings_api_add' business.business_id %}">
+                                        <button class="btn btn-dark">Add</button>
+                                    </a>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

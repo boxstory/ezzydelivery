@@ -102,23 +102,25 @@ def driver_directory_delete(request, id):
 
 
 # pickup location add------------------------------------------------------
+@login_required(login_url='account_login')
 def pickup_location_list(request):
     business = business_models.Business.objects.get(
-        user_id=request.user.id)
+        business_id=request.user.user_business.first().business_id)
     pickup_location = business_models.PickupLocation.objects.filter(
-        business_id=request.user.id).all()
+        business_id=business.business_id).all()
     if not pickup_location:
         return redirect('business:pickup_location_add')
     print('pickup_location', pickup_location)
     context = {
-        'pickup_location': pickup_location,
+        'stores': pickup_location,
         'business': business, }
     return render(request, 'client/parts/pickup_location_list.html', context)
 
 
 def pickup_location_add(request):
+
     business = business_models.Business.objects.get(
-        user_id=request.user.id)
+        business_id=request.user.user_business.first().business_id)
     form = business_forms.PickupLocationsAddForm(request.POST or None)
     if request.method == 'POST':
         if form.is_valid():
@@ -145,6 +147,8 @@ def pickup_location_delete(request, pickup_location_id):
 
 
 def pickup_location_update(request, pickup_location_id):
+    business = business_models.Business.objects.get(
+        business_id=request.user.user_business.first().business_id)
     id = pickup_location_id
     print(pickup_location_id)
     print('pickup_location_update')
@@ -161,6 +165,7 @@ def pickup_location_update(request, pickup_location_id):
             return redirect("business:pickup_location_list")
 
     context = {
+        'business' : business,
         'form': form,
         'id': id,
 
@@ -173,7 +178,7 @@ def pickup_location_update(request, pickup_location_id):
 def business_profile(request, business_id):
     try:
         business = business_models.Business.objects.get(
-            business_id=business_id)
+        business_id=request.user.user_business.first().business_id)
         profile = core_models.Profile.objects.filter(user_id=request.user.id)
         location = business_models.PickupLocation.objects.filter(
             business_id=business.business_id).values_list('pickup_location_title', flat=True)[:2]
@@ -243,19 +248,84 @@ def business_profile_update(request, business_id):
     else:
         return redirect("business:business_dashboard")
 
+
+# business settings links and veirfy status ---------------------------------------------------------------------------------------------------------------------
 def business_settings(request, business_id):
+    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
+
+    teams = business_models.BusinessTeamProfile.objects.filter(business_id=business_id).all()
+    stores = business_models.PickupLocation.objects.filter(business_id=business_id).all()
+    print('business', business)
+    print('business_apis', business_apis)
+    print('teams', teams)
+    print('stores', stores)
+
+    
+    
+
+    context = {
+        'business': business,
+        'business_apis': business_apis,
+        'teams': teams,
+        'stores': stores,
+
+    }
+    return render(request, 'client/parts/business_settings.html', context)
+
+
+#business_settings_api---------------------------------------------------------------------------------------------------------------------
+def business_settings_api_update(request, business_id, api_id ):
     if request.user.id == request.user.user_business.first().user_id:
         
         business =  business_models.Business.objects.filter(business_id=business_id).first()
-        print('business', business)
-        print('user_id', request.user.user_business.first().user_id)
-        print('business_id', request.user.user_business.first().business_id)
-        form = business_forms.businessApiSettingsForm(instance=business)
-        print('form')
+        business_apis = business_models.BusinessApiSettings.objects.filter(id=api_id).first()
+        form = business_forms.businessApiSettingsForm(instance=business_apis)
+        form.fields['business'].queryset = business_models.Business.objects.filter(business_id=request.user.user_business.first().business_id)
+        
+        if request.method == 'POST':
+            print('businessSettingsFormUpdate')
+            form = business_forms.businessApiSettingsForm(
+                request.POST, instance=business_apis)
+            
+            if form.is_valid():
+                f = form.save(commit=False)
+
+
+                form.save()
+                print('businessSettingsForm Update ok')
+                messages.success(request, "Successful Submission")
+                return redirect("business:business_settings", business_id)
+            else:
+                print('businessSettingsForm_update not valid')
+                messages.error(request, "Error")
+        context = {
+            'business': business,
+            'form': form,
+            'api_id': api_id,
+
+            'form_title': 'Business API Settings Add'
+        }
+
+        return render(request, 'client/parts/business_settings_api_update.html', context)
+    else:
+        return redirect("business:business_dashboard")
+
+
+
+def business_settings_api_add(request, business_id):
+    if request.user.id == request.user.user_business.first().user_id:
+        
+        business =  business_models.Business.objects.filter(business_id=business_id).first()
+        business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
+        form = business_forms.businessApiSettingsForm()
+        form.fields['business'].queryset = business_models.Business.objects.filter(business_id=request.user.user_business.first().business_id)
+        
         if request.method == 'POST':
             print('businessSettingsForm')
             form = business_forms.businessApiSettingsForm(
-                request.POST, instance=business)
+                request.POST)
+            
             if form.is_valid():
                 f = form.save(commit=False)
 
@@ -263,21 +333,38 @@ def business_settings(request, business_id):
                 form.save()
                 print('businessSettingsForm ok')
                 messages.success(request, "Successful Submission")
-                return redirect("business:business_dashboard")
+                return redirect("business:business_settings", business_id)
             else:
                 print('businessSettingsForm_update not valid')
                 messages.error(request, "Error")
         context = {
+            'business': business,
             'form': form,
-            'business_id': business.business_id,
-            'form_title': 'Business API Settings'
+
+            'form_title': 'Business API Settings Adding Form'
         }
 
-        return render(request, 'client/frontend/business_profile_update.html', context)
+        return render(request, 'client/parts/business_settings_api_add.html', context)
     else:
         return redirect("business:business_dashboard")
 
 
+def business_settings_api_list(request, business_id):
+    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
+    
+    
+
+    context = {
+        'business': business,
+        'business_apis': business_apis,
+    }
+    return render(request, 'client/parts/business_settings_api_list.html', context)
+
+
+
+
+#business_logo_update---------------------------------------------------------------------------------------------------------------------
 def business_logo_update(request , business_id):
     business_logos =  business_models.BusinessLogo.objects.get(business_id=business_id)
     business_code = business_models.Business.objects.get(business_id=business_id)
@@ -328,4 +415,79 @@ def business_logo_update(request , business_id):
         
         
     return render(request, 'client/parts/business_logo_update.html', context)
+
+
+
+
+#business_teams---------------------------------------------------------------------------------------------------------------------
+
+def business_teams(request, business_id):
+    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    teams = business_models.BusinessTeamProfile.objects.filter(business_id=business_id).all()
+    print('business', business)
+    print('teams', teams)
+    context = {
+        'business': business,
+        'teams': teams,
+    }
+    return render(request, 'client/parts/business_teams_list.html', context)
+
+def business_teams_add(request, business_id):
+    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    form = business_forms.BusinessTeamProfileForm()
+    if request.method == 'POST':
+        print('BusinessTeamProfileForm')
+        form = business_forms.BusinessTeamProfileForm(
+                request.POST)
+        if form.is_valid():
+            f = form.save(commit=False)
+            f.business_id = business_id
+            form.save()
+            print('ok')
+            messages.success(request, "Successful Submission")
+            return redirect("business:business_teams", business_id)
+        else:
+            print('BusinessTeamProfileForm not valid')
+            messages.error(request, "Error")
+    context = {
+            'business': business,
+            'form': form,
+            'form_title': 'Business Team Profile Adding Form'
+        }   
+  
+        
+        
+    return render(request, 'client/parts/business_teams_add.html', context)
+
+
+
+def business_teams_update(request, business_id, team_id):
+    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    team = business_models.BusinessTeamProfile.objects.filter(id=team_id).first()
+    form = business_forms.BusinessTeamProfileForm( instance=team)
+    if request.method == 'POST':
+        print('BusinessTeamProfileForm')
+        form = business_forms.BusinessTeamProfileForm(
+                request.POST, instance=team)
+        if form.is_valid():
+            f = form.save(commit=False)
+            f.business_id = business_id
+            form.save()
+            print('ok')
+            messages.success(request, "Successful Submission")
+            return redirect("business:business_teams", business_id)
+        else:
+            print('BusinessTeamProfileForm not valid')
+            messages.error(request, "Error")
+    context = {
+            'business': business,
+            'form': form,
+            'team': team,
+            'form_title': 'Business Team Profile Update Form' 
+        }   
+  
+        
+        
+    return render(request, 'client/parts/business_teams_update.html', context)
+
 

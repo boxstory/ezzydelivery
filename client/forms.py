@@ -59,26 +59,16 @@ class businessApiSettingsForm(forms.ModelForm):
         model = business_models.BusinessApiSettings
         fields = '__all__'
         exclude = ['verify_api']
-
-        def __init__(self, *args, **kwargs):
-            user = kwargs.pop('user', None)
-            super().__init__(*args, **kwargs)
-            print(" businessApiSettingsForm")
-            print(user)
-            print(user.business)
-
-            self.fields['business'].queryset = business_models.Business.objects.filter(business_id=request.user.user_business.first().business_id)
-        
         
         labels = {
             "api_type": "API Type",
             "api_key": "API Key",
             "api_secret": "API Secret",
-            "site_api_url": "Site API URL",
+            "site_api_url": "Site URL ( with https:// )",
             "order_api_url": "Order API URL",
             "product_api_url": "Product API URL",
         }
-        
+
 
 
  # PICKUP LOCATIONS FORM ----------------------------------------------------------------------------------------------------------------------
@@ -102,3 +92,25 @@ class BusinessLogoForm(forms.ModelForm):
         model = business_models.BusinessLogo
         fields = '__all__'
         exclude = ['business', 'updated_at', 'created_at']
+
+
+# business teams FORM ----------------------------------------------------------------------------------------------------------------------
+
+class BusinessTeamProfileForm(forms.ModelForm):
+    class Meta:
+        model = business_models.BusinessTeamProfile
+        fields = '__all__'
+        exclude = ['business', 'updated_at', 'created_at', 'profile']
+        widgets = {
+            'user': forms.Select(
+                choices=User.objects.all().values_list('username', 'username')),
+            'user': forms.TextInput(attrs={'class': 'form-control p-3'}),
+        }
+
+        labels = {
+            "team_name": "Team Name",
+            "team_phone": "Team Phone No",
+            "team_email": "Team Email",
+            "team_role": "Team Role",
+            'user' : 'Search member by username',
+        }

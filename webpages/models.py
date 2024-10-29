@@ -53,7 +53,7 @@ class PricingEnquiry(models.Model):
     # company Information
     is_registered_company_in_qatar = models.BooleanField(default=False)
     is_located_in_qatar = models.BooleanField(default=False)
-    is_staff_available_in_qatar = models.BooleanField(default=False)
+    is_team_available_in_qatar = models.BooleanField(default=False)
 
     # Service Information
     is_required_COD_service = models.BooleanField(default=False)
