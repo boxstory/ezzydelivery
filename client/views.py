@@ -1,3 +1,4 @@
+import binascii
 from multiprocessing import context
 import os
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
@@ -8,6 +9,8 @@ from decouple import config
 from django.core.files.storage import default_storage
 from PIL import Image
 import numpy as np
+import requests, json
+import shopify
 
 from client import models as business_models
 from core import models as core_models
@@ -15,6 +18,7 @@ from ezzydelivery.settings import BASE_DIR
 from orders import models as orders_models
 
 from client import forms as business_forms
+from datetime import datetime
 
 # Create your views here.
 
@@ -290,7 +294,8 @@ def business_settings_api_update(request, business_id, api_id ):
             
             if form.is_valid():
                 f = form.save(commit=False)
-
+                if f.verify_api == True:
+                    f.verify_api = False
 
                 form.save()
                 print('businessSettingsForm Update ok')
@@ -329,7 +334,7 @@ def business_settings_api_add(request, business_id):
             if form.is_valid():
                 f = form.save(commit=False)
 
-
+                
                 form.save()
                 print('businessSettingsForm ok')
                 messages.success(request, "Successful Submission")
@@ -360,6 +365,83 @@ def business_settings_api_list(request, business_id):
         'business_apis': business_apis,
     }
     return render(request, 'client/parts/business_settings_api_list.html', context)
+
+def business_settings_api_test(request, business_id, api_id):
+    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
+    
+    
+
+    context = {
+        'business': business,
+        'api': business_apis,
+    }
+    return render(request, 'client/parts/business_settings_api_test.html', context)
+
+
+def business_settings_api_test_result(request, business_id, api_id):
+    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
+    update_time = datetime.now().strftime('%Y-%m-%d  Time : %H:%M:%S')
+
+    SHOPIFY_API_KEY = business_apis.api_key
+    SHOPIFY_ACCESS_KEY = business_apis.api_access_token
+    SHOPIFY_API_SECRET = business_apis.api_secret
+    SHOPIFY_STORE_NAME = business_apis.site_api_url
+    SHOPIFY_ORDER_ENDPINT = business_apis.order_api_url
+    SHOPIFY_PRODUCT_ENDPINT = business_apis.product_api_url
+
+
+    SHOPIFY_STORE_NAME = SHOPIFY_STORE_NAME.replace('https://', '')
+
+    
+    shop_creds = {
+        'api_key': SHOPIFY_API_KEY,
+        'api_secret': SHOPIFY_API_SECRET,
+        'access_token': SHOPIFY_ACCESS_KEY, 
+    }
+
+    with open('shopify_creds.json', 'w') as f:
+        json.dump(shop_creds, f)
+
+    
+
+    shop_url = "%s" % SHOPIFY_STORE_NAME
+    print('shop_url', shop_url)
+
+    order_base_url = 'https://' + shop_url + SHOPIFY_ORDER_ENDPINT
+    product_base_url = 'https://' + shop_url + SHOPIFY_PRODUCT_ENDPINT
+
+
+    header_value = { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_KEY, 'Content-Type': 'application/json' }
+
+    order_response = requests.get(order_base_url, headers=header_value)
+    product_response = requests.get(product_base_url, headers=header_value)
+
+
+
+
+
+
+    result = order_response.json()
+    status = order_response.status_code
+    order_count = len(order_response.json().get('orders', []))
+    product_count = len(product_response.json().get('products', []))
+
+
+
+    context = {
+        'business': business,
+        'api': business_apis,
+        'update_time'  : update_time,
+        'order_count'  : order_count,
+        'product_count'  : product_count,
+
+        'status'  : status,
+        'result'  : result,
+
+    }
+    return render(request, 'client/parts/business_settings_api_test_result.html', context)
 
 
 

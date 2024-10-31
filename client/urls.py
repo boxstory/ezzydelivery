@@ -31,10 +31,17 @@ urlpatterns = [
          name='business_settings_api_add'),
     path('<int:business_id>/settings/api/<int:api_id>/update/', business_views.business_settings_api_update,
          name='business_settings_api_update'),
+    path('<int:business_id>/settings/api/<int:api_id>/test/', business_views.business_settings_api_test,
+         name='business_settings_api_test'),
+    path('<int:business_id>/settings/api/<int:api_id>/test/result', business_views.business_settings_api_test_result,
+         name='business_settings_api_test_result'),
+#     path('<int:business_id>/settings/api/<int:api_id>/test/call', business_views.business_settings_api_test_call,
+#          name='business_settings_api_test_call'),
+
      
      # teams settings
      path('<int:business_id>/teams/', business_views.business_teams,
-           name='business_teams'),
+          name='business_teams'),
      path('<int:business_id>/teams/add/', business_views.business_teams_add,
                name='business_teams_add'),
      path('<int:business_id>/teams/<int:team_id>/update/', business_views.business_teams_update,

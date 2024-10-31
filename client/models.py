@@ -76,6 +76,7 @@ class BusinessApiSettings(models.Model):
     )
     api_type = models.CharField(
         max_length=100, choices=type_choices, default='custom')
+    api_access_token = models.CharField(max_length=100, blank=True, null=True)
     api_key = models.CharField(max_length=100, blank=True, null=True)
     api_secret = models.CharField(max_length=100, blank=True, null=True)
     site_api_url = models.CharField(max_length=100, blank=True, null=True)

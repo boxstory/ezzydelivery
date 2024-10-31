@@ -1,0 +1,102 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+{% block content %}
+  <div class="p-3 col-12 col-lg-10 col-md-10">
+    <div class="h4 py-1 d-flex bg-light justify-content-between  mx-auto">
+      <div class=" my-auto fs-3 fw-bolder">API SETTINGS</div>
+      <a href="{% url 'business:business_settings_api_add'  business.business_id %}"
+         class=" text-center btn-primary-fill">New</a>
+    </div>
+    <section>
+      <div class="col-12">
+        <!-- API SETTINGS -->
+        <div class=" col-12 ">
+          <div class="row px-3 d-flex flex-wrap">
+            <div class="  col-12  col-md-6">
+              <div class="card mb-4 ">
+                <div class="card-header">
+                  <p class="card-title   ">{{ api.api_type }} API SETTINGS</p>
+                </div>
+                <form>
+                  <fieldset disabled>
+                    <div class="card-body ps-3">
+                      <div class="mb-3">
+                        <label for="disabledTextInput" class="form-label">Business</label>
+                        <input type="text"
+                               id="disabledTextInput"
+                               class="form-control"
+                               placeholder="{{ api.business }}">
+                      </div>
+                      <div class="mb-3">
+                        <label for="disabledTextInput" class="form-label">API Provider</label>
+                        <input type="text"
+                               id="disabledTextInput"
+                               class="form-control"
+                               placeholder="{{ api.api_type }}">
+                      </div>
+                      <div class="mb-3">
+                        <label for="disabledTextInput" class="form-label">Orders Url</label>
+                        <input type="text"
+                               id="disabledTextInput"
+                               class="form-control"
+                               placeholder="{{ api.order_api_url }}">
+                      </div>
+                      <div class="mb-3">
+                        <label for="disabledTextInput" class="form-label">Products Url</label>
+                        <input type="text"
+                               id="disabledTextInput"
+                               class="form-control"
+                               placeholder="{{ api.product_api_url }}">
+                      </div>
+                      <div class="mb-3">
+                        <p>
+                          <strong>Status:</strong>
+                          {% if api.verify_api == True %}
+                            <i class="fa-solid fa-circle-check mx-3" style="color: #14cc0e;"></i><span class="fw-bold fs-5" style="color: #14cc0e;">Verified</span>
+                          {% else  %}
+                          <i class="fa-solid fa-circle-check mx-3" style="color: #cc0e0e;"></i><span class="fw-bold fs-5" style="color: #cc0e0e;">Not Verified</span>
+                          <p style="color: #ff0000;">Contact Admin for get Approved</p>
+                        
+                          {% endif %}
+                        </p>
+                      </div>
+                    </div>
+                  </fieldset>
+                  <div class="d-flex justify-content-between">
+                    <a hx-post="{% url 'business:business_settings_api_test_result' business.business_id api.id %}"
+                    hx-trigger="click"
+                    hx-target="#api-response-div"
+                    hx-swap="outerHTML"
+                       class="card-footer text-center bg-primary fw-bold btn col-6">Make Test</a>
+                    <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
+                       class="card-footer text-center bg-dark text-white btn col-3 "><i class="fa-solid fa-pen-to-square fa-lg"></i></a>
+                    <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
+                       class="card-footer text-center bg-danger text-white btn col-3"><i class="fa-solid fa-trash fa-lg"></i></a>
+                  </div> 
+                </form>
+              </div>
+            </div>
+            <div class="  col-12  col-md-6">
+              <div class="card mb-4 ">
+                 
+                <div class="card-header">
+                  <p class="card-title   ">{} Response - JSON</p>
+                </div>
+                <div class="card-body ps-3 text-black " id="api-response-div">
+                  <p class="card-text api-response"> </p>
+                </div>
+              </div>
+            </div>
+            <div class="alert alert-info" role="alert">
+              <h4 class="alert-heading">Note:</h4>
+              <p class="mb-0">
+                You can't add multiple APIs for your one store. You can also update or delete the
+                APIs.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+{% endblock content %}

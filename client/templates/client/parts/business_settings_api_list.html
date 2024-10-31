@@ -36,13 +36,20 @@
                         {% elif api.verify_api == False %}
                           <span class="text-danger fs-5 fw-bold">Not Verified
                             <i class="fa-solid fa-circle-xmark" style="color: #ff0000;"></i>
+                            <p style="color: #ff0000;">Contact Admin for get Approved</p>
                           </span>
                         {% else %}
                         {% endif %}
                       </p>
                     </div>
-                    <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
-                       class="card-footer text-center bg-dark ps-0 text-white btn">Update</a>
+                    <div class="d-flex justify-content-between">
+                      <a href="{% url 'business:business_settings_api_test' business.business_id api.id %}"
+                         class="card-footer text-center bg-primary fw-bold btn col-6">Make Test</a>
+                      <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
+                         class="card-footer text-center bg-dark text-white btn col-3 "><i class="fa-solid fa-pen-to-square fa-lg"></i></a>
+                      <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
+                         class="card-footer text-center bg-danger text-white btn col-3"><i class="fa-solid fa-trash fa-lg"></i></a>
+                    </div>
                   </div>
                 </div>
               {% endfor %}
