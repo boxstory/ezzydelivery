@@ -58,15 +58,15 @@ class businessApiSettingsForm(forms.ModelForm):
     class Meta:
         model = business_models.BusinessApiSettings
         fields = '__all__'
-        exclude = ['verify_api']
+        exclude = ['is_verify_api']
         
         labels = {
             "api_type": "API Type",
             "api_key": "API Key",
             "api_secret": "API Secret",
             "site_api_url": "Site URL ( with https:// )",
-            "order_api_url": "Order API URL",
-            "product_api_url": "Product API URL",
+            "order_api_endpoint": "Order API URL",
+            "product_api_endpoint": "Product API URL",
         }
 
 

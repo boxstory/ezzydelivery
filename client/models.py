@@ -79,11 +79,12 @@ class BusinessApiSettings(models.Model):
     api_access_token = models.CharField(max_length=100, blank=True, null=True)
     api_key = models.CharField(max_length=100, blank=True, null=True)
     api_secret = models.CharField(max_length=100, blank=True, null=True)
+    api_version = models.CharField(max_length=100, blank=True, null=True)
     site_api_url = models.CharField(max_length=100, blank=True, null=True)
     site_contry = models.CharField(max_length=100, blank=True, null=True, default='Qatar')
-    order_api_url = models.CharField(max_length=100, blank=True, null=True)
-    product_api_url = models.CharField(max_length=100, blank=True, null=True)
-    verify_api = models.BooleanField(default=False)
+    order_api_endpoint = models.CharField(max_length=100, blank=True, null=True)
+    product_api_endpoint = models.CharField(max_length=100, blank=True, null=True)
+    is_verify_api = models.BooleanField(default=False)
     business = models.ForeignKey(
         Business, on_delete=models.CASCADE, related_name='business_settings_api')
     business_languages = models.CharField(

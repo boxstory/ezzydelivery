@@ -23,8 +23,10 @@
                                         </div>
                                         <div class="card-body ps-2">
                                             <p>
-                                                <a href="https://maps.app.goo.gl/JmKFfjAiLhm28LUSA" target="_blank" class=" btn btn-dark  btn-lg  "><strong> {{ store.locality }}  </strong>
-                                                <i class="fa-solid  fa-location-arrow ps-3" style="color: #ff0000;"></i></a>
+                                                <a href="https://maps.app.goo.gl/JmKFfjAiLhm28LUSA"
+                                                   target="_blank"
+                                                   class=" btn btn-dark  btn-lg  "><strong>{{ store.locality }}</strong>
+                                                    <i class="fa-solid  fa-location-arrow ps-3" style="color: #ff0000;"></i></a>
                                             </p>
                                             <p>
                                                 <strong>Building No:</strong>{{ storepickup_building_no }}
@@ -32,7 +34,7 @@
                                             <p>
                                                 <strong>Zone No:</strong>{{ store.pickup_zone_no }}
                                             </p>
-                                            <p >
+                                            <p>
                                                 <strong>Status:</strong>
                                                 {% if store.pickup_status == 'active' %}
                                                     <span class="text-success  fw-bold">{{ store.pickup_status }}</span><i class="fa fa-check-circle text-success ps-2" aria-hidden="true"></i>
@@ -52,7 +54,7 @@
                             <div class="col-12 d-flex flex-wrap justify-content-center pb-3">
                                 <div class="alert alert-warning m-0" role="alert">No stores Listed</div>
                                 <div class="card-footer text-center my-auto">
-                                    <a href="{% url 'business:pickup_location_add'  %}">
+                                    <a href="{% url 'business:pickup_location_add' %}">
                                         <button class="btn btn-dark">Add</button>
                                     </a>
                                 </div>
@@ -135,13 +137,14 @@
                                                 <strong>Code:</strong> {{ api.api_type }}
                                             </p>
                                             <p>
-                                                <strong>Site: </strong> {{ api.site_api_url }}
-                                            </p> 
+                                                <strong>Site:</strong> {{ api.site_api_url }}
+                                            </p>
                                             <p>
                                                 <strong>Status:</strong>
-                                                {% if api.verify_api == True %}<span class="text-success fw-bolder">Verified
-                                                    <i class="fa-solid fa-circle-check" style="color: #14cc0e;"></i></span>
-                                                {% elif api.verify_api == False %}
+                                                {% if api.is_verify_api == True %}
+                                                    <span class="text-success fw-bolder">Verified
+                                                        <i class="fa-solid fa-circle-check" style="color: #14cc0e;"></i></span>
+                                                {% elif api.is_verify_api == False %}
                                                     <span class="text-danger  fw-bolder ">Not Verified
                                                         <i class="fa-solid fa-circle-xmark" style="color: #ff0000;"></i>
                                                     </span>

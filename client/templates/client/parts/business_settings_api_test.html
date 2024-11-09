@@ -39,24 +39,23 @@
                         <input type="text"
                                id="disabledTextInput"
                                class="form-control"
-                               placeholder="{{ api.order_api_url }}">
+                               placeholder="{{ api.order_api_endpoint }}">
                       </div>
                       <div class="mb-3">
                         <label for="disabledTextInput" class="form-label">Products Url</label>
                         <input type="text"
                                id="disabledTextInput"
                                class="form-control"
-                               placeholder="{{ api.product_api_url }}">
+                               placeholder="{{ api.product_api_endpoint }}">
                       </div>
                       <div class="mb-3">
                         <p>
                           <strong>Status:</strong>
-                          {% if api.verify_api == True %}
+                          {% if api.is_verify_api == True %}
                             <i class="fa-solid fa-circle-check mx-3" style="color: #14cc0e;"></i><span class="fw-bold fs-5" style="color: #14cc0e;">Verified</span>
-                          {% else  %}
-                          <i class="fa-solid fa-circle-check mx-3" style="color: #cc0e0e;"></i><span class="fw-bold fs-5" style="color: #cc0e0e;">Not Verified</span>
-                          <p style="color: #ff0000;">Contact Admin for get Approved</p>
-                        
+                          {% else %}
+                            <i class="fa-solid fa-circle-check mx-3" style="color: #cc0e0e;"></i><span class="fw-bold fs-5" style="color: #cc0e0e;">Not Verified</span>
+                            <p style="color: #ff0000;">Contact Admin for get Approved</p>
                           {% endif %}
                         </p>
                       </div>
@@ -64,26 +63,25 @@
                   </fieldset>
                   <div class="d-flex justify-content-between">
                     <a hx-post="{% url 'business:business_settings_api_test_result' business.business_id api.id %}"
-                    hx-trigger="click"
-                    hx-target="#api-response-div"
-                    hx-swap="outerHTML"
+                       hx-trigger="click"
+                       hx-target="#api-response-div"
+                       hx-swap="outerHTML"
                        class="card-footer text-center bg-primary fw-bold btn col-6">Make Test</a>
                     <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
                        class="card-footer text-center bg-dark text-white btn col-3 "><i class="fa-solid fa-pen-to-square fa-lg"></i></a>
                     <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
                        class="card-footer text-center bg-danger text-white btn col-3"><i class="fa-solid fa-trash fa-lg"></i></a>
-                  </div> 
+                  </div>
                 </form>
               </div>
             </div>
             <div class="  col-12  col-md-6">
               <div class="card mb-4 ">
-                 
                 <div class="card-header">
                   <p class="card-title   ">{} Response - JSON</p>
                 </div>
                 <div class="card-body ps-3 text-black " id="api-response-div">
-                  <p class="card-text api-response"> </p>
+                  <p class="card-text api-response"></p>
                 </div>
               </div>
             </div>

@@ -42,6 +42,7 @@ urlpatterns = [
 
      # orders by API
      path('api/all/', orders_views.get_order_by_api, name='get_order_by_api'),
+     path('api/shopify_orders/', orders_views.get_orders_by_base_api, name='get_orders_by_base_api'),
 
 ]
 

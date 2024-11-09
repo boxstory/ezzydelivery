@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 from django.contrib import messages
 import requests
+from woocommerce import API as WooAPI
 
 from core import models as core_models
 from orders import forms, models as orders_models
@@ -469,6 +470,8 @@ def update_order_status(request):
 #get_by_api from shopify
 
 def get_order_by_api(request):
+    business = business_models.Business.objects.get(user_id=request.user.user_business.first().user_id)
+    
     headers = {
         'Content-Type': 'application/json',
         'X-Shopify-Access-Token': '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'
@@ -500,13 +503,145 @@ def get_order_by_api(request):
         
         data={
             'GetQuestion_response' : GetQuestion_response,
-            "order_data": order_data,
-            "orders": orders
+            'order_data': order_data,
+            'orders': orders,
+            'business': business,
+
+
         }
         return render(request, 'orders\get_order_by_api.html', data)
     else:
         return JsonResponse({'status': 'error', 'message': 'Failed to fetch orders from Shopify'})
 
+
+@login_required(login_url='account_login')
+def get_orders_by_base_api(request):
+    business = business_models.Business.objects.get(user_id=request.user.user_business.first().user_id)
+    business_id = business.business_id
+    business_api = business_models.BusinessApiSettings.objects.filter(business_id=business_id, is_verify_api='True' ).first()
+     
+
+    BASE_API_KEY = business_api.api_key
+    BASE_API_ACCESS_KEY = business_api.api_access_token
+    BASE_API_SECRET = business_api.api_secret
+    BASE_API_STORE_NAME = business_api.site_api_url
+    BASE_API_ORDER_ENDPINT = business_api.order_api_endpoint
+    BASE_API_PRODUCT_ENDPINT = business_api.product_api_endpoint
+
+    BASE_API_STORE_NAME = BASE_API_STORE_NAME.replace('https://', '')
+
+
+    if business_api.api_type == 'shopify':
+        shop_creds = {
+            'api_key': BASE_API_KEY,
+            'api_secret': BASE_API_SECRET,
+            'access_token': BASE_API_ACCESS_KEY, 
+        }
+
+        with open('shopify_creds.json', 'w') as f:
+            json.dump(shop_creds, f)
+
+        shop_url = "%s" % BASE_API_STORE_NAME
+        print('shopify shop_url', shop_url)
+
+        order_base_url = 'https://' + shop_url + BASE_API_ORDER_ENDPINT
+        product_base_url = 'https://' + shop_url + BASE_API_PRODUCT_ENDPINT
+        header_value = { 'X-Shopify-Access-Token': BASE_API_ACCESS_KEY, 'Content-Type': 'application/json' }
+
+        order_response = requests.get(order_base_url, headers=header_value, params={'status': 'any', 'limit': 10})
+        order_count = len(order_response.json().get('orders', []))
+
+        print('order_count', order_count    )
+        product_response = requests.get(product_base_url, headers=header_value )
+        product_count = len(product_response.json().get('products', []))
+        print('product_count', product_count)
+
+    elif business_api.api_type == 'woocommerce':
+        url="http://example.com",
+        shop_url = 'https://' + BASE_API_STORE_NAME 
+        print('woocommerce shop_url', shop_url)
+ 
+        wcapi = WooAPI(
+            url= shop_url,
+            consumer_key= BASE_API_KEY,
+            consumer_secret= BASE_API_SECRET,
+            version="wc/v3",
+        )
+
+        
+        #print(wcapi.get("products", params={"per_page": 20}).json())
+
+        order_response = wcapi.get("orders")
+        order_date = order_response.headers.get('Date')
+        print('order_date', order_date)
+        order_count = order_response.headers.get('X-WP-Total')
+        print('order_count', order_count)
+        product_response = wcapi.get("products", params={"per_page": 20})
+        product_count = product_response.headers.get('X-WP-Total')
+        print('product_count', product_count)
+ 
+    else:
+        order_response = None
+        product_response = None
+
+
+    if order_response.status_code == 200:
+        orders = []
+        for order in order_response.json().get('orders', []):
+            customer_id = order['customer']['id']
+            print('customer_id', customer_id)
+            
+            customer_response = requests.get(f'https://{shop_url}/admin/api/2024-01/customers/{customer_id}.json', headers=header_value)
+            if customer_response.status_code == 200:
+                customer_data = customer_response.json().get('customer', {})
+                print('customer_data', customer_data)
+                customer_info = {
+                    'first_name': customer_data.get('first_name', ''),
+                    'last_name': customer_data.get('last_name', ''),
+                    'email': customer_data.get('email', ''),
+                    'address': customer_data.get('default_address', {}).get('address1', '')
+
+                }
+            else:
+                customer_info = {
+                    'first_name': '',
+                    'last_name': '',
+                    'email': '',
+                    'address': ''
+                }
+
+            orders.append({
+            'id': order['id'],
+            'created_at': order['created_at'],
+            'payment_gateway_names': order['payment_gateway_names'],
+            'total_price': order['total_price'],
+            'current_total_price': order['current_total_price'],
+            'currency': order['currency'],
+            'customer_info': customer_info,
+            'line_items': [
+                {
+                'title': item['title'],
+                'quantity': item['quantity'],
+                'price': item['price']
+                } for item in order['line_items']
+            ],
+            })
+
+        #print('orders', orders)
+    else:
+        orders = []
+
+    result = order_response.json()
+    status = order_response.status_code  
+    context = {
+        'business': business,
+        'api': business_api,
+        'orders'  : orders,
+
+        'status'  : status,
+        'result'  : result,
+    }
+    return render(request, 'orders\orders_api_list.html', context)
 
 
 

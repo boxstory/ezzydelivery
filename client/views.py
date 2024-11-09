@@ -11,6 +11,7 @@ from PIL import Image
 import numpy as np
 import requests, json
 import shopify
+from woocommerce import API as WooAPI
 
 from client import models as business_models
 from core import models as core_models
@@ -294,8 +295,8 @@ def business_settings_api_update(request, business_id, api_id ):
             
             if form.is_valid():
                 f = form.save(commit=False)
-                if f.verify_api == True:
-                    f.verify_api = False
+                if f.is_verify_api == True:
+                    f.is_verify_api = False
 
                 form.save()
                 print('businessSettingsForm Update ok')
@@ -379,60 +380,83 @@ def business_settings_api_test(request, business_id, api_id):
     return render(request, 'client/parts/business_settings_api_test.html', context)
 
 
+
 def business_settings_api_test_result(request, business_id, api_id):
     business =  business_models.Business.objects.filter(business_id=business_id).first()
-    business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
+    business_api = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
     update_time = datetime.now().strftime('%Y-%m-%d  Time : %H:%M:%S')
 
-    SHOPIFY_API_KEY = business_apis.api_key
-    SHOPIFY_ACCESS_KEY = business_apis.api_access_token
-    SHOPIFY_API_SECRET = business_apis.api_secret
-    SHOPIFY_STORE_NAME = business_apis.site_api_url
-    SHOPIFY_ORDER_ENDPINT = business_apis.order_api_url
-    SHOPIFY_PRODUCT_ENDPINT = business_apis.product_api_url
+    BASE_API_KEY = business_api.api_key
+    BASE_API_ACCESS_KEY = business_api.api_access_token
+    BASE_API_SECRET = business_api.api_secret
+    BASE_API_VERSION = business_api.api_version
+    BASE_API_STORE_NAME = business_api.site_api_url
+    BASE_API_ORDER_ENDPINT = business_api.order_api_endpoint
+    BASE_API_PRODUCT_ENDPINT = business_api.product_api_endpoint
 
+    BASE_API_STORE_NAME = BASE_API_STORE_NAME.replace('https://', '')
 
-    SHOPIFY_STORE_NAME = SHOPIFY_STORE_NAME.replace('https://', '')
+    if business_api.api_type == 'shopify':
+        shop_creds = {
+            'api_key': BASE_API_KEY,
+            'api_secret': BASE_API_SECRET,
+            'access_token': BASE_API_ACCESS_KEY, 
+        }
 
-    
-    shop_creds = {
-        'api_key': SHOPIFY_API_KEY,
-        'api_secret': SHOPIFY_API_SECRET,
-        'access_token': SHOPIFY_ACCESS_KEY, 
-    }
+        with open('shopify_creds.json', 'w') as f:
+            json.dump(shop_creds, f)
 
-    with open('shopify_creds.json', 'w') as f:
-        json.dump(shop_creds, f)
+        shop_url = "%s" % BASE_API_STORE_NAME
+        print('shopify shop_url', shop_url)
 
-    
+        order_base_url = 'https://' + shop_url + BASE_API_ORDER_ENDPINT
+        product_base_url = 'https://' + shop_url + BASE_API_PRODUCT_ENDPINT
+        header_value = { 'X-Shopify-Access-Token': BASE_API_ACCESS_KEY, 'Content-Type': 'application/json' }
 
-    shop_url = "%s" % SHOPIFY_STORE_NAME
-    print('shop_url', shop_url)
+        order_response = requests.get(order_base_url, headers=header_value, params={'status': 'any', 'limit': 10})
+        order_count = len(order_response.json().get('orders', []))
 
-    order_base_url = 'https://' + shop_url + SHOPIFY_ORDER_ENDPINT
-    product_base_url = 'https://' + shop_url + SHOPIFY_PRODUCT_ENDPINT
+        print('order_count', order_count    )
+        product_response = requests.get(product_base_url, headers=header_value )
+        product_count = len(product_response.json().get('products', []))
+        print('product_count', product_count)
 
+    elif business_api.api_type == 'woocommerce':
+        url="http://example.com",
+        shop_url = 'https://' + BASE_API_STORE_NAME 
+        print('woocommerce shop_url', shop_url)
+ 
+        wcapi = WooAPI(
+            url= shop_url,
+            consumer_key= BASE_API_KEY,
+            consumer_secret= BASE_API_SECRET,
+            version="wc/v3",
+        )
 
-    header_value = { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_KEY, 'Content-Type': 'application/json' }
+        
+        #print(wcapi.get("products", params={"per_page": 20}).json())
 
-    order_response = requests.get(order_base_url, headers=header_value)
-    product_response = requests.get(product_base_url, headers=header_value)
-
-
-
-
+        order_response = wcapi.get("orders")
+        order_count = order_response.headers.get('X-WP-Total')
+        print('order_count', order_count)
+        product_response = wcapi.get("products", params={"per_page": 20})
+        product_count = product_response.headers.get('X-WP-Total')
+        print('product_count', product_count)
+ 
+    else:
+        order_response = None
+        product_response = None
 
 
     result = order_response.json()
     status = order_response.status_code
-    order_count = len(order_response.json().get('orders', []))
-    product_count = len(product_response.json().get('products', []))
 
-
+    order_count = order_count
+    product_count = product_count
 
     context = {
         'business': business,
-        'api': business_apis,
+        'api': business_api,
         'update_time'  : update_time,
         'order_count'  : order_count,
         'product_count'  : product_count,
@@ -442,7 +466,6 @@ def business_settings_api_test_result(request, business_id, api_id):
 
     }
     return render(request, 'client/parts/business_settings_api_test_result.html', context)
-
 
 
 
