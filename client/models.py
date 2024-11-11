@@ -85,6 +85,7 @@ class BusinessApiSettings(models.Model):
     order_api_endpoint = models.CharField(max_length=100, blank=True, null=True)
     product_api_endpoint = models.CharField(max_length=100, blank=True, null=True)
     is_verify_api = models.BooleanField(default=False)
+    is_default = models.BooleanField(default=False)
     business = models.ForeignKey(
         Business, on_delete=models.CASCADE, related_name='business_settings_api')
     business_languages = models.CharField(

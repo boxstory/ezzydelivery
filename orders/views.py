@@ -518,7 +518,10 @@ def get_order_by_api(request):
 def get_orders_by_base_api(request):
     business = business_models.Business.objects.get(user_id=request.user.user_business.first().user_id)
     business_id = business.business_id
-    business_api = business_models.BusinessApiSettings.objects.filter(business_id=business_id, is_verify_api='True' ).first()
+    business_api = business_models.BusinessApiSettings.objects.filter(business_id=business_id, is_verify_api='True', is_default='True' ).first()
+    if not business_api:
+        return redirect('business:business_settings_api_list', business_id)
+    print(business_api.api_type)
      
 
     BASE_API_KEY = business_api.api_key
@@ -583,6 +586,12 @@ def get_orders_by_base_api(request):
     else:
         order_response = None
         product_response = None
+
+
+    start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    print('start_date', start_date)
+    print('end_date', end_date)
 
 
     if order_response.status_code == 200:
