@@ -61,10 +61,10 @@ class PricingEnquiry(models.Model):
     is_required_fulfillment_service_for_make_hub_in_doha = models.BooleanField(default=False)
 
     # Order Information
-    avarage_number_of_order_last_week = models.CharField(blank=True, null=True)
-    avarage_number_of_order_done_last_month = models.CharField(blank=True, null=True)
-    avarage_number_of_order_expect_next_month = models.CharField(blank=True, null=True)
-    orders_expected_in_next_3_months_milestone = models.CharField(blank=True, null=True)
+    avarage_number_of_order_last_week = models.CharField(blank=True, null=True, max_length=20)
+    avarage_number_of_order_done_last_month = models.CharField(blank=True, null=True, max_length=20)
+    avarage_number_of_order_expect_next_month = models.CharField(blank=True, null=True, max_length=20)
+    orders_expected_in_next_3_months_milestone = models.CharField(blank=True, null=True, max_length=20)
     
 
     # Delivery Information

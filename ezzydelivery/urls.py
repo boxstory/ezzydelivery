@@ -1,6 +1,6 @@
 import debug_toolbar
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include , re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from orders import views as orders_views
@@ -11,6 +11,8 @@ admin.site.site_header = 'Ezzy Delivery Admin'
 urlpatterns = [
     path('dj-admin/', admin.site.urls),
     path('__debug__/', include(debug_toolbar.urls)),
+
+    re_path(r'^djga/', include('google_analytics.urls')),
 
     path('accounts/', include('allauth.urls')),
 

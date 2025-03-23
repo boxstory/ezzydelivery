@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'import_export',
     'geocoder',
+    'google_analytics',
 
     # local apps
     'core',
@@ -123,7 +124,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    "allauth.account.middleware.AccountMiddleware",
+    'allauth.account.middleware.AccountMiddleware',
+    #'google_analytics.middleware.GoogleAnalyticsMiddleware',
 ]
 
 ROOT_URLCONF = 'ezzydelivery.urls'
@@ -145,6 +147,11 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'ezzydelivery.wsgi.application'
+
+
+GOOGLE_ANALYTICS = {
+    'google_analytics_id': 'UA-000000-2',  # Replace with your actual tracking ID
+}
 
 
 # Database

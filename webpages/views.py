@@ -4,7 +4,7 @@ from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from webpages.forms import *
-from django.core.mail import mail_admins
+from django.core.mail import mail_admins, send_mail
 from client import models as business_models
 from fleet import models as fleet_models
 # Create your views here.
@@ -29,8 +29,22 @@ def delivery_inquiry(request):
         if form.is_valid():
             form.save()
             messages.success(request, "Successful Submission")
+            
+            # Send email to admins
+            subject = "New Delivery Inquiry"
+            message = f"New delivery inquiry submitted by {form.cleaned_data['name']}."
+            mail_admins(subject, message)
+            
+            # Send email to Gmail
+            send_mail(
+                subject,
+                message,
+                'zellaqatar@gmail.com',  # Replace with your Gmail address
+                ['ezzydelivery@gmail.com'],  # Replace with recipient's email address
+                fail_silently=False,
+            )
+            
             return redirect('/')
-
 
     data = {
         'form': form

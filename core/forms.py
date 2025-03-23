@@ -30,7 +30,7 @@ class ProfileForm(forms.ModelForm):
     class Meta:
         model = Profile
         fields = ['first_name', 'last_name', 'email', 'phone', 'address', 'instagram',
-                  'whatsapp', 'zone_name', 'nationlity', 'date_of_birth']
+              'whatsapp', 'zone_name', 'nationlity', 'date_of_birth']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -39,7 +39,13 @@ class ProfileForm(forms.ModelForm):
         self.fields['date_of_birth'].widget = forms.SelectDateWidget(
             years=YEARS)
         self.fields['date_of_birth'].widget.attrs = {
-            'class': 'form-control d-flex justify-content-center'}
+             'type': "date"}
+        self.fields['phone'].required = True
+        self.fields['nationlity'].required = True
+        self.fields['date_of_birth'].required = True
+        self.fields['whatsapp'].required = True
+        self.fields['zone_name'].required = True
+        
 
 
 class ProfilePictureForm(forms.ModelForm):
