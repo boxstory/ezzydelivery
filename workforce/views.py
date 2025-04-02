@@ -57,7 +57,7 @@ def all_orders(request):
     data = {
         'orders': orders,
     }
-    return render(request, 'workforce/parts/lists/orders_list.html', data)
+    return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
 
 
@@ -111,7 +111,7 @@ def orders_published(request):
     data = {
         'orders': orders,
     }
-    return render(request, 'workforce/parts/lists/orders_list.html', data)
+    return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
 def submit_to_task(request, order_id):
     order = get_object_or_404(orders_models.Order, id=order_id)

@@ -3,38 +3,44 @@
 {% load static %}
 <!-- extra css -->
 {% block extra_css %}
-<link href="{% static 'orders/css/orders_main.css' %}" rel="stylesheet" type="text/css" />
+  <link href="{% static 'orders/css/orders_main.css' %}"
+        rel="stylesheet"
+        type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-<!-- orders_list.html -->
-<div class="col-12 col-md-9 col-lg-10">
-  <section class="d-none d-md-block ">
-    <div class="flex-fill pb-2">
-      <div class="ms-3 col-11">
-        <div class="col-md-12 d-flex flex-wrap justify-content-between pb-md-4">
-          <div class="m-0 fs-4 fw-bolder">Orders Added list({{len}})</div>
-          <div>
-            <a class="btn btn-dark pe-3 text-white" href="{% url 'orders:get_order_by_api' %}">
-              <i class="fa fa-add me-3"></i> API Upload
-            </a>
-            <a class="btn btn-dark pe-3 text-white" href="{% url 'orders:order_upload_file' %}">
-              <i class="fa fa-add me-3"></i> Upload bulk
-            </a>
-            <a class="btn btn-dark pe-3 text-white" href="{% url 'orders:add_order' %}">
-              <i class="fa fa-add me-3"></i> Add Orders
-            </a>
+  <!-- orders_list_view.html -->
+  <div class="col-12 col-md-9 col-lg-10">
+    <section class="d-none d-md-block ">
+      <div class="col-12 pb-2">
+        <div class="ms-3 ">
+          <div class="col-md-12 pt-md-4 d-flex flex-wrap justify-content-between pb-md-4">
+            <div class="m-0 fs-4 fw-bolder">Orders Added list({{ len }})</div>
+            <div>
+              <a class="btn btn-dark pe-3 text-white"
+                 href="{% url 'orders:get_order_by_api' %}">
+                <i class="fa fa-add me-3"></i> API Upload
+              </a>
+              <a class="btn btn-dark pe-3 text-white"
+                 href="{% url 'orders:order_upload_file' %}">
+                <i class="fa fa-add me-3"></i> Upload bulk
+              </a>
+              <a class="btn btn-dark pe-3 text-white"
+                 href="{% url 'orders:add_order' %}">
+                <i class="fa fa-add me-3"></i> Add Orders
+              </a>
+            </div>
           </div>
+          {% include "orders/parts/orders_list_view.html" %}
         </div>
-        {% include "orders/parts/orders_list.html" %}
-      </div>
-  </section>
-  <section class="d-block d-md-none">
-
-    {% include "orders/parts/orders_list_mob.html" %}
-  </section>
-</div>
-{% endblock content %}
-{% block extra_js %}
-<script type="text/javascript" language="JavaScript" charset="UTF-8"
-  src="{%static 'orders/js/orders_main.js' %}"></script>
-{% endblock extra_js %}
+      </section>
+      <section class="d-block d-md-none">
+        {% include "orders/parts/orders_list_view_mob.html" %}
+      </section>
+    </div>
+  {% endblock content %}
+  {% block extra_js %}
+    <script type="text/javascript"
+            language="JavaScript"
+            charset="UTF-8"
+            src="{%static 'orders/js/orders_main.js' %}"></script>
+  {% endblock extra_js %}

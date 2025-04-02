@@ -32,7 +32,7 @@ class Order(models.Model):
         ('cancelled', 'Cancelled'),
         
     }
-    ORDER_STATUS_BY_STAFF = {
+    TASK_STATUS_BY_STAFF = {
         ('new_order', 'New Order'),
         ('info_missing', 'Info Missing'),
         ('pending_for_confirm', 'Pending in confirm with Customer'),
@@ -62,7 +62,7 @@ class Order(models.Model):
         max_length=100, choices=ORDER_STATUS_BY_CLIENT, default='to_review',
     )
     task_status = models.CharField(
-        max_length=100, choices=ORDER_STATUS_BY_CLIENT, default='new_order',
+        max_length=100, choices=TASK_STATUS_BY_STAFF, default='new_order',
     )
 
     # pickup details

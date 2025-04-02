@@ -10,7 +10,7 @@ crispy_forms_tags %}
         type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-  <!-- orders_list.html -->
+  <!-- orders_list_view.html -->
   <div class="col-12 col-md-9 col-lg-10">
     <section class="d-none d-md-block">
       <div class="flex-fill pb-2">
@@ -35,7 +35,7 @@ crispy_forms_tags %}
           <div class="section">
             <h3>Orders List</h3>
             <!-- Date Selection Form -->
-             {% csrf_token %}
+            {% csrf_token %}
             <form method="get" action="{% url 'orders:get_order_by_api' %}">
               <label for="start_date">Start Date:</label>
               <input class="px-3 py-1 fw-bold rounded-3"
@@ -63,19 +63,19 @@ crispy_forms_tags %}
                   <br />
                   <strong>Date:</strong> {{ order.created_at|slice:":10" }}
                   <br />
-                  <strong>Customer:</strong> {{ order.customer.first_name }} {{                  order.customer.last_name }}
+                  <strong>Customer:</strong> {{ order.customer.first_name }} {{ order.customer.last_name }}
                   <br />
                   <strong>Total Price:</strong> {{ order.total_price }}
                   <br />
                   <strong>Status:</strong> {{ order.financial_status }}
                   <br />
-                  <strong>Shipping Address:</strong> {{order.shipping_address.province }}, {{                  order.shipping_address.country }}
+                  <strong>Shipping Address:</strong> {{ order.shipping_address.province }}, {{ order.shipping_address.country }}
                   <br />
                   <strong>Billing Address:</strong> {{ order.billing_address.province }}, {{ order.billing_address.country }}
                   <br />
                   <strong>Payment Terms:</strong> {{ order.payment_terms }}
                   <br />
-                  <strong>Payment Method:</strong> {{ order.payment_gateway_names.0}}
+                  <strong>Payment Method:</strong> {{ order.payment_gateway_names.0 }}
                   <br />
                   <strong>Order Number:</strong> {{ order.order_number }}
                   <br />

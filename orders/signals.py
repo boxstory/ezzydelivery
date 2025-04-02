@@ -10,8 +10,8 @@ import json
 @receiver(pre_save, sender=Order)
 def order_pre_save_receiver(sender, instance, *args, **kwargs):
     if not instance.order_number:
-        #instance.order_number = str(uuid.uuid4()).replace('-', '').upper()[:10]
-        instance.order_number = "1"
+        instance.order_number = str(uuid.uuid4()).replace('-', '').upper()[:10]
+        #instance.order_number = "1"
 
 
 @ receiver(post_save, sender=Order)
@@ -19,8 +19,8 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
     print('order_post_save_receiver')
     if created:
         print(instance)
-        if instance.order_number == "1":
-            instance.order_number = instance.business.business_code + '-' + str(instance.client_order_code) + '-' + str(instance.id)
+        if instance.order_number == "" :
+            instance.order_number = str(instance.business.business_code) + '-' + str(instance.client_order_code) + '-' + str(instance.id)
             print(instance.order_number)
         
         if instance.order_number not in DlAddressUpdate.objects.values_list('dl_task_number', flat=True):
@@ -46,17 +46,4 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
                 order_id=instance.id, )
             instance.save()
 
-    # Get the changed fields
-    #changed_fields = instance.get_dirty_fields()
-    #print('changed_fields')
-    #print(changed_fields)
-
-    # Create a log entry
-    #log_entry = OrderLog(
-    #    original_enquiry=instance,
-    #    change_data_log=json.dumps(changed_fields)  # Convert dictionary to JSON
-    #)
-    #print('log_entry')
-    #print(log_entry)
-    #@todo log entry dict not getting
-    #log_entry.save()
+   

@@ -3,27 +3,29 @@
 {% load static %}
 <!-- extra css -->
 {% block extra_css %}
-<link href="{% static 'orders/css/orders_main.css' %}" rel="stylesheet" type="text/css" />
+  <link href="{% static 'orders/css/orders_main.css' %}"
+        rel="stylesheet"
+        type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-<!-- orders_list.html -->
-<div class="col-12 col-md-9 col-lg-10">
-  <div class="d-none d-md-block ">
-    <div class="flex-fill pb-2">
-      <div class="p-3 col-12">
-        <div class="col-md-12 d-flex flex-row justify-content-between pb-md-4">
-          <h2 class="m-0">Orders Pending list</h2>
-          <a class="btn btn-dark pe-3 text-white" href="{% url 'orders:add_order' %}">
-            <i class="fa fa-plus me-3"></i> Add Orders
-          </a>
+  <!-- orders_list_view.html -->
+  <div class="col-12 col-md-9 col-lg-10">
+    <div class="d-none d-md-block ">
+      <div class="flex-fill pb-2">
+        <div class="p-3 col-12">
+          <div class="col-md-12 d-flex flex-row justify-content-between pb-md-4">
+            <h2 class="m-0">Orders Pending list</h2>
+            <a class="btn btn-dark pe-3 text-white"
+               href="{% url 'orders:add_order' %}">
+              <i class="fa fa-plus me-3"></i> Add Orders
+            </a>
+          </div>
+          {% include "orders/parts/orders_list_view.html" %}
         </div>
-        {% include "orders/parts/orders_list.html" %}
       </div>
     </div>
+    <section class="d-block d-md-none">
+      {% include "orders/parts/orders_list_view_mob.html" %}
+    </section>
   </div>
-  <section class="d-block d-md-none">
-
-    {% include "orders/parts/orders_list_mob.html" %}
-  </section>
-</div>
 {% endblock content %}

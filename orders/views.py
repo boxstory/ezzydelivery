@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from datetime import datetime, timedelta, timezone
-
+from django.forms import inlineformset_factory
 import pandas as pd
 from django.contrib import messages
 import requests
@@ -38,7 +38,7 @@ def orders_all_list(request):
     default_page = 1
     page = request.GET.get('page', default_page)
     # Paginate items
-    items_per_page = 10
+    items_per_page = 5
     paginator = Paginator(items , items_per_page)
     try:
         orders = paginator.page(page)
@@ -158,7 +158,7 @@ def latest_orders_list(request):
 
     print(business, "latest 10 order list")
     orders = orders_models.Order.objects.filter(
-        business=business.business_id).order_by('-id')
+        business=business.business_id).order_by('-id')[:5]
     
     
     print(orders)
@@ -182,7 +182,7 @@ def latest_orders_list(request):
         'orders': orders,
         'business': business,
     }
-    return render(request, 'orders/orders_list.html', context)
+    return render(request, 'orders/orders_list_view.html', context)
 
 # order uploading section ----------------------------------------------------------------
 
@@ -205,7 +205,13 @@ def order_upload_file(request):
             return redirect('orders:order_upload_review_data')
     else:
         form = orders_forms.OrderFileUploadForm()
-    return render(request, 'orders/order_upload_file.html', {'form': form})
+    
+    business = business_models.Business.objects.get(user_id=request.user.id)
+    context = {
+        'form': form,
+        'business': business
+    }
+    return render(request, 'orders/order_upload_file.html',  context)
 
 def order_upload_review_data(request):
     if 'uploaded_data' not in request.session:
@@ -261,40 +267,104 @@ def order_upload_review_data(request):
 def add_order(request):
     business = business_models.Business.objects.get(
         user_id=request.user.id)
+    print(business.business_id)
     pickup_locations = business_models.PickupLocation.objects.filter(
-        business_id=request.user.id).all()
+        business_id=business.business_id).all()
 
     print('pickup_locations : ', pickup_locations)
     if not pickup_locations:
         print("pickup_locations is None")
-        return redirect('/business/pickup_location/add/')
+        return redirect('client:pickup_location_add')
     else:
         if request.method == 'POST':
             print("POST form in views")
             form = orders_forms.AddOrderForm(request.POST)
-            #print(form)
-
-            # @todo
-            form.fields['product_list'].queryset = orders_models.Items.objects.filter(
-                 business=request.user.user_business.first().business_id)
+            
             if form.is_valid():
                 print("valid form")
                 order = form.save(commit=False)
                 order.business = business_models.Business.objects.get(
-                    business_id=request.user.id)
-
+                    business_id=business.business_id)
                 print(order.business_id)
-
-
                 order = form.save()
                 print('order.id')
                 print(order.id)
-                
-                return  redirect('orders:orders_all_list')
+                return  redirect('orders:add_order_product', order_id=order.id)
         else:
-            print("load form")
+            print("load add_order form")
             form = orders_forms.AddOrderForm(business_id=business.business_id)
     return render(request, 'orders/add_order.html', {'form': form, 'business': business, })
+
+
+
+
+# add products to order
+@login_required(login_url='account_login')
+def add_order_product(request, order_id):
+    order = orders_models.Order.objects.get(id=order_id)
+    
+    business=business_models.Business.objects.get(user_id=request.user.id)
+    try:
+        order_product_list = orders_models.OrderProductList.objects.get(order_id=order_id)
+    except:
+        order_product_list = orders_models.OrderProductList.objects.create(order_id=order_id)
+    if request.method == 'POST':
+            print("POST form in views")
+            form = orders_forms.AddOrderProductsForm(request.POST, instance=order_product_list)
+            #print(form)
+            if form.is_valid():
+                print("valid form")
+                form.save()
+                return  redirect('orders:orders_all_list')
+    else:
+        form = orders_forms.AddOrderProductsForm(instance=order_product_list)
+        print('else form')
+    data = {
+        'order': order,
+        'form': form,
+        'business': business
+
+    }
+    return render(request, 'orders/add_order_product.html', data)
+
+
+
+#AddOrderWithProduct
+def add_order_with_product(request):
+    business = business_models.Business.objects.get(
+        user_id=request.user.id)
+    OrderFormset = inlineformset_factory(orders_models.Order, orders_models.OrderProductList, form=orders_forms.AddOrderProductsForm, extra=1)
+    if request.method == 'POST':
+        order_product_formset = OrderFormset(queryset=orders_models.OrderProductList.objects.none())
+        
+        
+            
+        if order_product_formset.is_valid():
+                order_product_formset.save()
+                
+                return redirect('orders:orders_all_list')
+    
+    else:
+        
+        order_product_formset = OrderFormset(queryset=orders_models.OrderProductList.objects.none())
+        
+    
+    context = {
+        'business' :  business,
+        
+        'order_product_formset': order_product_formset,
+    }
+    return render(request, 'orders/add_order_with_product.html', context)
+    
+
+
+
+
+
+
+
+
+#costumer side*********************************************************************
 
 
 @login_required(login_url='account_login')
@@ -324,9 +394,15 @@ def order_update(request, order_id):
     if request.method == 'POST':
         form = orders_forms.UpdateOrderForm(request.POST, instance=order)
         print('form valid checking')
-        if form.is_valid():
-            print('form valid')
-            form.save()
+        if order.task_status == 'dl_task_listed':
+            messages.error(request, 'Cannot update order published in Delivery Tasks. Contact Operation Admin')
+            return redirect('orders:orders_all_list')
+        else:
+            if form.is_valid():
+                print('form valid')
+                
+                form.save()
+                messages.success(request, 'Order updated successfully.')
             return  redirect('orders:orders_all_list')
     else:
         form = orders_forms.UpdateOrderForm(instance=order)
@@ -359,30 +435,6 @@ def order_details(request, order_id):
     return render(request, 'orders/order_details.html', data)
 
 
-# add products to order
-@login_required(login_url='account_login')
-def add_order_product(request, order_id):
-    order = orders_models.Order.objects.get(id=order_id)
-    try:
-        order_product_list = orders_models.OrderProductList.objects.get(order_id=order_id)
-    except:
-        order_product_list = orders_models.OrderProductList.objects.create(order_id=order_id)
-    if request.method == 'POST':
-            print("POST form in views")
-            form = orders_forms.AddOrderProductsForm(request.POST, instance=order_product_list)
-            #print(form)
-            if form.is_valid():
-                print("valid form")
-                form.save()
-                return  redirect('orders:orders_all_list')
-    else:
-        form = orders_forms.AddOrderProductsForm(instance=order_product_list)
-        print('else form')
-    data = {
-        'order': order,
-        'form': form
-    }
-    return render(request, 'orders/add_order_product.html', data)
 
 
 @login_required(login_url='account_login')
@@ -471,6 +523,8 @@ def update_order_status(request):
 
 def get_order_by_api(request):
     business = business_models.Business.objects.get(user_id=request.user.user_business.first().user_id)
+    api_data = business_models.BusinessApiSettings.objects.filter(business_id=business.business_id, is_verify_api='True', is_default='True' ).first()
+    print(api_data)
     
     headers = {
         'Content-Type': 'application/json',
@@ -597,6 +651,7 @@ def get_orders_by_base_api(request):
     if order_response.status_code == 200:
         orders = []
         for order in order_response.json().get('orders', []):
+            print('order in order_response', order)
             customer_id = order['customer']['id']
             print('customer_id', customer_id)
             
@@ -651,9 +706,3 @@ def get_orders_by_base_api(request):
         'result'  : result,
     }
     return render(request, 'orders\orders_api_list.html', context)
-
-
-
-
-
-

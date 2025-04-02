@@ -3,97 +3,101 @@
 {% load static %}
 <!-- extra css -->
 {% block extra_css %}
-<link href="{% static 'orders/css/orders_main.css' %}" rel="stylesheet" type="text/css" />
+  <link href="{% static 'orders/css/orders_main.css' %}"
+        rel="stylesheet"
+        type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-<!-- orders_list.html -->
-<div class="col-12 col-md-9 col-lg-10">
-  <section class="d-none d-md-block ">
-    <div class="flex-fill pb-2">
-      <div class="ms-3 col-11">
-        <div class="col-md-12 d-flex flex-wrap justify-content-between pb-md-4">
-          <div class="m-0 fs-4 fw-bolder">Orders Added list({{len}})</div>
-          <div>
-            <a class="btn btn-dark pe-3 text-white" href="{% url 'orders:get_order_by_api' %}">
-              <i class="fa fa-add me-3"></i> API Upload
-            </a>
-            <a class="btn btn-dark pe-3 text-white" href="{% url 'orders:order_upload_file' %}">
-              <i class="fa fa-add me-3"></i> Upload bulk
-            </a>
-            <a class="btn btn-dark pe-3 text-white" href="{% url 'orders:add_order' %}">
-              <i class="fa fa-add me-3"></i> Add Orders
-            </a>
+  <!-- orders_list_view.html -->
+  <div class="col-12 col-md-9 col-lg-10">
+    <section class="d-none d-md-block ">
+      <div class="flex-fill pb-2">
+        <div class="ms-3 col-11">
+          <div class="col-md-12 d-flex flex-wrap justify-content-between pb-md-4">
+            <div class="m-0 fs-4 fw-bolder">Orders Added list({{ len }})</div>
+            <div>
+              <a class="btn btn-dark pe-3 text-white"
+                 href="{% url 'orders:get_order_by_api' %}">
+                <i class="fa fa-add me-3"></i> API Upload
+              </a>
+              <a class="btn btn-dark pe-3 text-white"
+                 href="{% url 'orders:order_upload_file' %}">
+                <i class="fa fa-add me-3"></i> Upload bulk
+              </a>
+              <a class="btn btn-dark pe-3 text-white"
+                 href="{% url 'orders:add_order' %}">
+                <i class="fa fa-add me-3"></i> Add Orders
+              </a>
+            </div>
+          </div>
+          <!-- shopify orders listing to submit orders to task -->
+          <div class="container mt-4">
+            <h2>{{ api.api_type }} Orders,</h2>
+            API Provider : {{ api.api_type }},
+            From
+            <input type="date"
+                   id="start_date"
+                   name="start_date"
+                   value="{{ start_date }}">
+            To
+            <input type="date" id="end_date" name="end_date" value="{{ end_date }}">
+            <button class="btn btn-dark" onclick="getOrders()">Get Orders</button>
+            <table class="table table-bordered table-hover">
+              <thead class="thead-dark">
+                <tr>
+                  <th>Order Date</th>
+                  <th>Order ID</th>
+                  <th>Order Number</th>
+                  <th>Customer</th>
+                  <th>Payment Gateway</th>
+                  <th>Total Price</th>
+                  <th>Items</th>
+                  <th>Confirm</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for order in orders %}
+                  <tr>
+                    <td>{{ order.created_at }} - {{ order.created_at|date:"Y-m-d" }}</td>
+                    <td>{{ order.id }}</td>
+                    <td>{{ order.customer_info }}</td>
+                    <td>{{ order.customer_info.first_name }}</td>
+                    <td class="fs-6">{{ order.payment_gateway_names|first }}</td>
+                    <td class="fs-6">{{ order.current_total_price | floatformat:2 }}</td>
+                    <td>
+                      <table class="table table-sm">
+                        {% for item in order.line_items %}
+                          <tr>
+                            <td>{{ item.title }}</td>
+                            <td>{{ item.quantity }}</td>
+                          </tr>
+                        {% endfor %}
+                      </table>
+                    </td>
+                    <td>
+                      <div>
+                        <button class="btn btn-dark" onclick="confirmOrder({{ order.id }})">Confirm</button>
+                      </div>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="6" class="text-center">No orders found.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
-        <!-- shopify orders listing to submit orders to task -->
-
-        
-<div class="container mt-4">
-  <h2>{{api.api_type}} Orders, </h2>
-  API Provider : {{api.api_type}},
-  From <input type="date" id="start_date" name="start_date" value="{{start_date}}">
-  To <input type="date" id="end_date" name="end_date" value="{{end_date}}"> <button class="btn btn-dark" onclick="getOrders()">Get Orders</button>
-  <table class="table table-bordered table-hover">
-      <thead class="thead-dark">
-          <tr>
-              <th>Order Date</th>
-              <th>Order ID</th>
-              <th>Order Number</th>
-              <th>Customer</th>
-              <th>Payment Gateway</th>
-              <th>Total Price</th>
-              <th>Items</th>
-              <th>Confirm</th>
-          </tr>
-      </thead>
-      <tbody>
-          {% for order in orders %}
-              <tr>
-                  <td>{{ order.created_at   }} - {{ order.created_at|date:"Y-m-d" }}</td>
-                  <td>{{ order.id }}</td>
-                  <td>{{ order.customer_info }}</td>
-                  <td>{{ order.customer_info.first_name }}</td>
-                  <td class="fs-6">{{order.payment_gateway_names|first}}</td>
-                  <td class="fs-6">{{ order.current_total_price | floatformat:2 }}</td>
-                  <td>  
-                    <table class="table table-sm">
-                      {% for item in order.line_items %}
-                      <tr>
-                        <td>{{ item.title }}</td>
-                        <td>{{ item.quantity }}</td>
-                      </tr>
-                      {% endfor %}
-                    </table>
-                  </td>
-                  <td>
-                    <div>
-                      <button class="btn btn-dark" onclick="confirmOrder({{ order.id }})">Confirm</button> 
-                    </div>
-                  </td>
-              </tr>
-          {% empty %}
-              <tr>
-                  <td colspan="6" class="text-center">No orders found.</td>
-              </tr>
-          {% endfor %}
-      </tbody>
-  </table>
-</div>
-        
-
-
-      </div>
-  </section>
-  <section class="d-block d-md-none">
-
-    {% include "orders/parts/orders_list_mob.html" %}
-  </section>
-</div>
-{% endblock content %}
-{% block extra_js %}
-<script type="text/javascript" language="JavaScript" charset="UTF-8"
-  src="{%static 'orders/js/orders_main.js' %}"></script>
-
-
-
-{% endblock extra_js %}
+      </section>
+      <section class="d-block d-md-none">
+        {% include "orders/parts/orders_list_view_mob.html" %}
+      </section>
+    </div>
+  {% endblock content %}
+  {% block extra_js %}
+    <script type="text/javascript"
+            language="JavaScript"
+            charset="UTF-8"
+            src="{%static 'orders/js/orders_main.js' %}"></script>
+  {% endblock extra_js %}

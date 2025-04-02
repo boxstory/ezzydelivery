@@ -1,0 +1,167 @@
+{% for order in orders %}
+  <div class="section  ">
+    <div class="section d-flex">
+      <div class="p-3  col-8   bg-light border border-light border-5 rounded">
+        <div class="d-flex justify-content-between">
+          <div class="fw-bolder">
+            {{ order.order_number }} -
+            {% if order.task_created %}
+              Task Created
+            {% else %}
+              Task Not Created yet
+            {% endif %}
+          </div>
+          <div class="fw-bold mb-2">{{ order.order_date }}</div>
+        </div>
+        <div class="pb-2">
+          <div class="d-flex justify-content-between">
+            <div>Name : {{ order.customer_name }}</div>
+            <div>
+              Mobile : <a class="text-decoration-none text-dark"
+    href="http://wa.me/{{ order.customer_whatsapp }}"
+    target="_blank">{{ order.customer_phone }}</a>
+            </div>
+          </div>
+        </div>
+        <div class="pb-2">
+          <div class="d-flex justify-content-between">
+            <div>
+              Pickup Location :
+              {{ order.pickup_location }}
+              <a href="" class="text-decoration-none  ">  <i class="fa-solid fa-location-pin p-2" style="color: #008000;"></i> </a>
+            </div>
+          </div>
+          <div class="d-flex justify-content-between">
+            <div class="py-2"">
+              Drop OfF :
+              {{ order.dl_zone }} - {{ order.customer_address }}<a href="" class="text-decoration-none  ">  <i class="fa-solid fa-location-pin p-2" style="color: #ac2402;"></i> </a>
+            </div>
+            <div class="align-content-center">
+              Address : Zn-{{ order.dl_zone }}, Str-{{ order.dl_street }}, Bldg-{{ order.dl_building }},
+              {{ order.customer_address }}
+            </div>
+          </div>
+        </div>
+        <hr class="p-0 m-0 align-content-center" />
+        <div class="pb-1 ">
+          <div class="d-flex justify-content-between">
+            <div>Category : {{ order.product_sub_catgory }}</div>
+          </div>
+        </div>
+        <div class="d-flex justify-content-between">
+          <div>Pickup Status : {{ order.order_status }}</div>
+          <div>COD</div>
+        </div>
+        <div class="d-flex justify-content-between pt-2">
+          <div>DMS Status :{{ order.dl_task.dl_task_status_dms }}assigned</div>
+          <div class="fw-bold text-danger">Qr: {{ order.cod_amount }}</div>
+        </div>
+      </div>
+      <div class=" col-4   pb-1 bg-light  collapses"
+           id="collapse-product-{{ order.id }}">
+        <table class="table m-0 border border-right ">
+          <thead class="table-light">
+            <tr>
+              <th colspan="2">Items</th>
+              <th>Qty</th>
+              <th class="text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if listed_product %}
+              {% for product_list in listed_product %}
+                {% if product_list %}
+                  {% for product in product_list %}
+                    <tr>
+                      <td colspan="2">{{ product.name }}</td>
+                      <td>{{ product.qty }}</td>
+                      <td class="text-center">
+                        <a class="btn pe-1 text-dark text-decoration-none"
+                           href="{% url 'orders:add_order_product' order.id %}">
+                          <i class="fa fa-lg fa-edit me-2"></i>
+                        </a>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr>
+                    <td class="text-start" colspan="2">No products added</td>
+                    <td>--</td>
+                    <td class="text-center">
+                      <a class="btn pe-1 text-dark text-decoration-none"
+                         href="{% url 'orders:add_order_product' order.id %}">
+                        <i class="fa-solid fa-plus"></i>
+                      </a>
+                    </td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td class="text-start align-content-center" colspan="2">Load Products from DMS</td>
+                <td class="text-end" colspan="2">
+                  <a class="border rounded-pill p-2 btn px-3 me-3 text-dark text-decoration-none"
+                     hx-get="{% url 'orders:order_product_list' order.id %}"
+                     hx-target="#collapse-product-{{ order.id }}"
+                     hx-trigger="click"
+                     aria-expanded="true"
+                     data-bs-target="#collapse-product-{{ order.id }}"
+                     aria-controls="collapse-product-{{ order.id }}"
+                     data-bs-toggle="collapses">Click Here</a>
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="d-flex justify-content-end mb-3 m-0 p-2 bg-light ">
+      <a href="{% url 'orders:order_update' order.id %} "
+         class="border rounded-pill p-2  px-3 me-2 text-dark text-decoration-none">
+        <i class="fa fa-lg fa-edit me-2"></i>Edit Order
+      </a>
+      <a class="border rounded-pill p-2  px-3 btn  text-dark text-decoration-none"
+         href="{% url 'orders:delete_order' order.id %} ">
+        <i class="fa fa-trash me-2"></i>Delete</a>
+    </div>
+  </div>
+{% endfor %}
+{% if orders.has_other_pages %}
+  <ul class="pagination justify-content-end text-dark">
+    {% if orders.has_previous %}
+      <li class="page-item pe-2">
+        <a class="page-link text-dark"
+           href="?page={{ orders.previous_page_number }}">Previous</a>
+      </li>
+    {% else %}
+      <li class="page-item disabled pe-2">
+        <a class="page-link text-dark" href="#">Previous</a>
+      </li>
+    {% endif %}
+    {% for page_number in orders.paginator.page_range %}
+      {% if orders.number == page_number %}
+        <li class="page-item  btn btn-outline-dark active me-2">{{ page_number }}</li>
+      {% else %}
+        <li class="page-item me-2">
+          <a class="page-link text-dark" href="?page={{ page_number }}">{{ page_number }}</a>
+        </li>
+      {% endif %}
+    {% endfor %}
+    {% if orders.has_next %}
+      <li class="page-item pe-2">
+        <a class="page-link text-dark"
+           href="?page={{ orders.next_page_number }}">Next</a>
+      </li>
+    {% endif %}
+  </ul>
+{% else %}
+  <ul class="pagination justify-content-end text-dark">
+    <li class="page-item disabled pe-2">
+      <a class="page-link text-dark" href="#">Previous</a>
+    </li>
+    <li class="page-item  btn btn-outline-dark active me-2">1</li>
+    <li class="page-item disabled me-2">
+      <a class="page-link text-dark" href="#">Next</a>
+    </li>
+  </ul>
+{% endif %}

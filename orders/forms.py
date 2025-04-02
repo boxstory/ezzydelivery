@@ -2,6 +2,8 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 from datetime import timezone
 
+from requests import request
+
 from orders.models import *
 from client import models as business_models
 from product import models as product_models
@@ -30,7 +32,7 @@ class AddOrderForm(forms.ModelForm):
     class Meta:
         model = Order
         fields = ['pickup_location', 'client_order_code', 'customer_name', 'customer_phone', 'customer_whatsapp',   'cod_status_by_client', 'cod_amount',
-                  'dl_building', 'dl_street', 'dl_zone', 'customer_address', 'order_notes', ]
+                  'dl_building', 'dl_street', 'dl_zone', 'customer_address', 'order_notes', 'order_status']
         exclude = ['order_number', 'business', 'delivery_task', 'deadline_date', 'cod_status_by_staff',
                    'updated_at', 'created_at']
         widgets = {
@@ -48,7 +50,7 @@ class AddOrderForm(forms.ModelForm):
         }
 
     def __init__(self,  *args, **kwargs):
-        business_id = kwargs.pop('business_id', None)
+        business_id = kwargs.pop('business_id', None) 
         
 
         super().__init__(*args, **kwargs)
@@ -72,7 +74,7 @@ class AddOrderForm(forms.ModelForm):
         # Access the form data to filter pickup_location choices
         if business_id is not None:
             self.fields['pickup_location'].queryset = business_models.PickupLocation.objects.filter(
-                business_id=business_id)
+                business_id= business_id)
             
         
 
@@ -82,6 +84,34 @@ class AddOrderForm(forms.ModelForm):
         if commit:
             order.save()
         return order
+
+
+class AddOrderProductsForm(forms.ModelForm):
+    
+    class Meta:
+        model = OrderProductList
+        fields = '__all__' 
+
+        labels = {
+                
+            }
+       
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['order'].widget = forms.TextInput(attrs={'readonly': 'readonly', 'hidden': 'hidden'})
+
+
+  
+    
+
+
+
+
+class OrderFileUploadForm(forms.Form):
+    file = forms.FileField()
+    
+
 
 
 class UpdateOrderForm(forms.ModelForm):
@@ -122,24 +152,6 @@ class UpdateOrderForm(forms.ModelForm):
                 business_id=business_id)
 
 
-class AddOrderProductsForm(forms.ModelForm):
-    
-    class Meta:
-        model = OrderProductList
-        fields = '__all__' 
-
-        labels = {
-                
-            }
-       
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['order'].widget = forms.TextInput(attrs={'readonly': 'readonly', 'hidden': 'hidden'})
-
-
-class OrderFileUploadForm(forms.Form):
-    file = forms.FileField()
 
 
  

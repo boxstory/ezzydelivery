@@ -16,6 +16,7 @@ urlpatterns = [
 
     # ORDERS
     path('add_order/', orders_views.add_order, name='add_order'),
+    path('add_order_with_product/', orders_views.add_order_with_product, name='add_order_with_product'),
     path('add_order/<int:pickup_id>', orders_views.deliver_to_here, name='deliver_to_here'),
     path('order_update/<int:order_id>/',
          orders_views.order_update, name='order_update'),

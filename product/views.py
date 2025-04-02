@@ -19,7 +19,9 @@ def product_all_list(request):
     products = product_models.Product.objects.all()
     print(products)
     data = {
-        'products': products
+        'products': products,
+        'business': business
+
     }
     return render(request, 'product/product_all_list.html', data)
 
@@ -31,7 +33,8 @@ def product_all_list_card(request):
     products = product_models.Product.objects.all()
     print(products)
     data = {
-        'products': products
+        'products': products,
+        'business': business
     }
     return render(request, 'product/product_all_list_card.html', data)
 
@@ -39,6 +42,7 @@ def product_all_list_card(request):
 @login_required(login_url='account_login')
 def product_single_add(request):
     print('Product add')
+    business = business_models.Business.objects.get(user_id=request.user.id)
     if request.method == 'POST':
         form = product_forms.AddItemsForm(request.POST)
         if form.is_valid():
@@ -51,12 +55,16 @@ def product_single_add(request):
 
     data = {
         'form': form,
+        'business': business
+
     }
     return render(request, 'product/product_single_add.html', data)
 
 
 @login_required(login_url='account_login')
 def product_single_delete(request, product_id):
+    product = product_models.Product.objects.get(id=product_id)
+    product.delete()
 
     data = {
 
@@ -66,6 +74,8 @@ def product_single_delete(request, product_id):
 
 @login_required(login_url='account_login')
 def product_single_update(request, product_id):
+    
+    business=business_models.Business.objects.get(user_id=request.user.id)
     product = product_models.Product.objects.get(id=product_id)
     form = product_forms.AddItemsForm(instance= product)
     if request.method == 'POST':
@@ -77,6 +87,7 @@ def product_single_update(request, product_id):
             return redirect('/product/all/' )
 
     data = {
+        'business': business,
         'form': form,
         'product': product,
     }
@@ -84,7 +95,9 @@ def product_single_update(request, product_id):
 
 
 def product_inventory(request):
+    business = business_models.Business.objects.get(user_id=request.user.id)
     data = {
+        'business': business
 
     }
     return render(request, 'product/product_inventory.html', data)
