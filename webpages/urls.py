@@ -19,6 +19,7 @@ urlpatterns = [
     path('careers/', webpages_views.careers, name='careers'),
 
     path('fulfillment/', webpages_views.fulfillment, name='fulfillment'),
+    path('qcommerce/', webpages_views.qcommerce, name='qcommerce'),
     path('3pl/pricing/', webpages_views.delivery_pricing, name='delivery_pricing'),
     path('3pl/inquiry/', webpages_views.delivery_inquiry, name='delivery_inquiry'),
     path('affiliate/', webpages_views.affiliate, name='affiliate_marketing'),

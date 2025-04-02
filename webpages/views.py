@@ -100,6 +100,13 @@ def fulfillment(request):
     return render(request, 'webpages/fulfillment.html', data)
 
 
+def qcommerce(request):
+    data = {
+
+    }
+    return render(request, 'webpages/qcommerce.html', data)
+
+
 def affiliate(request):
     data = {
 
