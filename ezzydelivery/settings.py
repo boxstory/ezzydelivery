@@ -48,8 +48,7 @@ INSTALLED_APPS = [
     'fontawesomefree',
     'rest_framework',
     'import_export',
-    'geocoder',
-    'google_analytics',
+    'geocoder', 
 
     # local apps
     'core',

@@ -11,8 +11,7 @@ admin.site.site_header = 'Ezzy Delivery Admin'
 urlpatterns = [
     path('dj-admin/', admin.site.urls),
     path('__debug__/', include(debug_toolbar.urls)),
-
-    re_path(r'^djga/', include('google_analytics.urls')),
+ 
 
     path('accounts/', include('allauth.urls')),
 
