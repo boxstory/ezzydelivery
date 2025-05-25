@@ -49,7 +49,7 @@ class Business(models.Model):
     status_choices = (
         ('active', 'Active'),
         ('inactive', 'Inactive'),
-        ('aproval pending', 'Aproval Pending'),
+        ('pending', 'Aproval Pending'),
         ('suspended', 'Suspended'),
     )
     
@@ -63,6 +63,65 @@ class Business(models.Model):
 
     def __str__(self):
         return self.business_name
+
+
+class BusinessProfile(models.Model):
+    business = models.OneToOneField(
+        Business, on_delete=models.CASCADE, related_name='business_profile')
+    business_description = models.TextField(max_length=225, blank=True, 
+                                            null=True)
+
+
+    business_address = models.CharField(max_length=225, blank=True, null=True)
+    business_city = models.CharField(max_length=100, blank=True, null=True)
+    business_state = models.CharField(max_length=100, blank=True, null=True)
+    business_zip_code = models.CharField(max_length=10, blank=True, null=True)
+    business_country = models.CharField(max_length=100, blank=True, 
+                                        null=True, default='Qatar')
+    business_start_date = models.DateField(max_length=100, blank=True, null=True) 
+
+    business_founters_name = models.CharField(max_length=100, blank=True, null=True)
+    business_founters_bio = models.CharField(max_length=100, blank=True, null=True)
+    business_mision = models.TextField(max_length=25, blank=True, null=True)
+    business_mision_detailed = models.TextField(max_length=125, blank=True, null=True)
+    business_about_part_1 = models.TextField(max_length=125, blank=True, null=True)
+    business_about_part_2 = models.TextField(max_length=125, blank=True, null=True)
+    business_uniqueness_title = models.CharField(max_length=225, blank=True, null=True)
+    business_uniqueness_description = models.TextField(max_length=225, blank=True, null=True)
+    business_catagory_main = models.CharField(max_length=20, blank=True, null=True)
+    business_catagory_detailed = models.TextField(max_length=100, blank=True, null=True)
+
+
+    business_website = models.CharField(max_length=100, blank=True, null=True)
+    business_facebook_page = models.CharField(
+        max_length=100, blank=True, null=True)
+    business_instagram = models.CharField(
+        max_length=100, blank=True, null=True)
+    business_tiktok = models.CharField(
+        max_length=100, blank=True, null=True)
+    business_youtube = models.CharField(
+        max_length=100, blank=True, null=True) 
+    business_email = models.CharField(max_length=100, blank=True, 
+                                      null=True)
+    business_phone = models.CharField(max_length=12, blank=True, 
+                                      null=True)
+     
+
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.business.business_name
+
+    class Meta:
+        verbose_name_plural = "Business Profile"
+
+
+
+
+
 
 class BusinessApiSettings(models.Model):
     type_choices = (

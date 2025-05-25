@@ -70,6 +70,11 @@ class businessApiSettingsForm(forms.ModelForm):
         }
 
 
+class BusinessProfileForm(forms.ModelForm):
+    class Meta:
+        model = business_models.BusinessProfile
+        fields = '__all__'
+        exclude = ['business', 'updated_at', 'created_at']
 
  # PICKUP LOCATIONS FORM ----------------------------------------------------------------------------------------------------------------------
 
@@ -87,12 +92,12 @@ class DriverDirectoryAddForm(forms.ModelForm):
         fields = '__all__'
         exclude = ['business', 'updated_at', 'created_at']
 
+
 class BusinessLogoForm(forms.ModelForm):
     class Meta:
         model = business_models.BusinessLogo
         fields = '__all__'
         exclude = ['business', 'updated_at', 'created_at']
-
 
 # business teams FORM ----------------------------------------------------------------------------------------------------------------------
 

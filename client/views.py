@@ -204,6 +204,30 @@ def business_profile(request, business_id):
 
         return redirect("/join_us/")
 
+def business_profile_show(request, business_id):
+    try:
+        business = business_models.Business.objects.get(
+        business_id=request.user.user_business.first().business_id)
+        profile = core_models.Profile.objects.filter(user_id=request.user.id)
+        location = business_models.PickupLocation.objects.filter(
+            business_id=business.business_id).values_list('pickup_location_title', flat=True)[:2]
+        business_logo = business_models.BusinessLogo.objects.select_related('business').get_or_create(business_id = business.business_id )
+        instakey = config("INSTAGRAM_TOKEN_FEEDS_KEY")
+        business_logo = business_logo[0].business_logo.url
+
+
+        context = {
+            'profile': profile,
+            'business': business,
+            'location': location,
+            'business_logo_img': business_logo,
+            'instakey': instakey,
+        }
+        return render(request, 'client/frontend/business_profile_show.html', context)
+    except business_models.Business.DoesNotExist:
+
+        return redirect("/join_us/")
+
 def all_business(request):
     business = business_models.Business.objects.all()
     
