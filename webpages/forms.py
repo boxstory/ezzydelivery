@@ -93,7 +93,6 @@ class PricingEnquiryForm(forms.ModelForm):
             Field('is_located_in_qatar'),
             Field('is_team_available_in_qatar'),
             Field('is_required_COD_service'),
-            Field('is_required_COD_service'),
             Field('is_required_fulfillment_service_for_operate_from_outside_qatar'),
             Field('is_required_fulfillment_service_for_make_hub_in_doha'),
             Field('avarage_number_of_order_last_week'),
