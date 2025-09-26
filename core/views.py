@@ -268,10 +268,6 @@ def join_us(request):
 # @todo: make profile and connect
 
 
-def business_profile(request):
-
-    return render(request, 'core/business_profile.html')
-
 
 @login_required(login_url='/accounts/login/')
 def main_dashboard(request):

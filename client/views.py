@@ -33,8 +33,11 @@ def business_dashboard(request):
     try:
         business = business_models.Business.objects.get(
             business_id=request.user.user_business.first().business_id)
+        print('business', business)
+        print('business.id', business.business_id)
         
         profile = core_models.Profile.objects.get(user_id=business.user_id)
+        business_profile = business_models.BusinessProfile.objects.get_or_create(business_id=business.business_id)
         location = business_models.PickupLocation.objects.filter(
             business_id=business.business_id).all()
         
@@ -46,6 +49,7 @@ def business_dashboard(request):
         context = {
             'profile': profile,
             'business': business,
+            'business_profile': business_profile,
             'location': location,
             'orders': orders,
         }
@@ -180,11 +184,14 @@ def pickup_location_update(request, pickup_location_id):
 # frontend ---------------------------------------------------------------------------------------------------------------------
 
 
-def business_profile(request, business_id):
+def business_profile(request):
     try:
         business = business_models.Business.objects.get(
-        business_id=request.user.user_business.first().business_id)
+            business_id=request.user.user_business.first().business_id)
         profile = core_models.Profile.objects.filter(user_id=request.user.id)
+        business_profile = business_models.BusinessProfile.objects.get_or_create(business_id = business.business_id )
+        business_profile = business_profile[0]
+        #print('business_profile', business_profile)
         location = business_models.PickupLocation.objects.filter(
             business_id=business.business_id).values_list('pickup_location_title', flat=True)[:2]
         business_logo = business_models.BusinessLogo.objects.select_related('business').get_or_create(business_id = business.business_id )
@@ -196,6 +203,7 @@ def business_profile(request, business_id):
             'profile': profile,
             'business': business,
             'location': location,
+            'business_profile': business_profile,
             'business_logo_img': business_logo,
             'instakey': instakey,
         }
@@ -204,29 +212,26 @@ def business_profile(request, business_id):
 
         return redirect("/join_us/")
 
-def business_profile_show(request, business_id):
+def business_profile_display(request, business_id):
     try:
         business = business_models.Business.objects.get(
-        business_id=request.user.user_business.first().business_id)
-        profile = core_models.Profile.objects.filter(user_id=request.user.id)
+            business_id=business_id)
         location = business_models.PickupLocation.objects.filter(
             business_id=business.business_id).values_list('pickup_location_title', flat=True)[:2]
-        business_logo = business_models.BusinessLogo.objects.select_related('business').get_or_create(business_id = business.business_id )
-        instakey = config("INSTAGRAM_TOKEN_FEEDS_KEY")
-        business_logo = business_logo[0].business_logo.url
+        business_logo = business_models.BusinessLogo.objects.select_related('business').get(business_id = business.business_id )
+        business_logo = business_logo.business_logo.url
 
 
         context = {
-            'profile': profile,
             'business': business,
             'location': location,
             'business_logo_img': business_logo,
-            'instakey': instakey,
         }
-        return render(request, 'client/frontend/business_profile_show.html', context)
+        return render(request, 'client/frontend/business_profile.html', context)
     except business_models.Business.DoesNotExist:
+        
+        return redirect("/profile/")
 
-        return redirect("/join_us/")
 
 def all_business(request):
     business = business_models.Business.objects.all()
@@ -242,13 +247,18 @@ def all_business(request):
 
 
 def business_profile_update(request, business_id):
-    if request.user.id == business_id:
+    print('business_profile_update')
+    print('request.user.id', request.user.id)
+    print('business_id', business_id)
+    if request.user.user_business.first().business_id == business_id:
         print(':matched')
         redirect('core:main_dashboard')
         print('business_profile_update', business_id)
         print('request.user.id', request.user.id)
-        business =  business_models.Business.objects.filter(business_id=business_id).first()
+        business =  business_models.Business.objects.get(
+        business_id=request.user.user_business.first().business_id)
         print('business', business)
+        print('business.business_id', business.business_id)
         form = business_forms.businessRegisterForm(instance=business)
         print('form')
         if request.method == 'POST':
@@ -276,6 +286,59 @@ def business_profile_update(request, business_id):
         return render(request, 'client/frontend/business_profile_update.html', context)
     else:
         return redirect("business:business_dashboard")
+
+
+
+def business_profile_info_update(request, business_id):
+    if request.user.user_business.first().business_id == business_id:
+        print(':matched')
+        redirect('core:main_dashboard')
+        print('business_profile_update', business_id)
+        print('request.user.id', request.user.id)
+        business =  business_models.Business.objects.get(
+        business_id=request.user.user_business.first().business_id)
+        business_profile =  business_models.BusinessProfile.objects.get(business_id=business_id)
+
+        print('business', business)
+        print('business.business_id', business.business_id)
+        form = business_forms.BusinessProfileForm(instance=business_profile)
+        print('form')
+        if request.method == 'POST':
+            print('BusinessProfileForm')
+            form = business_forms.BusinessProfileForm(
+                request.POST,   instance=business_profile)
+            if form.is_valid():
+                f = form.save(commit=False)
+                print('f.user')
+                website = f.business_website
+
+                if website and isinstance(website, str) and  not website.startswith('https://') and not website.startswith('http://'):
+                    f.business_website = 'https://' + website
+                elif website and isinstance(website, str) and  website.startswith('http://'):
+                    f.business_website = 'https://' + website
+                else:
+                    f.business_website = website
+                
+
+                print(f.business_id)
+                f.business_id = business_id
+
+                form.save()
+                print('ok')
+                messages.success(request, "Successful Submission")
+                return redirect("business:business_profile")
+            else:
+                print('business_profile_info_update not valid')
+                messages.error(request, "Error")
+        context = {
+            'form': form,
+            'business': business,
+            'business_profile' : business_profile,
+        }
+
+        return render(request, 'client/frontend/business_profile_update.html', context)
+    else:
+        return redirect("business:business_profile")
 
 
 # business settings links and veirfy status ---------------------------------------------------------------------------------------------------------------------
@@ -534,7 +597,7 @@ def business_logo_update(request , business_id):
                 print(img)
                 img.save(final_filepath)
                 messages.success(request, "Successful Submission")
-                return redirect("business:business_profile", business_id)
+                return redirect("business:business_profile")
             
     context = {
             'form': form,

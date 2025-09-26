@@ -85,7 +85,7 @@ def orders_to_publish(request):
     data = {
         'orders': orders,
     }
-    return render(request, 'workforce/parts/lists/orders_list.html', data)
+    return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
 
 def orders_published(request):

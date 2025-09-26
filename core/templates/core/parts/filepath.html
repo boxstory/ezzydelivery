@@ -12,17 +12,20 @@
                 <li class="breadcrumb-item ">
                     <a href="{% url 'core:profile_view' %}"
                        class="btn btn-small text-decoration-none  fw-bold px-4 {% if '/profile/' in request.path %}active btn-dark{% endif %}">
-                        User
+                        User : {{request.user.id}}
                     </a>
                 </li>
                 <li class="breadcrumb-item">
                     <a class="btn  text-decoration-none  fw-bold px-2 {% if '/join_us/' == request.path %}active btn-dark{% endif %}"
-                       href="{% url 'core:join_us' %}">Role select</a>
+                       href="{% url 'core:join_us' %}">Role select</a> 
                 </li>
+              
+
+
                 {% if profile.is_business %}
                     <li class="breadcrumb-item ">
-                        <a href="{% url 'business:business_profile_update' request.user.id %}"
-                           class="btn btn-small  text-decoration-none  fw-bold px-2 {% if '/join_us/business/' in request.path %}active btn-dark{% endif %}">Update Business Info
+                        <a href="{% url 'business:business_profile_update' request.user.user_business.first.business_id %}"
+                           class="btn btn-small  text-decoration-none  fw-bold px-2 {% if '/join_us/business/' in request.path %}active btn-dark{% endif %}">Update Business Info : {{request.user.user_business.first.business_id}}
                         </a>
                     </li>
                 {% elif profile.is_driver %}

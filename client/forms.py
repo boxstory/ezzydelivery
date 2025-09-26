@@ -5,6 +5,9 @@ from django.contrib.auth.models import User
 
 from crispy_forms.helper import FormHelper
 from django.forms import ModelForm
+from crispy_forms.layout import Layout, Field
+
+
 from core import models as core_models
 from fleet import models as fleet_models
 from client import models as business_models
@@ -70,11 +73,44 @@ class businessApiSettingsForm(forms.ModelForm):
         }
 
 
+
 class BusinessProfileForm(forms.ModelForm):
     class Meta:
         model = business_models.BusinessProfile
         fields = '__all__'
         exclude = ['business', 'updated_at', 'created_at']
+
+    def __init__(self, *args, **kwargs):
+        super(BusinessProfileForm, self).__init__(*args, **kwargs)
+
+        self.helper = FormHelper()
+        self.helper.layout = Layout(
+            Field('business_description', placeholder='Tell us about your business')
+        )
+
+        # Correct field labels
+        labels = {
+            "business_description": "Tell us about your business",
+            "business_qid": "Passport/QID/CR No",
+            "business_facebook_page": "Business Facebook page : Enter username only",
+            "business_instagram": "Business Instagram : Enter username only",
+            "business_tiktok": "Business Tiktok : Enter username only",
+            "business_youtube": "Business Youtube : Enter your complete url",
+        }
+
+        for field_name, label in labels.items():
+            if field_name in self.fields:
+                self.fields[field_name].label = label
+
+class BusinessLogoForm(forms.ModelForm):
+        class Meta:
+            model = business_models.BusinessLogo
+            fields = '__all__'
+            exclude = ['business', 'updated_at', 'created_at']
+            
+
+
+
 
  # PICKUP LOCATIONS FORM ----------------------------------------------------------------------------------------------------------------------
 

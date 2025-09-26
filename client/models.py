@@ -22,7 +22,7 @@ def upload_path_handler(instance, filename):
 
 class Business(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='user_business')
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True, related_name='user_business')
     
     profile = models.ForeignKey(
         core_models.Profile, on_delete=models.SET_NULL, blank=True, null=True, related_name='profile_business')

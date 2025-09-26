@@ -20,19 +20,14 @@ from product import models as product_models
 
 # orders---------------------------------------------------------------------------------------------------------------------
 
-
-class Order(models.Model):
-
-    # Create your models here.
-
-    ORDER_STATUS_BY_CLIENT = {
+ORDER_STATUS_BY_CLIENT = {
         ('to_review', 'Hold for Review'),
         ('ready_to_pickup', 'Ready to pickup'),
         ('publish', 'Publish for start delivery'),
         ('cancelled', 'Cancelled'),
         
     }
-    TASK_STATUS_BY_STAFF = {
+TASK_STATUS_BY_STAFF = {
         ('new_order', 'New Order'),
         ('info_missing', 'Info Missing'),
         ('pending_for_confirm', 'Pending in confirm with Customer'),
@@ -40,19 +35,24 @@ class Order(models.Model):
         
     }
 
-    COD_STATUS_BY_CLIENT = {
+COD_STATUS_BY_CLIENT = {
         ('no_cod', 'No COD'),
         ('include', 'Include'),
     }
 
-    COD_STATUS_BY_STAFF = {
+COD_STATUS_BY_STAFF = {
         ('not_collected', 'Not Collected'),
         ('partially_collected', 'Partially Collected'),
         ('fully_paid', 'Fully Collected'),
         ('cod_with_driver', 'COD Collected & with Driver'),
         ('cod_with_ezzy', 'COD handover to EZZY'),
         ('cod_sattled_with_business', 'COD Sattled with Business'),
-    } 
+    }
+
+class Order(models.Model):
+
+    # Create your models here.
+ 
     order_number = models.CharField(max_length=64, unique=True)
     business = models.ForeignKey(
         business_models.Business, on_delete=models.CASCADE, related_name='order')

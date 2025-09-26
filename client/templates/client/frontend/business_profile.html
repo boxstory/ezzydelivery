@@ -2,340 +2,654 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block extra_css %}
-<style>
-    ul.instafeed {
-        list-style: none;
-        display: flex;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 2rem;
-    }
-
-    li.instafeed {
-        flex: 0 0 45vw;
-        max-width: 18rem;
-        position: -webkit-sticky;
-        position: sticky;
-        top: 0;
-        left: 0;
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        height: 20rem;
-    }
-
-    li.instafeed span {
-        position: absolute;
-        top: 0;
-        left: 0;
-        display: block;
-        padding: 0.75em;
-        height: 100%;
-        writing-mode: vertical-lr;
-        text-align: center;
-        transform: rotate(180deg);
-    }
-
-    li.instafeed::before {
-        content: "";
-        position: absolute;
-        top: 50%;
-        left: 0%;
-        transform: translate(0%, -50%);
-        height: 100%;
-        width: 100%;
-        background-image: linear-gradient(to right, #f44336 cc 2%, transparent 60%);
-        z-index: -1;
-    }
-
-    li.instafeed img {
-        display: block;
-        height: 20rem;
-        width: 100%;
-        object-fit: cover;
-        position: absolute;
-        top: 50%;
-        left: 0;
-        transform: translate(0%, -50%);
-        z-index: -2;
-    }
-
-    @media (min-width: 53rem) {
-        li.instafeed:nth-child(1) {
-            left: 0rem;
-        }
-
-        li.instafeed:nth-child(2) {
-            left: 2.2rem;
-        }
-
-        li.instafeed:nth-child(3) {
-            left: 4.4rem;
-        }
-
-        li.instafeed:nth-child(4) {
-            left: 6.6rem;
-        }
-
-        li.instafeed:nth-child(5) {
-            left: 8.8rem;
-        }
-
-        li.instafeed:nth-child(6) {
-            left: 11rem;
-        }
-
-        li.instafeed:nth-child(7) {
-            left: 13.2rem;
-        }
-
-        li.instafeed:nth-child(8) {
-            left: 15.4rem;
-        }
-
-        li.instafeed:nth-child(9) {
-            left: 17.6rem;
-        }
-
-        li.instafeed:nth-child(10) {
-            left: 19.8rem;
-        }
-
-        li.instafeed:nth-child(11) {
-            left: 22rem;
-        }
-
-        li.instafeed:nth-child(12) {
-            left: 24.2rem;
-        }
-
-        li.instafeed:nth-child(13) {
-            left: 26.4rem;
-        }
-
-        li.instafeed:nth-child(14) {
-            left: 28.6rem;
-        }
-
-        li.instafeed:nth-child(15) {
-            left: 30.8rem;
-        }
-    }
-</style>
+    <link type="text/css"
+          rel="stylesheet"
+          href="{% static 'client/css/business.css' %}" />
 {% endblock extra_css %}
 {% block title %}
-BUSINESS {{ business.business_name }}
+    BUSINESS PROFILE
 {% endblock title %}
 {% block content %}
-{% if request.user.id == business.business_id %}
-<div class="d-flex justify-content-end px-3  bg-light">
-    <h3 class=" w-100 m-2  ">BUSINESS Profile</h3>
-    <a type="submit" class="btn btn-dark m-2  w-25 "
-        href="{% url 'business:business_profile_update' business.business_id %}">Update
-        Info</a>
-    <!-- Button trigger modal -->
-    <button type="button " class="btn btn-dark m-2 w-25 " data-bs-toggle="modal" data-bs-target="#exampleModal">
-        Update
-        Photo
-    </button>
-    <!-- Modal -->
-    <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-        aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="exampleModalLabel">Logo Update</h5>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+    <!-- Masthead-->
+    <section class="page-section pt-0" id="header">
+        <header class="masthead bg-dark text-white text-center pt-5">
+            <div class="container d-flex align-items-center flex-column">
+                <!-- Masthead Avatar Image-->
+                {% if business_logo_img %}
+                    <img src="{{ business_logo_img }}" alt="" class=" masthead-avatar mb-5" />
+                {% else %}
+                    <img src="/media/business/avatar.png"
+                         title=""
+                         alt=""
+                         class="masthead-avatar mb-5" />
+                {% endif %}
+                <!-- Masthead Heading-->
+                <h1 class="masthead-heading text-uppercase mb-0">{{ business.business_name }}</h1>
+                <!-- Icon Divider-->
+                <div class="divider-custom divider-light">
+                    <div class="divider-custom-line"></div>
+                    <div class="divider-custom-icon">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <div class="divider-custom-line"></div>
                 </div>
-                <div class="modal-body">{% include "client/parts/business_logo_update.html" %}</div>
+                <!-- Masthead Subheading-->
+                <p class="masthead-subheading font-weight-light mb-0">{{ business.business_bio }}</p>
+                <p class="masthead-subheading font-weight-light mb-0">{{ business.business_id }}</p>
+                <p class="masthead-subheading font-weight-light mb-0">Since : {{ business.business_since|date:"Y" }}</p>
+                {% if request.user.user_business.first.business_id == business.business_id %}
+                    <a href="{% url 'business:business_profile_info_update' business.business_id %}">
+                        <div class="btn btn-light btn- my-2">
+                            <i class="fa-solid fa-edit me-2"></i> Update Infos
+                        </div>
+                    </a>
+                {% endif %}
+            </div>
+        </header>
+    </section>
+    <section class="page-section profile p-0 mx-2" id="profile">
+        <div class="container">
+            <!-- Products Section Heading-->
+            <h2 class="page-section-heading text-center text-uppercase text-secondary ">Business Profile</h2>
+            <!-- Icon Divider-->
+            <div class="divider-custom">
+                <div class="divider-custom-line"></div>
+                <div class="divider-custom-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="divider-custom-line"></div>
+            </div>
+        </div>
+        <div class="timeline">
+            <li>
+                <div class="timeline-image">
+                    <img class="rounded-circle img-fluid"
+                         src="/media/business/assets/img/about/1.jpg"
+                         alt="...">
+                </div>
+                <div class="timeline-panel">
+                    <div class="timeline-heading">
+                        <h5>Founders</h5>
+                        {{ business_profile }}
+                        {{ business_profile.first }}
+                        <h4 class="subheading">{{ business_profile.business_founters_name|capfirst }}</h4>
+                    </div>
+                    <div class="timeline-body">
+                        <p class="text-muted">{{ business_profile.business_founters_bio }}</p>
+                    </div>
+                </div>
+            </li>
+            <li class="timeline-inverted">
+                <div class="timeline-image">
+                    <img class="rounded-circle img-fluid"
+                         src="/media/business/assets/img/about/2.jpg"
+                         alt="...">
+                </div>
+                <div class="timeline-panel">
+                    <div class="timeline-heading">
+                        <h5>{{ business_profile.business_mision }}</h5>
+                        <h4 class="subheading">We do</h4>
+                    </div>
+                    <div class="timeline-body">
+                        <p class="text-muted">{{ business_profile.business_mision_detailed }}</p>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <div class="timeline-image">
+                    <img class="rounded-circle img-fluid"
+                         src="/media/business/assets/img/about/3.jpg"
+                         alt="...">
+                </div>
+                <div class="timeline-panel">
+                    <div class="timeline-heading">
+                        <h5>Catagories</h5>
+                        <h4 class="subheading">{{ business_profile.business_catagory_main }}</h4>
+                    </div>
+                    <div class="timeline-body">
+                        <p class="text-muted">{{ business_profile.business_catagory_detailed }}</p>
+                    </div>
+                </div>
+            </li>
+            <li class="timeline-inverted">
+                <div class="timeline-image">
+                    <img class="rounded-circle img-fluid"
+                         src="/media/business/assets/img/about/4.jpg"
+                         alt="...">
+                </div>
+                <div class="timeline-panel">
+                    <div class="timeline-heading">
+                        <h5>Uniqueness</h5>
+                        <h4 class="subheading">{{ business_profile.business_uniqueness_title }}</h4>
+                    </div>
+                    <div class="timeline-body">
+                        <p class="text-muted">{{ business_profile.business_uniqueness_description }}</p>
+                    </div>
+                </div>
+            </li>
+            <li class=" ">
+                <div class="timeline-image">
+                    <h4 class="text-dark fw-bolder">
+                        Be Part
+                        <br>
+                        Of Our
+                        <br>
+                        Journey!
+                    </h4>
+                </div>
+                <div class="timeline-panel">
+                    <div class="timeline-heading">
+                        <h5>Follow Pages</h5>
+                        <h4 class="subheading">Support Us</h4>
+                        <div class="  d-flex justify-content-md-end align-items-center pt-3 p-md-3">
+                            <a href="http://www.{{ business_profile.business_website }}"
+                               class="text-decoration-none text-dark"
+                               target="_blank">
+                                <i class="col-1 fa-solid fa-globe fa-2xl p-3"></i>
+                            </a>
+                            <a href="http://www.instagram.com/{{ business_profile.business_instagram }}"
+                               class="text-decoration-none text-dark"
+                               target="_blank">
+                                <i class="col-1 fa-brands fa-instagram fa-2xl p-3"></i>
+                            </a>
+                            <a href="http://www.facebook.com/{{ business_profile.business_facebook_page }}"
+                               class="text-decoration-none text-dark"
+                               target="_blank">
+                                <i class="col-1 fa-brands fa-facebook fa-2xl p-3 "></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </li>
+        </ul>
+    </section>
+    <!-- Products Section-->
+    <section class="page-section portfolio" id="portfolio">
+        <div class="container">
+            <!-- Products Section Heading-->
+            <h2 class="page-section-heading text-center text-uppercase text-secondary mb-0">Products or Services</h2>
+            <!-- Icon Divider-->
+            <div class="divider-custom">
+                <div class="divider-custom-line"></div>
+                <div class="divider-custom-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="divider-custom-line"></div>
+            </div>
+            <!-- Products Grid Items-->
+            <div class="row justify-content-center">
+                <!-- Products Item 1-->
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="portfolio-item mx-auto"
+                         data-bs-toggle="modal"
+                         data-bs-target="#portfolioModal1">
+                        <div class="portfolio-item-caption d-flex align-items-center justify-content-center h-100 w-100">
+                            <div class="portfolio-item-caption-content text-center text-white">
+                                <i class="fas fa-plus fa-3x"></i>
+                            </div>
+                        </div>
+                        <div class="  align-items-center justify-content-center h-100">
+                            <div class="align-items-center">
+                                <img class="rounded-circle img-thumbnail perfect-circle m-0 "
+                                     src="/media/business/assets/img/portfolio/cabin.png"
+                                     alt="...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Products Item 2-->
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="portfolio-item mx-auto"
+                         data-bs-toggle="modal"
+                         data-bs-target="#portfolioModal2">
+                        <div class="portfolio-item-caption d-flex align-items-center justify-content-center h-100 w-100">
+                            <div class="portfolio-item-caption-content text-center text-white">
+                                <i class="fas fa-plus fa-3x"></i>
+                            </div>
+                        </div>
+                        <div class="  align-items-center justify-content-center h-100">
+                            <div class="align-items-center">
+                                <img class="rounded-circle img-thumbnail perfect-circle m-0 "
+                                     src="/media/business/assets/img/portfolio/cake.png"
+                                     alt="...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Products Item 3-->
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="portfolio-item mx-auto"
+                         data-bs-toggle="modal"
+                         data-bs-target="#portfolioModal3">
+                        <div class="portfolio-item-caption d-flex align-items-center justify-content-center h-100 w-100">
+                            <div class="portfolio-item-caption-content text-center text-white">
+                                <i class="fas fa-plus fa-3x"></i>
+                            </div>
+                        </div>
+                        <div class="  align-items-center justify-content-center h-100">
+                            <div class="align-items-center">
+                                <img class="rounded-circle img-thumbnail perfect-circle m-0 "
+                                     src="/media/business/assets/img/portfolio/circus.png"
+                                     alt="...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Products Item 4-->
+                <div class="col-md-6 col-lg-4 mb-3  ">
+                    <div class="portfolio-item mx-auto text-center"
+                         data-bs-toggle="modal"
+                         data-bs-target="#portfolioModal4">
+                        <div class="portfolio-item-caption d-flex align-items-center justify-content-center h-100 w-100">
+                            <div class="portfolio-item-caption-content text-center text-white">
+                                <i class="fas fa-plus fa-3x"></i>
+                            </div>
+                        </div>
+                        <div class="  align-items-center justify-content-center h-100">
+                            <div class="align-items-center">
+                                <img class="rounded-circle img-thumbnail perfect-circle m-0 "
+                                     src="/media/business/assets/img/about/2.jpg"
+                                     alt="...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Products Item 5-->
+                <div class="col-md-6 col-lg-4 mb-3 ">
+                    <div class="portfolio-item mx-auto"
+                         data-bs-toggle="modal"
+                         data-bs-target="#portfolioModal5">
+                        <div class="portfolio-item-caption d-flex align-items-center justify-content-center h-100 w-100">
+                            <div class="portfolio-item-caption-content text-center text-white">
+                                <i class="fas fa-plus fa-3x"></i>
+                            </div>
+                        </div>
+                        <div class="  align-items-center justify-content-center h-100">
+                            <div class="align-items-center">
+                                <img class="rounded-circle img-thumbnail perfect-circle m-0 "
+                                     src="/media/business/assets/img/portfolio/safe.png"
+                                     alt="...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Products Item 6-->
+                <div class="col-md-6 col-lg-4">
+                    <div class="portfolio-item mx-auto"
+                         data-bs-toggle="modal"
+                         data-bs-target="#portfolioModal6">
+                        <div class="portfolio-item-caption d-flex align-items-center justify-content-center h-100 w-100">
+                            <div class="portfolio-item-caption-content text-center text-white">
+                                <i class="fas fa-plus fa-3x"></i>
+                            </div>
+                        </div>
+                        <div class="  align-items-center justify-content-center h-100">
+                            <div class="align-items-center">
+                                <img class="rounded-circle img-thumbnail perfect-circle m-0 "
+                                     src="/media/business/assets/img/portfolio/submarine.png"
+                                     alt="...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- Products Modals-->
+    <!-- Products Modal 1-->
+    <div class="portfolio-modal modal fade"
+         id="portfolioModal1"
+         tabindex="-1"
+         aria-labelledby="portfolioModal1"
+         aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <button class="btn-close"
+                            type="button"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center pb-5">
+                    <div class="container">
+                        <div class="row justify-content-center">
+                            <div class="col-lg-8">
+                                <!-- Products Modal - Title-->
+                                <h2 class="portfolio-modal-title text-secondary text-uppercase mb-0">Product Name</h2>
+                                <!-- Icon Divider-->
+                                <div class="divider-custom">
+                                    <div class="divider-custom-line"></div>
+                                    <div class="divider-custom-icon">
+                                        <i class="fas fa-star"></i>
+                                    </div>
+                                    <div class="divider-custom-line"></div>
+                                </div>
+                                <!-- Products Modal - Image-->
+                                <img class="img-fluid rounded mb-5"
+                                     src="/media/business/assets/img/portfolio/cabin.png"
+                                     alt="..." />
+                                <!-- Products Modal - Text-->
+                                <p class="mb-4">
+                                    Lorem ipsum dolor sit amet, consectetur adipisicing elit. Mollitia neque assumenda ipsam nihil, molestias magnam, recusandae quos quis inventore quisquam velit asperiores, vitae? Reprehenderit soluta, eos quod consequuntur itaque. Nam.
+                                </p>
+                                <button class="btn btn-dark" data-bs-dismiss="modal">
+                                    <i class="fas fa-xmark fa-fw"></i>
+                                    Close Window
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
-{% else %}
-<div class="d-flex justify-content-end px-3 m-3 bg-light">
-    <h2 class=" text-center fw-bolder w-100 my-3">Business Profile</h2>
-</div>
-{% endif %}
-<!--frontend business Profile page section -->
-<section class="section about-section my-3" id="about">
-    <div class="container">
-        <div class="row align-items-s flex-row-reverse my-4 h-50">
-            <div class="col-md-6  mb-3">
-                <div class=" img p-3 text-center bg-light">{{ business.business_logo.business_logo }}
-                    {% if business_logo_img %}
-
-                    <img src="{{ business_logo_img }}" alt="" class=" text-center img-thumbnail" />
-                    {% else %}
-                    <img src="/media/business/avatar.png" title="" alt="" class="img-thumbnail text-center" />
-                    {% endif %}
+    <!-- Products Modal 2-->
+    <div class="portfolio-modal modal fade"
+         id="portfolioModal2"
+         tabindex="-1"
+         aria-labelledby="portfolioModal2"
+         aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <button class="btn-close"
+                            type="button"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
                 </div>
-                <div class="d-flex justify-content-evenly p-3 bg-light">
-                    <a href="https://www.facebook.com/{{ business.business_facebook_page }}" target="_blank"><i
-                            class="fa-brands fa-facebook fa-2xl me-3 text-dark  "></i></a>
-                    <a href="https://wa.me/974{{ business.business_whatsapp }}" target="_blank"><i
-                            class="fa-brands fa-whatsapp fa-2xl me-3 text-dark"></i></a>
-                    <a href="https://www.instagram.com/{{ business.business_instagram }}" target="_blank"><i
-                            class="fa-brands fa-instagram fa-2xl text-dark"></i></a>
-                </div>
-            </div>
-            <div class="col-md-6 px-md-5 px-md-2 mb-3 bg-light">
-                <div class="about-text go-to ">
-                    <div class="text-center py-2 pt-3 rounded-3  p-0 mb-1">
-                        <h2 class="text-uppercase m-0">{{ business.business_name }}</h2>
-                    </div>
-                    <hr class=" bg-black m-0" style="height: 1px;">
-
-                    <div class="row row-cols-2 pt-3">
-                        <div class="media">
-                            <i class="fa-solid fa-layer-group pe-2"></i>
-                            <label>Category</label>
-                            <p class="ms-4">{{ business.business_product_category }}</p>
+                <div class="modal-body text-center pb-5">
+                    <div class="container">
+                        <div class="row justify-content-center">
+                            <div class="col-lg-8">
+                                <!-- Products Modal - Title-->
+                                <h2 class="portfolio-modal-title text-secondary text-uppercase mb-0">Product Name</h2>
+                                <!-- Icon Divider-->
+                                <div class="divider-custom">
+                                    <div class="divider-custom-line"></div>
+                                    <div class="divider-custom-icon">
+                                        <i class="fas fa-star"></i>
+                                    </div>
+                                    <div class="divider-custom-line"></div>
+                                </div>
+                                <!-- Products Modal - Image-->
+                                <img class="img-fluid rounded mb-5"
+                                     src="/media/business/assets/img/portfolio/cake.png"
+                                     alt="..." />
+                                <!-- Products Modal - Text-->
+                                <p class="mb-4">
+                                    Lorem ipsum dolor sit amet, consectetur adipisicing elit. Mollitia neque assumenda ipsam nihil, molestias magnam, recusandae quos quis inventore quisquam velit asperiores, vitae? Reprehenderit soluta, eos quod consequuntur itaque. Nam.
+                                </p>
+                                <button class="btn btn-dark" data-bs-dismiss="modal">
+                                    <i class="fas fa-xmark fa-fw"></i>
+                                    Close Window
+                                </button>
+                            </div>
                         </div>
-
-                        <div class="media pb-2">
-                            <i class="fa-solid fa-location-dot pe-2"></i>
-                            <label>Address</label>
-                            <p class="ms-4">{{ business.address }}</p>
-                        </div>
-                        <div class="media pb-2">
-                            <i class="fa-solid fa-phone pe-2"></i>{{ business.business_phone }}
-
-                        </div>
-
-                        <div class="media pb-2">
-                            <i class="fa-solid fa-envelope pe-2 "></i>{{ business.business_email }}
-                        </div>
-                        <div class="media pb-2">
-                            <i class="fa-solid fa-envelope pe-2 "></i>{{ business.business_email }}
-                        </div>
-                        <div class="media pb-2">
-                            <i class="fa-solid fa-person-running pe-2"></i>{{ business.business_since }}
-                        </div>
-                        <div class="media pb-2">
-                            <i class="fa-brands fa-product-hunt pe-2"></i>
-                            <label>Brands</label>
-                            <p class="ms-4">{{ business.products.brand_name }}</p>
-                        </div>
-                        <div class="media">
-                            <i class="fa-solid fa-shop pe-2"></i>
-                            <label>Store Location</label>
-                            <a href="{% url 'business:pickup_location_list' %}"><i
-                                    class="fa-solid fa-location-plus"></i></a>
-                            {% for loc in location %}<p class="p-0 m-0 ms-4 ps-1">{{ forloop.counter }}: {{ loc }}
-                            </p>{% endfor %}
-                        </div>
-                    </div>
-                    <div class="text-center py-3 bg-light rounded-3 ">
-                        <p class="mb-2">Intro : {{ business.business_bio }}</p>
                     </div>
                 </div>
             </div>
-
         </div>
-        <div class="row">
-            <div class="col-6 col-lg-3">
-                <div class="count-data text-center">
-                    <h6 class="count h3" data-to="500" data-speed="500">200</h6>
-                    <p class="m-0px font-w-600">Tasks Listed</p>
+    </div>
+    <!-- Products Modal 3-->
+    <div class="portfolio-modal modal fade"
+         id="portfolioModal3"
+         tabindex="-1"
+         aria-labelledby="portfolioModal3"
+         aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <button class="btn-close"
+                            type="button"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
                 </div>
-            </div>
-            <div class="col-6 col-lg-3">
-                <div class="count-data text-center">
-                    <h6 class="count h3" data-to="150" data-speed="150">170</h6>
-                    <p class="m-0px font-w-600">Tasks Completed</p>
-                </div>
-            </div>
-            <div class="col-6 col-lg-3">
-                <div class="count-data text-center">
-                    <h6 class="count h3" data-to="850" data-speed="850">2</h6>
-                    <p class="m-0px font-w-600">Products</p>
-                </div>
-            </div>
-            <div class="col-6 col-lg-3">
-                <div class="count-data text-center">
-                    <h6 class="count h3" data-to="190" data-speed="190">68 (M)</h6>
-                    <p class="m-0px font-w-600">Running</p>
-                </div>
-            </div>
-            <div class="row py-3">
-                <div class="media">
-                    <div id="instafeed-container">
-                        <h3 class=" flex-fill bg-light p-2 rounded-3 fw-bolder">Instagram Feed</h3>
-                        <ul class="p-0 instafeed">
-                            <li class="instafeed">
-                                <img src=" https://source.unsplash.com/ezSFnAFi9hY/500x500" alt="cut citrus fruits. " />
-                                <span>Lorem Ipsum</span>
-                            </li>
-                            <li class="instafeed">
-                                <img src="https://source.unsplash.com/TIGDsyy0TK4/500x500" alt="sliced mango. " />
-                                <span>Dolor Sit</span>
-                            </li>
-                            <li class="instafeed">
-                                <img src="https://source.unsplash.com/TdDtTu2rv4s/500x500"
-                                    alt="a bunch of blueberries. " />
-                                <span>Amet
-                                    Consectetur</span>
-                            </li>
-                            <li class="instafeed">
-                                <img src="https://source.unsplash.com/eudGUrDdBB0/500x500"
-                                    alt="a pineapple sitting on a table. " />
-                                <span>Adipiscing Elit</span>
-                            </li>
-                            <li class="instafeed">
-                                <img src="https://source.unsplash.com/eJH4f1rlG7g/500x500" alt="frozen raspberries. " />
-                                <span>Nunc
-                                    Tortor</span>
-                            </li>
-                            <li class="instafeed">
-                                <img src="https://source.unsplash.com/24RUrLSW1HI/500x500"
-                                    alt="a sliced strawberry. " />
-                                <span>Metus
-                                    Mollis</span>
-                            </li>
-                            <li class="instafeed">
-                                <img src="https://source.unsplash.com/h5yMpgOI5nI/500x500"
-                                    alt="an arrangement of assorted sliced fruits. " />
-                                <span>Congue Sagittis</span>
-                            </li>
-                            <li class="instafeed">
-                                <img src="https://source.unsplash.com/2TYrR2IB72s/500x500" alt="sliced watermelons. " />
-                                <span>Vestibulum
-                                    Et</span>
-                            </li>
-                            <li class="instafeed">
-                                <img src="https://source.unsplash.com/1cWZgnBhZRs/500x500"
-                                    alt="grapefruits, lemons, and pomegranates. " />
-                                <span>Donec Eget</span>
-                            </li>
-                            <li class="instafeed">
-                                <img src="https://source.unsplash.com/9aOswReDKPo/500x500" alt="half of an avocado. " />
-                                <span>Maecenas et
-                                    Justo</span>
-                            </li>
-                            <li class="instafeed">
-                                <img src="https://source.unsplash.com/Nl7eLS8E2Ss/500x500" alt="half of a lime. " />
-                                <span>Malesuada Quam</span>
-                            </li>
-                        </ul>
+                <div class="modal-body text-center pb-5">
+                    <div class="container">
+                        <div class="row justify-content-center">
+                            <div class="col-lg-8">
+                                <!-- Products Modal - Title-->
+                                <h2 class="portfolio-modal-title text-secondary text-uppercase mb-0">Product Name</h2>
+                                <!-- Icon Divider-->
+                                <div class="divider-custom">
+                                    <div class="divider-custom-line"></div>
+                                    <div class="divider-custom-icon">
+                                        <i class="fas fa-star"></i>
+                                    </div>
+                                    <div class="divider-custom-line"></div>
+                                </div>
+                                <!-- Products Modal - Image-->
+                                <img class="img-fluid rounded mb-5"
+                                     src="/media/business/assets/img/portfolio/circus.png"
+                                     alt="..." />
+                                <!-- Products Modal - Text-->
+                                <p class="mb-4">
+                                    Lorem ipsum dolor sit amet, consectetur adipisicing elit. Mollitia neque assumenda ipsam nihil, molestias magnam, recusandae quos quis inventore quisquam velit asperiores, vitae? Reprehenderit soluta, eos quod consequuntur itaque. Nam.
+                                </p>
+                                <button class="btn btn-dark" data-bs-dismiss="modal">
+                                    <i class="fas fa-xmark fa-fw"></i>
+                                    Close Window
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <script
-                        src="https://cdn.jsdelivr.net/gh/stevenschobert/instafeed.js@2.0.0rc1/src/instafeed.min.js"></script>
-                    <script type="text/javascript">
-                        var userFeed = new Instafeed({
-                            get: 'user',
-                            target: "instafeed-container",
-                            resolution: 'low_resolution',
-                            accessToken: '{{instakey}}'
-                        });
-                        userFeed.run();
-
-                    </script>
                 </div>
             </div>
+        </div>
+    </div>
+    <!-- Products Modal 4-->
+    <div class="portfolio-modal modal fade"
+         id="portfolioModal4"
+         tabindex="-1"
+         aria-labelledby="portfolioModal4"
+         aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <button class="btn-close"
+                            type="button"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center pb-5">
+                    <div class="container">
+                        <div class="row justify-content-center">
+                            <div class="col-lg-8">
+                                <!-- Products Modal - Title-->
+                                <h2 class="portfolio-modal-title text-secondary text-uppercase mb-0">Product Name</h2>
+                                <!-- Icon Divider-->
+                                <div class="divider-custom">
+                                    <div class="divider-custom-line"></div>
+                                    <div class="divider-custom-icon">
+                                        <i class="fas fa-star"></i>
+                                    </div>
+                                    <div class="divider-custom-line"></div>
+                                </div>
+                                <!-- Products Modal - Image-->
+                                <img class="img-fluid rounded mb-5"
+                                     src="/media/business/assets/img/portfolio/game.png"
+                                     alt="..." />
+                                <!-- Products Modal - Text-->
+                                <p class="mb-4">
+                                    Lorem ipsum dolor sit amet, consectetur adipisicing elit. Mollitia neque assumenda ipsam nihil, molestias magnam, recusandae quos quis inventore quisquam velit asperiores, vitae? Reprehenderit soluta, eos quod consequuntur itaque. Nam.
+                                </p>
+                                <button class="btn btn-dark" data-bs-dismiss="modal">
+                                    <i class="fas fa-xmark fa-fw"></i>
+                                    Close Window
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Products Modal 5-->
+    <div class="portfolio-modal modal fade"
+         id="portfolioModal5"
+         tabindex="-1"
+         aria-labelledby="portfolioModal5"
+         aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <button class="btn-close"
+                            type="button"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center pb-5">
+                    <div class="container">
+                        <div class="row justify-content-center">
+                            <div class="col-lg-8">
+                                <!-- Products Modal - Title-->
+                                <h2 class="portfolio-modal-title text-secondary text-uppercase mb-0">Product Name</h2>
+                                <!-- Icon Divider-->
+                                <div class="divider-custom">
+                                    <div class="divider-custom-line"></div>
+                                    <div class="divider-custom-icon">
+                                        <i class="fas fa-star"></i>
+                                    </div>
+                                    <div class="divider-custom-line"></div>
+                                </div>
+                                <!-- Products Modal - Image-->
+                                <img class="img-fluid rounded mb-5"
+                                     src="/media/business/assets/img/portfolio/safe.png"
+                                     alt="..." />
+                                <!-- Products Modal - Text-->
+                                <p class="mb-4">
+                                    Lorem ipsum dolor sit amet, consectetur adipisicing elit. Mollitia neque assumenda ipsam nihil, molestias magnam, recusandae quos quis inventore quisquam velit asperiores, vitae? Reprehenderit soluta, eos quod consequuntur itaque. Nam.
+                                </p>
+                                <button class="btn btn-dark" data-bs-dismiss="modal">
+                                    <i class="fas fa-xmark fa-fw"></i>
+                                    Close Window
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Products Modal 6-->
+    <div class="portfolio-modal modal fade"
+         id="portfolioModal6"
+         tabindex="-1"
+         aria-labelledby="portfolioModal6"
+         aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <button class="btn-close"
+                            type="button"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center pb-5">
+                    <div class="container">
+                        <div class="row justify-content-center">
+                            <div class="col-lg-8">
+                                <!-- Products Modal - Title-->
+                                <h2 class="portfolio-modal-title text-secondary text-uppercase mb-0">Product Name</h2>
+                                <!-- Icon Divider-->
+                                <div class="divider-custom">
+                                    <div class="divider-custom-line"></div>
+                                    <div class="divider-custom-icon">
+                                        <i class="fas fa-star"></i>
+                                    </div>
+                                    <div class="divider-custom-line"></div>
+                                </div>
+                                <!-- Products Modal - Image-->
+                                <img class="img-fluid rounded mb-5"
+                                     src="/media/business/assets/img/portfolio/submarine.png"
+                                     alt="..." />
+                                <!-- Products Modal - Text-->
+                                <p class="mb-4">
+                                    Lorem ipsum dolor sit amet, consectetur adipisicing elit. Mollitia neque assumenda ipsam nihil, molestias magnam, recusandae quos quis inventore quisquam velit asperiores, vitae? Reprehenderit soluta, eos quod consequuntur itaque. Nam.
+                                </p>
+                                <button class="btn btn-dark" data-bs-dismiss="modal">
+                                    <i class="fas fa-xmark fa-fw"></i>
+                                    Close Window
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- About Section-->
+    <section class="page-section bg-primary text-white mb-0" id="about">
+        <div class="container">
+            <!-- About Section Heading-->
+            <h2 class="page-section-heading text-center text-uppercase text-white">About</h2>
+            <!-- Icon Divider-->
+            <div class="divider-custom divider-light">
+                <div class="divider-custom-line"></div>
+                <div class="divider-custom-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="divider-custom-line"></div>
+            </div>
+            <!-- About Section Content-->
+            <div class="row">
+                <div class="col-lg-5 ms-auto">
+                    <p class="lead">{{ business_profile.business_about_part_1 }}</p>
+                </div>
+                <div class="col-lg-5 me-auto">
+                    <p class="lead">{{ business_profile.business_about_part_2 }}</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- Contact Section-->
+    <section class="page-section" id="contact">
+        <div class="container">
+            <!-- Contact Section Heading-->
+            <h2 class="page-section-heading text-center text-uppercase text-secondary mb-0">Contact Business</h2>
+            <!-- Icon Divider-->
+            <div class="divider-custom">
+                <div class="divider-custom-line"></div>
+                <div class="divider-custom-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="divider-custom-line"></div>
+            </div>
+            <!-- Contact Section Form-->
+            <ul class="text-center list-unstyled">
+                <a href="http://www.{{ business_profile.business_website }}"
+                   class="text-decoration-none text-dark"
+                   target="_blank">
+                    <li class="d-flex justify-content-center align-items-center py-3">
+                        <h4 class="col-5 text-end fw-bolder m-0 ps-2 d-none d-md-block">Website</h4>
+                        <i class="col-1 fa-solid fa-globe fa-2xl p-2"></i>
+                        <h4 class="col-5 text-start fw-bolder  ms-3 ms-md-0">{{ business_profile.business_website  | slice:"8:" }}</h4>
+                    </li>
+                </a>
+                <a href="http://www.instagram.com/{{ business_profile.business_instagram }}"
+                   class="text-decoration-none text-dark"
+                   target="_blank">
+                    <li class="d-flex justify-content-center align-items-center py-3">
+                        <h4 class="col-5 text-end  fw-bolder m-0 ps-2 d-none d-md-block">Instagram</h4>
+                        <i class="col-1 fa-brands fa-instagram fa-2xl p-2"></i>
+                        <h4 class="col-5 text-start fw-bolder ms-3 ms-md-0  ">{{ business_profile.business_instagram }}</h4>
+                    </li>
+                </a>
+                <a href="http://www.facebook.com/{{ business_profile.business_facebook_page }}"
+                   class="text-decoration-none text-dark"
+                   target="_blank">
+                    <li class="d-flex justify-content-center align-items-center py-3">
+                        <h4 class="col-5 text-end  fw-bolder m-0 ps-2 d-none d-md-block">Facebook Page</h4>
+                        <i class="col-1 fa-brands fa-facebook fa-2xl p-2 "></i>
+                        <h4 class="col-5 text-start fw-bolder ms-3 ms-md-0 ">{{ business_profile.business_facebook_page }}</h4>
+                    </li>
+                </a>
+            </ul>
         </div>
     </div>
 </section>
 {% endblock content %}
+{% block extra_js %}
+    {% include 'includes/scripts.html' %}
+    <script src="{% static 'client/js/business.js' %}" type="text/javascript"></script>
+{% endblock extra_js %}

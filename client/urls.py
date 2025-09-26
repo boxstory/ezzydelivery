@@ -11,7 +11,7 @@ urlpatterns = [
     # BUSINESS LINKS
     path('dashboard/', business_views.business_dashboard,
          name='business_dashboard'),
-
+     
      # BUSINESS settings
     path('<int:business_id>/settings/', business_views.business_settings,
          name='business_settings'),
@@ -48,13 +48,21 @@ urlpatterns = [
                name='business_teams_update'),
 
     # frontend
-    path('<int:business_id>/', business_views.business_profile,
+     #listing all business profiels cards
+    path('all/', business_views.all_business, name='all_business'),
+     #others business profile display
+    path('<int:business_id>/display/', business_views.business_profile_display,
+         name='business_profile_display'), 
+
+    #own business prodile
+    path('profile/', business_views.business_profile,
          name='business_profile'),
-    path('<int:business_id>/show/', business_views.business_profile_show,
-         name='business_profile_show'),
-    path('all', business_views.all_business, name='all_business'),
+     #business account info update
     path('<int:business_id>/update/', business_views.business_profile_update,
          name='business_profile_update'),
+     #business profile in details update
+    path('<int:business_id>/info_update/', business_views.business_profile_info_update,
+         name='business_profile_info_update'),
     path('logo/<int:business_id>/update/',
          business_views.business_logo_update, name='business_logo_update'),
 

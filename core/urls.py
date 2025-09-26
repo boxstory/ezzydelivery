@@ -3,6 +3,8 @@ from core import views as core_views
 from webpages import views as webpages_views
 from delivery import views as delivery_views
 from orders import views as orders_views
+from client import views as business_views
+
 
 app_name = 'core'
 urlpatterns = [
@@ -35,8 +37,6 @@ urlpatterns = [
 
     path('driverjobform/', core_views.driverjobform, name='driverjobform'),
 
-    path('business/', core_views.business_profile, name='business_profile'),
-
-
+     
 
 ]
