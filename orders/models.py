@@ -133,7 +133,7 @@ class OrderLog(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.change_data_log
+        return str(self.change_data_log)
 
 class OrderComments(models.Model):
     order =  models.ForeignKey(
@@ -148,7 +148,7 @@ class OrderComments(models.Model):
 
 
     def __str__(self):
-        return self.order.order_number
+        return str(self.order.order_number)
 
 
 def upload_path_handler(instance, filename):
@@ -170,7 +170,7 @@ class OrderBarcode(models.Model):
 
 
     def __str__(self):
-        return self.order_number
+        return str(self.order_number)
     
     def save(self, *args, **kwargs):
         EAN = barcode.get_barcode_class('code128')

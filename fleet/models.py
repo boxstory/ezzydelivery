@@ -51,7 +51,7 @@ class DriverVacancyAplication(models.Model):
         max_length=100, choices=VEHICLE_CHOICES)
 
     def __str__(self):
-        return self.f_name
+        return str(self.full_name)
 
     class Meta:
         verbose_name_plural = "Driver Job"
@@ -96,7 +96,10 @@ class Driver(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.profile.username
+        if self.profile and self.profile.user:
+            return self.profile.user.username
+        # Fallback to a non-None value
+        return f"Driver {self.driver_code or self.driver_id}"
 
     class Meta:
         verbose_name_plural = "Drivers"

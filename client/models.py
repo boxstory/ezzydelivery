@@ -251,7 +251,7 @@ class DriverDirectory(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.driver.driver_code
+        return str(self.driver.driver_code)
 
     class Meta:
         verbose_name_plural = "Drivers Directories"
@@ -267,4 +267,4 @@ class BusinessSocialInfo(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.business
+        return str(self.business)
