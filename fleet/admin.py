@@ -19,4 +19,7 @@ class DriverVehicleAdmin(admin.ModelAdmin):
     list_per_page = 10
 
 
-admin.register(fleet_models.DriverDocument)
+@admin.register(fleet_models.DriverDocument)
+class DriverDocumentAdmin(admin.ModelAdmin):
+    list_display = ('driver', 'document_type', 'document_no', 'document_expiry_date')
+    list_filter = ('document_type', 'document_issued_from')
