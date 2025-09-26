@@ -62,7 +62,7 @@ class Business(models.Model):
         verbose_name_plural = "Business"
 
     def __str__(self):
-        return self.business_name
+        return self.business_name or f"Business ID: {self.business_id}"
 
 
 class BusinessProfile(models.Model):

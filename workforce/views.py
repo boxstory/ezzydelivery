@@ -17,6 +17,20 @@ from delivery import models as delivery_models
 from client import forms as business_forms
 
 
+def paginate_queryset(request, queryset, items_per_page=10):
+    """
+    A helper function to handle pagination for a given queryset.
+    """
+    paginator = Paginator(queryset, items_per_page)
+    page_number = request.GET.get('page', 1)
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+    return page_obj
+
 
 
 
@@ -38,21 +52,7 @@ def wf_dashboard(request):
 
 def all_orders(request):
     orders  = orders_models.Order.objects.all().order_by('-created_at')
-        
-    default_page = 1
-    page = request.GET.get('page', default_page)
-    # Paginate items
-    items_per_page = 10
-    paginator = Paginator(orders , items_per_page)
-    try:
-        orders = paginator.page(page)
-        print(orders)
-    except PageNotAnInteger:
-        orders = paginator.page(default_page)
-        print(orders)
-    except EmptyPage:
-        orders = paginator.page(paginator.num_pages)
-        print(orders)
+    orders = paginate_queryset(request, orders)
 
     data = {
         'orders': orders,
@@ -65,22 +65,7 @@ def all_orders(request):
 def orders_to_publish(request):
     #orders = orders_models.Order.objects.filter(task_created = False).order_by('-created_at')
     orders = orders_models.Order.objects.filter(task_created = False).order_by('-created_at')
-    print(orders)
- 
-    default_page = 1
-    page = request.GET.get('page', default_page)
-    # Paginate items
-    items_per_page = 10
-    paginator = Paginator(orders , items_per_page)
-    try:
-        orders = paginator.page(page)
-        print(orders)
-    except PageNotAnInteger:
-        orders = paginator.page(default_page)
-        print(orders)
-    except EmptyPage:
-        orders = paginator.page(paginator.num_pages)
-        print(orders)
+    orders = paginate_queryset(request, orders)
 
     data = {
         'orders': orders,
@@ -91,22 +76,7 @@ def orders_to_publish(request):
 def orders_published(request):
     #orders = orders_models.Order.objects.filter(task_created = False).order_by('-created_at')
     orders = orders_models.Order.objects.filter(task_created = True).order_by('-created_at')
-    print(orders)
- 
-    default_page = 1
-    page = request.GET.get('page', default_page)
-    # Paginate items
-    items_per_page = 10
-    paginator = Paginator(orders , items_per_page)
-    try:
-        orders = paginator.page(page)
-        print(orders)
-    except PageNotAnInteger:
-        orders = paginator.page(default_page)
-        print(orders)
-    except EmptyPage:
-        orders = paginator.page(paginator.num_pages)
-        print(orders)
+    orders = paginate_queryset(request, orders)
 
     data = {
         'orders': orders,
@@ -158,22 +128,7 @@ def submit_to_task(request, order_id):
 
 def dl_list_all(request):
     dl_tasks  = delivery_models.DeliveryTask.objects.all().order_by('-created_at')
-    #print(orders)
-        
-    default_page = 1
-    page = request.GET.get('page', default_page)
-    # Paginate items
-    items_per_page = 10
-    paginator = Paginator(dl_tasks , items_per_page)
-    try:
-        dl_tasks = paginator.page(page)
-        print(dl_tasks)
-    except PageNotAnInteger:
-        dl_tasks = paginator.page(default_page)
-        print(dl_tasks)
-    except EmptyPage:
-        dl_tasks = paginator.page(paginator.num_pages)
-        print(dl_tasks)
+    dl_tasks = paginate_queryset(request, dl_tasks)
     data = {
         'dl_tasks': dl_tasks,
     }
@@ -182,21 +137,7 @@ def dl_list_all(request):
 
 def dl_list_incompleted_details(request):
     orders  = orders_models.Order.objects.all().order_by('-created_at')
-        
-    default_page = 1
-    page = request.GET.get('page', default_page)
-    # Paginate items
-    items_per_page = 10
-    paginator = Paginator(orders , items_per_page)
-    try:
-        orders = paginator.page(page)
-        print(orders)
-    except PageNotAnInteger:
-        orders = paginator.page(default_page)
-        print(orders)
-    except EmptyPage:
-        orders = paginator.page(paginator.num_pages)
-        print(orders)
+    orders = paginate_queryset(request, orders)
 
     data = {
         'orders': orders,
@@ -204,25 +145,9 @@ def dl_list_incompleted_details(request):
     return render(request, 'workforce/parts/lists/dl_list_incompleted.html', data)
 
 
-
-
 def dl_list_published_to_dms(request):
     orders  = delivery_models.DeliveryTask.objects.filter().order_by('-created_at')
-        
-    default_page = 1
-    page = request.GET.get('page', default_page)
-    # Paginate items
-    items_per_page = 10
-    paginator = Paginator(orders , items_per_page)
-    try:
-        orders = paginator.page(page)
-        print(orders)
-    except PageNotAnInteger:
-        orders = paginator.page(default_page)
-        print(orders)
-    except EmptyPage:
-        orders = paginator.page(paginator.num_pages)
-        print(orders)
+    orders = paginate_queryset(request, orders)
 
     data = {
         'orders': orders,
@@ -232,21 +157,7 @@ def dl_list_published_to_dms(request):
 
 def dl_list_ready_to_published_to_dms(request):
     orders  = orders_models.Order.objects.filter(task_created = False).order_by('-created_at')
-        
-    default_page = 1
-    page = request.GET.get('page', default_page)
-    # Paginate items
-    items_per_page = 10
-    paginator = Paginator(orders , items_per_page)
-    try:
-        orders = paginator.page(page)
-        print(orders)
-    except PageNotAnInteger:
-        orders = paginator.page(default_page)
-        print(orders)
-    except EmptyPage:
-        orders = paginator.page(paginator.num_pages)
-        print(orders)
+    orders = paginate_queryset(request, orders)
 
     data = {
         'orders': orders,
@@ -257,4 +168,3 @@ def dl_list_ready_to_published_to_dms(request):
 
 
 # DMS section  ------------------------------------------------------------------------------------------------------
-

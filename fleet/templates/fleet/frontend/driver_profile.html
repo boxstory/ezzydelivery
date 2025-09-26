@@ -2,8 +2,17 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block title %}
-FLEET {{ driver.driver_code }}
+Driver Profile: {{ profile.user.first_name }} {{ profile.user.last_name }} | Ezzy Delivery
 {% endblock title %}
+
+{% block seo %}
+    <meta name="description" content="View the driver profile for {{ profile.user.first_name }} {{ profile.user.last_name }} ({{ driver.driver_code }}) on Ezzy Delivery. See their bio, owned vehicles, and available documents.">
+    <meta property="og:title" content="Driver Profile: {{ profile.user.first_name }} {{ profile.user.last_name }} | Ezzy Delivery">
+    <meta property="og:description" content="View the driver profile for {{ profile.user.first_name }} {{ profile.user.last_name }} on Ezzy Delivery.">
+    <meta property="og:url" content="{{ request.build_absolute_uri }}">
+    <link rel="canonical" href="{{ request.build_absolute_uri }}">
+{% endblock seo %}
+
 {% block content %}
 <!-- frontend driver Profile pge section -->
 <h2 class="text-center  fw-bolder bg-light py-3 m-0 w-100">Driver Profile</h2>

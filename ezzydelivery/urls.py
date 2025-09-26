@@ -5,12 +5,14 @@ from django.conf import settings
 from django.conf.urls.static import static
 from orders import views as orders_views
 from django.contrib.sitemaps.views import sitemap
-from webpages.sitemaps import StaticViewSitemap
+from webpages.sitemaps import StaticViewSitemap, BusinessSitemap, DriverSitemap
 from django.views.generic import TemplateView
 
 
 sitemaps = {
-    'sitemap.xml': StaticViewSitemap,
+    'static': StaticViewSitemap,
+    'businesses': BusinessSitemap,
+    'drivers': DriverSitemap,
 }
 
 admin.site.site_header = 'Ezzy Delivery Admin'
