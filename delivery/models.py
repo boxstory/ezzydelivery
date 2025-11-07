@@ -17,20 +17,20 @@ from fleet import models as fleet_models
 class DlAddressUpdate(models.Model):
     full_name = models.CharField(max_length=100)
     mobile_no = models.CharField(max_length=11)
-    area_name = models.CharField(max_length=100)
-    dl_zone = models.PositiveIntegerField(blank=True)
-    dl_building = models.PositiveIntegerField(blank=True)
-    dl_street = models.PositiveIntegerField(blank=True)
-    dl_latitude = models.DecimalField(max_digits=19, decimal_places=15,blank=True)
-    dl_longitude = models.DecimalField(max_digits=19, decimal_places=15,blank=True)
-    dl_pluscode = models.PositiveIntegerField(blank=True, null=True)
-    dl_unit = models.CharField(max_length=2)
+    area_name = models.CharField(max_length=100, blank=True, null=True)
+    dl_zone = models.PositiveIntegerField(blank=True, null=True)
+    dl_building = models.PositiveIntegerField(blank=True, null=True)
+    dl_street = models.PositiveIntegerField(blank=True, null=True)
+    dl_latitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True, default=0)
+    dl_longitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True, default=0)
+    dl_pluscode = models.CharField(max_length=50, blank=True, null=True)
+    dl_unit = models.CharField(max_length=10, blank=True, null=True)
     is_villa_compound = models.BooleanField(default=False)
     is_flat = models.BooleanField(default=False)
     is_office = models.BooleanField(default=False)
     dl_task_number = models.CharField(max_length=100)
-    dms_id = models.CharField(max_length=100,blank=True, null=True)
-    time_slot = models.CharField(max_length=100,blank=True, null=True)
+    dms_id = models.CharField(max_length=100, blank=True, null=True)
+    time_slot = models.CharField(max_length=100, blank=True, null=True)
     order = models.ForeignKey(orders_models.Order, on_delete=models.DO_NOTHING, related_name='delivery_addresses')
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -148,17 +148,17 @@ class ZoneName(models.Model):
 class LatLonList(models.Model):
     zone_number = models.PositiveIntegerField()
     street_number = models.PositiveIntegerField()
-    building_number = models.PositiveIntegerField( blank=True, null=True)
-    latitude = models.PositiveIntegerField( blank=True, null=True)
-    longitude = models.PositiveIntegerField( blank=True, null=True)
+    building_number = models.PositiveIntegerField(blank=True, null=True)
+    latitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
+    longitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return str(self.zone_name) + " " + str(self.street_number)
+        return f"Zone {self.zone_number} - Street {self.street_number}"
 
     class Meta:
-        verbose_name_plural = " LatLons"
+        verbose_name_plural = "Lat/Lon Coordinates"
         app_label = 'delivery'
 
 

@@ -84,30 +84,183 @@ def orders_published(request):
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
 def submit_to_task(request, order_id):
+    """Submit order to delivery task - now uses verification workflow"""
+    from django.utils import timezone
+    from orders.signals import _create_delivery_task_from_order
+    
     order = get_object_or_404(orders_models.Order, id=order_id)
     
-    delivery_models.DeliveryTask.objects.create(
-                dl_task_number=order.order_number,
-                dl_task_number_dms=order.order_number,
-                order = order,
-                business = order.business,
-                )
-    orders_models.Order.objects.filter(id=order_id).update(
-                                       task_created = True)
+    # Check if order is verified
+    if order.verification_status != 'verified':
+        from django.contrib import messages
+        messages.warning(request, 'Order must be verified before creating delivery task')
+        return redirect(reverse('workforce:all_orders'))
     
-    delivery_models.DlAddressUpdate.objects.create(
-                full_name=order.customer_name,
-                dl_task_number=order.order_number,
-                mobile_no=order.customer_phone,
-                dl_zone=order.dl_zone,
-                dl_street=order.dl_street,
-                dl_building=order.dl_building,
-                dl_longitude='0',
-                dl_latitude = '0', 
-                order_id = order_id, 
-                dl_unit = '0', )
-
+    # Use the automated function that handles DMS push
+    delivery_task = _create_delivery_task_from_order(order)
+    
+    if delivery_task:
+        from django.contrib import messages
+        messages.success(request, f'Delivery task created and pushed to DMS: {delivery_task.dl_task_number}')
+    else:
+        from django.contrib import messages
+        messages.error(request, 'Failed to create delivery task')
+    
     return redirect(reverse('workforce:all_orders'))
+
+
+def verify_order_address(request, order_id):
+    """Verify order address - workforce view"""
+    from django.utils import timezone
+    from orders.models import AddressVerification, OrderVerificationLog
+    
+    order = get_object_or_404(orders_models.Order, id=order_id)
+    
+    if request.method == 'POST':
+        verified_address = request.POST.get('verified_address', order.customer_address)
+        verification_result = request.POST.get('verification_result', 'valid')
+        latitude = request.POST.get('latitude')
+        longitude = request.POST.get('longitude')
+        zone_number = request.POST.get('zone_number')
+        street_number = request.POST.get('street_number')
+        building_number = request.POST.get('building_number')
+        notes = request.POST.get('notes', '')
+        
+        # Create or update address verification
+        address_verification, created = AddressVerification.objects.get_or_create(
+            order=order,
+            defaults={
+                'original_address': order.customer_address,
+                'verified_address': verified_address,
+                'verification_result': verification_result,
+                'verified_by': request.user,
+                'verified_at': timezone.now(),
+                'latitude': latitude,
+                'longitude': longitude,
+                'zone_number': zone_number,
+                'street_number': street_number,
+                'building_number': building_number,
+                'notes': notes,
+            }
+        )
+        
+        if not created:
+            address_verification.verified_address = verified_address
+            address_verification.verification_result = verification_result
+            address_verification.verified_by = request.user
+            address_verification.verified_at = timezone.now()
+            if latitude:
+                address_verification.latitude = latitude
+            if longitude:
+                address_verification.longitude = longitude
+            if zone_number:
+                address_verification.zone_number = zone_number
+            if street_number:
+                address_verification.street_number = street_number
+            if building_number:
+                address_verification.building_number = building_number
+            address_verification.notes = notes
+            address_verification.save()
+        
+        # Update order
+        order.address_verified = True
+        order.address_verified_by = request.user
+        order.address_verified_at = timezone.now()
+        
+        if verification_result == 'valid':
+            order.verification_status = 'address_verified'
+        elif verification_result == 'needs_update':
+            order.verification_status = 'address_needs_update'
+            if verified_address:
+                order.customer_address = verified_address
+            if zone_number:
+                order.dl_zone = zone_number
+            if street_number:
+                order.dl_street = street_number
+            if building_number:
+                order.dl_building = building_number
+        
+        order.save()
+        
+        # Log verification
+        OrderVerificationLog.objects.create(
+            order=order,
+            verified_by=request.user,
+            action='address_verified',
+            notes=notes,
+            new_status=order.verification_status
+        )
+        
+        from django.contrib import messages
+        messages.success(request, 'Address verified successfully')
+        return redirect(reverse('workforce:all_orders'))
+    
+    # GET request - show verification form
+    address_verification = AddressVerification.objects.filter(order=order).first()
+    context = {
+        'order': order,
+        'address_verification': address_verification,
+    }
+    return render(request, 'workforce/parts/verify_address.html', context)
+
+
+def verify_order(request, order_id):
+    """Verify order - workforce view"""
+    from django.utils import timezone
+    from orders.models import OrderVerificationLog
+    from orders.signals import _create_delivery_task_from_order
+    
+    order = get_object_or_404(orders_models.Order, id=order_id)
+    
+    if request.method == 'POST':
+        verification_notes = request.POST.get('verification_notes', '')
+        
+        # Update order verification status
+        order.verification_status = 'verified'
+        order.verified_by = request.user
+        order.verified_at = timezone.now()
+        order.verification_notes = verification_notes
+        order.save()
+        
+        # Log verification
+        OrderVerificationLog.objects.create(
+            order=order,
+            verified_by=request.user,
+            action='order_verified',
+            notes=verification_notes,
+            new_status='verified'
+        )
+        
+        # Create delivery task (will be triggered by signal)
+        delivery_task = _create_delivery_task_from_order(order)
+        
+        from django.contrib import messages
+        if delivery_task:
+            messages.success(request, f'Order verified and delivery task created: {delivery_task.dl_task_number}')
+        else:
+            messages.success(request, 'Order verified successfully')
+        
+        return redirect(reverse('workforce:all_orders'))
+    
+    # GET request - show verification form
+    context = {
+        'order': order,
+    }
+    return render(request, 'workforce/parts/verify_order.html', context)
+
+
+def orders_pending_verification(request):
+    """List orders pending verification"""
+    verification_status = request.GET.get('verification_status', 'pending')
+    
+    orders = orders_models.Order.objects.filter(verification_status=verification_status).order_by('-created_at')
+    orders = paginate_queryset(request, orders)
+    
+    data = {
+        'orders': orders,
+        'verification_status': verification_status,
+    }
+    return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
 
     
@@ -168,3 +321,185 @@ def dl_list_ready_to_published_to_dms(request):
 
 
 # DMS section  ------------------------------------------------------------------------------------------------------
+
+
+# Workflow Guide -----------------------------------------------------
+
+@login_required(login_url='account_login')
+def workflow_guide(request):
+    """Display comprehensive workflow guide for workforce/staff members"""
+
+    workflow_steps = [
+        {
+            'number': 1,
+            'title': 'Dashboard Overview',
+            'description': 'Familiarize yourself with the workforce dashboard',
+            'tasks': [
+                'View pending orders count',
+                'Check orders awaiting verification',
+                'Monitor delivery tasks status',
+                'Review today\'s activities',
+            ],
+            'status': 'completed',
+            'url': 'workforce:wf_dashboard',
+        },
+        {
+            'number': 2,
+            'title': 'Review Pending Orders',
+            'description': 'Check new orders that need verification',
+            'tasks': [
+                'Go to Orders → Pending Verification',
+                'Review order details (customer name, address, COD)',
+                'Check if all required information is provided',
+                'Identify orders with missing information',
+            ],
+            'status': 'in_progress',
+            'url': 'workforce:orders_pending_verification',
+        },
+        {
+            'number': 3,
+            'title': 'Verify Customer Address',
+            'description': 'Validate and verify delivery addresses',
+            'tasks': [
+                'Click "Verify Address" on pending order',
+                'Validate address format and completeness',
+                'Use map integration to confirm coordinates',
+                'Set zone, street, and building numbers',
+                'Add GPS coordinates (latitude/longitude)',
+                'Mark verification result: Valid, Needs Update, or Invalid',
+                'Add notes if address needs customer contact',
+            ],
+            'status': 'primary',
+            'url': None,
+        },
+        {
+            'number': 4,
+            'title': 'Contact Customer (If Needed)',
+            'description': 'Reach out for address clarification',
+            'tasks': [
+                'Call customer using provided phone number',
+                'Request missing address details',
+                'Confirm zone, street, building information',
+                'Update order with corrected information',
+                'Log communication in order notes',
+            ],
+            'status': 'conditional',
+            'url': None,
+        },
+        {
+            'number': 5,
+            'title': 'Verify Complete Order',
+            'description': 'Final verification before delivery task creation',
+            'tasks': [
+                'Ensure address is verified',
+                'Confirm customer contact details',
+                'Validate COD amount if applicable',
+                'Check product list completeness',
+                'Click "Verify Order" button',
+                'Order automatically becomes "Verified"',
+            ],
+            'status': 'primary',
+            'url': None,
+        },
+        {
+            'number': 6,
+            'title': 'Automated Task Creation',
+            'description': 'System automatically creates delivery tasks',
+            'tasks': [
+                'Verified order triggers automatic process',
+                'Delivery task created with all order details',
+                'Address information duplicated to task',
+                'Original order preserved as proof',
+                'Task pushed to DMS automatically',
+                'You receive confirmation notification',
+            ],
+            'status': 'automated',
+            'url': None,
+        },
+        {
+            'number': 7,
+            'title': 'Monitor Delivery Tasks',
+            'description': 'Track delivery progress and status',
+            'tasks': [
+                'Go to Tasks → All Delivery Tasks',
+                'Check task status: Published, Assigned, In Transit',
+                'Monitor driver assignments',
+                'View real-time delivery updates from DMS',
+                'Check completion proof and signatures',
+            ],
+            'status': 'pending',
+            'url': 'workforce:dl_list_all',
+        },
+        {
+            'number': 8,
+            'title': 'Handle Exceptions',
+            'description': 'Manage orders that need special attention',
+            'tasks': [
+                'Identify rejected or failed deliveries',
+                'Contact customers for failed delivery reasons',
+                'Reschedule deliveries if needed',
+                'Update order status accordingly',
+                'Document all actions in order logs',
+            ],
+            'status': 'conditional',
+            'url': None,
+        },
+        {
+            'number': 9,
+            'title': 'COD Collection Tracking',
+            'description': 'Monitor Cash on Delivery payments',
+            'tasks': [
+                'Track COD amounts to be collected',
+                'Verify driver has collected payment',
+                'Update COD status: With Driver, With EZZY, Settled',
+                'Generate COD collection reports',
+                'Coordinate with finance for settlement',
+            ],
+            'status': 'pending',
+            'url': None,
+        },
+        {
+            'number': 10,
+            'title': 'Daily Reporting',
+            'description': 'Complete end-of-day activities',
+            'tasks': [
+                'Review all verified orders for the day',
+                'Check outstanding pending verifications',
+                'Generate daily activity report',
+                'Note any issues or concerns',
+                'Prepare task list for next day',
+            ],
+            'status': 'pending',
+            'url': None,
+        },
+    ]
+
+    important_notes = [
+        {
+            'title': 'Address Verification is Critical',
+            'description': 'Accurate address verification ensures successful deliveries and prevents return trips.',
+        },
+        {
+            'title': 'Original Orders are Preserved',
+            'description': 'All order data is saved as proof. Delivery tasks are duplicates for tracking.',
+        },
+        {
+            'title': 'Automated Workflow',
+            'description': 'Once you verify an order, the system automatically creates delivery tasks and pushes to DMS.',
+        },
+        {
+            'title': 'Audit Trail',
+            'description': 'All your verification actions are logged for accountability and tracking.',
+        },
+    ]
+
+    context = {
+        'workflow_steps': workflow_steps,
+        'important_notes': important_notes,
+        'page_title': 'Workforce Workflow Guide',
+    }
+
+    return render(request, 'workforce/workflow_guide.html', context)
+
+
+

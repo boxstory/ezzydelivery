@@ -677,9 +677,138 @@ def business_teams_update(request, business_id, team_id):
             'team': team,
             'form_title': 'Business Team Profile Update Form' 
         }   
-  
-        
-        
+
+
+
     return render(request, 'client/parts/business_teams_update.html', context)
+
+
+# Workflow Guide -----------------------------------------------------
+
+@login_required(login_url='account_login')
+def workflow_guide(request):
+    """Display comprehensive workflow guide for clients"""
+
+    workflow_steps = [
+        {
+            'number': 1,
+            'title': 'Create Your Business Account',
+            'description': 'Set up your business profile with complete information',
+            'tasks': [
+                'Register and verify your email address',
+                'Complete business profile with name, contact details',
+                'Upload business logo',
+                'Add business description and category',
+            ],
+            'status': 'completed',
+            'url': 'business:business_profile',
+        },
+        {
+            'number': 2,
+            'title': 'Configure Pickup Locations',
+            'description': 'Add your warehouse/pickup locations where orders will be collected',
+            'tasks': [
+                'Go to Settings → Pickup Locations',
+                'Add location title and address',
+                'Set zone, street, and building numbers',
+                'Add GPS coordinates (latitude/longitude)',
+                'Mark location as active',
+            ],
+            'status': 'in_progress',
+            'url': 'business:pickup_location_list',
+        },
+        {
+            'number': 3,
+            'title': 'Setup API Integration (Optional)',
+            'description': 'Connect your e-commerce platform for automatic order import',
+            'tasks': [
+                'Go to Settings → API Settings',
+                'Select your platform (Shopify, WooCommerce, etc.)',
+                'Enter API credentials (API Key, Secret)',
+                'Test API connection',
+                'Set as default if successful',
+            ],
+            'status': 'pending',
+            'url': 'business:business_settings_api_list',
+        },
+        {
+            'number': 4,
+            'title': 'Create Orders',
+            'description': 'Add customer orders for delivery',
+            'tasks': [
+                'Manual Entry: Click "Add Order" button',
+                'Fill customer details (name, phone, address)',
+                'Add delivery address with zone/street/building',
+                'Set COD amount if applicable',
+                'Add products to the order',
+                'Or: Import via CSV upload',
+                'Or: Auto-import from connected API',
+            ],
+            'status': 'pending',
+            'url': None,
+        },
+        {
+            'number': 5,
+            'title': 'Order Verification Process',
+            'description': 'Your orders go through automated verification',
+            'tasks': [
+                'Order submitted with status "Pending Verification"',
+                'Workforce verifies customer address',
+                'Address coordinates are validated',
+                'Order is marked as "Verified"',
+                'Delivery task is automatically created',
+            ],
+            'status': 'automated',
+            'url': None,
+        },
+        {
+            'number': 6,
+            'title': 'Delivery Task Creation',
+            'description': 'Verified orders automatically become delivery tasks',
+            'tasks': [
+                'System creates delivery task from verified order',
+                'Task is linked to original order (preserved as proof)',
+                'Delivery address details are duplicated',
+                'Task is pushed to DMS (Delivery Management System)',
+                'Driver assignment process begins',
+            ],
+            'status': 'automated',
+            'url': None,
+        },
+        {
+            'number': 7,
+            'title': 'Track Deliveries',
+            'description': 'Monitor your delivery status in real-time',
+            'tasks': [
+                'View all delivery tasks in dashboard',
+                'Check task status: Assigned, In Transit, Delivered',
+                'Track driver assignments',
+                'Monitor COD collection status',
+                'View delivery completion proof',
+            ],
+            'status': 'pending',
+            'url': None,
+        },
+        {
+            'number': 8,
+            'title': 'Manage Team Members',
+            'description': 'Add staff members to help manage orders',
+            'tasks': [
+                'Go to Settings → Team Management',
+                'Add team member with email and role',
+                'Set permissions for team members',
+                'Team members can view and manage orders',
+            ],
+            'status': 'pending',
+            'url': 'business:business_teams',
+        },
+    ]
+
+    context = {
+        'workflow_steps': workflow_steps,
+        'page_title': 'Client Workflow Guide',
+    }
+
+    return render(request, 'client/workflow_guide.html', context)
 
 

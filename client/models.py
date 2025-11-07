@@ -30,19 +30,18 @@ class Business(models.Model):
     business_name = models.CharField(
         max_length=100, blank=True, null=True)
     business_bio = models.CharField(max_length=225, blank=True, null=True)
-    business_code = models.CharField(max_length=225, blank=True, null=True)
+    business_code = models.CharField(max_length=225, blank=True, null=True, unique=True)
     business_phone = models.CharField(max_length=100, blank=True, null=True)
     business_email = models.CharField(max_length=100, blank=True, null=True)
     business_whatsapp = models.CharField(
         max_length=100, blank=True, null=True)
-    
+
     business_facebook_page = models.CharField(
         max_length=100, blank=True, null=True)
     business_instagram = models.CharField(max_length=100, blank=True, null=True)
     business_since = models.DateField(max_length=100, blank=True, null=True)
     business_product_category = models.CharField(
         max_length=100, blank=True, null=True)
-    business_code = models.CharField(max_length=100, blank=True, null=True)
     business_languages = models.CharField(
         max_length=100,  default='english')
     business_qid = models.CharField(max_length=11, blank=True, null=True)
@@ -222,8 +221,8 @@ class PickupLocation(models.Model):
     pickup_street_no = models.PositiveIntegerField(blank=True, null=True)
     pickup_building_no = models.PositiveIntegerField(
         blank=True, null=True)
-    pickup_lat = models.PositiveIntegerField(blank=True, null=True)
-    pickup_lon = models.PositiveIntegerField(blank=True, null=True)
+    pickup_lat = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
+    pickup_lon = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
     status_choices = (
         ('active', 'Active'),
         ('inactive', 'Inactive'),

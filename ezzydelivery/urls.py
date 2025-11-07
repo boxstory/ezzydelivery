@@ -6,13 +6,19 @@ from django.conf.urls.static import static
 from orders import views as orders_views
 from django.contrib.sitemaps.views import sitemap
 from webpages.sitemaps import StaticViewSitemap, BusinessSitemap, DriverSitemap
+from core.sitemaps import StaticViewSitemap as CoreStaticSitemap, BusinessPagesSitemap, WorkforcePagesSitemap
+from core.views_seo import robots_txt, security_txt, humans_txt
 from django.views.generic import TemplateView
 
 
+# Combine all sitemaps for comprehensive SEO
 sitemaps = {
     'static': StaticViewSitemap,
     'businesses': BusinessSitemap,
     'drivers': DriverSitemap,
+    'core': CoreStaticSitemap,
+    'business_pages': BusinessPagesSitemap,
+    'workforce_pages': WorkforcePagesSitemap,
 }
 
 admin.site.site_header = 'Ezzy Delivery Admin'
@@ -25,9 +31,11 @@ urlpatterns = [
     path('dj-admin/', admin.site.urls),
     path('__debug__/', include(debug_toolbar.urls)),
 
-    #seo sitemap, robots.txt, google analytics, facebook meta tags, etc.
+    #seo sitemap, robots.txt, security.txt, humans.txt - Qatar delivery SEO optimization
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
-    path('robots.txt', TemplateView.as_view(template_name="webpages/robots.txt", content_type='text/plain')),
+    path('robots.txt', robots_txt, name='robots_txt'),
+    path('.well-known/security.txt', security_txt, name='security_txt'),
+    path('humans.txt', humans_txt, name='humans_txt'),
      
 
     path('accounts/', include('allauth.urls')),

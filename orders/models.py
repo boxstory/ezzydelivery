@@ -78,6 +78,31 @@ class Order(models.Model):
     cod_amount = models.IntegerField(default=0)
     dl_included = models.BooleanField(default="True")
     dl_amount = models.IntegerField(default=0)
+    
+    # Verification tracking
+    VERIFICATION_STATUS = (
+        ('pending', 'Pending Verification'),
+        ('address_verified', 'Address Verified'),
+        ('address_needs_update', 'Address Needs Update'),
+        ('customer_contacted', 'Customer Contacted'),
+        ('verified', 'Verified'),
+        ('rejected', 'Rejected'),
+    )
+    verification_status = models.CharField(
+        max_length=50, choices=VERIFICATION_STATUS, default='pending')
+    address_verified = models.BooleanField(default=False)
+    address_verified_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='verified_addresses')
+    address_verified_at = models.DateTimeField(blank=True, null=True)
+    verified_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='verified_orders')
+    verified_at = models.DateTimeField(blank=True, null=True)
+    verification_notes = models.TextField(blank=True, null=True)
+    
+    # Original order data (proof/backup)
+    original_order_data = models.JSONField(blank=True, null=True, help_text="Original order data as proof")
 
     # Delivery customer details
     customer_name = models.CharField(max_length=100, blank=True)
@@ -184,7 +209,36 @@ class OrderBarcode(models.Model):
 
 
 
+class OrderItem(models.Model):
+    """Individual items in an order (replaces OrderProductList with proper many-to-many)"""
+    order = models.ForeignKey(
+        orders_models.Order, on_delete=models.CASCADE, related_name='order_items')
+    product = models.ForeignKey(
+        product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True)
+    quantity = models.PositiveIntegerField(default=1)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    notes = models.CharField(max_length=255, blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        # Auto-calculate total_price if unit_price and quantity are provided
+        if self.unit_price and self.quantity:
+            self.total_price = self.unit_price * self.quantity
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.order.order_number} - {self.product} x {self.quantity}" if self.product else f"{self.order.order_number} - Item"
+
+    class Meta:
+        verbose_name_plural = "Order Items"
+        ordering = ['id']
+
+
 class OrderProductList(models.Model):
+    """DEPRECATED: Legacy model for backward compatibility. Use OrderItem instead."""
     order =  models.ForeignKey(
         orders_models.Order, on_delete=models.CASCADE, related_name='order_product_list')
     product01_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
@@ -218,9 +272,64 @@ class OrderProductList(models.Model):
     product15_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
     product15_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
 
-    
+
     def __str__(self):
         return str(self.order)
 
     class Meta:
-        verbose_name_plural = "Order product lists"
+        verbose_name_plural = "Order product lists (DEPRECATED)"
+
+
+class OrderVerificationLog(models.Model):
+    """Track order verification history"""
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name='verification_logs')
+    verified_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=100)  # 'address_verified', 'order_verified', 'rejected', etc.
+    notes = models.TextField(blank=True, null=True)
+    old_status = models.CharField(max_length=50, blank=True, null=True)
+    new_status = models.CharField(max_length=50, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name_plural = "Order Verification Logs"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.order.order_number} - {self.action}"
+
+
+class AddressVerification(models.Model):
+    """Track address verification details"""
+    VERIFICATION_RESULT = (
+        ('valid', 'Valid'),
+        ('invalid', 'Invalid'),
+        ('needs_update', 'Needs Update'),
+        ('pending', 'Pending'),
+    )
+    
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name='address_verifications')
+    original_address = models.CharField(max_length=500)
+    verified_address = models.CharField(max_length=500, blank=True, null=True)
+    verification_result = models.CharField(
+        max_length=50, choices=VERIFICATION_RESULT, default='pending')
+    verified_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True)
+    verified_at = models.DateTimeField(blank=True, null=True)
+    latitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
+    longitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
+    zone_number = models.PositiveIntegerField(blank=True, null=True)
+    street_number = models.PositiveIntegerField(blank=True, null=True)
+    building_number = models.PositiveIntegerField(blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name_plural = "Address Verifications"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.order.order_number} - {self.verification_result}"

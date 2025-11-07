@@ -83,8 +83,8 @@ class PricingEnquiry(models.Model):
     number_of_pickup_times_in_day = models.CharField(max_length=200, default='1', blank=True, null=True)
     
     # date created
-    date_created = models.DateField(auto_now_add=True)
-    date_modified = models.DateField(auto_now=True) 
+    date_created = models.DateField(auto_now_add=True, null=True)
+    date_modified = models.DateField(auto_now=True, null=True) 
 
     def __str__(self):
         return self.business_name

@@ -73,7 +73,9 @@ urlpatterns = [
          name='driver_directory_add'),
     path('driver_directory/<int:id>/delete/',
          business_views.driver_directory_delete, name='driver_directory_delete'),
-     
+
+    # workflow guide
+    path('workflow-guide/', business_views.workflow_guide, name='workflow_guide'),
 
 
 ]

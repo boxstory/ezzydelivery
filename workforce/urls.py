@@ -13,6 +13,9 @@ urlpatterns = [
     path('orders/all/', workforce_views.all_orders, name='all_orders'),
     path('orders/to_publish/', workforce_views.orders_to_publish, name='orders_to_publish'),
     path('orders/published/', workforce_views.orders_published, name='orders_published'),
+    path('orders/pending-verification/', workforce_views.orders_pending_verification, name='orders_pending_verification'),
+    path('orders/<int:order_id>/verify-address/', workforce_views.verify_order_address, name='verify_order_address'),
+    path('orders/<int:order_id>/verify/', workforce_views.verify_order, name='verify_order'),
     path('orders/submit_to_task/<int:order_id>/', workforce_views.submit_to_task, name='submit_to_task'),
 
 
@@ -31,6 +34,8 @@ urlpatterns = [
 
     #Documents sections urls -----------------------------------------------------------------
 
+    # Workflow guide
+    path('workflow-guide/', workforce_views.workflow_guide, name='workflow_guide'),
 
 
 ]

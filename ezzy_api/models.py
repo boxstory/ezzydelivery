@@ -1,3 +1,259 @@
 from django.db import models
+from django.contrib.auth import get_user_model
+from django.utils.crypto import get_random_string
+from client import models as client_models
+from delivery import models as delivery_models
+from orders import models as orders_models
+import os
 
-# Create your models here.
+User = get_user_model()
+
+
+def api_key_upload_path(instance, filename):
+    """Generate upload path for API key documents"""
+    return f'api_keys/{instance.business.business_id}/{filename}'
+
+
+def task_document_upload_path(instance, filename):
+    """Generate upload path for task documents"""
+    return f'tasks/{instance.task.id}/documents/{filename}'
+
+
+def order_document_upload_path(instance, filename):
+    """Generate upload path for order documents"""
+    return f'orders/{instance.order.id}/documents/{filename}'
+
+
+class ClientApiKey(models.Model):
+    """API Key model for client authentication"""
+    business = models.ForeignKey(
+        client_models.Business,
+        on_delete=models.CASCADE,
+        related_name='api_keys'
+    )
+    api_key = models.CharField(max_length=64, unique=True, db_index=True)
+    api_secret = models.CharField(max_length=64, blank=True, null=True)
+    key_name = models.CharField(max_length=100, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    last_used = models.DateTimeField(blank=True, null=True)
+    expires_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_api_keys'
+    )
+
+    class Meta:
+        verbose_name_plural = "Client API Keys"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.business.business_name} - {self.api_key[:8]}..."
+
+    def save(self, *args, **kwargs):
+        if not self.api_key:
+            # Generate a unique API key
+            while True:
+                key = get_random_string(32)
+                if not ClientApiKey.objects.filter(api_key=key).exists():
+                    self.api_key = key
+                    break
+        if not self.api_secret:
+            # Generate a secret key
+            self.api_secret = get_random_string(32)
+        super().save(*args, **kwargs)
+
+    def is_valid(self):
+        """Check if API key is valid and not expired"""
+        from django.utils import timezone
+        if not self.is_active:
+            return False
+        if self.expires_at and self.expires_at < timezone.now():
+            return False
+        return True
+
+
+class TaskDocument(models.Model):
+    """Document model for delivery tasks (DMS uploads)"""
+    DOCUMENT_TYPES = (
+        ('delivery_proof', 'Delivery Proof'),
+        ('signature', 'Customer Signature'),
+        ('photo', 'Photo'),
+        ('invoice', 'Invoice'),
+        ('receipt', 'Receipt'),
+        ('other', 'Other'),
+    )
+    
+    task = models.ForeignKey(
+        delivery_models.DeliveryTask,
+        on_delete=models.CASCADE,
+        related_name='task_documents'
+    )
+    document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPES, default='other')
+    document_file = models.FileField(upload_to=task_document_upload_path)
+    document_name = models.CharField(max_length=255, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Task Documents"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.task.dl_task_number} - {self.document_type}"
+
+
+class OrderDocument(models.Model):
+    """Document model for orders (DMS uploads)"""
+    DOCUMENT_TYPES = (
+        ('invoice', 'Invoice'),
+        ('receipt', 'Receipt'),
+        ('label', 'Shipping Label'),
+        ('manifest', 'Manifest'),
+        ('other', 'Other'),
+    )
+    
+    order = models.ForeignKey(
+        orders_models.Order,
+        on_delete=models.CASCADE,
+        related_name='order_documents'
+    )
+    document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPES, default='other')
+    document_file = models.FileField(upload_to=order_document_upload_path)
+    document_name = models.CharField(max_length=255, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Order Documents"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.order.order_number} - {self.document_type}"
+
+
+class EcommerceIntegration(models.Model):
+    """Model to track e-commerce platform integrations"""
+    INTEGRATION_STATUS = (
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('error', 'Error'),
+        ('pending', 'Pending'),
+    )
+    
+    business = models.ForeignKey(
+        client_models.Business,
+        on_delete=models.CASCADE,
+        related_name='ecommerce_integrations'
+    )
+    platform = models.CharField(max_length=50)  # shopify, woocommerce, etc.
+    api_settings = models.ForeignKey(
+        client_models.BusinessApiSettings,
+        on_delete=models.CASCADE,
+        related_name='integrations'
+    )
+    last_sync = models.DateTimeField(blank=True, null=True)
+    sync_status = models.CharField(max_length=20, choices=INTEGRATION_STATUS, default='pending')
+    sync_error = models.TextField(blank=True, null=True)
+    total_orders_imported = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "E-commerce Integrations"
+        unique_together = ('business', 'platform')
+
+    def __str__(self):
+        return f"{self.business.business_name} - {self.platform}"
+
+
+class WebhookEndpoint(models.Model):
+    """Webhook endpoint configuration for receiving driver app status updates"""
+    WEBHOOK_EVENTS = (
+        ('task_status_update', 'Task Status Update'),
+        ('task_completed', 'Task Completed'),
+        ('task_accepted', 'Task Accepted'),
+        ('task_rejected', 'Task Rejected'),
+        ('driver_location_update', 'Driver Location Update'),
+        ('driver_status_change', 'Driver Status Change'),
+        ('cod_collected', 'COD Collected'),
+        ('document_uploaded', 'Document Uploaded'),
+    )
+    
+    business = models.ForeignKey(
+        client_models.Business,
+        on_delete=models.CASCADE,
+        related_name='webhook_endpoints',
+        null=True,
+        blank=True
+    )
+    url = models.URLField(max_length=500)
+    events = models.JSONField(default=list, help_text="List of event types to subscribe to")
+    secret = models.CharField(max_length=64, help_text="Secret key for webhook signature verification")
+    is_active = models.BooleanField(default=True)
+    description = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_triggered = models.DateTimeField(blank=True, null=True)
+    
+    class Meta:
+        verbose_name_plural = "Webhook Endpoints"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.url} - {len(self.events)} events"
+    
+    def save(self, *args, **kwargs):
+        if not self.secret:
+            self.secret = get_random_string(32)
+        super().save(*args, **kwargs)
+
+
+class WebhookDelivery(models.Model):
+    """Track webhook delivery attempts and responses"""
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('success', 'Success'),
+        ('failed', 'Failed'),
+        ('retrying', 'Retrying'),
+    )
+    
+    webhook = models.ForeignKey(
+        WebhookEndpoint,
+        on_delete=models.CASCADE,
+        related_name='deliveries'
+    )
+    event_type = models.CharField(max_length=50)
+    payload = models.JSONField()
+    response_status = models.IntegerField(blank=True, null=True)
+    response_body = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    error_message = models.TextField(blank=True, null=True)
+    attempt_count = models.IntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    delivered_at = models.DateTimeField(blank=True, null=True)
+    
+    class Meta:
+        verbose_name_plural = "Webhook Deliveries"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.webhook.url} - {self.event_type} - {self.status}"

@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'crispy_bootstrap5',
     'fontawesomefree',
     'rest_framework',
+    'rest_framework.authtoken',
     'import_export',
     'geocoder', 
 
@@ -138,6 +139,9 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # SEO context processors for Qatar delivery keywords
+                'core.context_processors.seo_defaults',
+                'core.context_processors.site_info',
             ],
         },
     },
@@ -222,7 +226,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10
+    'PAGE_SIZE': 10,
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
 }
 
 import mimetypes
