@@ -78,6 +78,34 @@
     if (clientOrderCodeInput.val()) {
       clientOrderCodeInput.trigger("input");
     }
+
+    // Pickup location data with lat/lon
+    const pickupLocationData = {{ pickup_locations_json|safe }};
+
+    // Auto-fill zone/street/building from pickup location for fulfilled clients
+    $("#id_pickup_location").on("change", function() {
+      const selectedLocationId = $(this).val();
+      if (selectedLocationId && pickupLocationData[selectedLocationId]) {
+        const location = pickupLocationData[selectedLocationId];
+
+        // Auto-fill zone, street, building if they have default values (0)
+        const dlBuilding = $("#id_dl_building");
+        const dlStreet = $("#id_dl_street");
+        const dlZone = $("#id_dl_zone");
+
+        if (dlZone.val() == '0' && location.zone) {
+          dlZone.val(location.zone);
+        }
+        if (dlStreet.val() == '0' && location.street) {
+          dlStreet.val(location.street);
+        }
+        if (dlBuilding.val() == '0' && location.building) {
+          dlBuilding.val(location.building);
+        }
+
+        console.log('Auto-filled from pickup location:', location.title);
+      }
+    });
   });
   // Initialize select2 in pickuplocation search field
   $("#id_pickup_location").select2();

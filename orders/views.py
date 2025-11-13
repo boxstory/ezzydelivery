@@ -328,6 +328,8 @@ def order_upload_review_data(request):
 
 @login_required(login_url='account_login')
 def add_order(request):
+    import json
+
     business = business_models.Business.objects.get(
         user_id=request.user.id)
     print(business.business_id)
@@ -359,7 +361,27 @@ def add_order(request):
                 business_id=business.business_id,
                 business_code=business.business_code
             )
-    return render(request, 'orders/add_order.html', {'form': form, 'business': business, })
+
+        # Prepare pickup locations data for JavaScript with lat/lon
+        pickup_locations_dict = {}
+        for location in pickup_locations:
+            pickup_locations_dict[str(location.id)] = {
+                'id': location.id,
+                'title': location.pickup_location_title,
+                'zone': location.pickup_zone_no if location.pickup_zone_no else None,
+                'street': location.pickup_street_no if location.pickup_street_no else None,
+                'building': location.pickup_building_no if location.pickup_building_no else None,
+                'lat': float(location.pickup_lat) if location.pickup_lat else None,
+                'lon': float(location.pickup_lon) if location.pickup_lon else None,
+            }
+        pickup_locations_json = json.dumps(pickup_locations_dict)
+
+    return render(request, 'orders/add_order.html', {
+        'form': form,
+        'business': business,
+        'pickup_locations': pickup_locations,
+        'pickup_locations_json': pickup_locations_json,
+    })
 
 
 
