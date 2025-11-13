@@ -3,6 +3,7 @@ from multiprocessing import context
 from django.db import connection
 from django.shortcuts import redirect, render
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 
 from core import models as core_models
 from core.views import profile
@@ -58,7 +59,12 @@ def fleet_dashboard(request):
 
 
 def driver_documents(request):
-    driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found. Please create a driver profile first.')
+        return redirect('webpages:join_driver')
+
     print('driver_documents', driver.driver_id)
     documents = fleet_models.DriverDocument.objects.filter(
         driver_id=driver.driver_id)
@@ -69,7 +75,12 @@ def driver_documents(request):
 
 
 def driver_documents_upload(request, fleet_id):
-    driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found. Please create a driver profile first.')
+        return redirect('webpages:join_driver')
+
     print('driver_documents_upload', driver.driver_id)
     form = fleet_forms.DriverDocumentForm()
     if request.method == 'POST':
@@ -93,7 +104,13 @@ def driver_documents_update(request, fleet_id, doc_id):
     print('update', id)
     if fleet_id != request.user.id:
         return redirect('/fleet/documents/')
-    driver = fleet_models.Driver.objects.get(user_id=fleet_id)
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=fleet_id)
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found. Please create a driver profile first.')
+        return redirect('webpages:join_driver')
+
     print('fleet', driver.driver_id)
     document = fleet_models.DriverDocument.objects.get(id=doc_id)
     form = fleet_forms.DriverDocumentForm(
@@ -106,7 +123,7 @@ def driver_documents_update(request, fleet_id, doc_id):
             f.driver_id = driver.driver_id
             f.save()
             return redirect('/fleet/documents/')
-    
+
     context = {
             'form': form,
         }
@@ -118,7 +135,13 @@ def driver_documents_delete(request, fleet_id, doc_id):
     print('delete', id)
     if fleet_id != request.user.id:
         return redirect('/fleet/documents/')
-    driver = fleet_models.Driver.objects.get(user_id=fleet_id)
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=fleet_id)
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found. Please create a driver profile first.')
+        return redirect('webpages:join_driver')
+
     print('fleet', driver.driver_id)
     document = fleet_models.DriverDocument.objects.filter(id=doc_id)
     document.delete()
@@ -128,7 +151,12 @@ def driver_documents_delete(request, fleet_id, doc_id):
 # vehicle---------------------------------------------------------------------------------------------------------------------
 
 def vehicle_own(request):
-    driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found. Please create a driver profile first.')
+        return redirect('webpages:join_driver')
+
     print('vehicle_own', driver.driver_id)
     vehicles = fleet_models.DriverVehicle.objects.filter(
         driver_id=driver.driver_id)
