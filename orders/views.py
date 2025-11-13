@@ -361,31 +361,47 @@ def add_order(request):
 # add products to order
 @login_required(login_url='account_login')
 def add_order_product(request, order_id):
-    order = orders_models.Order.objects.get(id=order_id)
-    
-    business=business_models.Business.objects.get(user_id=request.user.id)
     try:
-        order_product_list = orders_models.OrderProductList.objects.get(order_id=order_id)
-    except:
-        order_product_list = orders_models.OrderProductList.objects.create(order_id=order_id)
-    if request.method == 'POST':
-            print("POST form in views")
-            form = orders_forms.AddOrderProductsForm(request.POST, instance=order_product_list)
-            #print(form)
-            if form.is_valid():
-                print("valid form")
-                form.save()
-                return  redirect('orders:orders_all_list')
-    else:
-        form = orders_forms.AddOrderProductsForm(instance=order_product_list)
-        print('else form')
-    data = {
-        'order': order,
-        'form': form,
-        'business': business
+        # IDOR FIX: Verify order belongs to user's business
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        order = orders_models.Order.objects.get(id=order_id, business=business)
 
-    }
-    return render(request, 'orders/add_order_product.html', data)
+        logger.info(f"User {request.user.id} adding products to order {order_id}")
+
+        try:
+            order_product_list = orders_models.OrderProductList.objects.get(order_id=order_id)
+        except orders_models.OrderProductList.DoesNotExist:
+            order_product_list = orders_models.OrderProductList.objects.create(order_id=order_id)
+
+        if request.method == 'POST':
+            logger.info(f"Processing product addition for order {order_id}")
+            form = orders_forms.AddOrderProductsForm(request.POST, instance=order_product_list)
+
+            if form.is_valid():
+                logger.info(f"Products added successfully to order {order_id}")
+                form.save()
+                messages.success(request, "Products added to order successfully")
+                return redirect('orders:orders_all_list')
+            else:
+                logger.warning(f"Invalid product form for order {order_id}: {form.errors}")
+        else:
+            form = orders_forms.AddOrderProductsForm(instance=order_product_list)
+
+        data = {
+            'order': order,
+            'form': form,
+            'business': business
+        }
+        return render(request, 'orders/add_order_product.html', data)
+
+    except orders_models.Order.DoesNotExist:
+        logger.warning(f"Order {order_id} not found or unauthorized access by user {request.user.id}")
+        messages.error(request, "Order not found")
+        return redirect('orders:orders_all_list')
+    except business_models.Business.DoesNotExist:
+        logger.error(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('business:business_dashboard')
 
 
 
@@ -450,49 +466,95 @@ def deliver_to_here(request, pickup_id):
 
 @login_required(login_url='account_login')
 def order_update(request, order_id):
-    order = orders_models.Order.objects.get(id=order_id)
-    if request.method == 'POST':
-        form = orders_forms.UpdateOrderForm(request.POST, instance=order)
-        print('form valid checking')
-        if order.task_status == 'dl_task_listed':
-            messages.error(request, 'Cannot update order published in Delivery Tasks. Contact Operation Admin')
-            return redirect('orders:orders_all_list')
-        else:
+    try:
+        # IDOR FIX: Verify order belongs to user's business
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        order = orders_models.Order.objects.get(id=order_id, business=business)
+
+        logger.info(f"User {request.user.id} updating order {order_id}")
+
+        if request.method == 'POST':
+            form = orders_forms.UpdateOrderForm(request.POST, instance=order)
+
+            if order.task_status == 'dl_task_listed':
+                logger.warning(f"Cannot update order {order_id} - already published in delivery tasks")
+                messages.error(request, 'Cannot update order published in Delivery Tasks. Contact Operation Admin')
+                return redirect('orders:orders_all_list')
+
             if form.is_valid():
-                print('form valid')
-                
+                logger.info(f"Order {order_id} updated successfully")
                 form.save()
                 messages.success(request, 'Order updated successfully.')
-            return  redirect('orders:orders_all_list')
-    else:
-        form = orders_forms.UpdateOrderForm(instance=order)
+                return redirect('orders:orders_all_list')
+            else:
+                logger.warning(f"Invalid order update form for order {order_id}: {form.errors}")
+        else:
+            form = orders_forms.UpdateOrderForm(instance=order)
 
-    context = {
-        'form': form,
-        'order': order,
-        'order_id': order_id
-    }
-    return render(request, 'orders/order_update.html', context)
+        context = {
+            'form': form,
+            'order': order,
+            'order_id': order_id
+        }
+        return render(request, 'orders/order_update.html', context)
+
+    except orders_models.Order.DoesNotExist:
+        logger.warning(f"Order {order_id} not found or unauthorized access by user {request.user.id}")
+        messages.error(request, "Order not found")
+        return redirect('orders:orders_all_list')
+    except business_models.Business.DoesNotExist:
+        logger.error(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('business:business_dashboard')
 
 
 @login_required(login_url='account_login')
 def delete_order(request, order_id):
-    order = orders_models.Order.objects.get(id=order_id)
-    print(order.business.user_id)
-    if request.user.id == order.business.user_id:
-        print("true")
-        order.delete
-    # order.delete()
-    return  redirect('orders:orders_all_list')
+    try:
+        # IDOR FIX: Verify order belongs to user's business
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        order = orders_models.Order.objects.get(id=order_id, business=business)
+
+        logger.info(f"User {request.user.id} deleting order {order_id}")
+        order.delete()
+        logger.info(f"Order {order_id} deleted successfully")
+        messages.success(request, "Order deleted successfully")
+        return redirect('orders:orders_all_list')
+
+    except orders_models.Order.DoesNotExist:
+        logger.warning(f"Order {order_id} not found or unauthorized access by user {request.user.id}")
+        messages.error(request, "Order not found")
+        return redirect('orders:orders_all_list')
+    except business_models.Business.DoesNotExist:
+        logger.error(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('business:business_dashboard')
 
 
 @login_required(login_url='account_login')
 def order_details(request, order_id):
-    order = orders_models.Order.objects.get(id=order_id)
-    data = {
-        'order': order
-    }
-    return render(request, 'orders/order_details.html', data)
+    try:
+        # IDOR FIX: Verify order belongs to user's business
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        order = orders_models.Order.objects.select_related(
+            'business', 'client', 'pickup_location'
+        ).get(id=order_id, business=business)
+
+        logger.info(f"User {request.user.id} viewing order details for order {order_id}")
+
+        data = {
+            'order': order
+        }
+        return render(request, 'orders/order_details.html', data)
+
+    except orders_models.Order.DoesNotExist:
+        logger.warning(f"Order {order_id} not found or unauthorized access by user {request.user.id}")
+        messages.error(request, "Order not found")
+        return redirect('orders:orders_all_list')
+    except business_models.Business.DoesNotExist:
+        logger.error(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('business:business_dashboard')
 
 
 
