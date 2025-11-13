@@ -66,4 +66,12 @@ urlpatterns = [
     path('orders/<int:order_id>/verify/', ezzy_api_views.verify_order, name='verify_order'),
     path('orders/<int:order_id>/reject/', ezzy_api_views.reject_order, name='reject_order'),
     path('tasks/<int:task_id>/push-to-dms/', ezzy_api_views.push_task_to_dms_api, name='push_task_to_dms_api'),
+
+    # ==================== BUSINESS APIs ====================
+    path('business/dashboard/', ezzy_api_views.business_dashboard_stats, name='business_dashboard_stats'),
+    path('business/orders/', ezzy_api_views.business_orders_api, name='business_orders_api'),
+    path('business/orders/<int:order_id>/', ezzy_api_views.business_order_detail_api, name='business_order_detail_api'),
+    path('business/clients/', ezzy_api_views.business_clients_api, name='business_clients_api'),
+    path('business/tasks/', ezzy_api_views.business_tasks_api, name='business_tasks_api'),
+    path('business/pickup-locations/', ezzy_api_views.business_pickup_locations_api, name='business_pickup_locations_api'),
 ]

@@ -2337,10 +2337,459 @@ def push_task_to_dms_api(request, task_id):
                 'error': 'Failed to push task to DMS',
                 'task_id': task_id
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     except delivery_models.DeliveryTask.DoesNotExist:
         return Response(
             {'error': 'Task not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+# ==================== BUSINESS APIs ====================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def business_dashboard_stats(request):
+    """Get dashboard statistics for business"""
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        logger.info(f"Fetching dashboard stats for business {business.business_id}")
+
+        # Get date range from query params (default to last 30 days)
+        from datetime import datetime, timedelta
+        from django.db.models import Count, Q
+        from django.utils import timezone
+
+        days = int(request.query_params.get('days', 30))
+        start_date = timezone.now() - timedelta(days=days)
+
+        # Order statistics
+        total_orders = orders_models.Order.objects.filter(business=business).count()
+        pending_orders = orders_models.Order.objects.filter(
+            business=business, order_status='pending'
+        ).count()
+        completed_orders = orders_models.Order.objects.filter(
+            business=business, order_status='delivered'
+        ).count()
+        cancelled_orders = orders_models.Order.objects.filter(
+            business=business, order_status='cancelled'
+        ).count()
+
+        # Recent orders (last N days)
+        recent_orders = orders_models.Order.objects.filter(
+            business=business, created_at__gte=start_date
+        ).count()
+
+        # Task statistics
+        total_tasks = delivery_models.DeliveryTask.objects.filter(business=business).count()
+        active_tasks = delivery_models.DeliveryTask.objects.filter(
+            business=business, dl_task_status__in=['pending', 'in_transit', 'assigned']
+        ).count()
+        completed_tasks = delivery_models.DeliveryTask.objects.filter(
+            business=business, dl_task_status='delivered'
+        ).count()
+
+        # Client statistics
+        total_clients = client_models.Client.objects.filter(business=business).count()
+
+        logger.info(f"Dashboard stats retrieved for business {business.business_id}")
+
+        return Response({
+            'business_id': business.business_id,
+            'business_name': business.business_name,
+            'period_days': days,
+            'orders': {
+                'total': total_orders,
+                'pending': pending_orders,
+                'completed': completed_orders,
+                'cancelled': cancelled_orders,
+                'recent': recent_orders
+            },
+            'tasks': {
+                'total': total_tasks,
+                'active': active_tasks,
+                'completed': completed_tasks
+            },
+            'clients': {
+                'total': total_clients
+            }
+        }, status=status.HTTP_200_OK)
+
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"Business not found for user {request.user.id}")
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def business_orders_api(request):
+    """
+    GET: List all orders for business
+    POST: Create new order
+    """
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+
+        if request.method == 'GET':
+            logger.info(f"Fetching orders for business {business.business_id}")
+
+            # Filters
+            status_filter = request.query_params.get('status')
+            search = request.query_params.get('search')
+            limit = int(request.query_params.get('limit', 50))
+            offset = int(request.query_params.get('offset', 0))
+
+            orders = orders_models.Order.objects.filter(
+                business=business
+            ).select_related('client', 'pickup_location')
+
+            if status_filter:
+                orders = orders.filter(order_status=status_filter)
+
+            if search:
+                orders = orders.filter(
+                    Q(order_number__icontains=search) |
+                    Q(client__client_name__icontains=search)
+                )
+
+            orders = orders.order_by('-created_at')[offset:offset + limit]
+
+            data = []
+            for order in orders:
+                data.append({
+                    'id': order.id,
+                    'order_number': order.order_number,
+                    'client_name': order.client.client_name if order.client else None,
+                    'client_phone': order.client.client_phone if order.client else None,
+                    'delivery_address': order.delivery_address,
+                    'order_status': order.order_status,
+                    'order_date': order.order_date,
+                    'created_at': order.created_at,
+                    'total_amount': str(order.total_amount) if hasattr(order, 'total_amount') else None
+                })
+
+            logger.info(f"Returned {len(data)} orders for business {business.business_id}")
+            return Response({
+                'count': len(data),
+                'orders': data
+            }, status=status.HTTP_200_OK)
+
+        elif request.method == 'POST':
+            logger.info(f"Creating new order for business {business.business_id}")
+
+            # Required fields
+            client_id = request.data.get('client_id')
+            delivery_address = request.data.get('delivery_address')
+            pickup_location_id = request.data.get('pickup_location_id')
+
+            if not all([client_id, delivery_address]):
+                return Response(
+                    {'error': 'client_id and delivery_address are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Verify client belongs to business
+            try:
+                client = client_models.Client.objects.get(
+                    id=client_id, business=business
+                )
+            except client_models.Client.DoesNotExist:
+                return Response(
+                    {'error': 'Client not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Create order
+            order = orders_models.Order.objects.create(
+                business=business,
+                client=client,
+                delivery_address=delivery_address,
+                pickup_location_id=pickup_location_id,
+                order_status='pending',
+                created_by=request.user
+            )
+
+            logger.info(f"Order {order.order_number} created successfully")
+
+            return Response({
+                'message': 'Order created successfully',
+                'order': {
+                    'id': order.id,
+                    'order_number': order.order_number,
+                    'status': order.order_status
+                }
+            }, status=status.HTTP_201_CREATED)
+
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"Business not found for user {request.user.id}")
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def business_order_detail_api(request, order_id):
+    """
+    GET: Get order details
+    PUT: Update order
+    DELETE: Delete order
+    """
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        order = orders_models.Order.objects.select_related(
+            'client', 'pickup_location', 'business'
+        ).get(id=order_id, business=business)
+
+        if request.method == 'GET':
+            logger.info(f"User {request.user.id} viewing order {order_id}")
+
+            return Response({
+                'id': order.id,
+                'order_number': order.order_number,
+                'client': {
+                    'id': order.client.id,
+                    'name': order.client.client_name,
+                    'phone': order.client.client_phone,
+                    'email': order.client.client_email
+                } if order.client else None,
+                'delivery_address': order.delivery_address,
+                'pickup_location': {
+                    'id': order.pickup_location.id,
+                    'name': order.pickup_location.pickup_name
+                } if order.pickup_location else None,
+                'order_status': order.order_status,
+                'order_date': order.order_date,
+                'created_at': order.created_at,
+                'notes': order.order_notes if hasattr(order, 'order_notes') else None
+            }, status=status.HTTP_200_OK)
+
+        elif request.method == 'PUT':
+            logger.info(f"User {request.user.id} updating order {order_id}")
+
+            # Check if order can be updated
+            if order.task_status == 'dl_task_listed':
+                return Response(
+                    {'error': 'Cannot update order published in delivery tasks'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Update allowed fields
+            if 'delivery_address' in request.data:
+                order.delivery_address = request.data['delivery_address']
+            if 'order_status' in request.data:
+                order.order_status = request.data['order_status']
+            if 'order_notes' in request.data and hasattr(order, 'order_notes'):
+                order.order_notes = request.data['order_notes']
+
+            order.save()
+            logger.info(f"Order {order_id} updated successfully")
+
+            return Response({
+                'message': 'Order updated successfully',
+                'order_id': order.id
+            }, status=status.HTTP_200_OK)
+
+        elif request.method == 'DELETE':
+            logger.info(f"User {request.user.id} deleting order {order_id}")
+            order.delete()
+            logger.info(f"Order {order_id} deleted successfully")
+
+            return Response({
+                'message': 'Order deleted successfully'
+            }, status=status.HTTP_200_OK)
+
+    except orders_models.Order.DoesNotExist:
+        logger.warning(f"Order {order_id} not found or unauthorized")
+        return Response(
+            {'error': 'Order not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"Business not found for user {request.user.id}")
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def business_clients_api(request):
+    """
+    GET: List all clients for business
+    POST: Create new client
+    """
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+
+        if request.method == 'GET':
+            logger.info(f"Fetching clients for business {business.business_id}")
+
+            search = request.query_params.get('search')
+            limit = int(request.query_params.get('limit', 50))
+            offset = int(request.query_params.get('offset', 0))
+
+            clients = client_models.Client.objects.filter(business=business)
+
+            if search:
+                clients = clients.filter(
+                    Q(client_name__icontains=search) |
+                    Q(client_phone__icontains=search) |
+                    Q(client_email__icontains=search)
+                )
+
+            clients = clients.order_by('-created_at')[offset:offset + limit]
+
+            data = []
+            for client in clients:
+                data.append({
+                    'id': client.id,
+                    'name': client.client_name,
+                    'phone': client.client_phone,
+                    'email': client.client_email,
+                    'address': client.client_address if hasattr(client, 'client_address') else None,
+                    'created_at': client.created_at
+                })
+
+            logger.info(f"Returned {len(data)} clients")
+            return Response({
+                'count': len(data),
+                'clients': data
+            }, status=status.HTTP_200_OK)
+
+        elif request.method == 'POST':
+            logger.info(f"Creating new client for business {business.business_id}")
+
+            client_name = request.data.get('name')
+            client_phone = request.data.get('phone')
+
+            if not all([client_name, client_phone]):
+                return Response(
+                    {'error': 'name and phone are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            client = client_models.Client.objects.create(
+                business=business,
+                client_name=client_name,
+                client_phone=client_phone,
+                client_email=request.data.get('email', '')
+            )
+
+            logger.info(f"Client {client.id} created successfully")
+
+            return Response({
+                'message': 'Client created successfully',
+                'client': {
+                    'id': client.id,
+                    'name': client.client_name,
+                    'phone': client.client_phone
+                }
+            }, status=status.HTTP_201_CREATED)
+
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"Business not found for user {request.user.id}")
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def business_tasks_api(request):
+    """Get all delivery tasks for business"""
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        logger.info(f"Fetching tasks for business {business.business_id}")
+
+        # Filters
+        status_filter = request.query_params.get('status')
+        driver_id = request.query_params.get('driver_id')
+        limit = int(request.query_params.get('limit', 50))
+        offset = int(request.query_params.get('offset', 0))
+
+        tasks = delivery_models.DeliveryTask.objects.filter(
+            business=business
+        ).select_related('order', 'driver', 'order__client')
+
+        if status_filter:
+            tasks = tasks.filter(dl_task_status=status_filter)
+
+        if driver_id:
+            tasks = tasks.filter(driver_id=driver_id)
+
+        tasks = tasks.order_by('-created_at')[offset:offset + limit]
+
+        data = []
+        for task in tasks:
+            data.append({
+                'id': task.id,
+                'task_number': task.dl_task_number,
+                'order_number': task.order.order_number if task.order else None,
+                'client_name': task.order.client.client_name if task.order and task.order.client else None,
+                'delivery_address': task.dl_delivery_address if hasattr(task, 'dl_delivery_address') else None,
+                'status': task.dl_task_status,
+                'driver': {
+                    'id': task.driver.driver_id,
+                    'name': task.driver.driver_name
+                } if task.driver else None,
+                'task_date': task.dl_task_date,
+                'created_at': task.created_at
+            })
+
+        logger.info(f"Returned {len(data)} tasks")
+        return Response({
+            'count': len(data),
+            'tasks': data
+        }, status=status.HTTP_200_OK)
+
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"Business not found for user {request.user.id}")
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def business_pickup_locations_api(request):
+    """Get all pickup locations for business"""
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        logger.info(f"Fetching pickup locations for business {business.business_id}")
+
+        locations = business_models.PickupLocation.objects.filter(
+            business_id=business.business_id
+        ).order_by('pickup_name')
+
+        data = []
+        for location in locations:
+            data.append({
+                'id': location.id,
+                'name': location.pickup_name,
+                'address': location.pickup_address if hasattr(location, 'pickup_address') else None,
+                'zone': location.pickup_zone_no if hasattr(location, 'pickup_zone_no') else None,
+                'latitude': location.pickup_latitude if hasattr(location, 'pickup_latitude') else None,
+                'longitude': location.pickup_longitude if hasattr(location, 'pickup_longitude') else None
+            })
+
+        logger.info(f"Returned {len(data)} pickup locations")
+        return Response({
+            'count': len(data),
+            'locations': data
+        }, status=status.HTTP_200_OK)
+
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"Business not found for user {request.user.id}")
+        return Response(
+            {'error': 'Business not found'},
             status=status.HTTP_404_NOT_FOUND
         )
 
