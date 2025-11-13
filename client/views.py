@@ -1,6 +1,7 @@
 import binascii
 from multiprocessing import context
 import os
+import logging
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
@@ -21,6 +22,8 @@ from orders import models as orders_models
 from client import forms as business_forms
 from datetime import datetime
 
+logger = logging.getLogger('client')
+
 # Create your views here.
 
 
@@ -29,22 +32,27 @@ from datetime import datetime
 
 @login_required(login_url='account_login')
 def business_dashboard(request):
-    print('business id', request.user.user_business.first().business_id)
     try:
-        business = business_models.Business.objects.get(
-            business_id=request.user.user_business.first().business_id)
-        print('business', business)
-        print('business.id', business.business_id)
-        
+        # IDOR FIX: Verify user has associated business
+        user_business = request.user.user_business.first()
+        if not user_business:
+            logger.warning(f"User {request.user.id} has no associated business")
+            messages.error(request, "No business associated with your account")
+            return redirect('core:main_dashboard')
+
+        business = business_models.Business.objects.get(business_id=user_business.business_id)
+        logger.info(f"User {request.user.id} accessed dashboard for business {business.business_id}")
+
         profile = core_models.Profile.objects.get(user_id=business.user_id)
         business_profile = business_models.BusinessProfile.objects.get_or_create(business_id=business.business_id)
+
+        # N+1 FIX: Optimize queries
         location = business_models.PickupLocation.objects.filter(
             business_id=business.business_id).all()
-        
-        orders = orders_models.Order.objects.filter(
-            business=business.business_id).order_by('-id')[:10]
 
-        print(business)
+        orders = orders_models.Order.objects.filter(
+            business=business.business_id
+        ).select_related('client', 'business').order_by('-id')[:10]
 
         context = {
             'profile': profile,
@@ -55,131 +63,230 @@ def business_dashboard(request):
         }
         return render(request, 'client/business_dashboard.html', context)
     except business_models.Business.DoesNotExist:
+        logger.error(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('core:main_dashboard')
+    except Exception as e:
+        logger.error(f"Error loading business dashboard for user {request.user.id}: {e}")
+        messages.error(request, "Error loading dashboard")
         return redirect('core:main_dashboard')
 
 # Driver contact list of business---------------------------------------------------------------------------------------------------------------------
 
 
+@login_required(login_url='account_login')
 def driver_directory(request):
-    business = business_models.Business.objects.get(
-        user_id=request.user.id)
-    driver_directory = business_models.DriverDirectory.objects.filter(
-        business_id=request.user.id).all()
+    try:
+        # IDOR FIX: Get user's business with proper verification
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        driver_directory = business_models.DriverDirectory.objects.filter(
+            business_id=business.business_id).all()
 
-    context = {
-        'contacts': driver_directory,
-        'business': business,
-    }
-    return render(request, 'client/parts/driver_directory.html', context)
+        logger.info(f"User {request.user.id} accessed driver directory for business {business.business_id}")
+
+        context = {
+            'contacts': driver_directory,
+            'business': business,
+        }
+        return render(request, 'client/parts/driver_directory.html', context)
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('business:business_dashboard')
 
 
-# @todo:  fleet already added warning not showing
+@login_required(login_url='account_login')
 def driver_directory_add(request):
-
-    form = business_forms.DriverDirectoryAddForm(request.POST or None)
     if request.method == 'POST':
-        # Process the form data and save to the database
-        # Example: Assuming the contact information is in the request.POST['contact_info']
-        driver_id = request.POST['driver_id']
-        print('driver_info', driver_id)
-        business_id = request.user.id
-        print('business_id', business_id)
-        dict = business_models.DriverDirectory.objects.filter(business=business_id)
-        print('dict')
-        print(dict)
-        # Save the contact to the database or perform any other necessary actions
-        if not business_models.DriverDirectory.objects.filter(business_id=business_id, driver_id=driver_id).exists():
+        try:
+            # IDOR FIX: Verify user has business
+            business = business_models.Business.objects.get(user_id=request.user.id)
+            driver_id = request.POST.get('driver_id')
 
-            # Create a new FavoriteItem record
-            business_models.DriverDirectory.objects.create( business_id=business_id, driver_id=driver_id)
-            return JsonResponse({'success': True, 'success': 'Driver Added'})
-            # Return a JSON response indicating success
-        else:
-            pass
-            print('already exists')
-            return JsonResponse({'success': False, 'error': 'Driver Already Added'})
+            if not driver_id:
+                return JsonResponse({'success': False, 'error': 'Driver ID is required'})
 
-    # If the request method is not POST, return an error
+            logger.info(f"User {request.user.id} attempting to add driver {driver_id} to business {business.business_id}")
+
+            # Check if driver already exists in directory
+            if business_models.DriverDirectory.objects.filter(
+                business_id=business.business_id, driver_id=driver_id
+            ).exists():
+                logger.info(f"Driver {driver_id} already in directory for business {business.business_id}")
+                return JsonResponse({'success': False, 'error': 'Driver Already Added'})
+
+            # Create new directory entry
+            business_models.DriverDirectory.objects.create(
+                business_id=business.business_id, driver_id=driver_id
+            )
+            logger.info(f"Driver {driver_id} added to directory for business {business.business_id}")
+            return JsonResponse({'success': True, 'message': 'Driver Added'})
+
+        except business_models.Business.DoesNotExist:
+            logger.warning(f"Business not found for user {request.user.id}")
+            return JsonResponse({'success': False, 'error': 'Business not found'})
+        except Exception as e:
+            logger.error(f"Error adding driver to directory: {e}")
+            return JsonResponse({'success': False, 'error': 'Error adding driver'})
+
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 
+@login_required(login_url='account_login')
 def driver_directory_delete(request, id):
-    fleet = business_models.DriverDirectory.objects.get(id=id)
-    print(fleet)
-    fleet.delete()
-    return redirect('core:main_dashboard')
+    try:
+        # IDOR FIX: Verify directory entry belongs to user's business
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        fleet = business_models.DriverDirectory.objects.get(id=id, business_id=business.business_id)
+
+        logger.info(f"User {request.user.id} deleting driver directory entry {id} from business {business.business_id}")
+        fleet.delete()
+        messages.success(request, "Driver removed from directory")
+        return redirect('business:driver_directory')
+
+    except business_models.DriverDirectory.DoesNotExist:
+        logger.warning(f"Driver directory entry {id} not found or unauthorized access by user {request.user.id}")
+        messages.error(request, "Driver directory entry not found")
+        return redirect('business:driver_directory')
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('core:main_dashboard')
 
 
 # pickup location add------------------------------------------------------
 @login_required(login_url='account_login')
 def pickup_location_list(request):
-    business = business_models.Business.objects.get(
-        business_id=request.user.user_business.first().business_id)
-    pickup_location = business_models.PickupLocation.objects.filter(
-        business_id=business.business_id).all()
-    if not pickup_location:
-        return redirect('business:pickup_location_add')
-    print('pickup_location', pickup_location)
-    context = {
-        'stores': pickup_location,
-        'business': business, }
-    return render(request, 'client/parts/pickup_location_list.html', context)
+    try:
+        # IDOR FIX: Verify user has associated business
+        user_business = request.user.user_business.first()
+        if not user_business:
+            logger.warning(f"User {request.user.id} has no associated business")
+            messages.error(request, "No business associated with your account")
+            return redirect('core:main_dashboard')
+
+        business = business_models.Business.objects.get(business_id=user_business.business_id)
+        pickup_location = business_models.PickupLocation.objects.filter(
+            business_id=business.business_id).all()
+
+        if not pickup_location:
+            return redirect('business:pickup_location_add')
+
+        logger.info(f"User {request.user.id} viewing {len(pickup_location)} pickup locations for business {business.business_id}")
+
+        context = {
+            'stores': pickup_location,
+            'business': business,
+        }
+        return render(request, 'client/parts/pickup_location_list.html', context)
+    except business_models.Business.DoesNotExist:
+        logger.error(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('core:main_dashboard')
 
 
+@login_required(login_url='account_login')
 def pickup_location_add(request):
+    try:
+        # IDOR FIX: Verify user has associated business
+        user_business = request.user.user_business.first()
+        if not user_business:
+            logger.warning(f"User {request.user.id} has no associated business")
+            messages.error(request, "No business associated with your account")
+            return redirect('core:main_dashboard')
 
-    business = business_models.Business.objects.get(
-        business_id=request.user.user_business.first().business_id)
-    form = business_forms.PickupLocationsAddForm(request.POST or None)
-    if request.method == 'POST':
-        if form.is_valid():
-            pickup_location = form.save(commit=False)
-            pickup_location.business_id = business_models.Business.objects.get(
-                user_id=request.user.id).business_id
-            print(pickup_location.business)
-            form.save()
-            messages.success(request, "Successful Submission")
-            return redirect("business:pickup_location_list")
+        business = business_models.Business.objects.get(business_id=user_business.business_id)
+        form = business_forms.PickupLocationsAddForm(request.POST or None)
 
-    context = {
-        'form': form,
-        'business': business,
-    }
-    return render(request, 'client/parts/pickup_location_add.html', context)
+        if request.method == 'POST':
+            if form.is_valid():
+                pickup_location = form.save(commit=False)
+                # IDOR FIX: Use verified business_id
+                pickup_location.business_id = business.business_id
+                form.save()
+                logger.info(f"User {request.user.id} added pickup location for business {business.business_id}")
+                messages.success(request, "Pickup location added successfully")
+                return redirect("business:pickup_location_list")
+
+        context = {
+            'form': form,
+            'business': business,
+        }
+        return render(request, 'client/parts/pickup_location_add.html', context)
+    except business_models.Business.DoesNotExist:
+        logger.error(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('core:main_dashboard')
 
 
+@login_required(login_url='account_login')
 def pickup_location_delete(request, pickup_location_id):
-    pickup_location = business_models.PickupLocation.objects.get(
-        id=pickup_location_id)
-    pickup_location.delete()
-    return redirect("business:pickup_location_list")
+    try:
+        # IDOR FIX: Verify pickup location belongs to user's business
+        user_business = request.user.user_business.first()
+        if not user_business:
+            logger.warning(f"User {request.user.id} has no associated business")
+            messages.error(request, "No business associated with your account")
+            return redirect('core:main_dashboard')
+
+        business = business_models.Business.objects.get(business_id=user_business.business_id)
+        pickup_location = business_models.PickupLocation.objects.get(
+            id=pickup_location_id, business_id=business.business_id
+        )
+
+        logger.info(f"User {request.user.id} deleting pickup location {pickup_location_id} from business {business.business_id}")
+        pickup_location.delete()
+        messages.success(request, "Pickup location deleted successfully")
+        return redirect("business:pickup_location_list")
+
+    except business_models.PickupLocation.DoesNotExist:
+        logger.warning(f"Pickup location {pickup_location_id} not found or unauthorized access by user {request.user.id}")
+        messages.error(request, "Pickup location not found")
+        return redirect("business:pickup_location_list")
+    except business_models.Business.DoesNotExist:
+        logger.error(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('core:main_dashboard')
 
 
+@login_required(login_url='account_login')
 def pickup_location_update(request, pickup_location_id):
-    business = business_models.Business.objects.get(
-        business_id=request.user.user_business.first().business_id)
-    id = pickup_location_id
-    print(pickup_location_id)
-    print('pickup_location_update')
-    pickup_location = get_object_or_404(
-        business_models.PickupLocation, id=pickup_location_id)
-    print(pickup_location)
-    print(pickup_location.pickup_zone_no)
-    form = business_forms.PickupLocationsAddForm(
-        request.POST or None, instance=pickup_location)
-    if request.method == 'POST':
-        if form.is_valid():
-            print('pickup_location_update valid')
-            form.save()
-            return redirect("business:pickup_location_list")
+    try:
+        # IDOR FIX: Verify pickup location belongs to user's business
+        user_business = request.user.user_business.first()
+        if not user_business:
+            logger.warning(f"User {request.user.id} has no associated business")
+            messages.error(request, "No business associated with your account")
+            return redirect('core:main_dashboard')
 
-    context = {
-        'business' : business,
-        'form': form,
-        'id': id,
+        business = business_models.Business.objects.get(business_id=user_business.business_id)
+        pickup_location = get_object_or_404(
+            business_models.PickupLocation, id=pickup_location_id, business_id=business.business_id
+        )
 
-    }
-    return render(request, 'client/parts/pickup_location_update.html', context)
+        logger.info(f"User {request.user.id} updating pickup location {pickup_location_id} for business {business.business_id}")
+
+        form = business_forms.PickupLocationsAddForm(
+            request.POST or None, instance=pickup_location
+        )
+
+        if request.method == 'POST':
+            if form.is_valid():
+                form.save()
+                logger.info(f"Pickup location {pickup_location_id} updated successfully")
+                messages.success(request, "Pickup location updated successfully")
+                return redirect("business:pickup_location_list")
+
+        context = {
+            'business': business,
+            'form': form,
+            'id': pickup_location_id,
+        }
+        return render(request, 'client/parts/pickup_location_update.html', context)
+    except business_models.Business.DoesNotExist:
+        logger.error(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('core:main_dashboard')
 
 # frontend ---------------------------------------------------------------------------------------------------------------------
 
