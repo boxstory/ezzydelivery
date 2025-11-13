@@ -1,5 +1,73 @@
 {% load static %}
 <!-- services listing -->
+<style>
+.btn-service {
+    display: inline-block;
+    padding: 0.875rem 2rem;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    color: var(--brand-grey-800);
+    border: none;
+    border-radius: var(--brand-radius-md);
+    font-weight: 700;
+    font-size: 1rem;
+    text-decoration: none;
+    transition: var(--brand-transition);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-service:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 211, 59, 0.4);
+    color: var(--brand-grey-900);
+}
+
+.btn-service i {
+    font-size: 1.125rem;
+}
+
+.btn-service-disabled {
+    background: var(--brand-grey-400);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.service-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .btn-service {
+        padding: 0.75rem 1.5rem;
+        font-size: 0.9375rem;
+        width: 100%;
+        max-width: 280px;
+    }
+
+    .service-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+
+/* Desktop adjustments */
+@media (min-width: 769px) {
+    .service-buttons {
+        justify-content: center;
+    }
+
+    .btn-service {
+        min-width: 180px;
+    }
+}
+</style>
 <div class="container  ">
     <section class="py-md-5 p-md-2">
         <div class="container p-0">
@@ -22,13 +90,10 @@
                                 orders promptly and professionally, ensuring on-time deliveries. Free up your time for
                                 marketing efforts and secure repeat business effortlessly.
                             </p>
-                            <a class="nav-link active btn btn-dark p-2 "
-                               aria-current="page"
+                            <a class="btn btn-service"
                                href="{% url 'webpages:delivery_pricing' %}">
-                                <div class="w-md-50">
-                                    <i class="fa-solid fa-money-check-dollar me-2"></i>
-                                    Pricing
-                                </div>
+                                <i class="fa-solid fa-money-check-dollar me-2"></i>
+                                Pricing
                             </a>
                         </div>
                     </div>
@@ -43,12 +108,9 @@
                             Effortlessly manage bulk order shipments to our facility, where we expertly repack and
                             deliver to your business based on individual orders. Our cutting-edge inventory stock
                             management system ensures precision and control throughout the process.
-                            <a class="nav-link  btn btn-dark p-2 mt-3"
-                               aria-current="page"
+                            <a class="btn btn-service mt-3"
                                href="{% url 'webpages:fulfillment' %}">
-                                <div class=" w-md-50">
-                                    <i class="fa fa-info me-2 "></i>Know More
-                                </div>
+                                <i class="fa fa-info me-2"></i>Know More
                             </a>
                         </div>
                     </div>
@@ -67,16 +129,12 @@
                                 strategic marketing efforts. Easily find qualified drivers with the necessary documents
                                 to meet your delivery needs.
                             </p>
-                            <div class="mb-2 w-md-50 ">
-                                <a href="{% url 'fleet:fleets' %}" class="text-decoration-none">
-                                    <div class="btn btn-dark   mb-lg-0 mb-2">
-                                        <i class="fa fa-list me-2 "></i>All Drivers
-                                    </div>
+                            <div class="service-buttons">
+                                <a href="{% url 'fleet:fleets' %}" class="btn btn-service">
+                                    <i class="fa fa-list me-2"></i>All Drivers
                                 </a>
-                                <a href="{% url 'core:join_driver' %}" class="text-decoration-none">
-                                    <div class="btn btn-dark">
-                                        <i class="fa fa-add me-2 "></i>Join Drivers
-                                    </div>
+                                <a href="{% url 'core:join_driver' %}" class="btn btn-service">
+                                    <i class="fa fa-add me-2"></i>Join Drivers
                                 </a>
                             </div>
                         </div>
@@ -92,14 +150,11 @@
                             <p class="text-muted">
                                 Transform your online store with Quick Commerce Delivery, the ultimate solution for fast and efficient order fulfillment. In a competitive e-commerce landscape, speed and reliability are crucial. Our service enables you to offer lightning-fast deliveries, ensuring your customers receive their orders within hours, not days.
                             </p>
-                            <div class="mb-2 w-md-50 ">
-                                <a class="nav-link active btn btn-dark p-2 mt-3"
-                               aria-current="page"
-                               href="{% url 'webpages:qcommerce' %}">
-                                <div class=" w-md-50">
-                                    <i class="fa fa-info me-2 "></i>Know More
-                                </div>
-                            </a>
+                            <div class="service-buttons">
+                                <a class="btn btn-service mt-3"
+                                   href="{% url 'webpages:qcommerce' %}">
+                                    <i class="fa fa-info me-2"></i>Know More
+                                </a>
                             </div>
                         </div>
                     </a>
@@ -118,11 +173,9 @@
                             Qatar, join us as Affiliate Marketing Program. we provide verity of products to
                             get payment by selling through your business channel.
                         </p>
-                        <div class="mb-2 w-md-50 ">
-                            <a href="/affiliate/" class="text-decoration-none">
-                                <div class="btn btn-dark  ">
-                                    <i class="fa fa-info me-2 "></i>Know More
-                                </div>
+                        <div class="service-buttons">
+                            <a href="/affiliate/" class="btn btn-service">
+                                <i class="fa fa-info me-2"></i>Know More
                             </a>
                         </div>
                     </div>
@@ -141,9 +194,9 @@
                             across town or require a more extensive logistics solution, our network of independent
                             drivers is ready to assist.
                         </p>
-                        <div class="mb-2 w-md-50 ">
-                            <a href="#" class="text-decoration-none">
-                                <div class="btn btn-dark  ">Coming Soon</div>
+                        <div class="service-buttons">
+                            <a href="#" class="btn btn-service btn-service-disabled">
+                                Coming Soon
                             </a>
                         </div>
                     </div>
