@@ -7,19 +7,22 @@ from webpages.forms import *
 from django.core.mail import mail_admins, send_mail
 from client import models as business_models
 from fleet import models as fleet_models
+from core.seo import SEOMetadata
 # Create your views here.
 
 
 def index(request):
+    meta = SEOMetadata.get_home_meta()
     data = {
-
+        'seo': meta,
     }
     return render(request, 'webpages/index.html', data)
 
 
 def delivery_pricing(request):
+    meta = SEOMetadata.get_pricing_meta()
     data = {
-
+        'seo': meta,
     }
     return render(request, 'webpages/3pl_pricing.html', data)
 
@@ -53,7 +56,7 @@ def delivery_inquiry(request):
 
 
 def about(request):
-
+    meta = SEOMetadata.get_about_meta()
     brands = list(business_models.Business.objects.all())
     # brands = list(fleet_models.Driver.objects.all())
 
@@ -66,22 +69,24 @@ def about(request):
     print('brands', brands)
 
     data = {
+        'seo': meta,
         'brands': brands,
-
     }
     return render(request, 'webpages/about.html', data)
 
 
 def services(request):
+    meta = SEOMetadata.get_services_meta()
     data = {
-
+        'seo': meta,
     }
     return render(request, 'webpages/services.html', data)
 
 
 def terms(request):
+    meta = SEOMetadata.get_terms_meta()
     data = {
-
+        'seo': meta,
     }
     return render(request, 'webpages/terms.html', data)
 
@@ -94,15 +99,17 @@ def test(request):
 
 
 def fulfillment(request):
+    meta = SEOMetadata.get_fulfillment_meta()
     data = {
-
+        'seo': meta,
     }
     return render(request, 'webpages/fulfillment.html', data)
 
 
 def qcommerce(request):
+    meta = SEOMetadata.get_qcommerce_meta()
     data = {
-
+        'seo': meta,
     }
     return render(request, 'webpages/qcommerce.html', data)
 
@@ -122,6 +129,7 @@ def fleets(request):
 
 
 def contactus(request):
+    meta = SEOMetadata.get_contact_meta()
     if request.method == 'POST':
         f = ContactForm(request.POST)
         if f.is_valid():
@@ -136,9 +144,10 @@ def contactus(request):
     else:
         f = ContactForm()
 
-    return render(request, 'webpages/contactus.html', {'form': f})
+    return render(request, 'webpages/contactus.html', {'seo': meta, 'form': f})
 
 def careers(request):
+    meta = SEOMetadata.get_careers_meta()
     f = CareersForm(request.POST or None)
     if request.method == 'POST':
         f = CareersForm(request.POST)
@@ -146,13 +155,14 @@ def careers(request):
             f.save()
             messages.success(request, "Successful Submission")
             return redirect('/')
-    
-    return render(request, 'webpages/careers.html', {'form': f})
+
+    return render(request, 'webpages/careers.html', {'seo': meta, 'form': f})
 
 
 def privacy(request):
+    meta = SEOMetadata.get_privacy_meta()
     data = {
-
+        'seo': meta,
     }
     return render(request, 'webpages/privacy.html', data)
 
