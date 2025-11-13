@@ -99,10 +99,16 @@ class BusinessProfile(models.Model):
     business_tiktok = models.CharField(
         max_length=100, blank=True, null=True)
     business_youtube = models.CharField(
-        max_length=100, blank=True, null=True) 
-    business_email = models.CharField(max_length=100, blank=True, 
+        max_length=100, blank=True, null=True)
+    business_twitter = models.CharField(
+        max_length=100, blank=True, null=True)
+    business_linkedin = models.CharField(
+        max_length=100, blank=True, null=True)
+    business_snapchat = models.CharField(
+        max_length=100, blank=True, null=True)
+    business_email = models.CharField(max_length=100, blank=True,
                                       null=True)
-    business_phone = models.CharField(max_length=12, blank=True, 
+    business_phone = models.CharField(max_length=12, blank=True,
                                       null=True)
      
 
@@ -167,12 +173,38 @@ class BusinessLogo(models.Model):
         upload_to=upload_path_handler, default="business/avatar.png", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         verbose_name_plural = "Business Logo"
 
     def __str__(self):
         return str(self.business.business_name)
+
+
+class BusinessPoster(models.Model):
+    """Model for business promotional posters/banners (up to 6)"""
+    business = models.ForeignKey(
+        Business, on_delete=models.CASCADE, related_name='business_posters')
+    poster_image = models.ImageField(
+        upload_to=upload_path_handler, blank=True, null=True,
+        help_text='Upload promotional poster/banner image')
+    poster_title = models.CharField(max_length=200, blank=True, null=True,
+                                     help_text='Optional title for the poster')
+    poster_description = models.TextField(max_length=500, blank=True, null=True,
+                                          help_text='Optional description')
+    poster_order = models.PositiveIntegerField(default=0,
+                                                help_text='Display order (0-5)')
+    is_active = models.BooleanField(default=True,
+                                     help_text='Show/hide this poster')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Business Posters"
+        ordering = ['poster_order', '-created_at']
+
+    def __str__(self):
+        return f"{self.business.business_name} - Poster {self.poster_order + 1}"
 
 
 # @todo: link team profile with business
