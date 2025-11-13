@@ -121,6 +121,17 @@
     font-size: 0.875rem;
 }
 
+.mobile-nav-link.active {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    border-left-color: var(--brand-grey-800);
+    color: var(--brand-grey-900);
+    font-weight: 700;
+}
+
+.mobile-nav-link.active i {
+    color: var(--brand-grey-800);
+}
+
 .mobile-nav-divider {
     height: 1px;
     background: var(--brand-grey-200);
@@ -159,6 +170,16 @@
     color: var(--brand-grey-800);
 }
 
+.mobile-nav-single a.active {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    color: var(--brand-grey-900);
+    font-weight: 700;
+}
+
+.mobile-nav-single a.active i {
+    color: var(--brand-grey-800);
+}
+
 .staff-dashboard-btn {
     background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
     color: var(--brand-grey-800);
@@ -178,6 +199,12 @@
 .staff-dashboard-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(255, 211, 59, 0.4);
+}
+
+.staff-dashboard-btn.active {
+    box-shadow: 0 8px 25px rgba(255, 211, 59, 0.5);
+    font-weight: 700;
+    border: 2px solid var(--brand-grey-800);
 }
 </style>
 
@@ -416,4 +443,26 @@ function toggleMobileSection(sectionId) {
     submenu.classList.toggle('show');
     header.classList.toggle('active');
 }
+
+// Highlight current page link on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const currentPath = window.location.pathname;
+
+    // Check all mobile nav links
+    document.querySelectorAll('.mobile-nav-link, .mobile-nav-single a, .staff-dashboard-btn').forEach(function(link) {
+        const linkPath = new URL(link.href, window.location.origin).pathname;
+
+        // If current page matches the link
+        if (currentPath === linkPath) {
+            link.classList.add('active');
+
+            // If it's inside a submenu, expand that section
+            const submenu = link.closest('.mobile-nav-submenu');
+            if (submenu) {
+                submenu.classList.add('show');
+                submenu.previousElementSibling.classList.add('active');
+            }
+        }
+    });
+});
 </script>
