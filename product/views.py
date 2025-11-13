@@ -44,12 +44,17 @@ def product_single_add(request):
     print('Product add')
     business = business_models.Business.objects.get(user_id=request.user.id)
     if request.method == 'POST':
-        form = product_forms.AddItemsForm(request.POST)
+        form = product_forms.AddItemsForm(request.POST, request.FILES)
         if form.is_valid():
             print('form valid')
-            form.save()
-            #@todo: change redirection
+            product = form.save(commit=False)
+            product.business = business
+            product.save()
+            messages.success(request, 'Product added successfully!')
             return redirect('/product/all/')
+        else:
+            print('form errors:', form.errors)
+            messages.error(request, 'Error adding product. Please check the form.')
     else:
         form = product_forms.AddItemsForm()
 
