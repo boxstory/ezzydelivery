@@ -207,7 +207,11 @@ About Us
     <div class="d-flex flex-wrap justify-content-center gap-5 align-items-center">
       {% for brand in brands %}
       <a href="/business/{{brand.business_id}}/" class="brand-logo-wrapper text-decoration-none text-center">
-        <img src="{{brand.business_logo.url}}" alt="{{brand.business_name}}" class="brand-logo" />
+        {% if brand.business_logo.first and brand.business_logo.first.business_logo %}
+          <img src="{{brand.business_logo.first.business_logo.url}}" alt="{{brand.business_name}}" class="brand-logo" />
+        {% else %}
+          <img src="{% static 'business/avatar.png' %}" alt="{{brand.business_name}}" class="brand-logo" />
+        {% endif %}
         <div class="brand-name">{{brand.business_name}}</div>
       </a>
       {% endfor %}
