@@ -342,7 +342,7 @@ def add_order(request):
         if request.method == 'POST':
             print("POST form in views")
             form = orders_forms.AddOrderForm(request.POST)
-            
+
             if form.is_valid():
                 print("valid form")
                 order = form.save(commit=False)
@@ -355,7 +355,10 @@ def add_order(request):
                 return  redirect('orders:add_order_product', order_id=order.id)
         else:
             print("load add_order form")
-            form = orders_forms.AddOrderForm(business_id=business.business_id)
+            form = orders_forms.AddOrderForm(
+                business_id=business.business_id,
+                business_code=business.business_code
+            )
     return render(request, 'orders/add_order.html', {'form': form, 'business': business, })
 
 

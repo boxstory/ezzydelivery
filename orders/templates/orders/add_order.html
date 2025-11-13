@@ -57,6 +57,27 @@
       const phoneNumberValue = id_customer_phone.val();
       id_customer_whatsapp.val(974 + phoneNumberValue);
     });
+
+    // Auto-generate order number preview
+    const clientOrderCodeInput = $("#id_client_order_code");
+    const orderNumberPreview = $("#id_order_number_preview");
+    const businessCode = orderNumberPreview.data('business-code') || '';
+
+    // Update preview when user types order number
+    clientOrderCodeInput.on("input", function () {
+      const clientOrderCode = clientOrderCodeInput.val().trim();
+      if (clientOrderCode) {
+        // Format: BusinessCode-ClientOrderCode-[Auto ID]
+        orderNumberPreview.val(businessCode + '-' + clientOrderCode + '-[Auto]');
+      } else {
+        orderNumberPreview.val('');
+      }
+    });
+
+    // Set initial value if client order code already has a value
+    if (clientOrderCodeInput.val()) {
+      clientOrderCodeInput.trigger("input");
+    }
   });
   // Initialize select2 in pickuplocation search field
   $("#id_pickup_location").select2();

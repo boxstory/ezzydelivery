@@ -27,8 +27,18 @@ COD_STATUS_BY_CLIENT = {
 
 
 class AddOrderForm(forms.ModelForm):
-    
-    
+    # Add a field to display the unique order number preview
+    order_number_preview = forms.CharField(
+        label='Unique Order Number (Auto-generated)',
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'readonly': 'readonly',
+            'id': 'order_number_preview',
+            'placeholder': 'Will be generated: [Business Code]-[Your Order Number]-[System ID]'
+        })
+    )
+
     class Meta:
         model = Order
         fields = ['pickup_location', 'client_order_code', 'customer_name', 'customer_phone', 'customer_whatsapp',   'cod_status_by_client', 'cod_amount',
@@ -38,11 +48,11 @@ class AddOrderForm(forms.ModelForm):
         widgets = {
             'order_notes': forms.TextInput(attrs={'class': 'form-control'}),
             'order_status': forms.Select(attrs={'class': 'form-control'}, choices=ORDER_STATUS),
-
+            'client_order_code': forms.TextInput(attrs={'class': 'form-control', 'id': 'client_order_code_input'}),
         }
         labels = {
             'order_notes': _('Order Short description'),
-            'client_order_code': _('Order Number'),
+            'client_order_code': _('Your Order Number'),
             'cod_amount': 'Enter COD with Delivery charge',
             'dl_building': 'Customer building No',
             'dl_street': 'Customer Street No',
@@ -50,14 +60,19 @@ class AddOrderForm(forms.ModelForm):
         }
 
     def __init__(self,  *args, **kwargs):
-        business_id = kwargs.pop('business_id', None) 
-        
+        business_id = kwargs.pop('business_id', None)
+        business_code = kwargs.pop('business_code', None)
 
         super().__init__(*args, **kwargs)
+
+        # Store business_code for use in JavaScript
+        if business_code:
+            self.fields['order_number_preview'].widget.attrs['data-business-code'] = business_code
+
         for field in iter(self.fields):
             self.fields[field].widget.attrs.update(
                 {'class': 'form-control'})
-            
+
             self.fields['dl_building'].initial = '0'
             self.fields['dl_street'].initial = '0'
             self.fields['dl_zone'].initial = '0'
