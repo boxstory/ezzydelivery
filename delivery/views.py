@@ -1,7 +1,9 @@
 from multiprocessing import context
+import logging
 from django.forms.fields import DateTimeField
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.http import JsonResponse
 from decouple import config
 from django.views.decorators.csrf import csrf_exempt
@@ -20,6 +22,7 @@ from orders import forms as order_forms
 from delivery import forms as delivery_forms
 from fleet import forms as fleet_forms
 
+logger = logging.getLogger('delivery')
 
 # Create your views here.
 
@@ -79,17 +82,39 @@ def get_zone_lat_long(request):
 # delivery details -------------------------------------------------------------------------
 
 
+@login_required(login_url='account_login')
 def all_delivery_tasks(request):
-    driver = fleet_models.Driver.objects.get(user_id=request.user.id)
-    print('fleet', driver.driver_id)
-    dl_tasks = delivery_models.DeliveryTask.objects.all()
-    print(dl_tasks)
+    # Get driver (with error handling)
+    try:
+        driver = fleet_models.Driver.objects.select_related(
+            'user',  # FK: Driver → User
+        ).get(user_id=request.user.id)
+        logger.info(f"Driver {driver.driver_id} viewing all delivery tasks")
+    except fleet_models.Driver.DoesNotExist:
+        logger.warning(f"User {request.user.id} is not a driver")
+        messages.error(request, "No driver profile found for your account")
+        return redirect('homepage')
+
+    # FIX: Optimize with select_related and prefetch_related
+    dl_tasks = delivery_models.DeliveryTask.objects.select_related(
+        'order',                    # FK: DeliveryTask → Order
+        'order__business',          # Through: Order → Business
+        'order__customer',          # Through: Order → Customer
+        'order__pickup_location',   # Through: Order → PickupLocation
+        'driver',                   # FK: DeliveryTask → Driver (if assigned)
+    ).prefetch_related(
+        'assigned_drivers',               # M2M: DeliveryTask ← AssignedDriver → Driver
+        'assigned_drivers__driver',       # Through AssignedDriver
+        'order__order_product_list',      # Reverse FK: Order ← OrderProductList
+    ).order_by('-id')
+
+    logger.debug(f"Fetched {dl_tasks.count()} delivery tasks")
 
     context = {
         'cards': dl_tasks,
+        'driver': driver,
     }
     return render(request, 'delivery/parts/tasks_all.html', context)
-    # return render(request, 'delivery/all_delivery_tasks.html', context)
 
 
 def assign_driver(request):
@@ -118,31 +143,47 @@ def assign_driver(request):
     return JsonResponse({"success": False, "error": "Invalid request"})
 
 
+@login_required(login_url='account_login')
 def assigned_tasks(request):
     try:
-        # Get the driver associated with the current user
-        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
-        print('assigned_tasks Driver', driver.driver_id)
+        # FIX: Get driver with select_related
+        driver = fleet_models.Driver.objects.select_related('user').get(
+            user_id=request.user.id
+        )
+        logger.info(f"Driver {driver.driver_id} viewing assigned tasks")
 
-        assidned_tasks_ids = delivery_models.AssignedDriver.objects.filter(
-            driver_id=driver.driver_id).values_list('dl_task_id', flat=True)
-        print(assidned_tasks_ids)
-        # Get the list of delivery tasks assigned to the driver
+        # FIX: Get task IDs (this is efficient - stays the same)
+        assigned_tasks_ids = delivery_models.AssignedDriver.objects.filter(
+            driver_id=driver.driver_id
+        ).values_list('dl_task_id', flat=True)
+
+        # FIX: Optimize with select_related and prefetch_related
         assigned_tasks = delivery_models.DeliveryTask.objects.filter(
-            id__in=assidned_tasks_ids)
-        print('Assigned Tasks', assigned_tasks)
+            id__in=assigned_tasks_ids
+        ).select_related(
+            'order',
+            'order__business',
+            'order__customer',
+            'order__pickup_location',
+            'driver',
+        ).prefetch_related(
+            'assigned_drivers',
+            'assigned_drivers__driver',
+            'order__order_product_list',
+        ).order_by('-id')
+
+        logger.info(f"Driver {driver.driver_id} has {assigned_tasks.count()} assigned tasks")
 
         context = {
-            'tasks': assigned_tasks,  # Change 'cards' to 'tasks' for consistency
+            'tasks': assigned_tasks,
+            'driver': driver,
         }
         return render(request, 'delivery/parts/assigned_tasks.html', context)
-    except fleet_models.Driver.DoesNotExist:
-        # Handle the case where the driver does not exist
-        print('Driver does not exist')
-        # You might want to redirect the user or provide an appropriate response here
 
-    # Handle other exceptions or provide a default response
-    return render(request, 'delivery/parts/assigned_tasks.html', {})
+    except fleet_models.Driver.DoesNotExist:
+        logger.warning(f"User {request.user.id} attempted to view driver tasks but has no driver profile")
+        messages.error(request, "No driver profile found")
+        return redirect('homepage')
 
 
 # business side delivery data --------------------------------------------------------------

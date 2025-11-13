@@ -1,4 +1,5 @@
 import json
+import logging
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
@@ -21,66 +22,105 @@ from django.core.paginator import (
     PageNotAnInteger,
 )
 
+logger = logging.getLogger('orders')
+
 # orders---------------------------------------------------------------------------------------------------------------------
 
 
 @login_required(login_url='account_login')
 def orders_all_list(request):
-    business = business_models.Business.objects.get(user_id=request.user.id)
-    print(business, "business order list")
-    items = orders_models.Order.objects.filter(
-        business=business.business_id).order_by('-id')
-    print('order_product_list')
-    #print(orders.order_product_list)
+    # Get user's business (with authorization check)
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        logger.info(f"User {request.user.id} accessing orders list for business {business.business_id}")
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"User {request.user.id} has no associated business")
+        messages.error(request, "No business associated with your account")
+        return redirect('business_dashboard')
 
-    
-    
+    # FIX: Use select_related for ForeignKeys and prefetch_related for reverse relations
+    items = orders_models.Order.objects.filter(
+        business=business.business_id
+    ).select_related(
+        'business',              # FK: Order → Business
+        'customer',              # FK: Order → Customer
+        'pickup_location',       # FK: Order → PickupLocation
+    ).prefetch_related(
+        'order_product_list',          # Reverse FK: Order ← OrderProductList
+        'delivery_task',               # Reverse FK: Order ← DeliveryTask
+        'delivery_task__driver',       # Through: DeliveryTask → Driver
+        'delivery_task__assigned_drivers',  # M2M through AssignedDriver
+    ).order_by('-id')
+
+    logger.debug(f"Fetching orders for business {business.business_id}")
+
     default_page = 1
     page = request.GET.get('page', default_page)
     # Paginate items
-    items_per_page = 5
-    paginator = Paginator(items , items_per_page)
+    items_per_page = 10  # Increased from 5 for better UX
+    paginator = Paginator(items, items_per_page)
+
     try:
         orders = paginator.page(page)
-        print(orders)
+        logger.debug(f"Displaying page {page} with {len(orders)} orders")
     except PageNotAnInteger:
         orders = paginator.page(default_page)
-        print(orders)
+        logger.debug(f"Invalid page number, displaying page {default_page}")
     except EmptyPage:
         orders = paginator.page(paginator.num_pages)
-        print(orders)
+        logger.debug(f"Empty page, displaying last page {paginator.num_pages}")
+
     context = {
         'orders': orders,
         'business': business,
-        'len': len(items)
+        'len': items.count()  # Use .count() instead of len() for better performance
     }
     return render(request, 'orders/orders_all_list.html', context)
 
 
 @login_required(login_url='account_login')
 def orders_pending_list(request):
-    business = business_models.Business.objects.get(user_id=request.user.id)
+    # Get user's business (with authorization check)
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        logger.info(f"User {request.user.id} accessing pending orders for business {business.business_id}")
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"User {request.user.id} has no associated business")
+        messages.error(request, "No business associated with your account")
+        return redirect('business_dashboard')
 
-    print(business, "business order list")
+    # FIX: Optimize with select_related and prefetch_related
     orders = orders_models.Order.objects.filter(
-        delivery_task__dl_task_status_dms__in=[ '4', '5', '6'], business=business.business_id
+        delivery_task__dl_task_status_dms__in=['4', '5', '6'],
+        business=business.business_id
+    ).select_related(
+        'business',
+        'customer',
+        'pickup_location',
+    ).prefetch_related(
+        'order_product_list',
+        'delivery_task',
+        'delivery_task__driver',
+        'delivery_task__assigned_drivers',
     ).order_by('-id')
-    print(orders)
-    
+
+    logger.debug(f"Fetching pending orders for business {business.business_id}")
+
     default_page = 1
     page = request.GET.get('page', default_page)
     # Paginate items
     items_per_page = 10
-    paginator = Paginator(orders , items_per_page)
+    paginator = Paginator(orders, items_per_page)
+
     try:
         orders = paginator.page(page)
-        print(orders)
+        logger.debug(f"Displaying page {page} with {len(orders)} pending orders")
     except PageNotAnInteger:
         orders = paginator.page(default_page)
-        print(orders)
+        logger.debug(f"Invalid page number, displaying page {default_page}")
     except EmptyPage:
         orders = paginator.page(paginator.num_pages)
-        print(orders)
+        logger.debug(f"Empty page, displaying last page {paginator.num_pages}")
 
     context = {
         'orders': orders,
@@ -90,28 +130,47 @@ def orders_pending_list(request):
 
 @login_required(login_url='account_login')
 def orders_successfull_list(request):
-    business = business_models.Business.objects.get(user_id=request.user.id)
+    # Get user's business (with authorization check)
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        logger.info(f"User {request.user.id} accessing successful orders for business {business.business_id}")
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"User {request.user.id} has no associated business")
+        messages.error(request, "No business associated with your account")
+        return redirect('business_dashboard')
 
-    print(business, "business order list")
+    # FIX: Optimize with select_related and prefetch_related
     orders = orders_models.Order.objects.filter(
-        delivery_task__dl_task_status_dms='2' , business=business.business_id
+        delivery_task__dl_task_status_dms='2',
+        business=business.business_id
+    ).select_related(
+        'business',
+        'customer',
+        'pickup_location',
+    ).prefetch_related(
+        'order_product_list',
+        'delivery_task',
+        'delivery_task__driver',
+        'delivery_task__assigned_drivers',
     ).order_by('-id')
-    print(orders)
-    
+
+    logger.debug(f"Fetching successful orders for business {business.business_id}")
+
     default_page = 1
     page = request.GET.get('page', default_page)
     # Paginate items
     items_per_page = 10
-    paginator = Paginator(orders , items_per_page)
+    paginator = Paginator(orders, items_per_page)
+
     try:
         orders = paginator.page(page)
-        print(orders)
+        logger.debug(f"Displaying page {page} with {len(orders)} successful orders")
     except PageNotAnInteger:
         orders = paginator.page(default_page)
-        print(orders)
+        logger.debug(f"Invalid page number, displaying page {default_page}")
     except EmptyPage:
         orders = paginator.page(paginator.num_pages)
-        print(orders)
+        logger.debug(f"Empty page, displaying last page {paginator.num_pages}")
 
     context = {
         'orders': orders,
