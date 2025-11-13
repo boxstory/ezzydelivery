@@ -28,6 +28,15 @@ urlpatterns = [
     path('terms/', webpages_views.terms, name='terms'),
     path('testimonials/', webpages_views.testimonials, name='testimonials'),
     path('delivery-request/', webpages_views.delivery_request, name='delivery_request'),
+
+    # Help Center
+    path('help/', webpages_views.help_center, name='help_center'),
+    path('help/client-faq/', webpages_views.client_faq, name='client_faq'),
+    path('help/driver-faq/', webpages_views.driver_faq, name='driver_faq'),
+    path('help/guides/', webpages_views.help_guides, name='help_guides'),
+    path('help/guides/client/', webpages_views.client_guide, name='client_guide'),
+    path('help/guides/driver/', webpages_views.driver_guide, name='driver_guide'),
+
     path('test/', webpages_views.test, name='test'),
     path('500/', TemplateView.as_view(template_name='page_not_found.html')),
 

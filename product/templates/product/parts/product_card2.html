@@ -1,42 +1,77 @@
-<div class="d-flex justify-content-center text-center col-12 col-lg-6 p-2">
-    <div class="col-4 " style="height: 15rem;">
-        <div class="portada" style="background-image: url('{{ product.product_image.url }}')">
-
-        </div>
-    </div>
-    <div class="col-8 border">
-        <div class="row  p-0 m-0">
-            <div class="col-8">
-                <p class="fw-bold  text-start ps-2 pt-2 m-0">{{ product.brand_name }}</p>
-                <p class="fw-bold fs-5 text-start ps-2 m-0">{{ product.item_name }}</p>
-                <p class="text-start ps-2 m-0">{{ product.product_category }}</p>
-                <p class="text-start ps-2 m-0">Qr. {{ product.item_price }}</p>
-            </div>
-            <div class="col-4 p-0">
-                {% if product.brand_logo %}
-                <img src="{{ product.brand_logo.url }}" alt="" class="img-thumbnail border-0 p-0 m-0 ">
+<div class="col-12 col-md-6 col-lg-4 p-2">
+    <div class="modern-product-card h-100">
+        <!-- Product Image Section -->
+        <div class="product-image-wrapper position-relative">
+            <div class="product-image-container">
+                {% if product.product_image %}
+                <img src="{{ product.product_image.url }}" alt="{{ product.item_name }}" class="product-main-img">
                 {% else %}
-                <img src="/media/business/product_images/brand_logo_default.jpg" alt="" class="img-thumbnail border-0 ">
+                <img src="/media/business/product_images/product_default.jpg" alt="{{ product.item_name }}" class="product-main-img">
                 {% endif %}
             </div>
 
+            <!-- Brand Logo Badge -->
+            <div class="brand-logo-badge">
+                {% if product.brand_logo %}
+                <img src="{{ product.brand_logo.url }}" alt="{{ product.brand_name }}">
+                {% else %}
+                <img src="/media/business/product_images/brand_logo_default.jpg" alt="Brand">
+                {% endif %}
+            </div>
+
+            <!-- Stock Badge -->
+            {% if product.available_stock %}
+            <div class="stock-badge {% if product.available_stock > 10 %}in-stock{% elif product.available_stock > 0 %}low-stock{% else %}out-of-stock{% endif %}">
+                <i class="fa-solid fa-box"></i> {{ product.available_stock }} in stock
+            </div>
+            {% endif %}
         </div>
-        <div class="row p-0 m-0 ">
 
+        <!-- Product Info Section -->
+        <div class="product-card-body">
+            <!-- Category & Brand -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="product-category-tag">
+                    <i class="fa-solid fa-tag me-1"></i>{{ product.product_category }}
+                </span>
+                <span class="product-brand-name">{{ product.brand_name }}</span>
+            </div>
 
-            <p class="row p-2 m-0">
-                {{ product.item_discription | truncatechars:100 }}
+            <!-- Product Name -->
+            <h3 class="product-card-title">{{ product.item_name }}</h3>
 
+            <!-- Product Description -->
+            <p class="product-card-description">
+                {{ product.item_discription | truncatechars:80 }}
             </p>
-            <div class="d-flex justify-content-evenly align-self-center">
-                <button>
+
+            <!-- Price Section -->
+            <div class="product-price-section">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="product-price-label">Price</span>
+                        <div class="product-price-value">Qr. {{ product.item_price }}</div>
+                    </div>
+                    {% if product.available_stock %}
+                    <div class="text-end">
+                        <span class="product-stock-label">Stock</span>
+                        <div class="product-stock-value">{{ product.available_stock }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="product-card-actions">
+                <button class="action-btn action-btn-primary" title="Add to Cart">
+                    <i class="fa-solid fa-cart-plus"></i>
+                    <span>Add to Cart</span>
+                </button>
+                <button class="action-btn action-btn-secondary" title="Add to Wishlist">
                     <i class="far fa-heart"></i>
                 </button>
-                <button>
-                    <i class="fa-solid fa-cart-plus"></i>
-                </button>
-                <button>
-                    <i class="fas fa-user-friends"></i>
+                <button class="action-btn action-btn-secondary" title="Quick View">
+                    <i class="fa-solid fa-eye"></i>
                 </button>
             </div>
         </div>

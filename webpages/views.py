@@ -266,3 +266,87 @@ def delivery_request(request):
         'form': form,
     }
     return render(request, 'webpages/delivery_request.html', data)
+
+
+def help_center(request):
+    """Main help center page with overview of all help resources"""
+    meta = SEOMetadata.get_page_meta(
+        title="Help Center - Ezzy Delivery Qatar",
+        description="Get help with Ezzy Delivery services. Find FAQs, guides, and support for clients and drivers.",
+        keywords="help center, support, FAQs, guides, delivery help Qatar"
+    )
+
+    data = {
+        'seo': meta,
+    }
+    return render(request, 'webpages/help_center.html', data)
+
+
+def client_faq(request):
+    """Client FAQ page"""
+    meta = SEOMetadata.get_page_meta(
+        title="Client FAQ - Ezzy Delivery Qatar",
+        description="Frequently asked questions for e-commerce sellers and online stores using Ezzy Delivery services in Qatar.",
+        keywords="client FAQ, seller questions, ecommerce delivery Qatar"
+    )
+
+    data = {
+        'seo': meta,
+    }
+    return render(request, 'webpages/client_faq.html', data)
+
+
+def driver_faq(request):
+    """Driver FAQ page"""
+    meta = SEOMetadata.get_page_meta(
+        title="Driver FAQ - Ezzy Delivery Qatar",
+        description="Frequently asked questions for delivery drivers and couriers working with Ezzy Delivery in Qatar.",
+        keywords="driver FAQ, courier questions, delivery driver Qatar"
+    )
+
+    data = {
+        'seo': meta,
+    }
+    return render(request, 'webpages/driver_faq.html', data)
+
+
+def help_guides(request):
+    """Help guides and onboarding kits overview"""
+    meta = SEOMetadata.get_page_meta(
+        title="Guides & Resources - Ezzy Delivery Qatar",
+        description="Onboarding guides and resources for clients and drivers. Learn how to get started with Ezzy Delivery.",
+        keywords="onboarding guides, client kit, driver kit, delivery resources Qatar"
+    )
+
+    data = {
+        'seo': meta,
+    }
+    return render(request, 'webpages/help_guides.html', data)
+
+
+def client_guide(request):
+    """Client onboarding guide"""
+    meta = SEOMetadata.get_page_meta(
+        title="Client Onboarding Guide - Ezzy Delivery Qatar",
+        description="Complete onboarding guide for eCommerce sellers and online stores. Learn how to get started with Ezzy Delivery services.",
+        keywords="client onboarding, seller guide, ecommerce setup Qatar"
+    )
+
+    data = {
+        'seo': meta,
+    }
+    return render(request, 'webpages/client_guide.html', data)
+
+
+def driver_guide(request):
+    """Driver onboarding guide"""
+    meta = SEOMetadata.get_page_meta(
+        title="Driver Onboarding Guide - Ezzy Delivery Qatar",
+        description="Complete onboarding guide for delivery drivers and couriers. Learn about requirements, workflow, and getting started.",
+        keywords="driver onboarding, courier guide, delivery driver Qatar"
+    )
+
+    data = {
+        'seo': meta,
+    }
+    return render(request, 'webpages/driver_guide.html', data)

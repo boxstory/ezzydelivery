@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Guides & Resources - Ezzy Delivery Qatar{% endblock title %}
+
+{% block extra_css %}
+<style>
+  .guides-hero { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 4rem 0 3rem; color: white; }
+  .guide-card {
+    background: white;
+    border-radius: 16px;
+    padding: 3rem 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 2px solid #f0f0f0;
+    transition: all 0.3s ease;
+    text-align: center;
+  }
+  .guide-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+    border-color: #4facfe;
+  }
+  .guide-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: white;
+    margin: 0 auto 1.5rem;
+  }
+  .guide-description {
+    color: #6c757d;
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+    min-height: 60px;
+  }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="guides-hero text-center">
+  <div class="container">
+    <h1 class="display-4 fw-bold mb-3"><i class="fa-solid fa-book-open me-3"></i>Guides & Resources</h1>
+    <p class="lead mb-0">Choose your onboarding guide</p>
+  </div>
+</section>
+
+<section class="py-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-5 col-md-6 mb-4">
+        <div class="guide-card h-100">
+          <div class="guide-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <i class="fa-solid fa-store"></i>
+          </div>
+          <h2 class="fw-bold mb-3">Client Onboarding Guide</h2>
+          <p class="guide-description">
+            Complete guide for eCommerce sellers, online stores, and businesses. Learn about integrations, daily operations, and getting started.
+          </p>
+          <a href="{% url 'webpages:client_guide' %}" class="btn btn-primary btn-lg">
+            <i class="fa-solid fa-arrow-right me-2"></i>View Client Guide
+          </a>
+        </div>
+      </div>
+
+      <div class="col-lg-5 col-md-6 mb-4">
+        <div class="guide-card h-100">
+          <div class="guide-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <i class="fa-solid fa-truck"></i>
+          </div>
+          <h2 class="fw-bold mb-3">Driver Onboarding Guide</h2>
+          <p class="guide-description">
+            Complete guide for delivery drivers and couriers. Learn about requirements, daily workflow, delivery rules, and payment.
+          </p>
+          <a href="{% url 'webpages:driver_guide' %}" class="btn btn-danger btn-lg">
+            <i class="fa-solid fa-arrow-right me-2"></i>View Driver Guide
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center mt-5">
+      <a href="{% url 'webpages:help_center' %}" class="btn btn-info btn-lg me-2"><i class="fa-solid fa-arrow-left me-2"></i>Back to Help Center</a>
+      <a href="{% url 'webpages:contactus' %}" class="btn btn-outline-info btn-lg"><i class="fa-solid fa-headset me-2"></i>Contact Support</a>
+    </div>
+  </div>
+</section>
+{% endblock content %}

@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Help Center{% endblock title %}
+
+{% block extra_css %}
+<style>
+  .help-hero {
+    background: linear-gradient(135deg, #ffd33b 0%, #f4c20d 100%);
+    padding: 4rem 0 3rem;
+    color: #212529;
+  }
+
+  .help-card {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    height: 100%;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    border: 2px solid #f0f0f0;
+    text-decoration: none;
+    display: block;
+  }
+
+  .help-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+    border-color: #ffd33b;
+    text-decoration: none;
+  }
+
+  .help-icon {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    margin: 0 auto 1.5rem;
+    color: white;
+  }
+
+  .help-card h3 {
+    color: #212529;
+    margin-bottom: 1rem;
+  }
+
+  .help-card p {
+    color: #6c757d;
+    margin-bottom: 0;
+  }
+
+  .faq-preview {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .faq-preview h5 {
+    color: #212529;
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+  }
+
+  .faq-preview p {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin-bottom: 0;
+  }
+
+  .quick-link {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    background: white;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #212529;
+    transition: all 0.3s ease;
+    margin-bottom: 0.75rem;
+    border: 2px solid #f0f0f0;
+  }
+
+  .quick-link:hover {
+    background: #ffd33b;
+    border-color: #f4c20d;
+    transform: translateX(10px);
+    color: #212529;
+    text-decoration: none;
+  }
+
+  .quick-link i {
+    font-size: 1.5rem;
+    margin-right: 1rem;
+    color: #f4c20d;
+  }
+
+  .search-box {
+    background: white;
+    border-radius: 50px;
+    padding: 1rem 2rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    max-width: 600px;
+    margin: 0 auto 2rem;
+  }
+
+  .search-box input {
+    border: none;
+    outline: none;
+    width: 100%;
+    font-size: 1.05rem;
+  }
+
+  @media (max-width: 767px) {
+    .help-hero {
+      padding: 2rem 0 1.5rem;
+    }
+  }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="help-hero text-center">
+  <div class="container">
+    <h1 class="display-4 fw-bold mb-3">
+      <i class="fa-solid fa-circle-question me-3"></i>Help Center
+    </h1>
+    <p class="lead mb-4">Find answers, guides, and support for Ezzy Delivery services</p>
+
+    <!-- Search Box -->
+    <div class="search-box">
+      <div class="d-flex align-items-center gap-2">
+        <i class="fa-solid fa-search text-muted"></i>
+        <input type="text" placeholder="Search for help..." class="form-control-plaintext">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Main Help Categories -->
+<section class="py-5">
+  <div class="container">
+    <h2 class="fw-bold text-center mb-4">How Can We Help You?</h2>
+    <div class="row">
+      <div class="col-md-6 col-lg-3 mb-4">
+        <a href="{% url 'webpages:client_faq' %}" class="help-card">
+          <div class="help-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <i class="fa-solid fa-store"></i>
+          </div>
+          <h3 class="text-center">Client FAQ</h3>
+          <p class="text-center">Questions for e-commerce sellers & online stores</p>
+          <div class="text-center mt-3">
+            <span class="badge bg-primary">20 Questions</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-md-6 col-lg-3 mb-4">
+        <a href="{% url 'webpages:driver_faq' %}" class="help-card">
+          <div class="help-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <i class="fa-solid fa-truck"></i>
+          </div>
+          <h3 class="text-center">Driver FAQ</h3>
+          <p class="text-center">Questions for delivery drivers & couriers</p>
+          <div class="text-center mt-3">
+            <span class="badge bg-danger">10 Questions</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-md-6 col-lg-3 mb-4">
+        <a href="{% url 'webpages:help_guides' %}" class="help-card">
+          <div class="help-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+            <i class="fa-solid fa-book-open"></i>
+          </div>
+          <h3 class="text-center">Guides & Resources</h3>
+          <p class="text-center">Onboarding kits and step-by-step guides</p>
+          <div class="text-center mt-3">
+            <span class="badge bg-info">3 Guides</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-md-6 col-lg-3 mb-4">
+        <a href="{% url 'webpages:contactus' %}" class="help-card">
+          <div class="help-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+            <i class="fa-solid fa-headset"></i>
+          </div>
+          <h3 class="text-center">Contact Support</h3>
+          <p class="text-center">Get in touch with our support team</p>
+          <div class="text-center mt-3">
+            <span class="badge bg-success">24/7 Available</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Popular Questions Preview -->
+<section class="py-5 bg-light">
+  <div class="container">
+    <h2 class="fw-bold text-center mb-4">Popular Questions</h2>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <div class="faq-preview">
+          <h5><i class="fa-solid fa-circle-question text-primary me-2"></i>What services does Ezzy Delivery provide?</h5>
+          <p>Last-Mile Delivery, Cash on Delivery (COD), Reverse Pickup, Same-Day/Next-Day Delivery, Fulfilment & Storage, and E-commerce API Integrations.</p>
+          <a href="{% url 'webpages:client_faq' %}" class="text-primary small">Read more <i class="fa-solid fa-arrow-right ms-1"></i></a>
+        </div>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <div class="faq-preview">
+          <h5><i class="fa-solid fa-circle-question text-primary me-2"></i>How does the delivery process work?</h5>
+          <p>Send your order list → We pick up from your store → Packages are sorted and dispatched → Drivers deliver with live tracking → COD settled weekly.</p>
+          <a href="{% url 'webpages:client_faq' %}" class="text-primary small">Read more <i class="fa-solid fa-arrow-right ms-1"></i></a>
+        </div>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <div class="faq-preview">
+          <h5><i class="fa-solid fa-circle-question text-danger me-2"></i>What documents do drivers need to join?</h5>
+          <p>Qatar ID, Valid Qatar Driving License, Vehicle Ownership (or rental agreement), and Bank Details/Wallet number.</p>
+          <a href="{% url 'webpages:driver_faq' %}" class="text-danger small">Read more <i class="fa-solid fa-arrow-right ms-1"></i></a>
+        </div>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <div class="faq-preview">
+          <h5><i class="fa-solid fa-circle-question text-danger me-2"></i>How is COD handled by drivers?</h5>
+          <p>Drivers must collect exact COD amount, count in front of customer, deposit same day at office, and never hold money overnight.</p>
+          <a href="{% url 'webpages:driver_faq' %}" class="text-danger small">Read more <i class="fa-solid fa-arrow-right ms-1"></i></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center mt-4">
+      <a href="{% url 'webpages:client_faq' %}" class="btn btn-primary btn-lg me-2">View All Client FAQs</a>
+      <a href="{% url 'webpages:driver_faq' %}" class="btn btn-danger btn-lg">View All Driver FAQs</a>
+    </div>
+  </div>
+</section>
+
+<!-- Quick Links -->
+<section class="py-5">
+  <div class="container">
+    <h2 class="fw-bold text-center mb-4">Quick Links</h2>
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <a href="{% url 'webpages:help_guides' %}" class="quick-link">
+          <i class="fa-solid fa-graduation-cap"></i>
+          <div>
+            <strong>Getting Started Guides</strong>
+            <p class="mb-0 small text-muted">Onboarding kits for clients and drivers</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <a href="{% url 'webpages:delivery_pricing' %}" class="quick-link">
+          <i class="fa-solid fa-dollar-sign"></i>
+          <div>
+            <strong>Pricing Information</strong>
+            <p class="mb-0 small text-muted">View delivery rates and pricing plans</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <a href="{% url 'webpages:delivery_inquiry' %}" class="quick-link">
+          <i class="fa-solid fa-envelope"></i>
+          <div>
+            <strong>Request a Quote</strong>
+            <p class="mb-0 small text-muted">Get customized pricing for your business</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <a href="{% url 'core:join_driver' %}" class="quick-link">
+          <i class="fa-solid fa-user-plus"></i>
+          <div>
+            <strong>Join as Driver</strong>
+            <p class="mb-0 small text-muted">Start earning with Ezzy Delivery</p>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Still Need Help -->
+<section class="py-5 bg-dark text-white">
+  <div class="container text-center">
+    <h2 class="fw-bold mb-3">Still Need Help?</h2>
+    <p class="lead mb-4">Our support team is available 24/7 to assist you</p>
+    <div class="d-flex flex-wrap justify-content-center gap-3">
+      <a href="{% url 'webpages:contactus' %}" class="btn btn-warning btn-lg">
+        <i class="fa-solid fa-headset me-2"></i>Contact Support
+      </a>
+      <a href="mailto:ezzydelivery@gmail.com" class="btn btn-outline-light btn-lg">
+        <i class="fa-solid fa-envelope me-2"></i>Email Us
+      </a>
+      <a href="https://wa.me/97466328886" target="_blank" class="btn btn-success btn-lg">
+        <i class="fa-brands fa-whatsapp me-2"></i>WhatsApp
+      </a>
+    </div>
+  </div>
+</section>
+{% endblock content %}

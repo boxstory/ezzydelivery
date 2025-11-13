@@ -2,7 +2,7 @@
 <link rel="stylesheet" href="{% static 'orders/css/order_list.css' %}">
 
 {% for order in orders %}
-  <div class="order-card" id="order-card-{{ order.id }}">
+  <div class="order-card my-2" id="order-card-{{ order.id }}">
     <!-- Order Card Header (Clickable) -->
     <div class="order-card-header" onclick="toggleOrderCard({{ order.id }})">
       <div class="d-flex flex-wrap align-items-center justify-content-between w-100">
@@ -21,7 +21,7 @@
           {% endif %}
           <div class="order-date">
             <i class="fa-regular fa-calendar"></i>
-            <span>{{ order.order_date }}</span>
+            <span>{{ order.order_date|date:"d/m" }}</span>
           </div>
         </div>
       </div>
@@ -205,7 +205,7 @@ function loadProducts(orderId, event) {
   <ul class="pagination justify-content-end text-dark">
     {% if orders.has_previous %}
       <li class="page-item pe-2">
-        <a class="page-link text-dark"
+        <a class="page-link text-dark btn btn-dark"
            href="?page={{ orders.previous_page_number }}">Previous</a>
       </li>
     {% else %}
@@ -215,7 +215,7 @@ function loadProducts(orderId, event) {
     {% endif %}
     {% for page_number in orders.paginator.page_range %}
       {% if orders.number == page_number %}
-        <li class="page-item  btn btn-outline-dark active me-2">{{ page_number }}</li>
+        <li class="page-item  btn btn-dark active me-2">{{ page_number }}</li>
       {% else %}
         <li class="page-item me-2">
           <a class="page-link text-dark" href="?page={{ page_number }}">{{ page_number }}</a>
@@ -234,7 +234,7 @@ function loadProducts(orderId, event) {
     <li class="page-item disabled pe-2">
       <a class="page-link text-dark" href="#">Previous</a>
     </li>
-    <li class="page-item  btn btn-outline-dark active me-2">1</li>
+    <li class="page-item  btn btn-dark active me-2">1</li>
     <li class="page-item disabled me-2">
       <a class="page-link text-dark" href="#">Next</a>
     </li>

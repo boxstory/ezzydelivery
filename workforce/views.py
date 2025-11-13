@@ -51,11 +51,51 @@ def wf_dashboard(request):
 
 
 def all_orders(request):
-    orders  = orders_models.Order.objects.all().order_by('-created_at')
+    # Start with all orders
+    orders = orders_models.Order.objects.all()
+
+    # Apply filters based on GET parameters
+    dl_code = request.GET.get('dlCode', '').strip()
+    c_code = request.GET.get('cCode', '').strip()
+    mobile = request.GET.get('mobile', '').strip()
+    c_status = request.GET.get('cStatus', '').strip()
+    dms_status = request.GET.get('dmsStatus', '').strip()
+
+    # Filter by DL Code (delivery task code)
+    if dl_code:
+        orders = orders.filter(delivery_task__dl_task_code__icontains=dl_code)
+
+    # Filter by Client Order Code
+    if c_code:
+        orders = orders.filter(client_order_code__icontains=c_code)
+
+    # Filter by Customer Mobile
+    if mobile:
+        orders = orders.filter(customer_phone__icontains=mobile)
+
+    # Filter by Order Status
+    if c_status:
+        orders = orders.filter(order_status=c_status)
+
+    # Filter by DMS Status
+    if dms_status:
+        orders = orders.filter(delivery_task__dl_task_status_dms=dms_status)
+
+    # Order by created date
+    orders = orders.order_by('-created_at')
+
+    # Paginate results
     orders = paginate_queryset(request, orders)
 
     data = {
         'orders': orders,
+        'filters': {
+            'dlCode': dl_code,
+            'cCode': c_code,
+            'mobile': mobile,
+            'cStatus': c_status,
+            'dmsStatus': dms_status,
+        }
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 

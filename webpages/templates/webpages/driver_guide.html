@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Driver Onboarding Guide - Ezzy Delivery Qatar{% endblock title %}
+
+{% block extra_css %}
+<style>
+  .guide-hero { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 4rem 0 3rem; color: white; }
+  .section-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-left: 4px solid #f093fb;
+  }
+  .section-title {
+    color: #f5576c;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .section-title i {
+    font-size: 1.5rem;
+  }
+  .step-list {
+    list-style: none;
+    padding: 0;
+  }
+  .step-list li {
+    padding: 0.75rem 0 0.75rem 2.5rem;
+    position: relative;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .step-list li:last-child {
+    border-bottom: none;
+  }
+  .step-list li:before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    top: 0.75rem;
+    background: #f5576c;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    font-weight: bold;
+  }
+  .info-box {
+    background: #fff5f7;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    border: 1px solid #fce4ec;
+  }
+  .warning-box {
+    background: #fff8e1;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    border: 1px solid #ffe082;
+  }
+  .numbered-steps {
+    counter-reset: step-counter;
+    list-style: none;
+    padding: 0;
+  }
+  .numbered-steps li {
+    padding: 1rem 0 1rem 3rem;
+    position: relative;
+    border-bottom: 1px solid #e9ecef;
+  }
+  .numbered-steps li:last-child {
+    border-bottom: none;
+  }
+  .numbered-steps li:before {
+    counter-increment: step-counter;
+    content: counter(step-counter);
+    position: absolute;
+    left: 0;
+    top: 1rem;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1rem;
+  }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<section class="guide-hero text-center">
+  <div class="container">
+    <h1 class="display-4 fw-bold mb-3"><i class="fa-solid fa-truck me-3"></i>Driver Onboarding Guide</h1>
+    <p class="lead mb-0">For Riders, Couriers & Delivery Drivers</p>
+  </div>
+</section>
+
+<section class="py-5">
+  <div class="container">
+    <div class="section-card">
+      <h2 class="section-title"><i class="fa-solid fa-hand-wave"></i>Welcome Message</h2>
+      <p class="lead">Welcome to the Ezzy Delivery Qatar team!</p>
+      <p>This onboarding kit explains your responsibilities, payment flow, and daily delivery process.</p>
+    </div>
+
+    <div class="section-card">
+      <h2 class="section-title"><i class="fa-solid fa-clipboard-check"></i>Driver Requirements</h2>
+      <p class="mb-3">To join, you must have:</p>
+      <ul class="step-list">
+        <li>Valid Qatar ID</li>
+        <li>Valid Qatar Driving License</li>
+        <li>Own vehicle (car/bike)</li>
+        <li>Phone with mobile data</li>
+        <li>Clean behaviour & punctuality</li>
+      </ul>
+    </div>
+
+    <div class="section-card">
+      <h2 class="section-title"><i class="fa-solid fa-route"></i>Daily Workflow</h2>
+
+      <h5 class="fw-bold mb-3 mt-4">Step 1 – Pickup</h5>
+      <ul class="step-list">
+        <li>Arrive at warehouse/store</li>
+        <li>Scan packages</li>
+        <li>Load parcels by route</li>
+      </ul>
+
+      <h5 class="fw-bold mb-3 mt-4">Step 2 – Delivery Process</h5>
+      <p class="mb-2">For each delivery:</p>
+      <ol class="numbered-steps">
+        <li>Call customer</li>
+        <li>Confirm location</li>
+        <li>Deliver package safely</li>
+        <li>Collect COD (if applicable)</li>
+        <li>Update status in the app</li>
+        <li>Take delivery proof (photo/signature)</li>
+      </ol>
+
+      <h5 class="fw-bold mb-3 mt-4">Step 3 – End-of-Day</h5>
+      <ul class="step-list">
+        <li>Submit COD</li>
+        <li>Return undelivered parcels</li>
+        <li>Report issues to supervisor</li>
+      </ul>
+    </div>
+
+    <div class="section-card">
+      <h2 class="section-title"><i class="fa-solid fa-circle-check"></i>Delivery Rules</h2>
+      <p class="mb-3">Drivers must follow:</p>
+      <ul class="step-list">
+        <li>No delays</li>
+        <li>No arguments with customers</li>
+        <li>Be polite</li>
+        <li>Keep cash safe</li>
+        <li>Complete scanning</li>
+        <li>Respectful communication</li>
+      </ul>
+    </div>
+
+    <div class="section-card">
+      <h2 class="section-title"><i class="fa-solid fa-money-bill-wave"></i>Cash on Delivery (COD) Rules</h2>
+      <div class="warning-box">
+        <p class="mb-2"><i class="fa-solid fa-triangle-exclamation me-2"></i><strong>Important COD Rules:</strong></p>
+        <ul class="step-list">
+          <li>Collect exact amount shown</li>
+          <li>Count money in front of the customer</li>
+          <li>Deposit cash at office SAME DAY</li>
+          <li>Never hold money overnight</li>
+          <li>Never reduce, modify, or accept partial payments</li>
+        </ul>
+      </div>
+      <p class="text-danger fw-bold"><i class="fa-solid fa-exclamation-circle me-2"></i>Failure to follow COD protocol leads to penalties.</p>
+    </div>
+
+    <div class="section-card">
+      <h2 class="section-title"><i class="fa-solid fa-box-open"></i>Returns Procedure</h2>
+      <p class="mb-3">Return parcel when:</p>
+      <ul class="step-list">
+        <li>Customer not answering</li>
+        <li>Customer refused</li>
+        <li>Incorrect number</li>
+        <li>Address unreachable</li>
+      </ul>
+      <div class="info-box mt-3">
+        <p class="mb-0"><i class="fa-solid fa-lightbulb me-2"></i><strong>Important:</strong> Always mark correct status.</p>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <h2 class="section-title"><i class="fa-solid fa-triangle-exclamation"></i>Accident or Issue Handling</h2>
+      <p class="mb-3">If accidents/issues occur:</p>
+      <ol class="numbered-steps">
+        <li>Stop safely</li>
+        <li>Inform supervisor</li>
+        <li>Send photos and location</li>
+        <li>Wait for instructions</li>
+      </ol>
+      <p class="text-muted mt-3"><i class="fa-solid fa-shield-halved me-2"></i>Safety is priority.</p>
+    </div>
+
+    <div class="section-card">
+      <h2 class="section-title"><i class="fa-solid fa-sack-dollar"></i>Driver Payout</h2>
+      <p class="mb-3">Drivers are paid:</p>
+      <ul class="step-list">
+        <li>Weekly OR Monthly</li>
+      </ul>
+
+      <h5 class="fw-bold mb-3 mt-4">Based on:</h5>
+      <ul class="step-list">
+        <li>Number of deliveries</li>
+        <li>COD accuracy</li>
+        <li>Performance</li>
+      </ul>
+
+      <h5 class="fw-bold mb-3 mt-4">Incentives available for:</h5>
+      <ul class="step-list">
+        <li>Zero return days</li>
+        <li>High accuracy</li>
+        <li>Fast route completion</li>
+      </ul>
+    </div>
+
+    <div class="section-card">
+      <h2 class="section-title"><i class="fa-solid fa-user-check"></i>Behaviour & Discipline</h2>
+      <p class="mb-3">Drivers must:</p>
+      <ul class="step-list">
+        <li>Maintain professional behaviour</li>
+        <li>Keep vehicle clean</li>
+        <li>Avoid loud music at deliveries</li>
+        <li>Dress neatly</li>
+        <li>Follow team leaders' instructions</li>
+        <li>Never delay reporting</li>
+      </ul>
+    </div>
+
+    <div class="section-card">
+      <h2 class="section-title"><i class="fa-solid fa-address-book"></i>Contact Points</h2>
+      <p class="mb-3">You will receive:</p>
+      <ul class="step-list">
+        <li>Supervisor Contact</li>
+        <li>Operations Team Number</li>
+        <li>WhatsApp Support</li>
+        <li>Working Hours</li>
+        <li>Warehouse Location</li>
+      </ul>
+    </div>
+
+    <div class="text-center mt-5">
+      <a href="{% url 'webpages:driver_faq' %}" class="btn btn-danger btn-lg me-2"><i class="fa-solid fa-question-circle me-2"></i>View Driver FAQ</a>
+      <a href="{% url 'webpages:help_guides' %}" class="btn btn-outline-secondary btn-lg me-2"><i class="fa-solid fa-arrow-left me-2"></i>Back to Guides</a>
+      <a href="{% url 'webpages:contactus' %}" class="btn btn-outline-info btn-lg"><i class="fa-solid fa-headset me-2"></i>Contact Support</a>
+    </div>
+  </div>
+</section>
+{% endblock content %}
