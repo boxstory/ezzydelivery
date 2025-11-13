@@ -10,6 +10,7 @@ import pandas as pd
 from django.contrib import messages
 import requests
 from woocommerce import API as WooAPI
+from decouple import config
 
 from core import models as core_models
 from orders import forms, models as orders_models
@@ -580,16 +581,53 @@ def update_order_status(request):
 
 #get_by_api from shopify
 
+@login_required(login_url='account_login')
 def get_order_by_api(request):
-    business = business_models.Business.objects.get(user_id=request.user.user_business.first().user_id)
-    api_data = business_models.BusinessApiSettings.objects.filter(business_id=business.business_id, is_verify_api='True', is_default='True' ).first()
-    print(api_data)
-    
+    # IDOR FIX: Get user's business with authorization check
+    try:
+        user_business = request.user.user_business.first()
+        if not user_business:
+            logger.warning(f"User {request.user.id} has no associated business")
+            messages.error(request, "No business associated with your account")
+            return redirect('business_dashboard')
+
+        business = business_models.Business.objects.get(user_id=user_business.user_id)
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('business_dashboard')
+
+    api_data = business_models.BusinessApiSettings.objects.filter(
+        business_id=business.business_id,
+        is_verify_api='True',
+        is_default='True'
+    ).first()
+
+    if not api_data:
+        logger.warning(f"No API settings found for business {business.business_id}")
+        messages.error(request, "No API configuration found. Please configure your Shopify API settings.")
+        return redirect('business_settings')
+
+    logger.debug(f"Using API settings for business {business.business_id}")
+
+    # SECURITY FIX: Use environment variable for Shopify token instead of hardcoded value
+    shopify_token = config('SHOPIFY_ACCESS_TOKEN', default='')
+    if not shopify_token:
+        logger.error("SHOPIFY_ACCESS_TOKEN not configured in .env file")
+        messages.error(request, "Shopify API token not configured")
+        return redirect('business_settings')
+
     headers = {
         'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': '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'
+        'X-Shopify-Access-Token': shopify_token
     }
-    get_orders = requests.get('https://hn0d1z-qe.myshopify.com/admin/api/2024-10/orders.json?status=any', headers=headers)
+
+    try:
+        get_orders = requests.get('https://hn0d1z-qe.myshopify.com/admin/api/2024-10/orders.json?status=any', headers=headers, timeout=30)
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Shopify API request failed: {e}")
+        messages.error(request, "Failed to connect to Shopify API")
+        return redirect('orders_all_list')
     # Parse message as json
     GetQuestion_response = "json.loads(GetQuestion_response['Message'])"
     print(request.POST.get('start_date'))
@@ -629,12 +667,33 @@ def get_order_by_api(request):
 
 @login_required(login_url='account_login')
 def get_orders_by_base_api(request):
-    business = business_models.Business.objects.get(user_id=request.user.user_business.first().user_id)
-    business_id = business.business_id
-    business_api = business_models.BusinessApiSettings.objects.filter(business_id=business_id, is_verify_api='True', is_default='True' ).first()
+    # IDOR FIX: Get user's business with authorization check
+    try:
+        user_business = request.user.user_business.first()
+        if not user_business:
+            logger.warning(f"User {request.user.id} has no associated business")
+            messages.error(request, "No business associated with your account")
+            return redirect('business_dashboard')
+
+        business = business_models.Business.objects.get(user_id=user_business.user_id)
+        business_id = business.business_id
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('business_dashboard')
+
+    business_api = business_models.BusinessApiSettings.objects.filter(
+        business_id=business_id,
+        is_verify_api='True',
+        is_default='True'
+    ).first()
+
     if not business_api:
+        logger.warning(f"No API settings found for business {business_id}")
+        messages.error(request, "No API configuration found")
         return redirect('business:business_settings_api_list', business_id)
-    print(business_api.api_type)
+
+    logger.info(f"Fetching orders via {business_api.api_type} API for business {business_id}")
      
 
     BASE_API_KEY = business_api.api_key
