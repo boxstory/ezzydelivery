@@ -173,3 +173,72 @@ def handler404(request, exception):
 
 def handler500(request):
     return render(request, 'webpages/server_error.html', status=500)
+
+
+def testimonials(request):
+    """
+    Testimonials page with sample customer reviews
+    """
+    meta = SEOMetadata.get_default_meta(
+        title="Customer Testimonials - Ezzy Delivery",
+        description="Read what our customers say about Ezzy Delivery's reliable and fast delivery services in Qatar.",
+        keywords="testimonials, reviews, customer feedback, delivery service Qatar"
+    )
+
+    # Sample testimonials data
+    testimonials_data = [
+        {
+            'name': 'Ahmed Al-Mansoori',
+            'role': 'E-commerce Business Owner',
+            'company': 'Qatar Fashion Store',
+            'rating': 5,
+            'text': 'Ezzy Delivery has transformed our logistics operations. Their 3PL service is reliable, fast, and professional. Our customers are happier than ever with the timely deliveries!',
+            'date': '2 weeks ago'
+        },
+        {
+            'name': 'Sarah Johnson',
+            'role': 'Marketing Manager',
+            'company': 'Tech Solutions Qatar',
+            'rating': 5,
+            'text': 'Outstanding service! The delivery tracking system is excellent and our clients always receive their orders on time. Highly recommended for any business in Qatar.',
+            'date': '1 month ago'
+        },
+        {
+            'name': 'Mohammed Hassan',
+            'role': 'Restaurant Owner',
+            'company': 'Doha Food Hub',
+            'rating': 5,
+            'text': 'Quick commerce delivery has been a game-changer for our restaurant. Orders reach customers within hours, keeping our food fresh and customers satisfied.',
+            'date': '3 weeks ago'
+        },
+        {
+            'name': 'Fatima Al-Kuwari',
+            'role': 'Online Store Owner',
+            'company': 'Beauty & Wellness Qatar',
+            'rating': 5,
+            'text': 'The fulfillment service is exceptional! They handle our inventory perfectly and the delivery process is seamless. Customer support is always responsive and helpful.',
+            'date': '2 months ago'
+        },
+        {
+            'name': 'John Smith',
+            'role': 'Operations Director',
+            'company': 'Electronics Plus',
+            'rating': 5,
+            'text': 'Professional, reliable, and cost-effective. Ezzy Delivery has helped us scale our business without worrying about logistics. Their team is wonderful to work with.',
+            'date': '1 month ago'
+        },
+        {
+            'name': 'Layla Abdullah',
+            'role': 'Boutique Owner',
+            'company': 'Luxury Fashion Qatar',
+            'rating': 5,
+            'text': 'I love how easy it is to integrate with their system. The drivers are courteous and always handle our products with care. Best delivery partner in Qatar!',
+            'date': '3 weeks ago'
+        }
+    ]
+
+    data = {
+        'seo': meta,
+        'testimonials': testimonials_data,
+    }
+    return render(request, 'webpages/testimonials.html', data)

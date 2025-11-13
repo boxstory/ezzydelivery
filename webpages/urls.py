@@ -26,6 +26,7 @@ urlpatterns = [
 
 
     path('terms/', webpages_views.terms, name='terms'),
+    path('testimonials/', webpages_views.testimonials, name='testimonials'),
     path('test/', webpages_views.test, name='test'),
     path('500/', TemplateView.as_view(template_name='page_not_found.html')),
 
