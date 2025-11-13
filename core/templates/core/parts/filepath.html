@@ -1,53 +1,136 @@
-<section class="mb-3">
-    <div class="row rounded-3 m-1" style="background-color: #f1d100; ">
-        <nav aria-label="breadcrumb"
-             class=" rounded-3 p-3 "
-             style="--bs-breadcrumb-divider: '_'"
-             aria-label="breadcrumb">
-            <ol class="breadcrumb mb-0 ">
-                <li class="breadcrumb-item  ">
-                    <a class=" btn btn-small  text-decoration-none text-black fw-bold px-2 "
-                       href="/">Home</a>
+<style>
+.breadcrumb-wrapper {
+    background: var(--brand-grey-100);
+    border-radius: var(--brand-radius-md);
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--brand-shadow-sm);
+}
+
+.breadcrumb {
+    margin-bottom: 0;
+    background: transparent;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.breadcrumb-item {
+    display: inline-flex;
+    align-items: center;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    content: "/";
+    color: var(--brand-grey-600);
+    padding: 0 0.5rem;
+    font-weight: 600;
+}
+
+.breadcrumb-link {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: var(--brand-grey-200);
+    color: var(--brand-grey-800);
+    text-decoration: none;
+    border-radius: var(--brand-radius-sm);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    transition: var(--brand-transition);
+    white-space: nowrap;
+}
+
+.breadcrumb-link:hover {
+    background: var(--brand-grey-300);
+    color: var(--brand-grey-900);
+    transform: translateY(-1px);
+}
+
+.breadcrumb-link.active {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    color: var(--brand-grey-900);
+    font-weight: 700;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .breadcrumb-wrapper {
+        padding: 0.75rem 1rem;
+    }
+
+    .breadcrumb {
+        gap: 0.25rem;
+    }
+
+    .breadcrumb-link {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+    }
+
+    .breadcrumb-item + .breadcrumb-item::before {
+        padding: 0 0.25rem;
+        font-size: 0.875rem;
+    }
+}
+</style>
+
+<section class="breadcrumb-wrapper">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a class="breadcrumb-link" href="/">
+                    <i class="fa-solid fa-house me-1"></i>
+                    Home
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'core:profile_view' %}"
+                   class="breadcrumb-link {% if '/profile/' in request.path %}active{% endif %}">
+                    <i class="fa-solid fa-user me-1"></i>
+                    User Profile
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a class="breadcrumb-link {% if '/join_us/' == request.path %}active{% endif %}"
+                   href="{% url 'core:join_us' %}">
+                    <i class="fa-solid fa-user-tag me-1"></i>
+                    Role Select
+                </a>
+            </li>
+
+            {% if profile.is_business %}
+                <li class="breadcrumb-item">
+                    <a href="{% url 'business:business_profile_update' request.user.user_business.first.business_id %}"
+                       class="breadcrumb-link {% if '/join_us/business/' in request.path %}active{% endif %}">
+                        <i class="fa-solid fa-building me-1"></i>
+                        Business Info
+                    </a>
                 </li>
-                <li class="breadcrumb-item ">
-                    <a href="{% url 'core:profile_view' %}"
-                       class="btn btn-small text-decoration-none  fw-bold px-4 {% if '/profile/' in request.path %}active btn-dark{% endif %}">
-                        User : {{request.user.id}}
+            {% elif profile.is_driver %}
+                <li class="breadcrumb-item">
+                    <a href="{% url 'core:update_driver' %}"
+                       class="breadcrumb-link {% if '/dashboard/' in request.path %}active{% endif %}">
+                        <i class="fa-solid fa-id-card me-1"></i>
+                        Driver Info
                     </a>
                 </li>
                 <li class="breadcrumb-item">
-                    <a class="btn  text-decoration-none  fw-bold px-2 {% if '/join_us/' == request.path %}active btn-dark{% endif %}"
-                       href="{% url 'core:join_us' %}">Role select</a> 
+                    <a href="{% url 'fleet:vehicle_add' %}"
+                       class="breadcrumb-link {% if '/vehicle_add/' in request.path %}active{% endif %}">
+                        <i class="fa-solid fa-truck me-1"></i>
+                        Add Vehicle
+                    </a>
                 </li>
-              
-
-
-                {% if profile.is_business %}
-                    <li class="breadcrumb-item ">
-                        <a href="{% url 'business:business_profile_update' request.user.user_business.first.business_id %}"
-                           class="btn btn-small  text-decoration-none  fw-bold px-2 {% if '/join_us/business/' in request.path %}active btn-dark{% endif %}">Update Business Info : {{request.user.user_business.first.business_id}}
-                        </a>
-                    </li>
-                {% elif profile.is_driver %}
-                    <li class="breadcrumb-item ">
-                        <a href="{% url 'core:update_driver' %}"
-                           class="btn btn-small  text-decoration-none  fw-bold px-2 {% if '/dashboard/' in request.path %}active btn-dark{% endif %}">Update Driver Info
-                        </a>
-                    </li>
-                    <li class="breadcrumb-item ">
-                        <a href="{% url 'fleet:vehicle_add' %}"
-                           class="btn btn-small  text-decoration-none  fw-bold px-2 {% if '/vehicle_add/' in request.path %}active btn-dark{% endif %}">Add vehicle
-                        </a>
-                    </li>
-                    <li class="breadcrumb-item ">
-                        <a href="{% url 'fleet:driver_documents_upload' request.user.id %}"
-                           class="btn btn-small  text-decoration-none  fw-bold px-2 {% if '/documents/' in request.path %}active btn-dark{% endif %}">Add Documents
-                        </a>
-                    </li>
-                {% else %}
-                {% endif %}
-            </li>
+                <li class="breadcrumb-item">
+                    <a href="{% url 'fleet:driver_documents_upload' request.user.id %}"
+                       class="breadcrumb-link {% if '/documents/' in request.path %}active{% endif %}">
+                        <i class="fa-solid fa-file-upload me-1"></i>
+                        Documents
+                    </a>
+                </li>
+            {% endif %}
         </ol>
     </nav>
-</div>
 </section>
