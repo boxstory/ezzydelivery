@@ -14,10 +14,10 @@ class StaticViewSitemap(Sitemap):
     def items(self):
         # List of URL names for static pages
         return [
-            'webpages:home',
+            'webpages:index',
             'webpages:about',
-            'webpages:contact',
-            'webpages:pricing',
+            'webpages:contactus',
+            'webpages:delivery_pricing',
             'webpages:services',
             'webpages:careers',
         ]
