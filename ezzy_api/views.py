@@ -526,8 +526,7 @@ def dms_orders_list(request):
     # N+1 FIX: Use select_related for ForeignKey relationships
     orders = orders_models.Order.objects.select_related(
         'business',
-        'client',
-        'created_by'
+        'pickup_location'
     ).all().order_by('-created_at')
 
     # Filters
@@ -571,8 +570,7 @@ def dms_order_detail(request, order_id):
         # N+1 FIX: Use select_related for related objects
         order = orders_models.Order.objects.select_related(
             'business',
-            'client',
-            'created_by'
+            'pickup_location'
         ).get(id=order_id)
 
         logger.info(f"DMS order {order_id} accessed by user {request.user.id}")
