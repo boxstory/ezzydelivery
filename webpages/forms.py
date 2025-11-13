@@ -65,8 +65,8 @@ class PricingEnquiryForm(forms.ModelForm):
     is_located_in_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
     is_team_available_in_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
     is_required_COD_service = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
-    speed_delivery_offer_to_customers = forms.MultipleChoiceField(choices=[('5Days', '6: 5 Days Delivery'), ('NextDay48', '5: Next 48 Hrs Delivery'),('NextDay24', '4: Next 24 Hrs Delivery'),('SameDay', '3: Same Day Delivery'),('WithIn6Hr', '2: With In 6Hrs'),('WithIn2Hr', '1: With In 2Hrs'), ('None', 'None') ]) 
-    is_required_fulfillment_service_for_operate_from_outside_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')]) 
+    speed_delivery_offer_to_customers = forms.MultipleChoiceField(choices=[('5Days', '6: 5 Days Delivery'), ('NextDay48', '5: Next 48 Hrs Delivery'),('NextDay24', '4: Next 24 Hrs Delivery'),('SameDay', '3: Same Day Delivery'),('WithIn6Hr', '2: With In 6Hrs'),('WithIn2Hr', '1: With In 2Hrs'), ('None', 'None') ])
+    is_required_fulfillment_service_for_operate_from_outside_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
     is_required_fulfillment_service_for_make_hub_in_doha = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
     is_frequent_same_day_pick_and_delivery_required = forms.ChoiceField(choices=[(False, 'No'), (True, 'Yes, Pick And Delivery Same time') ])
     is_special_handling_required = forms.ChoiceField(choices=[(False, 'No'), (True, 'Yes')])
@@ -111,4 +111,84 @@ class PricingEnquiryForm(forms.ModelForm):
             Field('pickup_location_time_slab'),
             Field('number_of_pickup_times_in_day'),
             Submit('submit', 'Submit', css_class='btn-success')
+        )
+
+
+class DeliveryRequestForm(forms.ModelForm):
+    """Form for delivery requests from users/non-sellers"""
+
+    class Meta:
+        model = DeliveryRequest
+        fields = [
+            'delivery_type',
+            'customer_name',
+            'customer_email',
+            'customer_mobile',
+            'pickup_address',
+            'pickup_zone',
+            'pickup_street',
+            'pickup_building',
+            'pickup_latitude',
+            'pickup_longitude',
+            'pickup_contact_name',
+            'pickup_contact_mobile',
+            'delivery_address',
+            'delivery_zone',
+            'delivery_street',
+            'delivery_building',
+            'delivery_latitude',
+            'delivery_longitude',
+            'delivery_contact_name',
+            'delivery_contact_mobile',
+            'package_description',
+            'package_weight',
+            'package_category',
+            'preferred_date',
+            'preferred_time',
+            'delivery_speed',
+            'special_instructions',
+        ]
+        widgets = {
+            'delivery_type': forms.RadioSelect(),
+            'pickup_address': forms.Textarea(attrs={'rows': 3}),
+            'delivery_address': forms.Textarea(attrs={'rows': 3}),
+            'package_description': forms.Textarea(attrs={'rows': 3}),
+            'special_instructions': forms.Textarea(attrs={'rows': 3}),
+            'preferred_date': forms.DateInput(attrs={'type': 'date'}),
+            'preferred_time': forms.TimeInput(attrs={'type': 'time'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super(DeliveryRequestForm, self).__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_method = 'post'
+        self.helper.layout = Layout(
+            Field('delivery_type'),
+            Field('customer_name'),
+            Field('customer_email'),
+            Field('customer_mobile'),
+            Field('pickup_address'),
+            Field('pickup_zone'),
+            Field('pickup_street'),
+            Field('pickup_building'),
+            Field('pickup_latitude'),
+            Field('pickup_longitude'),
+            Field('pickup_contact_name'),
+            Field('pickup_contact_mobile'),
+            Field('delivery_address'),
+            Field('delivery_zone'),
+            Field('delivery_street'),
+            Field('delivery_building'),
+            Field('delivery_latitude'),
+            Field('delivery_longitude'),
+            Field('delivery_contact_name'),
+            Field('delivery_contact_mobile'),
+            Field('package_description'),
+            Field('package_weight'),
+            Field('package_category'),
+            Field('preferred_date'),
+            Field('preferred_time'),
+            Field('delivery_speed'),
+            Field('special_instructions'),
+            Submit('submit', 'Submit Delivery Request', css_class='btn btn-primary')
         )

@@ -242,3 +242,27 @@ def testimonials(request):
         'testimonials': testimonials_data,
     }
     return render(request, 'webpages/testimonials.html', data)
+
+
+def delivery_request(request):
+    """
+    Delivery request page for users/non-sellers
+    """
+    meta = SEOMetadata.get_default_meta(
+        title="Request Delivery - Ezzy Delivery",
+        description="Request a delivery service in Qatar. Choose from Pick and Delivery or Store Pickup and Delivery options.",
+        keywords="delivery request, Qatar delivery, pick and delivery, store pickup"
+    )
+
+    form = DeliveryRequestForm(request.POST or None)
+    if request.method == 'POST':
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Your delivery request has been submitted successfully. We will contact you soon!")
+            return redirect('webpages:index')
+
+    data = {
+        'seo': meta,
+        'form': form,
+    }
+    return render(request, 'webpages/delivery_request.html', data)
