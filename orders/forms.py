@@ -102,19 +102,57 @@ class AddOrderForm(forms.ModelForm):
 
 
 class AddOrderProductsForm(forms.ModelForm):
-    
+
     class Meta:
         model = OrderProductList
-        fields = '__all__' 
+        fields = '__all__'
 
         labels = {
-                
-            }
-       
+            'product01_name': 'Product 1',
+            'product01_qty': 'Quantity',
+            'product02_name': 'Product 2',
+            'product02_qty': 'Quantity',
+            'product03_name': 'Product 3',
+            'product03_qty': 'Quantity',
+            'product04_name': 'Product 4',
+            'product04_qty': 'Quantity',
+            'product05_name': 'Product 5',
+            'product05_qty': 'Quantity',
+            'product06_name': 'Product 6',
+            'product06_qty': 'Quantity',
+            'product07_name': 'Product 7',
+            'product07_qty': 'Quantity',
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['order'].widget = forms.TextInput(attrs={'readonly': 'readonly', 'hidden': 'hidden'})
+
+        # Filter products by business if order instance exists
+        if self.instance and self.instance.order_id:
+            try:
+                order = Order.objects.get(id=self.instance.order_id)
+                business_products = product_models.Product.objects.filter(business=order.business)
+
+                # Apply filter to all product fields
+                for i in range(1, 8):  # products 1-7
+                    field_name = f'product{i:02d}_name'
+                    if field_name in self.fields:
+                        self.fields[field_name].queryset = business_products
+                        self.fields[field_name].required = False
+                        # Add styling
+                        self.fields[field_name].widget.attrs.update({'class': 'form-control'})
+
+                    qty_field = f'product{i:02d}_qty'
+                    if qty_field in self.fields:
+                        self.fields[qty_field].required = False
+                        self.fields[qty_field].widget.attrs.update({
+                            'class': 'form-control',
+                            'min': '0',
+                            'type': 'number'
+                        })
+            except Order.DoesNotExist:
+                pass
 
 
   
