@@ -1,3 +1,4 @@
+import logging
 from django.http import JsonResponse
 from django.shortcuts import render
 import requests
@@ -31,6 +32,8 @@ import hashlib
 import requests
 from django.views.decorators.csrf import csrf_exempt
 
+logger = logging.getLogger('ezzy_api')
+
 
 # class OrderList(APIView):
 #     permission_classes = [permissions.IsAuthenticated]
@@ -59,44 +62,56 @@ shipday_obj = Shipday(api_key=API_KEY)
 
 
 def shipday_order_list(request):
-    print(shipday_obj)
-    orderNumber = "BMS045-1636-A222"
-    my_orders = shipday_obj.OrderService.get_orders()
-    #print(my_carriers)
-    #data = my_carriers.json()
-    #return JsonResponse(my_carriers, safe=False)
-    return render(request, 'ezzy_api/orders_in_shipday.html', {'orders_in_shipday': my_orders})
+    logger.info(f"Fetching Shipday orders for user: {request.user.id if request.user.is_authenticated else 'anonymous'}")
+    try:
+        orderNumber = "BMS045-1636-A222"
+        my_orders = shipday_obj.OrderService.get_orders()
+        logger.info(f"Successfully fetched {len(my_orders) if my_orders else 0} orders from Shipday")
+        return render(request, 'ezzy_api/orders_in_shipday.html', {'orders_in_shipday': my_orders})
+    except Exception as e:
+        logger.error(f"Error fetching Shipday orders: {e}")
+        return render(request, 'ezzy_api/orders_in_shipday.html', {'orders_in_shipday': []})
 
 def shipday_feet_list(request):
-    
-    my_carriers = shipday_obj.CarrierService.get_carriers()
-    #print(my_carriers)
-    #data = my_carriers.json()
-    #return JsonResponse(my_carriers, safe=False)
-    return render(request, 'ezzy_api/carriers.html', {'carriers': my_carriers})
+    logger.info(f"Fetching Shipday carriers for user: {request.user.id if request.user.is_authenticated else 'anonymous'}")
+    try:
+        my_carriers = shipday_obj.CarrierService.get_carriers()
+        logger.info(f"Successfully fetched {len(my_carriers) if my_carriers else 0} carriers from Shipday")
+        return render(request, 'ezzy_api/carriers.html', {'carriers': my_carriers})
+    except Exception as e:
+        logger.error(f"Error fetching Shipday carriers: {e}")
+        return render(request, 'ezzy_api/carriers.html', {'carriers': []})
 
 
 def ShipdayOrderList(request):
-    API_KEY = config("SHIPDAY_API_KEY")
-    my_shipday = Shipday(api_key=API_KEY)
-    my_carriers = my_shipday.CarrierService.get_carriers()
-    print('I have {} carriers'.format(len(my_carriers)))
+    logger.info("Fetching completed orders from Shipday partner API")
+    try:
+        API_KEY = config("SHIPDAY_API_KEY")
+        my_shipday = Shipday(api_key=API_KEY)
+        my_carriers = my_shipday.CarrierService.get_carriers()
+        logger.info(f"Retrieved {len(my_carriers)} carriers from Shipday")
 
-    import requests
+        import requests
 
-    url = "https://api.shipday.com/partner/members/1234/completedOrders"
+        url = "https://api.shipday.com/partner/members/1234/completedOrders"
 
-    headers = {
-        "accept": "application/json",
-        "PARTNER-API-KEY": API_KEY
-    }
+        headers = {
+            "accept": "application/json",
+            "PARTNER-API-KEY": API_KEY
+        }
 
-    response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
 
-    print(response.text)
-
-    data = response.json()
-    return data
+        data = response.json()
+        logger.info(f"Successfully fetched completed orders: {len(data) if isinstance(data, list) else 'unknown count'}")
+        return data
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Shipday API request failed: {e}")
+        return {'error': str(e)}
+    except Exception as e:
+        logger.error(f"Error in ShipdayOrderList: {e}")
+        return {'error': str(e)}
 
 
 
@@ -205,27 +220,38 @@ def driver_tasks(request):
     """Get all tasks assigned to the driver"""
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
-        
+        logger.info(f"Fetching tasks for driver {driver.driver_id}")
+
         # Get query parameters
         status_filter = request.query_params.get('status', None)
         date_filter = request.query_params.get('date', None)
-        
-        tasks = delivery_models.DeliveryTask.objects.filter(driver=driver)
-        
+
+        # N+1 FIX: Use select_related to fetch related objects in one query
+        tasks = delivery_models.DeliveryTask.objects.filter(driver=driver).select_related(
+            'order',
+            'order__business',
+            'order__client',
+            'driver',
+            'business'
+        )
+
         if status_filter:
             tasks = tasks.filter(dl_task_status=status_filter)
-        
+
         if date_filter:
             try:
                 date_obj = datetime.strptime(date_filter, '%Y-%m-%d').date()
                 tasks = tasks.filter(dl_task_date=date_obj)
             except ValueError:
+                logger.warning(f"Invalid date format provided: {date_filter}")
                 pass
-        
+
         serializer = ezzy_api_serializers.DeliveryTaskListSerializer(tasks, many=True)
+        logger.info(f"Returned {len(tasks)} tasks for driver {driver.driver_id}")
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
     except fleet_models.Driver.DoesNotExist:
+        logger.warning(f"Driver profile not found for user {request.user.id}")
         return Response(
             {'error': 'Driver profile not found'},
             status=status.HTTP_404_NOT_FOUND
@@ -238,15 +264,27 @@ def driver_task_detail(request, task_id):
     """Get detailed information about a specific task"""
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
-        task = delivery_models.DeliveryTask.objects.get(id=task_id, driver=driver)
+        # IDOR FIX: Verify task belongs to this driver
+        # N+1 FIX: Use select_related for related objects
+        task = delivery_models.DeliveryTask.objects.select_related(
+            'order',
+            'order__business',
+            'order__client',
+            'driver',
+            'business'
+        ).get(id=task_id, driver=driver)
+
+        logger.info(f"Driver {driver.driver_id} accessed task {task_id}")
         serializer = ezzy_api_serializers.DeliveryTaskSerializer(task)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except delivery_models.DeliveryTask.DoesNotExist:
+        logger.warning(f"Task {task_id} not found or not assigned to driver {request.user.id}")
         return Response(
             {'error': 'Task not found'},
             status=status.HTTP_404_NOT_FOUND
         )
     except fleet_models.Driver.DoesNotExist:
+        logger.warning(f"Driver profile not found for user {request.user.id}")
         return Response(
             {'error': 'Driver profile not found'},
             status=status.HTTP_404_NOT_FOUND
@@ -482,35 +520,45 @@ def driver_statistics(request):
 @permission_classes([IsAuthenticated])
 def dms_orders_list(request):
     """Get list of all orders for DMS"""
-    orders = orders_models.Order.objects.all().order_by('-created_at')
-    
+    logger.info(f"DMS orders list requested by user {request.user.id}")
+
+    # N+1 FIX: Use select_related for ForeignKey relationships
+    orders = orders_models.Order.objects.select_related(
+        'business',
+        'client',
+        'created_by'
+    ).all().order_by('-created_at')
+
     # Filters
     status_filter = request.query_params.get('status', None)
     business_filter = request.query_params.get('business_id', None)
     date_from = request.query_params.get('date_from', None)
     date_to = request.query_params.get('date_to', None)
-    
+
     if status_filter:
         orders = orders.filter(order_status=status_filter)
-    
+
     if business_filter:
         orders = orders.filter(business_id=business_filter)
-    
+
     if date_from:
         try:
             date_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
             orders = orders.filter(order_date__gte=date_obj)
         except ValueError:
+            logger.warning(f"Invalid date_from format: {date_from}")
             pass
-    
+
     if date_to:
         try:
             date_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
             orders = orders.filter(order_date__lte=date_obj)
         except ValueError:
+            logger.warning(f"Invalid date_to format: {date_to}")
             pass
-    
+
     serializer = ezzy_api_serializers.OrderListSerializer(orders, many=True)
+    logger.info(f"Returned {len(orders)} orders for DMS")
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -519,10 +567,18 @@ def dms_orders_list(request):
 def dms_order_detail(request, order_id):
     """Get detailed information about a specific order"""
     try:
-        order = orders_models.Order.objects.get(id=order_id)
+        # N+1 FIX: Use select_related for related objects
+        order = orders_models.Order.objects.select_related(
+            'business',
+            'client',
+            'created_by'
+        ).get(id=order_id)
+
+        logger.info(f"DMS order {order_id} accessed by user {request.user.id}")
         serializer = ezzy_api_serializers.OrderSerializer(order)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except orders_models.Order.DoesNotExist:
+        logger.warning(f"Order {order_id} not found")
         return Response(
             {'error': 'Order not found'},
             status=status.HTTP_404_NOT_FOUND
@@ -533,35 +589,47 @@ def dms_order_detail(request, order_id):
 @permission_classes([IsAuthenticated])
 def dms_tasks_list(request):
     """Get list of all delivery tasks for DMS"""
-    tasks = delivery_models.DeliveryTask.objects.all().order_by('-created_at')
-    
+    logger.info(f"DMS tasks list requested by user {request.user.id}")
+
+    # N+1 FIX: Use select_related for ForeignKey relationships
+    tasks = delivery_models.DeliveryTask.objects.select_related(
+        'order',
+        'order__business',
+        'order__client',
+        'driver',
+        'business'
+    ).all().order_by('-created_at')
+
     # Filters
     status_filter = request.query_params.get('status', None)
     driver_filter = request.query_params.get('driver_id', None)
     date_from = request.query_params.get('date_from', None)
     date_to = request.query_params.get('date_to', None)
-    
+
     if status_filter:
         tasks = tasks.filter(dl_task_status=status_filter)
-    
+
     if driver_filter:
         tasks = tasks.filter(driver_id=driver_filter)
-    
+
     if date_from:
         try:
             date_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
             tasks = tasks.filter(dl_task_date__gte=date_obj)
         except ValueError:
+            logger.warning(f"Invalid date_from format: {date_from}")
             pass
-    
+
     if date_to:
         try:
             date_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
             tasks = tasks.filter(dl_task_date__lte=date_obj)
         except ValueError:
+            logger.warning(f"Invalid date_to format: {date_to}")
             pass
-    
+
     serializer = ezzy_api_serializers.DeliveryTaskSerializer(tasks, many=True)
+    logger.info(f"Returned {len(tasks)} tasks for DMS")
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -570,7 +638,16 @@ def dms_tasks_list(request):
 def dms_task_detail(request, task_id):
     """Get detailed information about a specific task"""
     try:
-        task = delivery_models.DeliveryTask.objects.get(id=task_id)
+        # N+1 FIX: Use select_related for related objects
+        task = delivery_models.DeliveryTask.objects.select_related(
+            'order',
+            'order__business',
+            'order__client',
+            'driver',
+            'business'
+        ).get(id=task_id)
+
+        logger.info(f"DMS task {task_id} accessed by user {request.user.id}")
         serializer = ezzy_api_serializers.DeliveryTaskSerializer(task)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except delivery_models.DeliveryTask.DoesNotExist:
