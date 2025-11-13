@@ -31,46 +31,48 @@ logger = logging.getLogger('delivery')
 
 
 def dl_address_update(request, dl_task_number, mobile_no):
-    instance = delivery_models.DlAddressUpdate.objects.get(
-        dl_task_number=dl_task_number)
-    form = delivery_forms.DlAddressUpdateForm(
-        request.POST or None, instance=instance)
-    if request.method == 'POST':
-        print("dl_address request.POST")
+    try:
+        instance = delivery_models.DlAddressUpdate.objects.get(
+            dl_task_number=dl_task_number)
+        form = delivery_forms.DlAddressUpdateForm(
+            request.POST or None, instance=instance)
 
-        f = delivery_forms.DlAddressUpdateForm(
-            request.POST)
+        if request.method == 'POST':
+            logger.info(f"Address update request for task {dl_task_number}, mobile {mobile_no}")
 
-        if f.is_valid():
-            print("DlAddressUpdateForm 2 is valid")
-            form = f.save(commit=False)
-            form.dl_task_number = dl_task_number
-            form.mobile_no = mobile_no
+            f = delivery_forms.DlAddressUpdateForm(request.POST)
 
-            print(form)
-            form.save()
+            if f.is_valid():
+                logger.info(f"Address update form valid for task {dl_task_number}")
+                form = f.save(commit=False)
+                form.dl_task_number = dl_task_number
+                form.mobile_no = mobile_no
+                form.save()
+                logger.info(f"Address updated successfully for task {dl_task_number}")
+                return redirect('/')
+            else:
+                logger.warning(f"Invalid address update form for task {dl_task_number}: {f.errors}")
 
-            return redirect('/')
-    else:
-        print("dl_address else")
-
-    context = {
-        'form': form,
-        'dl_task_number': dl_task_number,
-        'mobile_no': mobile_no,
-    }
-    return render(request, 'delivery/dl_address.html', context)
+        context = {
+            'form': form,
+            'dl_task_number': dl_task_number,
+            'mobile_no': mobile_no,
+        }
+        return render(request, 'delivery/dl_address.html', context)
+    except delivery_models.DlAddressUpdate.DoesNotExist:
+        logger.error(f"Address update record not found for task {dl_task_number}")
+        messages.error(request, "Delivery task not found")
+        return redirect('/')
 
 
 # AJAX
 def get_zone_name(request):
     zone_number = request.GET.get('zone_number')
+    logger.info(f"Fetching zone names for zone number: {zone_number}")
     zone_name = delivery_models.ZoneName.objects.filter(
         zone_number=zone_number).all()
-    print(zone_name)
-    print("get_zone_name")
+    logger.debug(f"Found {len(zone_name)} zone names for zone {zone_number}")
     return render(request, 'delivery/zone_names.html', {'zone_name': zone_name})
-    # return JsonResponse(list(cities.values('id', 'name')), safe=False)
 
 
 def get_zone_lat_long(request):
@@ -117,28 +119,42 @@ def all_delivery_tasks(request):
     return render(request, 'delivery/parts/tasks_all.html', context)
 
 
+@login_required(login_url='account_login')
 def assign_driver(request):
-
     if request.method == "POST" and request.is_ajax():
         task_id = request.POST.get("task_id")
-        if task_id and delivery_models.AssignedDriver.objects.filter(dl_task_id=task_id).exists():
-            print(' already assigned')
-        else:
-            driver_id = request.user.id
-            print(task_id, "task_id -  driver_id", driver_id)
-            try:
-                task = delivery_models.DeliveryTask.objects.get(id=task_id)
-                print(task)
-                driver = fleet_models.Driver.objects.get(driver_id=driver_id)
-                print(driver)
-                assigned_driver = delivery_models.AssignedDriver(
-                    driver=driver, dl_task=task)
-                assigned_driver.save()
 
-                return JsonResponse({"success": True})
-            except Exception as e:
-                print('error')
-                return JsonResponse({"success": False, "error": str(e)})
+        if not task_id:
+            return JsonResponse({"success": False, "error": "Task ID required"})
+
+        if delivery_models.AssignedDriver.objects.filter(dl_task_id=task_id).exists():
+            logger.info(f"Task {task_id} already assigned to a driver")
+            return JsonResponse({"success": False, "error": "Task already assigned"})
+
+        try:
+            # IDOR FIX: Verify user is a driver
+            driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+            task = delivery_models.DeliveryTask.objects.get(id=task_id)
+            logger.info(f"Driver {driver.driver_id} assigning themselves to task {task_id}")
+
+            assigned_driver = delivery_models.AssignedDriver(
+                driver=driver, dl_task=task
+            )
+            assigned_driver.save()
+            logger.info(f"Task {task_id} successfully assigned to driver {driver.driver_id}")
+
+            return JsonResponse({"success": True})
+
+        except fleet_models.Driver.DoesNotExist:
+            logger.warning(f"User {request.user.id} is not a driver, cannot assign task")
+            return JsonResponse({"success": False, "error": "Driver profile not found"})
+        except delivery_models.DeliveryTask.DoesNotExist:
+            logger.warning(f"Task {task_id} not found")
+            return JsonResponse({"success": False, "error": "Task not found"})
+        except Exception as e:
+            logger.error(f"Error assigning task {task_id} to driver: {e}")
+            return JsonResponse({"success": False, "error": str(e)})
 
     return JsonResponse({"success": False, "error": "Invalid request"})
 
@@ -206,15 +222,20 @@ def dl_address_link(request, dl_task_code):
     MAPBOX_API_KEY = config("MAPBOX_API_KEY")
     address = f'{task.dl_latitude},{task.dl_longitude}'
     address2 = f'{task.dl_longitude},{task.dl_latitude}'
-    print(address)
-    g = geocoder.mapbox(address2, key=MAPBOX_API_KEY)
+    logger.info(f"Viewing address link for task {dl_task_code}, coordinates: {address}")
+
+    try:
+        g = geocoder.mapbox(address2, key=MAPBOX_API_KEY)
+        logger.debug(f"Geocoding successful for task {dl_task_code}")
+    except Exception as e:
+        logger.error(f"Geocoding failed for task {dl_task_code}: {e}")
+        g = None
+
     data = {
         'task': task,
         'address': address2,
         'g': g,
-
         'MAPBOX_API_KEY': MAPBOX_API_KEY
-
     }
     return render(request, 'delivery/frontend/dl_address_link.html', data)
 
@@ -229,17 +250,23 @@ def dl_address_link_update(request, dl_task_code):
 
 @csrf_exempt
 def save_location_data(request, dl_task_code):
-    print("vide save_location_data", dl_task_code)
-    if request.method == 'POST':
-        data = json.loads(request.body.decode('utf-8'))  # Parse JSON data from request body
-        dl_latitude = data.get('dl_latitude')
-        dl_longitude = data.get('dl_longitude')
+    logger.info(f"Saving location data for task {dl_task_code}")
 
+    if request.method == 'POST':
         try:
+            data = json.loads(request.body.decode('utf-8'))
+            dl_latitude = data.get('dl_latitude')
+            dl_longitude = data.get('dl_longitude')
+
             instance = delivery_models.DlAddressUpdate.objects.get(dl_task_number=dl_task_code)
-            print(instance)
+            logger.debug(f"Found task {dl_task_code}, updating location: {dl_latitude}, {dl_longitude}")
+
         except delivery_models.DlAddressUpdate.DoesNotExist:
+            logger.warning(f"Task {dl_task_code} not found for location update")
             return JsonResponse({'error': 'Instance not found'}, status=404)
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in location update request: {e}")
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
         instance.dl_latitude = dl_latitude
         instance.dl_longitude = dl_longitude
