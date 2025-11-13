@@ -1,0 +1,755 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EzzyDelivery API Tester - Order Management</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(56, 239, 125, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .response-section {
+            margin-top: 30px;
+        }
+
+        .response-box {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .response-box pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .success {
+            border-color: #38ef7d;
+            background: #f0fff4;
+        }
+
+        .error {
+            border-color: #ff6b6b;
+            background: #fff5f5;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .status-200 {
+            background: #38ef7d;
+            color: white;
+        }
+
+        .status-201 {
+            background: #11998e;
+            color: white;
+        }
+
+        .status-400,
+        .status-401,
+        .status-403,
+        .status-404 {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 12px 25px;
+            background: transparent;
+            border: none;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab:hover {
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .info-box h4 {
+            margin-bottom: 10px;
+            color: #2196F3;
+        }
+
+        .code-snippet {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        .code-snippet pre {
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 EzzyDelivery API Tester</h1>
+            <p>Test and interact with the EzzyDelivery REST API - Order Management</p>
+        </div>
+
+        <div class="main-content">
+            <!-- Left Panel - API Testing -->
+            <div class="card">
+                <h2>API Testing Panel</h2>
+
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('create-order')">Create Order</button>
+                    <button class="tab" onclick="switchTab('list-orders')">List Orders</button>
+                    <button class="tab" onclick="switchTab('create-client')">Create Client</button>
+                    <button class="tab" onclick="switchTab('dashboard')">Dashboard Stats</button>
+                </div>
+
+                <!-- Create Order Tab -->
+                <div id="create-order" class="tab-content active">
+                    <div class="info-box">
+                        <h4>Create New Order</h4>
+                        <p>Use this form to create a new delivery order via the API</p>
+                    </div>
+
+                    <form id="createOrderForm">
+                        <div class="form-group">
+                            <label for="token">Authentication Token *</label>
+                            <input type="text" id="token" placeholder="Enter your API token" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="client_id">Client ID *</label>
+                            <input type="number" id="client_id" placeholder="Enter client ID" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="delivery_address">Delivery Address *</label>
+                            <textarea id="delivery_address" placeholder="Enter full delivery address" required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="pickup_location_id">Pickup Location ID</label>
+                            <input type="number" id="pickup_location_id" placeholder="Enter pickup location ID">
+                        </div>
+
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-primary">
+                                📦 Create Order
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="clearForm('createOrderForm')">
+                                Clear
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- List Orders Tab -->
+                <div id="list-orders" class="tab-content">
+                    <div class="info-box">
+                        <h4>List Orders</h4>
+                        <p>Retrieve orders with optional filters</p>
+                    </div>
+
+                    <form id="listOrdersForm">
+                        <div class="form-group">
+                            <label for="token_list">Authentication Token *</label>
+                            <input type="text" id="token_list" placeholder="Enter your API token" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="status_filter">Order Status</label>
+                            <select id="status_filter">
+                                <option value="">All Statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="in_transit">In Transit</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="search">Search</label>
+                            <input type="text" id="search" placeholder="Search by order number or client name">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="limit">Limit</label>
+                            <input type="number" id="limit" value="10" min="1" max="100">
+                        </div>
+
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-primary">
+                                📋 List Orders
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="clearForm('listOrdersForm')">
+                                Clear
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Create Client Tab -->
+                <div id="create-client" class="tab-content">
+                    <div class="info-box">
+                        <h4>Create New Client</h4>
+                        <p>Add a new client to your business</p>
+                    </div>
+
+                    <form id="createClientForm">
+                        <div class="form-group">
+                            <label for="token_client">Authentication Token *</label>
+                            <input type="text" id="token_client" placeholder="Enter your API token" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="client_name">Client Name *</label>
+                            <input type="text" id="client_name" placeholder="Enter client name" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="client_phone">Phone Number *</label>
+                            <input type="tel" id="client_phone" placeholder="+1234567890" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="client_email">Email</label>
+                            <input type="email" id="client_email" placeholder="client@example.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="client_address">Address</label>
+                            <textarea id="client_address" placeholder="Enter client address"></textarea>
+                        </div>
+
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-success">
+                                👤 Create Client
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="clearForm('createClientForm')">
+                                Clear
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Dashboard Tab -->
+                <div id="dashboard" class="tab-content">
+                    <div class="info-box">
+                        <h4>Dashboard Statistics</h4>
+                        <p>View your business statistics and metrics</p>
+                    </div>
+
+                    <form id="dashboardForm">
+                        <div class="form-group">
+                            <label for="token_dashboard">Authentication Token *</label>
+                            <input type="text" id="token_dashboard" placeholder="Enter your API token" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="days">Period (Days)</label>
+                            <input type="number" id="days" value="30" min="1" max="365">
+                        </div>
+
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-primary">
+                                📊 Get Stats
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Processing request...</p>
+                </div>
+            </div>
+
+            <!-- Right Panel - Response -->
+            <div class="card">
+                <h2>API Response</h2>
+
+                <div id="responseStatus"></div>
+
+                <div class="response-section">
+                    <h3>Response Body</h3>
+                    <div id="responseBody" class="response-box">
+                        <pre>Make a request to see the response here...</pre>
+                    </div>
+                </div>
+
+                <div class="response-section">
+                    <h3>cURL Command</h3>
+                    <div class="code-snippet">
+                        <pre id="curlCommand">Make a request to see the cURL command here...</pre>
+                    </div>
+                </div>
+
+                <div class="response-section">
+                    <h3>Request Details</h3>
+                    <div id="requestDetails" class="response-box">
+                        <pre>Request details will appear here...</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        function switchTab(tabId) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab content
+            document.getElementById(tabId).classList.add('active');
+
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        // Clear form
+        function clearForm(formId) {
+            document.getElementById(formId).reset();
+        }
+
+        // Show loading
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+        }
+
+        // Hide loading
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+        }
+
+        // Display response
+        function displayResponse(status, data, curl, requestDetails) {
+            // Status badge
+            const statusBadge = `<span class="status-badge status-${status}">HTTP ${status}</span>`;
+            document.getElementById('responseStatus').innerHTML = statusBadge;
+
+            // Response body
+            const responseBox = document.getElementById('responseBody');
+            responseBox.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+
+            if (status >= 200 && status < 300) {
+                responseBox.classList.add('success');
+                responseBox.classList.remove('error');
+            } else {
+                responseBox.classList.add('error');
+                responseBox.classList.remove('success');
+            }
+
+            // cURL command
+            document.getElementById('curlCommand').textContent = curl;
+
+            // Request details
+            document.getElementById('requestDetails').innerHTML = `<pre>${requestDetails}</pre>`;
+        }
+
+        // Create Order
+        document.getElementById('createOrderForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+
+            const token = document.getElementById('token').value;
+            const client_id = document.getElementById('client_id').value;
+            const delivery_address = document.getElementById('delivery_address').value;
+            const pickup_location_id = document.getElementById('pickup_location_id').value;
+
+            const data = {
+                client_id: parseInt(client_id),
+                delivery_address: delivery_address
+            };
+
+            if (pickup_location_id) {
+                data.pickup_location_id = parseInt(pickup_location_id);
+            }
+
+            const curl = `curl -X POST "{{ request.scheme }}://{{ request.get_host }}/api/business/orders/" \\
+  -H "Authorization: Token ${token}" \\
+  -H "Content-Type: application/json" \\
+  -d '${JSON.stringify(data, null, 2)}'`;
+
+            const requestDetails = `Method: POST
+URL: {{ request.scheme }}://{{ request.get_host }}/api/business/orders/
+Headers:
+  Authorization: Token ${token.substring(0, 10)}...
+  Content-Type: application/json
+Body:
+${JSON.stringify(data, null, 2)}`;
+
+            try {
+                const response = await fetch('/api/business/orders/', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const responseData = await response.json();
+                displayResponse(response.status, responseData, curl, requestDetails);
+            } catch (error) {
+                displayResponse(500, { error: error.message }, curl, requestDetails);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // List Orders
+        document.getElementById('listOrdersForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+
+            const token = document.getElementById('token_list').value;
+            const status = document.getElementById('status_filter').value;
+            const search = document.getElementById('search').value;
+            const limit = document.getElementById('limit').value;
+
+            const params = new URLSearchParams();
+            if (status) params.append('status', status);
+            if (search) params.append('search', search);
+            if (limit) params.append('limit', limit);
+
+            const url = `/api/business/orders/?${params.toString()}`;
+
+            const curl = `curl -X GET "${url}" \\
+  -H "Authorization: Token ${token}"`;
+
+            const requestDetails = `Method: GET
+URL: ${url}
+Headers:
+  Authorization: Token ${token.substring(0, 10)}...`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Token ${token}`
+                    }
+                });
+
+                const responseData = await response.json();
+                displayResponse(response.status, responseData, curl, requestDetails);
+            } catch (error) {
+                displayResponse(500, { error: error.message }, curl, requestDetails);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Create Client
+        document.getElementById('createClientForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+
+            const token = document.getElementById('token_client').value;
+            const name = document.getElementById('client_name').value;
+            const phone = document.getElementById('client_phone').value;
+            const email = document.getElementById('client_email').value;
+            const address = document.getElementById('client_address').value;
+
+            const data = {
+                name: name,
+                phone: phone
+            };
+
+            if (email) data.email = email;
+            if (address) data.address = address;
+
+            const curl = `curl -X POST "{{ request.scheme }}://{{ request.get_host }}/api/business/clients/" \\
+  -H "Authorization: Token ${token}" \\
+  -H "Content-Type: application/json" \\
+  -d '${JSON.stringify(data, null, 2)}'`;
+
+            const requestDetails = `Method: POST
+URL: {{ request.scheme }}://{{ request.get_host }}/api/business/clients/
+Headers:
+  Authorization: Token ${token.substring(0, 10)}...
+  Content-Type: application/json
+Body:
+${JSON.stringify(data, null, 2)}`;
+
+            try {
+                const response = await fetch('/api/business/clients/', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const responseData = await response.json();
+                displayResponse(response.status, responseData, curl, requestDetails);
+            } catch (error) {
+                displayResponse(500, { error: error.message }, curl, requestDetails);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Dashboard Stats
+        document.getElementById('dashboardForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+
+            const token = document.getElementById('token_dashboard').value;
+            const days = document.getElementById('days').value;
+
+            const url = `/api/business/dashboard/?days=${days}`;
+
+            const curl = `curl -X GET "${url}" \\
+  -H "Authorization: Token ${token}"`;
+
+            const requestDetails = `Method: GET
+URL: ${url}
+Headers:
+  Authorization: Token ${token.substring(0, 10)}...`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Token ${token}`
+                    }
+                });
+
+                const responseData = await response.json();
+                displayResponse(response.status, responseData, curl, requestDetails);
+            } catch (error) {
+                displayResponse(500, { error: error.message }, curl, requestDetails);
+            } finally {
+                hideLoading();
+            }
+        });
+    </script>
+</body>
+</html>

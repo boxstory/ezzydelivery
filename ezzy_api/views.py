@@ -1,6 +1,7 @@
 import logging
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
 import requests
 from rest_framework import permissions, status, viewsets
 from rest_framework import generics
@@ -2423,6 +2424,15 @@ def business_dashboard_stats(request):
         )
 
 
+# ==================== API TESTING UI ====================
+
+@login_required(login_url='account_login')
+def api_tester_view(request):
+    """Render the API testing UI for clients"""
+    logger.info(f"User {request.user.id} accessing API tester UI")
+    return render(request, 'ezzy_api/api_tester.html')
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def business_orders_api(request):
@@ -2531,6 +2541,15 @@ def business_orders_api(request):
         )
 
 
+# ==================== API TESTING UI ====================
+
+@login_required(login_url='account_login')
+def api_tester_view(request):
+    """Render the API testing UI for clients"""
+    logger.info(f"User {request.user.id} accessing API tester UI")
+    return render(request, 'ezzy_api/api_tester.html')
+
+
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def business_order_detail_api(request, order_id):
@@ -2617,6 +2636,15 @@ def business_order_detail_api(request, order_id):
         )
 
 
+# ==================== API TESTING UI ====================
+
+@login_required(login_url='account_login')
+def api_tester_view(request):
+    """Render the API testing UI for clients"""
+    logger.info(f"User {request.user.id} accessing API tester UI")
+    return render(request, 'ezzy_api/api_tester.html')
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def business_clients_api(request):
@@ -2700,6 +2728,15 @@ def business_clients_api(request):
         )
 
 
+# ==================== API TESTING UI ====================
+
+@login_required(login_url='account_login')
+def api_tester_view(request):
+    """Render the API testing UI for clients"""
+    logger.info(f"User {request.user.id} accessing API tester UI")
+    return render(request, 'ezzy_api/api_tester.html')
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def business_tasks_api(request):
@@ -2757,6 +2794,15 @@ def business_tasks_api(request):
         )
 
 
+# ==================== API TESTING UI ====================
+
+@login_required(login_url='account_login')
+def api_tester_view(request):
+    """Render the API testing UI for clients"""
+    logger.info(f"User {request.user.id} accessing API tester UI")
+    return render(request, 'ezzy_api/api_tester.html')
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def business_pickup_locations_api(request):
@@ -2792,5 +2838,14 @@ def business_pickup_locations_api(request):
             {'error': 'Business not found'},
             status=status.HTTP_404_NOT_FOUND
         )
+
+
+# ==================== API TESTING UI ====================
+
+@login_required(login_url='account_login')
+def api_tester_view(request):
+    """Render the API testing UI for clients"""
+    logger.info(f"User {request.user.id} accessing API tester UI")
+    return render(request, 'ezzy_api/api_tester.html')
 
 

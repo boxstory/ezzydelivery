@@ -74,4 +74,7 @@ urlpatterns = [
     path('business/clients/', ezzy_api_views.business_clients_api, name='business_clients_api'),
     path('business/tasks/', ezzy_api_views.business_tasks_api, name='business_tasks_api'),
     path('business/pickup-locations/', ezzy_api_views.business_pickup_locations_api, name='business_pickup_locations_api'),
+
+    # ==================== API TESTING UI ====================
+    path('tester/', ezzy_api_views.api_tester_view, name='api_tester'),
 ]
