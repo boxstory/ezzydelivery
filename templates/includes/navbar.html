@@ -1,99 +1,86 @@
 {% load static %}
-<!-- ... navbar ... -->
-<div class="container-fluid navbar-default-css">
-  <nav class="navbar navbar-expand-md">
-    <div class="container-fluid px-0">
-      <a class="navbar-brand m-0 p-0" href="{% url 'webpages:index' %}">
-        <img src="{% static 'webpages/img/ezzy-logo-long-white.png' %}" alt="" width="240" height="60" />
-      </a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse w-100" id="navbarNav">
-        <ul class="navbar-nav ms-auto">
-          <li class="nav-item">
-            <a class="btn btn-light d-flex flex-fill fw-bold me-2 my-1 py-2  ps-4 px-md-5 d-none d-lg-block"
-              aria-current="page" href="{% url 'webpages:index' %}">
-              <span class="">
-                Home
-              </span>
-            </a>
-            <a class="btn btn-light d-flex flex-fill fw-bold me-2 my-1 py-2  px-2  d-block d-lg-none"
-              aria-current="page" href="{% url 'webpages:index' %}">
-              <i class="fa-solid fa-house p-1"></i>
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="fw-bold btn btn-light d-flex flex-fill me-2 my-1 py-2  px-lg-5  px-md-3" aria-current="page"
-              href="{% url 'webpages:services' %}">Services</a>
-          </li>
-          <li class="nav-item">
-            <a class="fw-bold btn btn-light d-flex flex-fill me-2 my-1 py-2  px-lg-5  px-md-4" aria-current="page"
-              href="{% url 'webpages:delivery_pricing' %}">Pricing</a>
-          </li>
-          <li class="nav-item d-flex">
-            <a class="btn btn-light d-flex flex-fill fw-bold me-2 my-1 py-2  px-lg-5  px-md-4" aria-current="page"
-              href="{% url 'webpages:contactus' %}">Contact</a>
-
-            <div class="btn btn-light bg-light d-flex fw-bold me-2 my-1 p-0 ps-2 p-md-0" role="group"
-              aria-label="Button group with nested dropdown">
-              {% if user.is_authenticated %}
-              <div class="btn-group " role="group">
-                <div class="nav-link btn  collapsed  align-items-center p-1" data-bs-toggle="dropdown"
-                  aria-expanded="false">
-                  {% comment %} #@todo add prodile pic {% endcomment %}
-                  <div class="d-flex justify-content-evenly ">
-                    <img src="{% static 'webpages/img/avatar.png' %}" class="" alt="" width="30" height="30"
-                      title="{{ user.username }}" />
-                    <i class=" fa-solid fa-caret-down px-2 py-2"></i>
-                  </div>
-                </div>
-                <ul class="dropdown-menu   dropdown-menu-end mx-auto border-0  text-center flex-fill"
-                  style="width:15rem" aria-labelledby="btnGroupDrop1">
-                  <li>
-                    <a class="nav-link active border-bottom-1 border-2" aria-current="page"
-                      href="{% url 'core:profile_view' %}">Profile</a>
-                  </li>
-                  <hr class="p-0 m-0">
-                  <li>
-                    <a class="nav-link active" aria-current="page" href="{% url 'core:main_dashboard' %}">Dashboard</a>
-                  </li>
-                  <hr class="p-0 m-0">
-                  <li>
-                    <a class="nav-link active" aria-current="page" href="{% url 'account_logout' %}">Log Out</a>
-                  </li>
-                </ul>
+<!-- Navbar -->
+<nav class="navbar navbar-expand-md modern-navbar">
+  <div class="container-fluid px-3">
+    <a class="navbar-brand m-0 p-0" href="{% url 'webpages:index' %}">
+      <img src="{% static 'webpages/img/ezzy-logo-long-white.png' %}" alt="Ezzy Delivery" width="200" height="50" />
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+      aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse w-100" id="navbarNav">
+      <ul class="navbar-nav ms-auto align-items-center">
+        <li class="nav-item d-none d-lg-block">
+          <a class="nav-link-modern" href="{% url 'webpages:index' %}">
+            Home
+          </a>
+        </li>
+        <li class="nav-item d-lg-none">
+          <a class="nav-link-icon" href="{% url 'webpages:index' %}" title="Home">
+            <i class="fa-solid fa-house"></i>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link-modern" href="{% url 'webpages:services' %}">Services</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link-modern" href="{% url 'webpages:delivery_pricing' %}">Pricing</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link-modern" href="{% url 'webpages:contactus' %}">Contact</a>
+        </li>
+        <li class="nav-item">
+          <div class="dropdown">
+            {% if user.is_authenticated %}
+              <div class="user-dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <img src="{% static 'webpages/img/avatar.png' %}" alt="{{ user.username }}" title="{{ user.username }}" />
               </div>
-              {% else %}
-              <div class="btn-group d-flex" role="group">
-                <div class="nav-link btn  collapsed d-flex justify-content-evenly align-items-center p-1"
-                  data-bs-toggle="dropdown" aria-expanded="false">
-                  {% comment %} #@todo add prodile pic {% endcomment %}
-                  <img src="{% static 'webpages/img/avatar.png' %}" class="" alt="" width="30" height="30"
-                    title="{{ user.username }}" />
-                  <p class=" my-0 text-start  d-md-none px-4">{{ user.username }}</p>
-                  <i class=" fa-solid fa-caret-down px-1"></i>
-                </div>
-                <ul class="dropdown-menu   dropdown-menu-end ms-3 border-0  text-center" style="width:15rem"
-                  aria-labelledby="btnGroupDrop1">
-                  <li>
-                    <a class="nav-link active border-bottom-1 border-2" aria-current="page"
-                      href="{% url 'account_login' %}">Log In</a>
-                  </li>
-                  <hr class="p-0 m-0">
-                  <li>
-                    <a class="nav-link active" aria-current="page" href="{% url 'account_signup' %}">Sign Up</a>
-                  </li>
-                </ul>
+              <ul class="dropdown-menu dropdown-menu-modern dropdown-menu-end">
+                <li>
+                  <a class="dropdown-item-modern" href="{% url 'core:profile_view' %}">
+                    <i class="fa-solid fa-user me-2"></i>
+                    Profile
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item-modern" href="{% url 'core:main_dashboard' %}">
+                    <i class="fa-solid fa-gauge-high me-2"></i>
+                    Dashboard
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item-modern" href="{% url 'account_logout' %}">
+                    <i class="fa-solid fa-right-from-bracket me-2"></i>
+                    Log Out
+                  </a>
+                </li>
+              </ul>
+            {% else %}
+              <div class="user-dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <img src="{% static 'webpages/img/avatar.png' %}" alt="User" />
               </div>
-        </ul>
-      </div>
-      {% endif %}
+              <ul class="dropdown-menu dropdown-menu-modern dropdown-menu-end">
+                <li>
+                  <a class="dropdown-item-modern" href="{% url 'account_login' %}">
+                    <i class="fa-solid fa-right-to-bracket me-2"></i>
+                    Log In
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item-modern" href="{% url 'account_signup' %}">
+                    <i class="fa-solid fa-user-plus me-2"></i>
+                    Sign Up
+                  </a>
+                </li>
+              </ul>
+            {% endif %}
+          </div>
+        </li>
+      </ul>
     </div>
-    </li>
-    </ul>
-</div>
-</div>
+  </div>
 </nav>
-</div>

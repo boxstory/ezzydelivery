@@ -1,187 +1,307 @@
 {% load static %}
+<style>
+  .mobile-sidebar-toggle {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 2px solid #dee2e6;
+  }
+
+  .mobile-sidebar-toggle .toggle-btn {
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 1rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .mobile-sidebar-toggle .toggle-btn:hover {
+    border-color: var(--brand-primary-dark, #f4c20d);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .mobile-sidebar-toggle .toggle-btn[aria-expanded="true"] {
+    background: var(--brand-primary, #ffd33b);
+    border-color: var(--brand-primary-dark, #f4c20d);
+  }
+
+  .mobile-sidebar-toggle .chevron {
+    transition: transform 0.3s ease;
+  }
+
+  .mobile-sidebar-toggle .toggle-btn[aria-expanded="true"] .chevron {
+    transform: rotate(180deg);
+  }
+
+  .mobile-sidebar-nav {
+    background: #f8f9fa;
+  }
+
+  .mobile-sidebar-nav .nav-item {
+    margin-bottom: 0.5rem;
+    padding: 0 1rem;
+  }
+
+  .mobile-sidebar-nav .nav-link.btn {
+    background: white;
+    border: 1px solid #e0e0e0;
+    color: #495057;
+    font-weight: 600;
+    padding: 0.875rem 1rem;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    text-align: left;
+    width: 100%;
+  }
+
+  .mobile-sidebar-nav .nav-link.btn:hover {
+    background: #fff;
+    border-color: var(--brand-primary-dark, #f4c20d);
+    color: #212529;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  .mobile-sidebar-nav .nav-link.btn.active,
+  .mobile-sidebar-nav .nav-item.active .nav-link.btn {
+    background: var(--brand-primary, #ffd33b);
+    border-color: var(--brand-primary-dark, #f4c20d);
+    color: #212529;
+    font-weight: 700;
+  }
+
+  .mobile-sidebar-nav .multi-level {
+    background: white;
+    border: 1px solid #e9ecef;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: 10px;
+  }
+
+  .mobile-sidebar-nav .multi-level .nav-link {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    margin-bottom: 0.5rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    border-radius: 8px;
+    color: #495057;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    transition: all 0.3s ease;
+  }
+
+  .mobile-sidebar-nav .multi-level .nav-link:hover {
+    background: var(--brand-accent, #fef9e6);
+    border-color: var(--brand-primary-dark, #f4c20d);
+    color: #212529;
+  }
+
+  .mobile-sidebar-nav .multi-level .nav-link:last-child {
+    margin-bottom: 0;
+  }
+
+  .mobile-sidebar-nav hr {
+    border-color: #dee2e6;
+    opacity: 0.5;
+    margin: 1rem;
+  }
+
+  .mobile-sidebar-nav .nav-link i {
+    color: #6c757d;
+    transition: color 0.3s ease;
+    min-width: 1.5rem;
+  }
+
+  .mobile-sidebar-nav .nav-link:hover i,
+  .mobile-sidebar-nav .nav-link.active i,
+  .mobile-sidebar-nav .nav-item.active .nav-link i {
+    color: #212529;
+  }
+
+  .mobile-sidebar-nav .fa-caret-down {
+    transition: transform 0.3s ease;
+  }
+
+  .mobile-sidebar-nav .nav-link[aria-expanded="true"] .fa-caret-down {
+    transform: rotate(180deg);
+  }
+
+  .mobile-sidebar-header {
+    background: var(--brand-primary, #ffd33b);
+    border: 2px solid var(--brand-primary-dark, #f4c20d);
+    color: #212529;
+    font-weight: 700;
+    padding: 1rem;
+    border-radius: 12px;
+    margin: 1rem;
+    box-shadow: 0 4px 12px rgba(255, 211, 59, 0.3);
+    text-align: center;
+    text-decoration: none;
+    display: block;
+    transition: all 0.3s ease;
+  }
+
+  .mobile-sidebar-header:hover {
+    background: var(--brand-primary-dark, #f4c20d);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 211, 59, 0.4);
+    color: #212529;
+  }
+</style>
+
 <!-- Mobile Sidebar Toggle Button - appears after header -->
-<div class="d-block d-md-none col-12 bg-light border-bottom">
-  <div class="container-fluid p-0">
-    <button class="btn btn-light w-100 d-flex justify-content-between align-items-center py-3 px-3 rounded-0 border-0"
+<div class="d-block d-md-none col-12 mobile-sidebar-toggle">
+  <div class="container-fluid p-3">
+    <button class="toggle-btn w-100 d-flex justify-content-between align-items-center border-0"
             type="button"
             data-bs-toggle="collapse"
             data-bs-target="#navbarNav2"
             aria-controls="navbarNav2"
             aria-expanded="false"
             aria-label="Toggle navigation">
-      <span class="fw-bold text-uppercase">
+      <span class="fw-bold">
         <i class="fa-solid fa-bars me-2"></i>
-        {{ business.business_name }} Dashboard Menu
+        Dashboard Menu
       </span>
-      <i class="fa-solid fa-chevron-down transition-rotate" id="sidebarToggleIcon"></i>
+      <i class="fa-solid fa-chevron-down chevron"></i>
     </button>
   </div>
 </div>
 
 <!-- Mobile Sidebar Content -->
-<nav class="navbar navbar-expand-lg navbar-light bg-light d-block d-md-none col-12">
+<nav class="d-block d-md-none col-12 mobile-sidebar-nav">
   <div class="collapse navbar-collapse" id="navbarNav2">
-    <hr class="mt-0" />
-    <ul class="navbar-nav ms-auto text-center">
-      <li class="nav-item"></li>
-      <li class="nav-item {% if request.resolver_match.url_name == 'orders_all_list' or request.resolver_match.url_name == 'orders_list' or request.resolver_match.url_name == 'add_order' %}active{% endif %}">
-        <div class="nav-link btn btn-outline-dark collapsed d-flex justify-content-start align-items-center"
+    <a class="mobile-sidebar-header" href="{% url 'business:business_dashboard' %}">
+      <i class="fa-solid fa-gauge-high me-2"></i>
+      Clients Dashboard
+    </a>
+
+    <hr />
+
+    <ul class="navbar-nav">
+      <li class="nav-item {% if request.resolver_match.url_name == 'orders_all_list' or request.resolver_match.url_name == 'orders_list' or request.resolver_match.url_name == 'orders_pending_list' or request.resolver_match.url_name == 'orders_successfull_list' or request.resolver_match.url_name == 'get_orders_by_base_api' or request.resolver_match.url_name == 'add_order' %}active{% endif %}">
+        <div class="nav-link btn collapsed d-flex justify-content-start align-items-center"
              data-bs-toggle="collapse"
-             data-bs-target="#submenu-orders">
-          <i class="fa-solid fa-basket-shopping p-2"></i>
-          <a class="nav-link my-0 flex-fill text-start ps-2"
-             href="{% url 'business:business_dashboard' %}">Orders</a><i class="flex-fill fa-solid fa-caret-down"></i>
-        </div>
-        <div class="multi-level collapse bg-white rounded-3"
-             role="list"
-             id="submenu-orders"
+             data-bs-target="#submenu-orders-mobile"
              aria-expanded="false">
-          <ul class="flex-column nav text-black">
-            <li class="nav-item">
-              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-                <i class="fa-solid fa-bars my-2 pt-1 pe-2"></i>
-                <a class="nav-link" href="{% url 'orders:orders_all_list' %}">All Orders</a>
-              </div>
-            </li>
-            <li class="nav-item">
-              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-                <i class="fa-solid fa-add my-2 pt-1 pe-2"></i>
-                <a class="nav-link" href="{% url 'orders:add_order' %}">Add Orders</a>
-              </div>
-            </li>
-            <li class="nav-item">
-              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-                <i class="fa-solid fa-check my-2 pt-1 pe-2"></i>
-                <a class="nav-link" href="{% url 'orders:orders_successfull_list' %}">Success List</a>
-              </div>
-            </li>
-            <li class="nav-item">
-              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-                <i class="fa-solid fa-spinner my-2 pt-1 pe-2"></i>
-                <a class="nav-link" href="{% url 'orders:orders_pending_list' %}">Pendings</a>
-              </div>
-            </li>
-            <li class="nav-item">
-              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-                <i class="fa-solid fa-xmark my-2 pt-1 pe-2"></i>
-                <a class="nav-link" href="{% url 'orders:orders_unsuccessfull_list' %}">Failed Orders</a>
-              </div>
-            </li>
-          </ul>
+          <i class="fa-solid fa-basket-shopping me-2"></i>
+          <span class="flex-fill text-start">Orders</span>
+          <i class="fa-solid fa-caret-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse"
+             id="submenu-orders-mobile"
+             aria-expanded="false">
+          <a class="nav-link" href="{% url 'orders:orders_all_list' %}">
+            <i class="fa-solid fa-bars me-2"></i>
+            <span>All Orders</span>
+          </a>
+          <a class="nav-link" href="{% url 'orders:add_order' %}">
+            <i class="fa-solid fa-add me-2"></i>
+            <span>Add Orders</span>
+          </a>
+          <a class="nav-link" href="{% url 'orders:orders_successfull_list' %}">
+            <i class="fa-solid fa-check me-2"></i>
+            <span>Successful</span>
+          </a>
+          <a class="nav-link" href="{% url 'orders:orders_pending_list' %}">
+            <i class="fa-solid fa-spinner me-2"></i>
+            <span>Pending</span>
+          </a>
+          <a class="nav-link" href="{% url 'orders:get_orders_by_base_api' %}">
+            <i class="fa-solid fa-code me-2"></i>
+            <span>API Orders</span>
+          </a>
         </div>
       </li>
+
       <hr />
+
       <li class="nav-item {% if request.resolver_match.url_name == 'product_all_list' or request.resolver_match.url_name == 'product_single_add' or request.resolver_match.url_name == 'product_categories' or request.resolver_match.url_name == 'product_all_list_card' %}active{% endif %}">
-        <div class="nav-link btn btn-outline-dark collapsed d-flex justify-content-start align-items-center"
+        <div class="nav-link btn collapsed d-flex justify-content-start align-items-center"
              data-bs-toggle="collapse"
-             data-bs-target="#submenu-product">
-          <i class="fa-solid fa-box-open p-2"></i>
-          <a class="nav-link my-0 flex-fill text-start ps-2"
-             href="{% url 'business:business_dashboard' %}">Products</a><i class="flex-fill fa-solid fa-caret-down"></i>
-        </div>
-        <div class="multi-level collapse bg-white rounded-3"
-             role="list"
-             id="submenu-product"
+             data-bs-target="#submenu-product-mobile"
              aria-expanded="false">
-          <ul class="flex-column nav text-black ps-2">
-            <li class="nav-item">
-              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-                <i class="fa-solid fa-bars my-2 pt-1 pe-2"></i>
-                <a class="nav-link ps-1" href="{% url 'product:product_all_list' %}">All Products</a>
-              </div>
-            </li>
-            <li class="nav-item">
-              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-                <i class="fa-solid fa-add my-2 pt-1 pe-2"></i>
-                <a class="nav-link ps-1" href="{% url 'product:product_single_add' %}">Add Product</a>
-              </div>
-            </li>
-            <li class="nav-item">
-              <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-                <i class="fa-solid fa-barcode my-2 pt-1 pe-2"></i>
-                <a class="nav-link ps-1"
-                   href="{% url 'product:product_all_list_card' %}">Cards</a>
-              </div>
-            </li>
-          </ul>
+          <i class="fa-solid fa-box-open me-2"></i>
+          <span class="flex-fill text-start">Products</span>
+          <i class="fa-solid fa-caret-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse"
+             id="submenu-product-mobile"
+             aria-expanded="false">
+          <a class="nav-link" href="{% url 'product:product_all_list' %}">
+            <i class="fa-solid fa-bars me-2"></i>
+            <span>All Products</span>
+          </a>
+          <a class="nav-link" href="{% url 'product:product_single_add' %}">
+            <i class="fa-solid fa-add me-2"></i>
+            <span>Add Product</span>
+          </a>
+          <a class="nav-link" href="{% url 'product:product_all_list_card' %}">
+            <i class="fa-solid fa-barcode me-2"></i>
+            <span>Cards</span>
+          </a>
         </div>
       </li>
+
       <hr />
+
       <li class="nav-item">
-        <a class="nav-link" href="{% url 'product:product_inventory' %}">
-          <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-            <i class="fa-solid fa-chart-bar m-2 pe-2 pb-1"></i>
-            <span class="pt-1">Inventory Report</span>
-          </div>
+        <a class="nav-link btn d-flex align-items-center" href="{% url 'product:product_inventory' %}">
+          <i class="fa-solid fa-chart-bar me-2"></i>
+          <span>Inventory Report</span>
         </a>
       </li>
+
       <li class="nav-item">
-        <a class="nav-link" href="{% url 'business:driver_directory' %}">
-          <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-            <i class="fa-solid fa-address-book m-2 pe-2 pb-1"></i>
-            <span class="pt-1">Fleet List</span>
-          </div>
+        <a class="nav-link btn d-flex align-items-center" href="{% url 'business:driver_directory' %}">
+          <i class="fa-solid fa-address-book me-2"></i>
+          <span>Fleet List</span>
         </a>
       </li>
+
       <li class="nav-item">
-        <a class="nav-link" href="{% url 'business:business_profile' %}">
-          <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-            <i class="fa-solid fa-store m-2 pe-2 pb-1"></i>
-            <span class="pt-1">Public view</span>
-          </div>
+        <a class="nav-link btn d-flex align-items-center" href="{% url 'business:business_profile' %}">
+          <i class="fa-solid fa-store me-2"></i>
+          <span>Public View</span>
         </a>
       </li>
+
       <hr />
+
       <li class="nav-item {% if request.resolver_match.url_name == 'business_settings' or request.resolver_match.url_name == 'business_settings' %}active{% endif %}">
-        <div class="nav-link btn btn-outline-dark collapsed d-flex justify-content-start align-items-center"
+        <div class="nav-link btn collapsed d-flex justify-content-start align-items-center"
              data-bs-toggle="collapse"
-             data-bs-target="#submenu-settings">
-          <i class="fa-solid fa-store m-2 pe-2 pb-1"></i>
-          <a class="nav-link my-0 flex-fill text-start btn-dark ps-2"
-             href="{% url 'business:business_profile' %}">Settings</a><i class="flex-fill fa-solid fa-caret-down ps-2"></i>
-        </div>
-        <div class="multi-level collapse bg-white rounded-3"
-             role="list"
-             id="submenu-settings"
+             data-bs-target="#submenu-settings-mobile"
              aria-expanded="false">
-          <ul class="flex-column nav text-black ps-2">
-            <li class="nav-item">
-              <a class="nav-link ms-0 p-0"
-                 href="{% url 'business:business_settings' request.user.user_business.first.business_id %}">
-                <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-                  <i class="fa-solid fa-store me-2 pe-1 pb-1 my-auto"></i>
-                  <span class="">Review</span>
-                </div>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link ms-0 p-0"
-                 href="{% url 'business:business_teams' request.user.user_business.first.business_id %}">
-                <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-                  <i class="fa-solid fa-store me-2 pe-1 pb-1 my-auto"></i>
-                  <span class="">Teams</span>
-                </div>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link ms-0 p-0"
-                 href="{% url 'business:pickup_location_list' %}">
-                <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-                  <i class="fa-solid fa-store me-2 pe-1 pb-1 my-auto"></i>
-                  <span class="">Stores list</span>
-                </div>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link ms-0 p-0"
-                 href="{% url 'business:business_settings_api_list' request.user.user_business.first.business_id %}">
-                <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
-                  <i class="fa-solid fa-store me-2 pe-1 pb-1 my-auto"></i>
-                  <span class="">API Settings</span>
-                </div>
-              </a>
-            </li>
-          </ul>
+          <i class="fa-solid fa-gear me-2"></i>
+          <span class="flex-fill text-start">Settings</span>
+          <i class="fa-solid fa-caret-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse"
+             id="submenu-settings-mobile"
+             aria-expanded="false">
+          <a class="nav-link"
+             href="{% url 'business:business_settings' request.user.user_business.first.business_id %}">
+            <i class="fa-solid fa-sliders me-2"></i>
+            <span>Review</span>
+          </a>
+          <a class="nav-link"
+             href="{% url 'business:business_teams' request.user.user_business.first.business_id %}">
+            <i class="fa-solid fa-users me-2"></i>
+            <span>Teams</span>
+          </a>
+          <a class="nav-link"
+             href="{% url 'business:pickup_location_list' %}">
+            <i class="fa-solid fa-location-dot me-2"></i>
+            <span>Stores List</span>
+          </a>
+          <a class="nav-link"
+             href="{% url 'business:business_settings_api_list' request.user.user_business.first.business_id %}">
+            <i class="fa-solid fa-code me-2"></i>
+            <span>API Settings</span>
+          </a>
         </div>
       </li>
     </ul>

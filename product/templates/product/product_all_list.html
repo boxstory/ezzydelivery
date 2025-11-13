@@ -1,51 +1,110 @@
-{% extends "dashboard_base.html" %} {% load static %}
-<!-- extra title -->
-{% block extra_head %}Products {% endblock extra_head %}
-<!-- extra css -->
-{% load crispy_forms_tags %} {% block content %}
-<div class="container">
-  <div class="col p-2 mt-3">
-    <h2 class="m-0  pb-2">All Products</h2>
-  </div>
-  <div class="row">
-    <div class="container">
-      <table class="table table-striped table-hover my-3">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>SKU</th>
-            <th>Colour</th>
-            <th>Qty</th>
-            <th>Price</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% if products %} {% for product in products %}
-          <tr>
-            <td>{{product.item_name}}</td>
-            <td>{{product.item_sku}}</td>
-            <td>{{product.color}}</td>
-            <td>{{product.size}}: {{product.unit}}</td>
-            <td>{{product.item_price}}</td>
-            <td>
-              <a href="{% url 'product:product_single_update' product_id=product.id %}" class="pe-3 text-dark"><i
-                  class="fa fa-lg fa-edit"></i></a>
-              <a href="{% url 'product:product_single_delete' product_id=product.id %}" class="text-danger"><i
-                  class="fa fa-lg fa-trash  "></i></a>
-            </td>
-          </tr>
-          {% endfor %}{% endif %}
-          <div>
-            <a href="{% url 'product:product_single_add' %}" class="btn btn-dark">
-              Add Product
-            </a>
-          </div>
+{% extends "dashboard_base.html" %}
+{% load static %}
 
-        </tbody>
-      </table>
-    </div>
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'product/css/product_list.css' %}">
+Products
+{% endblock extra_head %}
+
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="products-container">
+  <!-- Products Header -->
+  <div class="products-header">
+    <h2>
+      <i class="fa-solid fa-box-open"></i>
+      All Products
+    </h2>
+    <a href="{% url 'product:product_single_add' %}" class="add-product-btn">
+      <i class="fa-solid fa-plus"></i>
+      Add Product
+    </a>
   </div>
 
+  <!-- Products Grid -->
+  {% if products %}
+  <div class="products-grid">
+    {% for product in products %}
+    <article class="product-card">
+      <!-- Product Header -->
+      <div class="product-card-header">
+        <h3 class="product-name">
+          <i class="fa-solid fa-tag"></i>
+          {{ product.item_name }}
+        </h3>
+        <p class="product-sku">SKU: {{ product.item_sku }}</p>
+      </div>
+
+      <!-- Product Body -->
+      <div class="product-card-body">
+        {% if product.color %}
+        <div class="product-detail-row">
+          <span class="product-label">Color</span>
+          <span class="product-value">
+            <i class="fa-solid fa-palette"></i>
+            {{ product.color }}
+          </span>
+        </div>
+        {% endif %}
+
+        <div class="product-detail-row">
+          <span class="product-label">Size</span>
+          <span class="product-value">
+            <i class="fa-solid fa-ruler"></i>
+            {{ product.size }} {{ product.unit }}
+          </span>
+        </div>
+
+        <div class="product-detail-row">
+          <span class="product-label">Price</span>
+          <span class="product-price">
+            <i class="fa-solid fa-money-bill-wave"></i>
+            Qr {{ product.item_price }}
+          </span>
+        </div>
+
+        {% if product.qty %}
+        <div class="product-detail-row">
+          <span class="product-label">Stock</span>
+          <span class="product-value">
+            {% if product.qty > 10 %}
+              <span class="product-badge in-stock">In Stock</span>
+            {% elif product.qty > 0 %}
+              <span class="product-badge low-stock">Low Stock</span>
+            {% else %}
+              <span class="product-badge out-of-stock">Out of Stock</span>
+            {% endif %}
+          </span>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Product Footer -->
+      <div class="product-card-footer">
+        <a href="{% url 'product:product_single_update' product_id=product.id %}" class="product-action-btn edit">
+          <i class="fa fa-edit"></i>
+          Edit
+        </a>
+        <a href="{% url 'product:product_single_delete' product_id=product.id %}" class="product-action-btn delete">
+          <i class="fa fa-trash"></i>
+          Delete
+        </a>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <!-- Empty State -->
+  <div class="products-empty">
+    <i class="fa-solid fa-box-open"></i>
+    <h3>No Products Found</h3>
+    <p>Start adding products to your inventory</p>
+    <a href="{% url 'product:product_single_add' %}" class="add-product-btn">
+      <i class="fa-solid fa-plus"></i>
+      Add Your First Product
+    </a>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

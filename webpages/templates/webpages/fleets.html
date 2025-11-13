@@ -2,132 +2,321 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block title %}
-Fleets
+Join Our Fleet
 {% endblock title %}
 
+{% block extra_css %}
+<style>
+  .fleet-hero {
+    background: linear-gradient(135deg, #212529 0%, #495057 100%);
+    color: white;
+    padding: 5rem 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .fleet-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    opacity: 0.5;
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  .section-badge {
+    display: inline-block;
+    background: white;
+    color: #212529;
+    padding: 0.5rem 1.5rem;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 1.5rem;
+  }
+
+  .cta-button {
+    background: white;
+    color: #212529;
+    border: none;
+    padding: 1rem 3rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    border-radius: 50px;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .cta-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    color: #212529;
+  }
+
+  .step-card {
+    background: linear-gradient(135deg, #212529 0%, #343a40 100%);
+    border-radius: 24px;
+    padding: 3rem 2rem;
+    height: 100%;
+    color: white;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 3px solid transparent;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .step-card::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, #fff 0%, #e9ecef 100%);
+    border-radius: 24px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+  }
+
+  .step-card:hover {
+    transform: translateY(-15px) scale(1.03);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  }
+
+  .step-card:hover::before {
+    opacity: 1;
+  }
+
+  .step-number {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 2rem;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.3));
+    transition: all 0.3s ease;
+  }
+
+  .step-card:hover .step-number {
+    transform: scale(1.15) rotate(10deg);
+  }
+
+  .step-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 1.5rem;
+  }
+
+  .step-description {
+    font-size: 1.1rem;
+    line-height: 1.7;
+    opacity: 0.95;
+  }
+
+  .feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 2rem 0;
+  }
+
+  .feature-item {
+    padding: 0.75rem 0;
+    font-size: 1.05rem;
+    color: white;
+  }
+
+  .feature-item i {
+    color: #ffd700;
+    margin-right: 0.75rem;
+  }
+
+  .info-section {
+    background: #f8f9fa;
+    padding: 4rem 0;
+  }
+
+  .process-section {
+    background: white;
+    padding: 4rem 0;
+  }
+</style>
+{% endblock extra_css %}
 
 {% block content %}
-
-
-<div class="hero ">
-    <div class="container">
-        <div class="col text-center">
-            <div class="col is-half is-offset-one-quarter ">
-                <h1 class="title ">
-                    Looking for delivery driver jobs?
-                </h1>
-                <h2 class="subtitle">
-                    join the fleet and start delivering
-                </h2>
-            </div>
-            <div class="container">
-                We’ve been on the roads understanding the issues and complexities of last-mile delivery, and each one of
-                our
-                products has been tested rigorously to make sure that they address most of your needs.
-            </div>
-            <div class="btn m-10 mt-5">
-                <a
-                    href="/join_driver/"
-                    class="btn btn-dark btn-outlined btn-lg"
-                >
-
-                    <span class="icon">
-                        <i class="fa fa-user-plus"></i>
-                    </span>
-                    <span>
-                        Join As Driver
-                    </span>
-
-
-
-                </a>
-
-            </div>
-        </div>
+<!-- Hero Section -->
+<section class="fleet-hero">
+  <div class="container hero-content">
+    <div class="row align-items-center justify-content-center">
+      <div class="col-lg-8 text-center">
+        <span class="section-badge">JOIN THE FLEET</span>
+        <h1 class="display-3 fw-bold mb-4">Looking for Delivery Driver Jobs?</h1>
+        <h2 class="display-6 mb-4">Join the Fleet and Start Delivering</h2>
+        <p class="lead mb-4 col-lg-10 mx-auto">
+          We've been on the roads understanding the issues and complexities of last-mile delivery.
+          Each one of our features has been tested rigorously to make sure they address your needs.
+        </p>
+        <a href="/join_driver/" class="cta-button btn">
+          <i class="fa fa-user-plus me-2"></i>
+          Join As Driver
+        </a>
+      </div>
     </div>
-</div>
+  </div>
+</section>
 
-<h1 class="m-3">Get started in a few steps…</h1>
-<div class="row row-cols-1 row-cols-lg-3 align-items-stretch g-4 py-2 ">
-    <div class="col">
-        <div class="card card-cover h-100 overflow-hidden text-white bg-dark rounded-5 shadow-lg">
-            <div class="d-flex flex-column h-50 p-5 pb-3 text-white text-shadow-1">
-
-                <ul class="d-flex list-unstyled mt-auto">
-                    <li class="me-auto">
-                        <img
-                            src="{% static 'webpages/img/number-circle-one.png' %}"
-                            alt="Bootstrap"
-                            class="rounded-circle "
-                            width="54"
-                            height="54"
-                        >
-                    </li>
-                </ul>
-                <h2 class="mt-md-3 mb-4 display-6 lh-1 fw-bold">REGISTER</h2>
-                <p class="lead mb-5">
-                    Signup and
-                    Register as a driver and start delivering
-                </p>
-            </div>
-        </div>
+<!-- Benefits Section -->
+<section class="info-section">
+  <div class="container">
+    <div class="row justify-content-center mb-5">
+      <div class="col-lg-8 text-center">
+        <h2 class="display-5 fw-bold mb-3">Why Drive With Us?</h2>
+        <p class="lead text-muted">Join Qatar's premier delivery network and enjoy these benefits</p>
+      </div>
     </div>
-
-    <div class="col">
-        <div class="card card-cover h-100 overflow-hidden text-white bg-dark rounded-5 shadow-lg">
-            <div class="d-flex flex-column h-50 p-5 pb-3 text-white text-shadow-1">
-
-                <ul class="d-flex list-unstyled mt-auto">
-                    <li class="me-auto">
-                        <img
-                            src="{% static 'webpages/img/number-circle-two.png' %}"
-                            alt="Bootstrap"
-                            class="rounded-circle "
-                            width="54"
-                            height="54"
-                        >
-                    </li>
-                </ul>
-                <h2 class="mt-md-3 mb-4 display-6 lh-1 fw-bold">get onboard</h2>
-                <p class="lead mb-3">
-                    The Ezzy team will review and approve your application. We’ll also introduce you to the cool new
-                    features you’ll have access to.
-                </p>
-            </div>
+    <div class="row g-4">
+      <div class="col-md-6 col-lg-3">
+        <div class="text-center">
+          <div class="mb-3">
+            <i class="fa-solid fa-money-bill-wave fa-3x text-dark"></i>
+          </div>
+          <h5 class="fw-bold">Competitive Pay</h5>
+          <p class="text-muted">Earn attractive rates with performance bonuses</p>
         </div>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <div class="text-center">
+          <div class="mb-3">
+            <i class="fa-solid fa-clock fa-3x text-dark"></i>
+          </div>
+          <h5 class="fw-bold">Flexible Hours</h5>
+          <p class="text-muted">Work on your own schedule</p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <div class="text-center">
+          <div class="mb-3">
+            <i class="fa-solid fa-mobile-screen-button fa-3x text-dark"></i>
+          </div>
+          <h5 class="fw-bold">Easy-to-Use App</h5>
+          <p class="text-muted">Advanced driver app with navigation</p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <div class="text-center">
+          <div class="mb-3">
+            <i class="fa-solid fa-headset fa-3x text-dark"></i>
+          </div>
+          <h5 class="fw-bold">24/7 Support</h5>
+          <p class="text-muted">Always here to help you succeed</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Process Steps Section -->
+<section class="process-section">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="display-5 fw-bold mb-3">Get Started in 3 Simple Steps</h2>
+      <p class="lead text-muted">Join our fleet and start earning today</p>
     </div>
 
-    <div class="col">
-        <div class="card card-cover h-100 overflow-hidden text-white bg-dark rounded-5 shadow-lg">
-            <div class="d-flex flex-column h-50 p-5 pb-3 text-white text-shadow-1">
-
-                <ul class="d-flex list-unstyled mt-auto">
-                    <li class="me-auto">
-                        <img
-                            src="{% static 'webpages/img/number-circle-three.png' %}"
-                            alt="Bootstrap"
-                            class="rounded-circle "
-                            width="54"
-                            height="54"
-                        >
-                    </li>
-                </ul>
-                <h2 class="mt-md-3 mb-4 display-6 lh-1 fw-bold">start delivering</h2>
-                <p class="lead mb-3">
-                    You can start delivery as soon as you’ve completed the mandatory training and installed the
-                    Ezzy Driver App. </p>
-            </div>
+    <div class="row g-4 mb-5">
+      <div class="col-lg-4">
+        <div class="step-card">
+          <img src="{% static 'webpages/img/number-circle-one.png' %}" alt="Step 1" class="step-number" />
+          <h3 class="step-title">Register</h3>
+          <p class="step-description">
+            Sign up and register as a driver through our simple online application. Provide your details and documents to get started.
+          </p>
+          <ul class="feature-list mt-4">
+            <li class="feature-item">
+              <i class="fa-solid fa-check-circle"></i>
+              Quick online form
+            </li>
+            <li class="feature-item">
+              <i class="fa-solid fa-check-circle"></i>
+              Upload required documents
+            </li>
+            <li class="feature-item">
+              <i class="fa-solid fa-check-circle"></i>
+              Takes only 10 minutes
+            </li>
+          </ul>
         </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="step-card">
+          <img src="{% static 'webpages/img/number-circle-two.png' %}" alt="Step 2" class="step-number" />
+          <h3 class="step-title">Get Onboard</h3>
+          <p class="step-description">
+            The Ezzy team will review and approve your application. We'll introduce you to the cool new features you'll have access to.
+          </p>
+          <ul class="feature-list mt-4">
+            <li class="feature-item">
+              <i class="fa-solid fa-check-circle"></i>
+              Fast approval process
+            </li>
+            <li class="feature-item">
+              <i class="fa-solid fa-check-circle"></i>
+              Comprehensive training
+            </li>
+            <li class="feature-item">
+              <i class="fa-solid fa-check-circle"></i>
+              App walkthrough
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="step-card">
+          <img src="{% static 'webpages/img/number-circle-three.png' %}" alt="Step 3" class="step-number" />
+          <h3 class="step-title">Start Delivering</h3>
+          <p class="step-description">
+            You can start delivery as soon as you've completed the mandatory training and installed the Ezzy Driver App.
+          </p>
+          <ul class="feature-list mt-4">
+            <li class="feature-item">
+              <i class="fa-solid fa-check-circle"></i>
+              Start earning immediately
+            </li>
+            <li class="feature-item">
+              <i class="fa-solid fa-check-circle"></i>
+              Real-time order tracking
+            </li>
+            <li class="feature-item">
+              <i class="fa-solid fa-check-circle"></i>
+              Instant support available
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
 
-
-</div>
+    <div class="text-center">
+      <a href="/join_driver/" class="btn btn-dark btn-lg px-5 py-3">
+        <i class="fa fa-user-plus me-2"></i>
+        Apply Now to Join Our Fleet
+      </a>
+    </div>
+  </div>
+</section>
 
 {% endblock content %}
 
-
 {% block extra_js %}
 <!-- extra js -->
-
-
 {% endblock extra_js %}

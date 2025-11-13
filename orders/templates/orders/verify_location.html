@@ -1,0 +1,520 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Verify Delivery Location{% endblock %}
+
+{% block extra_css %}
+<style>
+.verification-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 1rem;
+}
+
+.verification-card {
+    background: var(--brand-white);
+    border-radius: var(--brand-radius-lg);
+    box-shadow: var(--brand-shadow-lg);
+    overflow: hidden;
+}
+
+.verification-header {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    padding: 2rem;
+    text-align: center;
+    color: var(--brand-grey-800);
+}
+
+.verification-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.verification-header p {
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+.order-info {
+    padding: 2rem;
+    border-bottom: 2px solid var(--brand-grey-200);
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.info-item {
+    display: flex;
+    align-items: start;
+    gap: 1rem;
+}
+
+.info-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(255, 211, 59, 0.1) 0%, rgba(255, 200, 0, 0.1) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.info-icon i {
+    color: var(--brand-primary);
+    font-size: 1.125rem;
+}
+
+.info-content h3 {
+    font-size: 0.875rem;
+    color: var(--brand-grey-600);
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.info-content p {
+    font-size: 1rem;
+    color: var(--brand-grey-800);
+    font-weight: 600;
+}
+
+.map-section {
+    padding: 2rem;
+}
+
+.map-container {
+    width: 100%;
+    height: 500px;
+    border-radius: var(--brand-radius-md);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    border: 2px solid var(--brand-grey-300);
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+}
+
+.form-section {
+    padding: 0 2rem 2rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    font-weight: 600;
+    color: var(--brand-grey-700);
+    margin-bottom: 0.5rem;
+    font-size: 0.9375rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 2px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm);
+    font-size: 1rem;
+    transition: var(--brand-transition);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(255, 211, 59, 0.1);
+}
+
+.address-inputs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.btn-verify {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    color: var(--brand-grey-800);
+    border: none;
+    border-radius: var(--brand-radius-md);
+    font-weight: 600;
+    font-size: 1.125rem;
+    cursor: pointer;
+    transition: var(--brand-transition);
+}
+
+.btn-verify:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 211, 59, 0.4);
+}
+
+.btn-verify:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.instructions {
+    background: var(--brand-grey-50);
+    padding: 1.5rem;
+    border-radius: var(--brand-radius-md);
+    border-left: 4px solid var(--brand-primary);
+    margin-bottom: 2rem;
+}
+
+.instructions h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--brand-grey-800);
+    margin-bottom: 0.75rem;
+}
+
+.instructions ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.instructions li {
+    padding: 0.5rem 0;
+    color: var(--brand-grey-700);
+    display: flex;
+    align-items: start;
+    gap: 0.75rem;
+}
+
+.instructions li i {
+    color: var(--brand-primary);
+    margin-top: 0.25rem;
+}
+
+@media (max-width: 768px) {
+    .verification-container {
+        margin: 1rem;
+        padding: 0.5rem;
+    }
+
+    .verification-header,
+    .order-info,
+    .map-section,
+    .form-section {
+        padding: 1.5rem 1rem;
+    }
+
+    .map-container {
+        height: 400px;
+    }
+
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="verification-container">
+    <div class="verification-card">
+        <div class="verification-header">
+            <i class="fa-solid fa-map-location-dot" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+            <h1>Verify Your Delivery Location</h1>
+            <p>Order #{{ order.order_number }}</p>
+        </div>
+
+        <div class="order-info">
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-grey-800); margin-bottom: 1rem;">
+                Order Details
+            </h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-icon">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div class="info-content">
+                        <h3>Customer Name</h3>
+                        <p>{{ order.customer_name }}</p>
+                    </div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-icon">
+                        <i class="fa-solid fa-phone"></i>
+                    </div>
+                    <div class="info-content">
+                        <h3>Phone Number</h3>
+                        <p>{{ order.customer_phone }}</p>
+                    </div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-icon">
+                        <i class="fa-solid fa-box"></i>
+                    </div>
+                    <div class="info-content">
+                        <h3>Items</h3>
+                        <p>{{ order.order_items.count }} item(s)</p>
+                    </div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-icon">
+                        <i class="fa-solid fa-money-bill-wave"></i>
+                    </div>
+                    <div class="info-content">
+                        <h3>COD Amount</h3>
+                        <p>{{ order.cod_amount }} QR</p>
+                    </div>
+                </div>
+
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="info-icon">
+                        <i class="fa-solid fa-location-dot"></i>
+                    </div>
+                    <div class="info-content">
+                        <h3>Current Address</h3>
+                        <p>{{ address_verification.original_address }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-section">
+            <div class="instructions">
+                <h3><i class="fa-solid fa-circle-info"></i> How to verify your location:</h3>
+                <ul>
+                    <li>
+                        <i class="fa-solid fa-check"></i>
+                        <span>Drag the marker to your exact delivery location on the map</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-check"></i>
+                        <span>Update your address details if needed</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-check"></i>
+                        <span>Add any special delivery instructions</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-check"></i>
+                        <span>Click "Confirm Location" to verify</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="map-container">
+                <div id="map"></div>
+            </div>
+        </div>
+
+        <form method="post" id="verificationForm" class="form-section">
+            {% csrf_token %}
+
+            <input type="hidden" name="latitude" id="latitude" required>
+            <input type="hidden" name="longitude" id="longitude" required>
+
+            <div class="form-group">
+                <label class="form-label" for="verified_address">
+                    <i class="fa-solid fa-location-dot"></i>
+                    Delivery Address
+                </label>
+                <textarea
+                    class="form-control"
+                    id="verified_address"
+                    name="verified_address"
+                    rows="3"
+                    placeholder="Enter or update your delivery address"
+                    required>{{ address_verification.original_address }}</textarea>
+            </div>
+
+            <div class="address-inputs">
+                <div class="form-group">
+                    <label class="form-label" for="zone_number">
+                        <i class="fa-solid fa-map"></i>
+                        Zone Number
+                    </label>
+                    <input
+                        type="number"
+                        class="form-control"
+                        id="zone_number"
+                        name="zone_number"
+                        placeholder="Enter zone number"
+                        value="{{ order.dl_zone|default:'' }}">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="street_number">
+                        <i class="fa-solid fa-road"></i>
+                        Street Number
+                    </label>
+                    <input
+                        type="number"
+                        class="form-control"
+                        id="street_number"
+                        name="street_number"
+                        placeholder="Enter street number"
+                        value="{{ order.dl_street|default:'' }}">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="building_number">
+                        <i class="fa-solid fa-building"></i>
+                        Building Number
+                    </label>
+                    <input
+                        type="number"
+                        class="form-control"
+                        id="building_number"
+                        name="building_number"
+                        placeholder="Enter building number"
+                        value="{{ order.dl_building|default:'' }}">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="notes">
+                    <i class="fa-solid fa-comment"></i>
+                    Delivery Instructions (Optional)
+                </label>
+                <textarea
+                    class="form-control"
+                    id="notes"
+                    name="notes"
+                    rows="3"
+                    placeholder="E.g., Gate code, floor number, landmarks, etc."></textarea>
+            </div>
+
+            <button type="submit" class="btn-verify" id="submitBtn">
+                <i class="fa-solid fa-check-circle me-2"></i>
+                Confirm Location
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+let map;
+let marker;
+let geocoder;
+
+// Initialize map
+function initMap() {
+    // Default to Doha, Qatar
+    const defaultLocation = { lat: 25.2854, lng: 51.5310 };
+
+    geocoder = new google.maps.Geocoder();
+
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: defaultLocation,
+        zoom: 13,
+        mapTypeControl: true,
+        streetViewControl: false,
+        fullscreenControl: true
+    });
+
+    marker = new google.maps.Marker({
+        position: defaultLocation,
+        map: map,
+        draggable: true,
+        animation: google.maps.Animation.DROP,
+        title: 'Drag me to your delivery location'
+    });
+
+    // Try to geocode the original address
+    const originalAddress = "{{ address_verification.original_address|escapejs }}";
+    if (originalAddress) {
+        geocodeAddress(originalAddress);
+    } else {
+        // Try to get user's current location
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const pos = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    map.setCenter(pos);
+                    marker.setPosition(pos);
+                    updateLatLng(pos.lat, pos.lng);
+                },
+                () => {
+                    updateLatLng(defaultLocation.lat, defaultLocation.lng);
+                }
+            );
+        } else {
+            updateLatLng(defaultLocation.lat, defaultLocation.lng);
+        }
+    }
+
+    // Update coordinates when marker is dragged
+    marker.addListener('dragend', (event) => {
+        const position = marker.getPosition();
+        updateLatLng(position.lat(), position.lng());
+        reverseGeocode(position.lat(), position.lng());
+    });
+
+    // Allow clicking on map to move marker
+    map.addListener('click', (event) => {
+        marker.setPosition(event.latLng);
+        updateLatLng(event.latLng.lat(), event.latLng.lng());
+        reverseGeocode(event.latLng.lat(), event.latLng.lng());
+    });
+}
+
+function geocodeAddress(address) {
+    geocoder.geocode({ address: address + ', Qatar' }, (results, status) => {
+        if (status === 'OK') {
+            const location = results[0].geometry.location;
+            map.setCenter(location);
+            marker.setPosition(location);
+            updateLatLng(location.lat(), location.lng());
+        } else {
+            console.error('Geocode failed: ' + status);
+            updateLatLng(25.2854, 51.5310); // Default to Doha
+        }
+    });
+}
+
+function reverseGeocode(lat, lng) {
+    const latlng = { lat: parseFloat(lat), lng: parseFloat(lng) };
+    geocoder.geocode({ location: latlng }, (results, status) => {
+        if (status === 'OK' && results[0]) {
+            document.getElementById('verified_address').value = results[0].formatted_address;
+        }
+    });
+}
+
+function updateLatLng(lat, lng) {
+    document.getElementById('latitude').value = lat;
+    document.getElementById('longitude').value = lng;
+}
+
+// Form validation
+document.getElementById('verificationForm').addEventListener('submit', function(e) {
+    const lat = document.getElementById('latitude').value;
+    const lng = document.getElementById('longitude').value;
+
+    if (!lat || !lng) {
+        e.preventDefault();
+        alert('Please select your location on the map by dragging the marker.');
+        return false;
+    }
+
+    // Disable submit button to prevent double submission
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Confirming...';
+});
+</script>
+
+<script async defer
+    src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap&libraries=places">
+</script>
+{% endblock %}

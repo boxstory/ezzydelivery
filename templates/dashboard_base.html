@@ -7,10 +7,21 @@
     <!-- extra css -->
     {% block extra_css %}
     {% endblock extra_css %}
+    <style>
+      body {
+        background: #f5f5f5;
+      }
+
+      .dashboard-content-area {
+        background: #f5f5f5;
+        min-height: calc(100vh - 56px);
+        padding: 1.5rem;
+      }
+    </style>
     <title>
       {% block title %}
       {% endblock title %}
-    Ezzy Dashaoard</title>
+    Ezzy Dashboard</title>
   </head>
   <body class="d-flex flex-column min-vh-100">
     {% include "includes/navbar.html" %}
@@ -23,8 +34,10 @@
           {% include "includes/dashboard_sidebar.html" %}
         {% endblock sidebar %}
         <!-- dashboard body content goes here -->
-        {% block content %}
-        {% endblock content %}
+        <div class="dashboard-content-area flex-grow-1">
+          {% block content %}
+          {% endblock content %}
+        </div>
       </div>
     </main>
     <!-- footer -->

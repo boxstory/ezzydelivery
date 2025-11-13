@@ -3,41 +3,215 @@
 {% load crispy_forms_tags %}
 {% block title %}
 About Us
-    {% endblock title %}
+{% endblock title %}
+
+{% block extra_css %}
+<style>
+  .about-hero {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 4rem 0;
+  }
+
+  .about-card {
+    background: white;
+    border-radius: 20px;
+    padding: 3rem 2rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    margin-bottom: 2rem;
+  }
+
+  .section-badge {
+    display: inline-block;
+    background: #212529;
+    color: white;
+    padding: 0.5rem 1.5rem;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 1.5rem;
+  }
+
+  .feature-icon {
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(135deg, #212529 0%, #495057 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .feature-card {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    height: 100%;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+  }
+
+  .feature-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+    border-color: #212529;
+  }
+
+  .brand-logo-wrapper {
+    position: relative;
+    transition: all 0.3s ease;
+    display: inline-block;
+  }
+
+  .brand-logo-wrapper:hover {
+    transform: translateY(-8px);
+  }
+
+  .brand-logo {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 4px solid #fff;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+  }
+
+  .brand-logo-wrapper:hover .brand-logo {
+    border-color: #212529;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  }
+
+  .brand-name {
+    margin-top: 1rem;
+    font-weight: 700;
+    color: #212529;
+    transition: color 0.3s ease;
+  }
+
+  .brand-logo-wrapper:hover .brand-name {
+    color: #495057;
+  }
+
+  .stats-card {
+    background: linear-gradient(135deg, #212529 0%, #343a40 100%);
+    color: white;
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .stat-number {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-label {
+    font-size: 1rem;
+    opacity: 0.9;
+  }
+</style>
+{% endblock extra_css %}
 
 {% block content %}
-<div class="container col-8 text-center">
+<div class="about-hero">
+  <div class="container">
+    <div class="text-center mb-5">
+      <span class="section-badge">ABOUT US</span>
+      <h1 class="display-3 fw-bold mb-4">Delivering Excellence Across Qatar</h1>
+      <p class="lead text-muted col-lg-8 mx-auto">
+        EzzyDelivery is more than just a delivery service – we're your trusted partner in growth.
+        Our passionate team of delivery professionals is dedicated to bringing your products to customers
+        with speed, care, and reliability.
+      </p>
+    </div>
 
-    <h1 class=" mb-3 fw-bold mb-2"> About Us</h1>
-    <p>
-        EzzyDelivery is a delivery service that provides you with the best delivery service in the city.
-        We are a team of delivery people who are passionate about delivering the orders to your customers.
-        We are here to make your business easier and more enjoyable.
-    </p>
-    <section class="py-5">
-        <div class="container">
-            <h2 class="text-center pb-4"> TRUSTED BRANDS</h2>
-            <div class="row ">
-
-
-
-                <div class="h-50 d-flex justify-content-evenly">
-                    {% for brand in brands %}
-                    <a href="/business/{{brand.business_id}}/" class="text-decoration-none">
-
-                        <img src="{{brand.business_logo.url}}" alt=""
-                            class="avatar d-block mx-auto img-fluid rounded-circle h-50 border border-dark-subtle border-3" />
-                        <h5 class="fw-bold text-dark pt-2">
-
-                            {{brand.business_name}}
-                        </h5>
-                    </a>
-                    {% endfor %}
-                </div>
-
-
-            </div>
+    <!-- Mission & Vision Section -->
+    <div class="row g-4 mb-5">
+      <div class="col-lg-4">
+        <div class="feature-card text-center">
+          <div class="feature-icon mx-auto">
+            <i class="fa-solid fa-bullseye fa-2x text-white"></i>
+          </div>
+          <h3 class="fw-bold mb-3">Our Mission</h3>
+          <p class="text-muted">
+            To make business operations easier and more enjoyable by providing exceptional last-mile delivery services.
+          </p>
         </div>
-    </section>
+      </div>
+      <div class="col-lg-4">
+        <div class="feature-card text-center">
+          <div class="feature-icon mx-auto">
+            <i class="fa-solid fa-eye fa-2x text-white"></i>
+          </div>
+          <h3 class="fw-bold mb-3">Our Vision</h3>
+          <p class="text-muted">
+            To be Qatar's most trusted and innovative delivery partner, connecting businesses with their customers seamlessly.
+          </p>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="feature-card text-center">
+          <div class="feature-icon mx-auto">
+            <i class="fa-solid fa-heart fa-2x text-white"></i>
+          </div>
+          <h3 class="fw-bold mb-3">Our Values</h3>
+          <p class="text-muted">
+            Excellence, reliability, and customer satisfaction drive everything we do. Your success is our success.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Section -->
+    <div class="row g-4 mb-5">
+      <div class="col-md-3 col-6">
+        <div class="stats-card">
+          <div class="stat-number">2017</div>
+          <div class="stat-label">Established</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="stats-card">
+          <div class="stat-number">24/7</div>
+          <div class="stat-label">Support</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="stats-card">
+          <div class="stat-number">100%</div>
+          <div class="stat-label">Dedicated</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="stats-card">
+          <div class="stat-number"><i class="fa-solid fa-star"></i></div>
+          <div class="stat-label">Top Rated</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+
+<!-- Trusted Brands Section -->
+<section class="py-5 bg-white">
+  <div class="container">
+    <div class="text-center mb-5">
+      <span class="section-badge">PARTNERS</span>
+      <h2 class="display-5 fw-bold mb-3">Trusted by Leading Brands</h2>
+      <p class="text-muted">Proud to serve Qatar's most respected businesses</p>
+    </div>
+
+    <div class="d-flex flex-wrap justify-content-center gap-5 align-items-center">
+      {% for brand in brands %}
+      <a href="/business/{{brand.business_id}}/" class="brand-logo-wrapper text-decoration-none text-center">
+        <img src="{{brand.business_logo.url}}" alt="{{brand.business_name}}" class="brand-logo" />
+        <div class="brand-name">{{brand.business_name}}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
 {% endblock content %}

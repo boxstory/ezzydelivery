@@ -12,16 +12,238 @@ Get a Quote for Delivery Services in Qatar
     <link rel="canonical" href="{{ request.build_absolute_uri }}">
 {% endblock seo %}
 
+{% block extra_css %}
+<style>
+  .pricing-hero {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 3rem 0;
+    margin-bottom: 2rem;
+  }
+
+  .section-badge {
+    display: inline-block;
+    background: #212529;
+    color: white;
+    padding: 0.5rem 1.5rem;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    margin-bottom: 1rem;
+  }
+
+  .pricing-form-card {
+    background: white;
+    border-radius: 20px;
+    padding: 3rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    margin-bottom: 3rem;
+  }
+
+  .form-control, .form-select, textarea {
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    padding: 0.75rem 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .form-control:focus, .form-select:focus, textarea:focus {
+    border-color: #212529;
+    box-shadow: 0 0 0 0.2rem rgba(33, 37, 41, 0.1);
+  }
+
+  .submit-btn {
+    background: #212529;
+    border: none;
+    padding: 1rem 2rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    border-radius: 50px;
+    transition: all 0.3s ease;
+    font-size: 1.1rem;
+  }
+
+  .submit-btn:hover {
+    background: #000;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  .benefit-card {
+    background: #f8f9fa;
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    height: 100%;
+    border: 2px solid transparent;
+  }
+
+  .benefit-card:hover {
+    border-color: #212529;
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .benefit-icon {
+    font-size: 3rem;
+    color: #212529;
+    margin-bottom: 1rem;
+  }
+
+  .info-box {
+    background: linear-gradient(135deg, #212529 0%, #343a40 100%);
+    color: white;
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+  }
+
+  .info-box h5 {
+    font-weight: 700;
+    margin-bottom: 1rem;
+  }
+
+  .info-box ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .info-box li {
+    padding: 0.5rem 0;
+  }
+
+  .info-box li i {
+    color: #ffd700;
+    margin-right: 0.75rem;
+  }
+</style>
+{% endblock extra_css %}
+
 {% block content %}
-<div class="container d-flex col-12 justify-content-center ">
-    <div class="p-3 col-12 col-md-10 col-lg-8 ">
-        <h1 class="text-center p-3 fw-bold bg-light">Delivery Pricing Inquiry Form</h1>
-        <form method="POST">
-            {% csrf_token %}
-            {{ form | crispy }}
-            <button type="submit" method="POST" class="btn btn-dark w-100" data-form-type="action">SUBMIT</button>
-        </form>
+<!-- Hero Section -->
+<section class="pricing-hero">
+  <div class="container">
+    <div class="text-center">
+      <span class="section-badge">GET A QUOTE</span>
+      <h1 class="display-4 fw-bold mb-3">Delivery Pricing Inquiry</h1>
+      <p class="lead text-muted">Get a custom quote tailored to your business needs</p>
     </div>
+  </div>
+</section>
+
+<div class="container">
+  <div class="row g-4">
+    <!-- Benefits Column -->
+    <div class="col-lg-4 order-lg-2">
+      <div class="info-box">
+        <h5>
+          <i class="fa-solid fa-star me-2"></i>
+          Why Choose Us?
+        </h5>
+        <ul>
+          <li>
+            <i class="fa-solid fa-check-circle"></i>
+            Competitive pricing
+          </li>
+          <li>
+            <i class="fa-solid fa-check-circle"></i>
+            Fast response time
+          </li>
+          <li>
+            <i class="fa-solid fa-check-circle"></i>
+            Flexible solutions
+          </li>
+          <li>
+            <i class="fa-solid fa-check-circle"></i>
+            No hidden fees
+          </li>
+          <li>
+            <i class="fa-solid fa-check-circle"></i>
+            Dedicated support
+          </li>
+        </ul>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12">
+          <div class="benefit-card">
+            <div class="benefit-icon">
+              <i class="fa-solid fa-bolt"></i>
+            </div>
+            <h6 class="fw-bold mb-2">Quick Response</h6>
+            <p class="text-muted small mb-0">Get your quote within 24 hours</p>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="benefit-card">
+            <div class="benefit-icon">
+              <i class="fa-solid fa-calculator"></i>
+            </div>
+            <h6 class="fw-bold mb-2">Transparent Pricing</h6>
+            <p class="text-muted small mb-0">No hidden costs or surprises</p>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="benefit-card">
+            <div class="benefit-icon">
+              <i class="fa-solid fa-handshake"></i>
+            </div>
+            <h6 class="fw-bold mb-2">Custom Solutions</h6>
+            <p class="text-muted small mb-0">Tailored to your specific needs</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Form Column -->
+    <div class="col-lg-8 order-lg-1">
+      <div class="pricing-form-card">
+        <h3 class="fw-bold mb-4">
+          <i class="fa-solid fa-file-invoice-dollar me-2"></i>
+          Request Your Quote
+        </h3>
+        <p class="text-muted mb-4">
+          Fill out the form below and our team will get back to you with a personalized pricing quote
+          for your delivery and fulfillment needs in Qatar.
+        </p>
+
+        <form method="POST">
+          {% csrf_token %}
+          {{ form | crispy }}
+
+          <div class="mt-4">
+            <button type="submit" class="submit-btn btn btn-dark w-100">
+              <i class="fa-solid fa-paper-plane me-2"></i>
+              SUBMIT INQUIRY
+            </button>
+          </div>
+
+          <div class="text-center mt-3">
+            <small class="text-muted">
+              <i class="fa-solid fa-lock me-1"></i>
+              Your information is secure and will never be shared
+            </small>
+          </div>
+        </form>
+      </div>
+
+      <!-- Additional Info -->
+      <div class="alert alert-info border-0" style="background: #e7f3ff; border-radius: 12px;">
+        <div class="d-flex align-items-start">
+          <i class="fa-solid fa-circle-info fa-2x me-3 mt-1" style="color: #0066cc;"></i>
+          <div>
+            <h6 class="fw-bold mb-2" style="color: #0066cc;">Need Help?</h6>
+            <p class="mb-0 small">
+              If you have any questions or need assistance filling out this form, please don't hesitate to
+              <a href="/contactus/" class="fw-bold">contact us</a> or reach out via
+              <a href="https://wa.me/97466451589" class="fw-bold">WhatsApp</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
-</div>
+
 {% endblock content %}

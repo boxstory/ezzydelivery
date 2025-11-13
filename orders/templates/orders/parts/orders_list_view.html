@@ -1,131 +1,206 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'orders/css/order_list.css' %}">
+
 {% for order in orders %}
-  <div class="section  ">
-    <div class="section d-flex">
-      <div class="p-3  col-8   bg-light border border-light border-5 rounded">
-        <div class="d-flex justify-content-between">
-          <div class="fw-bolder">
-            {{ order.order_number }} -
-            {% if order.task_created %}
-              Task Created
-            {% else %}
-              Task Not Created yet
-            {% endif %}
-          </div>
-          <div class="fw-bold mb-2">{{ order.order_date }}</div>
+  <div class="order-card" id="order-card-{{ order.id }}">
+    <!-- Order Card Header (Clickable) -->
+    <div class="order-card-header" onclick="toggleOrderCard({{ order.id }})">
+      <div class="d-flex flex-wrap align-items-center justify-content-between w-100">
+        <div class="order-number">
+          <i class="fa-solid fa-receipt"></i>
+          <span>{{ order.order_number }}</span>
+          <span class="expand-toggle">
+            <i class="fa-solid fa-chevron-down"></i>
+          </span>
         </div>
-        <div class="pb-2">
-          <div class="d-flex justify-content-between">
-            <div>Name : {{ order.customer_name }}</div>
-            <div>
-              Mobile : <a class="text-decoration-none text-dark"
-    href="http://wa.me/{{ order.customer_whatsapp }}"
-    target="_blank">{{ order.customer_phone }}</a>
-            </div>
+        <div class="d-flex align-items-center gap-2">
+          {% if order.task_created %}
+            <span class="order-status-badge status-delivered">Task Created</span>
+          {% else %}
+            <span class="order-status-badge status-pending">Pending</span>
+          {% endif %}
+          <div class="order-date">
+            <i class="fa-regular fa-calendar"></i>
+            <span>{{ order.order_date }}</span>
           </div>
         </div>
-        <div class="pb-2">
-          <div class="d-flex justify-content-between">
-            <div>
-              Pickup Location :
-              {{ order.pickup_location }}
-              <a href="" class="text-decoration-none  ">  <i class="fa-solid fa-location-pin p-2" style="color: #008000;"></i> </a>
-            </div>
-          </div>
-          <div class="d-flex justify-content-between">
-            <div class="py-2"">
-              Drop OfF :
-              {{ order.dl_zone }} - {{ order.customer_address }}<a href="" class="text-decoration-none  ">  <i class="fa-solid fa-location-pin p-2" style="color: #ac2402;"></i> </a>
-            </div>
-            <div class="align-content-center">
-              Address : Zn-{{ order.dl_zone }}, Str-{{ order.dl_street }}, Bldg-{{ order.dl_building }},
-              {{ order.customer_address }}
-            </div>
-          </div>
-        </div>
-        <hr class="p-0 m-0 align-content-center" />
-        <div class="pb-1 ">
-          <div class="d-flex justify-content-between">
-            <div>Category : {{ order.product_sub_catgory }}</div>
-          </div>
-        </div>
-        <div class="d-flex justify-content-between">
-          <div>Pickup Status : {{ order.order_status }}</div>
-          <div>COD</div>
-        </div>
-        <div class="d-flex justify-content-between pt-2">
-          <div>DMS Status :{{ order.dl_task.dl_task_status_dms }}assigned</div>
-          <div class="fw-bold text-danger">Qr: {{ order.cod_amount }}</div>
-        </div>
-      </div>
-      <div class=" col-4   pb-1 bg-light  collapses"
-           id="collapse-product-{{ order.id }}">
-        <table class="table m-0 border border-right ">
-          <thead class="table-light">
-            <tr>
-              <th colspan="2">Items</th>
-              <th>Qty</th>
-              <th class="text-center">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% if listed_product %}
-              {% for product_list in listed_product %}
-                {% if product_list %}
-                  {% for product in product_list %}
-                    <tr>
-                      <td colspan="2">{{ product.name }}</td>
-                      <td>{{ product.qty }}</td>
-                      <td class="text-center">
-                        <a class="btn pe-1 text-dark text-decoration-none"
-                           href="{% url 'orders:add_order_product' order.id %}">
-                          <i class="fa fa-lg fa-edit me-2"></i>
-                        </a>
-                      </td>
-                    </tr>
-                  {% endfor %}
-                {% else %}
-                  <tr>
-                    <td class="text-start" colspan="2">No products added</td>
-                    <td>--</td>
-                    <td class="text-center">
-                      <a class="btn pe-1 text-dark text-decoration-none"
-                         href="{% url 'orders:add_order_product' order.id %}">
-                        <i class="fa-solid fa-plus"></i>
-                      </a>
-                    </td>
-                  </tr>
-                {% endif %}
-              {% endfor %}
-            {% else %}
-              <tr>
-                <td class="text-start align-content-center" colspan="2">Load Products from DMS</td>
-                <td class="text-end" colspan="2">
-                  <a class="border rounded-pill p-2 btn px-3 me-3 text-dark text-decoration-none"
-                     hx-get="{% url 'orders:order_product_list' order.id %}"
-                     hx-target="#collapse-product-{{ order.id }}"
-                     hx-trigger="click"
-                     aria-expanded="true"
-                     data-bs-target="#collapse-product-{{ order.id }}"
-                     aria-controls="collapse-product-{{ order.id }}"
-                     data-bs-toggle="collapses">Click Here</a>
-                </td>
-              </tr>
-            {% endif %}
-          </tbody>
-        </table>
       </div>
     </div>
-    <div class="d-flex justify-content-end mb-3 m-0 p-2 bg-light ">
-      <a href="{% url 'orders:order_update' order.id %} "
-         class="border rounded-pill p-2  px-3 me-2 text-dark text-decoration-none">
-        <i class="fa fa-lg fa-edit me-2"></i>Edit Order
-      </a>
-      <a class="border rounded-pill p-2  px-3 btn  text-dark text-decoration-none"
-         href="{% url 'orders:delete_order' order.id %} ">
-        <i class="fa fa-trash me-2"></i>Delete</a>
+
+    <!-- Compact Summary (Always Visible) -->
+    <div class="order-summary">
+      <div class="summary-item">
+        <i class="fa-solid fa-user"></i>
+        <strong>{{ order.customer_name }}</strong>
+      </div>
+      <div class="summary-item">
+        <i class="fa-solid fa-phone"></i>
+        <span>{{ order.customer_phone }}</span>
+      </div>
+      <div class="summary-item">
+        <i class="fa-solid fa-location-dot"></i>
+        <span>Zone {{ order.dl_zone }}</span>
+      </div>
+      {% if order.cod_amount %}
+      <div class="summary-item">
+        <i class="fa-solid fa-money-bill-wave"></i>
+        <strong style="color: #ff6b6b;">Qr {{ order.cod_amount }}</strong>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Order Card Body -->
+    <div class="order-card-body">
+      <!-- Order Details Section -->
+      <div class="order-details">
+        <!-- Customer Information -->
+        <div class="detail-row">
+          <span class="detail-label">Customer</span>
+          <span class="detail-value">{{ order.customer_name }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Contact</span>
+          <div class="detail-value">
+            <a class="contact-link" href="http://wa.me/{{ order.customer_whatsapp }}" target="_blank">
+              <i class="fa-brands fa-whatsapp"></i>
+              <span>{{ order.customer_phone }}</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Location Information -->
+        <div class="detail-row">
+          <span class="detail-label">Locations</span>
+          <div class="detail-value">
+            <div class="location-info">
+              <!-- Pickup Location -->
+              <div class="location-item pickup">
+                <div class="location-icon pickup">
+                  <i class="fa-solid fa-arrow-up"></i>
+                </div>
+                <div class="location-text">
+                  <div class="location-name">Pickup</div>
+                  <div class="location-address">{{ order.pickup_location }}</div>
+                </div>
+              </div>
+
+              <!-- Dropoff Location -->
+              <div class="location-item dropoff">
+                <div class="location-icon dropoff">
+                  <i class="fa-solid fa-arrow-down"></i>
+                </div>
+                <div class="location-text">
+                  <div class="location-name">Drop-off</div>
+                  <div class="location-address">
+                    Zone {{ order.dl_zone }}, Street {{ order.dl_street }}, Building {{ order.dl_building }}<br>
+                    {{ order.customer_address }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category and Status -->
+        <div class="detail-row">
+          <span class="detail-label">Category</span>
+          <span class="detail-value">{{ order.product_sub_catgory }}</span>
+        </div>
+
+        <div class="detail-row">
+          <span class="detail-label">Order Status</span>
+          <span class="detail-value">
+            <span class="status-value">{{ order.order_status }}</span>
+          </span>
+        </div>
+
+        {% if order.delivery_task %}
+        <div class="detail-row">
+          <span class="detail-label">DMS Status</span>
+          <span class="detail-value">
+            <span class="status-value">{{ order.delivery_task.dl_task_status_dms|default:"Not assigned" }}</span>
+          </span>
+        </div>
+        {% endif %}
+
+        <!-- COD Amount -->
+        {% if order.cod_amount %}
+        <div class="detail-row">
+          <span class="detail-label">COD Amount</span>
+          <div class="detail-value">
+            <div class="cod-amount">
+              <i class="fa-solid fa-money-bill-wave"></i>
+              <span>Qr {{ order.cod_amount }}</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Action Buttons -->
+        <div class="detail-row">
+          <a href="{% url 'orders:order_update' order.id %}" class="contact-link">
+            <i class="fa fa-edit"></i>
+            <span>Edit Order</span>
+          </a>
+          <a href="{% url 'orders:delete_order' order.id %}" class="contact-link" style="background: #ffe8e8;">
+            <i class="fa fa-trash"></i>
+            <span>Delete</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Products Section -->
+      <div class="order-products" id="product-section-{{ order.id }}">
+        <div class="products-header">
+          <i class="fa-solid fa-box-open"></i>
+          <span>Order Items</span>
+        </div>
+
+        <div class="text-center py-3" id="product-placeholder-{{ order.id }}">
+          <p class="mb-3" style="color: var(--brand-grey-600);">Click to load products</p>
+          <button class="load-products-btn"
+                  onclick="loadProducts({{ order.id }}, event)"
+                  hx-get="{% url 'orders:order_product_list' order.id %}"
+                  hx-target="#product-content-{{ order.id }}"
+                  hx-swap="innerHTML">
+            <i class="fa-solid fa-download"></i>
+            <span>Load Products</span>
+          </button>
+        </div>
+
+        <div id="product-content-{{ order.id }}" style="display: none;">
+          <!-- Products will be loaded here via HTMX -->
+        </div>
+      </div>
     </div>
   </div>
 {% endfor %}
+
+<script>
+function toggleOrderCard(orderId) {
+  const card = document.getElementById('order-card-' + orderId);
+  card.classList.toggle('expanded');
+}
+
+function loadProducts(orderId, event) {
+  event.stopPropagation(); // Prevent triggering the card toggle
+  const placeholder = document.getElementById('product-placeholder-' + orderId);
+  const content = document.getElementById('product-content-' + orderId);
+
+  // Show loading state
+  placeholder.innerHTML = '<div class="text-center py-3"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--brand-primary);"></i><p class="mt-2" style="color: var(--brand-grey-600);">Loading products...</p></div>';
+
+  // After HTMX loads, hide placeholder and show content
+  document.body.addEventListener('htmx:afterSwap', function handler(evt) {
+    if (evt.detail.target.id === 'product-content-' + orderId) {
+      placeholder.style.display = 'none';
+      content.style.display = 'block';
+      document.body.removeEventListener('htmx:afterSwap', handler);
+    }
+  });
+}
+</script>
 {% if orders.has_other_pages %}
   <ul class="pagination justify-content-end text-dark">
     {% if orders.has_previous %}

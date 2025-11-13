@@ -1132,42 +1132,54 @@ def dms_order_documents(request, order_id):
 @permission_classes([IsAuthenticated])
 def create_api_key(request):
     """Create a new API key for a client"""
-    serializer = ezzy_api_serializers.ClientApiKeyCreateSerializer(data=request.data)
-    
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    business_id = serializer.validated_data['business_id']
-    key_name = serializer.validated_data.get('key_name', '')
-    expires_at = serializer.validated_data.get('expires_at')
-    
     try:
-        business = client_models.Business.objects.get(business_id=business_id)
-        
-        # Check if user has permission to create API keys for this business
-        if not request.user.is_staff and business.user != request.user:
-            return Response(
-                {'error': 'Permission denied'},
-                status=status.HTTP_403_FORBIDDEN
+        serializer = ezzy_api_serializers.ClientApiKeyCreateSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            logger.error(f"Serializer validation failed: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        business_id = serializer.validated_data['business_id']
+        key_name = serializer.validated_data.get('key_name', '')
+        expires_at = serializer.validated_data.get('expires_at')
+
+        try:
+            business = client_models.Business.objects.get(business_id=business_id)
+
+            # Check if user has permission to create API keys for this business
+            if not request.user.is_staff and business.user and business.user != request.user:
+                logger.warning(f"User {request.user.id} denied permission to create API key for business {business_id}")
+                return Response(
+                    {'error': 'Permission denied. You do not have access to this business.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            api_key = ezzy_api_models.ClientApiKey.objects.create(
+                business=business,
+                key_name=key_name,
+                expires_at=expires_at,
+                created_by=request.user
             )
-        
-        api_key = ezzy_api_models.ClientApiKey.objects.create(
-            business=business,
-            key_name=key_name,
-            expires_at=expires_at,
-            created_by=request.user
-        )
-        
-        serializer = ezzy_api_serializers.ClientApiKeySerializer(api_key)
-        return Response({
-            'message': 'API key created successfully',
-            'api_key': serializer.data
-        }, status=status.HTTP_201_CREATED)
-    
-    except client_models.Business.DoesNotExist:
+
+            logger.info(f"API key created successfully for business {business_id} by user {request.user.id}")
+            serializer = ezzy_api_serializers.ClientApiKeySerializer(api_key)
+            return Response({
+                'message': 'API key created successfully',
+                'api_key': serializer.data
+            }, status=status.HTTP_201_CREATED)
+
+        except client_models.Business.DoesNotExist:
+            logger.error(f"Business {business_id} not found")
+            return Response(
+                {'error': 'Business not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    except Exception as e:
+        logger.error(f"Error creating API key: {str(e)}", exc_info=True)
         return Response(
-            {'error': 'Business not found'},
-            status=status.HTTP_404_NOT_FOUND
+            {'error': f'An error occurred while creating the API key: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
@@ -2452,7 +2464,7 @@ def business_orders_api(request):
 
             orders = orders_models.Order.objects.filter(
                 business=business
-            ).select_related('client', 'pickup_location')
+            ).select_related('business', 'pickup_location', 'address_verified_by', 'verified_by')
 
             if status_filter:
                 orders = orders.filter(order_status=status_filter)

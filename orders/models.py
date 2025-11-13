@@ -307,10 +307,14 @@ class AddressVerification(models.Model):
         ('invalid', 'Invalid'),
         ('needs_update', 'Needs Update'),
         ('pending', 'Pending'),
+        ('address_verified', 'Address Verified by Customer'),
+        ('verified', 'Verified by Staff'),
     )
-    
+
     order = models.ForeignKey(
         Order, on_delete=models.CASCADE, related_name='address_verifications')
+    verification_token = models.CharField(max_length=64, unique=True, blank=True, null=True)
+    token_expires_at = models.DateTimeField(blank=True, null=True)
     original_address = models.CharField(max_length=500)
     verified_address = models.CharField(max_length=500, blank=True, null=True)
     verification_result = models.CharField(
@@ -318,6 +322,7 @@ class AddressVerification(models.Model):
     verified_by = models.ForeignKey(
         'auth.User', on_delete=models.SET_NULL, null=True, blank=True)
     verified_at = models.DateTimeField(blank=True, null=True)
+    customer_verified_at = models.DateTimeField(blank=True, null=True)
     latitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
     longitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
     zone_number = models.PositiveIntegerField(blank=True, null=True)
@@ -326,10 +331,26 @@ class AddressVerification(models.Model):
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         verbose_name_plural = "Address Verifications"
         ordering = ['-created_at']
-    
+
     def __str__(self):
         return f"{self.order.order_number} - {self.verification_result}"
+
+    def is_token_expired(self):
+        """Check if verification token has expired"""
+        if not self.token_expires_at:
+            return True
+        from django.utils import timezone
+        return timezone.now() > self.token_expires_at
+
+    def generate_token(self):
+        """Generate a unique verification token"""
+        import secrets
+        self.verification_token = secrets.token_urlsafe(32)
+        from django.utils import timezone
+        from datetime import timedelta
+        self.token_expires_at = timezone.now() + timedelta(days=7)  # Token valid for 7 days
+        return self.verification_token

@@ -44,13 +44,14 @@ def orders_all_list(request):
         business=business.business_id
     ).select_related(
         'business',              # FK: Order → Business
-        'customer',              # FK: Order → Customer
         'pickup_location',       # FK: Order → PickupLocation
+        'address_verified_by',   # FK: Order → User (address verifier)
+        'verified_by',           # FK: Order → User (order verifier)
     ).prefetch_related(
         'order_product_list',          # Reverse FK: Order ← OrderProductList
         'delivery_task',               # Reverse FK: Order ← DeliveryTask
         'delivery_task__driver',       # Through: DeliveryTask → Driver
-        'delivery_task__assigned_drivers',  # M2M through AssignedDriver
+        'delivery_task__business',     # Through: DeliveryTask → Business
     ).order_by('-id')
 
     logger.debug(f"Fetching orders for business {business.business_id}")
@@ -96,13 +97,14 @@ def orders_pending_list(request):
         business=business.business_id
     ).select_related(
         'business',
-        'customer',
         'pickup_location',
+        'address_verified_by',
+        'verified_by',
     ).prefetch_related(
         'order_product_list',
         'delivery_task',
         'delivery_task__driver',
-        'delivery_task__assigned_drivers',
+        'delivery_task__business',
     ).order_by('-id')
 
     logger.debug(f"Fetching pending orders for business {business.business_id}")
@@ -146,13 +148,14 @@ def orders_successfull_list(request):
         business=business.business_id
     ).select_related(
         'business',
-        'customer',
         'pickup_location',
+        'address_verified_by',
+        'verified_by',
     ).prefetch_related(
         'order_product_list',
         'delivery_task',
         'delivery_task__driver',
-        'delivery_task__assigned_drivers',
+        'delivery_task__business',
     ).order_by('-id')
 
     logger.debug(f"Fetching successful orders for business {business.business_id}")
@@ -537,7 +540,7 @@ def order_details(request, order_id):
         # IDOR FIX: Verify order belongs to user's business
         business = business_models.Business.objects.get(user_id=request.user.id)
         order = orders_models.Order.objects.select_related(
-            'business', 'client', 'pickup_location'
+            'business', 'pickup_location', 'address_verified_by', 'verified_by'
         ).get(id=order_id, business=business)
 
         logger.info(f"User {request.user.id} viewing order details for order {order_id}")
@@ -827,62 +830,177 @@ def get_orders_by_base_api(request):
     print('start_date', start_date)
     print('end_date', end_date)
 
+    try:
+        if order_response.status_code == 200:
+            orders = []
+            response_data = order_response.json()
 
-    if order_response.status_code == 200:
-        orders = []
-        for order in order_response.json().get('orders', []):
-            print('order in order_response', order)
-            customer_id = order['customer']['id']
-            print('customer_id', customer_id)
-            
-            customer_response = requests.get(f'https://{shop_url}/admin/api/2024-01/customers/{customer_id}.json', headers=header_value)
-            if customer_response.status_code == 200:
-                customer_data = customer_response.json().get('customer', {})
-                print('customer_data', customer_data)
-                customer_info = {
-                    'first_name': customer_data.get('first_name', ''),
-                    'last_name': customer_data.get('last_name', ''),
-                    'email': customer_data.get('email', ''),
-                    'address': customer_data.get('default_address', {}).get('address1', '')
-
-                }
+            # Handle different API response formats
+            if business_api.api_type == 'shopify':
+                # Shopify wraps orders in {'orders': [...]}
+                order_list = response_data.get('orders', []) if isinstance(response_data, dict) else []
+            elif business_api.api_type == 'woocommerce':
+                # WooCommerce returns orders directly as a list
+                order_list = response_data if isinstance(response_data, list) else []
             else:
-                customer_info = {
-                    'first_name': '',
-                    'last_name': '',
-                    'email': '',
-                    'address': ''
-                }
+                order_list = []
 
-            orders.append({
-            'id': order['id'],
-            'created_at': order['created_at'],
-            'payment_gateway_names': order['payment_gateway_names'],
-            'total_price': order['total_price'],
-            'current_total_price': order['current_total_price'],
-            'currency': order['currency'],
-            'customer_info': customer_info,
-            'line_items': [
-                {
-                'title': item['title'],
-                'quantity': item['quantity'],
-                'price': item['price']
-                } for item in order['line_items']
-            ],
+            for order in order_list:
+                print('order in order_response', order)
+
+                # Extract customer info safely
+                try:
+                    if business_api.api_type == 'shopify':
+                        customer_id = order.get('customer', {}).get('id')
+                        if customer_id:
+                            customer_response = requests.get(
+                                f'https://{shop_url}/admin/api/2024-01/customers/{customer_id}.json',
+                                headers=header_value
+                            )
+                            if customer_response.status_code == 200:
+                                customer_data = customer_response.json().get('customer', {})
+                                customer_info = {
+                                    'first_name': customer_data.get('first_name', ''),
+                                    'last_name': customer_data.get('last_name', ''),
+                                    'email': customer_data.get('email', ''),
+                                    'address': customer_data.get('default_address', {}).get('address1', '')
+                                }
+                            else:
+                                customer_info = {
+                                    'first_name': '',
+                                    'last_name': '',
+                                    'email': '',
+                                    'address': ''
+                                }
+                        else:
+                            customer_info = {
+                                'first_name': '',
+                                'last_name': '',
+                                'email': '',
+                                'address': ''
+                            }
+                    elif business_api.api_type == 'woocommerce':
+                        # WooCommerce includes customer info in order
+                        billing = order.get('billing', {})
+                        customer_info = {
+                            'first_name': billing.get('first_name', ''),
+                            'last_name': billing.get('last_name', ''),
+                            'email': billing.get('email', ''),
+                            'address': f"{billing.get('address_1', '')} {billing.get('address_2', '')}".strip()
+                        }
+                    else:
+                        customer_info = {
+                            'first_name': '',
+                            'last_name': '',
+                            'email': '',
+                            'address': ''
+                        }
+
+                    orders.append({
+                        'id': order.get('id'),
+                        'created_at': order.get('date_created') if business_api.api_type == 'woocommerce' else order.get('created_at'),
+                        'payment_gateway_names': order.get('payment_method') if business_api.api_type == 'woocommerce' else order.get('payment_gateway_names'),
+                        'total_price': order.get('total'),
+                        'current_total_price': order.get('total'),
+                        'currency': order.get('currency'),
+                        'customer_info': customer_info,
+                        'line_items': [
+                            {
+                                'title': item.get('name') if business_api.api_type == 'woocommerce' else item.get('title'),
+                                'quantity': item.get('quantity'),
+                                'price': item.get('price')
+                            } for item in order.get('line_items', [])
+                        ],
+                    })
+                except Exception as item_error:
+                    logger.error(f"Error processing order item: {str(item_error)}")
+                    continue
+
+        else:
+            logger.error(f"API returned status code: {order_response.status_code}")
+            messages.error(request, f"API error: {order_response.status_code}")
+            return redirect('business:business_settings_api_list', business_id)
+
+        result = order_response.json()
+        status = order_response.status_code
+        context = {
+            'business': business,
+            'api': business_api,
+            'orders': orders,
+            'status': status,
+            'result': result,
+        }
+        return render(request, 'orders\orders_api_list.html', context)
+
+    except Exception as e:
+        logger.error(f"Error fetching orders: {str(e)}")
+        messages.error(request, f"Failed to fetch orders: {str(e)}")
+        return redirect('business:business_settings_api_list', business_id)
+
+# Location Verification View
+def verify_location(request, token):
+    """
+    Public view for customers to verify their delivery location
+    """
+    from orders.models import AddressVerification
+    from django.utils import timezone
+    
+    try:
+        # Get address verification by token
+        address_verification = get_object_or_404(
+            AddressVerification,
+            verification_token=token
+        )
+        
+        # Check if token is expired
+        if address_verification.is_token_expired():
+            return render(request, 'orders/verification_expired.html', {
+                'order': address_verification.order
             })
-
-        #print('orders', orders)
-    else:
-        orders = []
-
-    result = order_response.json()
-    status = order_response.status_code  
-    context = {
-        'business': business,
-        'api': business_api,
-        'orders'  : orders,
-
-        'status'  : status,
-        'result'  : result,
-    }
-    return render(request, 'orders\orders_api_list.html', context)
+        
+        order = address_verification.order
+        
+        if request.method == 'POST':
+            # Get form data
+            latitude = request.POST.get('latitude')
+            longitude = request.POST.get('longitude')
+            verified_address = request.POST.get('verified_address')
+            zone_number = request.POST.get('zone_number')
+            street_number = request.POST.get('street_number')
+            building_number = request.POST.get('building_number')
+            notes = request.POST.get('notes')
+            
+            # Update address verification
+            address_verification.latitude = latitude
+            address_verification.longitude = longitude
+            address_verification.verified_address = verified_address or address_verification.original_address
+            address_verification.zone_number = zone_number if zone_number else None
+            address_verification.street_number = street_number if street_number else None
+            address_verification.building_number = building_number if building_number else None
+            address_verification.notes = notes
+            address_verification.verification_result = 'address_verified'
+            address_verification.customer_verified_at = timezone.now()
+            address_verification.save()
+            
+            # Update order verification status
+            order.verification_status = 'address_verified'
+            order.save()
+            
+            return render(request, 'orders/verification_success.html', {
+                'order': order
+            })
+        
+        # GET request - show verification form with map
+        context = {
+            'order': order,
+            'address_verification': address_verification,
+            'google_maps_api_key': config('GOOGLE_MAPS_API_KEY', default=''),
+        }
+        
+        return render(request, 'orders/verify_location.html', context)
+        
+    except Exception as e:
+        logger.error(f"Error in location verification: {str(e)}")
+        return render(request, 'orders/verification_error.html', {
+            'error': 'Invalid or expired verification link'
+        })

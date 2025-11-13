@@ -50,16 +50,48 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
             }
             instance.save(update_fields=['original_order_data'])
         
-        # Create initial address verification record
+        # Create initial address verification record and send verification link
         if instance.customer_address:
             from orders.models import AddressVerification
-            AddressVerification.objects.get_or_create(
+            address_verification, addr_created = AddressVerification.objects.get_or_create(
                 order=instance,
                 defaults={
                     'original_address': instance.customer_address,
                     'verification_result': 'pending'
                 }
             )
+
+            # Generate verification token and send WhatsApp link
+            if addr_created or not address_verification.verification_token:
+                token = address_verification.generate_token()
+                address_verification.save()
+
+                # Send verification link via WhatsApp
+                try:
+                    from core.whatsapp_utils import send_location_verification_whatsapp
+                    from core.whatsapp_utils import validate_input_phone
+
+                    # Validate and sanitize phone number
+                    is_valid, sanitized_phone, error_msg = validate_input_phone(instance.customer_phone)
+
+                    if is_valid:
+                        result = send_location_verification_whatsapp(
+                            order=instance,
+                            verification_token=token,
+                            phone_number=sanitized_phone
+                        )
+
+                        if result['success']:
+                            print(f"Location verification link sent for order {instance.order_number}")
+                        else:
+                            print(f"Failed to send location verification: {result.get('error', 'Unknown error')}")
+                    else:
+                        print(f"Invalid phone number for order {instance.order_number}: {error_msg}")
+                except Exception as e:
+                    print(f"Error sending location verification: {str(e)}")
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Error sending location verification for order {instance.id}: {str(e)}", exc_info=True)
         
         if instance.order_number not in DlAddressUpdate.objects.values_list('dl_task_number', flat=True):
             from decimal import Decimal

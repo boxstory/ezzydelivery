@@ -46,3 +46,44 @@ class ProfilePicture(models.Model):
 
     def __str__(self):
         return str(self.id)
+
+
+class WhatsAppVerification(models.Model):
+    """Model for storing WhatsApp verification codes"""
+    VERIFICATION_TYPES = (
+        ('password_reset', 'Password Reset'),
+        ('phone_add', 'Phone Number Add'),
+        ('phone_update', 'Phone Number Update'),
+        ('account_verify', 'Account Verification'),
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='whatsapp_verifications',
+        null=True,
+        blank=True
+    )
+    phone_number = models.CharField(max_length=20)
+    verification_code = models.CharField(max_length=6)
+    verification_type = models.CharField(max_length=20, choices=VERIFICATION_TYPES)
+    is_verified = models.BooleanField(default=False)
+    attempts = models.IntegerField(default=0)
+    max_attempts = models.IntegerField(default=3)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name_plural = "WhatsApp Verifications"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.phone_number} - {self.verification_type} - {self.verification_code}"
+
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
+
+    def can_attempt(self):
+        return self.attempts < self.max_attempts and not self.is_expired()

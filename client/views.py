@@ -18,6 +18,7 @@ from client import models as business_models
 from core import models as core_models
 from ezzydelivery.settings import BASE_DIR
 from orders import models as orders_models
+from ezzy_api import models as ezzy_api_models
 
 from client import forms as business_forms
 from datetime import datetime
@@ -52,7 +53,7 @@ def business_dashboard(request):
 
         orders = orders_models.Order.objects.filter(
             business=business.business_id
-        ).select_related('client', 'business').order_by('-id')[:10]
+        ).select_related('business', 'pickup_location', 'address_verified_by', 'verified_by').order_by('-id')[:10]
 
         context = {
             'profile': profile,
@@ -552,12 +553,14 @@ def business_settings_api_add(request, business_id):
 def business_settings_api_list(request, business_id):
     business =  business_models.Business.objects.filter(business_id=business_id).first()
     business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
-    
-    
+    api_keys = ezzy_api_models.ClientApiKey.objects.filter(business=business).order_by('-created_at')
+
+
 
     context = {
         'business': business,
         'business_apis': business_apis,
+        'api_keys': api_keys,
     }
     return render(request, 'client/parts/business_settings_api_list.html', context)
 

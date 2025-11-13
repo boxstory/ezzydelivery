@@ -1,5 +1,6 @@
 from django.urls import path
 from core import views as core_views
+from core import password_reset_views
 from webpages import views as webpages_views
 from delivery import views as delivery_views
 from orders import views as orders_views
@@ -37,6 +38,9 @@ urlpatterns = [
 
     path('driverjobform/', core_views.driverjobform, name='driverjobform'),
 
-     
+    # WhatsApp Password Reset URLs
+    path('password/reset/request/', password_reset_views.password_reset_request, name='password_reset_request'),
+    path('password/reset/verify/', password_reset_views.password_reset_verify, name='password_reset_verify'),
+    path('password/reset/confirm/', password_reset_views.password_reset_confirm, name='password_reset_confirm'),
 
 ]

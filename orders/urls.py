@@ -45,5 +45,8 @@ urlpatterns = [
      path('api/all/', orders_views.get_order_by_api, name='get_order_by_api'),
      path('api/shopify_orders/', orders_views.get_orders_by_base_api, name='get_orders_by_base_api'),
 
+     # Location Verification (Public URL)
+     path('verify-location/<str:token>/', orders_views.verify_location, name='verify_location'),
+
 ]
 

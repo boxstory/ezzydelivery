@@ -1,8 +1,8 @@
-<table class="table m-0">
-    <thead class="table-light">
+<table class="product-table">
+    <thead>
         <tr>
-            <th colspan="2">Name</th>
-            <th>Qty</th>
+            <th>Product</th>
+            <th class="text-center">Qty</th>
             <th class="text-center">Action</th>
         </tr>
     </thead>
@@ -12,11 +12,11 @@
         {% if product_list %}
         {% for product in product_list %}
         <tr>
-            <td colspan="2">{{ product.name }}</td>
-            <td>{{ product.qty }}</td>
+            <td>{{ product.name }}</td>
+            <td class="text-center">{{ product.qty }}</td>
             <td class="text-center">
-                <a class="btn pe-1 text-dark text-decoration-none" href="{% url 'orders:add_order_product' order.id %}">
-                    <i class="fa fa-lg fa-edit me-2"></i>
+                <a href="{% url 'orders:add_order_product' order.id %}" title="Edit Product">
+                    <i class="fa fa-edit" style="color: var(--brand-primary);"></i>
                 </a>
             </td>
         </tr>
@@ -25,11 +25,11 @@
         {% endfor %}
         {% else %}
         <tr>
-            <td class="text-start" colspan="2">No products added</td>
-            <td>--</td>
+            <td>No products added</td>
+            <td class="text-center">--</td>
             <td class="text-center">
-                <a class="btn pe-1 text-dark text-decoration-none" href="{% url 'orders:add_order_product' order.id %}">
-                    <i class="fa-solid fa-plus"></i>
+                <a href="{% url 'orders:add_order_product' order.id %}" title="Add Product">
+                    <i class="fa-solid fa-plus" style="color: var(--brand-primary);"></i>
                 </a>
             </td>
         </tr>
