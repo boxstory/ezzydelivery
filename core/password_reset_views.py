@@ -62,10 +62,9 @@ def password_reset_request(request):
                 messages.error(request, f'Error processing request: {str(e)}')
 
         elif reset_method == 'email':
-            # Handle email reset (existing Django functionality)
-            from django.contrib.auth.views import PasswordResetView
-            # Redirect to Django's built-in password reset
-            return redirect('password_reset')
+            # Handle email reset (existing allauth functionality)
+            # Redirect to allauth's password reset
+            return redirect('account_reset_password')
 
     return render(request, 'accounts/password_reset_request.html')
 
