@@ -49,7 +49,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'import_export',
-    'geocoder', 
+    'geocoder',
+    'django_initials_avatar', 
 
     # local apps
     'core',
