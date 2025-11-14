@@ -15,6 +15,7 @@ from client import models as business_models
 from core import models as core_models
 from orders import models as orders_models
 from delivery import models as delivery_models
+from fleet import models as fleet_models
 
 from client import forms as business_forms
 
@@ -1023,7 +1024,7 @@ def fleet_cod_in_hand(request):
     """View for COD in hand with drivers"""
     drivers = fleet_models.Driver.objects.filter(
         driver_status='Approved'
-    ).order_by('driver_name')
+    ).select_related('user').order_by('user__first_name')
 
     drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=20)
 
@@ -1039,7 +1040,7 @@ def fleet_drivers_earnings(request):
     """View for drivers earnings"""
     drivers = fleet_models.Driver.objects.filter(
         driver_status='Approved'
-    ).order_by('driver_name')
+    ).select_related('user').order_by('user__first_name')
 
     drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=20)
 

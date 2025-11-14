@@ -294,10 +294,25 @@
 
 <!-- Search Filter Section -->
 <div class="filter-section">
-    <label for="contactFilter" class="filter-label">
-        <i class="fa-solid fa-search me-2"></i>Search Contacts
-    </label>
-    <input type="text" id="contactFilter" class="filter-input" placeholder="Search by name, phone, or company...">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 250px;">
+            <label for="contactFilter" class="filter-label">
+                <i class="fa-solid fa-search me-2"></i>Search Contacts
+            </label>
+            <input type="text" id="contactFilter" class="filter-input" placeholder="Search by name, phone, or company...">
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+            <button onclick="window.print()" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-print"></i>
+                Print
+            </button>
+            <button onclick="exportToCSV()" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-file-export"></i>
+                Export
+            </button>
+        </div>
+    </div>
+    <div id="resultsCounter" style="margin-top: 1rem; font-size: 0.875rem; color: var(--brand-grey-600); font-weight: 600;"></div>
 </div>
 
 <!-- Filter Tabs -->
@@ -432,6 +447,19 @@
 
 {% block extra_js %}
 <script>
+    let currentFilter = 'all';
+
+    // Update results counter
+    function updateResultsCounter() {
+        const cards = document.querySelectorAll('.contact-card');
+        const visibleCards = Array.from(cards).filter(card => card.style.display !== 'none');
+        const counter = document.getElementById('resultsCounter');
+
+        if (counter) {
+            counter.innerHTML = '<i class="fa-solid fa-address-book me-2"></i>Showing ' + visibleCards.length + ' of ' + cards.length + ' contacts';
+        }
+    }
+
     // Filter tabs functionality
     document.querySelectorAll('.filter-tab').forEach(tab => {
         tab.addEventListener('click', function() {
@@ -440,36 +468,130 @@
             // Add active class to clicked tab
             this.classList.add('active');
 
-            const filter = this.getAttribute('data-filter');
-            const cards = document.querySelectorAll('.contact-card');
-
-            cards.forEach(card => {
-                if (filter === 'all') {
-                    card.style.display = 'block';
-                } else {
-                    if (card.getAttribute('data-type') === filter) {
-                        card.style.display = 'block';
-                    } else {
-                        card.style.display = 'none';
-                    }
-                }
-            });
+            currentFilter = this.getAttribute('data-filter');
+            applyFilters();
         });
     });
 
-    // Search functionality
+    // Search functionality with debounce
+    let searchTimeout;
     document.getElementById('contactFilter').addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(applyFilters, 300);
+    });
+
+    // Combined filter function
+    function applyFilters() {
+        const searchTerm = document.getElementById('contactFilter').value.toLowerCase();
         const cards = document.querySelectorAll('.contact-card');
 
         cards.forEach(card => {
+            const cardType = card.getAttribute('data-type');
             const searchData = card.getAttribute('data-search');
-            if (searchData.includes(searchTerm)) {
-                card.style.display = 'block';
+
+            let showCard = true;
+
+            // Apply type filter
+            if (currentFilter !== 'all' && cardType !== currentFilter) {
+                showCard = false;
+            }
+
+            // Apply search filter
+            if (searchTerm && !searchData.includes(searchTerm)) {
+                showCard = false;
+            }
+
+            card.style.display = showCard ? 'block' : 'none';
+        });
+
+        updateResultsCounter();
+    }
+
+    // Export to CSV functionality
+    function exportToCSV() {
+        const csvData = [];
+        csvData.push(['Name', 'Type', 'Company', 'Phone', 'Email', 'Location']);
+
+        const cards = document.querySelectorAll('.contact-card:not([style*="display: none"])');
+        cards.forEach(card => {
+            const name = card.querySelector('.contact-info h3').textContent.trim();
+            const type = card.querySelector('.contact-type').textContent.trim();
+            const company = card.querySelector('.fa-building')?.parentElement.querySelector('span')?.textContent.trim() || '';
+            const phone = card.querySelector('.fa-phone')?.parentElement.querySelector('a')?.textContent.trim() || '';
+            const email = card.querySelector('.fa-envelope')?.parentElement.querySelector('a')?.textContent.trim() || '';
+            const location = card.querySelector('.fa-location-dot')?.parentElement.querySelector('span')?.textContent.trim() || '';
+
+            csvData.push([name, type, company, phone, email, location]);
+        });
+
+        const csvContent = csvData.map(row => row.map(cell => '"' + (cell || '').replace(/"/g, '""') + '"').join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const filterSuffix = currentFilter !== 'all' ? '_' + currentFilter : '';
+        a.download = 'staff_contacts' + filterSuffix + '_' + new Date().toISOString().split('T')[0] + '.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    // Alphabetical sorting
+    function sortContacts(order = 'asc') {
+        const grid = document.querySelector('.contacts-grid');
+        const cards = Array.from(document.querySelectorAll('.contact-card'));
+
+        cards.sort((a, b) => {
+            const nameA = a.querySelector('.contact-info h3').textContent.trim().toLowerCase();
+            const nameB = b.querySelector('.contact-info h3').textContent.trim().toLowerCase();
+
+            if (order === 'asc') {
+                return nameA.localeCompare(nameB);
             } else {
-                card.style.display = 'none';
+                return nameB.localeCompare(nameA);
             }
         });
+
+        cards.forEach(card => grid.appendChild(card));
+    }
+
+    // Add sort button
+    window.addEventListener('DOMContentLoaded', function() {
+        const filterTabs = document.querySelector('.filter-tabs');
+        if (filterTabs) {
+            const sortBtn = document.createElement('button');
+            sortBtn.innerHTML = '<i class="fa-solid fa-arrow-down-a-z me-2"></i>Sort A-Z';
+            sortBtn.className = 'filter-tab';
+            sortBtn.style.marginLeft = 'auto';
+            sortBtn.addEventListener('click', function() {
+                const icon = this.querySelector('i');
+                if (icon.classList.contains('fa-arrow-down-a-z')) {
+                    icon.classList.remove('fa-arrow-down-a-z');
+                    icon.classList.add('fa-arrow-up-z-a');
+                    this.innerHTML = '<i class="fa-solid fa-arrow-up-z-a me-2"></i>Sort Z-A';
+                    sortContacts('desc');
+                } else {
+                    icon.classList.remove('fa-arrow-up-z-a');
+                    icon.classList.add('fa-arrow-down-a-z');
+                    this.innerHTML = '<i class="fa-solid fa-arrow-down-a-z me-2"></i>Sort A-Z';
+                    sortContacts('asc');
+                }
+            });
+            filterTabs.appendChild(sortBtn);
+        }
+
+        updateResultsCounter();
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            document.getElementById('contactFilter').focus();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+            e.preventDefault();
+            exportToCSV();
+        }
     });
 </script>
 {% endblock extra_js %}

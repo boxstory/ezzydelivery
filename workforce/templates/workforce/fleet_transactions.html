@@ -222,6 +222,57 @@
             min-width: 900px;
         }
     }
+
+    @media print {
+        /* Hide interactive elements */
+        button, .filter-section, .pagination, form, select {
+            display: none !important;
+        }
+
+        /* Optimize table for print */
+        .transactions-table {
+            font-size: 0.75rem !important;
+        }
+
+        .transactions-table th,
+        .transactions-table td {
+            padding: 0.5rem !important;
+        }
+
+        .transactions-table-container {
+            box-shadow: none !important;
+            overflow: visible !important;
+        }
+
+        /* Simplify header */
+        .transactions-header {
+            padding: 1rem !important;
+            margin-bottom: 1rem !important;
+        }
+
+        .info-banner,
+        .stats-container {
+            page-break-inside: avoid;
+            margin-bottom: 0.75rem !important;
+        }
+
+        /* Print-friendly colors */
+        .status-badge,
+        .transaction-type {
+            border: 1px solid #000 !important;
+            background: white !important;
+            color: black !important;
+        }
+
+        /* Avoid page breaks in table rows */
+        tr {
+            page-break-inside: avoid;
+        }
+
+        body {
+            background: white !important;
+        }
+    }
 </style>
 {% endblock extra_css %}
 
@@ -259,6 +310,51 @@
         <h4>Viewing transactions since last settlement</h4>
         <p>Last Settlement Date: <strong>{{ selected_driver.last_settled_date|date:"d M Y, h:i A" }}</strong></p>
     </div>
+</div>
+{% endif %}
+
+<!-- Transaction Summary -->
+{% if transactions %}
+<div class="stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+    <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #28a745;">
+        <div style="font-size: 0.813rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Total COD</div>
+        <div style="font-size: 1.75rem; font-weight: 800; color: #28a745;">₹{{ total_cod|default:"0.00" }}</div>
+    </div>
+
+    <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #2196f3;">
+        <div style="font-size: 0.813rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Total Earnings</div>
+        <div style="font-size: 1.75rem; font-weight: 800; color: #2196f3;">₹{{ total_earnings|default:"0.00" }}</div>
+    </div>
+
+    <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #dc3545;">
+        <div style="font-size: 0.813rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">COD Unsettled</div>
+        <div style="font-size: 1.75rem; font-weight: 800; color: #dc3545;">₹{{ cod_unsettled|default:"0.00" }}</div>
+    </div>
+
+    <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #ffc107;">
+        <div style="font-size: 0.813rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Earnings Unsettled</div>
+        <div style="font-size: 1.75rem; font-weight: 800; color: #f57c00;">₹{{ earnings_unsettled|default:"0.00" }}</div>
+    </div>
+</div>
+
+<!-- Action Buttons -->
+<div style="display: flex; gap: 0.75rem; margin-bottom: 2rem; flex-wrap: wrap;">
+    <button onclick="window.print()" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+        <i class="fa-solid fa-print"></i>
+        Print Report
+    </button>
+    <button onclick="exportToCSV()" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+        <i class="fa-solid fa-file-export"></i>
+        Export CSV
+    </button>
+    <button onclick="filterSettled('unsettled')" style="background: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+        <i class="fa-solid fa-filter"></i>
+        Show Unsettled Only
+    </button>
+    <button onclick="filterSettled('all')" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+        <i class="fa-solid fa-list"></i>
+        Show All
+    </button>
 </div>
 {% endif %}
 
@@ -372,3 +468,98 @@
 {% endif %}
 
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Filter transactions by settlement status
+    function filterSettled(type) {
+        const rows = document.querySelectorAll('.transactions-table tbody tr');
+
+        rows.forEach(row => {
+            if (type === 'all') {
+                row.style.display = '';
+            } else if (type === 'unsettled') {
+                const codSettled = row.cells[6].querySelector('.status-badge').textContent.trim() === 'Settled';
+                const earningsSettled = row.cells[7].querySelector('.status-badge').textContent.trim() === 'Settled';
+
+                if (!codSettled || !earningsSettled) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+    }
+
+    // Export to CSV functionality
+    function exportToCSV() {
+        const csvData = [];
+        csvData.push(['Date & Time', 'Task ID', 'Type', 'COD Amount', 'Earning Amount', 'Delivery Status', 'COD Settled', 'Earning Settled']);
+
+        const rows = document.querySelectorAll('.transactions-table tbody tr:not([style*="display: none"])');
+        rows.forEach(row => {
+            const cells = row.cells;
+            const rowData = [
+                cells[0].textContent.trim(),
+                cells[1].textContent.trim(),
+                cells[2].textContent.trim(),
+                cells[3].textContent.replace('₹', '').trim(),
+                cells[4].textContent.replace('₹', '').trim(),
+                cells[5].textContent.trim(),
+                cells[6].textContent.trim(),
+                cells[7].textContent.trim()
+            ];
+            csvData.push(rowData);
+        });
+
+        const csvContent = csvData.map(row => row.map(cell => '"' + cell + '"').join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const driverId = new URLSearchParams(window.location.search).get('driver_id') || 'all';
+        a.download = 'fleet_transactions_' + driverId + '_' + new Date().toISOString().split('T')[0] + '.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+            e.preventDefault();
+            exportToCSV();
+        }
+    });
+
+    // Auto-calculate totals on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        const rows = document.querySelectorAll('.transactions-table tbody tr');
+        let totalCOD = 0;
+        let totalEarnings = 0;
+        let codUnsettled = 0;
+        let earningsUnsettled = 0;
+
+        rows.forEach(row => {
+            const codAmount = parseFloat(row.cells[3].textContent.replace('₹', '').trim()) || 0;
+            const earningAmount = parseFloat(row.cells[4].textContent.replace('₹', '').trim()) || 0;
+            const isCODSettled = row.cells[6].querySelector('.status-badge').classList.contains('status-settled');
+            const isEarningsSettled = row.cells[7].querySelector('.status-badge').classList.contains('status-settled');
+
+            totalCOD += codAmount;
+            totalEarnings += earningAmount;
+
+            if (!isCODSettled) codUnsettled += codAmount;
+            if (!isEarningsSettled) earningsUnsettled += earningAmount;
+        });
+
+        // Update stat boxes if they exist
+        const statBoxes = document.querySelectorAll('.stats-container > div');
+        if (statBoxes.length >= 4) {
+            statBoxes[0].querySelector('div:nth-child(2)').textContent = '₹' + totalCOD.toFixed(2);
+            statBoxes[1].querySelector('div:nth-child(2)').textContent = '₹' + totalEarnings.toFixed(2);
+            statBoxes[2].querySelector('div:nth-child(2)').textContent = '₹' + codUnsettled.toFixed(2);
+            statBoxes[3].querySelector('div:nth-child(2)').textContent = '₹' + earningsUnsettled.toFixed(2);
+        }
+    });
+</script>
+{% endblock extra_js %}

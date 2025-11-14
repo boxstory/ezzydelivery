@@ -194,12 +194,56 @@
     <p>Track driver earnings and completed deliveries after settlement</p>
 </div>
 
+<!-- Summary Statistics -->
+<div class="stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <div style="background: var(--brand-white); padding: 1.5rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #28a745;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase;">Total Earnings</span>
+            <i class="fa-solid fa-coins" style="font-size: 1.5rem; color: #28a745; opacity: 0.3;"></i>
+        </div>
+        <div style="font-size: 2rem; font-weight: 800; color: #28a745;">₹{{ total_earnings|default:"0.00" }}</div>
+        <div style="font-size: 0.813rem; color: var(--brand-grey-500); margin-top: 0.5rem;">Pending driver earnings</div>
+    </div>
+
+    <div style="background: var(--brand-white); padding: 1.5rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #2196f3;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase;">Total Deliveries</span>
+            <i class="fa-solid fa-truck-fast" style="font-size: 1.5rem; color: #2196f3; opacity: 0.3;"></i>
+        </div>
+        <div style="font-size: 2rem; font-weight: 800; color: #2196f3;">{{ total_deliveries|default:"0" }}</div>
+        <div style="font-size: 0.813rem; color: var(--brand-grey-500); margin-top: 0.5rem;">After last settlement</div>
+    </div>
+
+    <div style="background: var(--brand-white); padding: 1.5rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid var(--brand-primary);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase;">Active Drivers</span>
+            <i class="fa-solid fa-users" style="font-size: 1.5rem; color: var(--brand-primary); opacity: 0.3;"></i>
+        </div>
+        <div style="font-size: 2rem; font-weight: 800; color: var(--brand-grey-800);">{{ drivers.paginator.count|default:"0" }}</div>
+        <div style="font-size: 0.813rem; color: var(--brand-grey-500); margin-top: 0.5rem;">With pending earnings</div>
+    </div>
+</div>
+
 <!-- Fleet Filter Section -->
 <div class="filter-section">
-    <label for="fleetFilter" class="filter-label">
-        <i class="fa-solid fa-filter me-2"></i>Filter by Fleet Driver
-    </label>
-    <input type="text" id="fleetFilter" class="filter-input" placeholder="Search by driver name or ID...">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div style="flex: 1; min-width: 250px;">
+            <label for="fleetFilter" class="filter-label">
+                <i class="fa-solid fa-filter me-2"></i>Filter by Fleet Driver
+            </label>
+            <input type="text" id="fleetFilter" class="filter-input" placeholder="Search by driver name or ID...">
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
+            <button onclick="window.print()" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-print"></i>
+                Print
+            </button>
+            <button onclick="exportToCSV()" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-file-export"></i>
+                Export CSV
+            </button>
+        </div>
+    </div>
 </div>
 
 <!-- Fleet Cards Grid -->
@@ -286,19 +330,76 @@
 
 {% block extra_js %}
 <script>
-    // Filter fleet cards
+    // Debounced search functionality
+    let searchTimeout;
     document.getElementById('fleetFilter').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
         const searchTerm = this.value.toLowerCase();
-        const cards = document.querySelectorAll('.fleet-card');
 
-        cards.forEach(card => {
-            const driverName = card.getAttribute('data-driver-name').toLowerCase();
-            if (driverName.includes(searchTerm)) {
-                card.style.display = 'block';
-            } else {
-                card.style.display = 'none';
+        searchTimeout = setTimeout(() => {
+            const cards = document.querySelectorAll('.fleet-card');
+            let visibleCount = 0;
+
+            cards.forEach(card => {
+                const driverName = card.getAttribute('data-driver-name').toLowerCase();
+                if (driverName.includes(searchTerm)) {
+                    card.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+
+            // Show message if no results
+            const existingMessage = document.querySelector('.no-results-message');
+            if (existingMessage) existingMessage.remove();
+
+            if (visibleCount === 0 && searchTerm !== '') {
+                const grid = document.querySelector('.fleet-grid');
+                const message = document.createElement('div');
+                message.className = 'no-results-message';
+                message.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--brand-grey-500);';
+                message.innerHTML = '<i class="fa-solid fa-search" style="font-size: 3rem; margin-bottom: 1rem; display: block;"></i><p>No drivers found matching "' + searchTerm + '"</p>';
+                grid.appendChild(message);
             }
+        }, 300);
+    });
+
+    // Export to CSV functionality
+    function exportToCSV() {
+        const csvData = [];
+        csvData.push(['Driver Name', 'Driver ID', 'Deliveries After Settlement', 'Last Settled Date']);
+
+        const cards = document.querySelectorAll('.fleet-card:not([style*="display: none"])');
+        cards.forEach(card => {
+            const name = card.getAttribute('data-driver-name');
+            const idText = card.querySelector('.fleet-info p').textContent.replace('ID: ', '');
+            const deliveries = card.querySelector('.detail-value.deliveries').textContent.trim();
+            const lastSettled = card.querySelector('.detail-value.date').textContent.trim();
+
+            csvData.push([name, idText, deliveries, lastSettled]);
         });
+
+        const csvContent = csvData.map(row => row.join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'fleet_driver_earnings_' + new Date().toISOString().split('T')[0] + '.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            document.getElementById('fleetFilter').focus();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+            e.preventDefault();
+            exportToCSV();
+        }
     });
 </script>
 {% endblock extra_js %}
