@@ -1,146 +1,5 @@
 {% load static %}
-{% block extra_css %}
-<style>
-  .dashboard-sidebar {
-    background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
-    border-right: 1px solid #dee2e6;
-  }
-
-  .dashboard-sidebar .sidebar-header {
-    padding: 1.5rem 1rem;
-    margin-bottom: 1rem;
-  }
-
-  .dashboard-sidebar .sidebar-header .btn {
-    background: var(--brand-primary, #ffd33b);
-    border: 2px solid var(--brand-primary-dark, #f4c20d);
-    color: #212529;
-    font-weight: 700;
-    padding: 0.875rem 1.5rem;
-    border-radius: 12px;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(255, 211, 59, 0.3);
-  }
-
-  .dashboard-sidebar .sidebar-header .btn:hover {
-    background: var(--brand-primary-dark, #f4c20d);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(255, 211, 59, 0.4);
-  }
-
-  .dashboard-sidebar .nav-item {
-    margin-bottom: 0.5rem;
-  }
-
-  .dashboard-sidebar .nav-link.btn {
-    background: white;
-    border: 1px solid #e0e0e0;
-    color: #495057;
-    font-weight: 600;
-    padding: 0.75rem 1rem;
-    border-radius: 10px;
-    transition: all 0.3s ease;
-    text-align: left;
-  }
-
-  .dashboard-sidebar .nav-link.btn:hover {
-    background: #fff;
-    border-color: var(--brand-primary-dark, #f4c20d);
-    color: #212529;
-    transform: translateX(5px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  }
-
-  .dashboard-sidebar .nav-link.btn.active,
-  .dashboard-sidebar .nav-item.active .nav-link.btn {
-    background: var(--brand-primary, #ffd33b);
-    border-color: var(--brand-primary-dark, #f4c20d);
-    color: #212529;
-    font-weight: 700;
-  }
-
-  .dashboard-sidebar .multi-level {
-    background: #f8f9fa !important;
-    border: 1px solid #e9ecef;
-    padding: 0.5rem;
-    margin-top: 0.5rem;
-    border-radius: 10px;
-  }
-
-  .dashboard-sidebar .multi-level .nav-link.btn {
-    background: white;
-    margin-bottom: 0.25rem;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.9rem;
-  }
-
-  .dashboard-sidebar .multi-level .nav-link.btn:hover {
-    background: var(--brand-accent, #fef9e6);
-    transform: translateX(3px);
-  }
-
-  .dashboard-sidebar hr {
-    border-color: #dee2e6;
-    opacity: 0.5;
-    margin: 1rem 0;
-  }
-
-  .dashboard-sidebar .nav-link i {
-    color: #6c757d;
-    transition: color 0.3s ease;
-  }
-
-  .dashboard-sidebar .nav-link:hover i,
-  .dashboard-sidebar .nav-link.active i,
-  .dashboard-sidebar .nav-item.active .nav-link i {
-    color: #212529;
-  }
-
-  .dashboard-sidebar .fa-caret-down {
-    transition: transform 0.3s ease;
-  }
-
-  .dashboard-sidebar .nav-link[aria-expanded="true"] .fa-caret-down {
-    transform: rotate(180deg);
-  }
-
-  @media (min-width: 768px) and (max-width: 991px) {
-    .dashboard-sidebar {
-      padding: 0.75rem !important;
-    }
-
-    .dashboard-sidebar .sidebar-header {
-      padding: 1rem 0.5rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .dashboard-sidebar .sidebar-header .btn {
-      font-size: 0.8125rem;
-      padding: 0.625rem 0.75rem;
-    }
-
-    .dashboard-sidebar .nav-link.btn {
-      font-size: 0.8125rem;
-      padding: 0.5rem 0.625rem;
-    }
-
-    .dashboard-sidebar .nav-link i {
-      font-size: 0.875rem;
-      margin-right: 0.375rem !important;
-    }
-
-    .dashboard-sidebar .multi-level .nav-link.btn {
-      font-size: 0.75rem;
-      padding: 0.375rem 0.5rem;
-    }
-
-    .dashboard-sidebar hr {
-      margin: 0.75rem 0;
-    }
-  }
-</style>
-{% endblock extra_css %}
+<link href="{% static 'css/sidebar-common.css' %}" rel="stylesheet" type="text/css" />
 <div class="min-vh-100 d-none d-md-flex flex-column flex-shrink-0 p-3 col-md-3 col-lg-2 the-sidebar dashboard-sidebar">
   <div class="text-center fw-bold sidebar-header">
     <a class="nav-link p-3 my-0 btn w-100"
@@ -154,7 +13,7 @@
     <ul class="navbar-nav ms-auto text-center">
       <li class="nav-item"></li>
       <li class="nav-item {% if request.resolver_match.url_name == 'orders_all_list' or request.resolver_match.url_name == 'orders_list' or request.resolver_match.url_name == 'orders_pending_list' or request.resolver_match.url_name == 'orders_successfull_list' or request.resolver_match.url_name == 'get_orders_by_base_api' or request.resolver_match.url_name == 'add_order' %}active{% endif %}">
-        <div class="nav-link btn collapsed d-flex justify-content-start align-items-center"
+        <div class="nav-link btn collapsed d-flex justify-content-start align-items-center {% if request.resolver_match.url_name == 'orders_all_list' or request.resolver_match.url_name == 'orders_list' or request.resolver_match.url_name == 'orders_pending_list' or request.resolver_match.url_name == 'orders_successfull_list' or request.resolver_match.url_name == 'get_orders_by_base_api' or request.resolver_match.url_name == 'add_order' %}active{% endif %}"
              data-bs-toggle="collapse"
              data-bs-target="#submenu-orders"
              aria-expanded="false">
@@ -167,32 +26,32 @@
              id="submenu-orders"
              aria-expanded="false">
           <ul class="flex-column nav text-black">
-            <li class="nav-item">
-              <a class="nav-link btn d-flex align-items-center" href="{% url 'orders:orders_all_list' %}">
+            <li class="nav-item {% if request.resolver_match.url_name == 'orders_all_list' or request.resolver_match.url_name == 'orders_list' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'orders_all_list' or request.resolver_match.url_name == 'orders_list' %}active{% endif %}" href="{% url 'orders:orders_all_list' %}">
                 <i class="fa-solid fa-bars me-2"></i>
                 <span>All Orders</span>
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link btn d-flex align-items-center" href="{% url 'orders:add_order' %}">
+            <li class="nav-item {% if request.resolver_match.url_name == 'add_order' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'add_order' %}active{% endif %}" href="{% url 'orders:add_order' %}">
                 <i class="fa-solid fa-add me-2"></i>
                 <span>Add Orders</span>
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link btn d-flex align-items-center" href="{% url 'orders:orders_successfull_list' %}">
+            <li class="nav-item {% if request.resolver_match.url_name == 'orders_successfull_list' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'orders_successfull_list' %}active{% endif %}" href="{% url 'orders:orders_successfull_list' %}">
                 <i class="fa-solid fa-check me-2"></i>
                 <span>Successful</span>
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link btn d-flex align-items-center" href="{% url 'orders:orders_pending_list' %}">
+            <li class="nav-item {% if request.resolver_match.url_name == 'orders_pending_list' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'orders_pending_list' %}active{% endif %}" href="{% url 'orders:orders_pending_list' %}">
                 <i class="fa-solid fa-spinner me-2"></i>
                 <span>Pending</span>
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link btn d-flex align-items-center" href="{% url 'orders:get_orders_by_base_api' %}">
+            <li class="nav-item {% if request.resolver_match.url_name == 'get_orders_by_base_api' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'get_orders_by_base_api' %}active{% endif %}" href="{% url 'orders:get_orders_by_base_api' %}">
                 <i class="fa-solid fa-code me-2"></i>
                 <span>API Orders</span>
               </a>
@@ -202,7 +61,7 @@
       </li>
       <hr />
       <li class="nav-item {% if request.resolver_match.url_name == 'product_all_list' or request.resolver_match.url_name == 'product_single_add' or request.resolver_match.url_name == 'product_categories' or request.resolver_match.url_name == 'product_all_list_card' %}active{% endif %}">
-        <div class="nav-link btn collapsed d-flex justify-content-start align-items-center"
+        <div class="nav-link btn collapsed d-flex justify-content-start align-items-center {% if request.resolver_match.url_name == 'product_all_list' or request.resolver_match.url_name == 'product_single_add' or request.resolver_match.url_name == 'product_categories' or request.resolver_match.url_name == 'product_all_list_card' %}active{% endif %}"
              data-bs-toggle="collapse"
              data-bs-target="#submenu-product"
              aria-expanded="false">
@@ -215,20 +74,20 @@
              id="submenu-product"
              aria-expanded="false">
           <ul class="flex-column nav text-black">
-            <li class="nav-item">
-              <a class="nav-link btn d-flex align-items-center" href="{% url 'product:product_all_list' %}">
+            <li class="nav-item {% if request.resolver_match.url_name == 'product_all_list' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'product_all_list' %}active{% endif %}" href="{% url 'product:product_all_list' %}">
                 <i class="fa-solid fa-bars me-2"></i>
                 <span>All Products</span>
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link btn d-flex align-items-center" href="{% url 'product:product_single_add' %}">
+            <li class="nav-item {% if request.resolver_match.url_name == 'product_single_add' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'product_single_add' %}active{% endif %}" href="{% url 'product:product_single_add' %}">
                 <i class="fa-solid fa-add me-2"></i>
                 <span>Add Product</span>
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link btn d-flex align-items-center" href="{% url 'product:product_all_list_card' %}">
+            <li class="nav-item {% if request.resolver_match.url_name == 'product_all_list_card' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'product_all_list_card' %}active{% endif %}" href="{% url 'product:product_all_list_card' %}">
                 <i class="fa-solid fa-barcode me-2"></i>
                 <span>Cards</span>
               </a>
@@ -237,27 +96,27 @@
         </div>
       </li>
       <hr />
-      <li class="nav-item">
-        <a class="nav-link btn d-flex align-items-center" href="{% url 'product:product_inventory' %}">
+      <li class="nav-item {% if request.resolver_match.url_name == 'product_inventory' %}active{% endif %}">
+        <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'product_inventory' %}active{% endif %}" href="{% url 'product:product_inventory' %}">
           <i class="fa-solid fa-chart-bar me-2"></i>
           <span>Inventory Report</span>
         </a>
       </li>
-      <li class="nav-item">
-        <a class="nav-link btn d-flex align-items-center" href="{% url 'business:driver_directory' %}">
+      <li class="nav-item {% if request.resolver_match.url_name == 'driver_directory' %}active{% endif %}">
+        <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'driver_directory' %}active{% endif %}" href="{% url 'business:driver_directory' %}">
           <i class="fa-solid fa-address-book me-2"></i>
           <span>Fleet List</span>
         </a>
       </li>
-      <li class="nav-item">
-        <a class="nav-link btn d-flex align-items-center" href="{% url 'business:business_profile' %}">
+      <li class="nav-item {% if request.resolver_match.url_name == 'business_profile' %}active{% endif %}">
+        <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'business_profile' %}active{% endif %}" href="{% url 'business:business_profile' %}">
           <i class="fa-solid fa-store me-2"></i>
           <span>Public View</span>
         </a>
       </li>
       <hr />
-      <li class="nav-item {% if request.resolver_match.url_name == 'business_settings' or request.resolver_match.url_name == 'business_settings' %}active{% endif %}">
-        <div class="nav-link btn collapsed d-flex justify-content-start align-items-center"
+      <li class="nav-item {% if request.resolver_match.url_name == 'business_settings' or request.resolver_match.url_name == 'business_teams' or request.resolver_match.url_name == 'pickup_location_list' or request.resolver_match.url_name == 'business_settings_api_list' %}active{% endif %}">
+        <div class="nav-link btn collapsed d-flex justify-content-start align-items-center {% if request.resolver_match.url_name == 'business_settings' or request.resolver_match.url_name == 'business_teams' or request.resolver_match.url_name == 'pickup_location_list' or request.resolver_match.url_name == 'business_settings_api_list' %}active{% endif %}"
              data-bs-toggle="collapse"
              data-bs-target="#submenu-settings"
              aria-expanded="false">
@@ -270,29 +129,29 @@
              id="submenu-settings"
              aria-expanded="false">
           <ul class="flex-column nav text-black">
-            <li class="nav-item">
-              <a class="nav-link btn d-flex align-items-center"
+            <li class="nav-item {% if request.resolver_match.url_name == 'business_settings' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'business_settings' %}active{% endif %}"
                  href="{% url 'business:business_settings' request.user.user_business.first.business_id %}">
                 <i class="fa-solid fa-sliders me-2"></i>
                 <span>Review</span>
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link btn d-flex align-items-center"
+            <li class="nav-item {% if request.resolver_match.url_name == 'business_teams' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'business_teams' %}active{% endif %}"
                  href="{% url 'business:business_teams' request.user.user_business.first.business_id %}">
                 <i class="fa-solid fa-users me-2"></i>
                 <span>Teams</span>
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link btn d-flex align-items-center"
+            <li class="nav-item {% if request.resolver_match.url_name == 'pickup_location_list' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'pickup_location_list' %}active{% endif %}"
                  href="{% url 'business:pickup_location_list' %}">
                 <i class="fa-solid fa-location-dot me-2"></i>
                 <span>Stores List</span>
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link btn d-flex align-items-center"
+            <li class="nav-item {% if request.resolver_match.url_name == 'business_settings_api_list' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'business_settings_api_list' %}active{% endif %}"
                  href="{% url 'business:business_settings_api_list' request.user.user_business.first.business_id %}">
                 <i class="fa-solid fa-code me-2"></i>
                 <span>API Settings</span>
@@ -302,8 +161,8 @@
         </div>
       </li>
       <hr />
-      <li class="nav-item">
-        <a class="nav-link btn d-flex align-items-center" href="{% url 'webpages:help_center' %}" target="_blank">
+      <li class="nav-item {% if request.resolver_match.url_name == 'help_center' %}active{% endif %}">
+        <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'help_center' %}active{% endif %}" href="{% url 'webpages:help_center' %}" target="_blank">
           <i class="fa-solid fa-circle-question me-2"></i>
           <span>Help Center</span>
         </a>
