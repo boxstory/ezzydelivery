@@ -1,0 +1,158 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}DMS Analytics - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/wf_pages.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Page Title -->
+<h1 class="page-title">
+    <i class="fa-solid fa-chart-line me-2"></i>DMS Analytics
+</h1>
+
+<!-- Error Message -->
+{% if error_message %}
+<div class="error-banner">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <p>{{ error_message }}</p>
+</div>
+{% endif %}
+
+<!-- Statistics Grid -->
+<div class="stats-grid">
+    <!-- Total Tasks -->
+    <div class="stat-card stat-primary">
+        <div class="stat-header">
+            <span class="stat-title">Total Tasks</span>
+            <i class="fa-solid fa-tasks stat-icon"></i>
+        </div>
+        <div class="stat-value">{{ total_tasks|default:"0" }}</div>
+        <div class="stat-label">All delivery tasks</div>
+    </div>
+
+    <!-- Synced Tasks -->
+    <div class="stat-card stat-success">
+        <div class="stat-header">
+            <span class="stat-title">Synced to DMS</span>
+            <i class="fa-solid fa-check-circle stat-icon"></i>
+        </div>
+        <div class="stat-value">{{ synced_tasks|default:"0" }}</div>
+        <div class="stat-label">Published to ShipDay</div>
+    </div>
+
+    <!-- Pending Tasks -->
+    <div class="stat-card stat-warning">
+        <div class="stat-header">
+            <span class="stat-title">Pending Sync</span>
+            <i class="fa-solid fa-hourglass-half stat-icon"></i>
+        </div>
+        <div class="stat-value">{{ pending_tasks|default:"0" }}</div>
+        <div class="stat-label">Not yet synced</div>
+    </div>
+
+    <!-- Total Drivers -->
+    <div class="stat-card stat-primary">
+        <div class="stat-header">
+            <span class="stat-title">Active Drivers</span>
+            <i class="fa-solid fa-users stat-icon"></i>
+        </div>
+        <div class="stat-value">{{ total_drivers|default:"0" }}</div>
+        <div class="stat-label">Available drivers</div>
+    </div>
+
+    <!-- Total Orders -->
+    <div class="stat-card">
+        <div class="stat-header">
+            <span class="stat-title">Total Orders</span>
+            <i class="fa-solid fa-boxes stat-icon"></i>
+        </div>
+        <div class="stat-value">{{ total_orders|default:"0" }}</div>
+        <div class="stat-label">All orders</div>
+    </div>
+
+    <!-- Published Orders -->
+    <div class="stat-card stat-success">
+        <div class="stat-header">
+            <span class="stat-title">Published Orders</span>
+            <i class="fa-solid fa-paper-plane stat-icon"></i>
+        </div>
+        <div class="stat-value">{{ published_orders|default:"0" }}</div>
+        <div class="stat-label">Orders sent to tasks</div>
+    </div>
+</div>
+
+<!-- Sync Performance -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-gauge-high"></i>
+        Sync Performance
+    </div>
+    <div class="info-grid">
+        <div class="info-row">
+            <span class="info-label">Sync Success Rate</span>
+            <span class="info-value">
+                {% if total_tasks > 0 %}
+                {{ synced_tasks|default:0|floatformat:0 }} / {{ total_tasks }} ({% widthratio synced_tasks total_tasks 100 %}%)
+                {% else %}
+                0%
+                {% endif %}
+            </span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Orders to Tasks Conversion</span>
+            <span class="info-value">
+                {% if total_orders > 0 %}
+                {{ published_orders|default:0 }} / {{ total_orders }} ({% widthratio published_orders total_orders 100 %}%)
+                {% else %}
+                0%
+                {% endif %}
+            </span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Average Tasks per Driver</span>
+            <span class="info-value">
+                {% if total_drivers > 0 %}
+                {% widthratio total_tasks total_drivers 1 %}
+                {% else %}
+                0
+                {% endif %}
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-bolt"></i>
+        Quick Actions
+    </div>
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <a href="{% url 'workforce:dms_publish_order' %}" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: var(--brand-transition);">
+            <i class="fa-solid fa-paper-plane"></i>
+            Publish to DMS
+        </a>
+        <a href="{% url 'workforce:dms_sync_monitor' %}" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: var(--brand-transition); color: var(--brand-grey-800);">
+            <i class="fa-solid fa-rotate"></i>
+            Sync Monitor
+        </a>
+        <a href="{% url 'workforce:dms_drivers_list' %}" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: var(--brand-transition); color: var(--brand-grey-800);">
+            <i class="fa-solid fa-users-gear"></i>
+            View Drivers
+        </a>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Auto-refresh every 60 seconds
+    setTimeout(function() {
+        window.location.reload();
+    }, 60000);
+</script>
+{% endblock extra_js %}

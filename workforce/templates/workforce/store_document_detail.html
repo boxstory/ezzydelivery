@@ -1,0 +1,199 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Store Document Detail - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/wf_pages.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Page Title -->
+<h1 class="page-title">
+    <i class="fa-solid fa-store me-2"></i>{{ business.business_name|default:"Store Document Detail" }}
+</h1>
+
+<!-- Back Button -->
+<div style="margin-bottom: 1.5rem;">
+    <a href="{% url 'workforce:store_documents_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--brand-grey-700); text-decoration: none; font-weight: 600;">
+        <i class="fa-solid fa-arrow-left"></i>
+        Back to Stores
+    </a>
+</div>
+
+<!-- Store Basic Info -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-circle-info"></i>
+        Business Information
+    </div>
+    <div class="info-grid">
+        <div class="info-row">
+            <span class="info-label">Business Name</span>
+            <span class="info-value">{{ business.business_name|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Business Code</span>
+            <span class="info-value">{{ business.business_code|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Phone</span>
+            <span class="info-value">{{ business.business_phone|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Email</span>
+            <span class="info-value">{{ business.business_email|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">WhatsApp</span>
+            <span class="info-value">{{ business.business_whatsapp|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">QID</span>
+            <span class="info-value">{{ business.business_qid|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Status</span>
+            <span class="info-value">
+                <span class="status-badge {% if business.business_status == 'active' %}status-active{% elif business.business_status == 'pending' %}status-pending{% elif business.business_status == 'suspended' %}status-failed{% else %}status-inactive{% endif %}">
+                    {{ business.business_status|title }}
+                </span>
+            </span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Created At</span>
+            <span class="info-value">{{ business.created_at|date:"d M Y, h:i A" }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- Store Profile Info -->
+{% if business_profile %}
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-location-dot"></i>
+        Address & Details
+    </div>
+    <div class="info-grid">
+        <div class="info-row">
+            <span class="info-label">Address</span>
+            <span class="info-value">{{ business_profile.business_address|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">City</span>
+            <span class="info-value">{{ business_profile.business_city|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">State</span>
+            <span class="info-value">{{ business_profile.business_state|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Zip Code</span>
+            <span class="info-value">{{ business_profile.business_zip_code|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Country</span>
+            <span class="info-value">{{ business_profile.business_country|default:"N/A" }}</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Edit Form -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-edit"></i>
+        Update Store Information
+    </div>
+
+    <form id="updateForm">
+        {% csrf_token %}
+        <div style="display: grid; gap: 1rem;">
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Business Name</label>
+                <input type="text" name="business_name" value="{{ business.business_name }}" class="filter-input" required>
+            </div>
+
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Phone</label>
+                <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="filter-input">
+            </div>
+
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Email</label>
+                <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="filter-input">
+            </div>
+
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">QID</label>
+                <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="filter-input">
+            </div>
+
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Status</label>
+                <select name="business_status" class="filter-input">
+                    <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <button type="submit" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+                    <i class="fa-solid fa-save"></i>
+                    Save Changes
+                </button>
+                <button type="button" onclick="window.location.href='{% url 'workforce:store_documents_list' %}'" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; color: var(--brand-grey-800);">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <div id="updateMessage" style="display: none; margin-top: 1rem; padding: 1rem; border-radius: var(--brand-radius-sm);"></div>
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('updateForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        const messageDiv = document.getElementById('updateMessage');
+
+        fetch('{% url 'workforce:store_document_detail' business.business_id %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                messageDiv.style.display = 'block';
+                messageDiv.style.background = '#d4edda';
+                messageDiv.style.color = '#155724';
+                messageDiv.innerHTML = '<i class="fa-solid fa-check-circle"></i> ' + data.message;
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                messageDiv.style.display = 'block';
+                messageDiv.style.background = '#f8d7da';
+                messageDiv.style.color = '#721c24';
+                messageDiv.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> ' + data.error;
+            }
+        })
+        .catch(error => {
+            messageDiv.style.display = 'block';
+            messageDiv.style.background = '#f8d7da';
+            messageDiv.style.color = '#721c24';
+            messageDiv.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Error updating store document';
+        });
+    });
+</script>
+{% endblock extra_js %}

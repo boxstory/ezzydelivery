@@ -52,6 +52,10 @@ urlpatterns = [
 
     #DMS sections urls -----------------------------------------------------------------------
     path('dms/publish-order/', workforce_views.dms_publish_order, name='dms_publish_order'),
+    path('dms/drivers/', workforce_views.dms_drivers_list, name='dms_drivers_list'),
+    path('dms/orders/', workforce_views.dms_orders_list, name='dms_orders_list'),
+    path('dms/analytics/', workforce_views.dms_analytics, name='dms_analytics'),
+    path('dms/sync-monitor/', workforce_views.dms_sync_monitor, name='dms_sync_monitor'),
 
     # Fleet Accounts URLs
     path('fleet/cod-in-hand/', workforce_views.fleet_cod_in_hand, name='fleet_cod_in_hand'),
@@ -59,7 +63,14 @@ urlpatterns = [
     path('fleet/transactions/', workforce_views.fleet_transactions, name='fleet_transactions'),
 
     #Documents sections urls -----------------------------------------------------------------
-    # (Documents URLs already exist in fleet app)
+    path('documents/driver-ids/', workforce_views.driver_documents_list, name='driver_documents_list'),
+    path('documents/driver-ids/<int:document_id>/', workforce_views.driver_document_detail, name='driver_document_detail'),
+    path('documents/vehicles/', workforce_views.vehicle_documents_list, name='vehicle_documents_list'),
+    path('documents/vehicles/<int:driver_id>/', workforce_views.vehicle_document_detail, name='vehicle_document_detail'),
+    path('documents/stores/', workforce_views.store_documents_list, name='store_documents_list'),
+    path('documents/stores/<int:business_id>/', workforce_views.store_document_detail, name='store_document_detail'),
+    path('documents/business-licenses/', workforce_views.business_licenses_list, name='business_licenses_list'),
+    path('documents/business-licenses/<int:business_id>/', workforce_views.business_license_detail, name='business_license_detail'),
 
     # Inventory URLs
     path('inventory/reports/', workforce_views.inventory_reports, name='inventory_reports'),

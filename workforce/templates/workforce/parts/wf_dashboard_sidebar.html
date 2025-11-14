@@ -110,31 +110,43 @@
         </div>
       </li>
 
-      <!-- DMS Links Section -->
-      <li class="nav-item {% if request.resolver_match.url_name == 'fleet_dashboard' or request.resolver_match.url_name == 'all_delivery_tasks' %}active{% endif %}">
+      <!-- DMS Management Section -->
+      <li class="nav-item {% if request.resolver_match.url_name == 'dms_drivers_list' or request.resolver_match.url_name == 'dms_orders_list' or request.resolver_match.url_name == 'dms_analytics' or request.resolver_match.url_name == 'dms_sync_monitor' or request.resolver_match.url_name == 'dms_publish_order' %}active{% endif %}">
         <a class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-dms" href="#">
-          <i class="fa-solid fa-link me-2"></i>
-          <span>DMS Links</span>
+          <i class="fa-solid fa-cloud me-2"></i>
+          <span>DMS (ShipDay)</span>
           <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
         </a>
         <div class="collapse submenu" id="submenu-dms">
           <ul class="nav flex-column">
             <li class="nav-item">
-              <a class="nav-link btn submenu-link" href="{% url 'ezzy_api:shipday_feet_list' %}">
-                <i class="fa-solid fa-user-tie me-2"></i>
-                Driver Listed
+              <a class="nav-link btn submenu-link" href="{% url 'workforce:dms_analytics' %}">
+                <i class="fa-solid fa-chart-line me-2"></i>
+                DMS Analytics
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link btn submenu-link" href="{% url 'ezzy_api:shipday_order_list' %}">
-                <i class="fa-solid fa-clipboard-list me-2"></i>
-                Order Listed
+              <a class="nav-link btn submenu-link" href="{% url 'workforce:dms_drivers_list' %}">
+                <i class="fa-solid fa-users-gear me-2"></i>
+                DMS Drivers
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link btn submenu-link" href="{% url 'workforce:dms_orders_list' %}">
+                <i class="fa-solid fa-boxes-packing me-2"></i>
+                DMS Orders
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link btn submenu-link" href="{% url 'workforce:dms_publish_order' %}">
                 <i class="fa-solid fa-paper-plane me-2"></i>
-                Publish Order
+                Publish to DMS
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link btn submenu-link" href="{% url 'workforce:dms_sync_monitor' %}">
+                <i class="fa-solid fa-rotate me-2"></i>
+                Sync Monitor
               </a>
             </li>
           </ul>
@@ -173,7 +185,7 @@
       </li>
 
       <!-- Documents Section -->
-      <li class="nav-item {% if request.resolver_match.url_name == 'driver_documents' or request.resolver_match.url_name == 'vehicle_own' %}active{% endif %}">
+      <li class="nav-item {% if request.resolver_match.url_name == 'driver_documents_list' or request.resolver_match.url_name == 'vehicle_documents_list' or request.resolver_match.url_name == 'store_documents_list' or request.resolver_match.url_name == 'business_licenses_list' %}active{% endif %}">
         <a class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-documents" href="#">
           <i class="fa-solid fa-id-card me-2"></i>
           <span>Documents</span>
@@ -182,15 +194,27 @@
         <div class="collapse submenu" id="submenu-documents">
           <ul class="nav flex-column">
             <li class="nav-item">
-              <a class="nav-link btn submenu-link" href="{% url 'fleet:driver_documents' %}">
-                <i class="fa-solid fa-address-card me-2"></i>
-                ID Cards
+              <a class="nav-link btn submenu-link" href="{% url 'workforce:driver_documents_list' %}">
+                <i class="fa-solid fa-id-card me-2"></i>
+                Driver IDs
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link btn submenu-link" href="{% url 'fleet:vehicle_own' %}">
+              <a class="nav-link btn submenu-link" href="{% url 'workforce:vehicle_documents_list' %}">
                 <i class="fa-solid fa-car me-2"></i>
                 Vehicles
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link btn submenu-link" href="{% url 'workforce:store_documents_list' %}">
+                <i class="fa-solid fa-store me-2"></i>
+                Store Documents
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link btn submenu-link" href="{% url 'workforce:business_licenses_list' %}">
+                <i class="fa-solid fa-certificate me-2"></i>
+                Business Licenses
               </a>
             </li>
           </ul>

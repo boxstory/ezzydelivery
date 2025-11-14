@@ -1,0 +1,116 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}DMS Orders List - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/wf_pages.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Page Title -->
+<h1 class="page-title">
+    <i class="fa-solid fa-boxes-packing me-2"></i>DMS Orders List
+</h1>
+
+<!-- Error Message -->
+{% if error_message %}
+<div class="error-banner">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <p>{{ error_message }}</p>
+</div>
+{% endif %}
+
+<!-- Order Filter Section -->
+<div class="filter-section">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div style="flex: 1; min-width: 250px;">
+            <label for="orderFilter" class="filter-label">
+                <i class="fa-solid fa-filter me-2"></i>Filter by Order
+            </label>
+            <input type="text" id="orderFilter" class="filter-input" placeholder="Search by order number...">
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
+            <button onclick="window.location.reload()" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-rotate"></i>
+                Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Orders Table -->
+{% if orders_in_shipday %}
+<div class="orders-table-container">
+    <table class="orders-table">
+        <thead>
+            <tr>
+                <th>Order Number</th>
+                <th>Order ID</th>
+                <th>Customer</th>
+                <th>Delivery Address</th>
+                <th>Status</th>
+                <th>Created Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders_in_shipday %}
+            <tr data-order-number="{{ order.orderNumber|default:'N/A' }}">
+                <td><strong>{{ order.orderNumber|default:"N/A" }}</strong></td>
+                <td>{{ order.id|default:"N/A" }}</td>
+                <td>{{ order.customerName|default:"Unknown" }}</td>
+                <td>{{ order.deliveryAddress|default:"N/A" }}</td>
+                <td>
+                    {% if order.status == 'delivered' %}
+                    <span class="status-badge status-delivered">Delivered</span>
+                    {% elif order.status == 'in_transit' %}
+                    <span class="status-badge status-in-transit">In Transit</span>
+                    {% elif order.status == 'assigned' %}
+                    <span class="status-badge status-assigned">Assigned</span>
+                    {% else %}
+                    <span class="status-badge status-failed">{{ order.status|default:"Unknown" }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ order.createdAt|default:"N/A" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <i class="fa-solid fa-boxes-packing"></i>
+    <h3>No Orders Found</h3>
+    <p>There are no orders in ShipDay DMS at the moment.</p>
+</div>
+{% endif %}
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Filter orders
+    let searchTimeout;
+    document.getElementById('orderFilter').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const searchTerm = this.value.toLowerCase();
+
+        searchTimeout = setTimeout(() => {
+            const rows = document.querySelectorAll('.orders-table tbody tr');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const orderNumber = row.getAttribute('data-order-number').toLowerCase();
+                const rowText = row.textContent.toLowerCase();
+
+                if (orderNumber.includes(searchTerm) || rowText.includes(searchTerm)) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }, 300);
+    });
+</script>
+{% endblock extra_js %}

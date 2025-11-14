@@ -3,6 +3,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 import json
+import logging
 # Add these imports at the top of your View file
 from django.core.paginator import (
     Paginator,
@@ -18,6 +19,18 @@ from delivery import models as delivery_models
 from fleet import models as fleet_models
 
 from client import forms as business_forms
+
+# ShipDay API integration
+from decouple import config
+try:
+    from shipday import Shipday
+    API_KEY = config("SHIPDAY_API_KEY", default="")
+    shipday_obj = Shipday(api_key=API_KEY) if API_KEY else None
+except ImportError:
+    shipday_obj = None
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 
 def paginate_queryset(request, queryset, items_per_page=10):
@@ -1151,5 +1164,444 @@ def staff_contacts(request):
     }
     return render(request, 'workforce/staff_contacts.html', context)
 
+
+# ==================== DMS (ShipDay) VIEWS ====================
+
+@login_required(login_url='/accounts/login/')
+def dms_drivers_list(request):
+    """View for listing all drivers from ShipDay DMS"""
+    logger.info(f"Fetching Shipday carriers for user: {request.user.id if request.user.is_authenticated else 'anonymous'}")
+
+    carriers = []
+    error_message = None
+
+    try:
+        if shipday_obj:
+            carriers = shipday_obj.CarrierService.get_carriers()
+            logger.info(f"Successfully fetched {len(carriers) if carriers else 0} carriers from Shipday")
+        else:
+            error_message = "ShipDay API is not configured. Please check SHIPDAY_API_KEY in settings."
+            logger.warning(error_message)
+    except Exception as e:
+        error_message = f"Error fetching Shipday carriers: {str(e)}"
+        logger.error(error_message)
+
+    context = {
+        'page_title': 'DMS Drivers List',
+        'carriers': carriers or [],
+        'error_message': error_message,
+    }
+    return render(request, 'workforce/dms_drivers_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def dms_orders_list(request):
+    """View for listing all orders from ShipDay DMS"""
+    logger.info(f"Fetching Shipday orders for user: {request.user.id if request.user.is_authenticated else 'anonymous'}")
+
+    orders = []
+    error_message = None
+
+    try:
+        if shipday_obj:
+            orders = shipday_obj.OrderService.get_orders()
+            logger.info(f"Successfully fetched {len(orders) if orders else 0} orders from Shipday")
+        else:
+            error_message = "ShipDay API is not configured. Please check SHIPDAY_API_KEY in settings."
+            logger.warning(error_message)
+    except Exception as e:
+        error_message = f"Error fetching Shipday orders: {str(e)}"
+        logger.error(error_message)
+
+    context = {
+        'page_title': 'DMS Orders List',
+        'orders_in_shipday': orders or [],
+        'error_message': error_message,
+    }
+    return render(request, 'workforce/dms_orders_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def dms_analytics(request):
+    """View for DMS analytics and statistics"""
+    try:
+        # Get statistics from local database
+        total_tasks = delivery_models.DeliveryTask.objects.count()
+        synced_tasks = delivery_models.DeliveryTask.objects.filter(is_published_to_dms=True).count()
+        pending_tasks = delivery_models.DeliveryTask.objects.filter(is_published_to_dms=False).count()
+
+        # Get driver statistics
+        total_drivers = fleet_models.Driver.objects.filter(is_active=True).count()
+
+        # Get order statistics
+        total_orders = orders_models.Order.objects.count()
+        published_orders = orders_models.Order.objects.filter(is_published=True).count()
+
+        context = {
+            'page_title': 'DMS Analytics',
+            'total_tasks': total_tasks,
+            'synced_tasks': synced_tasks,
+            'pending_tasks': pending_tasks,
+            'total_drivers': total_drivers,
+            'total_orders': total_orders,
+            'published_orders': published_orders,
+        }
+    except Exception as e:
+        logger.error(f"Error fetching DMS analytics: {e}")
+        context = {
+            'page_title': 'DMS Analytics',
+            'error_message': str(e),
+        }
+
+    return render(request, 'workforce/dms_analytics.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def dms_sync_monitor(request):
+    """View for monitoring DMS sync status"""
+    try:
+        # Get recently synced tasks
+        recently_synced = delivery_models.DeliveryTask.objects.filter(
+            is_published_to_dms=True
+        ).order_by('-updated_at')[:50]
+
+        # Get failed sync attempts
+        failed_sync = delivery_models.DeliveryTask.objects.filter(
+            is_published_to_dms=False,
+            status__in=['assigned', 'in_transit']
+        ).order_by('-created_at')[:50]
+
+        context = {
+            'page_title': 'DMS Sync Monitor',
+            'recently_synced': recently_synced,
+            'failed_sync': failed_sync,
+        }
+    except Exception as e:
+        logger.error(f"Error fetching DMS sync monitor data: {e}")
+        context = {
+            'page_title': 'DMS Sync Monitor',
+            'error_message': str(e),
+        }
+
+    return render(request, 'workforce/dms_sync_monitor.html', context)
+
+
+# Documents section  ------------------------------------------------------------------------------------------------------
+
+
+@login_required(login_url='/accounts/login/')
+def driver_documents_list(request):
+    """View for listing all driver documents with search and card/table toggle"""
+    from django.db.models import Q
+
+    # Get search query and view type
+    search_query = request.GET.get('search', '').strip()
+    view_type = request.GET.get('view', 'card')  # 'card' or 'table'
+
+    # Start with all driver documents
+    documents = fleet_models.DriverDocument.objects.select_related('driver', 'driver__user', 'driver__profile').all()
+
+    # Apply search filter
+    if search_query:
+        documents = documents.filter(
+            Q(document_no__icontains=search_query) |
+            Q(document_type__icontains=search_query) |
+            Q(driver__user__first_name__icontains=search_query) |
+            Q(driver__user__last_name__icontains=search_query) |
+            Q(driver__driver_code__icontains=search_query)
+        )
+
+    # Order by most recent
+    documents = documents.order_by('-created_at')
+
+    # Paginate results
+    page_obj = paginate_queryset(request, documents, items_per_page=20)
+
+    context = {
+        'page_title': 'Driver ID Documents',
+        'documents': page_obj,
+        'search_query': search_query,
+        'view_type': view_type,
+    }
+
+    return render(request, 'workforce/driver_documents_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def driver_document_detail(request, document_id):
+    """View for viewing and updating a specific driver document"""
+    document = get_object_or_404(fleet_models.DriverDocument, id=document_id)
+
+    if request.method == 'POST':
+        # Handle document update
+        try:
+            document.document_type = request.POST.get('document_type', document.document_type)
+            document.document_no = request.POST.get('document_no', document.document_no)
+            document.document_issued_from = request.POST.get('document_issued_from', document.document_issued_from)
+
+            expiry_date = request.POST.get('document_expiry_date')
+            if expiry_date:
+                document.document_expiry_date = expiry_date
+
+            # Handle file upload
+            if 'document_file' in request.FILES:
+                document.document_file = request.FILES['document_file']
+
+            document.save()
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Document updated successfully'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=400)
+
+    context = {
+        'page_title': 'Driver Document Detail',
+        'document': document,
+    }
+
+    return render(request, 'workforce/driver_document_detail.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def vehicle_documents_list(request):
+    """View for listing all vehicle documents with search and card/table toggle"""
+    from django.db.models import Q
+
+    # Get search query and view type
+    search_query = request.GET.get('search', '').strip()
+    view_type = request.GET.get('view', 'card')  # 'card' or 'table'
+
+    # Start with all driver vehicles
+    vehicles = fleet_models.DriverVehicle.objects.select_related('driver', 'driver__user', 'driver__profile').all()
+
+    # Apply search filter
+    if search_query:
+        vehicles = vehicles.filter(
+            Q(vehicle_no__icontains=search_query) |
+            Q(vehicle_type__icontains=search_query) |
+            Q(vehicle_model__icontains=search_query) |
+            Q(driver__user__first_name__icontains=search_query) |
+            Q(driver__user__last_name__icontains=search_query) |
+            Q(driver__driver_code__icontains=search_query)
+        )
+
+    # Order by most recent
+    vehicles = vehicles.order_by('-created_at')
+
+    # Paginate results
+    page_obj = paginate_queryset(request, vehicles, items_per_page=20)
+
+    context = {
+        'page_title': 'Vehicle Documents',
+        'vehicles': page_obj,
+        'search_query': search_query,
+        'view_type': view_type,
+    }
+
+    return render(request, 'workforce/vehicle_documents_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def vehicle_document_detail(request, driver_id):
+    """View for viewing and updating vehicle documents for a specific driver"""
+    driver = get_object_or_404(fleet_models.Driver, driver_id=driver_id)
+    vehicles = fleet_models.DriverVehicle.objects.filter(driver=driver).order_by('-created_at')
+
+    if request.method == 'POST':
+        # Handle vehicle update
+        try:
+            vehicle_id = request.POST.get('vehicle_id')
+            if vehicle_id:
+                vehicle = get_object_or_404(fleet_models.DriverVehicle, id=vehicle_id)
+                vehicle.vehicle_type = request.POST.get('vehicle_type', vehicle.vehicle_type)
+                vehicle.vehicle_no = request.POST.get('vehicle_no', vehicle.vehicle_no)
+                vehicle.vehicle_model = request.POST.get('vehicle_model', vehicle.vehicle_model)
+                vehicle.vehicle_color = request.POST.get('vehicle_color', vehicle.vehicle_color)
+                vehicle.vehicle_status = request.POST.get('vehicle_status', vehicle.vehicle_status)
+                vehicle.save()
+
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Vehicle updated successfully'
+                })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=400)
+
+    context = {
+        'page_title': 'Vehicle Documents Detail',
+        'driver': driver,
+        'vehicles': vehicles,
+    }
+
+    return render(request, 'workforce/vehicle_document_detail.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def store_documents_list(request):
+    """View for listing all store/business documents with search and card/table toggle"""
+    from django.db.models import Q
+
+    # Get search query and view type
+    search_query = request.GET.get('search', '').strip()
+    view_type = request.GET.get('view', 'card')  # 'card' or 'table'
+
+    # Start with all businesses
+    businesses = business_models.Business.objects.select_related('business_profile', 'user').all()
+
+    # Apply search filter
+    if search_query:
+        businesses = businesses.filter(
+            Q(business_name__icontains=search_query) |
+            Q(business_code__icontains=search_query) |
+            Q(business_phone__icontains=search_query) |
+            Q(business_email__icontains=search_query) |
+            Q(business_qid__icontains=search_query)
+        )
+
+    # Order by most recent
+    businesses = businesses.order_by('-created_at')
+
+    # Paginate results
+    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+
+    context = {
+        'page_title': 'Store Documents',
+        'businesses': page_obj,
+        'search_query': search_query,
+        'view_type': view_type,
+    }
+
+    return render(request, 'workforce/store_documents_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def store_document_detail(request, business_id):
+    """View for viewing and updating store documents for a specific business"""
+    business = get_object_or_404(business_models.Business, business_id=business_id)
+
+    try:
+        business_profile = business.business_profile
+    except:
+        business_profile = None
+
+    if request.method == 'POST':
+        # Handle business document update
+        try:
+            business.business_name = request.POST.get('business_name', business.business_name)
+            business.business_phone = request.POST.get('business_phone', business.business_phone)
+            business.business_email = request.POST.get('business_email', business.business_email)
+            business.business_qid = request.POST.get('business_qid', business.business_qid)
+            business.business_status = request.POST.get('business_status', business.business_status)
+            business.save()
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Store document updated successfully'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=400)
+
+    context = {
+        'page_title': 'Store Document Detail',
+        'business': business,
+        'business_profile': business_profile,
+    }
+
+    return render(request, 'workforce/store_document_detail.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def business_licenses_list(request):
+    """View for listing all business licenses with search and card/table toggle"""
+    from django.db.models import Q
+
+    # Get search query and view type
+    search_query = request.GET.get('search', '').strip()
+    view_type = request.GET.get('view', 'card')  # 'card' or 'table'
+
+    # Start with all businesses
+    businesses = business_models.Business.objects.select_related('business_profile', 'user').all()
+
+    # Apply search filter
+    if search_query:
+        businesses = businesses.filter(
+            Q(business_name__icontains=search_query) |
+            Q(business_code__icontains=search_query) |
+            Q(business_qid__icontains=search_query)
+        )
+
+    # Order by most recent
+    businesses = businesses.order_by('-created_at')
+
+    # Paginate results
+    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+
+    context = {
+        'page_title': 'Business Licenses',
+        'businesses': page_obj,
+        'search_query': search_query,
+        'view_type': view_type,
+    }
+
+    return render(request, 'workforce/business_licenses_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def business_license_detail(request, business_id):
+    """View for viewing and updating business license details"""
+    business = get_object_or_404(business_models.Business, business_id=business_id)
+
+    try:
+        business_profile = business.business_profile
+    except:
+        business_profile = None
+
+    if request.method == 'POST':
+        # Handle business license update
+        try:
+            business.business_name = request.POST.get('business_name', business.business_name)
+            business.business_qid = request.POST.get('business_qid', business.business_qid)
+            business.business_status = request.POST.get('business_status', business.business_status)
+
+            business_since = request.POST.get('business_since')
+            if business_since:
+                business.business_since = business_since
+
+            business.save()
+
+            # Update business profile if exists
+            if business_profile:
+                business_profile.business_address = request.POST.get('business_address', business_profile.business_address)
+                business_profile.business_city = request.POST.get('business_city', business_profile.business_city)
+                business_profile.save()
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Business license updated successfully'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=400)
+
+    context = {
+        'page_title': 'Business License Detail',
+        'business': business,
+        'business_profile': business_profile,
+    }
+
+    return render(request, 'workforce/business_license_detail.html', context)
 
 

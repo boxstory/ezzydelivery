@@ -1,0 +1,224 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Vehicle Document Detail - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/wf_pages.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Page Title -->
+<h1 class="page-title">
+    <i class="fa-solid fa-car me-2"></i>Vehicle Documents for {{ driver.user.first_name }} {{ driver.user.last_name }}
+</h1>
+
+<!-- Back Button -->
+<div style="margin-bottom: 1.5rem;">
+    <a href="{% url 'workforce:vehicle_documents_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--brand-grey-700); text-decoration: none; font-weight: 600;">
+        <i class="fa-solid fa-arrow-left"></i>
+        Back to Vehicles
+    </a>
+</div>
+
+<!-- Driver Info -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-user"></i>
+        Driver Information
+    </div>
+    <div class="info-grid">
+        <div class="info-row">
+            <span class="info-label">Driver Name</span>
+            <span class="info-value">{{ driver.user.first_name|default:"Unknown" }} {{ driver.user.last_name|default:"" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Driver Code</span>
+            <span class="info-value">{{ driver.driver_code|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Phone</span>
+            <span class="info-value">{{ driver.driver_phone|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Status</span>
+            <span class="info-value">{{ driver.driver_status|default:"N/A" }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- Vehicles List -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-car"></i>
+        Registered Vehicles
+    </div>
+
+    {% if vehicles %}
+        {% for vehicle in vehicles %}
+        <div style="background: var(--brand-white); border: 2px solid var(--brand-grey-200); border-radius: var(--brand-radius-md); padding: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="info-label">Vehicle Number</span>
+                    <span class="info-value">{{ vehicle.vehicle_no|default:"N/A" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Vehicle Type</span>
+                    <span class="info-value">{{ vehicle.vehicle_type|default:"N/A"|title }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Model</span>
+                    <span class="info-value">{{ vehicle.vehicle_model|default:"N/A" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Color</span>
+                    <span class="info-value">{{ vehicle.vehicle_color|default:"N/A" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Status</span>
+                    <span class="info-value">
+                        <span class="status-badge {% if vehicle.vehicle_status == 'active' %}status-active{% else %}status-inactive{% endif %}">
+                            {{ vehicle.vehicle_status|title }}
+                        </span>
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Created At</span>
+                    <span class="info-value">{{ vehicle.created_at|date:"d M Y, h:i A" }}</span>
+                </div>
+            </div>
+
+            <!-- Edit Button -->
+            <button onclick="openEditModal({{ vehicle.id }}, '{{ vehicle.vehicle_no }}', '{{ vehicle.vehicle_type }}', '{{ vehicle.vehicle_model }}', '{{ vehicle.vehicle_color }}', '{{ vehicle.vehicle_status }}')" style="margin-top: 1rem; background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.5rem 1rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-edit"></i>
+                Edit Vehicle
+            </button>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <i class="fa-solid fa-car"></i>
+            <h3>No Vehicles Found</h3>
+            <p>This driver has no registered vehicles.</p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: var(--brand-white); border-radius: var(--brand-radius-lg); padding: 2rem; max-width: 500px; width: 90%;">
+        <h2 style="margin-bottom: 1.5rem;">Edit Vehicle</h2>
+
+        <form id="editForm">
+            {% csrf_token %}
+            <input type="hidden" id="vehicleId" name="vehicle_id">
+
+            <div style="display: grid; gap: 1rem;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Vehicle Number</label>
+                    <input type="text" id="vehicleNo" name="vehicle_no" class="filter-input" required>
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Vehicle Type</label>
+                    <select id="vehicleType" name="vehicle_type" class="filter-input">
+                        <option value="none">None</option>
+                        <option value="bike">Bike</option>
+                        <option value="car">Car</option>
+                        <option value="van">Van</option>
+                        <option value="pickup">Pickup</option>
+                        <option value="pickup3ton">Pickup 3Ton</option>
+                        <option value="pickup_big">Pickup Big Items</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Model</label>
+                    <input type="text" id="vehicleModel" name="vehicle_model" class="filter-input">
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Color</label>
+                    <input type="text" id="vehicleColor" name="vehicle_color" class="filter-input">
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Status</label>
+                    <select id="vehicleStatus" name="vehicle_status" class="filter-input">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                    <button type="submit" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer;">
+                        Save Changes
+                    </button>
+                    <button type="button" onclick="closeEditModal()" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; color: var(--brand-grey-800);">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <div id="updateMessage" style="display: none; margin-top: 1rem; padding: 1rem; border-radius: var(--brand-radius-sm);"></div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    function openEditModal(id, no, type, model, color, status) {
+        document.getElementById('vehicleId').value = id;
+        document.getElementById('vehicleNo').value = no;
+        document.getElementById('vehicleType').value = type;
+        document.getElementById('vehicleModel').value = model;
+        document.getElementById('vehicleColor').value = color;
+        document.getElementById('vehicleStatus').value = status;
+        document.getElementById('editModal').style.display = 'flex';
+    }
+
+    function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+    }
+
+    document.getElementById('editForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        const messageDiv = document.getElementById('updateMessage');
+
+        fetch('{% url 'workforce:vehicle_document_detail' driver.driver_id %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                messageDiv.style.display = 'block';
+                messageDiv.style.background = '#d4edda';
+                messageDiv.style.color = '#155724';
+                messageDiv.innerHTML = '<i class="fa-solid fa-check-circle"></i> ' + data.message;
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                messageDiv.style.display = 'block';
+                messageDiv.style.background = '#f8d7da';
+                messageDiv.style.color = '#721c24';
+                messageDiv.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> ' + data.error;
+            }
+        })
+        .catch(error => {
+            messageDiv.style.display = 'block';
+            messageDiv.style.background = '#f8d7da';
+            messageDiv.style.color = '#721c24';
+            messageDiv.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Error updating vehicle';
+        });
+    });
+</script>
+{% endblock extra_js %}

@@ -1,0 +1,134 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}DMS Sync Monitor - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/wf_pages.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Page Title -->
+<h1 class="page-title">
+    <i class="fa-solid fa-rotate me-2"></i>DMS Sync Monitor
+</h1>
+
+<!-- Error Message -->
+{% if error_message %}
+<div class="error-banner">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <p>{{ error_message }}</p>
+</div>
+{% endif %}
+
+<!-- Refresh Banner -->
+<div class="refresh-banner">
+    <div class="refresh-banner-content">
+        <i class="fa-solid fa-circle-info"></i>
+        <p>Monitoring DMS sync status - Last updated: <span id="lastUpdate"></span></p>
+    </div>
+    <button onclick="window.location.reload()" style="background: #2196f3; color: white; border: none; border-radius: var(--brand-radius-sm); padding: 0.625rem 1rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+        <i class="fa-solid fa-rotate"></i>
+        Refresh
+    </button>
+</div>
+
+<!-- Recently Synced Tasks -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-check-circle"></i>
+        Recently Synced Tasks (Last 50)
+    </div>
+    {% if recently_synced %}
+    <div class="tasks-list">
+        {% for task in recently_synced %}
+        <div class="task-item synced">
+            <div class="task-header">
+                <span class="task-id">Task #{{ task.id }} - {{ task.order.order_number|default:"N/A" }}</span>
+                <span class="task-status status-synced">Synced</span>
+            </div>
+            <div class="task-details">
+                <div class="task-detail-item">
+                    <i class="fa-solid fa-user"></i>
+                    <span>{{ task.driver.user.first_name|default:"Unassigned" }} {{ task.driver.user.last_name|default:"" }}</span>
+                </div>
+                <div class="task-detail-item">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>{{ task.status|default:"N/A"|title }}</span>
+                </div>
+                <div class="task-detail-item">
+                    <i class="fa-solid fa-clock"></i>
+                    <span>{{ task.updated_at|date:"d M Y, h:i A"|default:"N/A" }}</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-check-circle"></i>
+        <h4>No Recently Synced Tasks</h4>
+        <p>There are no recently synced tasks to display</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Failed Sync Attempts -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        Failed Sync Attempts (Pending Tasks)
+    </div>
+    {% if failed_sync %}
+    <div class="tasks-list">
+        {% for task in failed_sync %}
+        <div class="task-item failed">
+            <div class="task-header">
+                <span class="task-id">Task #{{ task.id }} - {{ task.order.order_number|default:"N/A" }}</span>
+                <span class="task-status status-failed">Not Synced</span>
+            </div>
+            <div class="task-details">
+                <div class="task-detail-item">
+                    <i class="fa-solid fa-user"></i>
+                    <span>{{ task.driver.user.first_name|default:"Unassigned" }} {{ task.driver.user.last_name|default:"" }}</span>
+                </div>
+                <div class="task-detail-item">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>{{ task.status|default:"N/A"|title }}</span>
+                </div>
+                <div class="task-detail-item">
+                    <i class="fa-solid fa-clock"></i>
+                    <span>{{ task.created_at|date:"d M Y, h:i A"|default:"N/A" }}</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-check-circle"></i>
+        <h4>No Failed Syncs</h4>
+        <p>All tasks are successfully synced with DMS</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Update last refresh time
+    function updateLastRefreshTime() {
+        const now = new Date();
+        document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+    }
+
+    // Update on page load
+    updateLastRefreshTime();
+
+    // Auto-refresh every 30 seconds
+    setInterval(function() {
+        window.location.reload();
+    }, 30000);
+</script>
+{% endblock extra_js %}

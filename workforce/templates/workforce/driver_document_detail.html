@@ -1,0 +1,171 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Driver Document Detail - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/wf_pages.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Page Title -->
+<h1 class="page-title">
+    <i class="fa-solid fa-id-card me-2"></i>Driver Document Detail
+</h1>
+
+<!-- Back Button -->
+<div style="margin-bottom: 1.5rem;">
+    <a href="{% url 'workforce:driver_documents_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--brand-grey-700); text-decoration: none; font-weight: 600;">
+        <i class="fa-solid fa-arrow-left"></i>
+        Back to Documents
+    </a>
+</div>
+
+<!-- Document Details Card -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-circle-info"></i>
+        Document Information
+    </div>
+
+    <!-- Document Image -->
+    {% if document.document_file %}
+    <div style="margin-bottom: 2rem; text-align: center;">
+        <img src="{{ document.document_file.url }}" alt="Document" style="max-width: 100%; max-height: 400px; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-md);">
+    </div>
+    {% endif %}
+
+    <div class="info-grid">
+        <div class="info-row">
+            <span class="info-label">Driver Name</span>
+            <span class="info-value">{{ document.driver.user.first_name|default:"Unknown" }} {{ document.driver.user.last_name|default:"" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Driver Code</span>
+            <span class="info-value">{{ document.driver.driver_code|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Document Type</span>
+            <span class="info-value">{{ document.document_type|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Document Number</span>
+            <span class="info-value">{{ document.document_no|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Issued From</span>
+            <span class="info-value">{{ document.document_issued_from|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Expiry Date</span>
+            <span class="info-value">{{ document.document_expiry_date|date:"d M Y"|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Created At</span>
+            <span class="info-value">{{ document.created_at|date:"d M Y, h:i A" }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Last Updated</span>
+            <span class="info-value">{{ document.updated_at|date:"d M Y, h:i A" }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Form -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-edit"></i>
+        Update Document
+    </div>
+
+    <form id="updateForm" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div style="display: grid; gap: 1rem;">
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Document Type</label>
+                <select name="document_type" class="filter-input">
+                    <option value="QID" {% if document.document_type == 'QID' %}selected{% endif %}>QID</option>
+                    <option value="Driving License" {% if document.document_type == 'Driving License' %}selected{% endif %}>Driving License</option>
+                    <option value="Passport" {% if document.document_type == 'Passport' %}selected{% endif %}>Passport</option>
+                    <option value="National Identification" {% if document.document_type == 'National Identification' %}selected{% endif %}>National Identification</option>
+                </select>
+            </div>
+
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Document Number</label>
+                <input type="text" name="document_no" value="{{ document.document_no }}" class="filter-input" required>
+            </div>
+
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Issued From</label>
+                <input type="text" name="document_issued_from" value="{{ document.document_issued_from|default:'' }}" class="filter-input">
+            </div>
+
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Expiry Date</label>
+                <input type="date" name="document_expiry_date" value="{{ document.document_expiry_date|date:'Y-m-d' }}" class="filter-input">
+            </div>
+
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Document File (Image)</label>
+                <input type="file" name="document_file" accept="image/*" class="filter-input">
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <button type="submit" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+                    <i class="fa-solid fa-save"></i>
+                    Save Changes
+                </button>
+                <button type="button" onclick="window.location.href='{% url 'workforce:driver_documents_list' %}'" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; color: var(--brand-grey-800);">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <div id="updateMessage" style="display: none; margin-top: 1rem; padding: 1rem; border-radius: var(--brand-radius-sm);"></div>
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('updateForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        const messageDiv = document.getElementById('updateMessage');
+
+        fetch('{% url 'workforce:driver_document_detail' document.id %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                messageDiv.style.display = 'block';
+                messageDiv.style.background = '#d4edda';
+                messageDiv.style.color = '#155724';
+                messageDiv.innerHTML = '<i class="fa-solid fa-check-circle"></i> ' + data.message;
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                messageDiv.style.display = 'block';
+                messageDiv.style.background = '#f8d7da';
+                messageDiv.style.color = '#721c24';
+                messageDiv.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> ' + data.error;
+            }
+        })
+        .catch(error => {
+            messageDiv.style.display = 'block';
+            messageDiv.style.background = '#f8d7da';
+            messageDiv.style.color = '#721c24';
+            messageDiv.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Error updating document';
+        });
+    });
+</script>
+{% endblock extra_js %}
