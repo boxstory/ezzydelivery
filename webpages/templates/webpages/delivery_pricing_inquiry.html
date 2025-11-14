@@ -1,35 +1,88 @@
 {% extends "base.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
-{% block title %}
-Get a Quote for Delivery Services in Qatar
-{% endblock title %}
+{% block title %}Get a Quote for Delivery Services in Qatar{% endblock title %}
 
 {% block seo %}
-    <meta name="description" content="Request a custom delivery pricing quote for your business in Qatar. Ezzy Delivery provides affordable rates for e-commerce, 3PL, and last-mile delivery.">
-    <meta property="og:title" content="Get a Custom Delivery Pricing Quote | Ezzy Delivery Qatar">
-    <meta property="og:description" content="Fill out our form to get a personalized quote for your business's delivery and fulfillment needs in Qatar.">
-    <link rel="canonical" href="{{ request.build_absolute_uri }}">
+<meta name="description" content="Request a custom delivery pricing quote for your business in Qatar. Ezzy Delivery provides affordable rates for e-commerce, 3PL, and last-mile delivery.">
+<meta property="og:title" content="Get a Custom Delivery Pricing Quote | Ezzy Delivery Qatar">
+<meta property="og:description" content="Fill out our form to get a personalized quote for your business's delivery and fulfillment needs in Qatar.">
+<link rel="canonical" href="{{ request.build_absolute_uri }}">
 {% endblock seo %}
 
 {% block extra_css %}
 <style>
   .pricing-hero {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
     padding: 3rem 0;
     margin-bottom: 2rem;
   }
 
-  .section-badge {
-    display: inline-block;
-    background: #212529;
+  .progress-container {
+    max-width: 600px;
+    margin: 0 auto 3rem;
+  }
+
+  .step-indicator {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+    margin-bottom: 2rem;
+  }
+
+  .step-indicator::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #e9ecef;
+    z-index: 0;
+  }
+
+  .step-item {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.5rem;
+    font-weight: 700;
+    transition: all 0.3s ease;
+  }
+
+  .step-item.active .step-circle {
+    background: #667eea;
     color: white;
-    padding: 0.5rem 1.5rem;
-    border-radius: 50px;
+    border-color: #667eea;
+    transform: scale(1.1);
+  }
+
+  .step-item.completed .step-circle {
+    background: #28a745;
+    border-color: #28a745;
+    color: white;
+  }
+
+  .step-label {
     font-size: 0.875rem;
+    color: #6c757d;
     font-weight: 600;
-    letter-spacing: 1.5px;
-    margin-bottom: 1rem;
+  }
+
+  .step-item.active .step-label {
+    color: #667eea;
   }
 
   .pricing-form-card {
@@ -38,6 +91,7 @@ Get a Quote for Delivery Services in Qatar
     padding: 3rem;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
     margin-bottom: 3rem;
+    min-height: 500px;
   }
 
   .form-control, .form-select, textarea {
@@ -48,202 +102,583 @@ Get a Quote for Delivery Services in Qatar
   }
 
   .form-control:focus, .form-select:focus, textarea:focus {
-    border-color: #212529;
-    box-shadow: 0 0 0 0.2rem rgba(33, 37, 41, 0.1);
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.1);
   }
 
-  .submit-btn {
-    background: #212529;
+  .form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+  }
+
+  .btn-primary {
+    background: #667eea;
+    border: none;
+    padding: 0.75rem 2rem;
+    font-weight: 700;
+    border-radius: 50px;
+    transition: all 0.3s ease;
+  }
+
+  .btn-primary:hover {
+    background: #5568d3;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+  }
+
+  .btn-secondary {
+    background: #6c757d;
+    border: none;
+    padding: 0.75rem 2rem;
+    font-weight: 700;
+    border-radius: 50px;
+  }
+
+  .btn-whatsapp {
+    background: #25D366;
+    color: white;
     border: none;
     padding: 1rem 2rem;
     font-weight: 700;
-    letter-spacing: 0.5px;
     border-radius: 50px;
     transition: all 0.3s ease;
-    font-size: 1.1rem;
   }
 
-  .submit-btn:hover {
-    background: #000;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-  }
-
-  .benefit-card {
-    background: #f8f9fa;
-    border-radius: 16px;
-    padding: 2rem;
-    text-align: center;
-    transition: all 0.3s ease;
-    height: 100%;
-    border: 2px solid transparent;
-  }
-
-  .benefit-card:hover {
-    border-color: #212529;
-    transform: translateY(-5px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-  }
-
-  .benefit-icon {
-    font-size: 3rem;
-    color: #212529;
-    margin-bottom: 1rem;
-  }
-
-  .info-box {
-    background: linear-gradient(135deg, #212529 0%, #343a40 100%);
+  .btn-whatsapp:hover {
+    background: #128C7E;
     color: white;
-    border-radius: 16px;
-    padding: 2rem;
-    margin-bottom: 2rem;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(37, 211, 102, 0.3);
   }
 
-  .info-box h5 {
+  .form-navigation {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e9ecef;
+  }
+
+  .form-section-title {
+    font-size: 1.5rem;
     font-weight: 700;
-    margin-bottom: 1rem;
+    color: #212529;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #667eea;
   }
 
-  .info-box ul {
-    list-style: none;
-    padding: 0;
+  .help-text {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
   }
 
-  .info-box li {
-    padding: 0.5rem 0;
+  .radio-group, .checkbox-group {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
   }
 
-  .info-box li i {
-    color: #ffd700;
-    margin-right: 0.75rem;
+  .radio-group .form-check, .checkbox-group .form-check {
+    padding: 0.75rem 1.25rem;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    margin: 0;
+  }
+
+  .radio-group .form-check:hover, .checkbox-group .form-check:hover {
+    border-color: #667eea;
+    background: #f8f9ff;
+  }
+
+  .radio-group .form-check-input:checked ~ .form-check-label,
+  .checkbox-group .form-check-input:checked ~ .form-check-label {
+    color: #667eea;
+    font-weight: 600;
+  }
+
+  /* WhatsApp Modal Styles */
+  .modal-content {
+    border-radius: 20px;
+    border: none;
+  }
+
+  .modal-header {
+    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+    color: white;
+    border-radius: 20px 20px 0 0;
+    padding: 1.5rem;
+  }
+
+  .modal-title {
+    font-weight: 700;
+  }
+
+  .btn-close {
+    filter: brightness(0) invert(1);
   }
 </style>
 {% endblock extra_css %}
 
 {% block content %}
 <!-- Hero Section -->
-<section class="pricing-hero">
+<div class="pricing-hero">
   <div class="container">
     <div class="text-center">
-      <span class="section-badge">GET A QUOTE</span>
-      <h1 class="display-4 fw-bold mb-3">Delivery Pricing Inquiry</h1>
-      <p class="lead text-muted">Get a custom quote tailored to your business needs</p>
-    </div>
-  </div>
-</section>
-
-<div class="container">
-  <div class="row g-4">
-    <!-- Benefits Column -->
-    <div class="col-lg-4 order-lg-2">
-      <div class="info-box">
-        <h5>
-          <i class="fa-solid fa-star me-2"></i>
-          Why Choose Us?
-        </h5>
-        <ul>
-          <li>
-            <i class="fa-solid fa-check-circle"></i>
-            Competitive pricing
-          </li>
-          <li>
-            <i class="fa-solid fa-check-circle"></i>
-            Fast response time
-          </li>
-          <li>
-            <i class="fa-solid fa-check-circle"></i>
-            Flexible solutions
-          </li>
-          <li>
-            <i class="fa-solid fa-check-circle"></i>
-            No hidden fees
-          </li>
-          <li>
-            <i class="fa-solid fa-check-circle"></i>
-            Dedicated support
-          </li>
-        </ul>
-      </div>
-
-      <div class="row g-3">
-        <div class="col-12">
-          <div class="benefit-card">
-            <div class="benefit-icon">
-              <i class="fa-solid fa-bolt"></i>
-            </div>
-            <h6 class="fw-bold mb-2">Quick Response</h6>
-            <p class="text-muted small mb-0">Get your quote within 24 hours</p>
-          </div>
-        </div>
-        <div class="col-12">
-          <div class="benefit-card">
-            <div class="benefit-icon">
-              <i class="fa-solid fa-calculator"></i>
-            </div>
-            <h6 class="fw-bold mb-2">Transparent Pricing</h6>
-            <p class="text-muted small mb-0">No hidden costs or surprises</p>
-          </div>
-        </div>
-        <div class="col-12">
-          <div class="benefit-card">
-            <div class="benefit-icon">
-              <i class="fa-solid fa-handshake"></i>
-            </div>
-            <h6 class="fw-bold mb-2">Custom Solutions</h6>
-            <p class="text-muted small mb-0">Tailored to your specific needs</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Form Column -->
-    <div class="col-lg-8 order-lg-1">
-      <div class="pricing-form-card">
-        <h3 class="fw-bold mb-4">
-          <i class="fa-solid fa-file-invoice-dollar me-2"></i>
-          Request Your Quote
-        </h3>
-        <p class="text-muted mb-4">
-          Fill out the form below and our team will get back to you with a personalized pricing quote
-          for your delivery and fulfillment needs in Qatar.
-        </p>
-
-        <form method="POST">
-          {% csrf_token %}
-          {{ form | crispy }}
-
-          <div class="mt-4">
-            <button type="submit" class="submit-btn btn btn-dark w-100">
-              <i class="fa-solid fa-paper-plane me-2"></i>
-              SUBMIT INQUIRY
-            </button>
-          </div>
-
-          <div class="text-center mt-3">
-            <small class="text-muted">
-              <i class="fa-solid fa-lock me-1"></i>
-              Your information is secure and will never be shared
-            </small>
-          </div>
-        </form>
-      </div>
-
-      <!-- Additional Info -->
-      <div class="alert alert-info border-0" style="background: #e7f3ff; border-radius: 12px;">
-        <div class="d-flex align-items-start">
-          <i class="fa-solid fa-circle-info fa-2x me-3 mt-1" style="color: #0066cc;"></i>
-          <div>
-            <h6 class="fw-bold mb-2" style="color: #0066cc;">Need Help?</h6>
-            <p class="mb-0 small">
-              If you have any questions or need assistance filling out this form, please don't hesitate to
-              <a href="/contactus/" class="fw-bold">contact us</a> or reach out via
-              <a href="https://wa.me/97466451589" class="fw-bold">WhatsApp</a>.
-            </p>
-          </div>
-        </div>
-      </div>
+      <h1 class="display-4 fw-bold mb-3">Get Your Custom Delivery Quote</h1>
+      <p class="lead mb-4">Tell us about your business needs and we'll provide a tailored pricing solution</p>
+      <button type="button" class="btn btn-whatsapp btn-lg" data-bs-toggle="modal" data-bs-target="#whatsappModal">
+        <i class="fa-brands fa-whatsapp me-2"></i>Quick WhatsApp Inquiry
+      </button>
     </div>
   </div>
 </div>
 
+<div class="container mb-5">
+  <!-- Progress Indicator -->
+  <div class="progress-container">
+    <div class="step-indicator">
+      <div class="step-item {% if current_step == 1 %}active{% elif current_step > 1 %}completed{% endif %}">
+        <div class="step-circle">
+          {% if current_step > 1 %}<i class="fa fa-check"></i>{% else %}1{% endif %}
+        </div>
+        <div class="step-label">Company & Product</div>
+      </div>
+      <div class="step-item {% if current_step == 2 %}active{% elif current_step > 2 %}completed{% endif %}">
+        <div class="step-circle">
+          {% if current_step > 2 %}<i class="fa fa-check"></i>{% else %}2{% endif %}
+        </div>
+        <div class="step-label">Operations & Orders</div>
+      </div>
+      <div class="step-item {% if current_step == 3 %}active{% endif %}">
+        <div class="step-circle">3</div>
+        <div class="step-label">Delivery & Pickup</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Multi-Step Form -->
+  <div class="pricing-form-card">
+    <form method="POST" id="inquiryForm">
+      {% csrf_token %}
+
+      <!-- Step 1: Company & Product Details -->
+      <div class="step-content" id="step1" style="{% if current_step != 1 %}display: none;{% endif %}">
+        <h2 class="form-section-title">Company & Product Details</h2>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="full_name">Contact Person Name *</label>
+            <input type="text" class="form-control" id="full_name" name="full_name"
+                   value="{{ saved_data.full_name }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="business_name">Business Name *</label>
+            <input type="text" class="form-control" id="business_name" name="business_name"
+                   value="{{ saved_data.business_name }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="business_contact_number">Business Contact Number *</label>
+            <input type="tel" class="form-control" id="business_contact_number" name="business_contact_number"
+                   value="{{ saved_data.business_contact_number }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="operation_team_contact_number">Operations Team Contact</label>
+            <input type="tel" class="form-control" id="operation_team_contact_number" name="operation_team_contact_number"
+                   value="{{ saved_data.operation_team_contact_number }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="website_url">Website URL</label>
+            <input type="url" class="form-control" id="website_url" name="website_url"
+                   value="{{ saved_data.website_url }}" placeholder="https://example.com">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="social_profile">Social Media Profile</label>
+            <input type="url" class="form-control" id="social_profile" name="social_profile"
+                   value="{{ saved_data.social_profile }}" placeholder="Instagram/Facebook URL">
+          </div>
+          <div class="col-md-12">
+            <label class="form-label" for="product_category">Product Category *</label>
+            <input type="text" class="form-control" id="product_category" name="product_category"
+                   value="{{ saved_data.product_category }}" required
+                   placeholder="e.g., Electronics, Fashion, Food, etc.">
+          </div>
+          <div class="col-md-12">
+            <label class="form-label">Is this a personalized product? *</label>
+            <div class="radio-group">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_personalized_product" id="personalized_yes"
+                       value="True" {% if saved_data.is_personalized_product == 'True' %}checked{% endif %} required>
+                <label class="form-check-label" for="personalized_yes">Yes</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_personalized_product" id="personalized_no"
+                       value="False" {% if saved_data.is_personalized_product == 'False' or not saved_data.is_personalized_product %}checked{% endif %}>
+                <label class="form-check-label" for="personalized_no">No</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label">Is your company registered in Qatar? *</label>
+            <div class="radio-group">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_registered_company_in_qatar" id="registered_yes"
+                       value="True" {% if saved_data.is_registered_company_in_qatar == 'True' %}checked{% endif %} required>
+                <label class="form-check-label" for="registered_yes">Yes</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_registered_company_in_qatar" id="registered_no"
+                       value="False" {% if saved_data.is_registered_company_in_qatar == 'False' or not saved_data.is_registered_company_in_qatar %}checked{% endif %}>
+                <label class="form-check-label" for="registered_no">No</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label">Is your business located in Qatar? *</label>
+            <div class="radio-group">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_located_in_qatar" id="located_yes"
+                       value="True" {% if saved_data.is_located_in_qatar == 'True' %}checked{% endif %} required>
+                <label class="form-check-label" for="located_yes">Yes</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_located_in_qatar" id="located_no"
+                       value="False" {% if saved_data.is_located_in_qatar == 'False' or not saved_data.is_located_in_qatar %}checked{% endif %}>
+                <label class="form-check-label" for="located_no">No</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label">Do you have a team available in Qatar? *</label>
+            <div class="radio-group">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_team_available_in_qatar" id="team_yes"
+                       value="True" {% if saved_data.is_team_available_in_qatar == 'True' %}checked{% endif %} required>
+                <label class="form-check-label" for="team_yes">Yes</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_team_available_in_qatar" id="team_no"
+                       value="False" {% if saved_data.is_team_available_in_qatar == 'False' or not saved_data.is_team_available_in_qatar %}checked{% endif %}>
+                <label class="form-check-label" for="team_no">No</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-navigation">
+          <div></div>
+          <button type="submit" name="next_step" class="btn btn-primary btn-lg">
+            Next Step <i class="fa fa-arrow-right ms-2"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Operations & Orders -->
+      <div class="step-content" id="step2" style="{% if current_step != 2 %}display: none;{% endif %}">
+        <h2 class="form-section-title">Operations & Orders Details</h2>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="avarage_number_of_order_last_week">Orders Last Week</label>
+            <select class="form-select" id="avarage_number_of_order_last_week" name="avarage_number_of_order_last_week">
+              <option value="">Select range</option>
+              <option value="1-4" {% if saved_data.avarage_number_of_order_last_week == '1-4' %}selected{% endif %}>1 to 4</option>
+              <option value="5-25" {% if saved_data.avarage_number_of_order_last_week == '5-25' %}selected{% endif %}>5 to 25</option>
+              <option value="26-60" {% if saved_data.avarage_number_of_order_last_week == '26-60' %}selected{% endif %}>26 to 60</option>
+              <option value="61-100" {% if saved_data.avarage_number_of_order_last_week == '61-100' %}selected{% endif %}>61 to 100</option>
+              <option value="100-200" {% if saved_data.avarage_number_of_order_last_week == '100-200' %}selected{% endif %}>100 to 200</option>
+              <option value="200-300" {% if saved_data.avarage_number_of_order_last_week == '200-300' %}selected{% endif %}>200 to 300</option>
+              <option value="300-500" {% if saved_data.avarage_number_of_order_last_week == '300-500' %}selected{% endif %}>300 to 500</option>
+              <option value="500-1000" {% if saved_data.avarage_number_of_order_last_week == '500-1000' %}selected{% endif %}>500 to 1000</option>
+              <option value="1000-1500" {% if saved_data.avarage_number_of_order_last_week == '1000-1500' %}selected{% endif %}>1000 to 1500</option>
+              <option value="1500+" {% if saved_data.avarage_number_of_order_last_week == '1500+' %}selected{% endif %}>1500+</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="avarage_number_of_order_done_last_month">Orders Last Month</label>
+            <select class="form-select" id="avarage_number_of_order_done_last_month" name="avarage_number_of_order_done_last_month">
+              <option value="">Select range</option>
+              <option value="1-4" {% if saved_data.avarage_number_of_order_done_last_month == '1-4' %}selected{% endif %}>1 to 4</option>
+              <option value="5-25" {% if saved_data.avarage_number_of_order_done_last_month == '5-25' %}selected{% endif %}>5 to 25</option>
+              <option value="26-60" {% if saved_data.avarage_number_of_order_done_last_month == '26-60' %}selected{% endif %}>26 to 60</option>
+              <option value="61-100" {% if saved_data.avarage_number_of_order_done_last_month == '61-100' %}selected{% endif %}>61 to 100</option>
+              <option value="100-200" {% if saved_data.avarage_number_of_order_done_last_month == '100-200' %}selected{% endif %}>100 to 200</option>
+              <option value="200-300" {% if saved_data.avarage_number_of_order_done_last_month == '200-300' %}selected{% endif %}>200 to 300</option>
+              <option value="300-500" {% if saved_data.avarage_number_of_order_done_last_month == '300-500' %}selected{% endif %}>300 to 500</option>
+              <option value="500-1000" {% if saved_data.avarage_number_of_order_done_last_month == '500-1000' %}selected{% endif %}>500 to 1000</option>
+              <option value="1000-1500" {% if saved_data.avarage_number_of_order_done_last_month == '1000-1500' %}selected{% endif %}>1000 to 1500</option>
+              <option value="1500+" {% if saved_data.avarage_number_of_order_done_last_month == '1500+' %}selected{% endif %}>1500+</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="avarage_number_of_order_expect_next_month">Expected Orders Next Month</label>
+            <select class="form-select" id="avarage_number_of_order_expect_next_month" name="avarage_number_of_order_expect_next_month">
+              <option value="">Select range</option>
+              <option value="1-4" {% if saved_data.avarage_number_of_order_expect_next_month == '1-4' %}selected{% endif %}>1 to 4</option>
+              <option value="5-25" {% if saved_data.avarage_number_of_order_expect_next_month == '5-25' %}selected{% endif %}>5 to 25</option>
+              <option value="26-60" {% if saved_data.avarage_number_of_order_expect_next_month == '26-60' %}selected{% endif %}>26 to 60</option>
+              <option value="61-100" {% if saved_data.avarage_number_of_order_expect_next_month == '61-100' %}selected{% endif %}>61 to 100</option>
+              <option value="100-200" {% if saved_data.avarage_number_of_order_expect_next_month == '100-200' %}selected{% endif %}>100 to 200</option>
+              <option value="200-300" {% if saved_data.avarage_number_of_order_expect_next_month == '200-300' %}selected{% endif %}>200 to 300</option>
+              <option value="300-500" {% if saved_data.avarage_number_of_order_expect_next_month == '300-500' %}selected{% endif %}>300 to 500</option>
+              <option value="500-1000" {% if saved_data.avarage_number_of_order_expect_next_month == '500-1000' %}selected{% endif %}>500 to 1000</option>
+              <option value="1000-1500" {% if saved_data.avarage_number_of_order_expect_next_month == '1000-1500' %}selected{% endif %}>1000 to 1500</option>
+              <option value="1500+" {% if saved_data.avarage_number_of_order_expect_next_month == '1500+' %}selected{% endif %}>1500+</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="orders_expected_in_next_3_months_milestone">3-Month Milestone</label>
+            <select class="form-select" id="orders_expected_in_next_3_months_milestone" name="orders_expected_in_next_3_months_milestone">
+              <option value="">Select range</option>
+              <option value="1-4" {% if saved_data.orders_expected_in_next_3_months_milestone == '1-4' %}selected{% endif %}>1 to 4</option>
+              <option value="5-25" {% if saved_data.orders_expected_in_next_3_months_milestone == '5-25' %}selected{% endif %}>5 to 25</option>
+              <option value="26-60" {% if saved_data.orders_expected_in_next_3_months_milestone == '26-60' %}selected{% endif %}>26 to 60</option>
+              <option value="61-100" {% if saved_data.orders_expected_in_next_3_months_milestone == '61-100' %}selected{% endif %}>61 to 100</option>
+              <option value="100-200" {% if saved_data.orders_expected_in_next_3_months_milestone == '100-200' %}selected{% endif %}>100 to 200</option>
+              <option value="200-300" {% if saved_data.orders_expected_in_next_3_months_milestone == '200-300' %}selected{% endif %}>200 to 300</option>
+              <option value="300-500" {% if saved_data.orders_expected_in_next_3_months_milestone == '300-500' %}selected{% endif %}>300 to 500</option>
+              <option value="500-1000" {% if saved_data.orders_expected_in_next_3_months_milestone == '500-1000' %}selected{% endif %}>500 to 1000</option>
+              <option value="1000-1500" {% if saved_data.orders_expected_in_next_3_months_milestone == '1000-1500' %}selected{% endif %}>1000 to 1500</option>
+              <option value="1500+" {% if saved_data.orders_expected_in_next_3_months_milestone == '1500+' %}selected{% endif %}>1500+</option>
+            </select>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label">Do you require COD (Cash on Delivery) service? *</label>
+            <div class="radio-group">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_required_COD_service" id="cod_yes"
+                       value="True" {% if saved_data.is_required_COD_service == 'True' %}checked{% endif %}>
+                <label class="form-check-label" for="cod_yes">Yes</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_required_COD_service" id="cod_no"
+                       value="False" {% if saved_data.is_required_COD_service == 'False' or not saved_data.is_required_COD_service %}checked{% endif %}>
+                <label class="form-check-label" for="cod_no">No</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label">Do you need fulfillment service to operate from outside Qatar? *</label>
+            <div class="radio-group">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_operate_from_outside_qatar"
+                       id="fulfillment_outside_yes" value="True" {% if saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar == 'True' %}checked{% endif %}>
+                <label class="form-check-label" for="fulfillment_outside_yes">Yes</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_operate_from_outside_qatar"
+                       id="fulfillment_outside_no" value="False" {% if saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar == 'False' or not saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar %}checked{% endif %}>
+                <label class="form-check-label" for="fulfillment_outside_no">No</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label">Do you need fulfillment service to make a hub in Doha? *</label>
+            <div class="radio-group">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_make_hub_in_doha"
+                       id="fulfillment_hub_yes" value="True" {% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha == 'True' %}checked{% endif %}>
+                <label class="form-check-label" for="fulfillment_hub_yes">Yes</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_make_hub_in_doha"
+                       id="fulfillment_hub_no" value="False" {% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha == 'False' or not saved_data.is_required_fulfillment_service_for_make_hub_in_doha %}checked{% endif %}>
+                <label class="form-check-label" for="fulfillment_hub_no">No</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-navigation">
+          <button type="submit" name="prev_step" class="btn btn-secondary btn-lg">
+            <i class="fa fa-arrow-left me-2"></i> Previous
+          </button>
+          <button type="submit" name="next_step" class="btn btn-primary btn-lg">
+            Next Step <i class="fa fa-arrow-right ms-2"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Delivery & Pickup Details -->
+      <div class="step-content" id="step3" style="{% if current_step != 3 %}display: none;{% endif %}">
+        <h2 class="form-section-title">Delivery & Pickup Details</h2>
+
+        <div class="row g-3">
+          <div class="col-md-12">
+            <label class="form-label" for="speed_delivery_offer_to_customers">Delivery Speed Offered to Customers</label>
+            <input type="text" class="form-control" id="speed_delivery_offer_to_customers" name="speed_delivery_offer_to_customers"
+                   value="{{ saved_data.speed_delivery_offer_to_customers }}" placeholder="e.g., Same Day, Next Day, 2-3 Days">
+          </div>
+          <div class="col-md-12">
+            <label class="form-label">Frequent same-day pick and delivery required? *</label>
+            <div class="radio-group">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_frequent_same_day_pick_and_delivery_required"
+                       id="sameday_yes" value="True" {% if saved_data.is_frequent_same_day_pick_and_delivery_required == 'True' %}checked{% endif %}>
+                <label class="form-check-label" for="sameday_yes">Yes, Pick And Delivery Same Time</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_frequent_same_day_pick_and_delivery_required"
+                       id="sameday_no" value="False" {% if saved_data.is_frequent_same_day_pick_and_delivery_required == 'False' or not saved_data.is_frequent_same_day_pick_and_delivery_required %}checked{% endif %}>
+                <label class="form-check-label" for="sameday_no">No</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="preferred_delivery_time_window">Preferred Delivery Time Window</label>
+            <input type="text" class="form-control" id="preferred_delivery_time_window" name="preferred_delivery_time_window"
+                   value="{{ saved_data.preferred_delivery_time_window }}" placeholder="e.g., 9AM - 6PM">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="typical_package_size">Typical Package Size</label>
+            <input type="text" class="form-control" id="typical_package_size" name="typical_package_size"
+                   value="{{ saved_data.typical_package_size }}" placeholder="e.g., Small packets, Boxes">
+          </div>
+          <div class="col-md-12">
+            <label class="form-label">Special handling required? *</label>
+            <div class="radio-group">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_special_handling_required"
+                       id="special_yes" value="True" {% if saved_data.is_special_handling_required == 'True' %}checked{% endif %}>
+                <label class="form-check-label" for="special_yes">Yes</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_special_handling_required"
+                       id="special_no" value="False" {% if saved_data.is_special_handling_required == 'False' or not saved_data.is_special_handling_required %}checked{% endif %}>
+                <label class="form-check-label" for="special_no">No</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="type_of_pickup_location">Type of Pickup Location</label>
+            <select class="form-select" id="type_of_pickup_location" name="type_of_pickup_location">
+              <option value="">Select type</option>
+              <option value="Home" {% if saved_data.type_of_pickup_location == 'Home' %}selected{% endif %}>Home</option>
+              <option value="Office" {% if saved_data.type_of_pickup_location == 'Office' %}selected{% endif %}>Office</option>
+              <option value="Store" {% if saved_data.type_of_pickup_location == 'Store' %}selected{% endif %}>Store</option>
+              <option value="Multiple Store" {% if saved_data.type_of_pickup_location == 'Multiple Store' %}selected{% endif %}>Multiple Stores</option>
+              <option value="Fulfillment" {% if saved_data.type_of_pickup_location == 'Fulfillment' %}selected{% endif %}>Fulfillment Center</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="pickup_Location_area_name">Pickup Location Area</label>
+            <input type="text" class="form-control" id="pickup_Location_area_name" name="pickup_Location_area_name"
+                   value="{{ saved_data.pickup_Location_area_name }}" placeholder="e.g., Al Sadd, West Bay">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="pickup_location_time_slab">Pickup Time Slot</label>
+            <input type="text" class="form-control" id="pickup_location_time_slab" name="pickup_location_time_slab"
+                   value="{{ saved_data.pickup_location_time_slab }}" placeholder="e.g., 9AM - 12PM">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="number_of_pickup_times_in_day">Number of Pickups Per Day</label>
+            <select class="form-select" id="number_of_pickup_times_in_day" name="number_of_pickup_times_in_day">
+              <option value="1" {% if saved_data.number_of_pickup_times_in_day == '1' or not saved_data.number_of_pickup_times_in_day %}selected{% endif %}>1 time</option>
+              <option value="2" {% if saved_data.number_of_pickup_times_in_day == '2' %}selected{% endif %}>2 times</option>
+              <option value="3" {% if saved_data.number_of_pickup_times_in_day == '3' %}selected{% endif %}>3 times</option>
+              <option value="4+" {% if saved_data.number_of_pickup_times_in_day == '4+' %}selected{% endif %}>4+ times</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-navigation">
+          <button type="submit" name="prev_step" class="btn btn-secondary btn-lg">
+            <i class="fa fa-arrow-left me-2"></i> Previous
+          </button>
+          <button type="submit" name="submit_final" class="btn btn-primary btn-lg">
+            Submit Inquiry <i class="fa fa-check ms-2"></i>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- WhatsApp Quick Inquiry Modal -->
+<div class="modal fade" id="whatsappModal" tabindex="-1" aria-labelledby="whatsappModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="whatsappModalLabel">
+          <i class="fa-brands fa-whatsapp me-2"></i>Quick WhatsApp Inquiry
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="whatsappForm">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="wa_company_name" class="form-label">Company Name *</label>
+            <input type="text" class="form-control" id="wa_company_name" name="wa_company_name" required>
+          </div>
+          <div class="mb-3">
+            <label for="wa_contact_person" class="form-label">Contact Person *</label>
+            <input type="text" class="form-control" id="wa_contact_person" name="wa_contact_person" required>
+          </div>
+          <div class="mb-3">
+            <label for="wa_contact_number" class="form-label">Contact Number *</label>
+            <input type="tel" class="form-control" id="wa_contact_number" name="wa_contact_number" required>
+          </div>
+          <div class="mb-3">
+            <label for="wa_product_category" class="form-label">Product Category *</label>
+            <input type="text" class="form-control" id="wa_product_category" name="wa_product_category"
+                   placeholder="e.g., Electronics, Fashion, Food" required>
+          </div>
+          <div class="mb-3">
+            <label for="wa_product_name" class="form-label">Product Name (Optional)</label>
+            <input type="text" class="form-control" id="wa_product_name" name="wa_product_name">
+          </div>
+          <div class="mb-3">
+            <label for="wa_additional_info" class="form-label">Additional Information (Optional)</label>
+            <textarea class="form-control" id="wa_additional_info" name="wa_additional_info" rows="3"></textarea>
+          </div>
+          <button type="submit" class="btn btn-whatsapp w-100">
+            <i class="fa-brands fa-whatsapp me-2"></i>Connect via WhatsApp
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+// WhatsApp Form Submission
+document.getElementById('whatsappForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    formData.append('whatsapp_submit', 'true');
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Redirect to WhatsApp
+            window.open(data.redirect_url, '_blank');
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('whatsappModal'));
+            modal.hide();
+            // Optionally redirect user or show success message
+            setTimeout(() => {
+                alert('Thank you! You will be redirected to WhatsApp.');
+            }, 500);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred. Please try again.');
+    });
+});
+</script>
+{% endblock extra_js %}

@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Verification Pending - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .pending-container {
+        max-width: 700px;
+        margin: 4rem auto;
+        padding: 0 1rem;
+        text-align: center;
+    }
+
+    .pending-card {
+        background: white;
+        border-radius: 20px;
+        padding: 3rem 2rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .status-icon {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 2rem;
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: pulse 2s infinite;
+    }
+
+    .status-icon i {
+        font-size: 3.5rem;
+        color: white;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
+        }
+        50% {
+            transform: scale(1.05);
+            box-shadow: 0 0 0 15px rgba(251, 191, 36, 0);
+        }
+    }
+
+    .status-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 1rem;
+    }
+
+    .status-message {
+        font-size: 1.125rem;
+        color: #6b7280;
+        margin-bottom: 2rem;
+        line-height: 1.75;
+    }
+
+    .info-box {
+        background: #f3f4f6;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 2rem 0;
+        text-align: left;
+    }
+
+    .info-box h4 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 1rem;
+    }
+
+    .info-box ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .info-box li {
+        padding: 0.5rem 0;
+        color: #6b7280;
+    }
+
+    .info-box li i {
+        color: #10b981;
+        margin-right: 0.75rem;
+        width: 20px;
+    }
+
+    .btn-home {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.3s ease;
+        border: none;
+    }
+
+    .btn-home:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .profile-summary {
+        background: #eff6ff;
+        border: 2px solid #3b82f6;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 2rem 0;
+    }
+
+    .profile-summary h5 {
+        color: #1e40af;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .profile-detail {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #bfdbfe;
+    }
+
+    .profile-detail:last-child {
+        border-bottom: none;
+    }
+
+    .profile-detail strong {
+        color: #374151;
+    }
+
+    .profile-detail span {
+        color: #6b7280;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        margin: 1rem 0;
+    }
+
+    .badge-pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .badge-review {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="pending-container">
+    <div class="pending-card">
+        <!-- Status Icon -->
+        <div class="status-icon">
+            <i class="fa-solid fa-clock"></i>
+        </div>
+
+        <!-- Status Title -->
+        <h1 class="status-title">
+            {% if profile.verification_status == 'pending' %}
+                Verification Pending
+            {% else %}
+                Under Review
+            {% endif %}
+        </h1>
+
+        <!-- Status Badge -->
+        <div class="status-badge {% if profile.verification_status == 'pending' %}badge-pending{% else %}badge-review{% endif %}">
+            <i class="fa-solid fa-hourglass-half me-2"></i>
+            {% if profile.verification_status == 'pending' %}
+                Awaiting Review
+            {% else %}
+                Being Reviewed
+            {% endif %}
+        </div>
+
+        <!-- Status Message -->
+        <p class="status-message">
+            {% if profile.verification_status == 'pending' %}
+                Thank you for submitting your application! Our verification team will review your information and get back to you soon.
+            {% else %}
+                Great news! Our team is currently reviewing your application. We'll notify you once the verification is complete.
+            {% endif %}
+        </p>
+
+        <!-- Profile Summary -->
+        <div class="profile-summary">
+            <h5>
+                <i class="fa-solid fa-user-check me-2"></i>Application Details
+            </h5>
+            <div class="profile-detail">
+                <strong>Name:</strong>
+                <span>{{ profile.first_name }} {{ profile.last_name }}</span>
+            </div>
+            <div class="profile-detail">
+                <strong>Email:</strong>
+                <span>{{ profile.email }}</span>
+            </div>
+            <div class="profile-detail">
+                <strong>Role:</strong>
+                <span>
+                    {% if profile.is_business %}
+                        <i class="fa-solid fa-building me-1"></i>Business
+                    {% elif profile.is_driver %}
+                        <i class="fa-solid fa-car me-1"></i>Driver
+                    {% endif %}
+                </span>
+            </div>
+            <div class="profile-detail">
+                <strong>Submitted:</strong>
+                <span>
+                    {% if profile.verification_applied_at %}
+                        {{ profile.verification_applied_at|date:"F d, Y - g:i A" }}
+                    {% else %}
+                        Recently
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <!-- Info Box -->
+        <div class="info-box">
+            <h4>
+                <i class="fa-solid fa-lightbulb me-2"></i>What Happens Next?
+            </h4>
+            <ul>
+                <li>
+                    <i class="fa-solid fa-check-circle"></i>
+                    Our team will review your profile and documents
+                </li>
+                <li>
+                    <i class="fa-solid fa-check-circle"></i>
+                    Verification typically takes 1-2 business days
+                </li>
+                <li>
+                    <i class="fa-solid fa-check-circle"></i>
+                    You'll receive an email notification once verified
+                </li>
+                <li>
+                    <i class="fa-solid fa-check-circle"></i>
+                    Once approved, you can access your dashboard
+                </li>
+            </ul>
+        </div>
+
+        <!-- Action Button -->
+        <a href="{% url 'webpages:index' %}" class="btn-home">
+            <i class="fa-solid fa-home me-2"></i>Return to Homepage
+        </a>
+
+        <!-- Help Text -->
+        <p class="text-muted small mt-4">
+            <i class="fa-solid fa-info-circle me-1"></i>
+            Need help? Contact us at <a href="mailto:support@ezzydelivery.com">support@ezzydelivery.com</a>
+        </p>
+    </div>
+</div>
+{% endblock content %}

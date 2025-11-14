@@ -782,4 +782,373 @@ def update_task_status(request, task_id):
         }, status=400)
 
 
+# USER VERIFICATION VIEWS --------------------------------------------------------------------------------------------------------------
+
+@login_required(login_url='/accounts/login/')
+def user_verification_list(request):
+    """Staff view to see all users pending verification"""
+    from core import models as core_models
+    from django.db.models import Q
+
+    # Get all profiles based on filter
+    verification_filter = request.GET.get('status', 'all')
+
+    if verification_filter == 'pending':
+        profiles = core_models.Profile.objects.filter(verification_status='pending')
+    elif verification_filter == 'verified':
+        profiles = core_models.Profile.objects.filter(verification_status='verified')
+    elif verification_filter == 'rejected':
+        profiles = core_models.Profile.objects.filter(verification_status='rejected')
+    elif verification_filter == 'incomplete':
+        profiles = core_models.Profile.objects.filter(verification_status='incomplete')
+    else:
+        profiles = core_models.Profile.objects.all()
+
+    # Order by application date (most recent first)
+    profiles = profiles.order_by('-verification_applied_at', '-created_at')
+
+    # Get additional data for each profile
+    verification_data = []
+    for profile in profiles:
+        data = {
+            'profile': profile,
+            'business': None,
+            'driver': None,
+            'user': profile.user,
+        }
+
+        if profile.is_business:
+            try:
+                from client import models as business_models
+                data['business'] = business_models.Business.objects.get(user=profile.user)
+            except:
+                pass
+
+        if profile.is_driver:
+            try:
+                data['driver'] = fleet_models.Driver.objects.get(user=profile.user)
+            except:
+                pass
+
+        verification_data.append(data)
+
+    context = {
+        'verification_data': verification_data,
+        'current_filter': verification_filter,
+    }
+
+    return render(request, 'workforce/user_verification_list.html', context)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+def update_verification_status(request, profile_id):
+    """AJAX endpoint to update user verification status"""
+    from core import models as core_models
+    from django.utils import timezone
+
+    try:
+        profile = get_object_or_404(core_models.Profile, id=profile_id)
+
+        # Parse JSON body
+        data = json.loads(request.body)
+        new_status = data.get('status')
+        rejection_reason = data.get('rejection_reason', '')
+
+        if not new_status:
+            return JsonResponse({
+                'success': False,
+                'error': 'Status is required'
+            }, status=400)
+
+        # Update verification status
+        profile.verification_status = new_status
+        profile.verified_by = request.user
+
+        if new_status == 'verified':
+            profile.verified_at = timezone.now()
+            profile.rejection_reason = None
+
+            # Update business or driver status to active
+            if profile.is_business:
+                try:
+                    from client import models as business_models
+                    business = business_models.Business.objects.get(user=profile.user)
+                    business.business_status = 'active'
+                    business.save()
+                except:
+                    pass
+
+            if profile.is_driver:
+                try:
+                    driver = fleet_models.Driver.objects.get(user=profile.user)
+                    driver.driver_status = 'Approved'
+                    driver.save()
+                except:
+                    pass
+
+        elif new_status == 'rejected':
+            profile.rejection_reason = rejection_reason
+            profile.verified_at = None
+
+        elif new_status == 'under_review':
+            profile.verified_at = None
+
+        profile.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Verification status updated to {new_status}',
+            'profile_id': profile.id,
+            'new_status': new_status
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+# ADDITIONAL SIDEBAR FUNCTIONS --------------------------------------------------------------------------------------------------------------
+
+# Orders Section Functions
+@login_required(login_url='/accounts/login/')
+def orders_dms_updated(request):
+    """View for DMS updated orders list"""
+    from orders import models as orders_models
+
+    orders_list = orders_models.Order.objects.filter(
+        order_dms_status__isnull=False
+    ).order_by('-created_at')
+
+    orders_with_pagination = paginate_queryset(request, orders_list, items_per_page=20)
+
+    context = {
+        'orders': orders_with_pagination,
+        'page_title': 'DMS Updated Orders',
+    }
+    return render(request, 'workforce/orders_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def orders_reported(request):
+    """View for reported orders list"""
+    from orders import models as orders_models
+
+    orders_list = orders_models.Order.objects.filter(
+        order_status='reported'
+    ).order_by('-created_at')
+
+    orders_with_pagination = paginate_queryset(request, orders_list, items_per_page=20)
+
+    context = {
+        'orders': orders_with_pagination,
+        'page_title': 'Reported Orders',
+    }
+    return render(request, 'workforce/orders_list.html', context)
+
+
+# Tasks Section Functions
+@login_required(login_url='/accounts/login/')
+def tasks_followup_list(request):
+    """View for follow-up tasks list"""
+    tasks_list = delivery_models.DeliveryTask.objects.filter(
+        dl_pickup_status='scheduled'
+    ).order_by('-created_at')
+
+    tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
+
+    context = {
+        'delivery_tasks': tasks_with_pagination,
+        'page_title': 'Follow-Up Tasks',
+    }
+    return render(request, 'workforce/parts/lists/dl_list_all.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def tasks_dms_updated(request):
+    """View for DMS updated tasks list"""
+    tasks_list = delivery_models.DeliveryTask.objects.filter(
+        dl_dms_status__isnull=False
+    ).order_by('-created_at')
+
+    tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
+
+    context = {
+        'delivery_tasks': tasks_with_pagination,
+        'page_title': 'DMS Updated Tasks',
+    }
+    return render(request, 'workforce/parts/lists/dl_list_all.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def tasks_reported(request):
+    """View for reported tasks list"""
+    tasks_list = delivery_models.DeliveryTask.objects.filter(
+        dl_pickup_status='reported'
+    ).order_by('-created_at')
+
+    tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
+
+    context = {
+        'delivery_tasks': tasks_with_pagination,
+        'page_title': 'Reported Tasks',
+    }
+    return render(request, 'workforce/parts/lists/dl_list_all.html', context)
+
+
+# DMS Links Section Functions
+@login_required(login_url='/accounts/login/')
+def dms_publish_order(request):
+    """View for publishing orders to DMS"""
+    from orders import models as orders_models
+
+    orders_list = orders_models.Order.objects.filter(
+        order_status='verified',
+        order_dms_id__isnull=True
+    ).order_by('-created_at')
+
+    orders_with_pagination = paginate_queryset(request, orders_list, items_per_page=20)
+
+    context = {
+        'orders': orders_with_pagination,
+        'page_title': 'Publish Orders to DMS',
+    }
+    return render(request, 'workforce/dms_publish_order.html', context)
+
+
+# Fleet Accounts Section Functions
+@login_required(login_url='/accounts/login/')
+def fleet_cod_in_hand(request):
+    """View for COD in hand with drivers"""
+    drivers = fleet_models.Driver.objects.filter(
+        driver_status='Approved'
+    ).order_by('driver_name')
+
+    drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=20)
+
+    context = {
+        'drivers': drivers_with_pagination,
+        'page_title': 'COD In Hand',
+    }
+    return render(request, 'workforce/fleet_cod_in_hand.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def fleet_drivers_earnings(request):
+    """View for drivers earnings"""
+    drivers = fleet_models.Driver.objects.filter(
+        driver_status='Approved'
+    ).order_by('driver_name')
+
+    drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=20)
+
+    context = {
+        'drivers': drivers_with_pagination,
+        'page_title': 'Drivers Earnings',
+    }
+    return render(request, 'workforce/fleet_drivers_earnings.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def fleet_transactions(request):
+    """View for fleet transactions"""
+    # This would connect to a transactions model when implemented
+    context = {
+        'page_title': 'Fleet Transactions',
+        'transactions': [],  # Placeholder for transactions queryset
+    }
+    return render(request, 'workforce/fleet_transactions.html', context)
+
+
+# Inventory Section Functions
+@login_required(login_url='/accounts/login/')
+def inventory_reports(request):
+    """View for inventory reports"""
+    context = {
+        'page_title': 'Inventory Reports',
+    }
+    return render(request, 'workforce/inventory_reports.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def inventory_restock_list(request):
+    """View for restock list"""
+    context = {
+        'page_title': 'Restock List',
+    }
+    return render(request, 'workforce/inventory_restock_list.html', context)
+
+
+# Quick Links Functions
+@login_required(login_url='/accounts/login/')
+def staff_reports(request):
+    """View for staff reports dashboard"""
+    from orders import models as orders_models
+
+    # Get statistics
+    total_orders = orders_models.Order.objects.count()
+    pending_orders = orders_models.Order.objects.filter(order_status='pending').count()
+    verified_orders = orders_models.Order.objects.filter(order_status='verified').count()
+    completed_orders = orders_models.Order.objects.filter(order_status='completed').count()
+
+    total_tasks = delivery_models.DeliveryTask.objects.count()
+    active_tasks = delivery_models.DeliveryTask.objects.filter(
+        dl_pickup_status__in=['assigned', 'in_transit', 'picked_up']
+    ).count()
+    completed_tasks = delivery_models.DeliveryTask.objects.filter(
+        dl_pickup_status='delivered'
+    ).count()
+
+    total_drivers = fleet_models.Driver.objects.count()
+    active_drivers = fleet_models.Driver.objects.filter(driver_status='Approved').count()
+
+    context = {
+        'page_title': 'Reports Dashboard',
+        'total_orders': total_orders,
+        'pending_orders': pending_orders,
+        'verified_orders': verified_orders,
+        'completed_orders': completed_orders,
+        'total_tasks': total_tasks,
+        'active_tasks': active_tasks,
+        'completed_tasks': completed_tasks,
+        'total_drivers': total_drivers,
+        'active_drivers': active_drivers,
+    }
+    return render(request, 'workforce/staff_reports.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def staff_contacts(request):
+    """View for staff contacts directory"""
+    from core import models as core_models
+
+    # Get all staff members
+    staff_profiles = core_models.Profile.objects.filter(
+        is_staff=True
+    ).order_by('first_name')
+
+    # Get all business users
+    business_profiles = core_models.Profile.objects.filter(
+        is_business=True,
+        verification_status='verified'
+    ).order_by('first_name')
+
+    # Get all drivers
+    driver_profiles = core_models.Profile.objects.filter(
+        is_driver=True,
+        verification_status='verified'
+    ).order_by('first_name')
+
+    staff_with_pagination = paginate_queryset(request, staff_profiles, items_per_page=50)
+
+    context = {
+        'page_title': 'Contacts Directory',
+        'staff_profiles': staff_with_pagination,
+        'business_count': business_profiles.count(),
+        'driver_count': driver_profiles.count(),
+    }
+    return render(request, 'workforce/staff_contacts.html', context)
+
+
 

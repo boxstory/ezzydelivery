@@ -21,3 +21,12 @@ class PricingEnquiryAdmin(admin.ModelAdmin):
     search_fields = ('full_name', 'business_name', 'business_contact_number', 'product_category' )
     ordering = ('-date_modified',)
     readonly_fields = ('id',)
+
+
+@admin.register(webpages_models.WhatsAppInquiry)
+class WhatsAppInquiryAdmin(admin.ModelAdmin):
+    list_display = ('company_name', 'contact_person', 'contact_number', 'product_category', 'created_at')
+    list_filter = ('product_category', 'created_at')
+    search_fields = ('company_name', 'contact_person', 'contact_number', 'product_category', 'product_name')
+    ordering = ('-created_at',)
+    readonly_fields = ('created_at',)

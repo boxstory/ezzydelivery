@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Business Registration - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .completion-container {
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+
+    .completion-header {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px 15px 0 0;
+        text-align: center;
+    }
+
+    .completion-circle {
+        width: 100px;
+        height: 100px;
+        margin: 0 auto 1rem;
+        position: relative;
+    }
+
+    .completion-circle svg {
+        transform: rotate(-90deg);
+    }
+
+    .completion-circle circle {
+        fill: none;
+        stroke-width: 8;
+    }
+
+    .circle-bg {
+        stroke: rgba(255, 255, 255, 0.2);
+    }
+
+    .circle-progress {
+        stroke: #4ade80;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.5s ease;
+    }
+
+    .completion-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 1.75rem;
+        font-weight: bold;
+        color: white;
+    }
+
+    .form-card {
+        background: white;
+        border-radius: 0 0 15px 15px;
+        padding: 2.5rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 2px solid #e5e7eb;
+        padding: 0.75rem 1rem;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+    }
+
+    .btn-action {
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        font-weight: 600;
+        border: none;
+        transition: all 0.3s ease;
+    }
+
+    .btn-save {
+        background: #10b981;
+        color: white;
+    }
+
+    .btn-save:hover {
+        background: #059669;
+        transform: translateY(-2px);
+    }
+
+    .btn-apply {
+        background: #f59e0b;
+        color: white;
+    }
+
+    .btn-apply:hover {
+        background: #d97706;
+        transform: translateY(-2px);
+    }
+
+    .btn-apply:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .success-alert {
+        background: #d1fae5;
+        border-left: 4px solid #10b981;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .warning-alert {
+        background: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin: 2rem 0 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e5e7eb;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="completion-container">
+    <!-- Completion Header -->
+    <div class="completion-header">
+        <div class="completion-circle">
+            <svg width="100" height="100">
+                <circle class="circle-bg" cx="50" cy="50" r="42"></circle>
+                <circle class="circle-progress" cx="50" cy="50" r="42"
+                        stroke-dasharray="263.89"
+                        style="stroke-dashoffset: calc(263.89 - (263.89 * {{ completion_percentage }} / 100));">
+                </circle>
+            </svg>
+            <div class="completion-text">{{ completion_percentage }}%</div>
+        </div>
+        <h2 class="mb-2">
+            <i class="fa-solid fa-building me-2"></i>Business Registration
+        </h2>
+        <p class="mb-0">Complete your business information to apply for verification</p>
+    </div>
+
+    <!-- Form Card -->
+    <div class="form-card">
+        {% if completion_percentage >= 100 and can_apply %}
+        <div class="success-alert">
+            <i class="fa-solid fa-check-circle me-2"></i>
+            <strong>Ready to Apply!</strong> Your business information is complete. Click "Apply for Verification" to submit your application.
+        </div>
+        {% elif completion_percentage < 100 %}
+        <div class="warning-alert">
+            <i class="fa-solid fa-exclamation-triangle me-2"></i>
+            <strong>Incomplete Information:</strong> Please fill in all required fields before applying for verification.
+        </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+
+            <!-- Business Information -->
+            <div class="section-title">
+                <i class="fa-solid fa-briefcase me-2"></i>Business Information
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Business Name <span class="text-danger">*</span></label>
+                    {{ form.business_name }}
+                    {% if form.business_name.errors %}
+                        <div class="text-danger small">{{ form.business_name.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Product Category <span class="text-danger">*</span></label>
+                    {{ form.business_product_category }}
+                    {% if form.business_product_category.errors %}
+                        <div class="text-danger small">{{ form.business_product_category.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">Business Description</label>
+                    {{ form.business_bio }}
+                    {% if form.business_bio.errors %}
+                        <div class="text-danger small">{{ form.business_bio.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="section-title">
+                <i class="fa-solid fa-phone me-2"></i>Contact Information
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Business Phone <span class="text-danger">*</span></label>
+                    {{ form.business_phone }}
+                    {% if form.business_phone.errors %}
+                        <div class="text-danger small">{{ form.business_phone.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Business WhatsApp <span class="text-danger">*</span></label>
+                    {{ form.business_whatsapp }}
+                    {% if form.business_whatsapp.errors %}
+                        <div class="text-danger small">{{ form.business_whatsapp.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Business Email <span class="text-danger">*</span></label>
+                    {{ form.business_email }}
+                    {% if form.business_email.errors %}
+                        <div class="text-danger small">{{ form.business_email.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">QID/Passport/CR Number <span class="text-danger">*</span></label>
+                    {{ form.business_qid }}
+                    {% if form.business_qid.errors %}
+                        <div class="text-danger small">{{ form.business_qid.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Social Media (Optional) -->
+            <div class="section-title">
+                <i class="fa-brands fa-facebook me-2"></i>Social Media (Optional)
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Facebook Page</label>
+                    {{ form.business_facebook_page }}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Instagram</label>
+                    {{ form.business_instagram }}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Business Since</label>
+                    {{ form.business_since }}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Preferred Language</label>
+                    {{ form.business_languages }}
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                <button type="submit" name="action" value="save" class="btn btn-action btn-save">
+                    <i class="fa-solid fa-floppy-disk me-2"></i>Save Progress
+                </button>
+
+                <button type="submit" name="action" value="apply_verification"
+                        class="btn btn-action btn-apply"
+                        {% if not can_apply or completion_percentage < 100 %}disabled{% endif %}>
+                    <i class="fa-solid fa-paper-plane me-2"></i>Apply for Verification
+                </button>
+            </div>
+
+            {% if completion_percentage < 100 %}
+            <p class="text-muted small text-center mt-3">
+                <i class="fa-solid fa-info-circle me-1"></i>
+                Complete all required fields ({{ completion_percentage }}% done) to apply for verification
+            </p>
+            {% endif %}
+        </form>
+    </div>
+</div>
+{% endblock content %}

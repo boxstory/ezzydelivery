@@ -93,6 +93,25 @@ class PricingEnquiry(models.Model):
         verbose_name_plural = "Pricing Inquiries"
 
 
+class WhatsAppInquiry(models.Model):
+    """Quick inquiry via WhatsApp"""
+    company_name = models.CharField(max_length=200)
+    contact_person = models.CharField(max_length=100)
+    contact_number = models.CharField(max_length=50)
+    product_category = models.CharField(max_length=200)
+    product_name = models.CharField(max_length=200, blank=True, null=True)
+    additional_info = models.TextField(blank=True, null=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.company_name} - {self.contact_person}"
+
+    class Meta:
+        verbose_name_plural = "WhatsApp Inquiries"
+
+
 class DeliveryRequest(models.Model):
     """Model for delivery requests from users/non-sellers"""
 

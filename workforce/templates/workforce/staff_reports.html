@@ -1,0 +1,395 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Staff Reports - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .reports-header {
+        background: var(--brand-gradient-yellow-white);
+        padding: 2rem;
+        border-radius: var(--brand-radius-lg);
+        margin-bottom: 2rem;
+        box-shadow: var(--brand-shadow-md);
+    }
+
+    .reports-header h1 {
+        color: var(--brand-grey-800);
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .reports-header p {
+        color: var(--brand-grey-600);
+        margin-bottom: 0;
+    }
+
+    .section-container {
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        padding: 2rem;
+        box-shadow: var(--brand-shadow-sm);
+        margin-bottom: 2rem;
+    }
+
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--brand-grey-800);
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid var(--brand-grey-200);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .section-title i {
+        color: var(--brand-primary);
+    }
+
+    /* Todo List Styles */
+    .todo-list {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .todo-item {
+        background: var(--brand-secondary);
+        border-left: 4px solid var(--brand-primary);
+        padding: 1rem;
+        border-radius: var(--brand-radius-sm);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition: var(--brand-transition);
+    }
+
+    .todo-item:hover {
+        background: #fff7d6;
+        box-shadow: var(--brand-shadow-sm);
+    }
+
+    .todo-checkbox {
+        width: 24px;
+        height: 24px;
+        cursor: pointer;
+        accent-color: var(--brand-primary);
+    }
+
+    .todo-content {
+        flex: 1;
+    }
+
+    .todo-title {
+        font-weight: 600;
+        color: var(--brand-grey-800);
+        margin-bottom: 0.25rem;
+    }
+
+    .todo-meta {
+        font-size: 0.813rem;
+        color: var(--brand-grey-600);
+    }
+
+    .todo-item.completed {
+        opacity: 0.6;
+        border-left-color: #28a745;
+    }
+
+    .todo-item.completed .todo-title {
+        text-decoration: line-through;
+    }
+
+    /* Team Notes Styles */
+    .notes-grid {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .note-card {
+        background: #fff9e6;
+        border-left: 4px solid #ffc107;
+        padding: 1.25rem;
+        border-radius: var(--brand-radius-sm);
+        box-shadow: var(--brand-shadow-sm);
+    }
+
+    .note-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .note-author {
+        font-weight: 700;
+        color: var(--brand-grey-800);
+    }
+
+    .note-date {
+        font-size: 0.813rem;
+        color: var(--brand-grey-600);
+    }
+
+    .note-content {
+        color: var(--brand-grey-700);
+        line-height: 1.6;
+    }
+
+    /* Report Generator Styles */
+    .report-form {
+        display: grid;
+        gap: 1.5rem;
+    }
+
+    .form-group {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: var(--brand-grey-700);
+        font-size: 0.938rem;
+    }
+
+    .form-input,
+    .form-select {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 2px solid var(--brand-grey-300);
+        border-radius: var(--brand-radius-sm);
+        transition: var(--brand-transition);
+        font-size: 1rem;
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+        outline: none;
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.2);
+    }
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+
+    .btn-generate {
+        background: var(--brand-primary);
+        color: var(--brand-grey-900);
+        padding: 1rem 2rem;
+        border-radius: var(--brand-radius-sm);
+        border: none;
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: var(--brand-transition);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+
+    .btn-generate:hover {
+        background: var(--brand-primary-dark);
+        transform: translateY(-2px);
+        box-shadow: var(--brand-shadow-md);
+    }
+
+    .checkbox-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .checkbox-item input {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        accent-color: var(--brand-primary);
+    }
+
+    .checkbox-item label {
+        font-weight: 600;
+        color: var(--brand-grey-700);
+        cursor: pointer;
+        margin: 0;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Header -->
+<div class="reports-header">
+    <h1>
+        <i class="fa-solid fa-chart-bar me-2"></i>Staff Reports Dashboard
+    </h1>
+    <p>Manage tasks, notes, and generate daily reports</p>
+</div>
+
+<!-- Staff To-Do List -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-list-check"></i>
+        Staff To-Do List
+    </div>
+    <div class="todo-list">
+        {% if todos %}
+            {% for todo in todos %}
+            <div class="todo-item {% if todo.is_completed %}completed{% endif %}">
+                <input type="checkbox" class="todo-checkbox" {% if todo.is_completed %}checked{% endif %} onchange="toggleTodo({{ todo.id }})">
+                <div class="todo-content">
+                    <div class="todo-title">{{ todo.title }}</div>
+                    <div class="todo-meta">
+                        <i class="fa-solid fa-user"></i> {{ todo.assigned_to|default:"Unassigned" }} |
+                        <i class="fa-solid fa-calendar"></i> {{ todo.due_date|date:"d M Y"|default:"No due date" }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p style="color: var(--brand-grey-500); text-align: center; padding: 2rem;">No tasks for today</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Staff Team Notes -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-sticky-note"></i>
+        Staff Team Notes
+    </div>
+    <div class="notes-grid">
+        {% if notes %}
+            {% for note in notes %}
+            <div class="note-card">
+                <div class="note-header">
+                    <span class="note-author">{{ note.author.first_name }} {{ note.author.last_name }}</span>
+                    <span class="note-date">{{ note.created_at|date:"d M Y, h:i A" }}</span>
+                </div>
+                <div class="note-content">{{ note.content }}</div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p style="color: var(--brand-grey-500); text-align: center; padding: 2rem;">No team notes available</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Daily Report Generator -->
+<div class="section-container">
+    <div class="section-title">
+        <i class="fa-solid fa-file-pdf"></i>
+        Daily Report Generator
+    </div>
+    <form method="post" action="" class="report-form" id="reportForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">Report Date</label>
+            <input type="date" name="report_date" class="form-input" value="{{ today }}" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Report Type</label>
+            <select name="report_type" class="form-select" id="reportType" required>
+                <option value="">Select Report Type</option>
+                <option value="daily_summary">Daily Summary (All Tasks)</option>
+                <option value="deliveries">Deliveries Only</option>
+                <option value="cod">COD Transactions</option>
+                <option value="fleet">Fleet Performance</option>
+                <option value="custom">Custom (Filter Below)</option>
+            </select>
+        </div>
+
+        <div id="customFilters" style="display: none;">
+            <div class="form-group">
+                <label class="form-label">Include Sections</label>
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="includeDeliveries" name="include_deliveries" value="1">
+                        <label for="includeDeliveries">Deliveries</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="includeCOD" name="include_cod" value="1">
+                        <label for="includeCOD">COD Transactions</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="includeFleet" name="include_fleet" value="1">
+                        <label for="includeFleet">Fleet Performance</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="includeInventory" name="include_inventory" value="1">
+                        <label for="includeInventory">Inventory</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-grid">
+                <div class="form-group">
+                    <label class="form-label">Delivery Status</label>
+                    <select name="delivery_status" class="form-select">
+                        <option value="">All Statuses</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="in_transit">In Transit</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Fleet Driver</label>
+                    <select name="driver_id" class="form-select">
+                        <option value="">All Drivers</option>
+                        {% for driver in drivers %}
+                        <option value="{{ driver.id }}">{{ driver.user.first_name }} {{ driver.user.last_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <button type="submit" class="btn-generate">
+                <i class="fa-solid fa-file-pdf"></i>
+                Generate & Print Report
+            </button>
+        </div>
+    </form>
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Toggle report type filters
+    document.getElementById('reportType').addEventListener('change', function() {
+        const customFilters = document.getElementById('customFilters');
+        if (this.value === 'custom') {
+            customFilters.style.display = 'block';
+        } else {
+            customFilters.style.display = 'none';
+        }
+    });
+
+    // Toggle todo completion
+    function toggleTodo(todoId) {
+        // TODO: Implement AJAX call to toggle todo status
+        console.log('Toggle todo:', todoId);
+    }
+
+    // Form submission
+    document.getElementById('reportForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        // TODO: Implement report generation and print
+        alert('Report generation feature will be implemented soon.');
+    });
+</script>
+{% endblock extra_js %}

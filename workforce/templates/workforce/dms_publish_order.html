@@ -1,0 +1,249 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}DMS Delivery Tasks - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .dms-header {
+        background: var(--brand-gradient-yellow-white);
+        padding: 2rem;
+        border-radius: var(--brand-radius-lg);
+        margin-bottom: 2rem;
+        box-shadow: var(--brand-shadow-md);
+    }
+
+    .dms-header h1 {
+        color: var(--brand-grey-800);
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .dms-header p {
+        color: var(--brand-grey-600);
+        margin-bottom: 0;
+    }
+
+    .tasks-table-container {
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        box-shadow: var(--brand-shadow-sm);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+
+    .tasks-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .tasks-table thead {
+        background: var(--brand-gradient-yellow-white);
+    }
+
+    .tasks-table th {
+        padding: 1rem;
+        text-align: left;
+        font-weight: 700;
+        color: var(--brand-grey-800);
+        text-transform: uppercase;
+        font-size: 0.875rem;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid var(--brand-grey-300);
+    }
+
+    .tasks-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--brand-grey-200);
+        color: var(--brand-grey-700);
+    }
+
+    .tasks-table tbody tr {
+        transition: var(--brand-transition);
+    }
+
+    .tasks-table tbody tr:hover {
+        background: var(--brand-secondary);
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 0.375rem 0.75rem;
+        border-radius: var(--brand-radius-sm);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .status-assigned {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+
+    .status-picked_up {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .status-in_transit {
+        background: #cce5ff;
+        color: #004085;
+    }
+
+    .status-delivered {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-failed {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        box-shadow: var(--brand-shadow-sm);
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: var(--brand-grey-400);
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h3 {
+        color: var(--brand-grey-700);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+        color: var(--brand-grey-500);
+    }
+
+    @media (max-width: 768px) {
+        .tasks-table-container {
+            overflow-x: auto;
+        }
+
+        .tasks-table {
+            min-width: 1000px;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Header -->
+<div class="dms-header">
+    <h1>
+        <i class="fa-solid fa-paper-plane me-2"></i>DMS Delivery Tasks
+    </h1>
+    <p>View delivery tasks from DMS (ShipDay) through API</p>
+</div>
+
+<!-- Delivery Tasks Table -->
+{% if delivery_tasks %}
+<div class="tasks-table-container">
+    <table class="tasks-table">
+        <thead>
+            <tr>
+                <th>Task ID</th>
+                <th>Order Number</th>
+                <th>Driver</th>
+                <th>Customer</th>
+                <th>Delivery Address</th>
+                <th>Status</th>
+                <th>Created Date</th>
+                <th>DMS Sync</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in delivery_tasks %}
+            <tr>
+                <td><strong>#{{ task.id }}</strong></td>
+                <td>{{ task.order_number|default:"N/A" }}</td>
+                <td>
+                    {% if task.driver %}
+                        {{ task.driver.user.first_name }} {{ task.driver.user.last_name }}
+                    {% else %}
+                        <span style="color: var(--brand-grey-500);">Unassigned</span>
+                    {% endif %}
+                </td>
+                <td>{{ task.customer_name|default:"N/A" }}</td>
+                <td>{{ task.delivery_address|truncatewords:8 }}</td>
+                <td>
+                    <span class="status-badge status-{{ task.status|lower }}">
+                        {{ task.status|default:"Pending" }}
+                    </span>
+                </td>
+                <td>{{ task.created_at|date:"d M Y, h:i A" }}</td>
+                <td>
+                    {% if task.dms_synced %}
+                        <i class="fa-solid fa-check-circle" style="color: #28a745;"></i> Synced
+                    {% else %}
+                        <i class="fa-solid fa-times-circle" style="color: #dc3545;"></i> Not Synced
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if delivery_tasks.has_other_pages %}
+<nav aria-label="Tasks pagination">
+    <ul class="pagination justify-content-center">
+        {% if delivery_tasks.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ delivery_tasks.previous_page_number }}" aria-label="Previous">
+                <span aria-hidden="true">&laquo;</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">&laquo;</span>
+        </li>
+        {% endif %}
+
+        {% for num in delivery_tasks.paginator.page_range %}
+        {% if delivery_tasks.number == num %}
+        <li class="page-item active">
+            <span class="page-link">{{ num }}</span>
+        </li>
+        {% elif num > delivery_tasks.number|add:'-3' and num < delivery_tasks.number|add:'3' %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+        </li>
+        {% endif %}
+        {% endfor %}
+
+        {% if delivery_tasks.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ delivery_tasks.next_page_number }}" aria-label="Next">
+                <span aria-hidden="true">&raquo;</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">&raquo;</span>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="empty-state">
+    <i class="fa-solid fa-paper-plane"></i>
+    <h3>No Delivery Tasks Found</h3>
+    <p>There are no delivery tasks from DMS at the moment.</p>
+</div>
+{% endif %}
+
+{% endblock content %}

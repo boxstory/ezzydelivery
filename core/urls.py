@@ -38,6 +38,11 @@ urlpatterns = [
 
     path('driverjobform/', core_views.driverjobform, name='driverjobform'),
 
+    # NEW VERIFICATION WORKFLOW URLs
+    path('profile/complete/', core_views.profile_complete_update, name='profile_complete_update'),
+    path('business/register/', core_views.business_register, name='business_register'),
+    path('driver/register/', core_views.driver_register, name='driver_register'),
+
     # WhatsApp Password Reset URLs
     path('password/reset/request/', password_reset_views.password_reset_request, name='password_reset_request'),
     path('password/reset/verify/', password_reset_views.password_reset_verify, name='password_reset_verify'),

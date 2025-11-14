@@ -7,6 +7,7 @@ import random
 import re
 import string
 from unicodedata import name
+from functools import wraps
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -23,6 +24,69 @@ from core import forms as core_forms
 from webpages import forms as webpages_forms
 from fleet import forms as fleet_forms
 from client import forms as business_forms
+
+
+# VERIFICATION DECORATOR --------------------------------------------------------------------------------------------------------------
+
+def verification_required(role=None):
+    """
+    Decorator to check if user is verified before allowing access to views.
+
+    Args:
+        role: 'business', 'driver', or None (for any verified user)
+
+    Usage:
+        @verification_required(role='business')
+        def business_dashboard(request):
+            ...
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            # First check if user is logged in
+            if not request.user.is_authenticated:
+                return redirect('/accounts/login/')
+
+            # Check if profile exists
+            try:
+                profile = core_models.Profile.objects.get(user_id=request.user.id)
+            except core_models.Profile.DoesNotExist:
+                messages.error(request, "Please create your profile first.")
+                return redirect('core:profile_add')
+
+            # Staff users bypass verification
+            if profile.is_staff:
+                return view_func(request, *args, **kwargs)
+
+            # Check role if specified
+            if role == 'business' and not profile.is_business:
+                messages.error(request, "This area is for business users only.")
+                return redirect('core:main_dashboard')
+            elif role == 'driver' and not profile.is_driver:
+                messages.error(request, "This area is for drivers only.")
+                return redirect('core:main_dashboard')
+
+            # Check verification status
+            if profile.verification_status != 'verified':
+                if profile.verification_status == 'incomplete':
+                    messages.warning(request, "Please complete your profile and apply for verification.")
+                    return redirect('core:profile_complete_update')
+                elif profile.verification_status == 'pending' or profile.verification_status == 'under_review':
+                    messages.info(request, "Your application is pending verification. Please wait for approval.")
+                    return render(request, 'core/verification_pending.html', {'profile': profile})
+                elif profile.verification_status == 'rejected':
+                    messages.error(request, f"Your application was rejected. Please update and reapply.")
+                    if profile.is_business:
+                        return redirect('core:business_register')
+                    elif profile.is_driver:
+                        return redirect('core:driver_register')
+                    return redirect('core:profile_complete_update')
+
+            # User is verified, allow access
+            return view_func(request, *args, **kwargs)
+
+        return wrapper
+    return decorator
 
 
 # Create your views here.
@@ -271,20 +335,59 @@ def join_us(request):
 
 @login_required(login_url='/accounts/login/')
 def main_dashboard(request):
+    """Main dashboard with verification status checking"""
     if core_models.Profile.objects.filter(user_id=request.user.id).exists():
-        print('EXIST profile')
-
         profile = core_models.Profile.objects.get(user_id=request.user.id)
-        if profile.is_business:
-            return redirect('business:business_dashboard')
-        elif profile.is_driver:
-            return redirect('fleet:fleet_dashboard')
-        elif profile.is_staff:
+
+        # Staff users don't need verification
+        if profile.is_staff:
             return redirect('workforce:wf_dashboard')
+
+        # Check if profile is completed
+        if not profile.is_profile_completed:
+            messages.warning(request, "Please complete your profile to access the dashboard.")
+            return redirect('core:profile_complete_update')
+
+        # Check verification status
+        if profile.verification_status == 'incomplete':
+            if profile.is_business and not profile.is_business_profile_completed:
+                messages.warning(request, "Please complete your business registration.")
+                return redirect('core:business_register')
+            elif profile.is_driver and not profile.is_driver_profile_completed:
+                messages.warning(request, "Please complete your driver registration.")
+                return redirect('core:driver_register')
+            else:
+                messages.warning(request, "Please complete your profile and role registration.")
+                return redirect('core:profile_complete_update')
+
+        elif profile.verification_status == 'pending':
+            messages.info(request, "Your application is pending verification. Please wait for staff approval.")
+            return render(request, 'core/verification_pending.html', {'profile': profile})
+
+        elif profile.verification_status == 'under_review':
+            messages.info(request, "Your application is under review. We'll notify you once verified.")
+            return render(request, 'core/verification_pending.html', {'profile': profile})
+
+        elif profile.verification_status == 'rejected':
+            messages.error(request, f"Your application was rejected. Reason: {profile.rejection_reason or 'Not specified'}. Please update your information and reapply.")
+            if profile.is_business:
+                return redirect('core:business_register')
+            elif profile.is_driver:
+                return redirect('core:driver_register')
+
+        elif profile.verification_status == 'verified':
+            # Allow access to dashboard
+            if profile.is_business:
+                return redirect('business:business_dashboard')
+            elif profile.is_driver:
+                return redirect('fleet:fleet_dashboard')
+
+        # Default fallback
+        messages.warning(request, "Please complete your profile setup.")
+        return redirect('core:profile_complete_update')
     else:
-        print('NOT EXIST profile')
-        return redirect('core:join_us')
-    return redirect('core:join_us')
+        messages.info(request, "Please create your profile to get started.")
+        return redirect('core:profile_add')
 
 
 # bckend profile  pages---------------------------------------------------------------------------------------------------------------------
@@ -451,3 +554,249 @@ def driverjobform(request):
     else:
         driverjobform = core_forms.DriverVacancyAplicationForm()
     return render(request, 'core/driverjobform.html', {'driverjobform': driverjobform})
+
+
+# NEW PROFILE VERIFICATION WORKFLOW --------------------------------------------------------------------------------------------------------------
+
+@login_required(login_url='/accounts/login/')
+def profile_complete_update(request):
+    """Profile update with completion tracking and partial saves"""
+    try:
+        profile = core_models.Profile.objects.get(user_id=request.user.id)
+    except core_models.Profile.DoesNotExist:
+        messages.error(request, "Please create a profile first!")
+        return redirect('core:profile_add')
+
+    if request.method == 'POST':
+        form = core_forms.ProfileUpdateForm(request.POST, instance=profile)
+
+        # Check which button was clicked
+        action = request.POST.get('action')
+
+        if form.is_valid():
+            profile = form.save(commit=False)
+
+            # Check if profile is complete
+            completion_percentage = profile.get_profile_completion_percentage()
+
+            if action == 'save':
+                # Partial save
+                profile.save()
+                messages.success(request, f"Profile saved successfully! ({completion_percentage}% complete)")
+                return redirect('core:profile_complete_update')
+
+            elif action == 'register_business' or action == 'join_driver':
+                # Check if profile is 100% complete
+                if completion_percentage == 100:
+                    profile.is_profile_completed = True
+
+                    if action == 'register_business':
+                        profile.is_business = True
+                        profile.is_driver = False
+                    else:  # join_driver
+                        profile.is_driver = True
+                        profile.is_business = False
+
+                    profile.save()
+                    messages.success(request, "Profile completed! Please complete your registration form.")
+
+                    if action == 'register_business':
+                        return redirect('core:business_register')
+                    else:
+                        return redirect('core:driver_register')
+                else:
+                    messages.error(request, f"Please complete all profile fields before proceeding. ({completion_percentage}% complete)")
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = core_forms.ProfileUpdateForm(instance=profile)
+
+    completion_percentage = profile.get_profile_completion_percentage()
+
+    context = {
+        'form': form,
+        'profile': profile,
+        'completion_percentage': completion_percentage,
+    }
+    return render(request, 'core/profile_complete_update.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def business_register(request):
+    """Business registration with completion tracking"""
+    try:
+        profile = core_models.Profile.objects.get(user_id=request.user.id)
+    except core_models.Profile.DoesNotExist:
+        messages.error(request, "Please complete your profile first!")
+        return redirect('core:profile_complete_update')
+
+    # Check if profile is completed
+    if not profile.is_profile_completed:
+        messages.error(request, "Please complete your profile before registering a business!")
+        return redirect('core:profile_complete_update')
+
+    # Check if user is set as business
+    if not profile.is_business:
+        messages.error(request, "Please select business role in your profile first!")
+        return redirect('core:profile_complete_update')
+
+    # Check if business already exists
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        # Business exists, update it
+        is_update = True
+    except business_models.Business.DoesNotExist:
+        business = None
+        is_update = False
+
+    if request.method == 'POST':
+        form = business_forms.businessRegisterForm(request.POST, instance=business)
+        action = request.POST.get('action')
+
+        if form.is_valid():
+            business = form.save(commit=False)
+            business.user = request.user
+            business.profile = profile
+
+            if not is_update:
+                business.business_id = random.randint(100000, 999999)
+                business.business_status = 'pending'
+
+            business.save()
+
+            # Calculate completion percentage
+            required_fields = ['business_name', 'business_phone', 'business_whatsapp',
+                             'business_email', 'business_product_category', 'business_qid']
+            completed = sum(1 for field in required_fields if getattr(business, field))
+            completion_percentage = int((completed / len(required_fields)) * 100)
+
+            if action == 'save':
+                messages.success(request, f"Business information saved! ({completion_percentage}% complete)")
+                return redirect('core:business_register')
+
+            elif action == 'apply_verification':
+                if completion_percentage == 100:
+                    profile.is_business_profile_completed = True
+                    profile.verification_status = 'pending'
+                    profile.verification_applied_at = datetime.now()
+                    profile.save()
+                    messages.success(request, "Application submitted for verification! Our team will review it soon.")
+                    return redirect('core:profile_view')
+                else:
+                    messages.error(request, f"Please complete all required fields. ({completion_percentage}% complete)")
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = business_forms.businessRegisterForm(instance=business)
+
+    # Calculate completion
+    if business:
+        required_fields = ['business_name', 'business_phone', 'business_whatsapp',
+                         'business_email', 'business_product_category', 'business_qid']
+        completed = sum(1 for field in required_fields if getattr(business, field))
+        completion_percentage = int((completed / len(required_fields)) * 100)
+    else:
+        completion_percentage = 0
+
+    can_apply = profile.can_apply_for_verification()
+
+    context = {
+        'form': form,
+        'profile': profile,
+        'completion_percentage': completion_percentage,
+        'can_apply': can_apply,
+        'is_update': is_update,
+    }
+    return render(request, 'core/business_register.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def driver_register(request):
+    """Driver registration with completion tracking"""
+    try:
+        profile = core_models.Profile.objects.get(user_id=request.user.id)
+    except core_models.Profile.DoesNotExist:
+        messages.error(request, "Please complete your profile first!")
+        return redirect('core:profile_complete_update')
+
+    # Check if profile is completed
+    if not profile.is_profile_completed:
+        messages.error(request, "Please complete your profile before joining as a driver!")
+        return redirect('core:profile_complete_update')
+
+    # Check if user is set as driver
+    if not profile.is_driver:
+        messages.error(request, "Please select driver role in your profile first!")
+        return redirect('core:profile_complete_update')
+
+    # Check if driver profile already exists
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        is_update = True
+    except fleet_models.Driver.DoesNotExist:
+        driver = None
+        is_update = False
+
+    if request.method == 'POST':
+        form = fleet_forms.DriverJoinForm(request.POST, instance=driver)
+        action = request.POST.get('action')
+
+        if form.is_valid():
+            driver = form.save(commit=False)
+            driver.user = request.user
+            driver.profile = profile
+
+            if not is_update:
+                driver.driver_id = profile.id
+                driver.driver_status = 'Pending on Review'
+                driver.driver_code = ''.join(random.choice(string.digits) for _ in range(6))
+                driver.driver_rating = 0
+                driver.driver_rating_count = 0
+                driver.driver_reviews_count = 0
+
+            driver.save()
+
+            # Calculate completion
+            required_fields = ['driver_phone', 'driver_whatsapp', 'driver_languages',
+                             'driver_license_number', 'driver_bio']
+            completed = sum(1 for field in required_fields if getattr(driver, field))
+            completion_percentage = int((completed / len(required_fields)) * 100)
+
+            if action == 'save':
+                messages.success(request, f"Driver information saved! ({completion_percentage}% complete)")
+                return redirect('core:driver_register')
+
+            elif action == 'apply_verification':
+                if completion_percentage == 100:
+                    profile.is_driver_profile_completed = True
+                    profile.verification_status = 'pending'
+                    profile.verification_applied_at = datetime.now()
+                    profile.save()
+                    messages.success(request, "Application submitted for verification! Our team will review it soon.")
+                    return redirect('core:profile_view')
+                else:
+                    messages.error(request, f"Please complete all required fields. ({completion_percentage}% complete)")
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = fleet_forms.DriverJoinForm(instance=driver)
+
+    # Calculate completion
+    if driver:
+        required_fields = ['driver_phone', 'driver_whatsapp', 'driver_languages',
+                         'driver_license_number', 'driver_bio']
+        completed = sum(1 for field in required_fields if getattr(driver, field))
+        completion_percentage = int((completed / len(required_fields)) * 100)
+    else:
+        completion_percentage = 0
+
+    can_apply = profile.can_apply_for_verification()
+
+    context = {
+        'form': form,
+        'profile': profile,
+        'completion_percentage': completion_percentage,
+        'can_apply': can_apply,
+        'is_update': is_update,
+    }
+    return render(request, 'core/driver_register.html', context)

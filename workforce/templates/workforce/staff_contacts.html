@@ -1,0 +1,475 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Staff Contacts - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .contacts-header {
+        background: var(--brand-gradient-yellow-white);
+        padding: 2rem;
+        border-radius: var(--brand-radius-lg);
+        margin-bottom: 2rem;
+        box-shadow: var(--brand-shadow-md);
+    }
+
+    .contacts-header h1 {
+        color: var(--brand-grey-800);
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .contacts-header p {
+        color: var(--brand-grey-600);
+        margin-bottom: 0;
+    }
+
+    .filter-section {
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        padding: 1.5rem;
+        box-shadow: var(--brand-shadow-sm);
+        margin-bottom: 2rem;
+    }
+
+    .filter-label {
+        display: block;
+        font-weight: 600;
+        color: var(--brand-grey-700);
+        margin-bottom: 0.75rem;
+        font-size: 1rem;
+    }
+
+    .filter-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 2px solid var(--brand-grey-300);
+        border-radius: var(--brand-radius-sm);
+        transition: var(--brand-transition);
+        font-size: 1rem;
+    }
+
+    .filter-input:focus {
+        outline: none;
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.2);
+    }
+
+    .filter-tabs {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+    }
+
+    .filter-tab {
+        background: var(--brand-white);
+        border: 2px solid var(--brand-grey-300);
+        border-radius: var(--brand-radius-sm);
+        padding: 0.625rem 1.25rem;
+        cursor: pointer;
+        transition: var(--brand-transition);
+        font-weight: 600;
+        color: var(--brand-grey-700);
+        font-size: 0.875rem;
+    }
+
+    .filter-tab:hover {
+        border-color: var(--brand-primary);
+        background: var(--brand-secondary);
+    }
+
+    .filter-tab.active {
+        background: var(--brand-primary);
+        border-color: var(--brand-primary);
+        color: var(--brand-grey-900);
+    }
+
+    /* Compact View - Contact Cards */
+    .contacts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .contact-card {
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        padding: 1.5rem;
+        box-shadow: var(--brand-shadow-sm);
+        border-left: 4px solid var(--brand-primary);
+        transition: var(--brand-transition);
+    }
+
+    .contact-card:hover {
+        box-shadow: var(--brand-shadow-md);
+        transform: translateY(-4px);
+    }
+
+    .contact-card.seller {
+        border-left-color: #2196f3;
+    }
+
+    .contact-card.fleet {
+        border-left-color: #ffc107;
+    }
+
+    .contact-card.courier {
+        border-left-color: #9c27b0;
+    }
+
+    .contact-card.dealer {
+        border-left-color: #ff5722;
+    }
+
+    .contact-card.supplier {
+        border-left-color: #4caf50;
+    }
+
+    .contact-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid var(--brand-grey-200);
+    }
+
+    .contact-avatar {
+        width: 55px;
+        height: 55px;
+        border-radius: 50%;
+        background: var(--brand-gradient-yellow-white);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--brand-grey-800);
+        flex-shrink: 0;
+    }
+
+    .contact-info h3 {
+        font-size: 1.063rem;
+        font-weight: 700;
+        color: var(--brand-grey-800);
+        margin-bottom: 0.25rem;
+    }
+
+    .contact-type {
+        display: inline-block;
+        padding: 0.25rem 0.625rem;
+        border-radius: var(--brand-radius-sm);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .contact-type.seller {
+        background: #e3f2fd;
+        color: #1565c0;
+    }
+
+    .contact-type.fleet {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .contact-type.courier {
+        background: #f3e5f5;
+        color: #6a1b9a;
+    }
+
+    .contact-type.dealer {
+        background: #ffebee;
+        color: #c62828;
+    }
+
+    .contact-type.supplier {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+
+    .contact-details {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .contact-item {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        color: var(--brand-grey-700);
+        font-size: 0.938rem;
+    }
+
+    .contact-item i {
+        width: 20px;
+        color: var(--brand-primary);
+        font-size: 0.875rem;
+    }
+
+    .contact-item a {
+        color: var(--brand-grey-700);
+        text-decoration: none;
+        transition: var(--brand-transition);
+    }
+
+    .contact-item a:hover {
+        color: var(--brand-primary);
+    }
+
+    .contact-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--brand-grey-200);
+    }
+
+    .contact-btn {
+        flex: 1;
+        padding: 0.625rem;
+        border-radius: var(--brand-radius-sm);
+        border: 1px solid var(--brand-grey-300);
+        background: var(--brand-white);
+        color: var(--brand-grey-700);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        transition: var(--brand-transition);
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .contact-btn:hover {
+        background: var(--brand-secondary);
+        border-color: var(--brand-primary);
+        color: var(--brand-grey-800);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        box-shadow: var(--brand-shadow-sm);
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: var(--brand-grey-400);
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h3 {
+        color: var(--brand-grey-700);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+        color: var(--brand-grey-500);
+    }
+
+    @media (max-width: 768px) {
+        .contacts-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Header -->
+<div class="contacts-header">
+    <h1>
+        <i class="fa-solid fa-address-book me-2"></i>Staff Contacts Directory
+    </h1>
+    <p>All contacts in compact view - Sellers, Fleet, Couriers, Dealers, Suppliers</p>
+</div>
+
+<!-- Search Filter Section -->
+<div class="filter-section">
+    <label for="contactFilter" class="filter-label">
+        <i class="fa-solid fa-search me-2"></i>Search Contacts
+    </label>
+    <input type="text" id="contactFilter" class="filter-input" placeholder="Search by name, phone, or company...">
+</div>
+
+<!-- Filter Tabs -->
+<div class="filter-tabs">
+    <div class="filter-tab active" data-filter="all">
+        <i class="fa-solid fa-users me-2"></i>All Contacts
+    </div>
+    <div class="filter-tab" data-filter="seller">
+        <i class="fa-solid fa-store me-2"></i>Sellers
+    </div>
+    <div class="filter-tab" data-filter="fleet">
+        <i class="fa-solid fa-car me-2"></i>Fleet
+    </div>
+    <div class="filter-tab" data-filter="courier">
+        <i class="fa-solid fa-truck me-2"></i>Couriers
+    </div>
+    <div class="filter-tab" data-filter="dealer">
+        <i class="fa-solid fa-handshake me-2"></i>Dealers
+    </div>
+    <div class="filter-tab" data-filter="supplier">
+        <i class="fa-solid fa-boxes-stacked me-2"></i>Suppliers
+    </div>
+</div>
+
+<!-- Contacts Grid -->
+{% if contacts %}
+<div class="contacts-grid">
+    {% for contact in contacts %}
+    <div class="contact-card {{ contact.type }}" data-type="{{ contact.type }}" data-search="{{ contact.name|lower }} {{ contact.phone }} {{ contact.company|lower }}">
+        <div class="contact-header">
+            <div class="contact-avatar">
+                {{ contact.name|first|upper }}
+            </div>
+            <div class="contact-info">
+                <h3>{{ contact.name }}</h3>
+                <span class="contact-type {{ contact.type }}">{{ contact.type|title }}</span>
+            </div>
+        </div>
+        <div class="contact-details">
+            {% if contact.company %}
+            <div class="contact-item">
+                <i class="fa-solid fa-building"></i>
+                <span>{{ contact.company }}</span>
+            </div>
+            {% endif %}
+            {% if contact.phone %}
+            <div class="contact-item">
+                <i class="fa-solid fa-phone"></i>
+                <a href="tel:{{ contact.phone }}">{{ contact.phone }}</a>
+            </div>
+            {% endif %}
+            {% if contact.email %}
+            <div class="contact-item">
+                <i class="fa-solid fa-envelope"></i>
+                <a href="mailto:{{ contact.email }}">{{ contact.email|truncatewords:3 }}</a>
+            </div>
+            {% endif %}
+            {% if contact.location %}
+            <div class="contact-item">
+                <i class="fa-solid fa-location-dot"></i>
+                <span>{{ contact.location|truncatewords:4 }}</span>
+            </div>
+            {% endif %}
+        </div>
+        <div class="contact-actions">
+            <a href="tel:{{ contact.phone }}" class="contact-btn">
+                <i class="fa-solid fa-phone"></i>
+                Call
+            </a>
+            <a href="mailto:{{ contact.email }}" class="contact-btn">
+                <i class="fa-solid fa-envelope"></i>
+                Email
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if contacts.has_other_pages %}
+<nav aria-label="Contacts pagination">
+    <ul class="pagination justify-content-center">
+        {% if contacts.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ contacts.previous_page_number }}" aria-label="Previous">
+                <span aria-hidden="true">&laquo;</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">&laquo;</span>
+        </li>
+        {% endif %}
+
+        {% for num in contacts.paginator.page_range %}
+        {% if contacts.number == num %}
+        <li class="page-item active">
+            <span class="page-link">{{ num }}</span>
+        </li>
+        {% elif num > contacts.number|add:'-3' and num < contacts.number|add:'3' %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+        </li>
+        {% endif %}
+        {% endfor %}
+
+        {% if contacts.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ contacts.next_page_number }}" aria-label="Next">
+                <span aria-hidden="true">&raquo;</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">&raquo;</span>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="empty-state">
+    <i class="fa-solid fa-address-book"></i>
+    <h3>No Contacts Found</h3>
+    <p>There are no contacts available at the moment.</p>
+</div>
+{% endif %}
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Filter tabs functionality
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            // Remove active class from all tabs
+            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            // Add active class to clicked tab
+            this.classList.add('active');
+
+            const filter = this.getAttribute('data-filter');
+            const cards = document.querySelectorAll('.contact-card');
+
+            cards.forEach(card => {
+                if (filter === 'all') {
+                    card.style.display = 'block';
+                } else {
+                    if (card.getAttribute('data-type') === filter) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                }
+            });
+        });
+    });
+
+    // Search functionality
+    document.getElementById('contactFilter').addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const cards = document.querySelectorAll('.contact-card');
+
+        cards.forEach(card => {
+            const searchData = card.getAttribute('data-search');
+            if (searchData.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+</script>
+{% endblock extra_js %}

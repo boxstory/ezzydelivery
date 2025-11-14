@@ -1,9 +1,12 @@
 import random
+from urllib.parse import quote
 from django.forms.fields import DateTimeField
 from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from webpages.forms import *
+from webpages.models import WhatsAppInquiry, PricingEnquiry
 from django.core.mail import mail_admins, send_mail
 from client import models as business_models
 from fleet import models as fleet_models
@@ -27,30 +30,116 @@ def delivery_pricing(request):
     return render(request, 'webpages/3pl_pricing.html', data)
 
 def delivery_inquiry(request):
-    form = PricingEnquiryForm(request.POST or None)
+    """Multi-step pricing inquiry form"""
+    # Initialize session data if not exists
+    if 'inquiry_data' not in request.session:
+        request.session['inquiry_data'] = {}
+
+    # Get current step (default to 1)
+    current_step = int(request.GET.get('step', request.session.get('inquiry_step', 1)))
+
     if request.method == 'POST':
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Successful Submission")
-            
-            # Send email to admins
-            subject = "New Delivery Inquiry"
-            message = f"New delivery inquiry submitted by {form.cleaned_data['name']}."
-            mail_admins(subject, message)
-            
-            # Send email to Gmail
-            send_mail(
-                subject,
-                message,
-                'zellaqatar@gmail.com',  # Replace with your Gmail address
-                ['ezzydelivery@gmail.com'],  # Replace with recipient's email address
-                fail_silently=False,
+        # Handle WhatsApp quick inquiry
+        if 'whatsapp_submit' in request.POST:
+            company_name = request.POST.get('wa_company_name')
+            contact_person = request.POST.get('wa_contact_person')
+            contact_number = request.POST.get('wa_contact_number')
+            product_category = request.POST.get('wa_product_category')
+            product_name = request.POST.get('wa_product_name', '')
+            additional_info = request.POST.get('wa_additional_info', '')
+
+            # Save to database
+            WhatsAppInquiry.objects.create(
+                company_name=company_name,
+                contact_person=contact_person,
+                contact_number=contact_number,
+                product_category=product_category,
+                product_name=product_name,
+                additional_info=additional_info
             )
-            
+
+            # Generate WhatsApp message
+            wa_message = f"Hi, I'm {contact_person} from {company_name}. "
+            wa_message += f"I'm interested in delivery services for {product_category}"
+            if product_name:
+                wa_message += f" ({product_name})"
+            wa_message += f". Contact: {contact_number}"
+            if additional_info:
+                wa_message += f". Additional info: {additional_info}"
+
+            # WhatsApp business number (replace with actual number)
+            wa_number = "97466609347"  # Example Qatar number
+            wa_link = f"https://wa.me/{wa_number}?text={quote(wa_message)}"
+
+            return JsonResponse({'success': True, 'redirect_url': wa_link})
+
+        # Store current step data in session
+        step_data = {}
+        for key, value in request.POST.items():
+            if key != 'csrfmiddlewaretoken':
+                step_data[key] = value
+
+        request.session['inquiry_data'].update(step_data)
+        request.session['inquiry_step'] = current_step
+
+        # Handle navigation
+        if 'next_step' in request.POST:
+            next_step = current_step + 1
+            return redirect(f'/3pl/inquiry/?step={next_step}')
+
+        elif 'prev_step' in request.POST:
+            prev_step = max(1, current_step - 1)
+            return redirect(f'/3pl/inquiry/?step={prev_step}')
+
+        elif 'submit_final' in request.POST:
+            # Save complete inquiry
+            inquiry_data = request.session.get('inquiry_data', {})
+
+            # Create pricing enquiry instance
+            pricing_enquiry = PricingEnquiry.objects.create(
+                full_name=inquiry_data.get('full_name', ''),
+                business_name=inquiry_data.get('business_name', ''),
+                business_contact_number=inquiry_data.get('business_contact_number', ''),
+                operation_team_contact_number=inquiry_data.get('operation_team_contact_number', ''),
+                website_url=inquiry_data.get('website_url', ''),
+                social_profile=inquiry_data.get('social_profile', ''),
+                product_category=inquiry_data.get('product_category', ''),
+                is_personalized_product=inquiry_data.get('is_personalized_product', 'False') == 'True',
+                is_registered_company_in_qatar=inquiry_data.get('is_registered_company_in_qatar', 'False') == 'True',
+                is_located_in_qatar=inquiry_data.get('is_located_in_qatar', 'False') == 'True',
+                is_team_available_in_qatar=inquiry_data.get('is_team_available_in_qatar', 'False') == 'True',
+                is_required_COD_service=inquiry_data.get('is_required_COD_service', 'False') == 'True',
+                is_required_fulfillment_service_for_operate_from_outside_qatar=inquiry_data.get('is_required_fulfillment_service_for_operate_from_outside_qatar', 'False') == 'True',
+                is_required_fulfillment_service_for_make_hub_in_doha=inquiry_data.get('is_required_fulfillment_service_for_make_hub_in_doha', 'False') == 'True',
+                avarage_number_of_order_last_week=inquiry_data.get('avarage_number_of_order_last_week', ''),
+                avarage_number_of_order_done_last_month=inquiry_data.get('avarage_number_of_order_done_last_month', ''),
+                avarage_number_of_order_expect_next_month=inquiry_data.get('avarage_number_of_order_expect_next_month', ''),
+                orders_expected_in_next_3_months_milestone=inquiry_data.get('orders_expected_in_next_3_months_milestone', ''),
+                speed_delivery_offer_to_customers=inquiry_data.get('speed_delivery_offer_to_customers', ''),
+                is_frequent_same_day_pick_and_delivery_required=inquiry_data.get('is_frequent_same_day_pick_and_delivery_required', 'False') == 'True',
+                preferred_delivery_time_window=inquiry_data.get('preferred_delivery_time_window', ''),
+                typical_package_size=inquiry_data.get('typical_package_size', ''),
+                is_special_handling_required=inquiry_data.get('is_special_handling_required', 'False') == 'True',
+                type_of_pickup_location=inquiry_data.get('type_of_pickup_location', ''),
+                pickup_Location_area_name=inquiry_data.get('pickup_Location_area_name', ''),
+                pickup_location_time_slab=inquiry_data.get('pickup_location_time_slab', ''),
+                number_of_pickup_times_in_day=inquiry_data.get('number_of_pickup_times_in_day', '1'),
+            )
+
+            # Clear session
+            request.session.pop('inquiry_data', None)
+            request.session.pop('inquiry_step', None)
+
+            messages.success(request, "Thank you! Your inquiry has been submitted successfully. Our team will contact you soon.")
             return redirect('/')
 
+    # Get saved data from session
+    saved_data = request.session.get('inquiry_data', {})
+
     data = {
-        'form': form
+        'current_step': current_step,
+        'saved_data': saved_data,
+        'total_steps': 3,
     }
     return render(request, 'webpages/delivery_pricing_inquiry.html', data)
 

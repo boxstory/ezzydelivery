@@ -36,14 +36,38 @@ urlpatterns = [
     path('delivery-task/<int:task_id>/publish-driver-app/', workforce_views.publish_task_to_driver_app, name='publish_task_to_driver_app'),
     path('delivery-task/<int:task_id>/assign-driver/', workforce_views.assign_driver_to_task, name='assign_driver_to_task'),
     path('delivery-task/<int:task_id>/update-status/', workforce_views.update_task_status, name='update_task_status'),
-    
 
+    # User Verification URLs
+    path('verification/users/', workforce_views.user_verification_list, name='user_verification_list'),
+    path('verification/<int:profile_id>/update-status/', workforce_views.update_verification_status, name='update_verification_status'),
+
+    # Additional Orders URLs
+    path('orders/dms-updated/', workforce_views.orders_dms_updated, name='orders_dms_updated'),
+    path('orders/reported/', workforce_views.orders_reported, name='orders_reported'),
+
+    # Additional Tasks URLs
+    path('tasks/followup-list/', workforce_views.tasks_followup_list, name='tasks_followup_list'),
+    path('tasks/dms-updated/', workforce_views.tasks_dms_updated, name='tasks_dms_updated'),
+    path('tasks/reported/', workforce_views.tasks_reported, name='tasks_reported'),
 
     #DMS sections urls -----------------------------------------------------------------------
+    path('dms/publish-order/', workforce_views.dms_publish_order, name='dms_publish_order'),
 
-
+    # Fleet Accounts URLs
+    path('fleet/cod-in-hand/', workforce_views.fleet_cod_in_hand, name='fleet_cod_in_hand'),
+    path('fleet/drivers-earnings/', workforce_views.fleet_drivers_earnings, name='fleet_drivers_earnings'),
+    path('fleet/transactions/', workforce_views.fleet_transactions, name='fleet_transactions'),
 
     #Documents sections urls -----------------------------------------------------------------
+    # (Documents URLs already exist in fleet app)
+
+    # Inventory URLs
+    path('inventory/reports/', workforce_views.inventory_reports, name='inventory_reports'),
+    path('inventory/restock-list/', workforce_views.inventory_restock_list, name='inventory_restock_list'),
+
+    # Quick Links URLs
+    path('reports/', workforce_views.staff_reports, name='staff_reports'),
+    path('contacts/', workforce_views.staff_contacts, name='staff_contacts'),
 
     # Workflow guide
     path('workflow-guide/', workforce_views.workflow_guide, name='workflow_guide'),

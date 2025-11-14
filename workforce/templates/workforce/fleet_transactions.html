@@ -1,0 +1,374 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Fleet Transactions - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .transactions-header {
+        background: var(--brand-gradient-yellow-white);
+        padding: 2rem;
+        border-radius: var(--brand-radius-lg);
+        margin-bottom: 2rem;
+        box-shadow: var(--brand-shadow-md);
+    }
+
+    .transactions-header h1 {
+        color: var(--brand-grey-800);
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .transactions-header p {
+        color: var(--brand-grey-600);
+        margin-bottom: 0;
+    }
+
+    .filter-section {
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        padding: 1.5rem;
+        box-shadow: var(--brand-shadow-sm);
+        margin-bottom: 2rem;
+    }
+
+    .filter-label {
+        display: block;
+        font-weight: 600;
+        color: var(--brand-grey-700);
+        margin-bottom: 0.75rem;
+        font-size: 1rem;
+    }
+
+    .filter-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 2px solid var(--brand-grey-300);
+        border-radius: var(--brand-radius-sm);
+        transition: var(--brand-transition);
+        font-size: 1rem;
+    }
+
+    .filter-input:focus {
+        outline: none;
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.2);
+    }
+
+    .info-banner {
+        background: #e7f3ff;
+        border-left: 4px solid #2196f3;
+        padding: 1.25rem;
+        border-radius: var(--brand-radius-sm);
+        margin-bottom: 2rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .info-banner i {
+        font-size: 1.5rem;
+        color: #1565c0;
+    }
+
+    .info-banner-content h4 {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #0d47a1;
+        margin-bottom: 0.25rem;
+    }
+
+    .info-banner-content p {
+        font-size: 0.875rem;
+        color: #1565c0;
+        margin-bottom: 0;
+    }
+
+    .transactions-table-container {
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        box-shadow: var(--brand-shadow-sm);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+
+    .transactions-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .transactions-table thead {
+        background: var(--brand-gradient-yellow-white);
+    }
+
+    .transactions-table th {
+        padding: 1rem;
+        text-align: left;
+        font-weight: 700;
+        color: var(--brand-grey-800);
+        text-transform: uppercase;
+        font-size: 0.875rem;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid var(--brand-grey-300);
+    }
+
+    .transactions-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--brand-grey-200);
+        color: var(--brand-grey-700);
+    }
+
+    .transactions-table tbody tr {
+        transition: var(--brand-transition);
+    }
+
+    .transactions-table tbody tr:hover {
+        background: var(--brand-secondary);
+    }
+
+    .transaction-type {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: var(--brand-radius-sm);
+        font-size: 0.813rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .transaction-type.cod {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .transaction-type.earning {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+
+    .transaction-type.settlement {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .amount-cell {
+        font-weight: 700;
+        font-size: 1.125rem;
+    }
+
+    .amount-credit {
+        color: #28a745;
+    }
+
+    .amount-debit {
+        color: #dc3545;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 0.375rem 0.75rem;
+        border-radius: var(--brand-radius-sm);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .status-settled {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-pending {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .status-unsettled {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        box-shadow: var(--brand-shadow-sm);
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: var(--brand-grey-400);
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h3 {
+        color: var(--brand-grey-700);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+        color: var(--brand-grey-500);
+    }
+
+    @media (max-width: 768px) {
+        .transactions-table-container {
+            overflow-x: auto;
+        }
+
+        .transactions-table {
+            min-width: 900px;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Header -->
+<div class="transactions-header">
+    <h1>
+        <i class="fa-solid fa-money-bill-transfer me-2"></i>Fleet Transactions
+    </h1>
+    <p>View COD and earnings transactions from last settlement</p>
+</div>
+
+<!-- Fleet Filter Section -->
+<div class="filter-section">
+    <form method="get" action="">
+        <label for="driverFilter" class="filter-label">
+            <i class="fa-solid fa-filter me-2"></i>Filter by Fleet Driver
+        </label>
+        <select id="driverFilter" name="driver_id" class="filter-input" onchange="this.form.submit()">
+            <option value="">All Drivers</option>
+            {% for driver in all_drivers %}
+            <option value="{{ driver.id }}" {% if request.GET.driver_id == driver.id|stringformat:"s" %}selected{% endif %}>
+                {{ driver.user.first_name }} {{ driver.user.last_name }} ({{ driver.driver_id }})
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<!-- Info Banner - Last Settled Date -->
+{% if selected_driver and selected_driver.last_settled_date %}
+<div class="info-banner">
+    <i class="fa-solid fa-calendar-check"></i>
+    <div class="info-banner-content">
+        <h4>Viewing transactions since last settlement</h4>
+        <p>Last Settlement Date: <strong>{{ selected_driver.last_settled_date|date:"d M Y, h:i A" }}</strong></p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Transactions Table -->
+{% if transactions %}
+<div class="transactions-table-container">
+    <table class="transactions-table">
+        <thead>
+            <tr>
+                <th>Date & Time</th>
+                <th>Task ID</th>
+                <th>Type</th>
+                <th>COD Amount</th>
+                <th>Earning Amount</th>
+                <th>Delivery Status</th>
+                <th>COD Settled</th>
+                <th>Earning Settled</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for transaction in transactions %}
+            <tr>
+                <td>{{ transaction.created_at|date:"d M Y, h:i A" }}</td>
+                <td><strong>#{{ transaction.delivery_task_id }}</strong></td>
+                <td>
+                    <span class="transaction-type {% if transaction.cod_amount > 0 %}cod{% else %}earning{% endif %}">
+                        {% if transaction.cod_amount > 0 %}COD{% else %}Earning{% endif %}
+                    </span>
+                </td>
+                <td>
+                    <span class="amount-cell {% if transaction.cod_amount > 0 %}amount-credit{% endif %}">
+                        ₹{{ transaction.cod_amount|default:"0.00" }}
+                    </span>
+                </td>
+                <td>
+                    <span class="amount-cell amount-credit">
+                        ₹{{ transaction.earning_amount|default:"0.00" }}
+                    </span>
+                </td>
+                <td>
+                    <span class="transaction-type {{ transaction.delivery_status|lower }}">
+                        {{ transaction.delivery_status|default:"Pending" }}
+                    </span>
+                </td>
+                <td>
+                    <span class="status-badge {% if transaction.is_cod_settled %}status-settled{% else %}status-unsettled{% endif %}">
+                        {% if transaction.is_cod_settled %}Settled{% else %}Unsettled{% endif %}
+                    </span>
+                </td>
+                <td>
+                    <span class="status-badge {% if transaction.is_settled_DL %}status-settled{% else %}status-unsettled{% endif %}">
+                        {% if transaction.is_settled_DL %}Settled{% else %}Unsettled{% endif %}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if transactions.has_other_pages %}
+<nav aria-label="Transactions pagination">
+    <ul class="pagination justify-content-center">
+        {% if transactions.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ transactions.previous_page_number }}{% if request.GET.driver_id %}&driver_id={{ request.GET.driver_id }}{% endif %}" aria-label="Previous">
+                <span aria-hidden="true">&laquo;</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">&laquo;</span>
+        </li>
+        {% endif %}
+
+        {% for num in transactions.paginator.page_range %}
+        {% if transactions.number == num %}
+        <li class="page-item active">
+            <span class="page-link">{{ num }}</span>
+        </li>
+        {% elif num > transactions.number|add:'-3' and num < transactions.number|add:'3' %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ num }}{% if request.GET.driver_id %}&driver_id={{ request.GET.driver_id }}{% endif %}">{{ num }}</a>
+        </li>
+        {% endif %}
+        {% endfor %}
+
+        {% if transactions.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ transactions.next_page_number }}{% if request.GET.driver_id %}&driver_id={{ request.GET.driver_id }}{% endif %}" aria-label="Next">
+                <span aria-hidden="true">&raquo;</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">&raquo;</span>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="empty-state">
+    <i class="fa-solid fa-money-bill-transfer"></i>
+    <h3>No Transactions Found</h3>
+    <p>There are no transactions since the last settlement date.</p>
+</div>
+{% endif %}
+
+{% endblock content %}

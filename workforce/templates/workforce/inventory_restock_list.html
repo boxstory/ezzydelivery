@@ -1,0 +1,348 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Restock List - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .restock-header {
+        background: var(--brand-gradient-yellow-white);
+        padding: 2rem;
+        border-radius: var(--brand-radius-lg);
+        margin-bottom: 2rem;
+        box-shadow: var(--brand-shadow-md);
+    }
+
+    .restock-header h1 {
+        color: var(--brand-grey-800);
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .restock-header p {
+        color: var(--brand-grey-600);
+        margin-bottom: 0;
+    }
+
+    .filter-section {
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        padding: 1.5rem;
+        box-shadow: var(--brand-shadow-sm);
+        margin-bottom: 2rem;
+    }
+
+    .filter-label {
+        display: block;
+        font-weight: 600;
+        color: var(--brand-grey-700);
+        margin-bottom: 0.75rem;
+        font-size: 1rem;
+    }
+
+    .filter-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 2px solid var(--brand-grey-300);
+        border-radius: var(--brand-radius-sm);
+        transition: var(--brand-transition);
+        font-size: 1rem;
+    }
+
+    .filter-input:focus {
+        outline: none;
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.2);
+    }
+
+    /* Compact View - Product Cards */
+    .product-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .product-card {
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        padding: 1.25rem;
+        box-shadow: var(--brand-shadow-sm);
+        border-left: 4px solid #ff6b6b;
+        transition: var(--brand-transition);
+        cursor: pointer;
+    }
+
+    .product-card:hover {
+        box-shadow: var(--brand-shadow-md);
+        transform: translateY(-4px);
+    }
+
+    .product-card-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid var(--brand-grey-200);
+    }
+
+    .product-icon {
+        width: 45px;
+        height: 45px;
+        background: var(--brand-gradient-yellow-white);
+        border-radius: var(--brand-radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        color: var(--brand-grey-800);
+    }
+
+    .product-info h4 {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--brand-grey-800);
+        margin-bottom: 0.25rem;
+    }
+
+    .product-info p {
+        font-size: 0.813rem;
+        color: var(--brand-grey-600);
+        margin-bottom: 0;
+    }
+
+    .product-details {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .stock-qty {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #dc3545;
+    }
+
+    .stock-label {
+        font-size: 0.813rem;
+        font-weight: 600;
+        color: var(--brand-grey-600);
+        text-transform: uppercase;
+    }
+
+    /* Detailed Inventory List */
+    .inventory-table-container {
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        box-shadow: var(--brand-shadow-sm);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+
+    .inventory-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .inventory-table thead {
+        background: var(--brand-gradient-yellow-white);
+    }
+
+    .inventory-table th {
+        padding: 1rem;
+        text-align: left;
+        font-weight: 700;
+        color: var(--brand-grey-800);
+        text-transform: uppercase;
+        font-size: 0.875rem;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid var(--brand-grey-300);
+    }
+
+    .inventory-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--brand-grey-200);
+        color: var(--brand-grey-700);
+    }
+
+    .inventory-table tbody tr {
+        transition: var(--brand-transition);
+    }
+
+    .inventory-table tbody tr:hover {
+        background: var(--brand-secondary);
+    }
+
+    .back-btn {
+        background: var(--brand-white);
+        border: 2px solid var(--brand-grey-300);
+        border-radius: var(--brand-radius-sm);
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--brand-transition);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        text-decoration: none;
+        color: var(--brand-grey-700);
+    }
+
+    .back-btn:hover {
+        background: var(--brand-secondary);
+        border-color: var(--brand-primary);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        box-shadow: var(--brand-shadow-sm);
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: #28a745;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h3 {
+        color: var(--brand-grey-700);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+        color: var(--brand-grey-500);
+    }
+
+    @media (max-width: 768px) {
+        .product-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .inventory-table-container {
+            overflow-x: auto;
+        }
+
+        .inventory-table {
+            min-width: 800px;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Header -->
+<div class="restock-header">
+    <h1>
+        <i class="fa-solid fa-box-open me-2"></i>Inventory Restock List
+    </h1>
+    <p>Products requiring restocking by seller/store</p>
+</div>
+
+<!-- Seller/Store Filter Section -->
+<div class="filter-section">
+    <label for="sellerFilter" class="filter-label">
+        <i class="fa-solid fa-filter me-2"></i>Filter by Seller/Store
+    </label>
+    <input type="text" id="sellerFilter" class="filter-input" placeholder="Search by seller or store name...">
+</div>
+
+{% if selected_seller %}
+<!-- Back Button -->
+<a href="{% url 'workforce:inventory_restock_list' %}" class="back-btn">
+    <i class="fa-solid fa-arrow-left"></i>
+    Back to All Sellers
+</a>
+
+<!-- Detailed Inventory Table -->
+<div class="inventory-table-container">
+    <table class="inventory-table">
+        <thead>
+            <tr>
+                <th>Product Name</th>
+                <th>SKU</th>
+                <th>Current Stock</th>
+                <th>Reorder Level</th>
+                <th>Suggested Qty</th>
+                <th>Priority</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+            <tr>
+                <td><strong>{{ product.name }}</strong></td>
+                <td>{{ product.sku|default:"N/A" }}</td>
+                <td><strong style="color: #dc3545;">{{ product.quantity|default:"0" }}</strong> {{ product.unit|default:"units" }}</td>
+                <td>{{ product.reorder_level|default:"N/A" }}</td>
+                <td><strong>{{ product.suggested_qty|default:"N/A" }}</strong></td>
+                <td>
+                    {% if product.quantity == 0 %}
+                    <span style="color: #dc3545; font-weight: 700;">Urgent</span>
+                    {% else %}
+                    <span style="color: #ffc107; font-weight: 700;">High</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+<!-- Compact View - Product Cards -->
+{% if products %}
+<div class="product-grid">
+    {% for product in products %}
+    <div class="product-card" onclick="window.location.href='?seller_id={{ product.seller_id }}'">
+        <div class="product-card-header">
+            <div class="product-icon">
+                <i class="fa-solid fa-box"></i>
+            </div>
+            <div class="product-info">
+                <h4>{{ product.name }}</h4>
+                <p>{{ product.seller_name|default:"Store" }}</p>
+            </div>
+        </div>
+        <div class="product-details">
+            <div>
+                <div class="stock-label">Stock Quantity</div>
+                <div class="stock-qty">{{ product.quantity|default:"0" }}</div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <i class="fa-solid fa-check-circle"></i>
+    <h3>All Stocked Up!</h3>
+    <p>No products require restocking at this time.</p>
+</div>
+{% endif %}
+{% endif %}
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Filter product cards
+    document.getElementById('sellerFilter').addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const cards = document.querySelectorAll('.product-card');
+
+        cards.forEach(card => {
+            const text = card.textContent.toLowerCase();
+            if (text.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+</script>
+{% endblock extra_js %}

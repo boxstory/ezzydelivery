@@ -20,14 +20,62 @@ class Profile(models.Model):
     is_business = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     is_driver = models.BooleanField(default=False)
+
+    # Profile completion tracking
+    is_profile_completed = models.BooleanField(default=False)
+    is_business_profile_completed = models.BooleanField(default=False)
+    is_driver_profile_completed = models.BooleanField(default=False)
+
+    # Verification status
+    VERIFICATION_STATUS_CHOICES = (
+        ('pending', 'Pending Verification'),
+        ('under_review', 'Under Review'),
+        ('verified', 'Verified'),
+        ('rejected', 'Rejected'),
+        ('incomplete', 'Incomplete'),
+    )
+    verification_status = models.CharField(
+        max_length=20,
+        choices=VERIFICATION_STATUS_CHOICES,
+        default='incomplete'
+    )
+    verification_applied_at = models.DateTimeField(blank=True, null=True)
+    verified_at = models.DateTimeField(blank=True, null=True)
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='verified_profiles'
+    )
+    rejection_reason = models.TextField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
         return f"{self.username}"
 
     class Meta:
         verbose_name_plural = "Profiles"
+
+    def get_profile_completion_percentage(self):
+        """Calculate profile completion percentage"""
+        required_fields = [
+            'username', 'first_name', 'last_name', 'email',
+            'phone', 'whatsapp', 'zone_name', 'address',
+            'nationlity', 'date_of_birth'
+        ]
+        completed = sum(1 for field in required_fields if getattr(self, field))
+        return int((completed / len(required_fields)) * 100)
+
+    def can_apply_for_verification(self):
+        """Check if user can apply for verification"""
+        if self.is_business:
+            return self.is_profile_completed and self.is_business_profile_completed
+        elif self.is_driver:
+            return self.is_profile_completed and self.is_driver_profile_completed
+        return False
 
 
 def user_directory_path(instance, filename):

@@ -1,0 +1,472 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block title %}User Verification - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .verification-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+    }
+
+    .filter-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .filter-tab {
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        background: white;
+        border: 2px solid #e5e7eb;
+        color: #6b7280;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+
+    .filter-tab:hover {
+        border-color: #667eea;
+        color: #667eea;
+    }
+
+    .filter-tab.active {
+        background: #667eea;
+        border-color: #667eea;
+        color: white;
+    }
+
+    .verification-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    }
+
+    .verification-card:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .user-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #f3f4f6;
+    }
+
+    .user-info h4 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 0.25rem;
+    }
+
+    .user-meta {
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+
+    .status-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .badge-incomplete {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+
+    .badge-pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .badge-under_review {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .badge-verified {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .badge-rejected {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .role-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .role-business {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .role-driver {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+
+    .detail-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .detail-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+        text-transform: uppercase;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .detail-value {
+        font-size: 0.875rem;
+        color: #1f2937;
+        font-weight: 500;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 2px solid #f3f4f6;
+    }
+
+    .btn-verify {
+        background: #10b981;
+        color: white;
+        padding: 0.5rem 1.25rem;
+        border-radius: 6px;
+        font-weight: 600;
+        border: none;
+        transition: all 0.3s ease;
+    }
+
+    .btn-verify:hover {
+        background: #059669;
+    }
+
+    .btn-reject {
+        background: #ef4444;
+        color: white;
+        padding: 0.5rem 1.25rem;
+        border-radius: 6px;
+        font-weight: 600;
+        border: none;
+        transition: all 0.3s ease;
+    }
+
+    .btn-reject:hover {
+        background: #dc2626;
+    }
+
+    .btn-review {
+        background: #3b82f6;
+        color: white;
+        padding: 0.5rem 1.25rem;
+        border-radius: 6px;
+        font-weight: 600;
+        border: none;
+        transition: all 0.3s ease;
+    }
+
+    .btn-review:hover {
+        background: #2563eb;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #9ca3af;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+
+    .completion-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-left: 0.5rem;
+    }
+
+    .completion-high {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .completion-medium {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .completion-low {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Header -->
+<div class="verification-header">
+    <h1 class="mb-2">
+        <i class="fa-solid fa-user-check me-2"></i>User Verification Management
+    </h1>
+    <p class="mb-0">Review and approve user applications</p>
+</div>
+
+<!-- Filter Tabs -->
+<div class="filter-tabs">
+    <a href="?status=all" class="filter-tab {% if current_filter == 'all' %}active{% endif %}">
+        <i class="fa-solid fa-list me-1"></i>All Users
+    </a>
+    <a href="?status=pending" class="filter-tab {% if current_filter == 'pending' %}active{% endif %}">
+        <i class="fa-solid fa-clock me-1"></i>Pending
+    </a>
+    <a href="?status=under_review" class="filter-tab {% if current_filter == 'under_review' %}active{% endif %}">
+        <i class="fa-solid fa-eye me-1"></i>Under Review
+    </a>
+    <a href="?status=verified" class="filter-tab {% if current_filter == 'verified' %}active{% endif %}">
+        <i class="fa-solid fa-check-circle me-1"></i>Verified
+    </a>
+    <a href="?status=rejected" class="filter-tab {% if current_filter == 'rejected' %}active{% endif %}">
+        <i class="fa-solid fa-times-circle me-1"></i>Rejected
+    </a>
+    <a href="?status=incomplete" class="filter-tab {% if current_filter == 'incomplete' %}active{% endif %}">
+        <i class="fa-solid fa-exclamation-triangle me-1"></i>Incomplete
+    </a>
+</div>
+
+<!-- Verification Cards -->
+{% if verification_data %}
+    {% for data in verification_data %}
+    <div class="verification-card">
+        <!-- User Header -->
+        <div class="user-header">
+            <div class="user-info">
+                <h4>
+                    {{ data.user.first_name }} {{ data.user.last_name }}
+                    <span class="role-badge {% if data.profile.is_business %}role-business{% else %}role-driver{% endif %}">
+                        {% if data.profile.is_business %}
+                            <i class="fa-solid fa-building me-1"></i>Business
+                        {% else %}
+                            <i class="fa-solid fa-car me-1"></i>Driver
+                        {% endif %}
+                    </span>
+                </h4>
+                <div class="user-meta">
+                    <i class="fa-solid fa-envelope me-1"></i>{{ data.user.email }}
+                    <span class="mx-2">|</span>
+                    <i class="fa-solid fa-phone me-1"></i>{{ data.profile.phone }}
+                </div>
+            </div>
+            <div class="status-badge badge-{{ data.profile.verification_status }}">
+                {{ data.profile.get_verification_status_display }}
+            </div>
+        </div>
+
+        <!-- Details Grid -->
+        <div class="detail-grid">
+            <div class="detail-item">
+                <span class="detail-label">Username</span>
+                <span class="detail-value">{{ data.profile.username }}</span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Profile Completion</span>
+                <span class="detail-value">
+                    {{ data.profile.get_profile_completion_percentage }}%
+                    <span class="completion-badge {% if data.profile.get_profile_completion_percentage == 100 %}completion-high{% elif data.profile.get_profile_completion_percentage >= 50 %}completion-medium{% else %}completion-low{% endif %}">
+                        {% if data.profile.get_profile_completion_percentage == 100 %}Complete{% else %}Incomplete{% endif %}
+                    </span>
+                </span>
+            </div>
+
+            {% if data.business %}
+            <div class="detail-item">
+                <span class="detail-label">Business Name</span>
+                <span class="detail-value">{{ data.business.business_name }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Product Category</span>
+                <span class="detail-value">{{ data.business.business_product_category }}</span>
+            </div>
+            {% endif %}
+
+            {% if data.driver %}
+            <div class="detail-item">
+                <span class="detail-label">License Number</span>
+                <span class="detail-value">{{ data.driver.driver_license_number }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Languages</span>
+                <span class="detail-value">{{ data.driver.get_driver_languages_display }}</span>
+            </div>
+            {% endif %}
+
+            <div class="detail-item">
+                <span class="detail-label">Applied On</span>
+                <span class="detail-value">
+                    {% if data.profile.verification_applied_at %}
+                        {{ data.profile.verification_applied_at|date:"M d, Y - g:i A" }}
+                    {% else %}
+                        Not yet applied
+                    {% endif %}
+                </span>
+            </div>
+
+            {% if data.profile.verified_at %}
+            <div class="detail-item">
+                <span class="detail-label">Verified On</span>
+                <span class="detail-value">
+                    {{ data.profile.verified_at|date:"M d, Y" }}
+                    {% if data.profile.verified_by %}
+                        by {{ data.profile.verified_by.username }}
+                    {% endif %}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if data.profile.rejection_reason %}
+        <div class="alert alert-danger mt-2">
+            <strong><i class="fa-solid fa-exclamation-circle me-2"></i>Rejection Reason:</strong>
+            {{ data.profile.rejection_reason }}
+        </div>
+        {% endif %}
+
+        <!-- Action Buttons -->
+        {% if data.profile.verification_status != 'verified' %}
+        <div class="action-buttons">
+            <button class="btn-verify" onclick="updateStatus({{ data.profile.id }}, 'verified')">
+                <i class="fa-solid fa-check me-1"></i>Verify
+            </button>
+            <button class="btn-review" onclick="updateStatus({{ data.profile.id }}, 'under_review')">
+                <i class="fa-solid fa-eye me-1"></i>Mark Under Review
+            </button>
+            <button class="btn-reject" onclick="rejectUser({{ data.profile.id }})">
+                <i class="fa-solid fa-times me-1"></i>Reject
+            </button>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-inbox"></i>
+        <h3>No Users Found</h3>
+        <p>There are no users matching this filter.</p>
+    </div>
+{% endif %}
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    function updateStatus(profileId, status) {
+        if (confirm(`Are you sure you want to ${status} this user?`)) {
+            fetch(`/workforce/verification/${profileId}/update-status/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({ status: status })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`User ${status} successfully!`);
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to update status'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while updating status');
+            });
+        }
+    }
+
+    function rejectUser(profileId) {
+        const reason = prompt('Please provide a reason for rejection:');
+        if (reason) {
+            fetch(`/workforce/verification/${profileId}/update-status/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({
+                    status: 'rejected',
+                    rejection_reason: reason
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('User rejected successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to reject user'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while rejecting user');
+            });
+        }
+    }
+</script>
+{% endblock extra_js %}

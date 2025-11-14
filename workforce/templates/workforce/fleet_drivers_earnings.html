@@ -1,0 +1,304 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Driver Earnings - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .earnings-header {
+        background: var(--brand-gradient-yellow-white);
+        padding: 2rem;
+        border-radius: var(--brand-radius-lg);
+        margin-bottom: 2rem;
+        box-shadow: var(--brand-shadow-md);
+    }
+
+    .earnings-header h1 {
+        color: var(--brand-grey-800);
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .earnings-header p {
+        color: var(--brand-grey-600);
+        margin-bottom: 0;
+    }
+
+    .filter-section {
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        padding: 1.5rem;
+        box-shadow: var(--brand-shadow-sm);
+        margin-bottom: 2rem;
+    }
+
+    .filter-label {
+        display: block;
+        font-weight: 600;
+        color: var(--brand-grey-700);
+        margin-bottom: 0.75rem;
+        font-size: 1rem;
+    }
+
+    .filter-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 2px solid var(--brand-grey-300);
+        border-radius: var(--brand-radius-sm);
+        transition: var(--brand-transition);
+        font-size: 1rem;
+    }
+
+    .filter-input:focus {
+        outline: none;
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.2);
+    }
+
+    .fleet-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .fleet-card {
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        padding: 1.5rem;
+        box-shadow: var(--brand-shadow-sm);
+        border-left: 4px solid #28a745;
+        transition: var(--brand-transition);
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
+
+    .fleet-card:hover {
+        box-shadow: var(--brand-shadow-md);
+        transform: translateY(-4px);
+        border-left-color: #218838;
+    }
+
+    .fleet-card-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid var(--brand-grey-200);
+    }
+
+    .fleet-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: var(--brand-gradient-yellow-white);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--brand-grey-800);
+        flex-shrink: 0;
+    }
+
+    .fleet-info h3 {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: var(--brand-grey-800);
+        margin-bottom: 0.25rem;
+    }
+
+    .fleet-info p {
+        font-size: 0.875rem;
+        color: var(--brand-grey-600);
+        margin-bottom: 0;
+    }
+
+    .fleet-details {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .detail-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--brand-grey-600);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .detail-value {
+        font-size: 1.125rem;
+        font-weight: 800;
+        color: var(--brand-grey-800);
+    }
+
+    .detail-value.deliveries {
+        color: #2196f3;
+        font-size: 1.75rem;
+    }
+
+    .detail-value.date {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--brand-grey-700);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: var(--brand-white);
+        border-radius: var(--brand-radius-md);
+        box-shadow: var(--brand-shadow-sm);
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: var(--brand-grey-400);
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h3 {
+        color: var(--brand-grey-700);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+        color: var(--brand-grey-500);
+    }
+
+    @media (max-width: 768px) {
+        .fleet-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Header -->
+<div class="earnings-header">
+    <h1>
+        <i class="fa-solid fa-money-bill-wave me-2"></i>Fleet Driver Earnings
+    </h1>
+    <p>Track driver earnings and completed deliveries after settlement</p>
+</div>
+
+<!-- Fleet Filter Section -->
+<div class="filter-section">
+    <label for="fleetFilter" class="filter-label">
+        <i class="fa-solid fa-filter me-2"></i>Filter by Fleet Driver
+    </label>
+    <input type="text" id="fleetFilter" class="filter-input" placeholder="Search by driver name or ID...">
+</div>
+
+<!-- Fleet Cards Grid -->
+{% if drivers %}
+<div class="fleet-grid">
+    {% for driver in drivers %}
+    <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.id }}" class="fleet-card" data-driver-name="{{ driver.user.first_name }} {{ driver.user.last_name }}">
+        <div class="fleet-card-header">
+            <div class="fleet-avatar">
+                {{ driver.user.first_name|first|upper }}{{ driver.user.last_name|first|upper }}
+            </div>
+            <div class="fleet-info">
+                <h3>{{ driver.user.first_name }} {{ driver.user.last_name }}</h3>
+                <p>ID: {{ driver.driver_id }}</p>
+            </div>
+        </div>
+        <div class="fleet-details">
+            <div class="detail-row">
+                <span class="detail-label">Deliveries After Settlement</span>
+                <span class="detail-value deliveries">{{ driver.deliveries_after_settlement|default:"0" }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Last Settled</span>
+                <span class="detail-value date">{{ driver.last_settled_date|date:"d M Y"|default:"Never" }}</span>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if drivers.has_other_pages %}
+<nav aria-label="Fleet pagination" style="margin-top: 2rem;">
+    <ul class="pagination justify-content-center">
+        {% if drivers.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ drivers.previous_page_number }}" aria-label="Previous">
+                <span aria-hidden="true">&laquo;</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">&laquo;</span>
+        </li>
+        {% endif %}
+
+        {% for num in drivers.paginator.page_range %}
+        {% if drivers.number == num %}
+        <li class="page-item active">
+            <span class="page-link">{{ num }}</span>
+        </li>
+        {% elif num > drivers.number|add:'-3' and num < drivers.number|add:'3' %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+        </li>
+        {% endif %}
+        {% endfor %}
+
+        {% if drivers.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ drivers.next_page_number }}" aria-label="Next">
+                <span aria-hidden="true">&raquo;</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">&raquo;</span>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="empty-state">
+    <i class="fa-solid fa-money-bill-wave"></i>
+    <h3>No Fleet Drivers Found</h3>
+    <p>There are no drivers with earnings records at the moment.</p>
+</div>
+{% endif %}
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Filter fleet cards
+    document.getElementById('fleetFilter').addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const cards = document.querySelectorAll('.fleet-card');
+
+        cards.forEach(card => {
+            const driverName = card.getAttribute('data-driver-name').toLowerCase();
+            if (driverName.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+</script>
+{% endblock extra_js %}

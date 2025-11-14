@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Complete Your Profile - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .completion-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+
+    .completion-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px 15px 0 0;
+        text-align: center;
+    }
+
+    .completion-circle {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 1rem;
+        position: relative;
+    }
+
+    .completion-circle svg {
+        transform: rotate(-90deg);
+    }
+
+    .completion-circle circle {
+        fill: none;
+        stroke-width: 8;
+    }
+
+    .circle-bg {
+        stroke: rgba(255, 255, 255, 0.2);
+    }
+
+    .circle-progress {
+        stroke: #4ade80;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.5s ease;
+    }
+
+    .completion-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 2rem;
+        font-weight: bold;
+        color: white;
+    }
+
+    .form-card {
+        background: white;
+        border-radius: 0 0 15px 15px;
+        padding: 2rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    .form-control {
+        border-radius: 8px;
+        border: 2px solid #e5e7eb;
+        padding: 0.75rem 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .btn-action {
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+    }
+
+    .btn-save {
+        background: #10b981;
+        color: white;
+    }
+
+    .btn-save:hover {
+        background: #059669;
+        transform: translateY(-2px);
+    }
+
+    .btn-register {
+        background: #667eea;
+        color: white;
+    }
+
+    .btn-register:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+    }
+
+    .btn-register:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .info-alert {
+        background: #dbeafe;
+        border-left: 4px solid #3b82f6;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .warning-alert {
+        background: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .role-selection {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    .role-selection .btn {
+        flex: 1;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="completion-container">
+    <!-- Completion Header -->
+    <div class="completion-header">
+        <div class="completion-circle">
+            <svg width="120" height="120">
+                <circle class="circle-bg" cx="60" cy="60" r="52"></circle>
+                <circle class="circle-progress" cx="60" cy="60" r="52"
+                        stroke-dasharray="326.73"
+                        stroke-dashoffset="{{ 326.73|add:0|floatformat:0|add:'-'|add:completion_percentage|add:'*3.2673'|add:'='|floatformat:0 }}"
+                        style="stroke-dashoffset: calc(326.73 - (326.73 * {{ completion_percentage }} / 100));">
+                </circle>
+            </svg>
+            <div class="completion-text">{{ completion_percentage }}%</div>
+        </div>
+        <h2 class="mb-2">Complete Your Profile</h2>
+        <p class="mb-0">Fill in all required fields to proceed with registration</p>
+    </div>
+
+    <!-- Form Card -->
+    <div class="form-card">
+        {% if completion_percentage < 100 %}
+        <div class="info-alert">
+            <i class="fa-solid fa-circle-info me-2"></i>
+            <strong>Profile Incomplete:</strong> Please fill in all required fields to unlock the registration buttons.
+        </div>
+        {% else %}
+        <div class="warning-alert">
+            <i class="fa-solid fa-check-circle me-2"></i>
+            <strong>Profile Complete!</strong> Choose your role below to continue with registration.
+        </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.username.id_for_label }}">
+                            Username <span class="text-danger">*</span>
+                        </label>
+                        {{ form.username }}
+                        {% if form.username.errors %}
+                            <div class="text-danger small mt-1">{{ form.username.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.email.id_for_label }}">
+                            Email <span class="text-danger">*</span>
+                        </label>
+                        {{ form.email }}
+                        {% if form.email.errors %}
+                            <div class="text-danger small mt-1">{{ form.email.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.first_name.id_for_label }}">
+                            First Name <span class="text-danger">*</span>
+                        </label>
+                        {{ form.first_name }}
+                        {% if form.first_name.errors %}
+                            <div class="text-danger small mt-1">{{ form.first_name.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.last_name.id_for_label }}">
+                            Last Name <span class="text-danger">*</span>
+                        </label>
+                        {{ form.last_name }}
+                        {% if form.last_name.errors %}
+                            <div class="text-danger small mt-1">{{ form.last_name.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.phone.id_for_label }}">
+                            Phone Number <span class="text-danger">*</span>
+                        </label>
+                        {{ form.phone }}
+                        {% if form.phone.errors %}
+                            <div class="text-danger small mt-1">{{ form.phone.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.whatsapp.id_for_label }}">
+                            WhatsApp Number <span class="text-danger">*</span>
+                        </label>
+                        {{ form.whatsapp }}
+                        {% if form.whatsapp.errors %}
+                            <div class="text-danger small mt-1">{{ form.whatsapp.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.zone_name.id_for_label }}">
+                            Zone Name <span class="text-danger">*</span>
+                        </label>
+                        {{ form.zone_name }}
+                        {% if form.zone_name.errors %}
+                            <div class="text-danger small mt-1">{{ form.zone_name.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.nationlity.id_for_label }}">
+                            Nationality <span class="text-danger">*</span>
+                        </label>
+                        {{ form.nationlity }}
+                        {% if form.nationlity.errors %}
+                            <div class="text-danger small mt-1">{{ form.nationlity.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.date_of_birth.id_for_label }}">
+                            Date of Birth <span class="text-danger">*</span>
+                        </label>
+                        {{ form.date_of_birth }}
+                        {% if form.date_of_birth.errors %}
+                            <div class="text-danger small mt-1">{{ form.date_of_birth.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.instagram.id_for_label }}">
+                            Instagram (Optional)
+                        </label>
+                        {{ form.instagram }}
+                        {% if form.instagram.errors %}
+                            <div class="text-danger small mt-1">{{ form.instagram.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.address.id_for_label }}">
+                            Full Address <span class="text-danger">*</span>
+                        </label>
+                        {{ form.address }}
+                        {% if form.address.errors %}
+                            <div class="text-danger small mt-1">{{ form.address.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-between align-items-center mt-4">
+                <button type="submit" name="action" value="save" class="btn btn-action btn-save">
+                    <i class="fa-solid fa-floppy-disk me-2"></i>Save Progress
+                </button>
+
+                <div class="role-selection">
+                    <button type="submit" name="action" value="register_business"
+                            class="btn btn-action btn-register"
+                            {% if completion_percentage < 100 %}disabled{% endif %}>
+                        <i class="fa-solid fa-building me-2"></i>Register as Business
+                    </button>
+
+                    <button type="submit" name="action" value="join_driver"
+                            class="btn btn-action btn-register"
+                            {% if completion_percentage < 100 %}disabled{% endif %}>
+                        <i class="fa-solid fa-car me-2"></i>Join as Driver
+                    </button>
+                </div>
+            </div>
+
+            {% if completion_percentage < 100 %}
+            <p class="text-muted small text-center mt-3">
+                <i class="fa-solid fa-info-circle me-1"></i>
+                Complete all required fields to enable role selection
+            </p>
+            {% endif %}
+        </form>
+    </div>
+</div>
+{% endblock content %}

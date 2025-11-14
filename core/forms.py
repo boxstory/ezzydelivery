@@ -45,6 +45,37 @@ class ProfileForm(forms.ModelForm):
         self.fields['date_of_birth'].required = True
         self.fields['whatsapp'].required = True
         self.fields['zone_name'].required = True
+
+
+class ProfileUpdateForm(forms.ModelForm):
+    """Enhanced profile update form with all required fields"""
+    class Meta:
+        model = Profile
+        fields = [
+            'username', 'first_name', 'last_name', 'email',
+            'phone', 'whatsapp', 'zone_name', 'address',
+            'nationlity', 'date_of_birth', 'instagram'
+        ]
+        widgets = {
+            'username': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Username'}),
+            'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'First Name'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Last Name'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email'}),
+            'phone': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Phone Number'}),
+            'whatsapp': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'WhatsApp Number'}),
+            'zone_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Zone Name'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Full Address', 'rows': 3}),
+            'nationlity': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nationality'}),
+            'date_of_birth': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'instagram': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Instagram Handle'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make all fields required for profile completion except instagram
+        for field_name in self.fields:
+            if field_name != 'instagram':
+                self.fields[field_name].required = True
         
 
 
