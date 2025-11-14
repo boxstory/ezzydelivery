@@ -442,13 +442,13 @@
                 <div class="collapse mt-2" id="comments{{ order.id }}">
                     <div class="card card-body bg-light">
                         <div class="comments-list" style="max-height: 200px; overflow-y: auto;">
-                            {% if order.comments.all %}
-                            {% for comment in order.comments.all %}
+                            {% if order.order_comments.all %}
+                            {% for comment in order.order_comments.all %}
                             <div class="comment-item mb-2 p-2 bg-white rounded">
                                 <small class="text-muted d-block">
-                                    <strong>{{ comment.user.username }}</strong> - {{ comment.created_at|date:"M d, Y H:i" }}
+                                    <strong>{{ comment.name }}</strong> - {{ comment.created_at|date:"M d, Y H:i" }}
                                 </small>
-                                <p class="mb-0 small">{{ comment.content }}</p>
+                                <p class="mb-0 small">{{ comment.body }}</p>
                             </div>
                             {% endfor %}
                             {% else %}

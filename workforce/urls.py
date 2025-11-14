@@ -18,6 +18,11 @@ urlpatterns = [
     path('orders/<int:order_id>/verify/', workforce_views.verify_order, name='verify_order'),
     path('orders/submit_to_task/<int:order_id>/', workforce_views.submit_to_task, name='submit_to_task'),
 
+    # AJAX endpoints for orders
+    path('orders/<int:order_id>/publish/', workforce_views.publish_order_to_delivery, name='publish_order_to_delivery'),
+    path('orders/<int:order_id>/update-status/', workforce_views.update_order_status, name='update_order_status'),
+    path('orders/<int:order_id>/add-comment/', workforce_views.add_order_comment, name='add_order_comment'),
+
 
 
     #Deliveries sections urls ----------------------------------------------------------------
@@ -25,6 +30,12 @@ urlpatterns = [
     path('tasks/dl_list_unpublished/', workforce_views.dl_list_ready_to_published_to_dms, name='dl_list_ready_to_published_to_dms'),
     path('tasks/dl_list_published/', workforce_views.dl_list_published_to_dms, name='dl_list_published_to_dms'),
     path('tasks/dl_list_incompleted/', workforce_views.dl_list_incompleted_details, name='dl_list_incompleted_details'),
+
+    # AJAX endpoints for delivery tasks
+    path('delivery-task/<int:task_id>/publish-dms/', workforce_views.publish_task_to_dms, name='publish_task_to_dms'),
+    path('delivery-task/<int:task_id>/publish-driver-app/', workforce_views.publish_task_to_driver_app, name='publish_task_to_driver_app'),
+    path('delivery-task/<int:task_id>/assign-driver/', workforce_views.assign_driver_to_task, name='assign_driver_to_task'),
+    path('delivery-task/<int:task_id>/update-status/', workforce_views.update_task_status, name='update_task_status'),
     
 
 

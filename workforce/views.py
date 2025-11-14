@@ -1,6 +1,8 @@
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_http_methods
+import json
 # Add these imports at the top of your View file
 from django.core.paginator import (
     Paginator,
@@ -51,6 +53,8 @@ def wf_dashboard(request):
 
 
 def all_orders(request):
+    from django.db.models import Count
+
     # Start with all orders
     orders = orders_models.Order.objects.all()
 
@@ -80,6 +84,9 @@ def all_orders(request):
     # Filter by DMS Status
     if dms_status:
         orders = orders.filter(delivery_task__dl_task_status_dms=dms_status)
+
+    # Annotate with comment count (for now, all comments are counted as unread)
+    orders = orders.annotate(unread_comments_count=Count('order_comments'))
 
     # Order by created date
     orders = orders.order_by('-created_at')
@@ -540,6 +547,239 @@ def workflow_guide(request):
     }
 
     return render(request, 'workforce/workflow_guide.html', context)
+
+
+# AJAX Endpoints for Orders List ------------------------------------------------------------------------------------------------------
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+def publish_order_to_delivery(request, order_id):
+    """AJAX endpoint to publish order to delivery"""
+    try:
+        order = get_object_or_404(orders_models.Order, id=order_id)
+
+        # Update order status to publish
+        order.order_status = 'publish'
+        order.task_status = 'dl_task_listed'
+        order.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Order published to delivery successfully',
+            'order_id': order.id,
+            'order_status': order.order_status
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+def update_order_status(request, order_id):
+    """AJAX endpoint to update order status"""
+    try:
+        order = get_object_or_404(orders_models.Order, id=order_id)
+
+        # Parse JSON body
+        data = json.loads(request.body)
+        status = data.get('status')
+
+        if not status:
+            return JsonResponse({
+                'success': False,
+                'error': 'Status is required'
+            }, status=400)
+
+        # Update task status
+        order.task_status = status
+        order.save()
+
+        # Log the status update
+        from orders.models import OrderVerificationLog
+        OrderVerificationLog.objects.create(
+            order=order,
+            verified_by=request.user,
+            action=f'status_updated_to_{status}',
+            notes=f'Status updated to {status}',
+            new_status=status
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Status updated to {status} successfully',
+            'order_id': order.id,
+            'new_status': status
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+def add_order_comment(request, order_id):
+    """AJAX endpoint to add comment to order"""
+    try:
+        order = get_object_or_404(orders_models.Order, id=order_id)
+
+        # Parse JSON body
+        data = json.loads(request.body)
+        comment_text = data.get('comment')
+
+        if not comment_text:
+            return JsonResponse({
+                'success': False,
+                'error': 'Comment text is required'
+            }, status=400)
+
+        # Create comment
+        from orders.models import OrderComments
+        comment = OrderComments.objects.create(
+            order=order,
+            name=request.user.username,
+            body=comment_text
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Comment added successfully',
+            'order_id': order.id,
+            'comment_id': comment.id,
+            'comment_text': comment.body,
+            'created_at': comment.created_at.strftime('%B %d, %Y %H:%M')
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+# AJAX Endpoints for Delivery Tasks ------------------------------------------------------------------------------------------------------
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+def publish_task_to_dms(request, task_id):
+    """AJAX endpoint to publish delivery task to DMS"""
+    try:
+        task = get_object_or_404(delivery_models.DeliveryTask, id=task_id)
+
+        # Update task status to publish to DMS
+        task.dl_task_status = 'publish_to_dms'
+        task.dl_task_publish = True
+        task.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Task published to DMS successfully',
+            'task_id': task.id,
+            'task_number': task.dl_task_number
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+def publish_task_to_driver_app(request, task_id):
+    """AJAX endpoint to publish delivery task to Driver App"""
+    try:
+        task = get_object_or_404(delivery_models.DeliveryTask, id=task_id)
+
+        # Update task to be available in driver app
+        task.dl_task_status_dms = '6'  # Unassigned - available for drivers
+        task.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Task published to Driver App successfully',
+            'task_id': task.id,
+            'task_number': task.dl_task_number
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+def assign_driver_to_task(request, task_id):
+    """AJAX endpoint to assign driver to delivery task"""
+    try:
+        task = get_object_or_404(delivery_models.DeliveryTask, id=task_id)
+
+        # Parse JSON body
+        data = json.loads(request.body)
+        driver_id = data.get('driver_id')
+
+        if not driver_id:
+            return JsonResponse({
+                'success': False,
+                'error': 'Driver ID is required'
+            }, status=400)
+
+        # Get driver and assign
+        driver = get_object_or_404(fleet_models.Driver, id=driver_id)
+        task.driver = driver
+        task.dl_task_status_dms = '0'  # Assigned
+        task.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Task assigned to {driver} successfully',
+            'task_id': task.id,
+            'driver_id': driver.id,
+            'driver_name': str(driver)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+def update_task_status(request, task_id):
+    """AJAX endpoint to update delivery task status"""
+    try:
+        task = get_object_or_404(delivery_models.DeliveryTask, id=task_id)
+
+        # Parse JSON body
+        data = json.loads(request.body)
+        status = data.get('status')
+
+        if not status:
+            return JsonResponse({
+                'success': False,
+                'error': 'Status is required'
+            }, status=400)
+
+        # Update task status
+        task.dl_task_status = status
+        task.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Task status updated to {status} successfully',
+            'task_id': task.id,
+            'new_status': status
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
 
 
 
