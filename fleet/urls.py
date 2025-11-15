@@ -38,9 +38,23 @@ urlpatterns = [
           fleet_views.vehicle_delete, name='vehicle_delete'),
 
 
-     #  Financeial Accounts
+     #  Financial Accounts
      path('cod_collection/',
           fleet_views.cod_collection, name='cod_collection'),
+     path('cod_submission/',
+          fleet_views.cod_submission, name='cod_submission'),
+     path('earnings/',
+          fleet_views.driver_earnings, name='driver_earnings'),
+     path('transactions/',
+          fleet_views.transaction_history, name='transaction_history'),
+
+     # Performance & Reports
+     path('performance/',
+          fleet_views.driver_performance, name='driver_performance'),
+     path('reports/',
+          fleet_views.driver_reports, name='driver_reports'),
+     path('analytics/',
+          fleet_views.driver_analytics, name='driver_analytics'),
 
 
 

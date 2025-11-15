@@ -84,6 +84,17 @@ class ProfilePictureForm(forms.ModelForm):
         model = ProfilePicture
         fields = ['profile_picture',]
 
+    def clean_profile_picture(self):
+        """Validate uploaded profile picture"""
+        from core.views import validate_image_upload
+
+        picture = self.cleaned_data.get('profile_picture')
+        if picture:
+            is_valid, error_msg = validate_image_upload(picture)
+            if not is_valid:
+                raise forms.ValidationError(error_msg)
+        return picture
+
 
 class JoinUsForm(forms.ModelForm):
     class Meta:

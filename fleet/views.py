@@ -10,6 +10,7 @@ from core.views import profile
 from fleet import models as fleet_models
 from delivery import models as delivery_models
 from fleet import forms as fleet_forms
+from fleet.wallet_service import WalletService, WalletAlertService
 
 # Create your views here.
 
@@ -44,10 +45,26 @@ def fleet_dashboard(request):
         driver_vehicle = fleet_models.DriverVehicle.objects.filter(
             driver_id=driver.driver_id)
 
+        # Get statistics for last 30 days
+        stats_30_days = WalletService.get_driver_statistics(driver, days=30)
+
+        # Get statistics for last 7 days
+        stats_7_days = WalletService.get_driver_statistics(driver, days=7)
+
+        # Get wallet status
+        wallet_status = WalletService.get_wallet_status(driver)
+
+        # Get wallet alerts
+        wallet_alerts = WalletAlertService.check_wallet_alerts(driver)
+
         context = {
             'profile': profile,
             'driver': driver,
             'driver_vehicle': driver_vehicle,
+            'stats_30_days': stats_30_days,
+            'stats_7_days': stats_7_days,
+            'wallet_status': wallet_status,
+            'wallet_alerts': wallet_alerts,
         }
         return render(request, 'fleet/fleet_dashboard.html', context)
 
@@ -226,15 +243,393 @@ def vehicle_update(request, vehicle_id):
 
 
 # cod_collection ----------------------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
 def cod_collection(request):
-    print('cod_collection')
-    driver = fleet_models.Driver.objects.get(user_id=request.user.id)
-    
-    context = {
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        # Get wallet status
+        wallet_status = WalletService.get_wallet_status(driver)
+
+        # Get COD transactions
+        cod_transactions = fleet_models.DriverTransaction.objects.filter(
+            driver=driver,
+            transaction_type__in=['cod_collection', 'cod_deposit']
+        ).select_related('delivery_task').order_by('-created_at')[:50]
+
+        # Get recent deliveries with COD
+        cod_deliveries = delivery_models.DeliveryTask.objects.filter(
+            driver=driver,
+            cod_collected=True
+        ).select_related('order').order_by('-completed_at')[:20]
+
+        context = {
             'driver': driver,
+            'wallet_status': wallet_status,
+            'cod_transactions': cod_transactions,
+            'cod_deliveries': cod_deliveries,
         }
 
-    return render(request, 'fleet/parts/cod_collection.html', context)
+        return render(request, 'fleet/parts/cod_collection.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found.')
+        return redirect('core:main_dashboard')
+
+
+# COD Submission ----------------------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
+def cod_submission(request):
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        if request.method == 'POST':
+            amount = request.POST.get('amount')
+            reference_number = request.POST.get('reference_number', '')
+            notes = request.POST.get('notes', '')
+
+            try:
+                amount = float(amount)
+                if amount <= 0:
+                    messages.error(request, 'Amount must be greater than zero.')
+                elif amount > float(driver.cod_in_hand):
+                    messages.error(request, f'You only have {driver.cod_in_hand} QR in hand.')
+                else:
+                    # Process COD submission
+                    transaction = WalletService.submit_cod_to_admin(
+                        driver=driver,
+                        amount=amount,
+                        created_by=request.user,
+                        reference_number=reference_number,
+                        notes=notes
+                    )
+                    messages.success(request, f'Successfully submitted {amount} QR COD to admin.')
+                    return redirect('fleet:cod_collection')
+            except ValueError as e:
+                messages.error(request, str(e))
+            except Exception as e:
+                messages.error(request, f'Error processing submission: {str(e)}')
+
+        # Get wallet status
+        wallet_status = WalletService.get_wallet_status(driver)
+
+        context = {
+            'driver': driver,
+            'wallet_status': wallet_status,
+        }
+
+        return render(request, 'fleet/parts/cod_submission.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found.')
+        return redirect('core:main_dashboard')
+
+
+# Earnings View ----------------------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
+def driver_earnings(request):
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        # Get filter parameters
+        days = int(request.GET.get('days', 30))
+
+        # Get statistics
+        stats = WalletService.get_driver_statistics(driver, days=days)
+
+        # Get wallet status
+        wallet_status = WalletService.get_wallet_status(driver)
+
+        # Get earning transactions
+        earning_transactions = fleet_models.DriverTransaction.objects.filter(
+            driver=driver,
+            transaction_type__in=['earning', 'bonus', 'deduction']
+        ).select_related('delivery_task').order_by('-created_at')[:50]
+
+        # Get recent settlements
+        settlements = fleet_models.DriverSettlement.objects.filter(
+            driver=driver
+        ).order_by('-created_at')[:10]
+
+        context = {
+            'driver': driver,
+            'stats': stats,
+            'wallet_status': wallet_status,
+            'earning_transactions': earning_transactions,
+            'settlements': settlements,
+            'selected_days': days,
+        }
+
+        return render(request, 'fleet/parts/driver_earnings.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found.')
+        return redirect('core:main_dashboard')
+
+
+# Transaction History ----------------------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
+def transaction_history(request):
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        # Get filter parameters
+        transaction_type = request.GET.get('type', 'all')
+        days = int(request.GET.get('days', 30))
+
+        # Build query
+        from datetime import timedelta
+        from django.utils import timezone
+
+        start_date = timezone.now() - timedelta(days=days)
+
+        transactions = fleet_models.DriverTransaction.objects.filter(
+            driver=driver,
+            created_at__gte=start_date
+        )
+
+        if transaction_type != 'all':
+            transactions = transactions.filter(transaction_type=transaction_type)
+
+        transactions = transactions.select_related(
+            'delivery_task', 'settlement', 'created_by'
+        ).order_by('-created_at')
+
+        # Get wallet status
+        wallet_status = WalletService.get_wallet_status(driver)
+
+        context = {
+            'driver': driver,
+            'transactions': transactions,
+            'wallet_status': wallet_status,
+            'selected_type': transaction_type,
+            'selected_days': days,
+            'transaction_types': fleet_models.DriverTransaction.TRANSACTION_TYPES,
+        }
+
+        return render(request, 'fleet/parts/transaction_history.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found.')
+        return redirect('core:main_dashboard')
+
+
+# Performance & Analytics ----------------------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
+def driver_performance(request):
+    """Comprehensive performance dashboard for drivers"""
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        # Get filter parameters
+        period = request.GET.get('period', '30')  # days
+        days = int(period)
+
+        # Get statistics for selected period
+        stats = WalletService.get_driver_statistics(driver, days=days)
+
+        # Get wallet status
+        wallet_status = WalletService.get_wallet_status(driver)
+
+        # Get delivery performance metrics
+        from django.db.models import Avg, Max, Min, F, ExpressionWrapper, fields
+        from django.utils import timezone
+        from datetime import timedelta
+
+        start_date = timezone.now() - timedelta(days=days)
+
+        deliveries = delivery_models.DeliveryTask.objects.filter(
+            driver=driver,
+            completed_at__gte=start_date
+        )
+
+        # Calculate detailed metrics
+        performance_metrics = {
+            'total_tasks': deliveries.count(),
+            'completed_tasks': deliveries.filter(dl_task_status_dms='2').count(),
+            'failed_tasks': deliveries.filter(dl_task_status_dms='3').count(),
+            'in_progress': deliveries.filter(dl_task_status_dms__in=['0', '1', '4', '7']).count(),
+            'cancelled_tasks': deliveries.filter(dl_task_status_dms='9').count(),
+        }
+
+        # Calculate completion rate
+        if performance_metrics['total_tasks'] > 0:
+            performance_metrics['completion_rate'] = (performance_metrics['completed_tasks'] / performance_metrics['total_tasks']) * 100
+        else:
+            performance_metrics['completion_rate'] = 0
+
+        # Get COD collection rate
+        cod_deliveries = deliveries.filter(cod_collected=True)
+        performance_metrics['cod_collection_rate'] = (cod_deliveries.count() / deliveries.count() * 100) if deliveries.count() > 0 else 0
+
+        # Get average ratings
+        performance_metrics['average_rating'] = driver.driver_rating / driver.driver_rating_count if driver.driver_rating_count > 0 else 0
+        performance_metrics['total_reviews'] = driver.driver_reviews_count
+
+        # Get daily performance (last 7 days)
+        daily_stats = []
+        for i in range(6, -1, -1):
+            day_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=i)
+            day_end = day_start + timedelta(days=1)
+
+            day_deliveries = deliveries.filter(completed_at__gte=day_start, completed_at__lt=day_end)
+            daily_stats.append({
+                'date': day_start.strftime('%a %d'),
+                'total': day_deliveries.count(),
+                'completed': day_deliveries.filter(dl_task_status_dms='2').count(),
+                'failed': day_deliveries.filter(dl_task_status_dms='3').count(),
+            })
+
+        context = {
+            'driver': driver,
+            'stats': stats,
+            'wallet_status': wallet_status,
+            'performance_metrics': performance_metrics,
+            'daily_stats': daily_stats,
+            'selected_period': period,
+            'period_options': [
+                ('7', 'Last 7 Days'),
+                ('30', 'Last 30 Days'),
+                ('90', 'Last 90 Days'),
+                ('365', 'This Year'),
+            ],
+        }
+
+        return render(request, 'fleet/parts/driver_performance.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found.')
+        return redirect('core:main_dashboard')
+
+
+@login_required(login_url='/accounts/login/')
+def driver_reports(request):
+    """Generate and download various reports"""
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        # Get available report types
+        report_types = [
+            {
+                'id': 'earnings',
+                'name': 'Earnings Report',
+                'description': 'Detailed breakdown of your earnings, COD collections, and settlements',
+                'icon': 'fa-coins',
+            },
+            {
+                'id': 'deliveries',
+                'name': 'Delivery Report',
+                'description': 'Complete list of all deliveries with status and timestamps',
+                'icon': 'fa-truck',
+            },
+            {
+                'id': 'transactions',
+                'name': 'Transaction Report',
+                'description': 'All financial transactions including COD, earnings, and deposits',
+                'icon': 'fa-receipt',
+            },
+            {
+                'id': 'performance',
+                'name': 'Performance Report',
+                'description': 'Performance metrics, ratings, and completion rates',
+                'icon': 'fa-gauge-high',
+            },
+        ]
+
+        # Get recent settlements for quick download
+        settlements = fleet_models.DriverSettlement.objects.filter(
+            driver=driver,
+            status='paid'
+        ).order_by('-paid_at')[:5]
+
+        context = {
+            'driver': driver,
+            'report_types': report_types,
+            'settlements': settlements,
+        }
+
+        return render(request, 'fleet/parts/driver_reports.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found.')
+        return redirect('core:main_dashboard')
+
+
+@login_required(login_url='/accounts/login/')
+def driver_analytics(request):
+    """Advanced analytics and visualizations"""
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        from django.db.models import Count, Sum, Avg, Q
+        from django.utils import timezone
+        from datetime import timedelta
+        import json
+
+        # Get data for last 90 days
+        start_date = timezone.now() - timedelta(days=90)
+
+        deliveries = delivery_models.DeliveryTask.objects.filter(
+            driver=driver,
+            completed_at__gte=start_date
+        )
+
+        # Monthly trend data
+        monthly_data = []
+        for i in range(2, -1, -1):  # Last 3 months
+            month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=30*i)
+            month_end = month_start + timedelta(days=30)
+
+            month_deliveries = deliveries.filter(completed_at__gte=month_start, completed_at__lt=month_end)
+            monthly_data.append({
+                'month': month_start.strftime('%B'),
+                'total': month_deliveries.count(),
+                'earnings': float(month_deliveries.aggregate(Sum('driver_earnings'))['driver_earnings__sum'] or 0),
+                'cod_collected': float(month_deliveries.aggregate(Sum('cod_collected_amount'))['cod_collected_amount__sum'] or 0),
+            })
+
+        # Delivery type breakdown
+        delivery_categories = deliveries.values('dl_category').annotate(
+            count=Count('id')
+        ).order_by('-count')
+
+        # Speed type breakdown
+        delivery_speeds = deliveries.values('dl_speed').annotate(
+            count=Count('id')
+        ).order_by('-count')
+
+        # Peak hours analysis
+        hour_distribution = []
+        for hour in range(24):
+            count = deliveries.filter(completed_at__hour=hour).count()
+            hour_distribution.append({
+                'hour': f"{hour:02d}:00",
+                'deliveries': count
+            })
+
+        # Get top 5 peak hours
+        peak_hours = sorted(hour_distribution, key=lambda x: x['deliveries'], reverse=True)[:5]
+
+        # COD vs Prepaid ratio
+        cod_count = deliveries.filter(cod_collected=True).count()
+        prepaid_count = deliveries.filter(cod_collected=False).count()
+
+        context = {
+            'driver': driver,
+            'monthly_data': json.dumps(monthly_data),
+            'delivery_categories': delivery_categories,
+            'delivery_speeds': delivery_speeds,
+            'peak_hours': peak_hours,
+            'cod_count': cod_count,
+            'prepaid_count': prepaid_count,
+            'hour_distribution': json.dumps(hour_distribution),
+        }
+
+        return render(request, 'fleet/parts/driver_analytics.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found.')
+        return redirect('core:main_dashboard')
 
 
 # delivery tasks ----------------------------------------------------------------------------------------------------------------------------

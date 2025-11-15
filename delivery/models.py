@@ -122,11 +122,46 @@ class DeliveryTask(models.Model):
     dl_to_address = models.ForeignKey(
         delivery_models.DlAddressUpdate, on_delete=models.DO_NOTHING, blank=True, null=True)
 
+    # Earnings and COD Tracking Fields
+    driver_earnings = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Driver's earnings from this delivery (calculated on completion)"
+    )
+    company_commission = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Company's commission from this delivery"
+    )
+    cod_collected = models.BooleanField(
+        default=False,
+        help_text="Whether COD has been collected for this delivery"
+    )
+    cod_collected_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00,
+        help_text="Actual COD amount collected from customer"
+    )
+    cod_collected_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When COD was collected"
+    )
+    completed_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the delivery was completed"
+    )
+    earnings_processed = models.BooleanField(
+        default=False,
+        help_text="Whether earnings have been added to driver's wallet"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.order}-{self.dl_task_number}"
+
+    @property
+    def has_cod(self):
+        """Check if this delivery involves COD collection"""
+        return self.order and self.order.cod_amount and self.order.cod_amount > 0
 
     class Meta:
         verbose_name_plural = "Delivery Task"
