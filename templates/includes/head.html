@@ -52,33 +52,50 @@
 <link rel="shortcut icon" href="#" />
 
 <!-- ========================================
-     CSS LOADING ORDER (IMPORTANT!)
-     1. Bootstrap & External Libraries - LOAD FIRST
-     2. Base CSS (legacy utilities)
-     3. Brand Kit (defines CSS variables and components)
-     4. Brand Kit Overrides (override Bootstrap with brand styles) - LOAD LAST
-     5. App-specific CSS (loaded via extra_css block in templates)
+     CSS LOADING ORDER (CRITICAL - DO NOT CHANGE!)
+     1. Brand Kit CSS Variables - MUST BE FIRST (defines design tokens)
+     2. Bootstrap 5 - Third-party framework (uses CSS variables)
+     3. Brand Kit Overrides - Override Bootstrap with brand styles
+     4. Font Awesome - Icon library
+     5. Google Fonts - Typography (if needed)
+     6. Base CSS - Legacy utilities
+     7. Third-party plugins (Select2, etc.)
+     8. App-specific CSS (via extra_css block)
+     9. Brand Kit Overrides FINAL - MUST BE LAST (final override layer)
      ======================================== -->
 
-<!-- 1. EXTERNAL LIBRARIES (Custom Bootstrap Build, FontAwesome) -->
+<!-- 1. BRAND KIT - CSS Variables & Design Tokens (FIRST!) -->
+<link href="{% static 'webpages/css/brand-kit.css' %}" rel="stylesheet" type="text/css" />
+
+<!-- 2. BOOTSTRAP - Third-party framework -->
 <!-- Custom minimal Bootstrap build (190KB vs 226KB CDN) - 15.6% smaller -->
 <link href="{% static 'webpages/css/bootstrap-custom.min.css' %}" rel="stylesheet" type="text/css" />
+
+<!-- 3. BRAND KIT OVERRIDES - Override Bootstrap styles -->
+<link href="{% static 'webpages/css/brand-kit-overrides.css' %}" rel="stylesheet" type="text/css" />
+
+<!-- 4. FONT AWESOME - Icon library -->
 <link href="{% static 'fontawesomefree/css/fontawesome.css' %}" rel="stylesheet" type="text/css" />
 <link href="{% static 'fontawesomefree/css/brands.css' %}" rel="stylesheet" type="text/css" />
 <link href="{% static 'fontawesomefree/css/solid.css' %}" rel="stylesheet" type="text/css" />
 
-<!-- 2. BASE CSS - Legacy utilities -->
+<!-- 5. GOOGLE FONTS - Typography (if needed) -->
+<!-- Add Google Fonts here if required -->
+
+<!-- 6. BASE CSS - Legacy utilities -->
 <link href="{% static 'webpages/css/base.css' %}" rel="stylesheet" type="text/css" />
 
-<!-- 3. BRAND KIT - Brand styles and CSS variables -->
-<link href="{% static 'webpages/css/brand-kit.css' %}" rel="stylesheet" type="text/css" />
+<!-- 7. THIRD-PARTY PLUGINS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
+<!-- 8. APP-SPECIFIC CSS - Loaded via extra_css block in child templates -->
+{% block extra_css %}{% endblock extra_css %}
 
-<!-- 4. APP-SPECIFIC CSS - Loaded via extra_css block in child templates -->
+<!-- 9. BRAND KIT OVERRIDES FINAL - MUST BE LAST (final override layer) -->
+<link href="{% static 'webpages/css/brand-kit-overrides.css' %}" rel="stylesheet" type="text/css" />
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"
       integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
 <script src="https://cdn.lordicon.com//libs/frhvbuzj/lord-icon-2.0.2.js"></script>
-<!-- Using Select2 form select -->
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<!-- Using Select2 form select (JS only - CSS loaded above with third-party plugins) -->
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
