@@ -2,14 +2,14 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block content %}
-<section style="background-color: #eee">
+<section style="background-color: #eee" id="core_profile_update_section_main">
     <div class="container py-3">
         {% include "core/parts/filepath.html" %}
-        <form method="POST">
+        <form id="core_profile_update_form_main" method="POST">
             <div class="row">
                 {% csrf_token %}
                 <div class="col-lg-4">
-                    <div class="card mb-4">
+                    <div class="card mb-4" id="core_profile_update_card_picture">
                         <div class="card-body text-center">
                             <img src="{{ instance.profile_picture.url }}" alt="avatar" class="rounded-circle img-fluid"
                                 style="width: 180px">
@@ -18,14 +18,14 @@
                             <div class="d-flex justify-content-center mb-2">
                                 {% if profileform.is_business %}
                                 <a type="button" class="btn btn-dark"
-                                    href="{% url 'core:business_dashboard' %}">DASHBOARD</a>
+                                    href="{% url 'core:business_dashboard' %}" id="core_profile_update_btn_dashboard_business">DASHBOARD</a>
                                 {% elif profileform.is_driver %}
                                 <a type="button" class="btn btn-dark"
-                                    href="{% url 'core:fleet_dashboard' %}">DASHBOARD</a>
+                                    href="{% url 'core:fleet_dashboard' %}" id="core_profile_update_btn_dashboard_driver">DASHBOARD</a>
                                 {% else %}
-                                <a type="button" class="btn btn-dark" href="/dashboard/">DASHBOARD</a>
+                                <a type="button" class="btn btn-dark" href="/dashboard/" id="core_profile_update_btn_dashboard">DASHBOARD</a>
                                 {% endif %}
-                                <button type="button" class="btn btn-outline-dark ms-1">Message</button>
+                                <button type="button" class="btn btn-outline-dark ms-1" id="core_profile_update_btn_message">Message</button>
                             </div>
                             <div class="d-flex justify-content-center p-3">
                                 <a href="#!"><i class="fa-brands fa-facebook fa-2xl me-3 text-dark"></i></a>
@@ -36,7 +36,7 @@
                     </div>
                 </div>
                 <div class="col-lg-8">
-                    <div class="card mb-4">
+                    <div class="card mb-4" id="core_profile_update_card_info">
                         <div class="card-body">
                             {% if profileform.errors %}
                             {% for field in profileform %}
@@ -139,7 +139,7 @@
                         </div>
                     </div>
                     <div class="d-grid gap-2 col-6 align-content-end">
-                        <button class="btn btn-primary btn-dark" type="submit" value="submit">Submit</button>
+                        <button id="core_profile_update_btn_submit" class="btn btn-primary btn-dark" type="submit" value="submit">Submit</button>
                     </div>
                 </div>
             </div>

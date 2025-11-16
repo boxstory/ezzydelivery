@@ -2,10 +2,11 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block content %}
-  <div class="flex-fill p-2">
-    <div class=" h4 p-3">All Tasks lists</div>
-    <div class="table-responsive">
-      <table class="table table-striped table-hover  fw-lighter">
+  <div class="flex-fill p-2" id="delivery_tasks_all_wrapper">
+    <div class=" h4 p-3" id="delivery_tasks_all_header">All Tasks lists</div>
+    <div class="table-responsive" id="delivery_tasks_all_table_wrapper">
+      <table class="table table-striped table-hover  fw-lighter" id="delivery_tasks_all_table">
+        <thead id="delivery_tasks_all_thead">
         <tr>
           <th>
             Date &
@@ -22,6 +23,8 @@
           </th>
           <th></th>
         </tr>
+        </thead>
+        <tbody id="delivery_tasks_all_tbody">
         {% for card in cards %}
           <tr data-order-id="{{ card.id }}" class="data-order-row">
             <td>
@@ -50,11 +53,11 @@
       </tr>
       <tr class="collapse" id="collapse-{{ card.id }}">
         <td colspan="9">
-          <div class="card h-100 w-100 m-0">
+          <div class="card h-100 w-100 m-0" id="delivery_tasks_all_card_details_{{ card.id }}">
             <div class="card-body">
               <div class="expand row">
                 <div class="col-12 col-md-4">
-                  <table class="table fs-6">
+                  <table class="table fs-6" id="delivery_tasks_all_table_from_{{ card.id }}">
                     <span class="fw-bold">From:</span>
                     <tr>
                       <th class="fw-light p-0 col-5">Pickup Loc:</th>
@@ -75,7 +78,7 @@
                   </table>
                 </div>
                 <div class="col-12 col-md-4">
-                  <table class="table">
+                  <table class="table" id="delivery_tasks_all_table_to_{{ card.id }}">
                     <span class="fw-bold">To:</span>
                     <tr id="collapse-{{ card.id }}">
                       <th class="fw-light p-0 col-5">Zone No & Place:</th>
@@ -102,7 +105,7 @@
                   </table>
                 </div>
                 <div class="col-12 col-md-4">
-                  <table class="table">
+                  <table class="table" id="delivery_tasks_all_table_details_{{ card.id }}">
                     <span class="fw-bold">Details:</span>
                     <tr>
                       <th class="fw-light p-0 col-5">COD Amount:</th>
@@ -127,12 +130,15 @@
           </div>
           <div class="col-12 p-3 d-flex justify-content-end">
             <button class="btn btn-success assign-driver-btn"
-                    data-task-id="{{ card.id }}">Accept Order</button>
+                    data-task-id="{{ card.id }}"
+                    id="delivery_tasks_all_btn_accept_{{ card.id }}">Accept Order</button>
           </div>
         </td>
       </tr>
     {% endfor %}
+  </tbody>
   </table>
+</div>
 </div>
 {% endblock content %}
 {% block extra_js %}

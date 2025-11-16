@@ -43,6 +43,7 @@ urlpatterns = [
 
     # Additional Orders URLs
     path('orders/dms-updated/', workforce_views.orders_dms_updated, name='orders_dms_updated'),
+    path('orders/match-dms/', workforce_views.match_dms_task, name='match_dms_task'),
     path('orders/reported/', workforce_views.orders_reported, name='orders_reported'),
 
     # Additional Tasks URLs

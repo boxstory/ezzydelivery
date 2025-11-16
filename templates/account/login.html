@@ -313,17 +313,17 @@
 {% endblock %}
 
 {% block account_content %}
-<div class="auth-container">
-    <div class="auth-card">
-        <div class="auth-header">
+<div class="auth-container" id="account_login_container_main">
+    <div class="auth-card" id="account_login_card_main">
+        <div class="auth-header" id="account_login_header">
             <div class="auth-logo">
                 <i class="fa-solid fa-truck-fast"></i>
             </div>
-            <h1>{% trans "Welcome Back" %}</h1>
-            <p>{% trans "Sign in to your Ezzy Delivery account" %}</p>
+            <h1 id="account_login_title_main">{% trans "Welcome Back" %}</h1>
+            <p id="account_login_subtitle">{% trans "Sign in to your Ezzy Delivery account" %}</p>
         </div>
 
-        <div class="auth-body">
+        <div class="auth-body" id="account_login_section_body">
             {% if messages %}
                 {% for message in messages %}
                     <div class="alert alert-{{ message.tags }}">
@@ -332,7 +332,7 @@
                 {% endfor %}
             {% endif %}
 
-            <form method="POST" action="{% url 'account_login' %}">
+            <form id="account_login_form_main" method="POST" action="{% url 'account_login' %}">
                 {% csrf_token %}
 
                 <div class="form-group">
@@ -384,37 +384,37 @@
                     <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
                 {% endif %}
 
-                <button type="submit" class="btn-login">
+                <button id="account_login_btn_submit" type="submit" class="btn-login">
                     <i class="fa-solid fa-right-to-bracket me-2"></i>
                     {% trans "Sign In" %}
                 </button>
             </form>
 
-            <div class="divider">
+            <div class="divider" id="account_login_divider">
                 <span>{% trans "Or continue with" %}</span>
             </div>
 
-            <div class="social-auth">
+            <div class="social-auth" id="account_login_section_social">
                 {% get_providers as socialaccount_providers %}
                 {% if socialaccount_providers %}
                     {% for provider in socialaccount_providers %}
                         {% if provider.id == "google" %}
-                            <a href="{% provider_login_url provider.id %}" class="social-btn google">
+                            <a id="account_login_btn_google" href="{% provider_login_url provider.id %}" class="social-btn google">
                                 <i class="fa-brands fa-google"></i>
                                 <span>{% trans "Continue with Google" %}</span>
                             </a>
                         {% elif provider.id == "facebook" %}
-                            <a href="{% provider_login_url provider.id %}" class="social-btn facebook">
+                            <a id="account_login_btn_facebook" href="{% provider_login_url provider.id %}" class="social-btn facebook">
                                 <i class="fa-brands fa-facebook"></i>
                                 <span>{% trans "Continue with Facebook" %}</span>
                             </a>
                         {% elif provider.id == "twitter" %}
-                            <a href="{% provider_login_url provider.id %}" class="social-btn twitter">
+                            <a id="account_login_btn_twitter" href="{% provider_login_url provider.id %}" class="social-btn twitter">
                                 <i class="fa-brands fa-twitter"></i>
                                 <span>{% trans "Continue with Twitter" %}</span>
                             </a>
                         {% elif provider.id == "github" %}
-                            <a href="{% provider_login_url provider.id %}" class="social-btn github">
+                            <a id="account_login_btn_github" href="{% provider_login_url provider.id %}" class="social-btn github">
                                 <i class="fa-brands fa-github"></i>
                                 <span>{% trans "Continue with GitHub" %}</span>
                             </a>
@@ -422,19 +422,19 @@
                     {% endfor %}
                 {% else %}
                     <!-- Placeholder buttons for when social auth is not configured -->
-                    <button class="social-btn google" disabled>
+                    <button id="account_login_btn_google_disabled" class="social-btn google" disabled>
                         <i class="fa-brands fa-google"></i>
                         <span>{% trans "Continue with Google" %}</span>
                     </button>
-                    <button class="social-btn facebook" disabled>
+                    <button id="account_login_btn_facebook_disabled" class="social-btn facebook" disabled>
                         <i class="fa-brands fa-facebook"></i>
                         <span>{% trans "Continue with Facebook" %}</span>
                     </button>
-                    <button class="social-btn twitter" disabled>
+                    <button id="account_login_btn_twitter_disabled" class="social-btn twitter" disabled>
                         <i class="fa-brands fa-twitter"></i>
                         <span>{% trans "Continue with Twitter" %}</span>
                     </button>
-                    <button class="social-btn github" disabled>
+                    <button id="account_login_btn_github_disabled" class="social-btn github" disabled>
                         <i class="fa-brands fa-github"></i>
                         <span>{% trans "Continue with GitHub" %}</span>
                     </button>
@@ -442,10 +442,10 @@
             </div>
         </div>
 
-        <div class="auth-footer">
+        <div class="auth-footer" id="account_login_footer">
             <p>
                 {% trans "Don't have an account?" %}
-                <a href="{% url 'account_signup' %}">{% trans "Sign Up" %}</a>
+                <a id="account_login_link_signup" href="{% url 'account_signup' %}">{% trans "Sign Up" %}</a>
             </p>
         </div>
     </div>

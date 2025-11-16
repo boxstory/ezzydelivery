@@ -3,25 +3,25 @@
  {% block head_title %}Update Orders{% endblock %} 
 
 {% block content %}
-<div class="container col-md-8 align-content-center">
+<div class="container col-md-8 align-content-center" id="orders_update_container_main">
   <div class="row">
     <div class="col-md-12 pb-3 d-flex justify-content-between">
-      <h2 class="my-2">Update Order</h2>
+      <h2 class="my-2" id="orders_update_header_title">Update Order</h2>
       <a class="text-decoration-none text-light" href="{% url 'business:business_dashboard' %}">
-        <div class="btn btn-dark my-2">Back</div>
+        <div class="btn btn-dark my-2" id="orders_update_btn_back">Back</div>
       </a>
     </div>
   </div>
   <div class="row">
     <div class="col-md-12">
-      <form method="POST">
+      <form method="POST" id="orders_update_form_main">
         {% csrf_token %} {% if form.non_field_errors %}
         {% for error in form.non_field_errors %}
         <div>{{error}}</div>
         {% endfor %} {% endif %} {{ form | crispy }}
         {% if order.order_status == 'publish' %}
         <div class="submit my-3 text-center">
-          <button class="btn btn-success w-25 align-content-center">
+          <button class="btn btn-success w-25 align-content-center" id="orders_update_btn_published">
 
             <P class="m-0"> Already Published</P>
           </button>
@@ -31,10 +31,10 @@
 
 
         <div class="submit my-3 text-center">
-          <button type="submit" class="btn btn-dark w-25 align-content-center">
+          <button type="submit" class="btn btn-dark w-25 align-content-center" id="orders_update_btn_submit">
             Update Order
           </button>
-          <a href="{% url 'orders:add_order_product' order.id %} " class="btn btn-dark w-25 align-content-center me-2 ">
+          <a href="{% url 'orders:add_order_product' order.id %} " class="btn btn-dark w-25 align-content-center me-2 " id="orders_update_btn_add_product">
             <i class="me-2 fa-brands fa-plus"></i>Product
           </a>
         </div>{% endif %}

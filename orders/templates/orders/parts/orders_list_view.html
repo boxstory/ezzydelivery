@@ -2,9 +2,9 @@
 <link rel="stylesheet" href="{% static 'orders/css/order_list.css' %}">
 
 {% for order in orders %}
-  <div class="order-card my-2" id="order-card-{{ order.id }}">
+  <div class="order-card my-2" id="order-card-{{ order.id }}" data-card-id="orders_list_card_order">
     <!-- Order Card Header (Clickable) -->
-    <div class="order-card-header" onclick="toggleOrderCard({{ order.id }})">
+    <div class="order-card-header" onclick="toggleOrderCard({{ order.id }})" data-header-id="orders_list_header_order_card">
       <div class="d-flex flex-wrap align-items-center justify-content-between w-100">
         <div class="order-number">
           <i class="fa-solid fa-receipt"></i>
@@ -28,7 +28,7 @@
     </div>
 
     <!-- Compact Summary (Always Visible) -->
-    <div class="order-summary">
+    <div class="order-summary" data-summary-id="orders_list_section_summary">
       <div class="summary-item">
         <i class="fa-solid fa-user"></i>
         <strong>{{ order.customer_name }}</strong>
@@ -50,9 +50,9 @@
     </div>
 
     <!-- Order Card Body -->
-    <div class="order-card-body">
+    <div class="order-card-body" data-body-id="orders_list_section_body">
       <!-- Order Details Section -->
-      <div class="order-details">
+      <div class="order-details" data-details-id="orders_list_section_details">
         <!-- Customer Information -->
         <div class="detail-row">
           <span class="detail-label">Customer</span>
@@ -151,7 +151,7 @@
       </div>
 
       <!-- Products Section -->
-      <div class="order-products" id="product-section-{{ order.id }}">
+      <div class="order-products" id="product-section-{{ order.id }}" data-section-id="orders_list_section_products">
         <div class="products-header">
           <i class="fa-solid fa-box-open"></i>
           <span>Order Items</span>

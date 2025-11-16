@@ -2,12 +2,12 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block content %}
-<div class="flex-fill p-2">
-    <div class="container">
+<div class="flex-fill p-2" id="delivery_vehicle_info_wrapper">
+    <div class="container" id="delivery_vehicle_info_container">
         <div class="row table-responsive">
-            <div class=" col-md-12 d-flex flex-row justify-content-between">
-                <h2 class="m-0">Orders list</h2>
-                <a class="btn btn-dark" href="{% url 'orders:add_order' %}">
+            <div class=" col-md-12 d-flex flex-row justify-content-between" id="delivery_vehicle_info_header_row">
+                <h2 class="m-0" id="delivery_vehicle_info_header">Orders list</h2>
+                <a class="btn btn-dark" href="{% url 'orders:add_order' %}" id="delivery_vehicle_info_btn_add_orders">
                     <i class="fa fa-add me-3"></i> Add Orders
                 </a>
             </div>
@@ -15,7 +15,8 @@
             <p>No orders</p>
             {% else %}
             <!-- as--------------  -->
-            <table class="table table-striped table-hover my-3">
+            <table class="table table-striped table-hover my-3" id="delivery_vehicle_info_table_orders">
+                <thead id="delivery_vehicle_info_thead">
                 <tr>
                     <th>Order No</th>
                     <th>Order_date</th>
@@ -28,6 +29,8 @@
                     <th>customer_zone_no</th>
                     <th>Actions</th>
                 </tr>
+                </thead>
+                <tbody id="delivery_vehicle_info_tbody">
                 {% for order in orders %}
                 <tr>
                     <td>{{ order.order_number }}</td>
@@ -49,6 +52,7 @@
                     </td>
                 </tr>
                 {% endfor %}
+                </tbody>
             </table>
             {% endif %}
         </div>

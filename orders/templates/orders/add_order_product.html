@@ -2,27 +2,27 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block content %}
-<div class="p-3 col-12 col-lg-10 col-md-10">
+<div class="p-3 col-12 col-lg-10 col-md-10" id="orders_add_product_container_main">
   <div class="container align-content-center w-100">
     <div class="row">
       <div class="col-md-12 pb-3">
         <div class="col p-2">
-          <h2 class="m-0 text-center">Add Ordered Products list</h2>
+          <h2 class="m-0 text-center" id="orders_add_product_header_title">Add Ordered Products list</h2>
         </div>
-        <div class="col d-flex justify-content-between rounded-2 bg-light">
+        <div class="col d-flex justify-content-between rounded-2 bg-light" id="orders_add_product_nav_actions">
 
           <a class="btn pe-3 text-dark" href="{% url 'orders:orders_all_list' %}">
-            <div class="btn btn-dark my-2">Orders List</div>
+            <div class="btn btn-dark my-2" id="orders_add_product_btn_orders_list">Orders List</div>
           </a>
           <a class="btn pe-3 text-dark d-none d-md-block" href="{% url 'orders:orders_all_list' %}">
-            <div class="btn btn-dark my-2">Edit Order</div>
+            <div class="btn btn-dark my-2" id="orders_add_product_btn_edit_order">Edit Order</div>
           </a>
 
         </div>
       </div>
     </div>
 
-    <div class=" pb-2 bg-light p-3 pt-0" id="collapse-{{ order.id }}">
+    <div class=" pb-2 bg-light p-3 pt-0" id="collapse-{{ order.id }}" data-card-id="orders_add_product_card_order_info">
       <div class="pb-2">
         <div class="d-flex justify-content-between">
           <div>Name</div>
@@ -51,7 +51,7 @@
     <div class="row mt-3">
       <div class="col-md-12">
         {{ error }}
-        <form method="POST">
+        <form method="POST" id="orders_add_product_form_main">
           {% if form.non_field_errors %}
           <!-- extra css -->
           {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
@@ -62,7 +62,7 @@
 
           {% if order.order_status == 'publish' %}
           <div class="my-3 text-center">
-            <button class="btn btn-success w-50 ">
+            <button class="btn btn-success w-50 " id="orders_add_product_btn_published">
 
               <P class="m-0"> Already Published</P>
             </button>
@@ -72,7 +72,7 @@
 
 
           <div class=" my-3 text-center">
-            <button class="btn btn-dark w-50 align-content-center" href="{% url 'orders:orders_all_list'  %}">Confirm
+            <button class="btn btn-dark w-50 align-content-center" href="{% url 'orders:orders_all_list'  %}" id="orders_add_product_btn_confirm">Confirm
               Products
             </button>
 

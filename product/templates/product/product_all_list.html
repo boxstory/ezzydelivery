@@ -9,14 +9,14 @@ Products
 {% load crispy_forms_tags %}
 
 {% block content %}
-<div class="products-container">
+<div class="products-container" id="product_list_container">
   <!-- Products Header -->
-  <div class="products-header">
-    <h2>
+  <div class="products-header" id="product_list_header">
+    <h2 id="product_list_title">
       <i class="fa-solid fa-box-open"></i>
       All Products
     </h2>
-    <a href="{% url 'product:product_single_add' %}" class="add-product-btn">
+    <a href="{% url 'product:product_single_add' %}" class="add-product-btn" id="product_list_btn_add">
       <i class="fa-solid fa-plus"></i>
       Add Product
     </a>
@@ -24,22 +24,22 @@ Products
 
   <!-- Products Grid -->
   {% if products %}
-  <div class="products-grid">
+  <div class="products-grid" id="product_list_grid">
     {% for product in products %}
-    <article class="product-card">
+    <article class="product-card" id="product_list_card_{{ product.id }}">
       <!-- Product Header -->
-      <div class="product-card-header">
-        <h3 class="product-name">
+      <div class="product-card-header" id="product_list_card_header_{{ product.id }}">
+        <h3 class="product-name" id="product_list_card_name_{{ product.id }}">
           <i class="fa-solid fa-tag"></i>
           {{ product.item_name }}
         </h3>
-        <p class="product-sku">SKU: {{ product.item_sku }}</p>
+        <p class="product-sku" id="product_list_card_sku_{{ product.id }}">SKU: {{ product.item_sku }}</p>
       </div>
 
       <!-- Product Body -->
-      <div class="product-card-body">
+      <div class="product-card-body" id="product_list_card_body_{{ product.id }}">
         {% if product.color %}
-        <div class="product-detail-row">
+        <div class="product-detail-row" id="product_list_card_detail_color_{{ product.id }}">
           <span class="product-label">Color</span>
           <span class="product-value">
             <i class="fa-solid fa-palette"></i>
@@ -48,7 +48,7 @@ Products
         </div>
         {% endif %}
 
-        <div class="product-detail-row">
+        <div class="product-detail-row" id="product_list_card_detail_size_{{ product.id }}">
           <span class="product-label">Size</span>
           <span class="product-value">
             <i class="fa-solid fa-ruler"></i>
@@ -56,7 +56,7 @@ Products
           </span>
         </div>
 
-        <div class="product-detail-row">
+        <div class="product-detail-row" id="product_list_card_detail_price_{{ product.id }}">
           <span class="product-label">Price</span>
           <span class="product-price">
             <i class="fa-solid fa-money-bill-wave"></i>
@@ -65,7 +65,7 @@ Products
         </div>
 
         {% if product.qty %}
-        <div class="product-detail-row">
+        <div class="product-detail-row" id="product_list_card_detail_stock_{{ product.id }}">
           <span class="product-label">Stock</span>
           <span class="product-value">
             {% if product.qty > 10 %}
@@ -81,12 +81,12 @@ Products
       </div>
 
       <!-- Product Footer -->
-      <div class="product-card-footer">
-        <a href="{% url 'product:product_single_update' product_id=product.id %}" class="product-action-btn edit">
+      <div class="product-card-footer" id="product_list_card_footer_{{ product.id }}">
+        <a href="{% url 'product:product_single_update' product_id=product.id %}" class="product-action-btn edit" id="product_list_btn_edit_{{ product.id }}">
           <i class="fa fa-edit"></i>
           Edit
         </a>
-        <a href="{% url 'product:product_single_delete' product_id=product.id %}" class="product-action-btn delete">
+        <a href="{% url 'product:product_single_delete' product_id=product.id %}" class="product-action-btn delete" id="product_list_btn_delete_{{ product.id }}">
           <i class="fa fa-trash"></i>
           Delete
         </a>
@@ -96,11 +96,11 @@ Products
   </div>
   {% else %}
   <!-- Empty State -->
-  <div class="products-empty">
+  <div class="products-empty" id="product_list_empty_state">
     <i class="fa-solid fa-box-open"></i>
-    <h3>No Products Found</h3>
-    <p>Start adding products to your inventory</p>
-    <a href="{% url 'product:product_single_add' %}" class="add-product-btn">
+    <h3 id="product_list_empty_title">No Products Found</h3>
+    <p id="product_list_empty_text">Start adding products to your inventory</p>
+    <a href="{% url 'product:product_single_add' %}" class="add-product-btn" id="product_list_btn_add_first">
       <i class="fa-solid fa-plus"></i>
       Add Your First Product
     </a>

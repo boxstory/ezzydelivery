@@ -170,37 +170,37 @@
 {% endblock %}
 
 {% block account_content %}
-<div class="auth-container">
-    <div class="auth-card">
-        <div class="logout-icon-container">
+<div class="auth-container" id="account_logout_container_main">
+    <div class="auth-card" id="account_logout_card_main">
+        <div class="logout-icon-container" id="account_logout_section_icon">
             <div class="logout-icon">
                 <i class="fa-solid fa-right-from-bracket"></i>
             </div>
         </div>
 
-        <div class="auth-body">
-            <h1>{% trans "Sign Out" %}</h1>
-            <p>{% trans "Are you sure you want to sign out of your Ezzy Delivery account?" %}</p>
+        <div class="auth-body" id="account_logout_section_body">
+            <h1 id="account_logout_title_main">{% trans "Sign Out" %}</h1>
+            <p id="account_logout_message_confirm">{% trans "Are you sure you want to sign out of your Ezzy Delivery account?" %}</p>
 
-            <form method="post" action="{% url 'account_logout' %}">
+            <form id="account_logout_form_main" method="post" action="{% url 'account_logout' %}">
                 {% csrf_token %}
                 {% if redirect_field_value %}
                     <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
                 {% endif %}
 
                 <div class="button-group">
-                    <a href="javascript:history.back()" class="btn-cancel">
+                    <a id="account_logout_btn_cancel" href="javascript:history.back()" class="btn-cancel">
                         <i class="fa-solid fa-arrow-left me-2"></i>
                         {% trans "Cancel" %}
                     </a>
-                    <button type="submit" class="btn-logout">
+                    <button id="account_logout_btn_submit" type="submit" class="btn-logout">
                         <i class="fa-solid fa-right-from-bracket me-2"></i>
                         {% trans "Sign Out" %}
                     </button>
                 </div>
             </form>
 
-            <div class="info-box">
+            <div class="info-box" id="account_logout_alert_info">
                 <p>
                     <i class="fa-solid fa-circle-info"></i>
                     {% trans "You can sign back in anytime using your credentials." %}

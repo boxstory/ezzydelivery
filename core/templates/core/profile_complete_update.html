@@ -148,9 +148,9 @@
 {% endblock extra_css %}
 
 {% block content %}
-<div class="completion-container">
+<div class="completion-container" id="core_profile_complete_container_main">
     <!-- Completion Header -->
-    <div class="completion-header">
+    <div class="completion-header" id="core_profile_complete_header">
         <div class="completion-circle">
             <svg width="120" height="120">
                 <circle class="circle-bg" cx="60" cy="60" r="52"></circle>
@@ -167,7 +167,7 @@
     </div>
 
     <!-- Form Card -->
-    <div class="form-card">
+    <div class="form-card" id="core_profile_complete_card_form">
         {% if completion_percentage < 100 %}
         <div class="info-alert">
             <i class="fa-solid fa-circle-info me-2"></i>
@@ -180,7 +180,7 @@
         </div>
         {% endif %}
 
-        <form method="post">
+        <form id="core_profile_complete_form_main" method="post">
             {% csrf_token %}
 
             <div class="row g-3">
@@ -319,18 +319,18 @@
 
             <!-- Action Buttons -->
             <div class="d-flex justify-content-between align-items-center mt-4">
-                <button type="submit" name="action" value="save" class="btn btn-action btn-save">
+                <button id="core_profile_complete_btn_save" type="submit" name="action" value="save" class="btn btn-action btn-save">
                     <i class="fa-solid fa-floppy-disk me-2"></i>Save Progress
                 </button>
 
                 <div class="role-selection">
-                    <button type="submit" name="action" value="register_business"
+                    <button id="core_profile_complete_btn_register_business" type="submit" name="action" value="register_business"
                             class="btn btn-action btn-register"
                             {% if completion_percentage < 100 %}disabled{% endif %}>
                         <i class="fa-solid fa-building me-2"></i>Register as Business
                     </button>
 
-                    <button type="submit" name="action" value="join_driver"
+                    <button id="core_profile_complete_btn_join_driver" type="submit" name="action" value="join_driver"
                             class="btn btn-action btn-register"
                             {% if completion_percentage < 100 %}disabled{% endif %}>
                         <i class="fa-solid fa-car me-2"></i>Join as Driver

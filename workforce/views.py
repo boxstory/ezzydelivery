@@ -933,20 +933,89 @@ def update_verification_status(request, profile_id):
 # Orders Section Functions
 @login_required(login_url='/accounts/login/')
 def orders_dms_updated(request):
-    """View for DMS updated orders list"""
+    """
+    View for DMS updated orders list.
+    Shows orders that have delivery tasks with DMS status updates.
+    """
     from orders import models as orders_models
+    from django.db.models import Prefetch
 
+    # Get orders that have delivery tasks with DMS IDs (meaning they're in the DMS system)
+    # Use select_related and prefetch_related to optimize queries
     orders_list = orders_models.Order.objects.filter(
-        order_dms_status__isnull=False
-    ).order_by('-created_at')
+        delivery_task__dl_task_number_dms__isnull=False
+    ).select_related(
+        'business',
+        'pickup_location'
+    ).prefetch_related(
+        Prefetch(
+            'delivery_task',
+            queryset=delivery_models.DeliveryTask.objects.select_related(
+                'driver__user',
+                'order'
+            ).filter(
+                dl_task_number_dms__isnull=False
+            )
+        )
+    ).distinct().order_by('-created_at')
+
+    # Check if there are any orders
+    has_orders = orders_list.exists()
+
+    # Check if DMS is configured (you can check if shipday_obj exists)
+    dms_configured = shipday_obj is not None
 
     orders_with_pagination = paginate_queryset(request, orders_list, items_per_page=20)
 
     context = {
         'orders': orders_with_pagination,
         'page_title': 'DMS Updated Orders',
+        'has_orders': has_orders,
+        'dms_configured': dms_configured,
     }
-    return render(request, 'workforce/orders_list.html', context)
+    return render(request, 'workforce/orders_dms_updated_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def match_dms_task(request):
+    """Manually match a delivery task to a DMS job ID."""
+    from delivery import models as delivery_models
+    from django.contrib import messages
+
+    if request.method == 'POST':
+        delivery_task_number = request.POST.get('delivery_task_number', '').strip()
+        dms_job_id = request.POST.get('dms_job_id', '').strip()
+
+        if not delivery_task_number or not dms_job_id:
+            messages.error(request, 'Both Delivery Task Number and DMS Job ID are required.')
+            logger.warning(f"Match attempt failed - missing fields. Task: {delivery_task_number}, DMS ID: {dms_job_id}")
+            return redirect('workforce:orders_dms_updated')
+
+        try:
+            # Find the delivery task
+            task = delivery_models.DeliveryTask.objects.get(
+                dl_task_number=delivery_task_number
+            )
+
+            # Update with DMS job ID
+            task.dl_task_number_dms = dms_job_id
+            task.save()
+
+            messages.success(
+                request,
+                f'Successfully matched Delivery Task {delivery_task_number} to DMS Job ID: {dms_job_id}'
+            )
+            logger.info(f"User {request.user.id} matched delivery task {delivery_task_number} to DMS ID {dms_job_id}")
+
+        except delivery_models.DeliveryTask.DoesNotExist:
+            messages.error(request, f'Delivery Task "{delivery_task_number}" not found in the system.')
+            logger.warning(f"Failed to match - delivery task {delivery_task_number} not found")
+
+        except Exception as e:
+            messages.error(request, f'An error occurred while matching: {str(e)}')
+            logger.error(f"Error matching task {delivery_task_number} to DMS ID {dms_job_id}: {str(e)}")
+
+    return redirect('workforce:orders_dms_updated')
 
 
 @login_required(login_url='/accounts/login/')

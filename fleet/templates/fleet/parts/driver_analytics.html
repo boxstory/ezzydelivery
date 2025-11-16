@@ -9,10 +9,10 @@
 <div class="flex-fill p-2">
     <div class="col-12 py-2">
         <!-- Page Header -->
-        <section class="m-0 p-0 mb-4">
+        <section class="m-0 p-0 mb-4" id="fleet_analytics_section_header">
             <div class="pt-3 pt-md-3 pb-0 text-dark">
                 <div class="text-center">
-                    <h3 class="fw-bolder text-uppercase">
+                    <h3 class="fw-bolder text-uppercase" id="fleet_analytics_header_title">
                         <i class="fa-solid fa-chart-pie me-2"></i>Advanced Analytics
                         <br />
                         <span class="fw-light text-lowercase h5">{{ driver.user.get_full_name }}</span>
@@ -25,12 +25,12 @@
         <!-- Monthly Trend Chart -->
         <div class="row g-3 mb-4">
             <div class="col-12">
-                <section class="p-4 bg-white rounded shadow-sm">
-                    <h5 class="fw-bold mb-3">
+                <section class="p-4 bg-white rounded shadow-sm" id="fleet_analytics_card_monthly_trend">
+                    <h5 class="fw-bold mb-3" id="fleet_analytics_title_monthly">
                         <i class="fa-solid fa-chart-line me-2"></i>
                         Monthly Performance Trend
                     </h5>
-                    <canvas id="monthlyTrendChart" height="80"></canvas>
+                    <canvas id="fleet_analytics_chart_monthly" height="80"></canvas>
                 </section>
             </div>
         </div>
@@ -43,7 +43,7 @@
                         <i class="fa-solid fa-chart-pie me-2"></i>
                         COD vs Prepaid
                     </h5>
-                    <canvas id="codPrepaidChart"></canvas>
+                    <canvas id="fleet_analytics_chart_cod_prepaid"></canvas>
                     <div class="row text-center mt-3">
                         <div class="col-6">
                             <p class="text-muted mb-0 small">COD Orders</p>
@@ -180,7 +180,7 @@
                         <i class="fa-solid fa-chart-bar me-2"></i>
                         24-Hour Delivery Distribution
                     </h5>
-                    <canvas id="hourlyChart" height="60"></canvas>
+                    <canvas id="fleet_analytics_chart_hourly" height="60"></canvas>
                 </section>
             </div>
         </div>
@@ -260,7 +260,7 @@ const monthlyData = {{ monthly_data|safe }};
 const hourDistribution = {{ hour_distribution|safe }};
 
 // Monthly Trend Chart
-const monthlyCtx = document.getElementById('monthlyTrendChart').getContext('2d');
+const monthlyCtx = document.getElementById('fleet_analytics_chart_monthly').getContext('2d');
 new Chart(monthlyCtx, {
     type: 'line',
     data: {
@@ -321,7 +321,7 @@ new Chart(monthlyCtx, {
 });
 
 // COD vs Prepaid Pie Chart
-const codCtx = document.getElementById('codPrepaidChart').getContext('2d');
+const codCtx = document.getElementById('fleet_analytics_chart_cod_prepaid').getContext('2d');
 new Chart(codCtx, {
     type: 'doughnut',
     data: {
@@ -346,7 +346,7 @@ new Chart(codCtx, {
 });
 
 // Hourly Distribution Chart
-const hourlyCtx = document.getElementById('hourlyChart').getContext('2d');
+const hourlyCtx = document.getElementById('fleet_analytics_chart_hourly').getContext('2d');
 new Chart(hourlyCtx, {
     type: 'bar',
     data: {

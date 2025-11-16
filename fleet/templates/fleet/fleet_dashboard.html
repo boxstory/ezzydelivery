@@ -5,17 +5,17 @@
   <!-- Your content here -->
   <div class="flex-fill p-2">
     <div class="col-12 py-2">
-      <section class="m-0 p-0">
+      <section class="m-0 p-0" id="fleet_dashboard_section_main">
         <div class="pt-3 pt-md-3 pb-0 text-dark d-none d-md-block">
           <div class="text-center">
-            <h3 class="fw-bolder text-uppercase">
+            <h3 class="fw-bolder text-uppercase" id="fleet_dashboard_header_title">
               Driver Dashboard
               <br />
               <span class="fw-light text-lowercase h5">{{ profile.first_name }} {{ profile.last_name }}</span>
             </h3>
           </div>
         </div>
-        <div class="pt-md-3 m-0 px-3" id="dasboard_div">
+        <div class="pt-md-3 m-0 px-3" id="fleet_dashboard_container_main">
           {% block widget %}
             <!-- Wallet Alert Section -->
             {% if wallet_alerts %}
@@ -41,10 +41,10 @@
             <!-- Wallet Status Widget -->
             <div class="row g-3 mb-4">
               <div class="col-12">
-                <section class="p-4 bg-white rounded shadow-sm border-start border-5 {% if wallet_status.is_blocked %}border-danger{% elif wallet_status.is_warning %}border-warning{% else %}border-success{% endif %}">
+                <section class="p-4 bg-white rounded shadow-sm border-start border-5 {% if wallet_status.is_blocked %}border-danger{% elif wallet_status.is_warning %}border-warning{% else %}border-success{% endif %}" id="fleet_dashboard_card_wallet_status">
                   <div class="row align-items-center">
                     <div class="col-md-8">
-                      <h5 class="fw-bold mb-3">
+                      <h5 class="fw-bold mb-3" id="fleet_dashboard_title_wallet">
                         <i class="fa-solid fa-wallet me-2"></i>
                         COD Wallet Status
                       </h5>
@@ -83,10 +83,10 @@
                       <i class="fa-solid fa-sack-dollar fs-1 text-primary mb-2"></i>
                       <p class="text-muted mb-1">Pending Earnings</p>
                       <h3 class="fw-bold text-primary mb-3">{{ wallet_status.pending_earnings }} QR</h3>
-                      <a href="{% url 'fleet:cod_submission' %}" class="btn btn-primary btn-sm me-2">
+                      <a href="{% url 'fleet:cod_submission' %}" class="btn btn-primary btn-sm me-2" id="fleet_dashboard_btn_submit_cod">
                         <i class="fa-solid fa-upload me-1"></i> Submit COD
                       </a>
-                      <a href="{% url 'fleet:driver_earnings' %}" class="btn btn-outline-primary btn-sm">
+                      <a href="{% url 'fleet:driver_earnings' %}" class="btn btn-outline-primary btn-sm" id="fleet_dashboard_btn_view_earnings">
                         <i class="fa-solid fa-chart-line me-1"></i> View Earnings
                       </a>
                     </div>
@@ -98,26 +98,26 @@
             <!-- Statistics Cards -->
             <div class="row g-3 mb-3">
               <div class="col-12 col-md-6 col-lg-3">
-                <section class="p-3 bg-light rounded shadow-sm">
+                <section class="p-3 bg-light rounded shadow-sm" id="fleet_dashboard_card_stats_total_deliveries">
                   <p class="m-0 fw-bolder fs-6 text-muted text-uppercase">Total Deliveries (30d)</p>
                   <p class="mb-0 mt-2 fs-2 fw-bold text-end text-primary">{{ stats_30_days.total_deliveries }}</p>
                 </section>
               </div>
               <div class="col-12 col-md-6 col-lg-3">
-                <section class="p-3 bg-light rounded shadow-sm">
+                <section class="p-3 bg-light rounded shadow-sm" id="fleet_dashboard_card_stats_successful">
                   <p class="m-0 fw-bolder fs-6 text-muted text-uppercase">Successful Deliveries</p>
                   <p class="mb-0 mt-2 fs-2 fw-bold text-end text-success">{{ stats_30_days.successful_deliveries }}</p>
                   <p class="mb-0 mt-1 small text-muted text-end">Success Rate: {{ stats_30_days.success_rate|floatformat:1 }}%</p>
                 </section>
               </div>
               <div class="col-12 col-md-6 col-lg-3">
-                <section class="p-3 bg-light rounded shadow-sm">
+                <section class="p-3 bg-light rounded shadow-sm" id="fleet_dashboard_card_stats_cod_collected">
                   <p class="m-0 fw-bolder fs-6 text-muted text-uppercase">Total COD Collected</p>
                   <p class="mb-0 mt-2 fs-2 fw-bold text-end text-warning">{{ stats_30_days.total_cod_collected|floatformat:2 }} QR</p>
                 </section>
               </div>
               <div class="col-12 col-md-6 col-lg-3">
-                <section class="p-3 bg-light rounded shadow-sm">
+                <section class="p-3 bg-light rounded shadow-sm" id="fleet_dashboard_card_stats_earnings">
                   <p class="m-0 fw-bolder fs-6 text-muted text-uppercase">Total Earnings (30d)</p>
                   <p class="mb-0 mt-2 fs-2 fw-bold text-end text-info">{{ stats_30_days.total_earnings|floatformat:2 }} QR</p>
                 </section>
@@ -127,8 +127,8 @@
             <!-- Quick Actions -->
             <div class="row g-3 mb-3">
               <div class="col-12">
-                <section class="p-3 bg-light rounded shadow-sm">
-                  <h5 class="fw-bold mb-3">Quick Actions</h5>
+                <section class="p-3 bg-light rounded shadow-sm" id="fleet_dashboard_section_quick_actions">
+                  <h5 class="fw-bold mb-3" id="fleet_dashboard_title_quick_actions">Quick Actions</h5>
                   <div class="row g-2">
                     <div class="col-6 col-md-3">
                       <a href="{% url 'fleet:cod_collection' %}" class="btn btn-outline-primary w-100">
@@ -161,8 +161,8 @@
             <!-- Performance Overview -->
             <div class="row g-3 mb-3">
               <div class="col-12">
-                <section class="p-4 bg-white rounded shadow-sm">
-                  <h5 class="fw-bold mb-3">
+                <section class="p-4 bg-white rounded shadow-sm" id="fleet_dashboard_card_performance_overview">
+                  <h5 class="fw-bold mb-3" id="fleet_dashboard_title_performance">
                     <i class="fa-solid fa-gauge-high me-2"></i>
                     Performance Overview (Last 7 Days)
                   </h5>
@@ -197,7 +197,7 @@
                     </div>
                   </div>
                   <div class="text-center mt-3">
-                    <a href="{% url 'fleet:driver_performance' %}" class="btn btn-primary">
+                    <a href="{% url 'fleet:driver_performance' %}" class="btn btn-primary" id="fleet_dashboard_btn_view_performance">
                       <i class="fa-solid fa-chart-line me-2"></i>
                       View Detailed Performance
                     </a>
@@ -209,7 +209,7 @@
             <!-- Comparison: This Week vs Last 30 Days -->
             <div class="row g-3 mb-3">
               <div class="col-md-6">
-                <section class="p-3 bg-light rounded shadow-sm">
+                <section class="p-3 bg-light rounded shadow-sm" id="fleet_dashboard_card_stats_week">
                   <h6 class="fw-bold mb-3 text-center">This Week</h6>
                   <div class="row text-center">
                     <div class="col-6 mb-2">
@@ -232,7 +232,7 @@
                 </section>
               </div>
               <div class="col-md-6">
-                <section class="p-3 bg-light rounded shadow-sm">
+                <section class="p-3 bg-light rounded shadow-sm" id="fleet_dashboard_card_stats_30days">
                   <h6 class="fw-bold mb-3 text-center">Last 30 Days</h6>
                   <div class="row text-center">
                     <div class="col-6 mb-2">
@@ -260,8 +260,8 @@
             {% if driver.driver_rating_count > 0 %}
             <div class="row g-3 mb-3">
               <div class="col-12">
-                <section class="p-4 bg-white rounded shadow-sm">
-                  <h5 class="fw-bold mb-3">
+                <section class="p-4 bg-white rounded shadow-sm" id="fleet_dashboard_card_ratings">
+                  <h5 class="fw-bold mb-3" id="fleet_dashboard_title_ratings">
                     <i class="fa-solid fa-star me-2 text-warning"></i>
                     Ratings & Reviews
                   </h5>
@@ -294,8 +294,8 @@
             {% endif %}
 
             <div>
-              <section class="p-3 m-3 fw-medium fs-4 bg-light">
-                <p class="pb-2 m-0 fw-bolder fs-5 text-center text-md-start">Latest jobs list</p>
+              <section class="p-3 m-3 fw-medium fs-4 bg-light" id="fleet_dashboard_section_latest_jobs">
+                <p class="pb-2 m-0 fw-bolder fs-5 text-center text-md-start" id="fleet_dashboard_title_latest_jobs">Latest jobs list</p>
                 <p>{{ order.id }}</p>
                 {% include "orders/parts/orders_list_review.html" %}
               </section>

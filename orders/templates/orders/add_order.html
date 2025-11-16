@@ -2,41 +2,41 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block content %}
-<div class="p-3 col-12 col-lg-10 col-md-10">
+<div class="p-3 col-12 col-lg-10 col-md-10" id="orders_add_container_main">
   <div class="container align-content-center">
     <div class="row">
       <div class="col-md-12 pb-3">
         <div class="col p-2">
-          <h2 class="m-0 text-center">Add Order</h2>
+          <h2 class="m-0 text-center" id="orders_add_header_title">Add Order</h2>
         </div>
-        <div class="col d-flex justify-content-between rounded-2 bg-light">
+        <div class="col d-flex justify-content-between rounded-2 bg-light" id="orders_add_nav_actions">
           <a class="btn pe-3 text-dark" href="{% url 'business:pickup_location_list' %}">
-            <div class="btn btn-dark my-2">Pickup locations</div>
+            <div class="btn btn-dark my-2" id="orders_add_btn_pickup_locations">Pickup locations</div>
           </a>
           <a class="btn pe-3 text-dark" href="{% url 'business:pickup_location_list' %}">
-            <div class="btn btn-dark my-2">Pick and Delivery</div>
+            <div class="btn btn-dark my-2" id="orders_add_btn_pick_delivery">Pick and Delivery</div>
           </a>
           <a class="btn pe-3 text-dark" href="{% url 'orders:add_order_with_product' %}">
-            <div class="btn btn-dark my-2">add_order_with_product</div>
+            <div class="btn btn-dark my-2" id="orders_add_btn_with_product">add_order_with_product</div>
           </a>
           <a class="btn pe-3 text-dark d-none d-md-block" href="{% url 'orders:order_upload_file' %}">
-            <div class="btn btn-dark my-2">Upload bulk</div>
+            <div class="btn btn-dark my-2" id="orders_add_btn_upload_bulk">Upload bulk</div>
           </a><a class="btn pe-3 text-dark d-none d-md-block" href="{% url 'orders:orders_all_list' %}">
-            <div class="btn btn-dark my-2">Back</div>
+            <div class="btn btn-dark my-2" id="orders_add_btn_back">Back</div>
           </a>
         </div>
       </div>
     </div>
     <div class="row">
       <div class="col-md-12">
-        <form method="POST">
+        <form method="POST" id="orders_add_form_main">
           {% if form.non_field_errors %}
           <!-- extra css -->
           {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
           {% endif %}
           {% csrf_token %} {{ form | crispy }}
           <div class="text-end">
-            <button type="submit" class="btn btn-dark w-100 w-md-50" href="{% url 'orders:add_order' %}">Save & Add
+            <button type="submit" class="btn btn-dark w-100 w-md-50" href="{% url 'orders:add_order' %}" id="orders_add_btn_submit">Save & Add
               Products</button>
           </div>
         </form>

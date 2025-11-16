@@ -131,27 +131,28 @@
 {% endblock extra_css %}
 
 {% block content %}
-  <div class="p-3 col-12">
-    <div class="api-section-header d-flex justify-content-between align-items-center">
+  <div class="p-3 col-12" id="client_api_list_container_main">
+    <div class="api-section-header d-flex justify-content-between align-items-center" id="client_api_list_section_header">
       <div>
-        <h2 class="mb-0 fw-bold">API SETTINGS</h2>
-        <p class="text-muted mb-0 mt-1">Manage your e-commerce integrations and API keys</p>
+        <h2 class="mb-0 fw-bold" id="client_api_list_title_main">API SETTINGS</h2>
+        <p class="text-muted mb-0 mt-1" id="client_api_list_subtitle_main">Manage your e-commerce integrations and API keys</p>
       </div>
       <a href="{% url 'business:business_settings_api_add'  business.business_id %}"
-         class="btn btn-dark px-4">
+         class="btn btn-dark px-4"
+         id="client_api_list_btn_new_integration">
         <i class="fa-solid fa-plus me-2"></i>
         New Integration
       </a>
     </div>
 
     <!-- E-Commerce API Integrations Section -->
-    <section class="mb-4">
-      <h3 class="section-title">
+    <section class="mb-4" id="client_api_list_section_ecommerce">
+      <h3 class="section-title" id="client_api_list_title_ecommerce">
         <i class="fa-solid fa-store"></i>
         E-Commerce Platform Integrations
       </h3>
 
-      <div class="row">
+      <div class="row" id="client_api_list_section_integrations_list">
         {% if business_apis %}
           {% for api in business_apis %}
             <div class="col-md-6 col-12">
@@ -249,13 +250,13 @@
     <hr class="section-divider">
 
     <!-- API Keys Section -->
-    <section>
+    <section id="client_api_list_section_api_keys">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3 class="section-title mb-0">
+        <h3 class="section-title mb-0" id="client_api_list_title_api_keys">
           <i class="fa-solid fa-key"></i>
           API Keys & App Integrations
         </h3>
-        <button class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#createApiKeyModal" data-business-id="{{ business.business_id }}">
+        <button class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#createApiKeyModal" data-business-id="{{ business.business_id }}" id="client_api_list_btn_generate_key">
           <i class="fa-solid fa-plus me-2"></i>
           Generate API Key
         </button>
@@ -358,7 +359,7 @@
   <!-- Create API Key Modal -->
   <div class="modal fade" id="createApiKeyModal" tabindex="-1" aria-labelledby="createApiKeyModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content" style="border-radius: 16px; border: none;">
+      <div class="modal-content" style="border-radius: 16px; border: none;" id="client_api_list_modal_create">
         <div class="modal-header" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-bottom: 1px solid #dee2e6;">
           <h5 class="modal-title fw-bold" id="createApiKeyModalLabel">
             <i class="fa-solid fa-key me-2"></i>
@@ -366,7 +367,7 @@
           </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <div class="modal-body p-4">
+        <div class="modal-body p-4" id="client_api_list_modal_create_body">
           <form id="createApiKeyForm">
             {% csrf_token %}
             <div class="mb-3">
@@ -412,7 +413,7 @@
   <!-- API Key Success Modal -->
   <div class="modal fade" id="apiKeySuccessModal" tabindex="-1" aria-labelledby="apiKeySuccessModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content" style="border-radius: 16px; border: none;">
+      <div class="modal-content" style="border-radius: 16px; border: none;" id="client_api_list_modal_success">
         <div class="modal-header" style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-bottom: 1px solid #c3e6cb;">
           <h5 class="modal-title fw-bold text-success" id="apiKeySuccessModalLabel">
             <i class="fa-solid fa-check-circle me-2"></i>

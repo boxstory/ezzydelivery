@@ -7,21 +7,21 @@ FLEETS
 <!-- title -->
 {% block content %}
 <div class="d-flex justify-content-between pt-4 align-content-center mx-3">
-  <h1 class="">Drivers</h1>
+  <h1 class="" id="fleet_drivers_header_title">Drivers</h1>
   <div>
     <a href="{% url 'fleet:fleets' %}">
-      <div class="btn btn-dark btn-md-2">
+      <div class="btn btn-dark btn-md-2" id="fleet_drivers_btn_back">
         <i class="fa-solid fa-chevron-left me-2"></i> Back
       </div>
     </a>
     <a href="{% url 'core:join_driver' %}">
-      <div class="btn btn-dark">
+      <div class="btn btn-dark" id="fleet_drivers_btn_join">
         <i class="fa fa-add me-2"></i> join As Driver
       </div>
     </a>
   </div>
 </div>
-<section class=" ">
+<section class=" " id="fleet_drivers_section_list">
   <div class="d-md-flex ">
     {% for fleet in fleets %}
     <div class="col-12 col-md-6 border border-1 bg-light rounded-3 mb-2 me-1">
@@ -62,11 +62,11 @@ FLEETS
         </div>
         <div class="row m-t-30 px-2 my-2">
           <div class="col-6 p-r-0">
-            <form id="favorite-form" action="{% url 'business:driver_directory_add' %}" method="post">
+            <form id="fleet_drivers_form_add_directory" action="{% url 'business:driver_directory_add' %}" method="post">
               {% csrf_token %}
               <input type="hidden" name="driver_id" value="{{ fleet.profile.id }}">
               <input type="hidden" name="business_id" value="{{ user.id }}">
-              <button type="submit" class="btn btn-dark  w-100">
+              <button type="submit" class="btn btn-dark  w-100" id="fleet_drivers_btn_add_directory">
                 Add to
                 directory
               </button>
@@ -74,7 +74,7 @@ FLEETS
           </div>
           <div class="col-6">
             <div class="d-grid">
-              <a href="/fleet/{{ fleet.driver_id }}/" class="btn text-uppercase border btn-outline-secondary">View
+              <a href="/fleet/{{ fleet.driver_id }}/" class="btn text-uppercase border btn-outline-secondary" id="fleet_drivers_btn_view_profile">View
                 Profile</a>
             </div>
           </div>

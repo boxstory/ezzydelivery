@@ -8,13 +8,13 @@
         href="{% static 'fleet/css/fleet.css' %}" />
 {% endblock extra_css %}
 {% block content %}
-  <div class="flex-fill p-2">
-    <div class=" h4 p-3">Documents Listings</div>
-    <div class="container">
+  <div class="flex-fill p-2" id="delivery_all_tasks_wrapper">
+    <div class=" h4 p-3" id="delivery_all_tasks_title">Documents Listings</div>
+    <div class="container" id="delivery_all_tasks_container">
       <div class="row table-responsive">
-        <div class="col-md-12 d-flex flex-row justify-content-between">
-          <h2 class="m-0">Delivery Tasks list</h2>
-          <a class="btn btn-dark" href="{% url 'fleet:fleets' %}">
+        <div class="col-md-12 d-flex flex-row justify-content-between" id="delivery_all_tasks_header_row">
+          <h2 class="m-0" id="delivery_all_tasks_header">Delivery Tasks list</h2>
+          <a class="btn btn-dark" href="{% url 'fleet:fleets' %}" id="delivery_all_tasks_btn_drivers">
             <i class="fa fa-user me-3"></i> Drivers List
           </a>
         </div>
@@ -22,8 +22,9 @@
           <p>No Delivery Tasks</p>
         {% else %}
           <!-- as--------------  -->
-          <div class="table-responsive">
-            <table class="table table-striped table-hover my-3 fw-lighter">
+          <div class="table-responsive" id="delivery_all_tasks_table_wrapper">
+            <table class="table table-striped table-hover my-3 fw-lighter" id="delivery_all_tasks_table">
+              <thead id="delivery_all_tasks_thead">
               <tr>
                 <th class="d-none d-md-block">No</th>
                 <th>Task Date</th>
@@ -33,6 +34,8 @@
                 <th>Delivery Location</th>
                 <th>Task Status</th>
               </tr>
+              </thead>
+              <tbody id="delivery_all_tasks_tbody">
               {% for card in cards %}
                 <tr>
                   <td class="d-none d-md-block">{{ forloop.counter }}</td>
@@ -48,11 +51,11 @@
                 </tr>
                 <tr>
                   <td colspan="9">
-                    <div class="card h-100 w-100 m-0">
+                    <div class="card h-100 w-100 m-0" id="delivery_all_tasks_card_details_{{ card.id }}">
                       <div class="card-body">
                         <div class="expand row">
                           <div class="col-12 col-md-4">
-                            <table class="table">
+                            <table class="table" id="delivery_all_tasks_table_from_{{ card.id }}">
                               <span class="fw-bold">From:</span>
                               <tr>
                                 <th class="fw-light p-0 col-5">Pickup Loc:</th>
@@ -73,7 +76,7 @@
                             </table>
                           </div>
                           <div class="col-12 col-md-4">
-                            <table class="table">
+                            <table class="table" id="delivery_all_tasks_table_to_{{ card.id }}">
                               <span class="fw-bold">To:</span>
                               <tr>
                                 <th class="fw-light p-0 col-5">Zone No & Place:</th>
@@ -100,7 +103,7 @@
                             </table>
                           </div>
                           <div class="col-12 col-md-4">
-                            <table class="table">
+                            <table class="table" id="delivery_all_tasks_table_details_{{ card.id }}">
                               <span class="fw-bold">Details:</span>
                               <tr>
                                 <th class="fw-light p-0 col-5">COD Amount:</th>
@@ -122,18 +125,18 @@
                           </div>
                         </div>
                       </div>
-                      <div class="col-10 d-flex justify-content-evenly">
-                        <a href="{% url 'fleet:fleets' %}">
+                      <div class="col-10 d-flex justify-content-evenly" id="delivery_all_tasks_section_actions_{{ card.id }}">
+                        <a href="{% url 'fleet:fleets' %}" id="delivery_all_tasks_btn_back_{{ card.id }}">
                           <div class="btn btn-dark">
                             <i class="fa-solid fa-chevron-left me-2"></i> Back
                           </div>
                         </a>
-                        <a href="{% url 'core:main_dashboard' %}">
+                        <a href="{% url 'core:main_dashboard' %}" id="delivery_all_tasks_btn_accept_{{ card.id }}">
                           <div class="btn btn-dark">
                             <i class="fa-solid fa-tick"></i> Accept Task
                           </div>
                         </a>
-                        <a href="{% url 'core:main_dashboard' %}">
+                        <a href="{% url 'core:main_dashboard' %}" id="delivery_all_tasks_btn_dashboard_{{ card.id }}">
                           <div class="btn btn-dark">
                             <i class="fa-solid fa-chart-line"></i> Dashboard
                           </div>
@@ -143,6 +146,7 @@
                   </td>
                 </tr>
               {% endfor %}
+            </tbody>
             </table>
           </div>
         {% endif %}

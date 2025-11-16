@@ -3,21 +3,22 @@
 <!-- extra css -->
 {% load crispy_forms_tags %}
 {% block content %}
-    <div class="col-12  ">
-        <div class="col p-2 mt-3">
-            <h2 class="m-0 text-center pb-3">{{ form_title }}</h2>
+    <div class="col-12  " id="client_teams_update_container_main">
+        <div class="col p-2 mt-3" id="client_teams_update_section_header">
+            <h2 class="m-0 text-center pb-3" id="client_teams_update_title_form">{{ form_title }}</h2>
         </div>
         <div class="d-flex col-12 justify-content-center">
-            <form method="POST" class="col-10">
+            <form method="POST" class="col-10" id="client_teams_update_form_main">
                 {% csrf_token %}
                 {{ form | crispy }}
                 <div class=" text-end d-block justify-content-evenly">
-                    <a class="btn btn-dark  w-md-50 px-5" href="{% url 'business:business_teams' business.business_id %}">Cancel</a>
+                    <a class="btn btn-dark  w-md-50 px-5" href="{% url 'business:business_teams' business.business_id %}" id="client_teams_update_btn_cancel">Cancel</a>
                     <button type="submit"
                             value="submit"
                             methode="POST"
                             class="btn btn-dark  w-md-50 px-5"
-                            href="{% url 'business:business_teams_update' business.business_id team.id %}">Submit for approval</button>
+                            href="{% url 'business:business_teams_update' business.business_id team.id %}"
+                            id="client_teams_update_btn_submit">Submit for approval</button>
                 </div>
             </form>
         </div>

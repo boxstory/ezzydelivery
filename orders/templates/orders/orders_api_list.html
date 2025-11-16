@@ -9,41 +9,44 @@
 {% endblock extra_css %}
 {% block content %}
   <!-- orders_list_view.html -->
-  <div class="col-12 col-md-9 col-lg-10">
-    <section class="d-none d-md-block ">
+  <div class="col-12 col-md-9 col-lg-10" id="orders_api_list_container_main">
+    <section class="d-none d-md-block " id="orders_api_list_section_desktop">
       <div class="flex-fill pb-2">
         <div class="ms-3 col-11">
-          <div class="col-md-12 d-flex flex-wrap justify-content-between pb-md-4">
-            <div class="m-0 fs-4 fw-bolder">Orders Added list({{ len }})</div>
-            <div>
+          <div class="col-md-12 d-flex flex-wrap justify-content-between pb-md-4" id="orders_api_list_header">
+            <div class="m-0 fs-4 fw-bolder" id="orders_api_list_title">Orders Added list({{ len }})</div>
+            <div id="orders_api_list_nav_actions">
               <a class="btn btn-dark pe-3 text-white"
-                 href="{% url 'orders:get_order_by_api' %}">
+                 href="{% url 'orders:get_order_by_api' %}"
+                 id="orders_api_list_btn_api_upload">
                 <i class="fa fa-add me-3"></i> API Upload
               </a>
               <a class="btn btn-dark pe-3 text-white"
-                 href="{% url 'orders:order_upload_file' %}">
+                 href="{% url 'orders:order_upload_file' %}"
+                 id="orders_api_list_btn_upload_bulk">
                 <i class="fa fa-add me-3"></i> Upload bulk
               </a>
               <a class="btn btn-dark pe-3 text-white"
-                 href="{% url 'orders:add_order' %}">
+                 href="{% url 'orders:add_order' %}"
+                 id="orders_api_list_btn_add_orders">
                 <i class="fa fa-add me-3"></i> Add Orders
               </a>
             </div>
           </div>
           <!-- shopify orders listing to submit orders to task -->
-          <div class="container mt-4">
+          <div class="container mt-4" id="orders_api_list_section_api_orders">
             <h2>{{ api.api_type }} Orders,</h2>
             API Provider : {{ api.api_type }},
             From
             <input type="date"
-                   id="start_date"
+                   id="orders_api_list_input_start_date"
                    name="start_date"
                    value="{{ start_date }}">
             To
-            <input type="date" id="end_date" name="end_date" value="{{ end_date }}">
-            <button class="btn btn-dark" onclick="getOrders()">Get Orders</button>
-            <table class="table table-bordered table-hover">
-              <thead class="thead-dark">
+            <input type="date" id="orders_api_list_input_end_date" name="end_date" value="{{ end_date }}">
+            <button class="btn btn-dark" onclick="getOrders()" id="orders_api_list_btn_get_orders">Get Orders</button>
+            <table class="table table-bordered table-hover" id="orders_api_list_table_orders">
+              <thead class="thead-dark" id="orders_api_list_thead">
                 <tr>
                   <th>Order Date</th>
                   <th>Order ID</th>
@@ -55,7 +58,7 @@
                   <th>Confirm</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="orders_api_list_tbody">
                 {% for order in orders %}
                   <tr>
                     <td>{{ order.created_at }} - {{ order.created_at|date:"Y-m-d" }}</td>

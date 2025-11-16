@@ -2,14 +2,14 @@
 {% block content %}
 
 
-<section>
+<section id="core_role_update_section_main">
     <div class="container py-3">
         <!-- file path section -->
         {% include "core/parts/filepath.html" %}
         <div class="row">
             <!-- profile left side section -->
             <div class="col-lg-4">
-                <div class="card mb-4 ">
+                <div class="card mb-4 " id="core_role_update_card_profile">
                     <div class="card-body text-center">
                         <img src="/media/core/user/avatar.png" alt="avatar" class="rounded-circle img-fluid"
                             style="width: 180px;">
@@ -18,23 +18,23 @@
                         <p class="text-muted mb-4">{{joinusform.zone_name}}</p>
                         <div class="d-flex justify-content-center mb-2">
                             {% if profile.is_business %}
-                            <a type="button" class="btn btn-dark" href="{% url 'business:business_dashboard' %}">
+                            <a type="button" class="btn btn-dark" href="{% url 'business:business_dashboard' %}" id="core_role_update_btn_dashboard_business">
                                 Dashboard
                             </a>
                             <p>{{profile.is_business}}</p>
 
 
                             {% elif profile.is_driver %}
-                            <a type="button" class="btn btn-dark" href="{% url 'fleet:fleet_dashboard' %}">
+                            <a type="button" class="btn btn-dark" href="{% url 'fleet:fleet_dashboard' %}" id="core_role_update_btn_dashboard_driver">
                                 Dashboard
                             </a>
                             {% else %}
-                            <a type="button" class="btn btn-dark" href="{% url 'core:join_us' %}">
+                            <a type="button" class="btn btn-dark" href="{% url 'core:join_us' %}" id="core_role_update_btn_select_role">
                                 SELECT ROLE
                             </a>
                             {% endif %}
 
-                            <button type="button" class="btn btn-outline-dark ms-1">Message</button>
+                            <button type="button" class="btn btn-outline-dark ms-1" id="core_role_update_btn_message">Message</button>
                         </div>
                         <div class="d-flex justify-content-center p-3">
                             <a href="#!"><i class="fa-brands fa-facebook fa-2xl me-3 text-dark"></i></a>
@@ -46,7 +46,7 @@
             </div>
             <!-- profile join form section -->
             <div class="col-lg-8">
-                <div class="card-body bg-light ">
+                <div class="card-body bg-light " id="core_role_update_card_form">
                     <!-- join buttons -->
                     {% if form.errors %}
 
@@ -60,7 +60,7 @@
                     {% endfor %}
 
                     {% endif %}
-                    <form method="POST" name="prodile_role_update" enctype="multipart/form-data">{% csrf_token %}
+                    <form id="core_role_update_form_main" method="POST" name="prodile_role_update" enctype="multipart/form-data">{% csrf_token %}
                         <div class="row g-3">
                             {{ form | crispy }}
 
@@ -75,7 +75,7 @@
                             <label class="btn btn-outline-dark" for="dark-outlined">DELIVERY DRIVER</label>
 
 
-                            <button class="w-100 btn btn-dark btn-lg" name="join_as_driver" type="submit"
+                            <button id="core_role_update_btn_submit" class="w-100 btn btn-dark btn-lg" name="join_as_driver" type="submit"
                                 value="submit">UPDATE ROLE</button>
                     </form>
                     <ul class="  mb-3  justify-content-center text-decoration-none" id="pills-tab"
@@ -87,10 +87,10 @@
 
                         <li class="col-4  mb-5 me-lg-0" role="presentation">
 
-                            <button class="nav-link  btn joinbtn  me-5">ADD BUSINESS</button>
+                            <button id="core_role_update_btn_add_business" class="nav-link  btn joinbtn  me-5">ADD BUSINESS</button>
                         </li>
                         <li class="col-4  " role="presentation">
-                            <button class="nav-link  btn joinbtn ">JOIN AS DRIVER</button>
+                            <button id="core_role_update_btn_join_driver" class="nav-link  btn joinbtn ">JOIN AS DRIVER</button>
 
 
                         </li>

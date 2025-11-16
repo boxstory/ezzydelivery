@@ -5,18 +5,18 @@
 {% block head_title %}{% trans "Account Connections" %}{% endblock %}
 
 {% block content %}
-<h1>{% trans "Account Connections" %}</h1>
+<h1 id="social_connections_title_main">{% trans "Account Connections" %}</h1>
 
 {% if form.accounts %}
-<p>{% blocktrans %}You can sign in to your account using any of the following third party accounts:{% endblocktrans %}</p>
+<p id="social_connections_message_intro">{% blocktrans %}You can sign in to your account using any of the following third party accounts:{% endblocktrans %}</p>
 
 
-<form method="post" action="{% url 'socialaccount_connections' %}">
+<form id="social_connections_form_remove" method="post" action="{% url 'socialaccount_connections' %}">
 {% csrf_token %}
 
 <fieldset>
 {% if form.non_field_errors %}
-<div id="errorMsg">{{ form.non_field_errors }}</div>
+<div id="social_connections_alert_error">{{ form.non_field_errors }}</div>
 {% endif %}
 
 {% for base_account in form.accounts %}
@@ -32,7 +32,7 @@
 {% endfor %}
 
 <div>
-<button type="submit">{% trans 'Remove' %}</button>
+<button id="social_connections_btn_remove" type="submit">{% trans 'Remove' %}</button>
 </div>
 
 </fieldset>
@@ -40,12 +40,12 @@
 </form>
 
 {% else %}
-<p>{% trans 'You currently have no social network accounts connected to this account.' %}</p>
+<p id="social_connections_message_empty">{% trans 'You currently have no social network accounts connected to this account.' %}</p>
 {% endif %}
 
-<h2>{% trans 'Add a 3rd Party Account' %}</h2>
+<h2 id="social_connections_title_add">{% trans 'Add a 3rd Party Account' %}</h2>
 
-<ul class="socialaccount_providers">
+<ul class="socialaccount_providers" id="social_connections_list_providers">
 {% include "socialaccount/snippets/provider_list.html" with process="connect" %}
 </ul>
 

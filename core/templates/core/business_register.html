@@ -318,9 +318,9 @@
 {% endblock extra_css %}
 
 {% block content %}
-<div class="completion-container">
+<div class="completion-container" id="core_business_register_container_main">
     <!-- Completion Header -->
-    <div class="completion-header">
+    <div class="completion-header" id="core_business_register_header">
         <div class="completion-circle">
             <svg width="100" height="100" viewBox="0 0 100 100">
                 <circle class="circle-bg" cx="50" cy="50" r="42"></circle>
@@ -338,7 +338,7 @@
     </div>
 
     <!-- Form Card -->
-    <div class="form-card">
+    <div class="form-card" id="core_business_register_card_form">
         {% if profile.verification_status == 'verified' %}
         <!-- VERIFIED USER - Show Dashboard Link and Role Change Option -->
         <div class="verified-alert">
@@ -382,7 +382,7 @@
         </div>
         {% endif %}
 
-        <form method="post">
+        <form id="core_business_register_form_main" method="post">
             {% csrf_token %}
 
             <!-- Business Information -->
@@ -484,11 +484,11 @@
 
             <!-- Action Buttons -->
             <div class="action-buttons-wrapper">
-                <button type="submit" name="action" value="save" class="btn btn-action btn-save">
+                <button id="core_business_register_btn_save" type="submit" name="action" value="save" class="btn btn-action btn-save">
                     <i class="fa-solid fa-floppy-disk me-2"></i>Save Progress
                 </button>
 
-                <button type="submit" name="action" value="apply_verification"
+                <button id="core_business_register_btn_apply" type="submit" name="action" value="apply_verification"
                         class="btn btn-action btn-apply"
                         {% if completion_percentage < 100 %}disabled{% endif %}>
                     <i class="fa-solid fa-paper-plane me-2"></i>Apply for Verification

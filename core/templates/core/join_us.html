@@ -2,14 +2,14 @@
 {% block content %}
 
 
-<section style="background-color: #eee; " class="h-100">
+<section style="background-color: #eee; " class="h-100" id="core_join_section_main">
     <div class="container py-3">
         <!-- file path section -->
         {% include "core/parts/filepath.html" %}
         <div class="row">
             <!-- profile left side section -->
             <div class="col-lg-4">
-                <div class="card mb-4 ">
+                <div class="card mb-4 " id="core_join_card_profile">
                     <div class="card-body text-center">
                         <img src="/media/core/user/avatar.png" alt="avatar" class="rounded-circle img-fluid"
                             style="width: 180px;">
@@ -18,22 +18,22 @@
                         <p class="text-muted mb-4">{{joinusform.zone_name}}</p>
                         <div class="d-flex justify-content-center mb-2">
                             {% if profile.is_business %}
-                            <a type="button" class="btn btn-dark" href="{% url 'business:business_dashboard' %}">
+                            <a type="button" class="btn btn-dark" href="{% url 'business:business_dashboard' %}" id="core_join_btn_business_dashboard">
                                 Business Dashboard
                             </a>
 
 
                             {% elif profile.is_driver %}
-                            <a type="button" class="btn btn-dark" href="{% url 'fleet:fleet_dashboard' %}">
+                            <a type="button" class="btn btn-dark" href="{% url 'fleet:fleet_dashboard' %}" id="core_join_btn_driver_dashboard">
                                 Driver Dashboard
                             </a>
                             {% else %}
-                            <a type="button" class="btn btn-dark" href="{% url 'core:join_us' %}">
+                            <a type="button" class="btn btn-dark" href="{% url 'core:join_us' %}" id="core_join_btn_select_role">
                                 SELECT ROLE
                             </a>
                             {% endif %}
 
-                            <button type="button" class="btn btn-outline-dark ms-1">Update</button>
+                            <button type="button" class="btn btn-outline-dark ms-1" id="core_join_btn_update">Update</button>
                         </div>
                         <div class="d-flex justify-content-center p-3">
                             <a href="#!"><i class="fa-brands fa-facebook fa-2xl me-3 text-dark"></i></a>
@@ -45,7 +45,7 @@
             </div>
             <!-- profile join form section -->
             <div class="col-lg-8">
-                <div class="card-body bg-light  p-3">
+                <div class="card-body bg-light  p-3" id="core_join_card_role_selection">
                     <!-- join buttons -->
                     {% if form.errors %}
 
@@ -74,7 +74,7 @@
                             {% endif %}
 
 
-                            <a type="button" class="btn btn-dark mt-3" href="/dashboard/">
+                            <a type="button" class="btn btn-dark mt-3" href="/dashboard/" id="core_join_btn_go_dashboard">
                                 Go To Dashboard
                             </a>
                         </div>
@@ -86,11 +86,11 @@
                         </li>
                         <li class="col-4  mb-5 me-lg-0" role="presentation">
                             <a href="{%url 'core:join_business'%} " class="text-decoration-none">
-                                <button class="nav-link  btn joinbtn  me-5">BUSINESS ADMIN</button></a>
+                                <button id="core_join_btn_business_admin" class="nav-link  btn joinbtn  me-5">BUSINESS ADMIN</button></a>
                         </li>
                         <li class="col-4  " role="presentation"><a href="{%url 'core:join_driver'%}"
                                 class="text-decoration-none">
-                                <button class="nav-link  btn joinbtn ">JOIN AS DRIVER</button>
+                                <button id="core_join_btn_driver" class="nav-link  btn joinbtn ">JOIN AS DRIVER</button>
                             </a>
 
                         </li>

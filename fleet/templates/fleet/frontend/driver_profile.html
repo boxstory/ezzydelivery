@@ -15,8 +15,8 @@ Driver Profile: {{ profile.user.first_name }} {{ profile.user.last_name }} | Ezz
 
 {% block content %}
 <!-- frontend driver Profile pge section -->
-<h2 class="text-center  fw-bolder bg-light py-3 m-0 w-100">Driver Profile</h2>
-<section class="section about-section bg-light" id="about">
+<h2 class="text-center  fw-bolder bg-light py-3 m-0 w-100" id="fleet_driver_profile_header_title">Driver Profile</h2>
+<section class="section about-section bg-light" id="fleet_driver_profile_section_main">
     <div class="container">
         <div class="row align-items-center flex-row-reverse p-2">
             <div class="col-md-6">
@@ -95,11 +95,11 @@ Driver Profile: {{ profile.user.first_name }} {{ profile.user.last_name }} | Ezz
                 <div class="m-3  btn-block ">
                     {% if user.profile.is_business == True %}
                     <!-- #chatgpt -->
-                    <form id="favorite-form" action="{% url 'business:driver_directory_add' %}" method="post">
+                    <form id="fleet_driver_profile_form_add_directory" action="{% url 'business:driver_directory_add' %}" method="post">
                         {% csrf_token %}
                         <input type="hidden" name="driver_id" value="{{ profile.id }}">
                         <input type="hidden" name="business_id" value="{{ user.id }}">
-                        <button type="submit" class="btn btn-dark  w-100">
+                        <button type="submit" class="btn btn-dark  w-100" id="fleet_driver_profile_btn_add_directory">
                             Add to
                             directory
                         </button>
@@ -141,11 +141,11 @@ Driver Profile: {{ profile.user.first_name }} {{ profile.user.last_name }} | Ezz
                 </div>
             </div>
             <!-- documents section -----------  -->
-            <div class="counter bg-light p-4">
-                <h3 class="fw-bold">AVAILABLE DOCUMENTS</h3>
+            <div class="counter bg-light p-4" id="fleet_driver_profile_section_documents">
+                <h3 class="fw-bold" id="fleet_driver_profile_title_documents">AVAILABLE DOCUMENTS</h3>
                 <hr>
-                <table class="table table-borderless">
-                    <thead>
+                <table class="table table-borderless" id="fleet_driver_profile_table_documents">
+                    <thead id="fleet_driver_profile_thead_documents">
                         <tr>
                             <th scope="col">#</th>
                             <th scope="col">Type</th>
@@ -153,7 +153,7 @@ Driver Profile: {{ profile.user.first_name }} {{ profile.user.last_name }} | Ezz
                             <th scope="col">Expiry Date</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="fleet_driver_profile_tbody_documents">
                         {% for doc in driver_documents %}
                         <tr>
                             <th>{{ forloop.counter }}</th>
@@ -166,12 +166,12 @@ Driver Profile: {{ profile.user.first_name }} {{ profile.user.last_name }} | Ezz
                 </table>
             </div>
             <!-- vehicle section   -->
-            <div class="counter bg-light p-4 my-3">
+            <div class="counter bg-light p-4 my-3" id="fleet_driver_profile_section_vehicles">
                 <div class="row">
-                    <h3 class="fw-bold">OWNED VEHICLE DETAILS</h3>
+                    <h3 class="fw-bold" id="fleet_driver_profile_title_vehicles">OWNED VEHICLE DETAILS</h3>
                     <hr>
-                    <table class="table table-borderless">
-                        <thead>
+                    <table class="table table-borderless" id="fleet_driver_profile_table_vehicles">
+                        <thead id="fleet_driver_profile_thead_vehicles">
                             <tr>
                                 <th scope="col">#</th>
                                 <th scope="col">Type</th>
@@ -180,7 +180,7 @@ Driver Profile: {{ profile.user.first_name }} {{ profile.user.last_name }} | Ezz
                                 <th scope="col">Status</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="fleet_driver_profile_tbody_vehicles">
                             {% if not driver_vehicle %}
                             <th scope="col"></th>
                             <td>No Vehicles Added</td>

@@ -9,20 +9,20 @@
 
 {% block content %}
 <!-- Page Title -->
-<h1 class="page-title">
+<h1 id="workforce_dms_orders_title_main" class="page-title">
     <i class="fa-solid fa-boxes-packing me-2"></i>DMS Orders List
 </h1>
 
 <!-- Error Message -->
 {% if error_message %}
-<div class="error-banner">
+<div id="workforce_dms_orders_alert_error" class="error-banner">
     <i class="fa-solid fa-triangle-exclamation"></i>
     <p>{{ error_message }}</p>
 </div>
 {% endif %}
 
 <!-- Order Filter Section -->
-<div class="filter-section">
+<div id="workforce_dms_orders_section_filter" class="filter-section">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <div style="flex: 1; min-width: 250px;">
             <label for="orderFilter" class="filter-label">
@@ -31,7 +31,7 @@
             <input type="text" id="orderFilter" class="filter-input" placeholder="Search by order number...">
         </div>
         <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
-            <button onclick="window.location.reload()" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+            <button id="workforce_dms_orders_btn_refresh" onclick="window.location.reload()" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
                 <i class="fa-solid fa-rotate"></i>
                 Refresh
             </button>
@@ -41,9 +41,9 @@
 
 <!-- Orders Table -->
 {% if orders_in_shipday %}
-<div class="orders-table-container">
-    <table class="orders-table">
-        <thead>
+<div id="workforce_dms_orders_container_table" class="orders-table-container">
+    <table id="workforce_dms_orders_table_all" class="orders-table">
+        <thead id="workforce_dms_orders_thead">
             <tr>
                 <th>Order Number</th>
                 <th>Order ID</th>
@@ -53,7 +53,7 @@
                 <th>Created Date</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="workforce_dms_orders_tbody">
             {% for order in orders_in_shipday %}
             <tr data-order-number="{{ order.orderNumber|default:'N/A' }}">
                 <td><strong>{{ order.orderNumber|default:"N/A" }}</strong></td>
@@ -78,7 +78,7 @@
     </table>
 </div>
 {% else %}
-<div class="empty-state">
+<div id="workforce_dms_orders_section_empty" class="empty-state">
     <i class="fa-solid fa-boxes-packing"></i>
     <h3>No Orders Found</h3>
     <p>There are no orders in ShipDay DMS at the moment.</p>

@@ -1,0 +1,464 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }} - Workforce Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Mobile-First Responsive Design */
+    .page-header {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+        padding: 1.5rem 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .alert-warning-custom {
+        background: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .alert-danger-custom {
+        background: #fee2e2;
+        border-left: 4px solid #ef4444;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .alert-info-custom {
+        background: #dbeafe;
+        border-left: 4px solid #3b82f6;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .table-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    .dms-table {
+        width: 100%;
+        margin: 0;
+    }
+
+    .dms-table thead {
+        background: var(--brand-grey-100);
+    }
+
+    .dms-table th {
+        padding: 0.875rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: var(--brand-grey-700);
+        text-align: left;
+        border-bottom: 2px solid var(--brand-grey-300);
+        white-space: nowrap;
+    }
+
+    .dms-table td {
+        padding: 0.875rem;
+        font-size: 0.875rem;
+        color: var(--brand-grey-600);
+        border-bottom: 1px solid var(--brand-grey-200);
+        vertical-align: middle;
+    }
+
+    .dms-table tbody tr:hover {
+        background: var(--brand-grey-100);
+    }
+
+    .dms-status-badge {
+        display: inline-block;
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .status-assigned {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .status-started {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .status-successful {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-failed {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .status-cancelled {
+        background: #e5e7eb;
+        color: #374151;
+    }
+
+    .btn-match {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 0.35rem 0.875rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-match:hover {
+        background: #2563eb;
+        transform: translateY(-1px);
+    }
+
+    /* Manual Match Section */
+    .match-section {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        margin-bottom: 1.5rem;
+    }
+
+    .match-title {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: var(--brand-grey-800);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: var(--brand-grey-700);
+        margin-bottom: 0.5rem;
+        display: block;
+        font-size: 0.9rem;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.6rem 0.875rem;
+        border: 1.5px solid var(--brand-grey-300);
+        border-radius: 6px;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .btn-submit {
+        background: #10b981;
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.95rem;
+    }
+
+    .btn-submit:hover {
+        background: #059669;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    /* Pagination */
+    .pagination-wrapper {
+        display: flex;
+        justify-content: center;
+        margin-top: 1.5rem;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .page-link {
+        padding: 0.5rem 1rem;
+        background: white;
+        border: 1px solid var(--brand-grey-300);
+        border-radius: 6px;
+        color: var(--brand-grey-700);
+        text-decoration: none;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+    }
+
+    .page-link:hover {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+    }
+
+    .page-link.active {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .dms-table {
+            font-size: 0.8rem;
+        }
+
+        .dms-table th,
+        .dms-table td {
+            padding: 0.5rem;
+        }
+
+        .page-title {
+            font-size: 1.25rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="workforce_dms_orders_container" class="container-fluid px-3 px-md-4">
+    <!-- Page Header -->
+    <div id="workforce_dms_orders_header" class="page-header">
+        <h1 id="workforce_dms_orders_title" class="page-title">
+            <i class="fa-solid fa-truck-fast"></i>
+            {{ page_title }}
+        </h1>
+    </div>
+
+    <!-- Django Messages -->
+    {% if messages %}
+    <div id="workforce_dms_orders_messages" class="messages-container mb-3">
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-danger{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+            {% if message.tags == 'success' %}
+                <i class="fa-solid fa-circle-check me-2"></i>
+            {% elif message.tags == 'error' %}
+                <i class="fa-solid fa-circle-exclamation me-2"></i>
+            {% elif message.tags == 'warning' %}
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+            {% else %}
+                <i class="fa-solid fa-circle-info me-2"></i>
+            {% endif %}
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- DMS Configuration Warning -->
+    {% if not dms_configured %}
+    <div id="workforce_dms_orders_alert_not_configured" class="alert-danger-custom">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+        <strong>DMS Not Connected!</strong> The Delivery Management System (ShipDay) is not configured. Please check your API settings.
+    </div>
+    {% endif %}
+
+    <!-- No Orders Warning -->
+    {% if not has_orders and dms_configured %}
+    <div id="workforce_dms_orders_alert_no_orders" class="alert-warning-custom">
+        <i class="fa-solid fa-inbox me-2"></i>
+        <strong>No DMS Orders Found!</strong> There are currently no orders matched with the DMS system. Use the manual matching section below to link delivery tasks with DMS jobs.
+    </div>
+    {% endif %}
+
+    <!-- Manual Match Section -->
+    <div id="workforce_dms_orders_section_manual_match" class="match-section">
+        <h2 id="workforce_dms_orders_section_manual_match_title" class="match-title">
+            <i class="fa-solid fa-link"></i>
+            Manually Match Delivery Task to DMS Job
+        </h2>
+
+        <form id="workforce_dms_orders_form_manual_match" method="POST" action="{% url 'workforce:match_dms_task' %}">
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <div class="form-group">
+                        <label class="form-label" for="workforce_dms_orders_input_task_number">
+                            <i class="fa-solid fa-hashtag me-1"></i>
+                            Delivery Task Number
+                        </label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="workforce_dms_orders_input_task_number"
+                            name="delivery_task_number"
+                            placeholder="Enter Delivery Task Number (e.g., DL-001)"
+                            required>
+                        <small class="text-muted">Enter the internal delivery task number</small>
+                    </div>
+                </div>
+
+                <div class="col-md-5">
+                    <div class="form-group">
+                        <label class="form-label" for="workforce_dms_orders_input_dms_job_id">
+                            <i class="fa-solid fa-id-badge me-1"></i>
+                            DMS Job ID
+                        </label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="workforce_dms_orders_input_dms_job_id"
+                            name="dms_job_id"
+                            placeholder="Enter ShipDay Job ID"
+                            required>
+                        <small class="text-muted">Enter the ShipDay/DMS job ID</small>
+                    </div>
+                </div>
+
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-group w-100">
+                        <button id="workforce_dms_orders_btn_match" type="submit" class="btn-submit w-100">
+                            <i class="fa-solid fa-link me-2"></i>Match
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Orders Table -->
+    {% if has_orders %}
+    <div id="workforce_dms_orders_card_table" class="table-card">
+        <div id="workforce_dms_orders_table_responsive" class="table-responsive">
+            <table id="workforce_dms_orders_table_matched" class="dms-table table">
+                <thead id="workforce_dms_orders_thead">
+                    <tr>
+                        <th><i class="fa-solid fa-hashtag me-1"></i>Order #</th>
+                        <th><i class="fa-solid fa-building me-1"></i>Business</th>
+                        <th><i class="fa-solid fa-truck me-1"></i>Task #</th>
+                        <th><i class="fa-solid fa-id-badge me-1"></i>DMS Job ID</th>
+                        <th><i class="fa-solid fa-signal me-1"></i>DMS Status</th>
+                        <th><i class="fa-solid fa-user me-1"></i>Driver</th>
+                        <th><i class="fa-solid fa-phone me-1"></i>Customer</th>
+                        <th><i class="fa-solid fa-calendar me-1"></i>Created</th>
+                        <th><i class="fa-solid fa-cog me-1"></i>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="workforce_dms_orders_tbody">
+                    {% for order in orders %}
+                        {% for task in order.delivery_task.all %}
+                        <tr>
+                            <td class="fw-bold">{{ order.order_number }}</td>
+                            <td>{{ order.business.business_name|truncatechars:20 }}</td>
+                            <td>{{ task.dl_task_number }}</td>
+                            <td><code>{{ task.dl_task_number_dms }}</code></td>
+                            <td>
+                                {% if task.dl_task_status_dms == '0' %}
+                                    <span class="dms-status-badge status-assigned">Assigned</span>
+                                {% elif task.dl_task_status_dms == '1' %}
+                                    <span class="dms-status-badge status-started">Started</span>
+                                {% elif task.dl_task_status_dms == '2' %}
+                                    <span class="dms-status-badge status-successful">Successful</span>
+                                {% elif task.dl_task_status_dms == '3' %}
+                                    <span class="dms-status-badge status-failed">Failed</span>
+                                {% elif task.dl_task_status_dms == '4' %}
+                                    <span class="dms-status-badge status-cancelled">Cancelled</span>
+                                {% else %}
+                                    <span class="dms-status-badge">Unknown</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if task.driver %}
+                                    {{ task.driver.user.first_name }} {{ task.driver.user.last_name }}
+                                {% else %}
+                                    <span class="text-muted">Not assigned</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ order.customer_name|truncatechars:20 }}<br><small class="text-muted">{{ order.customer_phone }}</small></td>
+                            <td>{{ order.created_at|date:"d M Y" }}<br><small class="text-muted">{{ order.created_at|time:"H:i" }}</small></td>
+                            <td>
+                                <a href="{% url 'orders:order_details' order.id %}" class="btn-match" title="View Details">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-4">
+                                <i class="fa-solid fa-inbox fa-3x mb-3 d-block" style="opacity: 0.3;"></i>
+                                No DMS-matched orders found
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if orders.has_other_pages %}
+    <div id="workforce_dms_orders_pagination" class="pagination-wrapper">
+        {% if orders.has_previous %}
+            <a href="?page=1" class="page-link" id="workforce_dms_orders_btn_first_page">
+                <i class="fa-solid fa-angles-left"></i> First
+            </a>
+            <a href="?page={{ orders.previous_page_number }}" class="page-link" id="workforce_dms_orders_btn_prev_page">
+                <i class="fa-solid fa-angle-left"></i> Previous
+            </a>
+        {% endif %}
+
+        <span class="page-link active" id="workforce_dms_orders_page_current">
+            Page {{ orders.number }} of {{ orders.paginator.num_pages }}
+        </span>
+
+        {% if orders.has_next %}
+            <a href="?page={{ orders.next_page_number }}" class="page-link" id="workforce_dms_orders_btn_next_page">
+                Next <i class="fa-solid fa-angle-right"></i>
+            </a>
+            <a href="?page={{ orders.paginator.num_pages }}" class="page-link" id="workforce_dms_orders_btn_last_page">
+                Last <i class="fa-solid fa-angles-right"></i>
+            </a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <div id="workforce_dms_orders_alert_getting_started" class="alert-info-custom">
+        <i class="fa-solid fa-circle-info me-2"></i>
+        <strong>Getting Started:</strong> Use the manual matching form above to link your delivery tasks with DMS job IDs. Once matched, they will appear in the table below.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

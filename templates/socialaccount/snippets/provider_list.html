@@ -5,8 +5,9 @@
 {% for provider in socialaccount_providers %}
 {% if provider.id == "openid" %}
 {% for brand in provider.get_brands %}
-<li class="btn-primary">
+<li class="btn-primary" id="social_provider_item_openid_{{ brand.id }}">
   <a
+    id="social_provider_link_{{ brand.id }}"
     title="{{brand.name}}"
     class=" {{provider.id}} {{brand.id}}"
     href="{% provider_login_url provider.id openid=brand.openid_url process=process %}"
@@ -14,8 +15,9 @@
 </li>
 {% endfor %}
 {% endif %}
-<li class=" btn btn-primary-fill  w-75 text-uppercase">
+<li class=" btn btn-primary-fill  w-75 text-uppercase" id="social_provider_item_{{ provider.id }}">
   <a
+    id="social_provider_link_{{ provider.id }}"
     title="{{provider.name}}"
     class="socialaccount_provider {{provider.id}} link-light text-decoration-none"
     href="{% provider_login_url provider.id process=process scope=scope auth_params=auth_params %}"

@@ -2,15 +2,15 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block content %}
-<section style="background-color: #eee">
+<section style="background-color: #eee" id="core_profile_add_section_main">
     <div class="container py-3">
         {% include "core/parts/filepath.html" %}
         <div class="row">
-            <form method="POST">
+            <form id="core_profile_add_form_main" method="POST">
                 <div class="row">
                     {% csrf_token %}
                     <div class="col-lg-4">
-                        <div class="card mb-4">
+                        <div class="card mb-4" id="core_profile_add_card_picture">
                             <div class="card-body text-center">
                                 <img src="/media/core/user/avatar.png" alt="avatar" class="rounded-circle img-fluid"
                                     style="width: 180px">
@@ -18,8 +18,8 @@
                                     {{ profileaddform.profile_pic }}
                                 </div>
                                 <div class="d-flex justify-content-center mb-2">
-                                    <button type="button" class="btn btn-dark" href="/">Dashboard</button>
-                                    <button type="button" class="btn btn-outline-dark ms-1">Message</button>
+                                    <button type="button" class="btn btn-dark" href="/" id="core_profile_add_btn_dashboard">Dashboard</button>
+                                    <button type="button" class="btn btn-outline-dark ms-1" id="core_profile_add_btn_message">Message</button>
                                 </div>
                                 <div class="d-flex justify-content-center p-3">
                                     <a href="#!"><i class="fa-brands fa-facebook fa-2xl me-3 text-dark"></i></a>
@@ -30,7 +30,7 @@
                         </div>
                     </div>
                     <div class="col-lg-8">
-                        <div class="card mb-4">
+                        <div class="card mb-4" id="core_profile_add_card_info">
                             <div class="card-body">
                                 {% if profileaddform.errors %}
                                 <div class="alert alert-danger">
@@ -123,7 +123,7 @@
                             </div>
                         </div>
                         <div class="d-grid gap-2 col-6 align-content-end">
-                            <button class="btn btn-primary btn-dark" type="submit" value="submit">Submit</button>
+                            <button id="core_profile_add_btn_submit" class="btn btn-primary btn-dark" type="submit" value="submit">Submit</button>
                         </div>
                     </div>
                 </div>

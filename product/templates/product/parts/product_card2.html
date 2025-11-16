@@ -1,8 +1,8 @@
-<div class="col-12 col-md-6 col-lg-4 p-2">
-    <div class="modern-product-card h-100">
+<div class="col-12 col-md-6 col-lg-4 p-2" id="product_card_col">
+    <div class="modern-product-card h-100" id="product_card_modern">
         <!-- Product Image Section -->
-        <div class="product-image-wrapper position-relative">
-            <div class="product-image-container">
+        <div class="product-image-wrapper position-relative" id="product_card_image_wrapper">
+            <div class="product-image-container" id="product_card_image_container">
                 {% if product.product_image %}
                 <img src="{{ product.product_image.url }}" alt="{{ product.item_name }}" class="product-main-img">
                 {% else %}
@@ -11,7 +11,7 @@
             </div>
 
             <!-- Brand Logo Badge -->
-            <div class="brand-logo-badge">
+            <div class="brand-logo-badge" id="product_card_brand_badge">
                 {% if product.brand_logo %}
                 <img src="{{ product.brand_logo.url }}" alt="{{ product.brand_name }}">
                 {% else %}
@@ -21,32 +21,32 @@
 
             <!-- Stock Badge -->
             {% if product.available_stock %}
-            <div class="stock-badge {% if product.available_stock > 10 %}in-stock{% elif product.available_stock > 0 %}low-stock{% else %}out-of-stock{% endif %}">
+            <div class="stock-badge {% if product.available_stock > 10 %}in-stock{% elif product.available_stock > 0 %}low-stock{% else %}out-of-stock{% endif %}" id="product_card_stock_badge">
                 <i class="fa-solid fa-box"></i> {{ product.available_stock }} in stock
             </div>
             {% endif %}
         </div>
 
         <!-- Product Info Section -->
-        <div class="product-card-body">
+        <div class="product-card-body" id="product_card_body">
             <!-- Category & Brand -->
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="product-category-tag">
+            <div class="d-flex justify-content-between align-items-center mb-2" id="product_card_meta">
+                <span class="product-category-tag" id="product_card_category_tag">
                     <i class="fa-solid fa-tag me-1"></i>{{ product.product_category }}
                 </span>
-                <span class="product-brand-name">{{ product.brand_name }}</span>
+                <span class="product-brand-name" id="product_card_brand_name">{{ product.brand_name }}</span>
             </div>
 
             <!-- Product Name -->
-            <h3 class="product-card-title">{{ product.item_name }}</h3>
+            <h3 class="product-card-title" id="product_card_title_text">{{ product.item_name }}</h3>
 
             <!-- Product Description -->
-            <p class="product-card-description">
+            <p class="product-card-description" id="product_card_description_text">
                 {{ product.item_discription | truncatechars:80 }}
             </p>
 
             <!-- Price Section -->
-            <div class="product-price-section">
+            <div class="product-price-section" id="product_card_price_section">
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
                         <span class="product-price-label">Price</span>
@@ -62,15 +62,15 @@
             </div>
 
             <!-- Action Buttons -->
-            <div class="product-card-actions">
-                <button class="action-btn action-btn-primary" title="Add to Cart">
+            <div class="product-card-actions" id="product_card_actions_group">
+                <button class="action-btn action-btn-primary" title="Add to Cart" id="product_card_btn_add_cart">
                     <i class="fa-solid fa-cart-plus"></i>
                     <span>Add to Cart</span>
                 </button>
-                <button class="action-btn action-btn-secondary" title="Add to Wishlist">
+                <button class="action-btn action-btn-secondary" title="Add to Wishlist" id="product_card_btn_wishlist">
                     <i class="far fa-heart"></i>
                 </button>
-                <button class="action-btn action-btn-secondary" title="Quick View">
+                <button class="action-btn action-btn-secondary" title="Quick View" id="product_card_btn_quick_view">
                     <i class="fa-solid fa-eye"></i>
                 </button>
             </div>
