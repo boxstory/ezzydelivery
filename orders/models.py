@@ -149,12 +149,12 @@ class Order(models.Model):
         verbose_name_plural = "Order"
         # COMPOUND INDEXES: business + status + created_at for fast filtering and ordering
         indexes = [
-            models.Index(fields=['business', 'order_status', '-created_at'], name='order_business_status_created_idx'),
-            models.Index(fields=['business', 'task_status'], name='order_business_task_idx'),
-            models.Index(fields=['order_number'], name='order_number_idx'),
-            models.Index(fields=['client_order_code'], name='order_client_code_idx'),
-            models.Index(fields=['-created_at'], name='order_created_idx'),
-            models.Index(fields=['verification_status'], name='order_verification_idx'),
+            models.Index(fields=['business', 'order_status', '-created_at'], name='ord_biz_status_created_idx'),
+            models.Index(fields=['business', 'task_status'], name='ord_biz_task_idx'),
+            models.Index(fields=['order_number'], name='ord_number_idx'),
+            models.Index(fields=['client_order_code'], name='ord_client_code_idx'),
+            models.Index(fields=['-created_at'], name='ord_created_idx'),
+            models.Index(fields=['verification_status'], name='ord_verification_idx'),
         ]
 
 class OrderLog(models.Model):
