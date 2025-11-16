@@ -52,7 +52,12 @@ def paginate_queryset(request, queryset, items_per_page=10):
 
 @login_required(login_url='/accounts/login/')
 def wf_dashboard(request):
-    profile = core_models.Profile.objects.get(user_id=request.user.id)
+    try:
+        profile = core_models.Profile.objects.get(user_id=request.user.id)
+    except core_models.Profile.DoesNotExist:
+        logger.warning(f"User {request.user.id} has no profile. Redirecting to profile creation.")
+        # Redirect to profile view or create a profile
+        return redirect('core:profile_view')
 
     data = {
         'profile': profile,

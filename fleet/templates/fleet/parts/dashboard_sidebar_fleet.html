@@ -1,0 +1,173 @@
+{% load static %}
+<link href="{% static 'css/sidebar-common.css' %}" rel="stylesheet" type="text/css" />
+<div class="min-vh-100 d-none d-md-flex flex-column flex-shrink-0 p-3 col-md-2 the-sidebar dashboard-sidebar">
+  <div class="sidebar-header">
+    <a class="nav-link btn btn-primary-modern" href="{% url 'fleet:fleet_dashboard' %}">
+      <i class="fa-solid fa-truck-fast me-2"></i>
+      Fleet Dashboard
+    </a>
+  </div>
+  <hr class="sidebar-divider" />
+  <div class="navbar-collapse" id="navbarNav">
+    <ul class="navbar-nav ms-auto text-center">
+      <li class="nav-item {% if request.resolver_match.url_name == 'assigned_tasks' or request.resolver_match.url_name == 'all_delivery_tasks' %}active{% endif %}">
+        <div class="nav-link btn {% if request.resolver_match.url_name == 'assigned_tasks' or request.resolver_match.url_name == 'all_delivery_tasks' %}active{% endif %}"
+             data-bs-toggle="collapse"
+             data-bs-target="#submenu-deliveries"
+             aria-expanded="false">
+          <i class="fa-solid fa-truck-fast me-2"></i>
+          <span>Deliveries</span>
+          <i class="fa-solid fa-caret-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse submenu" id="submenu-deliveries">
+          <ul class="nav flex-column">
+            <li class="nav-item {% if request.resolver_match.url_name == 'all_delivery_tasks' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'all_delivery_tasks' %}active{% endif %}" href="{% url 'delivery:all_delivery_tasks' %}">
+                <i class="fa-solid fa-hourglass-half me-2"></i>
+                All Tasks List
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'assigned_tasks' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'assigned_tasks' %}active{% endif %}" href="{% url 'delivery:assigned_tasks' %}">
+                <i class="fa-solid fa-spinner me-2"></i>
+                Assigned Jobs
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link btn" href="{% url 'delivery:assigned_tasks' %}">
+                <i class="fa-solid fa-check-double me-2"></i>
+                Accepted List
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link btn" href="{% url 'delivery:assigned_tasks' %}">
+                <i class="fa-solid fa-road me-2"></i>
+                InTransit
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link btn" href="{% url 'delivery:assigned_tasks' %}">
+                <i class="fa-solid fa-circle-check me-2"></i>
+                Successful
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link btn" href="{% url 'delivery:assigned_tasks' %}">
+                <i class="fa-solid fa-circle-xmark me-2"></i>
+                Unsuccessful
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+      <li class="nav-item {% if request.resolver_match.url_name == 'cod_collection' or request.resolver_match.url_name == 'cod_submission' or request.resolver_match.url_name == 'driver_earnings' or request.resolver_match.url_name == 'transaction_history' %}active{% endif %}">
+        <div class="nav-link btn {% if request.resolver_match.url_name == 'cod_collection' or request.resolver_match.url_name == 'cod_submission' or request.resolver_match.url_name == 'driver_earnings' or request.resolver_match.url_name == 'transaction_history' %}active{% endif %}"
+             data-bs-toggle="collapse"
+             data-bs-target="#submenu-accounts"
+             aria-expanded="false">
+          <i class="fa-solid fa-wallet me-2"></i>
+          <span>Accounts & Wallet</span>
+          <i class="fa-solid fa-caret-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse submenu" id="submenu-accounts">
+          <ul class="nav flex-column">
+            <li class="nav-item {% if request.resolver_match.url_name == 'cod_collection' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'cod_collection' %}active{% endif %}" href="{% url 'fleet:cod_collection' %}">
+                <i class="fa-solid fa-sack-dollar me-2"></i>
+                COD In Hand
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'cod_submission' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'cod_submission' %}active{% endif %}" href="{% url 'fleet:cod_submission' %}">
+                <i class="fa-solid fa-money-bill-transfer me-2"></i>
+                Submit COD
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'driver_earnings' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'driver_earnings' %}active{% endif %}" href="{% url 'fleet:driver_earnings' %}">
+                <i class="fa-solid fa-coins me-2"></i>
+                My Earnings
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'transaction_history' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'transaction_history' %}active{% endif %}" href="{% url 'fleet:transaction_history' %}">
+                <i class="fa-solid fa-receipt me-2"></i>
+                Transactions
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+      <li class="nav-item {% if request.resolver_match.url_name == 'driver_documents' or request.resolver_match.url_name == 'vehicle_own' %}active{% endif %}">
+        <div class="nav-link btn {% if request.resolver_match.url_name == 'driver_documents' or request.resolver_match.url_name == 'vehicle_own' %}active{% endif %}"
+             data-bs-toggle="collapse"
+             data-bs-target="#submenu-documents"
+             aria-expanded="false">
+          <i class="fa-solid fa-id-card me-2"></i>
+          <span>Documents</span>
+          <i class="fa-solid fa-caret-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse submenu" id="submenu-documents">
+          <ul class="nav flex-column">
+            <li class="nav-item {% if request.resolver_match.url_name == 'driver_documents' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'driver_documents' %}active{% endif %}" href="{% url 'fleet:driver_documents' %}">
+                <i class="fa-solid fa-address-card me-2"></i>
+                ID Cards
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'vehicle_own' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'vehicle_own' %}active{% endif %}" href="{% url 'fleet:vehicle_own' %}">
+                <i class="fa-solid fa-car me-2"></i>
+                Vehicles
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <hr class="sidebar-divider" />
+
+      <li class="nav-item {% if request.resolver_match.url_name == 'driver_performance' or request.resolver_match.url_name == 'driver_reports' or request.resolver_match.url_name == 'driver_analytics' %}active{% endif %}">
+        <div class="nav-link btn {% if request.resolver_match.url_name == 'driver_performance' or request.resolver_match.url_name == 'driver_reports' or request.resolver_match.url_name == 'driver_analytics' %}active{% endif %}"
+             data-bs-toggle="collapse"
+             data-bs-target="#submenu-performance"
+             aria-expanded="false">
+          <i class="fa-solid fa-chart-line me-2"></i>
+          <span>Performance & Reports</span>
+          <i class="fa-solid fa-caret-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse submenu" id="submenu-performance">
+          <ul class="nav flex-column">
+            <li class="nav-item {% if request.resolver_match.url_name == 'driver_performance' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'driver_performance' %}active{% endif %}" href="{% url 'fleet:driver_performance' %}">
+                <i class="fa-solid fa-gauge-high me-2"></i>
+                My Performance
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'driver_reports' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'driver_reports' %}active{% endif %}" href="{% url 'fleet:driver_reports' %}">
+                <i class="fa-solid fa-file-pdf me-2"></i>
+                Download Reports
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'driver_analytics' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'driver_analytics' %}active{% endif %}" href="{% url 'fleet:driver_analytics' %}">
+                <i class="fa-solid fa-chart-pie me-2"></i>
+                Analytics
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <hr class="sidebar-divider" />
+
+      <li class="nav-item {% if request.resolver_match.url_name == 'driver_profile' %}active{% endif %}">
+        <a class="nav-link btn {% if request.resolver_match.url_name == 'driver_profile' %}active{% endif %}" href="{% url 'fleet:driver_profile' request.user.profile.id %}">
+          <i class="fa-solid fa-user me-2"></i>
+          <span>Profile</span>
+        </a>
+      </li>
+    </ul>
+  </div>
+</div>

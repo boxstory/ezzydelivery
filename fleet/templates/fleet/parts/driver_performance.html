@@ -1,0 +1,271 @@
+{% extends "fleet_dashboard_base.html" %}
+{% load static %}
+{% block extra_css %}
+<link href="{% static 'fleet/css/fleet_dashboard.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="flex-fill p-2">
+    <div class="col-12 py-2">
+        <!-- Page Header -->
+        <section class="m-0 p-0 mb-4">
+            <div class="pt-3 pt-md-3 pb-0 text-dark">
+                <div class="text-center">
+                    <h3 class="fw-bolder text-uppercase">
+                        <i class="fa-solid fa-gauge-high me-2"></i>My Performance
+                        <br />
+                        <span class="fw-light text-lowercase h5">{{ driver.user.get_full_name }}</span>
+                    </h3>
+                </div>
+            </div>
+        </section>
+
+        <!-- Period Filter -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="bg-white rounded shadow-sm p-3 border">
+                    <form method="get" class="d-flex align-items-center gap-3 flex-wrap">
+                        <label class="fw-bold mb-0">
+                            <i class="fa-solid fa-calendar me-2"></i>Time Period:
+                        </label>
+                        <select name="period" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                            {% for value, label in period_options %}
+                            <option value="{{ value }}" {% if selected_period == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Overview Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-md-6 col-lg-3">
+                <section class="p-3 bg-white rounded shadow-sm border-start border-5 border-primary">
+                    <p class="m-0 fw-bold fs-6 text-muted text-uppercase">Completion Rate</p>
+                    <p class="mb-0 mt-2 fs-2 fw-bold text-end text-primary">
+                        {{ performance_metrics.completion_rate|floatformat:1 }}%
+                    </p>
+                    <p class="mb-0 mt-1 small text-muted text-end">
+                        {{ performance_metrics.completed_tasks }} of {{ performance_metrics.total_tasks }} tasks
+                    </p>
+                </section>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+                <section class="p-3 bg-white rounded shadow-sm border-start border-5 border-success">
+                    <p class="m-0 fw-bold fs-6 text-muted text-uppercase">COD Collection Rate</p>
+                    <p class="mb-0 mt-2 fs-2 fw-bold text-end text-success">
+                        {{ performance_metrics.cod_collection_rate|floatformat:1 }}%
+                    </p>
+                    <p class="mb-0 mt-1 small text-muted text-end">
+                        Efficient cash handling
+                    </p>
+                </section>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+                <section class="p-3 bg-white rounded shadow-sm border-start border-5 border-warning">
+                    <p class="m-0 fw-bold fs-6 text-muted text-uppercase">Average Rating</p>
+                    <p class="mb-0 mt-2 fs-2 fw-bold text-end text-warning">
+                        {{ performance_metrics.average_rating|floatformat:1 }}
+                    </p>
+                    <p class="mb-0 mt-1 small text-muted text-end">
+                        Based on {{ performance_metrics.total_reviews }} reviews
+                    </p>
+                </section>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+                <section class="p-3 bg-white rounded shadow-sm border-start border-5 border-info">
+                    <p class="m-0 fw-bold fs-6 text-muted text-uppercase">Total Earnings</p>
+                    <p class="mb-0 mt-2 fs-2 fw-bold text-end text-info">
+                        {{ stats.total_earnings|floatformat:0 }} QR
+                    </p>
+                    <p class="mb-0 mt-1 small text-muted text-end">
+                        In this period
+                    </p>
+                </section>
+            </div>
+        </div>
+
+        <!-- Task Status Breakdown -->
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <section class="p-4 bg-white rounded shadow-sm">
+                    <h5 class="fw-bold mb-3">
+                        <i class="fa-solid fa-chart-pie me-2"></i>
+                        Task Status Breakdown
+                    </h5>
+                    <div class="row text-center">
+                        <div class="col-6 col-md-3 mb-3">
+                            <div class="border rounded p-3 bg-light">
+                                <i class="fa-solid fa-clipboard-check fs-2 text-primary mb-2"></i>
+                                <h3 class="fw-bold mb-0">{{ performance_metrics.total_tasks }}</h3>
+                                <p class="text-muted small mb-0">Total Tasks</p>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <div class="border rounded p-3 bg-success bg-opacity-10">
+                                <i class="fa-solid fa-circle-check fs-2 text-success mb-2"></i>
+                                <h3 class="fw-bold mb-0">{{ performance_metrics.completed_tasks }}</h3>
+                                <p class="text-muted small mb-0">Completed</p>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <div class="border rounded p-3 bg-danger bg-opacity-10">
+                                <i class="fa-solid fa-circle-xmark fs-2 text-danger mb-2"></i>
+                                <h3 class="fw-bold mb-0">{{ performance_metrics.failed_tasks }}</h3>
+                                <p class="text-muted small mb-0">Failed</p>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <div class="border rounded p-3 bg-warning bg-opacity-10">
+                                <i class="fa-solid fa-spinner fs-2 text-warning mb-2"></i>
+                                <h3 class="fw-bold mb-0">{{ performance_metrics.in_progress }}</h3>
+                                <p class="text-muted small mb-0">In Progress</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Daily Performance (Last 7 Days) -->
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <section class="p-4 bg-white rounded shadow-sm">
+                    <h5 class="fw-bold mb-3">
+                        <i class="fa-solid fa-chart-line me-2"></i>
+                        Daily Performance (Last 7 Days)
+                    </h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th class="text-center">Total Deliveries</th>
+                                    <th class="text-center">Completed</th>
+                                    <th class="text-center">Failed</th>
+                                    <th class="text-center">Success Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for day in daily_stats %}
+                                <tr>
+                                    <td class="fw-bold">{{ day.date }}</td>
+                                    <td class="text-center">{{ day.total }}</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-success">{{ day.completed }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-danger">{{ day.failed }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if day.total > 0 %}
+                                        {{ day.completed|mul:100|div:day.total|floatformat:0 }}%
+                                        {% else %}
+                                        N/A
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Wallet Performance -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <section class="p-4 bg-white rounded shadow-sm h-100">
+                    <h5 class="fw-bold mb-3">
+                        <i class="fa-solid fa-wallet me-2"></i>
+                        Wallet Status
+                    </h5>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Credit Usage</span>
+                            <span class="fw-bold">{{ wallet_status.usage_percentage|floatformat:1 }}%</span>
+                        </div>
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar {% if wallet_status.is_blocked %}bg-danger{% elif wallet_status.is_warning %}bg-warning{% else %}bg-success{% endif %}"
+                                 role="progressbar"
+                                 style="width: {{ wallet_status.usage_percentage }}%;">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row text-center mt-4">
+                        <div class="col-4">
+                            <p class="text-muted mb-0 small">Available Credit</p>
+                            <p class="fw-bold fs-5 mb-0 text-success">{{ wallet_status.available_credit }} QR</p>
+                        </div>
+                        <div class="col-4">
+                            <p class="text-muted mb-0 small">COD In Hand</p>
+                            <p class="fw-bold fs-5 mb-0 text-warning">{{ wallet_status.cod_in_hand }} QR</p>
+                        </div>
+                        <div class="col-4">
+                            <p class="text-muted mb-0 small">Pending Earnings</p>
+                            <p class="fw-bold fs-5 mb-0 text-primary">{{ wallet_status.pending_earnings }} QR</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            <div class="col-md-6">
+                <section class="p-4 bg-white rounded shadow-sm h-100">
+                    <h5 class="fw-bold mb-3">
+                        <i class="fa-solid fa-sack-dollar me-2"></i>
+                        Financial Summary
+                    </h5>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                            <span class="text-muted">Total COD Collected</span>
+                            <span class="fw-bold fs-5 text-warning">{{ stats.total_cod_collected|floatformat:2 }} QR</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                            <span class="text-muted">Total Earnings</span>
+                            <span class="fw-bold fs-5 text-success">{{ stats.total_earnings|floatformat:2 }} QR</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Successful Deliveries</span>
+                            <span class="fw-bold fs-5 text-primary">{{ stats.successful_deliveries }}</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="row g-3">
+            <div class="col-12">
+                <section class="p-3 bg-light rounded shadow-sm">
+                    <div class="d-flex gap-2 flex-wrap justify-content-center">
+                        <a href="{% url 'fleet:driver_analytics' %}" class="btn btn-primary">
+                            <i class="fa-solid fa-chart-pie me-2"></i>View Analytics
+                        </a>
+                        <a href="{% url 'fleet:driver_reports' %}" class="btn btn-outline-primary">
+                            <i class="fa-solid fa-file-pdf me-2"></i>Download Reports
+                        </a>
+                        <a href="{% url 'fleet:driver_earnings' %}" class="btn btn-outline-success">
+                            <i class="fa-solid fa-coins me-2"></i>View Earnings
+                        </a>
+                        <a href="{% url 'fleet:fleet_dashboard' %}" class="btn btn-outline-secondary">
+                            <i class="fa-solid fa-arrow-left me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+// Auto-refresh performance data every 5 minutes
+setInterval(function() {
+    location.reload();
+}, 300000);
+</script>
+{% endblock extra_js %}

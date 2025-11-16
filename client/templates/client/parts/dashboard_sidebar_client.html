@@ -1,0 +1,172 @@
+{% load static %}
+<link href="{% static 'css/sidebar-common.css' %}" rel="stylesheet" type="text/css" />
+<div class="min-vh-100 d-none d-md-flex flex-column flex-shrink-0 p-3 col-md-3 col-lg-2 the-sidebar dashboard-sidebar">
+  <div class="text-center fw-bold sidebar-header">
+    <a class="nav-link p-3 my-0 btn w-100"
+       href="{% url 'business:business_dashboard' %}">
+       <i class="fa-solid fa-gauge-high me-2"></i>
+       Clients Dashboard
+    </a>
+  </div>
+  <hr />
+  <div class="navbar-collapse" id="navbarNav">
+    <ul class="navbar-nav ms-auto text-center">
+      <li class="nav-item"></li>
+      <li class="nav-item {% if request.resolver_match.url_name == 'orders_all_list' or request.resolver_match.url_name == 'orders_list' or request.resolver_match.url_name == 'orders_pending_list' or request.resolver_match.url_name == 'orders_successfull_list' or request.resolver_match.url_name == 'get_orders_by_base_api' or request.resolver_match.url_name == 'add_order' %}active{% endif %}">
+        <div class="nav-link btn collapsed d-flex justify-content-start align-items-center {% if request.resolver_match.url_name == 'orders_all_list' or request.resolver_match.url_name == 'orders_list' or request.resolver_match.url_name == 'orders_pending_list' or request.resolver_match.url_name == 'orders_successfull_list' or request.resolver_match.url_name == 'get_orders_by_base_api' or request.resolver_match.url_name == 'add_order' %}active{% endif %}"
+             data-bs-toggle="collapse"
+             data-bs-target="#submenu-orders"
+             aria-expanded="false">
+          <i class="fa-solid fa-basket-shopping me-2"></i>
+          <span class="flex-fill text-start">Orders</span>
+          <i class="fa-solid fa-caret-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse rounded-3"
+             role="list"
+             id="submenu-orders"
+             aria-expanded="false">
+          <ul class="flex-column nav text-black">
+            <li class="nav-item {% if request.resolver_match.url_name == 'orders_all_list' or request.resolver_match.url_name == 'orders_list' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'orders_all_list' or request.resolver_match.url_name == 'orders_list' %}active{% endif %}" href="{% url 'orders:orders_all_list' %}">
+                <i class="fa-solid fa-bars me-2"></i>
+                <span>All Orders</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'add_order' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'add_order' %}active{% endif %}" href="{% url 'orders:add_order' %}">
+                <i class="fa-solid fa-add me-2"></i>
+                <span>Add Orders</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'orders_successfull_list' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'orders_successfull_list' %}active{% endif %}" href="{% url 'orders:orders_successfull_list' %}">
+                <i class="fa-solid fa-check me-2"></i>
+                <span>Successful</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'orders_pending_list' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'orders_pending_list' %}active{% endif %}" href="{% url 'orders:orders_pending_list' %}">
+                <i class="fa-solid fa-spinner me-2"></i>
+                <span>Pending</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'get_orders_by_base_api' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'get_orders_by_base_api' %}active{% endif %}" href="{% url 'orders:get_orders_by_base_api' %}">
+                <i class="fa-solid fa-code me-2"></i>
+                <span>API Orders</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+      <hr />
+      <li class="nav-item {% if request.resolver_match.url_name == 'product_all_list' or request.resolver_match.url_name == 'product_single_add' or request.resolver_match.url_name == 'product_categories' or request.resolver_match.url_name == 'product_all_list_card' %}active{% endif %}">
+        <div class="nav-link btn collapsed d-flex justify-content-start align-items-center {% if request.resolver_match.url_name == 'product_all_list' or request.resolver_match.url_name == 'product_single_add' or request.resolver_match.url_name == 'product_categories' or request.resolver_match.url_name == 'product_all_list_card' %}active{% endif %}"
+             data-bs-toggle="collapse"
+             data-bs-target="#submenu-product"
+             aria-expanded="false">
+          <i class="fa-solid fa-box-open me-2"></i>
+          <span class="flex-fill text-start">Products</span>
+          <i class="fa-solid fa-caret-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse rounded-3"
+             role="list"
+             id="submenu-product"
+             aria-expanded="false">
+          <ul class="flex-column nav text-black">
+            <li class="nav-item {% if request.resolver_match.url_name == 'product_all_list' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'product_all_list' %}active{% endif %}" href="{% url 'product:product_all_list' %}">
+                <i class="fa-solid fa-bars me-2"></i>
+                <span>All Products</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'product_single_add' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'product_single_add' %}active{% endif %}" href="{% url 'product:product_single_add' %}">
+                <i class="fa-solid fa-add me-2"></i>
+                <span>Add Product</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'product_all_list_card' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'product_all_list_card' %}active{% endif %}" href="{% url 'product:product_all_list_card' %}">
+                <i class="fa-solid fa-barcode me-2"></i>
+                <span>Cards</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+      <hr />
+      <li class="nav-item {% if request.resolver_match.url_name == 'product_inventory' %}active{% endif %}">
+        <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'product_inventory' %}active{% endif %}" href="{% url 'product:product_inventory' %}">
+          <i class="fa-solid fa-chart-bar me-2"></i>
+          <span>Inventory Report</span>
+        </a>
+      </li>
+      <li class="nav-item {% if request.resolver_match.url_name == 'driver_directory' %}active{% endif %}">
+        <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'driver_directory' %}active{% endif %}" href="{% url 'business:driver_directory' %}">
+          <i class="fa-solid fa-address-book me-2"></i>
+          <span>Fleet List</span>
+        </a>
+      </li>
+      <li class="nav-item {% if request.resolver_match.url_name == 'business_profile' %}active{% endif %}">
+        <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'business_profile' %}active{% endif %}" href="{% url 'business:business_profile' %}">
+          <i class="fa-solid fa-store me-2"></i>
+          <span>Public View</span>
+        </a>
+      </li>
+      <hr />
+      <li class="nav-item {% if request.resolver_match.url_name == 'business_settings' or request.resolver_match.url_name == 'business_teams' or request.resolver_match.url_name == 'pickup_location_list' or request.resolver_match.url_name == 'business_settings_api_list' %}active{% endif %}">
+        <div class="nav-link btn collapsed d-flex justify-content-start align-items-center {% if request.resolver_match.url_name == 'business_settings' or request.resolver_match.url_name == 'business_teams' or request.resolver_match.url_name == 'pickup_location_list' or request.resolver_match.url_name == 'business_settings_api_list' %}active{% endif %}"
+             data-bs-toggle="collapse"
+             data-bs-target="#submenu-settings"
+             aria-expanded="false">
+          <i class="fa-solid fa-gear me-2"></i>
+          <span class="flex-fill text-start">Settings</span>
+          <i class="fa-solid fa-caret-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse rounded-3"
+             role="list"
+             id="submenu-settings"
+             aria-expanded="false">
+          <ul class="flex-column nav text-black">
+            <li class="nav-item {% if request.resolver_match.url_name == 'business_settings' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'business_settings' %}active{% endif %}"
+                 href="{% url 'business:business_settings' request.user.user_business.first.business_id %}">
+                <i class="fa-solid fa-sliders me-2"></i>
+                <span>Review</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'business_teams' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'business_teams' %}active{% endif %}"
+                 href="{% url 'business:business_teams' request.user.user_business.first.business_id %}">
+                <i class="fa-solid fa-users me-2"></i>
+                <span>Teams</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'pickup_location_list' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'pickup_location_list' %}active{% endif %}"
+                 href="{% url 'business:pickup_location_list' %}">
+                <i class="fa-solid fa-location-dot me-2"></i>
+                <span>Stores List</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.resolver_match.url_name == 'business_settings_api_list' %}active{% endif %}">
+              <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'business_settings_api_list' %}active{% endif %}"
+                 href="{% url 'business:business_settings_api_list' request.user.user_business.first.business_id %}">
+                <i class="fa-solid fa-code me-2"></i>
+                <span>API Settings</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+      <hr />
+      <li class="nav-item {% if request.resolver_match.url_name == 'help_center' %}active{% endif %}">
+        <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'help_center' %}active{% endif %}" href="{% url 'webpages:help_center' %}" target="_blank">
+          <i class="fa-solid fa-circle-question me-2"></i>
+          <span>Help Center</span>
+        </a>
+      </li>
+    </ul>
+  </div>
+</div>
