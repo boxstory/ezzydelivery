@@ -58,7 +58,7 @@ class UnitVariant(models.Model):
 class Product(models.Model):
     brand_name = models.CharField(max_length=100)
     item_name = models.CharField(max_length=100)
-    item_sku = models.CharField(max_length=100)
+    item_sku = models.CharField(max_length=100, db_index=True)  # INDEX: Frequently searched/filtered
     color = models.ForeignKey(
         ColorVariant, on_delete=models.SET_NULL, null=True, blank=True)
     size = models.CharField(max_length=100, null=True, blank=True)
@@ -72,10 +72,10 @@ class Product(models.Model):
     product_image = models.ImageField(
         upload_to='product_images/product_images', null=True, blank=True, default="business/product_images/product_image_default.jpg")
     business = models.ForeignKey(
-        business_models.Business, on_delete=models.SET_NULL, null=True, related_name='product')
+        business_models.Business, on_delete=models.SET_NULL, null=True, related_name='product', db_index=True)  # INDEX: Filtered in every product query
     product_category = models.ForeignKey(
         product_models.ProductCategory, on_delete=models.SET_NULL, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)  # INDEX: Used for ordering (.order_by('-created_at'))
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -83,6 +83,11 @@ class Product(models.Model):
 
     class Meta:
         verbose_name_plural = "Products items"
+        # COMPOUND INDEX: business + created_at for faster filtering and ordering
+        indexes = [
+            models.Index(fields=['business', '-created_at'], name='product_business_created_idx'),
+            models.Index(fields=['item_sku'], name='product_sku_idx'),
+        ]
 
 
 

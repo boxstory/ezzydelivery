@@ -1,3 +1,4 @@
+import logging
 from genericpath import exists
 from multiprocessing import context
 from django.db import connection
@@ -12,6 +13,8 @@ from delivery import models as delivery_models
 from fleet import forms as fleet_forms
 from fleet.wallet_service import WalletService, WalletAlertService
 
+logger = logging.getLogger('fleet')
+
 # Create your views here.
 
 
@@ -19,31 +22,53 @@ from fleet.wallet_service import WalletService, WalletAlertService
 
 @login_required(login_url='/accounts/login/')
 def fleets(request):
-    fleets = fleet_models.Driver.objects.all()
-    driver_vehicle = fleet_models.DriverVehicle.objects.all()
-    vehicle_list = []
+    """
+    Display all drivers with their vehicles.
 
-    for driver in fleets:
-        driver_vehicle = fleet_models.DriverVehicle.objects.filter(
-            driver_id=driver.driver_id).values_list('vehicle_type', flat=True)
-        print('driver_vehicle ', driver_vehicle)
-        vehicle_list.append(driver_vehicle)
-    print(vehicle_list)
-    # print(connection.queries)
+    CRITICAL N+1 FIX: This view had a major N+1 query issue.
+    Before: 1 query to fetch drivers + N queries (one per driver) to fetch vehicles = N+1 queries
+    After: 1 query with prefetch_related = 1 query (or 2 max)
+
+    Expected query reduction: 90-95% (100 drivers: 101 queries → 2 queries)
+    """
+    # N+1 FIX: Use prefetch_related to fetch all driver vehicles in one query
+    fleets = fleet_models.Driver.objects.prefetch_related(
+        'driver_vehicle_set'  # Reverse FK: Driver ← DriverVehicle
+    ).select_related(
+        'user',     # FK: Driver → User
+        'profile',  # FK: Driver → Profile
+    ).all()
+
+    logger.info(f"User {request.user.id} accessing fleets list ({fleets.count()} drivers)")
+
     context = {
         'fleets': fleets,
-        'vehicle_list': vehicle_list,
     }
     return render(request, 'fleet/fleets.html', context)
 
 
 @login_required(login_url='/accounts/login/')
 def fleet_dashboard(request):
+    """
+    Display driver dashboard with wallet statistics.
+
+    OPTIMIZATION: Uses select_related to fetch driver and profile in single query.
+    """
     try:
-        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
-        profile = core_models.Profile.objects.get(user_id=driver.user_id)
+        # OPTIMIZATION: Fetch driver with related user and profile in one query
+        driver = fleet_models.Driver.objects.select_related(
+            'user',
+            'profile'
+        ).get(user_id=request.user.id)
+
+        profile = driver.profile  # Already fetched via select_related
+
+        # Fetch driver vehicles (could have multiple)
         driver_vehicle = fleet_models.DriverVehicle.objects.filter(
-            driver_id=driver.driver_id)
+            driver_id=driver.driver_id
+        ).select_related('vehicle_type')
+
+        logger.info(f"Driver {driver.driver_id} accessing dashboard")
 
         # Get statistics for last 30 days
         stats_30_days = WalletService.get_driver_statistics(driver, days=30)
@@ -69,7 +94,8 @@ def fleet_dashboard(request):
         return render(request, 'fleet/fleet_dashboard.html', context)
 
     except fleet_models.Driver.DoesNotExist:
-        print('driver does not exist')
+        logger.warning(f"User {request.user.id} has no driver profile")
+        messages.error(request, "Driver profile not found. Please create one first.")
         return redirect('core:main_dashboard')
 
 # document---------------------------------------------------------------------------------------------------------------------

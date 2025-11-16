@@ -53,16 +53,16 @@ class Order(models.Model):
 
     # Create your models here.
  
-    order_number = models.CharField(max_length=64, unique=True)
+    order_number = models.CharField(max_length=64, unique=True, db_index=True)  # INDEX: Unique, frequently searched
     business = models.ForeignKey(
-        business_models.Business, on_delete=models.CASCADE, related_name='order')
-    client_order_code = models.CharField(max_length=64, unique=True)
+        business_models.Business, on_delete=models.CASCADE, related_name='order', db_index=True)  # INDEX: Filtered in every order query
+    client_order_code = models.CharField(max_length=64, unique=True, db_index=True)  # INDEX: Searched by clients
     order_notes = models.CharField(max_length=100, blank=True, null=True)
     order_status = models.CharField(
-        max_length=100, choices=ORDER_STATUS_BY_CLIENT, default='to_review',
+        max_length=100, choices=ORDER_STATUS_BY_CLIENT, default='to_review', db_index=True  # INDEX: Filtered for pending/published orders
     )
     task_status = models.CharField(
-        max_length=100, choices=TASK_STATUS_BY_STAFF, default='new_order',
+        max_length=100, choices=TASK_STATUS_BY_STAFF, default='new_order', db_index=True  # INDEX: Filtered for new/pending tasks
     )
 
     # pickup details
@@ -147,6 +147,15 @@ class Order(models.Model):
 
     class Meta:
         verbose_name_plural = "Order"
+        # COMPOUND INDEXES: business + status + created_at for fast filtering and ordering
+        indexes = [
+            models.Index(fields=['business', 'order_status', '-created_at'], name='order_business_status_created_idx'),
+            models.Index(fields=['business', 'task_status'], name='order_business_task_idx'),
+            models.Index(fields=['order_number'], name='order_number_idx'),
+            models.Index(fields=['client_order_code'], name='order_client_code_idx'),
+            models.Index(fields=['-created_at'], name='order_created_idx'),
+            models.Index(fields=['verification_status'], name='order_verification_idx'),
+        ]
 
 class OrderLog(models.Model):
     # Dictionary field to store the changes

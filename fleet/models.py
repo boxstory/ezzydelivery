@@ -59,12 +59,12 @@ class DriverVacancyAplication(models.Model):
 
 class Driver(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, db_index=True)  # INDEX: Frequently queried (driver.objects.get(user_id=...))
     profile = models.ForeignKey(
         core_models.Profile, on_delete=models.SET_NULL, blank=True, null=True, related_name='driver')
     driver_id = models.PositiveSmallIntegerField(primary_key=True)
 
-    driver_code = models.CharField(max_length=100, blank=True, null=True)
+    driver_code = models.CharField(max_length=100, blank=True, null=True, db_index=True)  # INDEX: Searched/filtered often
     driver_code_dms = models.CharField(max_length=100, blank=True, null=True)
     driver_phone = models.CharField(max_length=100)
     driver_whatsapp = models.CharField(max_length=100)
@@ -91,7 +91,7 @@ class Driver(models.Model):
         ('Blocked', 'Blocked'),
     )
     driver_status = models.CharField(
-        max_length=100, choices=driver_status_choices)
+        max_length=100, choices=driver_status_choices, db_index=True)  # INDEX: Filtered for approved/pending drivers
 
     # COD Wallet System Fields
     wallet_balance = models.DecimalField(
@@ -152,11 +152,17 @@ class Driver(models.Model):
 
     class Meta:
         verbose_name_plural = "Drivers"
+        # COMPOUND INDEX: user + driver_status for fast driver lookups
+        indexes = [
+            models.Index(fields=['user', 'driver_status'], name='driver_user_status_idx'),
+            models.Index(fields=['driver_code'], name='driver_code_idx'),
+            models.Index(fields=['created_at'], name='driver_created_idx'),
+        ]
 
 
 class DriverVehicle(models.Model):
     driver = models.ForeignKey(
-        Driver, on_delete=models.CASCADE, related_name='driver_vehicle')
+        Driver, on_delete=models.CASCADE, related_name='driver_vehicle', db_index=True)  # INDEX: Always filtered by driver_id
     vehicle_type = models.CharField(
         max_length=100, choices=VEHICLE_CHOICES, default='none')
     vehicle_no = models.CharField(max_length=100, blank=True, null=True)
@@ -167,7 +173,7 @@ class DriverVehicle(models.Model):
         ('inactive', 'Inactive'),
     )
     vehicle_status = models.CharField(
-        max_length=100, choices=VEHICLE_STATUS, default='Inactive')
+        max_length=100, choices=VEHICLE_STATUS, default='Inactive', db_index=True)  # INDEX: Filtered for active vehicles
     vehicle_date = models.DateField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -177,6 +183,10 @@ class DriverVehicle(models.Model):
 
     class Meta:
         verbose_name_plural = "Driver Vehicles"
+        # COMPOUND INDEX: driver + vehicle_status for fast active vehicle lookups
+        indexes = [
+            models.Index(fields=['driver', 'vehicle_status'], name='vehicle_driver_status_idx'),
+        ]
 
 
 def upload_path_handler(instance, filename):

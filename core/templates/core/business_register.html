@@ -5,24 +5,25 @@
 
 {% block extra_css %}
 <style>
+    /* MOBILE-FIRST RESPONSIVE DESIGN */
     .completion-container {
         max-width: 900px;
-        margin: 2rem auto;
-        padding: 0 1rem;
+        margin: 0.75rem auto;
+        padding: 0 0.5rem;
     }
 
     .completion-header {
         background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
         color: white;
-        padding: 2rem;
-        border-radius: 15px 15px 0 0;
+        padding: 1.25rem 1rem;
+        border-radius: 10px 10px 0 0;
         text-align: center;
     }
 
     .completion-circle {
-        width: 100px;
-        height: 100px;
-        margin: 0 auto 1rem;
+        width: 70px;
+        height: 70px;
+        margin: 0 auto 0.5rem;
         position: relative;
     }
 
@@ -32,7 +33,7 @@
 
     .completion-circle circle {
         fill: none;
-        stroke-width: 8;
+        stroke-width: 5;
     }
 
     .circle-bg {
@@ -50,41 +51,56 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        font-size: 1.75rem;
+        font-size: 1.25rem;
         font-weight: bold;
         color: white;
     }
 
+    .completion-header h2 {
+        font-size: 1.25rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .completion-header p {
+        font-size: 0.85rem;
+        margin-bottom: 0;
+    }
+
     .form-card {
         background: white;
-        border-radius: 0 0 15px 15px;
-        padding: 2.5rem;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        border-radius: 0 0 10px 10px;
+        padding: 1rem 0.75rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
     }
 
     .form-label {
         font-weight: 600;
         color: #374151;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.35rem;
+        font-size: 0.875rem;
     }
 
-    .form-control, .form-select {
-        border-radius: 8px;
-        border: 2px solid #e5e7eb;
-        padding: 0.75rem 1rem;
+    .form-control, .form-select, .form-control textarea {
+        border-radius: 6px;
+        border: 1.5px solid #e5e7eb;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
     }
 
     .form-control:focus, .form-select:focus {
         border-color: #f59e0b;
-        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+        box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.08);
     }
 
     .btn-action {
-        padding: 0.75rem 2rem;
-        border-radius: 8px;
+        padding: 0.6rem 1.25rem;
+        border-radius: 6px;
         font-weight: 600;
         border: none;
-        transition: all 0.3s ease;
+        transition: all 0.2s ease;
+        font-size: 0.875rem;
+        width: 100%;
+        margin-bottom: 0.5rem;
     }
 
     .btn-save {
@@ -94,7 +110,17 @@
 
     .btn-save:hover {
         background: #059669;
-        transform: translateY(-2px);
+        color: white;
+    }
+
+    .btn-dashboard {
+        background: #f59e0b;
+        color: white;
+    }
+
+    .btn-dashboard:hover {
+        background: #d97706;
+        color: white;
     }
 
     .btn-apply {
@@ -104,38 +130,189 @@
 
     .btn-apply:hover {
         background: #d97706;
-        transform: translateY(-2px);
+        color: white;
     }
 
     .btn-apply:disabled {
         background: #9ca3af;
         cursor: not-allowed;
-        transform: none;
+        opacity: 0.6;
+    }
+
+    .btn-change-role {
+        background: #8b5cf6;
+        color: white;
+    }
+
+    .btn-change-role:hover {
+        background: #7c3aed;
+        color: white;
     }
 
     .success-alert {
         background: #d1fae5;
         border-left: 4px solid #10b981;
-        padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 1.5rem;
+        padding: 0.875rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+    }
+
+    .verified-alert {
+        background: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        padding: 0.875rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
     }
 
     .warning-alert {
-        background: #fef3c7;
+        background: #fed7aa;
         border-left: 4px solid #f59e0b;
-        padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 1.5rem;
+        padding: 0.875rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
     }
 
     .section-title {
-        font-size: 1.25rem;
+        font-size: 1rem;
         font-weight: 700;
         color: #1f2937;
-        margin: 2rem 0 1rem;
-        padding-bottom: 0.5rem;
+        margin: 1.25rem 0 0.75rem;
+        padding-bottom: 0.4rem;
         border-bottom: 2px solid #e5e7eb;
+    }
+
+    .section-title:first-of-type {
+        margin-top: 0;
+    }
+
+    .action-buttons-wrapper {
+        margin-top: 1.25rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    /* TABLET RESPONSIVE (>= 576px) */
+    @media (min-width: 576px) {
+        .completion-container {
+            margin: 1.5rem auto;
+            padding: 0 1rem;
+        }
+
+        .completion-header {
+            padding: 1.75rem 1.5rem;
+        }
+
+        .completion-circle {
+            width: 90px;
+            height: 90px;
+            margin-bottom: 0.75rem;
+        }
+
+        .completion-text {
+            font-size: 1.5rem;
+        }
+
+        .completion-header h2 {
+            font-size: 1.5rem;
+        }
+
+        .completion-header p {
+            font-size: 0.95rem;
+        }
+
+        .form-card {
+            padding: 1.5rem 1.25rem;
+        }
+
+        .form-label {
+            font-size: 0.9rem;
+        }
+
+        .form-control, .form-select {
+            padding: 0.6rem 0.875rem;
+            font-size: 0.95rem;
+        }
+
+        .btn-action {
+            padding: 0.65rem 1.5rem;
+            font-size: 0.9rem;
+            width: auto;
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            font-size: 1.125rem;
+            margin: 1.5rem 0 1rem;
+        }
+
+        .action-buttons-wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+    }
+
+    /* DESKTOP RESPONSIVE (>= 768px) */
+    @media (min-width: 768px) {
+        .completion-container {
+            margin: 2rem auto;
+        }
+
+        .completion-header {
+            padding: 2rem;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .completion-circle {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 1rem;
+        }
+
+        .completion-text {
+            font-size: 1.75rem;
+        }
+
+        .completion-header h2 {
+            font-size: 1.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .completion-header p {
+            font-size: 1rem;
+        }
+
+        .form-card {
+            padding: 2rem 1.75rem;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .form-label {
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-control, .form-select {
+            padding: 0.7rem 1rem;
+            font-size: 1rem;
+        }
+
+        .btn-action {
+            padding: 0.75rem 2rem;
+            font-size: 1rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            margin: 2rem 0 1rem;
+            padding-bottom: 0.5rem;
+        }
     }
 </style>
 {% endblock extra_css %}
@@ -145,7 +322,7 @@
     <!-- Completion Header -->
     <div class="completion-header">
         <div class="completion-circle">
-            <svg width="100" height="100">
+            <svg width="100" height="100" viewBox="0 0 100 100">
                 <circle class="circle-bg" cx="50" cy="50" r="42"></circle>
                 <circle class="circle-progress" cx="50" cy="50" r="42"
                         stroke-dasharray="263.89"
@@ -154,20 +331,51 @@
             </svg>
             <div class="completion-text">{{ completion_percentage }}%</div>
         </div>
-        <h2 class="mb-2">
+        <h2>
             <i class="fa-solid fa-building me-2"></i>Business Registration
         </h2>
-        <p class="mb-0">Complete your business information to apply for verification</p>
+        <p>Complete your business information to apply for verification</p>
     </div>
 
     <!-- Form Card -->
     <div class="form-card">
-        {% if completion_percentage >= 100 and can_apply %}
+        {% if profile.verification_status == 'verified' %}
+        <!-- VERIFIED USER - Show Dashboard Link and Role Change Option -->
+        <div class="verified-alert">
+            <i class="fa-solid fa-check-circle me-2"></i>
+            <strong>Congratulations!</strong> Your business account is verified and active.
+        </div>
+
+        <div class="action-buttons-wrapper">
+            <a href="{% url 'client:business_dashboard' %}" class="btn btn-action btn-dashboard">
+                <i class="fa-solid fa-gauge me-2"></i>Go to Business Dashboard
+            </a>
+            <a href="{% url 'core:profile_view' %}" class="btn btn-action btn-change-role">
+                <i class="fa-solid fa-user-gear me-2"></i>Change Role / View Profile
+            </a>
+        </div>
+
+        {% elif profile.verification_status == 'pending' or profile.verification_status == 'under_review' %}
+        <!-- PENDING VERIFICATION -->
+        <div class="warning-alert">
+            <i class="fa-solid fa-clock me-2"></i>
+            <strong>Application Pending:</strong> Your business verification is under review. We'll notify you once it's approved!
+        </div>
+
+        <div class="action-buttons-wrapper">
+            <a href="{% url 'core:profile_view' %}" class="btn btn-action btn-save">
+                <i class="fa-solid fa-user me-2"></i>View Profile
+            </a>
+        </div>
+
+        {% else %}
+        <!-- NOT YET VERIFIED - Show Form -->
+        {% if completion_percentage >= 100 %}
         <div class="success-alert">
             <i class="fa-solid fa-check-circle me-2"></i>
             <strong>Ready to Apply!</strong> Your business information is complete. Click "Apply for Verification" to submit your application.
         </div>
-        {% elif completion_percentage < 100 %}
+        {% else %}
         <div class="warning-alert">
             <i class="fa-solid fa-exclamation-triangle me-2"></i>
             <strong>Incomplete Information:</strong> Please fill in all required fields before applying for verification.
@@ -275,25 +483,26 @@
             </div>
 
             <!-- Action Buttons -->
-            <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+            <div class="action-buttons-wrapper">
                 <button type="submit" name="action" value="save" class="btn btn-action btn-save">
                     <i class="fa-solid fa-floppy-disk me-2"></i>Save Progress
                 </button>
 
                 <button type="submit" name="action" value="apply_verification"
                         class="btn btn-action btn-apply"
-                        {% if not can_apply or completion_percentage < 100 %}disabled{% endif %}>
+                        {% if completion_percentage < 100 %}disabled{% endif %}>
                     <i class="fa-solid fa-paper-plane me-2"></i>Apply for Verification
                 </button>
             </div>
 
             {% if completion_percentage < 100 %}
-            <p class="text-muted small text-center mt-3">
+            <p class="text-muted small text-center mt-3 mb-0">
                 <i class="fa-solid fa-info-circle me-1"></i>
                 Complete all required fields ({{ completion_percentage }}% done) to apply for verification
             </p>
             {% endif %}
         </form>
+        {% endif %}
     </div>
 </div>
 {% endblock content %}
