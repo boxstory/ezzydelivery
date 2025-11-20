@@ -1,8 +1,11 @@
 {% extends "base.html" %} {% load static %} {% load crispy_forms_tags %}
+
+{% block extra_css %}
+<link href="{% static 'core/css/role-selection.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
 {% block content %}
-
-
-<section style="background-color: #eee; " class="h-100" id="core_join_section_main">
+<section class="h-100 bg-light-grey" id="core_join_section_main">
     <div class="container py-3">
         <!-- file path section -->
         {% include "core/parts/filepath.html" %}
@@ -11,8 +14,7 @@
             <div class="col-lg-4">
                 <div class="card mb-4 " id="core_join_card_profile">
                     <div class="card-body text-center">
-                        <img src="/media/core/user/avatar.png" alt="avatar" class="rounded-circle img-fluid"
-                            style="width: 180px;">
+                        <img src="/media/core/user/avatar.png" alt="avatar" class="rounded-circle img-fluid profile-avatar" width="180" height="180">
                         <h5 class="my-3">{{joinusform.first_name}} {{joinusform.last_name}}</h5>
                         <p class="text-muted mb-1">{{joinusform.profile_pic}}</p>
                         <p class="text-muted mb-4">{{joinusform.zone_name}}</p>
@@ -21,8 +23,6 @@
                             <a type="button" class="btn btn-dark" href="{% url 'business:business_dashboard' %}" id="core_join_btn_business_dashboard">
                                 Business Dashboard
                             </a>
-
-
                             {% elif profile.is_driver %}
                             <a type="button" class="btn btn-dark" href="{% url 'fleet:fleet_dashboard' %}" id="core_join_btn_driver_dashboard">
                                 Driver Dashboard
@@ -45,57 +45,93 @@
             </div>
             <!-- profile join form section -->
             <div class="col-lg-8">
-                <div class="card-body bg-light  p-3" id="core_join_card_role_selection">
-                    <!-- join buttons -->
+                <div class="role-selection-card" id="core_join_card_role_selection">
                     {% if form.errors %}
-
-                    <!-- For each field in form -->
-                    {% for field in form %}
-                    <!-- For each error in field -->
-                    {% for error in field.errors %}
-                    <!-- Output error text message only -->
-                    <div>{{error}}</div>
-                    {% endfor %}
-                    {% endfor %}
-
+                    <div class="alert alert-danger">
+                        {% for field in form %}
+                            {% for error in field.errors %}
+                                <div><i class="fas fa-exclamation-circle me-2"></i>{{ error }}</div>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
                     {% endif %}
-                    <ul class="  mb-3  justify-content-center text-decoration-none" id="pills-tab"
-                        style="list-style: none;" role="tablist">
 
-                        {% if profile.is_business or profile.is_driver %}
-                        <div class="">
+                    {% if profile.is_business or profile.is_driver %}
+                        <!-- Already Selected Role Display -->
+                        <div class="selected-role-container">
+                            <div class="selected-role-badge">
+                                <i class="fas fa-check-circle me-2"></i>Active Role
+                            </div>
 
-                            <span class="h4 fw-bold mb-3"> Already joined as</span>
-                            <hr>
-                            {% if profile.is_business %}
-                            <div class="h4 fw-bold">Business Admin</div>
-                            {% else %}
-                            <div class="h4 fw-bold">Driver</div>
-                            {% endif %}
+                            <div class="selected-role-icon">
+                                {% if profile.is_business %}
+                                <i class="fas fa-building"></i>
+                                {% else %}
+                                <i class="fas fa-car"></i>
+                                {% endif %}
+                            </div>
 
+                            <h2 class="selected-role-title">
+                                {% if profile.is_business %}
+                                Business Admin
+                                {% else %}
+                                Driver Partner
+                                {% endif %}
+                            </h2>
 
-                            <a type="button" class="btn btn-dark mt-3" href="/dashboard/" id="core_join_btn_go_dashboard">
-                                Go To Dashboard
+                            <p class="selected-role-description">
+                                {% if profile.is_business %}
+                                You're registered as a Business Administrator. Manage your business operations, orders, and team from your dashboard.
+                                {% else %}
+                                You're registered as a Driver Partner. Access your delivery tasks, earnings, and performance metrics from your dashboard.
+                                {% endif %}
+                            </p>
+
+                            <a href="/dashboard/" class="dashboard-button" id="core_join_btn_go_dashboard">
+                                <i class="fas fa-tachometer-alt"></i>
+                                <span>Go To Dashboard</span>
                             </a>
                         </div>
 
-                        {% else %}
-                        <li class="pb-2 h3 fw-bold">
+                    {% else %}
+                        <!-- Role Selection Interface -->
+                        <div class="role-selection-header">
+                            <h1 class="role-selection-title">Choose Your Role</h1>
+                            <p class="role-selection-subtitle">Select how you'd like to use EzzyDelivery platform</p>
+                        </div>
 
-                            Select your job title:
-                        </li>
-                        <li class="col-4  mb-5 me-lg-0" role="presentation">
-                            <a href="{%url 'core:join_business'%} " class="text-decoration-none">
-                                <button id="core_join_btn_business_admin" class="nav-link  btn joinbtn  me-5">BUSINESS ADMIN</button></a>
-                        </li>
-                        <li class="col-4  " role="presentation"><a href="{%url 'core:join_driver'%}"
-                                class="text-decoration-none">
-                                <button id="core_join_btn_driver" class="nav-link  btn joinbtn ">JOIN AS DRIVER</button>
+                        <div class="role-options">
+                            <!-- Business Admin Option -->
+                            <a href="{% url 'core:join_business' %}" class="role-card" id="core_join_link_business">
+                                <div class="role-card-icon">
+                                    <i class="fas fa-building"></i>
+                                </div>
+                                <h3 class="role-card-title">Business Admin</h3>
+                                <p class="role-card-description">
+                                    Manage your business, create orders, track deliveries, and oversee your entire delivery operations.
+                                </p>
+                                <button class="role-card-button" id="core_join_btn_business_admin">
+                                    <i class="fas fa-arrow-right"></i>
+                                    <span>Register as Business</span>
+                                </button>
                             </a>
 
-                        </li>
-                        {% endif %}
-                    </ul>
+                            <!-- Driver Option -->
+                            <a href="{% url 'core:join_driver' %}" class="role-card" id="core_join_link_driver">
+                                <div class="role-card-icon">
+                                    <i class="fas fa-car"></i>
+                                </div>
+                                <h3 class="role-card-title">Driver Partner</h3>
+                                <p class="role-card-description">
+                                    Join our delivery fleet, accept tasks, earn money, and track your performance and earnings.
+                                </p>
+                                <button class="role-card-button" id="core_join_btn_driver">
+                                    <i class="fas fa-arrow-right"></i>
+                                    <span>Join as Driver</span>
+                                </button>
+                            </a>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

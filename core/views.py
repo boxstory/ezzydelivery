@@ -682,14 +682,25 @@ def profile_complete_update(request):
         messages.error(request, "Please create a profile first!")
         return redirect('core:profile_add')
 
+    # Ensure profile username matches Django User username
+    if profile.username != request.user.username:
+        profile.username = request.user.username
+        profile.save()
+
     if request.method == 'POST':
         form = core_forms.ProfileUpdateForm(request.POST, instance=profile)
+        # Auto-populate username from logged-in user and disable it
+        form.fields['username'].initial = request.user.username
+        form.fields['username'].widget.attrs['readonly'] = True
+        form.fields['username'].disabled = True
 
         # Check which button was clicked
         action = request.POST.get('action')
 
         if form.is_valid():
             profile = form.save(commit=False)
+            # Ensure username stays the same as the Django User account username
+            profile.username = request.user.username
 
             # Check if profile is complete
             completion_percentage = profile.get_profile_completion_percentage()
@@ -725,6 +736,10 @@ def profile_complete_update(request):
             messages.error(request, "Please correct the errors below.")
     else:
         form = core_forms.ProfileUpdateForm(instance=profile)
+        # Auto-populate username from logged-in user and disable it
+        form.fields['username'].initial = request.user.username
+        form.fields['username'].widget.attrs['readonly'] = True
+        form.fields['username'].disabled = True
 
     completion_percentage = profile.get_profile_completion_percentage()
 

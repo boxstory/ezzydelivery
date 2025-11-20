@@ -107,10 +107,26 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
+# Authentication backends required for django-allauth
+AUTHENTICATION_BACKENDS = [
+    # Needed to login by username in Django admin, regardless of `allauth`
+    'django.contrib.auth.backends.ModelBackend',
+    # `allauth` specific authentication methods, such as login by email
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
+LOGIN_URL = '/accounts/login/'
+
+# Django-allauth settings (using latest allauth 0.50+ syntax)
+ACCOUNT_LOGIN_METHODS = {'username', 'email'}  # Allow login with username or email
 ACCOUNT_SIGNUP_FIELDS = ['email', 'username*', 'password1*', 'password2*']
 ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+ACCOUNT_LOGOUT_ON_GET = False  # Require POST for logout (security)
+ACCOUNT_SESSION_REMEMBER = True  # Remember session
+ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_FORMS = {
     'signup': 'core.forms.CustomSignupForm',
 }

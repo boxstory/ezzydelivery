@@ -6,6 +6,11 @@ from django.db import models
 class Profile(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')
+
+    # Permanent User Identification Number (never changes)
+    user_number = models.CharField(max_length=20, unique=True, editable=False, null=True, blank=True, db_index=True)
+
+    # User Information (can be changed)
     username = models.CharField(max_length=255, blank=True, null=True, unique=True)
     first_name = models.CharField(max_length=255, blank=True, null=True)
     last_name = models.CharField(max_length=255, blank=True, null=True)
@@ -17,6 +22,8 @@ class Profile(models.Model):
     address = models.CharField(max_length=255, blank=True, null=True)
     nationlity = models.CharField(max_length=255, blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
+
+    # User Roles
     is_business = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     is_driver = models.BooleanField(default=False)
@@ -53,8 +60,25 @@ class Profile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate user_number on creation"""
+        if not self.user_number:
+            # Generate user number: EZZY + Year + 6-digit number
+            from datetime import datetime
+            import random
+            year = datetime.now().year
+            random_num = random.randint(100000, 999999)
+            self.user_number = f"EZZY{year}{random_num}"
+
+            # Ensure uniqueness
+            while Profile.objects.filter(user_number=self.user_number).exists():
+                random_num = random.randint(100000, 999999)
+                self.user_number = f"EZZY{year}{random_num}"
+
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.username}"
+        return f"{self.username or self.user_number}"
 
     class Meta:
         verbose_name_plural = "Profiles"

@@ -59,9 +59,14 @@ def wf_dashboard(request):
         # Redirect to profile view or create a profile
         return redirect('core:profile_view')
 
+    # Count pending user verifications
+    pending_verifications = core_models.Profile.objects.filter(
+        verification_status='pending'
+    ).count()
+
     data = {
         'profile': profile,
-
+        'pending_verifications': pending_verifications,
     }
     return render(request, 'workforce/wf_base_dashboard.html', data)
 

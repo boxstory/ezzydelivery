@@ -1,167 +1,211 @@
 {% load static %}
+<link href="{% static 'core/css/profile-sidebar.css' %}" rel="stylesheet" type="text/css" />
+
 <!-- Profile Sidebar -->
-<div class="card shadow-sm mb-4 col-12 col-lg-4" id="core_dashboard_sidebar_profile_card">
-    <div class="card-body text-center p-4">
-        <!-- Profile Picture Section -->
-        <div class="mb-3">
-            <img src="{{ profile_picture.profile_picture.url }}"
-                 alt="{{ profile.first_name }} {{ profile.last_name }}"
-                 class="rounded-circle img-fluid shadow-sm"
-                 style="width: 150px; height: 150px; object-fit: cover;">
+<div class="card mb-4 col-12 col-lg-4" id="core_dashboard_sidebar_profile_card">
+    <!-- Profile Header with Gradient Background -->
+    <div class="profile-header-gradient">
+        <!-- Verification Badge -->
+        {% if profile.verification_status == 'verified' %}
+        <div class="verification-badge">
+            <i class="fas fa-check-circle"></i>
+            <span>Verified</span>
         </div>
+        {% endif %}
 
-        <!-- Update Photo Button -->
-        <button id="core_dashboard_sidebar_profile_btn_update_photo" type="button" class="btn btn-dark btn-sm mb-3" data-bs-toggle="modal" data-bs-target="#updatePhotoModal">
-            <i class="fas fa-camera me-1"></i> Update Photo
-        </button>
+        <!-- Profile Picture Section -->
+        <div class="text-center">
+            <div class="profile-picture-wrapper">
+                <img src="{{ profile_picture.profile_picture.url }}"
+                     alt="{{ profile.first_name }} {{ profile.last_name }}"
+                     class="rounded-circle">
+                <div class="profile-picture-badge" data-bs-toggle="modal" data-bs-target="#updatePhotoModal">
+                    <i class="fas fa-camera"></i>
+                </div>
+            </div>
 
-        <!-- Photo Update Modal -->
-        <div class="modal fade" id="core_dashboard_sidebar_profile_modal_photo" tabindex="-1" aria-labelledby="updatePhotoModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="updatePhotoModalLabel">Update Profile Picture</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        {% include "core/parts/profile_picture_update.html" %}
-                    </div>
+            <!-- User Name -->
+            <h5 class="profile-name">{{ profile.first_name|default:"" }} {{ profile.last_name|default:"" }}</h5>
+
+            <!-- User Number -->
+            {% if profile.user_number %}
+            <div class="profile-user-number">
+                <i class="fas fa-id-card me-1"></i>{{ profile.user_number }}
+            </div>
+            {% endif %}
+
+            <!-- Location Info -->
+            <div class="profile-location">
+                <i class="fas fa-map-marker-alt"></i>
+                <span>{{ profile.zone_name|default:"Not specified" }}, {{ profile.nationlity|default:"Qatar" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Update Modal -->
+    <div class="modal fade" id="updatePhotoModal" tabindex="-1" aria-labelledby="updatePhotoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="updatePhotoModalLabel">
+                        <i class="fas fa-camera me-2"></i>Update Profile Picture
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-toggle="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% include "core/parts/profile_picture_update.html" %}
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- User Info -->
-        <h5 class="mb-2 fw-bold">{{ profile.first_name|default:"" }} {{ profile.last_name|default:"" }}</h5>
-        <p class="text-muted mb-1 small">
-            <i class="fas fa-flag me-1"></i>{{ profile.nationlity|default:"Not specified" }}
-        </p>
-        <p class="text-muted mb-3 small">
-            <i class="fas fa-map-marker-alt me-1"></i>{{ profile.zone_name|default:"Not specified" }}
-        </p>
+    <!-- Profile Status Section -->
+    <div class="status-section">
+        <div class="section-title">
+            <i class="fas fa-clipboard-check me-1"></i>Profile Status
+        </div>
 
-        <hr class="my-3">
-
-        <!-- Profile Completion Status -->
-        <div class="mb-3">
-            <h6 class="text-start mb-2 fw-bold small">Profile Status</h6>
-
-            <!-- Basic Profile Completion -->
-            <div class="form-check form-switch d-flex align-items-center justify-content-between mb-2">
-                <label class="form-check-label small" for="basicProfileStatus">
-                    Basic Profile
-                </label>
-                <input class="form-check-input"
-                       type="checkbox"
-                       role="switch"
-                       id="basicProfileStatus"
-                       {% if profile.is_profile_completed %}checked{% endif %}
-                       disabled>
+        <!-- Basic Profile Completion -->
+        <div class="status-item">
+            <div class="status-label">
+                <i class="fas fa-user"></i>
+                <span>Basic Profile</span>
             </div>
-
-            <!-- Business Profile Completion (only show if is_business) -->
-            {% if profile.is_business %}
-            <div class="form-check form-switch d-flex align-items-center justify-content-between mb-2">
-                <label class="form-check-label small" for="businessProfileStatus">
-                    Business Profile
-                </label>
-                <input class="form-check-input"
-                       type="checkbox"
-                       role="switch"
-                       id="businessProfileStatus"
-                       {% if profile.is_business_profile_completed %}checked{% endif %}
-                       disabled>
-            </div>
-            {% endif %}
-
-            <!-- Driver Profile Completion (only show if is_driver) -->
-            {% if profile.is_driver %}
-            <div class="form-check form-switch d-flex align-items-center justify-content-between mb-2">
-                <label class="form-check-label small" for="driverProfileStatus">
-                    Driver Profile
-                </label>
-                <input class="form-check-input"
-                       type="checkbox"
-                       role="switch"
-                       id="driverProfileStatus"
-                       {% if profile.is_driver_profile_completed %}checked{% endif %}
-                       disabled>
-            </div>
+            {% if profile.is_profile_completed %}
+            <span class="status-badge badge-success">
+                <i class="fas fa-check"></i> Complete
+            </span>
+            {% else %}
+            <span class="status-badge badge-warning">
+                <i class="fas fa-clock"></i> Pending
+            </span>
             {% endif %}
         </div>
 
-        <hr class="my-3">
-
-        <!-- Role Status -->
-        <div class="mb-3">
-            <h6 class="text-start mb-2 fw-bold small">User Role</h6>
-
-            <div class="form-check form-switch d-flex align-items-center justify-content-between mb-2">
-                <label class="form-check-label small" for="businessAdminRole">
-                    Business Admin
-                </label>
-                <input class="form-check-input"
-                       type="checkbox"
-                       role="switch"
-                       id="businessAdminRole"
-                       {% if profile.is_business %}checked{% endif %}
-                       disabled>
-            </div>
-
-            <div class="form-check form-switch d-flex align-items-center justify-content-between mb-2">
-                <label class="form-check-label small" for="driverRole">
-                    Driver
-                </label>
-                <input class="form-check-input"
-                       type="checkbox"
-                       role="switch"
-                       id="driverRole"
-                       {% if profile.is_driver %}checked{% endif %}
-                       disabled>
-            </div>
-        </div>
-
-        <hr class="my-3">
-
-        <!-- Action Buttons Based on Role -->
+        <!-- Business Profile (if applicable) -->
         {% if profile.is_business %}
-        <div class="d-grid gap-2">
-            <a href="{% url 'core:main_dashboard' %}" class="btn btn-dark">
-                <i class="fas fa-tachometer-alt me-1"></i> Business Dashboard
-            </a>
-            <a href="{% url 'business:business_profile' %}" class="btn btn-outline-dark">
-                <i class="fas fa-building me-1"></i> Business Profile
-            </a>
+        <div class="status-item">
+            <div class="status-label">
+                <i class="fas fa-building"></i>
+                <span>Business Profile</span>
+            </div>
+            {% if profile.is_business_profile_completed %}
+            <span class="status-badge badge-success">
+                <i class="fas fa-check"></i> Complete
+            </span>
+            {% else %}
+            <span class="status-badge badge-warning">
+                <i class="fas fa-clock"></i> Pending
+            </span>
+            {% endif %}
         </div>
-        {% elif profile.is_driver %}
-        <div class="d-grid gap-2">
-            <a href="{% url 'core:main_dashboard' %}" class="btn btn-dark">
-                <i class="fas fa-tachometer-alt me-1"></i> Driver Dashboard
-            </a>
-            <a href="{% url 'fleet:driver_profile' profile.id %}" class="btn btn-outline-dark">
-                <i class="fas fa-user me-1"></i> My Profile
-            </a>
-        </div>
-        {% else %}
-        <div class="d-grid gap-2">
-            <a href="{% url 'core:join_us' %}" class="btn btn-dark">
-                <i class="fas fa-user-plus me-1"></i> Select Role
-            </a>
+        {% endif %}
+
+        <!-- Driver Profile (if applicable) -->
+        {% if profile.is_driver %}
+        <div class="status-item">
+            <div class="status-label">
+                <i class="fas fa-car"></i>
+                <span>Driver Profile</span>
+            </div>
+            {% if profile.is_driver_profile_completed %}
+            <span class="status-badge badge-success">
+                <i class="fas fa-check"></i> Complete
+            </span>
+            {% else %}
+            <span class="status-badge badge-warning">
+                <i class="fas fa-clock"></i> Pending
+            </span>
+            {% endif %}
         </div>
         {% endif %}
     </div>
 
+    <!-- User Role Section -->
+    <div class="status-section" style="padding-top: 0;">
+        <div class="section-title">
+            <i class="fas fa-user-tag me-1"></i>Active Roles
+        </div>
+
+        <div class="text-center">
+            {% if profile.is_business %}
+            <div class="role-badge">
+                <i class="fas fa-building"></i>
+                <span>Business Admin</span>
+            </div>
+            {% endif %}
+
+            {% if profile.is_driver %}
+            <div class="role-badge">
+                <i class="fas fa-car"></i>
+                <span>Driver</span>
+            </div>
+            {% endif %}
+
+            {% if profile.is_staff %}
+            <div class="role-badge">
+                <i class="fas fa-user-shield"></i>
+                <span>Staff Member</span>
+            </div>
+            {% endif %}
+
+            {% if not profile.is_business and not profile.is_driver and not profile.is_staff %}
+            <p class="text-muted small mb-0">
+                <i class="fas fa-info-circle me-1"></i>
+                No role assigned yet
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="status-section" style="padding-top: 0;">
+        <div class="d-grid gap-2">
+            {% if profile.is_business %}
+            <a href="{% url 'core:main_dashboard' %}" class="btn btn-primary-gradient action-button">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>Business Dashboard</span>
+            </a>
+            <a href="{% url 'business:business_profile' %}" class="btn btn-outline-gradient action-button">
+                <i class="fas fa-building"></i>
+                <span>Business Profile</span>
+            </a>
+            {% elif profile.is_driver %}
+            <a href="{% url 'core:main_dashboard' %}" class="btn btn-primary-gradient action-button">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>Driver Dashboard</span>
+            </a>
+            <a href="{% url 'fleet:driver_profile' profile.id %}" class="btn btn-outline-gradient action-button">
+                <i class="fas fa-user"></i>
+                <span>My Profile</span>
+            </a>
+            {% else %}
+            <a href="{% url 'core:join_us' %}" class="btn btn-primary-gradient action-button">
+                <i class="fas fa-user-plus"></i>
+                <span>Select Your Role</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- Social Media Links -->
-    <div class="card-footer bg-light">
-        <div class="d-flex justify-content-center gap-3 py-2">
+    <div class="social-links">
+        <div class="d-flex justify-content-center gap-3">
             {% if profile.whatsapp %}
-            <a href="http://wa.me/974{{ profile.whatsapp }}" class="text-success" target="_blank" rel="noopener" title="WhatsApp">
-                <i class="fab fa-whatsapp fa-2x"></i>
+            <a href="http://wa.me/974{{ profile.whatsapp }}" class="social-icon whatsapp" target="_blank" rel="noopener" title="WhatsApp">
+                <i class="fab fa-whatsapp fa-lg"></i>
             </a>
             {% endif %}
             {% if profile.instagram %}
-            <a href="http://www.instagram.com/{{ profile.instagram }}" class="text-dark" target="_blank" rel="noopener" title="Instagram">
-                <i class="fab fa-instagram fa-2x"></i>
+            <a href="http://www.instagram.com/{{ profile.instagram }}" class="social-icon instagram" target="_blank" rel="noopener" title="Instagram">
+                <i class="fab fa-instagram fa-lg"></i>
             </a>
+            {% endif %}
+            {% if not profile.whatsapp and not profile.instagram %}
+            <p class="text-muted small mb-0">
+                <i class="fas fa-info-circle me-1"></i>
+                No social links added
+            </p>
             {% endif %}
         </div>
     </div>

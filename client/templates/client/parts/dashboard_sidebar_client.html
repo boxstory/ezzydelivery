@@ -130,6 +130,7 @@
              id="submenu-settings"
              aria-expanded="false">
           <ul class="flex-column nav text-black">
+            {% if request.user.user_business.first %}
             <li class="nav-item {% if request.resolver_match.url_name == 'business_settings' %}active{% endif %}">
               <a class="nav-link btn d-flex align-items-center {% if request.resolver_match.url_name == 'business_settings' %}active{% endif %}"
                  href="{% url 'business:business_settings' request.user.user_business.first.business_id %}">
@@ -158,6 +159,7 @@
                 <span>API Settings</span>
               </a>
             </li>
+            {% endif %}
           </ul>
         </div>
       </li>
