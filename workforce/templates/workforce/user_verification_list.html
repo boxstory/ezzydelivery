@@ -1,16 +1,18 @@
-{% extends "client_dashboard_base.html" %}
+{% extends "wf_dashboard_base.html" %}
 {% load static %}
 
 {% block title %}User Verification - Staff Dashboard{% endblock title %}
 
 {% block extra_css %}
-<style>
+<link href="{% static 'workforce/css/user-verification.css' %}" rel="stylesheet" type="text/css" />
+<!-- Legacy styles removed - now using brand kit CSS -->
+<style style="display:none;">
     .verification-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        padding: 2rem;
-        border-radius: 15px;
-        margin-bottom: 2rem;
+        padding: 1rem 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
     }
 
     .filter-tabs {
@@ -248,26 +250,39 @@
     <p class="mb-0">Review and approve user applications</p>
 </div>
 
-<!-- Filter Tabs -->
-<div class="filter-tabs">
-    <a href="?status=all" class="filter-tab {% if current_filter == 'all' %}active{% endif %}">
-        <i class="fa-solid fa-list me-1"></i>All Users
-    </a>
-    <a href="?status=pending" class="filter-tab {% if current_filter == 'pending' %}active{% endif %}">
-        <i class="fa-solid fa-clock me-1"></i>Pending
-    </a>
-    <a href="?status=under_review" class="filter-tab {% if current_filter == 'under_review' %}active{% endif %}">
-        <i class="fa-solid fa-eye me-1"></i>Under Review
-    </a>
-    <a href="?status=verified" class="filter-tab {% if current_filter == 'verified' %}active{% endif %}">
-        <i class="fa-solid fa-check-circle me-1"></i>Verified
-    </a>
-    <a href="?status=rejected" class="filter-tab {% if current_filter == 'rejected' %}active{% endif %}">
-        <i class="fa-solid fa-times-circle me-1"></i>Rejected
-    </a>
-    <a href="?status=incomplete" class="filter-tab {% if current_filter == 'incomplete' %}active{% endif %}">
-        <i class="fa-solid fa-exclamation-triangle me-1"></i>Incomplete
-    </a>
+<!-- Filter Tabs - Collapsible -->
+<div class="filter-tabs-container mb-3">
+    <button class="btn btn-outline-primary w-100 d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#filterTabsCollapse" aria-expanded="false" aria-controls="filterTabsCollapse">
+        <span>
+            <i class="fa-solid fa-filter me-2"></i>Filters
+            {% if current_filter != 'all' %}
+                <span class="badge bg-primary ms-2">{{ current_filter|title }}</span>
+            {% endif %}
+        </span>
+        <i class="fa-solid fa-chevron-down"></i>
+    </button>
+    <div class="collapse" id="filterTabsCollapse">
+        <div class="filter-tabs mt-2">
+            <a href="?status=all" class="filter-tab {% if current_filter == 'all' %}active{% endif %}">
+                <i class="fa-solid fa-list me-1"></i>All Users
+            </a>
+            <a href="?status=pending" class="filter-tab {% if current_filter == 'pending' %}active{% endif %}">
+                <i class="fa-solid fa-clock me-1"></i>Pending
+            </a>
+            <a href="?status=under_review" class="filter-tab {% if current_filter == 'under_review' %}active{% endif %}">
+                <i class="fa-solid fa-eye me-1"></i>Under Review
+            </a>
+            <a href="?status=verified" class="filter-tab {% if current_filter == 'verified' %}active{% endif %}">
+                <i class="fa-solid fa-check-circle me-1"></i>Verified
+            </a>
+            <a href="?status=rejected" class="filter-tab {% if current_filter == 'rejected' %}active{% endif %}">
+                <i class="fa-solid fa-times-circle me-1"></i>Rejected
+            </a>
+            <a href="?status=incomplete" class="filter-tab {% if current_filter == 'incomplete' %}active{% endif %}">
+                <i class="fa-solid fa-exclamation-triangle me-1"></i>Incomplete
+            </a>
+        </div>
+    </div>
 </div>
 
 <!-- Verification Cards -->
@@ -468,5 +483,16 @@
             });
         }
     }
+
+    // Rotate chevron icon on collapse toggle
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterButton = document.querySelector('[data-bs-target="#filterTabsCollapse"]');
+        const chevronIcon = filterButton.querySelector('.fa-chevron-down');
+
+        filterButton.addEventListener('click', function() {
+            chevronIcon.style.transition = 'transform 0.3s ease';
+            chevronIcon.style.transform = chevronIcon.style.transform === 'rotate(180deg)' ? 'rotate(0deg)' : 'rotate(180deg)';
+        });
+    });
 </script>
 {% endblock extra_js %}
