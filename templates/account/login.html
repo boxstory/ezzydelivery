@@ -216,6 +216,7 @@
     font-size: 1.25rem;
 }
 
+/* Social media brand colors - keeping original brand colors for authenticity */
 .social-btn.google i {
     color: #DB4437;
 }
@@ -229,7 +230,7 @@
 }
 
 .social-btn.github i {
-    color: #333;
+    color: var(--brand-grey-700);
 }
 
 .auth-footer {
@@ -264,7 +265,7 @@
 }
 
 .errorlist li {
-    color: #dc3545;
+    color: #ff6b6b;
     font-size: 0.875rem;
     margin-top: 0.25rem;
 }
@@ -277,15 +278,15 @@
 }
 
 .alert-danger {
-    background: #f8d7da;
-    border-color: #dc3545;
-    color: #721c24;
+    background: #fee2e2;
+    border-color: #ff6b6b;
+    color: #991b1b;
 }
 
 .alert-info {
-    background: #d1ecf1;
-    border-color: #17a2b8;
-    color: #0c5460;
+    background: #e0e7ff;
+    border-color: #667eea;
+    color: #3730a3;
 }
 
 @media (max-width: 576px) {
@@ -335,7 +336,7 @@
             <form id="account_login_form_main" method="POST" action="{% url 'account_login' %}">
                 {% csrf_token %}
 
-                <div class="form-group">
+                <div class="form-group" id="account_login_form_group_login">
                     <label for="{{ form.login.id_for_label }}">
                         <i class="fa-solid fa-user me-1"></i>
                         {{ form.login.label }}
@@ -350,7 +351,7 @@
                     {% endif %}
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="account_login_form_group_password">
                     <label for="{{ form.password.id_for_label }}">
                         <i class="fa-solid fa-lock me-1"></i>
                         {{ form.password.label }}
@@ -365,8 +366,8 @@
                     {% endif %}
                 </div>
 
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div class="form-check">
+                <div class="d-flex justify-content-between align-items-center mb-3" id="account_login_options_container">
+                    <div class="form-check" id="account_login_remember_container">
                         {{ form.remember }}
                         <label class="form-check-label" for="{{ form.remember.id_for_label }}">
                             {{ form.remember.label }}
@@ -374,7 +375,7 @@
                     </div>
 
                     <div class="forgot-password">
-                        <a href="{% url 'core:password_reset_request' %}">
+                        <a id="account_login_link_forgot_password" href="{% url 'core:password_reset_request' %}">
                             {% trans "Forgot Password?" %}
                         </a>
                     </div>
