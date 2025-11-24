@@ -35,3 +35,27 @@ def site_info(request):
         'SUPPORT_EMAIL': 'support@ezzydelivery.qa',
         'SUPPORT_PHONE': '+974-XXXX-XXXX',
     }
+
+
+def social_media_links(request):
+    """
+    Add social media links to all templates
+    Update these URLs with your actual social media profiles
+    """
+    return {
+        'SOCIAL_MEDIA': {
+            'facebook': 'https://www.facebook.com/ezzydeliveryqatar',
+            'instagram': 'https://www.instagram.com/ezzydeliveryqatar',
+            'whatsapp': 'https://wa.me/97412345678',  # Replace with actual WhatsApp business number
+            'twitter': 'https://twitter.com/ezzydeliveryqa',
+            'linkedin': 'https://www.linkedin.com/company/ezzydelivery-qatar',
+            'youtube': 'https://www.youtube.com/@ezzydeliveryqatar',
+        },
+        'CONTACT_LINKS': {
+            'support': '/contact/',
+            'help_center': '/help-center/',
+            'faq': '/faq/',
+            'terms': '/terms/',
+            'privacy': '/privacy/',
+        },
+    }

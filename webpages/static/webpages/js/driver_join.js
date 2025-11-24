@@ -1,5 +1,4 @@
 var conditional_fields = $("div.shipping_destination");
-console.log(conditional_fields);
 conditional_fields.hide();
 
 $(".shipping").change(function () {

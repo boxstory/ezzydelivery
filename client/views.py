@@ -292,6 +292,7 @@ def pickup_location_update(request, pickup_location_id):
 # frontend ---------------------------------------------------------------------------------------------------------------------
 
 
+@login_required(login_url='/accounts/login/')
 def business_profile(request):
     try:
         business = business_models.Business.objects.get(
@@ -320,6 +321,7 @@ def business_profile(request):
 
         return redirect("/join_us/")
 
+@login_required(login_url='/accounts/login/')
 def business_profile_display(request, business_id):
     try:
         business = business_models.Business.objects.get(
@@ -341,6 +343,7 @@ def business_profile_display(request, business_id):
         return redirect("/profile/")
 
 
+@login_required(login_url='/accounts/login/')
 def all_business(request):
     business = business_models.Business.objects.all()
     
@@ -354,6 +357,7 @@ def all_business(request):
 #business_settings---------------------------------------------------------------------------------------------------------------------
 
 
+@login_required(login_url='/accounts/login/')
 def business_profile_update(request, business_id):
     print('business_profile_update')
     print('request.user.id', request.user.id)
@@ -397,6 +401,7 @@ def business_profile_update(request, business_id):
 
 
 
+@login_required(login_url='/accounts/login/')
 def business_profile_info_update(request, business_id):
     if request.user.user_business.first().business_id == business_id:
         print(':matched')
@@ -450,6 +455,7 @@ def business_profile_info_update(request, business_id):
 
 
 # business settings links and veirfy status ---------------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
 def business_settings(request, business_id):
     business =  business_models.Business.objects.filter(business_id=business_id).first()
     business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
@@ -475,6 +481,7 @@ def business_settings(request, business_id):
 
 
 #business_settings_api---------------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
 def business_settings_api_update(request, business_id, api_id ):
     if request.user.id == request.user.user_business.first().user_id:
         
@@ -514,6 +521,7 @@ def business_settings_api_update(request, business_id, api_id ):
 
 
 
+@login_required(login_url='/accounts/login/')
 def business_settings_api_add(request, business_id):
     if request.user.id == request.user.user_business.first().user_id:
         
@@ -550,6 +558,7 @@ def business_settings_api_add(request, business_id):
         return redirect("business:business_dashboard")
 
 
+@login_required(login_url='/accounts/login/')
 def business_settings_api_list(request, business_id):
     business =  business_models.Business.objects.filter(business_id=business_id).first()
     business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
@@ -564,6 +573,7 @@ def business_settings_api_list(request, business_id):
     }
     return render(request, 'client/parts/business_settings_api_list.html', context)
 
+@login_required(login_url='/accounts/login/')
 def business_settings_api_test(request, business_id, api_id):
     business =  business_models.Business.objects.filter(business_id=business_id).first()
     business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
@@ -578,6 +588,7 @@ def business_settings_api_test(request, business_id, api_id):
 
 
 
+@login_required(login_url='/accounts/login/')
 def business_settings_api_test_result(request, business_id, api_id):
     business =  business_models.Business.objects.filter(business_id=business_id).first()
     business_api = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
@@ -667,6 +678,7 @@ def business_settings_api_test_result(request, business_id, api_id):
 
 
 #business_logo_update---------------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
 def business_logo_update(request , business_id):
     business_logos =  business_models.BusinessLogo.objects.get(business_id=business_id)
     business_code = business_models.Business.objects.get(business_id=business_id)
@@ -723,6 +735,7 @@ def business_logo_update(request , business_id):
 
 #business_teams---------------------------------------------------------------------------------------------------------------------
 
+@login_required(login_url='/accounts/login/')
 def business_teams(request, business_id):
     business =  business_models.Business.objects.filter(business_id=business_id).first()
     teams = business_models.BusinessTeamProfile.objects.filter(business_id=business_id).all()
@@ -734,6 +747,7 @@ def business_teams(request, business_id):
     }
     return render(request, 'client/parts/business_teams_list.html', context)
 
+@login_required(login_url='/accounts/login/')
 def business_teams_add(request, business_id):
     business =  business_models.Business.objects.filter(business_id=business_id).first()
     form = business_forms.BusinessTeamProfileForm()
@@ -763,6 +777,7 @@ def business_teams_add(request, business_id):
 
 
 
+@login_required(login_url='/accounts/login/')
 def business_teams_update(request, business_id, team_id):
     business =  business_models.Business.objects.filter(business_id=business_id).first()
     team = business_models.BusinessTeamProfile.objects.filter(id=team_id).first()

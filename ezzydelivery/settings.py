@@ -131,6 +131,14 @@ ACCOUNT_FORMS = {
     'signup': 'core.forms.CustomSignupForm',
 }
 
+# Session Configuration - Auto logout after 1 hour of inactivity
+SESSION_COOKIE_AGE = 3600  # 1 hour in seconds (3600 seconds = 60 minutes)
+SESSION_SAVE_EVERY_REQUEST = True  # Refresh session on every request (updates last activity)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Keep session even after browser close
+SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
+SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -141,6 +149,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    # Custom middleware for session timeout and auto-logout
+    'core.middleware.SessionTimeoutMiddleware',
+    'core.middleware.SessionWarningMiddleware',
 ]
 
 ROOT_URLCONF = 'ezzydelivery.urls'
@@ -159,6 +170,8 @@ TEMPLATES = [
                 # SEO context processors for Qatar delivery keywords
                 'core.context_processors.seo_defaults',
                 'core.context_processors.site_info',
+                # Social media and contact links
+                'core.context_processors.social_media_links',
             ],
         },
     },

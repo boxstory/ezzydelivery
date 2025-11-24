@@ -540,6 +540,17 @@ def profile_update(request, pk):
     form.fields['last_name'].widget.attrs['value'] = request.user.last_name
     form.fields['email'].widget.attrs['value'] = request.user.email
 
+    # Get or create profile picture
+    try:
+        profile_picture = core_models.ProfilePicture.objects.get(user_id=pk)
+    except core_models.ProfilePicture.DoesNotExist:
+        # Create default profile picture if it doesn't exist
+        profile_picture = core_models.ProfilePicture.objects.create(
+            user_id=pk,
+            profile_id=pk
+        )
+        logger.info(f"Created default profile picture for user {pk}")
+
     if request.method == 'POST' and form.is_valid():
         form.save()
         logger.info(f"Profile updated for user {pk}")
@@ -551,7 +562,8 @@ def profile_update(request, pk):
 
     context = {
         'profileform': form,
-        'instance': instance
+        'instance': instance,
+        'profile_picture': profile_picture
     }
     return render(request, 'core/profile_update.html', context)
 
@@ -620,7 +632,7 @@ def profile_picture_update(request):
                     logger.error(f"Error processing image for user {request.user.id}: {str(e)}")
                     messages.warning(request, "Profile picture uploaded but image processing had issues.")
 
-                return redirect("core:profile_view")
+                return redirect("core:profile_update", pk=request.user.id)
             except Exception as e:
                 logger.error(f"Error saving profile picture for user {request.user.id}: {str(e)}")
                 messages.error(request, "An error occurred while saving the profile picture.")

@@ -72,10 +72,7 @@ def wf_dashboard(request):
 
 
 # Orders section  ------------------------------------------------------------------------------------------------------
-
-
-
-
+@login_required(login_url='/accounts/login/')
 def all_orders(request):
     from django.db.models import Count
 
@@ -133,6 +130,7 @@ def all_orders(request):
 
 
 
+@login_required(login_url='/accounts/login/')
 def orders_to_publish(request):
     #orders = orders_models.Order.objects.filter(task_created = False).order_by('-created_at')
     orders = orders_models.Order.objects.filter(task_created = False).order_by('-created_at')
@@ -144,6 +142,7 @@ def orders_to_publish(request):
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
 
+@login_required(login_url='/accounts/login/')
 def orders_published(request):
     #orders = orders_models.Order.objects.filter(task_created = False).order_by('-created_at')
     orders = orders_models.Order.objects.filter(task_created = True).order_by('-created_at')
@@ -154,6 +153,7 @@ def orders_published(request):
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
+@login_required(login_url='/accounts/login/')
 def submit_to_task(request, order_id):
     """Submit order to delivery task - now uses verification workflow"""
     from django.utils import timezone
@@ -180,6 +180,7 @@ def submit_to_task(request, order_id):
     return redirect(reverse('workforce:all_orders'))
 
 
+@login_required(login_url='/accounts/login/')
 def verify_order_address(request, order_id):
     """Verify order address - workforce view"""
     from django.utils import timezone
@@ -275,6 +276,7 @@ def verify_order_address(request, order_id):
     return render(request, 'workforce/parts/verify_address.html', context)
 
 
+@login_required(login_url='/accounts/login/')
 def verify_order(request, order_id):
     """Verify order - workforce view"""
     from django.utils import timezone
@@ -320,6 +322,7 @@ def verify_order(request, order_id):
     return render(request, 'workforce/parts/verify_order.html', context)
 
 
+@login_required(login_url='/accounts/login/')
 def orders_pending_verification(request):
     """List orders pending verification"""
     verification_status = request.GET.get('verification_status', 'pending')
@@ -350,6 +353,7 @@ def orders_pending_verification(request):
 
 # Delivery Tasks section  ------------------------------------------------------------------------------------------------------
 
+@login_required(login_url='/accounts/login/')
 def dl_list_all(request):
     dl_tasks  = delivery_models.DeliveryTask.objects.all().order_by('-created_at')
     dl_tasks = paginate_queryset(request, dl_tasks)
@@ -359,6 +363,7 @@ def dl_list_all(request):
     return render(request, 'workforce/parts/lists/dl_list_all.html', data)
 
 
+@login_required(login_url='/accounts/login/')
 def dl_list_incompleted_details(request):
     orders  = orders_models.Order.objects.all().order_by('-created_at')
     orders = paginate_queryset(request, orders)
@@ -369,6 +374,7 @@ def dl_list_incompleted_details(request):
     return render(request, 'workforce/parts/lists/dl_list_incompleted.html', data)
 
 
+@login_required(login_url='/accounts/login/')
 def dl_list_published_to_dms(request):
     orders  = delivery_models.DeliveryTask.objects.filter().order_by('-created_at')
     orders = paginate_queryset(request, orders)
@@ -379,6 +385,7 @@ def dl_list_published_to_dms(request):
     return render(request, 'workforce/parts/lists/dl_list_all.html', data)
 
 
+@login_required(login_url='/accounts/login/')
 def dl_list_ready_to_published_to_dms(request):
     orders  = orders_models.Order.objects.filter(task_created = False).order_by('-created_at')
     orders = paginate_queryset(request, orders)

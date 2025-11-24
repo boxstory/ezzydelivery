@@ -101,6 +101,7 @@ def fleet_dashboard(request):
 # document---------------------------------------------------------------------------------------------------------------------
 
 
+@login_required(login_url='/accounts/login/')
 def driver_documents(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -117,6 +118,7 @@ def driver_documents(request):
     return render(request, 'fleet/parts/document_all.html', context)
 
 
+@login_required(login_url='/accounts/login/')
 def driver_documents_upload(request, fleet_id):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -143,6 +145,7 @@ def driver_documents_upload(request, fleet_id):
         return render(request, 'fleet/parts/document_add.html', context)
 
 
+@login_required(login_url='/accounts/login/')
 def driver_documents_update(request, fleet_id, doc_id):
     print('update', id)
     if fleet_id != request.user.id:
@@ -174,6 +177,7 @@ def driver_documents_update(request, fleet_id, doc_id):
     return render(request, 'fleet/parts/document_update.html', context)
 
 
+@login_required(login_url='/accounts/login/')
 def driver_documents_delete(request, fleet_id, doc_id):
     print('delete', id)
     if fleet_id != request.user.id:
@@ -193,6 +197,7 @@ def driver_documents_delete(request, fleet_id, doc_id):
 
 # vehicle---------------------------------------------------------------------------------------------------------------------
 
+@login_required(login_url='/accounts/login/')
 def vehicle_own(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -210,6 +215,7 @@ def vehicle_own(request):
     return render(request, 'fleet/parts/vehicle_own.html', context)
 
 
+@login_required(login_url='/accounts/login/')
 def vehicle_add(request):
     print('vehicle_add')
     driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -230,6 +236,7 @@ def vehicle_add(request):
     return render(request, 'fleet/parts/vehicle_add.html', context)
 
 
+@login_required(login_url='/accounts/login/')
 def vehicle_delete(request, fleet_id, vehicle_id):
     print('vehicle_delete', id)
     if fleet_id != request.user.id:
@@ -239,6 +246,7 @@ def vehicle_delete(request, fleet_id, vehicle_id):
     return redirect('/fleet/vehicle_own/')
 
 
+@login_required(login_url='/accounts/login/')
 def vehicle_update(request, vehicle_id):
     driver = fleet_models.Driver.objects.get(user_id=request.user.id)
     print('update_vehicle', driver.driver_id)
@@ -663,6 +671,7 @@ def driver_analytics(request):
 
 # Front end -------------------------------------------------------------------------------------------------------------------------------------------------
 
+@login_required(login_url='/accounts/login/')
 def driver_profile(request, fleet_id):
     try:
         driver = fleet_models.Driver.objects.get(driver_id=fleet_id)
