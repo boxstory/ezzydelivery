@@ -162,7 +162,7 @@
                 {% endif %}
             </div>
             <h1 id="socialaccount_login_title_main">
-                {% blocktrans with provider.name as provider_name %}
+                {% blocktrans with provider_name=provider.name %}
                 Sign In with {{ provider_name }}
                 {% endblocktrans %}
             </h1>
@@ -172,13 +172,13 @@
         <div class="auth-body" id="socialaccount_login_section_body">
             <div class="provider-info" id="socialaccount_login_provider_info">
                 <p>
-                    {% blocktrans with provider.name as provider_name site.name as site_name %}
-                    You will be redirected to {{ provider_name }} to sign in to {{ site_name }}.
+                    {% blocktrans with provider_name=provider.name %}
+                    You will be redirected to {{ provider_name }} to continue signing in.
                     {% endblocktrans %}
                 </p>
             </div>
 
-            <form method="post" action="{% url 'socialaccount_login' provider=provider.id %}">
+            <form method="post">
                 {% csrf_token %}
 
                 {% if process == "connect" %}
