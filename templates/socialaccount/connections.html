@@ -1,54 +1,312 @@
 {% extends "socialaccount/base.html" %}
-
 {% load i18n %}
+{% load static %}
 
 {% block head_title %}{% trans "Account Connections" %}{% endblock %}
 
-{% block content %}
-<h1 id="social_connections_title_main">{% trans "Account Connections" %}</h1>
+{% block extra_css %}
+<style>
+.auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--brand-grey-50) 0%, var(--brand-grey-100) 100%);
+    padding: 2rem 1rem;
+}
 
-{% if form.accounts %}
-<p id="social_connections_message_intro">{% blocktrans %}You can sign in to your account using any of the following third party accounts:{% endblocktrans %}</p>
+.auth-card {
+    background: var(--brand-white);
+    border-radius: var(--brand-radius-lg);
+    box-shadow: var(--brand-shadow-xl);
+    max-width: 600px;
+    width: 100%;
+    overflow: hidden;
+}
 
+.auth-header {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    color: var(--brand-grey-800);
+}
 
-<form id="social_connections_form_remove" method="post" action="{% url 'socialaccount_connections' %}">
-{% csrf_token %}
+.auth-logo {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1rem;
+    background: var(--brand-white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
 
-<fieldset>
-{% if form.non_field_errors %}
-<div id="social_connections_alert_error">{{ form.non_field_errors }}</div>
-{% endif %}
+.auth-logo i {
+    font-size: 2.5rem;
+    color: var(--brand-primary);
+}
 
-{% for base_account in form.accounts %}
-{% with base_account.get_provider_account as account %}
-<div>
-<label for="id_account_{{ base_account.id }}">
-<input id="id_account_{{ base_account.id }}" type="radio" name="account" value="{{ base_account.id }}"/>
-<span class="socialaccount_provider {{ base_account.provider }} {{ account.get_brand.id }}">{{account.get_brand.name}}</span>
-{{ account }}
-</label>
+.auth-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.auth-body {
+    padding: 2.5rem 2rem;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--brand-grey-800);
+    margin: 0 0 1rem;
+}
+
+.intro-message {
+    color: var(--brand-grey-600);
+    font-size: 0.9375rem;
+    margin-bottom: 1.5rem;
+}
+
+.account-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.5rem;
+}
+
+.account-item {
+    background: var(--brand-grey-50);
+    border: 2px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-sm);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    transition: var(--brand-transition);
+}
+
+.account-item:hover {
+    border-color: var(--brand-primary);
+    background: var(--brand-white);
+}
+
+.account-item input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    margin-right: 1rem;
+    cursor: pointer;
+}
+
+.account-item label {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    cursor: pointer;
+    margin: 0;
+}
+
+.provider-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--brand-white);
+    border-radius: var(--brand-radius-sm);
+    font-weight: 600;
+    margin-right: 0.75rem;
+}
+
+.provider-badge.google {
+    color: #DB4437;
+    border: 2px solid #DB4437;
+}
+
+.provider-badge.facebook {
+    color: #4267B2;
+    border: 2px solid #4267B2;
+}
+
+.btn-remove {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    background: #fee2e2;
+    color: #991b1b;
+    border: 2px solid #ff6b6b;
+    border-radius: var(--brand-radius-md);
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--brand-transition);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-remove:hover {
+    background: #fecaca;
+    transform: translateY(-2px);
+}
+
+.empty-message {
+    background: var(--brand-grey-50);
+    border-left: 4px solid var(--brand-primary);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    border-radius: var(--brand-radius-sm);
+    color: var(--brand-grey-700);
+}
+
+.divider {
+    height: 2px;
+    background: var(--brand-grey-200);
+    margin: 2rem 0;
+}
+
+.provider-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.social-btn {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 2px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm);
+    background: var(--brand-white);
+    color: var(--brand-grey-700);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    cursor: pointer;
+    transition: var(--brand-transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    text-decoration: none;
+}
+
+.social-btn:hover {
+    border-color: var(--brand-grey-400);
+    background: var(--brand-grey-50);
+    transform: translateY(-2px);
+}
+
+.social-btn i {
+    font-size: 1.25rem;
+}
+
+.social-btn.google i {
+    color: #DB4437;
+}
+
+.social-btn.facebook i {
+    color: #4267B2;
+}
+
+.error-alert {
+    background: #fee2e2;
+    border-left: 4px solid #ff6b6b;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    border-radius: var(--brand-radius-sm);
+    color: #991b1b;
+}
+
+@media (max-width: 576px) {
+    .auth-container {
+        padding: 1rem 0.5rem;
+    }
+
+    .auth-header {
+        padding: 2rem 1.5rem;
+    }
+
+    .auth-body {
+        padding: 2rem 1.5rem;
+    }
+
+    .auth-header h1 {
+        font-size: 1.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block account_content %}
+<div class="auth-container" id="social_connections_container_main">
+    <div class="auth-card" id="social_connections_card_main">
+        <div class="auth-header" id="social_connections_header">
+            <div class="auth-logo">
+                <i class="fa-solid fa-link"></i>
+            </div>
+            <h1 id="social_connections_title_main">{% trans "Account Connections" %}</h1>
+        </div>
+
+        <div class="auth-body" id="social_connections_section_body">
+            {% if form.accounts %}
+                <p class="intro-message" id="social_connections_message_intro">
+                    {% trans "You can sign in to your account using any of the following third party accounts:" %}
+                </p>
+
+                <form id="social_connections_form_remove" method="post" action="{% url 'socialaccount_connections' %}">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                        <div class="error-alert" id="social_connections_alert_error">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+
+                    <div class="account-list">
+                        {% for base_account in form.accounts %}
+                            {% with base_account.get_provider_account as account %}
+                                <div class="account-item">
+                                    <label for="id_account_{{ base_account.id }}">
+                                        <input id="id_account_{{ base_account.id }}" type="radio" name="account" value="{{ base_account.id }}"/>
+                                        <span class="provider-badge {{ base_account.provider }} {{ account.get_brand.id }}">
+                                            {% if base_account.provider == "google" %}
+                                                <i class="fa-brands fa-google"></i>
+                                            {% elif base_account.provider == "facebook" %}
+                                                <i class="fa-brands fa-facebook"></i>
+                                            {% endif %}
+                                            {{ account.get_brand.name }}
+                                        </span>
+                                        <span>{{ account }}</span>
+                                    </label>
+                                </div>
+                            {% endwith %}
+                        {% endfor %}
+                    </div>
+
+                    <button id="social_connections_btn_remove" type="submit" class="btn-remove">
+                        <i class="fa-solid fa-unlink me-2"></i>
+                        {% trans 'Remove Selected Account' %}
+                    </button>
+                </form>
+
+                <div class="divider"></div>
+            {% else %}
+                <p class="empty-message" id="social_connections_message_empty">
+                    {% trans 'You currently have no social network accounts connected to this account.' %}
+                </p>
+            {% endif %}
+
+            <h2 class="section-title" id="social_connections_title_add">
+                {% trans 'Add a 3rd Party Account' %}
+            </h2>
+
+            <ul class="provider-list" id="social_connections_list_providers">
+                {% include "socialaccount/snippets/provider_list.html" with process="connect" %}
+            </ul>
+
+            {% include "socialaccount/snippets/login_extra.html" %}
+        </div>
+    </div>
 </div>
-{% endwith %}
-{% endfor %}
-
-<div>
-<button id="social_connections_btn_remove" type="submit">{% trans 'Remove' %}</button>
-</div>
-
-</fieldset>
-
-</form>
-
-{% else %}
-<p id="social_connections_message_empty">{% trans 'You currently have no social network accounts connected to this account.' %}</p>
-{% endif %}
-
-<h2 id="social_connections_title_add">{% trans 'Add a 3rd Party Account' %}</h2>
-
-<ul class="socialaccount_providers" id="social_connections_list_providers">
-{% include "socialaccount/snippets/provider_list.html" with process="connect" %}
-</ul>
-
-{% include "socialaccount/snippets/login_extra.html" %}
-
 {% endblock %}

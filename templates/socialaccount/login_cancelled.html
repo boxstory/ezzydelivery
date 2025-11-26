@@ -1,15 +1,158 @@
 {% extends "socialaccount/base.html" %}
-
 {% load i18n %}
+{% load static %}
 
 {% block head_title %}{% trans "Login Cancelled" %}{% endblock %}
 
-{% block content %}
+{% block extra_css %}
+<style>
+.auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--brand-grey-50) 0%, var(--brand-grey-100) 100%);
+    padding: 2rem 1rem;
+}
 
-<h1 id="social_login_cancelled_title_main">{% trans "Login Cancelled" %}</h1>
+.auth-card {
+    background: var(--brand-white);
+    border-radius: var(--brand-radius-lg);
+    box-shadow: var(--brand-shadow-xl);
+    max-width: 480px;
+    width: 100%;
+    overflow: hidden;
+}
 
-{% url 'account_login' as login_url %}
+.auth-header {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    color: var(--brand-grey-800);
+}
 
-<p id="social_login_cancelled_message">{% blocktrans %}You decided to cancel logging in to our site using one of your existing accounts. If this was a mistake, please proceed to <a href="{{login_url}}">sign in</a>.{% endblocktrans %}</p>
+.auth-logo {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1rem;
+    background: var(--brand-white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
 
+.auth-logo i {
+    font-size: 2.5rem;
+    color: #f59e0b;
+}
+
+.auth-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.auth-body {
+    padding: 2.5rem 2rem;
+}
+
+.info-message {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    border-radius: var(--brand-radius-sm);
+}
+
+.info-message p {
+    margin: 0;
+    color: var(--brand-grey-800);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+}
+
+.info-message a {
+    color: #92400e;
+    font-weight: 700;
+    text-decoration: underline;
+}
+
+.info-message a:hover {
+    color: #78350f;
+}
+
+.btn-back {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    color: var(--brand-grey-800);
+    border: none;
+    border-radius: var(--brand-radius-md);
+    font-weight: 700;
+    font-size: 1.125rem;
+    cursor: pointer;
+    transition: var(--brand-transition);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+}
+
+.btn-back:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 211, 59, 0.4);
+    color: var(--brand-grey-900);
+}
+
+@media (max-width: 576px) {
+    .auth-container {
+        padding: 1rem 0.5rem;
+    }
+
+    .auth-header {
+        padding: 2rem 1.5rem;
+    }
+
+    .auth-body {
+        padding: 2rem 1.5rem;
+    }
+
+    .auth-header h1 {
+        font-size: 1.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block account_content %}
+<div class="auth-container" id="social_login_cancelled_container_main">
+    <div class="auth-card" id="social_login_cancelled_card_main">
+        <div class="auth-header" id="social_login_cancelled_header">
+            <div class="auth-logo">
+                <i class="fa-solid fa-ban"></i>
+            </div>
+            <h1 id="social_login_cancelled_title_main">{% trans "Login Cancelled" %}</h1>
+        </div>
+
+        <div class="auth-body" id="social_login_cancelled_section_body">
+            <div class="info-message" id="social_login_cancelled_message_container">
+                {% url 'account_login' as login_url %}
+                <p id="social_login_cancelled_message">
+                    {% blocktrans %}
+                    You cancelled the login process with your social account.
+                    If this was a mistake, please <a href="{{login_url}}">return to the sign in page</a> to try again.
+                    {% endblocktrans %}
+                </p>
+            </div>
+
+            <a href="{% url 'account_login' %}" class="btn-back">
+                <i class="fa-solid fa-arrow-left me-2"></i>
+                {% trans "Back to Sign In" %}
+            </a>
+        </div>
+    </div>
+</div>
 {% endblock %}
