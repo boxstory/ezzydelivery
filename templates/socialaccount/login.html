@@ -1,0 +1,205 @@
+{% extends "socialaccount/base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block head_title %}{% trans "Sign In" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+.auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--brand-grey-50) 0%, var(--brand-grey-100) 100%);
+    padding: 2rem 1rem;
+}
+
+.auth-card {
+    background: var(--brand-white);
+    border-radius: var(--brand-radius-lg);
+    box-shadow: var(--brand-shadow-xl);
+    max-width: 480px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.auth-header {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    color: var(--brand-grey-800);
+}
+
+.auth-logo {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1rem;
+    background: var(--brand-white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.auth-logo i {
+    font-size: 2.5rem;
+}
+
+.auth-logo i.fa-google {
+    color: #DB4437;
+}
+
+.auth-logo i.fa-facebook {
+    color: #4267B2;
+}
+
+.auth-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.auth-header p {
+    font-size: 0.9375rem;
+    margin: 0.5rem 0 0;
+    opacity: 0.9;
+}
+
+.auth-body {
+    padding: 2.5rem 2rem;
+}
+
+.provider-info {
+    background: var(--brand-grey-50);
+    border-left: 4px solid var(--brand-primary);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    border-radius: var(--brand-radius-sm);
+}
+
+.provider-info p {
+    margin: 0;
+    color: var(--brand-grey-700);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+}
+
+.btn-continue {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    color: var(--brand-grey-800);
+    border: none;
+    border-radius: var(--brand-radius-md);
+    font-weight: 700;
+    font-size: 1.125rem;
+    cursor: pointer;
+    transition: var(--brand-transition);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-continue:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 211, 59, 0.4);
+}
+
+.btn-cancel {
+    width: 100%;
+    padding: 1rem;
+    background: var(--brand-white);
+    color: var(--brand-grey-700);
+    border: 2px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-md);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--brand-transition);
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    margin-top: 0.75rem;
+}
+
+.btn-cancel:hover {
+    border-color: var(--brand-grey-400);
+    background: var(--brand-grey-50);
+}
+
+@media (max-width: 576px) {
+    .auth-container {
+        padding: 1rem 0.5rem;
+    }
+
+    .auth-header {
+        padding: 2rem 1.5rem;
+    }
+
+    .auth-body {
+        padding: 2rem 1.5rem;
+    }
+
+    .auth-header h1 {
+        font-size: 1.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block account_content %}
+<div class="auth-container" id="socialaccount_login_container_main">
+    <div class="auth-card" id="socialaccount_login_card_main">
+        <div class="auth-header" id="socialaccount_login_header">
+            <div class="auth-logo">
+                {% if provider.id == "google" %}
+                    <i class="fa-brands fa-google"></i>
+                {% elif provider.id == "facebook" %}
+                    <i class="fa-brands fa-facebook"></i>
+                {% else %}
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                {% endif %}
+            </div>
+            <h1 id="socialaccount_login_title_main">
+                {% blocktrans with provider.name as provider_name %}
+                Sign In with {{ provider_name }}
+                {% endblocktrans %}
+            </h1>
+            <p id="socialaccount_login_subtitle">{% trans "Continue to authenticate with your account" %}</p>
+        </div>
+
+        <div class="auth-body" id="socialaccount_login_section_body">
+            <div class="provider-info" id="socialaccount_login_provider_info">
+                <p>
+                    {% blocktrans with provider.name as provider_name site.name as site_name %}
+                    You will be redirected to {{ provider_name }} to sign in to {{ site_name }}.
+                    {% endblocktrans %}
+                </p>
+            </div>
+
+            <form method="post" action="{% url 'socialaccount_login' provider=provider.id %}">
+                {% csrf_token %}
+
+                {% if process == "connect" %}
+                    <input type="hidden" name="process" value="connect" />
+                {% endif %}
+
+                {% if next %}
+                    <input type="hidden" name="next" value="{{ next }}" />
+                {% endif %}
+
+                <button id="socialaccount_login_btn_submit" type="submit" class="btn-continue">
+                    <i class="fa-solid fa-arrow-right me-2"></i>
+                    {% trans "Continue" %}
+                </button>
+            </form>
+
+            <a href="{% url 'account_login' %}" class="btn-cancel">
+                <i class="fa-solid fa-xmark me-2"></i>
+                {% trans "Cancel" %}
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
