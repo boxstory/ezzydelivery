@@ -37,9 +37,9 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
 
-    # ... include the providers you want to enable:
-    # 'allauth.socialaccount.providers.google',
-    # 'allauth.socialaccount.providers.facebook',
+    # Social Auth Providers
+    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.facebook',
 
     'django.contrib.staticfiles',
     "debug_toolbar",
@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     # local apps
     'core',
     'webpages',
+    'blog',
     'client',
     'product',
     'fleet',
