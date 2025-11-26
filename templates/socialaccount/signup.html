@@ -1,22 +1,224 @@
 {% extends "socialaccount/base.html" %}
-
 {% load i18n %}
+{% load static %}
 
-{% block head_title %}{% trans "Signup" %}{% endblock %}
+{% block head_title %}{% trans "Complete Sign Up" %}{% endblock %}
 
-{% block content %}
-    <h1 id="social_signup_title_main">{% trans "Sign Up" %}</h1>
+{% block extra_css %}
+<style>
+.auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--brand-grey-50) 0%, var(--brand-grey-100) 100%);
+    padding: 2rem 1rem;
+}
 
-<p id="social_signup_message_intro">{% blocktrans with provider_name=account.get_provider.name site_name=site.name %}You are about to use your {{provider_name}} account to login to
-{{site_name}}. As a final step, please complete the following form:{% endblocktrans %}</p>
+.auth-card {
+    background: var(--brand-white);
+    border-radius: var(--brand-radius-lg);
+    box-shadow: var(--brand-shadow-xl);
+    max-width: 480px;
+    width: 100%;
+    overflow: hidden;
+}
 
-<form class="signup" id="social_signup_form_main" method="post" action="{% url 'socialaccount_signup' %}">
-  {% csrf_token %}
-  {{ form.as_p }}
-  {% if redirect_field_value %}
-  <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
-  {% endif %}
-  <button id="social_signup_btn_submit" type="submit">{% trans "Sign Up" %} &raquo;</button>
-</form>
+.auth-header {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    color: var(--brand-grey-800);
+}
 
+.auth-logo {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1rem;
+    background: var(--brand-white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.auth-logo i {
+    font-size: 2.5rem;
+    color: var(--brand-primary);
+}
+
+.auth-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.auth-header p {
+    font-size: 0.9375rem;
+    margin: 0.5rem 0 0;
+    opacity: 0.9;
+}
+
+.auth-body {
+    padding: 2.5rem 2rem;
+}
+
+.provider-info {
+    background: var(--brand-grey-50);
+    border-left: 4px solid var(--brand-primary);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    border-radius: var(--brand-radius-sm);
+}
+
+.provider-info p {
+    margin: 0;
+    color: var(--brand-grey-700);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+}
+
+.provider-name {
+    font-weight: 700;
+    color: var(--brand-primary);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    color: var(--brand-grey-700);
+    margin-bottom: 0.5rem;
+    font-size: 0.9375rem;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"] {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 2px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm);
+    font-size: 1rem;
+    transition: var(--brand-transition);
+    background: var(--brand-white);
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(255, 211, 59, 0.1);
+}
+
+.btn-signup {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    color: var(--brand-grey-800);
+    border: none;
+    border-radius: var(--brand-radius-md);
+    font-weight: 700;
+    font-size: 1.125rem;
+    cursor: pointer;
+    transition: var(--brand-transition);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-signup:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 211, 59, 0.4);
+}
+
+.errorlist {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
+}
+
+.errorlist li {
+    color: #ff6b6b;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+@media (max-width: 576px) {
+    .auth-container {
+        padding: 1rem 0.5rem;
+    }
+
+    .auth-header {
+        padding: 2rem 1.5rem;
+    }
+
+    .auth-body {
+        padding: 2rem 1.5rem;
+    }
+
+    .auth-header h1 {
+        font-size: 1.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block account_content %}
+<div class="auth-container" id="social_signup_container_main">
+    <div class="auth-card" id="social_signup_card_main">
+        <div class="auth-header" id="social_signup_header">
+            <div class="auth-logo">
+                <i class="fa-solid fa-user-plus"></i>
+            </div>
+            <h1 id="social_signup_title_main">{% trans "Complete Sign Up" %}</h1>
+            <p id="social_signup_subtitle">{% trans "One more step to get started" %}</p>
+        </div>
+
+        <div class="auth-body" id="social_signup_section_body">
+            <div class="provider-info" id="social_signup_provider_info">
+                <p>
+                    {% blocktrans with provider_name=account.get_provider.name site_name=site.name %}
+                    You are using your <span class="provider-name">{{ provider_name }}</span> account to sign up for {{ site_name }}.
+                    Please complete the form below to finish creating your account.
+                    {% endblocktrans %}
+                </p>
+            </div>
+
+            <form class="signup" id="social_signup_form_main" method="post" action="{% url 'socialaccount_signup' %}">
+                {% csrf_token %}
+
+                {% for field in form %}
+                <div class="form-group" id="social_signup_form_group_{{ field.name }}">
+                    <label for="{{ field.id_for_label }}">
+                        {{ field.label }}
+                    </label>
+                    {{ field }}
+                    {% if field.errors %}
+                        <ul class="errorlist">
+                            {% for error in field.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    {% if field.help_text %}
+                        <small class="form-text text-muted">{{ field.help_text }}</small>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+                {% if redirect_field_value %}
+                <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+                {% endif %}
+
+                <button id="social_signup_btn_submit" type="submit" class="btn-signup">
+                    <i class="fa-solid fa-user-check me-2"></i>
+                    {% trans "Complete Sign Up" %}
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
