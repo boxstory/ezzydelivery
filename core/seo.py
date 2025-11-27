@@ -525,3 +525,259 @@ def generate_json_ld_service(service_name, description, price_range=""):
             "priceRange": price_range
         }
     }
+
+
+# SEO Landing Pages Meta Functions (Based on Search Console Data)
+
+class SEOLandingPages:
+    """SEO metadata for high-conversion landing pages targeting Qatar keywords"""
+
+    @staticmethod
+    def get_delivery_companies_qatar_meta():
+        """Optimized for 'delivery companies in qatar' (443 impressions, pos 5.86)"""
+        return SEOMetadata.get_page_meta(
+            title="Best Delivery Companies in Qatar 2025 | Compare Courier Services Doha",
+            description=(
+                "Find the best delivery companies in Qatar for your business. Compare same-day delivery, "
+                "COD services, e-commerce fulfillment in Doha, Al Wakrah & Lusail. Ezzy Delivery - "
+                "Qatar's trusted logistics partner with 500+ satisfied businesses."
+            ),
+            keywords=[
+                "delivery companies in qatar",
+                "best delivery company qatar",
+                "courier companies qatar",
+                "delivery service providers doha",
+                "logistics companies qatar",
+                "delivery companies doha",
+                "qatar delivery services comparison",
+                "top courier companies qatar",
+            ],
+        )
+
+    @staticmethod
+    def get_delivery_service_qatar_meta():
+        """Optimized for 'delivery service in qatar' (103 impressions, pos 9.41)"""
+        return SEOMetadata.get_page_meta(
+            title="Professional Delivery Service in Qatar | Fast & Reliable Courier Doha",
+            description=(
+                "Expert delivery service in Qatar for businesses & individuals. Same-day delivery, "
+                "COD, real-time tracking across Doha, Al Wakrah, Lusail. Ezzy Delivery offers "
+                "affordable, reliable courier services in Qatar. Get instant quote!"
+            ),
+            keywords=[
+                "delivery service in qatar",
+                "qatar delivery service",
+                "delivery service qatar",
+                "courier service in qatar",
+                "delivery service doha",
+                "professional delivery qatar",
+                "reliable delivery service qatar",
+            ],
+        )
+
+    @staticmethod
+    def get_same_day_delivery_qatar_meta():
+        """Optimized for same-day delivery searches"""
+        return SEOMetadata.get_page_meta(
+            title="Same Day Delivery Qatar | Express Courier Service Doha in 24 Hours",
+            description=(
+                "Same day delivery in Qatar guaranteed! Order pickup and delivery within hours across Doha, "
+                "Al Wakrah, Lusail. Perfect for urgent deliveries, e-commerce orders, documents. "
+                "Ezzy Delivery - Fast, affordable same-day courier service in Qatar."
+            ),
+            keywords=[
+                "same day delivery qatar",
+                "same day delivery doha",
+                "express delivery qatar",
+                "urgent delivery qatar",
+                "24 hour delivery qatar",
+                "fast delivery service qatar",
+                "quick delivery doha",
+            ],
+        )
+
+    @staticmethod
+    def get_cod_delivery_qatar_meta():
+        """Optimized for COD service searches"""
+        return SEOMetadata.get_page_meta(
+            title="COD Delivery Service Qatar | Cash on Delivery Doha - Secure & Fast",
+            description=(
+                "Reliable COD (Cash on Delivery) service in Qatar. Perfect for online stores, Instagram sellers, "
+                "e-commerce businesses. Collect payments on delivery across all Qatar. Low fees, fast settlement, "
+                "real-time tracking. Trusted COD delivery partner in Doha."
+            ),
+            keywords=[
+                "COD service qatar",
+                "cash on delivery qatar",
+                "COD delivery doha",
+                "COD delivery service qatar",
+                "payment on delivery qatar",
+                "cash collection delivery qatar",
+                "cod courier service qatar",
+            ],
+        )
+
+    @staticmethod
+    def get_ecommerce_delivery_qatar_meta():
+        """Optimized for e-commerce delivery searches"""
+        return SEOMetadata.get_page_meta(
+            title="E-commerce Delivery Qatar | Online Store Shipping Solutions Doha",
+            description=(
+                "Complete e-commerce delivery solutions in Qatar. Shopify, WooCommerce, Instagram store integration. "
+                "Same-day delivery, COD, automated order sync, real-time tracking. Ezzy Delivery powers 500+ "
+                "online stores in Qatar. Start shipping smarter today!"
+            ),
+            keywords=[
+                "ecommerce delivery qatar",
+                "online store delivery qatar",
+                "shopify delivery qatar",
+                "woocommerce delivery qatar",
+                "ecommerce fulfillment qatar",
+                "online business delivery doha",
+                "ecommerce logistics qatar",
+            ],
+        )
+
+    @staticmethod
+    def get_instagram_sellers_delivery_meta():
+        """Optimized for Instagram sellers and social commerce"""
+        return SEOMetadata.get_page_meta(
+            title="Delivery Service for Instagram Sellers Qatar | Social Commerce Shipping Doha",
+            description=(
+                "Perfect delivery solution for Instagram sellers in Qatar! Easy order management, COD collection, "
+                "same-day delivery across Doha. No minimum orders, affordable rates, WhatsApp integration. "
+                "Join 200+ Instagram businesses using Ezzy Delivery Qatar."
+            ),
+            keywords=[
+                "instagram seller delivery qatar",
+                "social media seller delivery qatar",
+                "instagram business delivery doha",
+                "small business delivery qatar",
+                "home business delivery qatar",
+                "online seller delivery service qatar",
+            ],
+        )
+
+    @staticmethod
+    def get_express_delivery_qatar_meta():
+        """Optimized for express/urgent delivery searches"""
+        return SEOMetadata.get_page_meta(
+            title="Express Delivery Qatar | Urgent Courier Service Doha - 2 Hour Pickup",
+            description=(
+                "Express delivery in Qatar with 2-hour pickup guarantee. Urgent courier service for documents, "
+                "parcels, e-commerce orders across Doha, Al Wakrah, Lusail. Fast, reliable, tracked. "
+                "Ezzy Delivery - Qatar's fastest express courier service."
+            ),
+            keywords=[
+                "express delivery qatar",
+                "express courier qatar",
+                "urgent delivery doha",
+                "fast delivery service qatar",
+                "express shipping qatar",
+                "quick courier doha",
+                "rapid delivery qatar",
+            ],
+        )
+
+    @staticmethod
+    def get_courier_service_qatar_meta():
+        """Optimized for general courier service searches"""
+        return SEOMetadata.get_page_meta(
+            title="Courier Service Qatar | Professional Delivery Company Doha - Best Rates",
+            description=(
+                "Professional courier service in Qatar for businesses & individuals. Document delivery, parcel "
+                "shipping, e-commerce fulfillment across Doha, Lusail, Al Wakrah. Affordable rates, real-time "
+                "tracking, COD available. Trusted courier company in Qatar."
+            ),
+            keywords=[
+                "courier service qatar",
+                "courier company qatar",
+                "courier doha",
+                "parcel delivery qatar",
+                "document courier qatar",
+                "professional courier doha",
+                "courier service doha qatar",
+            ],
+        )
+
+    @staticmethod
+    def get_3pl_qatar_meta():
+        """Optimized for 3PL/third-party logistics searches"""
+        return SEOMetadata.get_page_meta(
+            title="3PL Qatar | Third Party Logistics & Fulfillment Services Doha",
+            description=(
+                "Complete 3PL solutions in Qatar. Warehousing, inventory management, order fulfillment, "
+                "distribution across Qatar. Third-party logistics partner for e-commerce & businesses in Doha. "
+                "Ezzy Delivery - Qatar's trusted 3PL provider."
+            ),
+            keywords=[
+                "3pl qatar",
+                "third party logistics qatar",
+                "3pl services doha",
+                "fulfillment center qatar",
+                "warehouse services qatar",
+                "logistics provider qatar",
+                "3pl company doha",
+            ],
+        )
+
+    @staticmethod
+    def get_last_mile_delivery_qatar_meta():
+        """Optimized for last mile delivery searches"""
+        return SEOMetadata.get_page_meta(
+            title="Last Mile Delivery Qatar | Final Mile Logistics Solutions Doha",
+            description=(
+                "Expert last mile delivery in Qatar. Final mile logistics for e-commerce, retail, B2B. "
+                "Same-day delivery, route optimization, real-time tracking across Doha, Lusail, Al Wakrah. "
+                "Ezzy Delivery - Optimizing last mile logistics in Qatar."
+            ),
+            keywords=[
+                "last mile delivery qatar",
+                "final mile delivery doha",
+                "last mile logistics qatar",
+                "last mile courier qatar",
+                "final mile solutions qatar",
+                "last mile delivery service doha",
+            ],
+        )
+
+    @staticmethod
+    def get_logistics_services_qatar_meta():
+        """Optimized for broad logistics services searches"""
+        return SEOMetadata.get_page_meta(
+            title="Logistics Services Qatar | Complete Supply Chain Solutions Doha",
+            description=(
+                "Comprehensive logistics services in Qatar. Delivery, warehousing, distribution, supply chain "
+                "management across Doha & all Qatar. B2B & B2C logistics solutions. Ezzy Delivery - "
+                "Your complete logistics partner in Qatar."
+            ),
+            keywords=[
+                "logistics services qatar",
+                "logistics company qatar",
+                "logistics doha",
+                "supply chain qatar",
+                "distribution services qatar",
+                "logistics provider doha",
+                "qatar logistics solutions",
+            ],
+        )
+
+    @staticmethod
+    def get_online_store_delivery_qatar_meta():
+        """Optimized for online store delivery searches"""
+        return SEOMetadata.get_page_meta(
+            title="Online Store Delivery Qatar | E-commerce Shipping Solutions Doha",
+            description=(
+                "Complete delivery solutions for online stores in Qatar. Shopify, WooCommerce, custom stores. "
+                "Same-day delivery, COD, order management, customer notifications. Power your online store "
+                "with Ezzy Delivery Qatar - 500+ stores trust us."
+            ),
+            keywords=[
+                "online store delivery qatar",
+                "online shop delivery doha",
+                "ecommerce shipping qatar",
+                "online business delivery qatar",
+                "webstore delivery doha",
+                "internet store delivery qatar",
+            ],
+        )

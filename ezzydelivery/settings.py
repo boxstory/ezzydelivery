@@ -73,7 +73,7 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 # SOCIALACCOUNT_PROVIDERS specific settings
-SITE_ID = 1
+SITE_ID = config('SITE_ID', default=1, cast=int)
 
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
@@ -116,7 +116,7 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-LOGIN_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
 LOGIN_URL = '/accounts/login/'
 

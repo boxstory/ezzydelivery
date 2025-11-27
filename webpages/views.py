@@ -439,3 +439,161 @@ def driver_guide(request):
         'seo': meta,
     }
     return render(request, 'webpages/driver_guide.html', data)
+
+
+# SEO Landing Pages Views (Based on Search Console Data)
+
+def delivery_companies_qatar(request):
+    """Landing page for 'delivery companies in qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_delivery_companies_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Best Delivery Companies in Qatar',
+        'hero_subtitle': 'Compare Top Courier Services in Doha, Al Wakrah & Lusail',
+    }
+    return render(request, 'webpages/seo/delivery_companies_qatar.html', data)
+
+
+def delivery_service_qatar(request):
+    """Landing page for 'delivery service in qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_delivery_service_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Professional Delivery Service in Qatar',
+        'hero_subtitle': 'Fast, Reliable & Affordable Courier Service Across All Qatar',
+    }
+    return render(request, 'webpages/seo/delivery_service_qatar.html', data)
+
+
+def same_day_delivery_qatar(request):
+    """Landing page for 'same day delivery qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_same_day_delivery_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Same Day Delivery Qatar',
+        'hero_subtitle': 'Express Courier Service - Pickup & Delivery Within Hours',
+    }
+    return render(request, 'webpages/seo/same_day_delivery_qatar.html', data)
+
+
+def cod_delivery_qatar(request):
+    """Landing page for 'COD service qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_cod_delivery_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'COD Delivery Service Qatar',
+        'hero_subtitle': 'Secure Cash on Delivery for Online Stores & E-commerce',
+    }
+    return render(request, 'webpages/seo/cod_delivery_qatar.html', data)
+
+
+def ecommerce_delivery_qatar(request):
+    """Landing page for 'ecommerce delivery qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_ecommerce_delivery_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'E-commerce Delivery Solutions Qatar',
+        'hero_subtitle': 'Complete Shipping Solutions for Online Stores in Doha',
+    }
+    return render(request, 'webpages/seo/ecommerce_delivery_qatar.html', data)
+
+
+def instagram_sellers_delivery(request):
+    """Landing page for Instagram sellers in Qatar"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_instagram_sellers_delivery_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Delivery Service for Instagram Sellers Qatar',
+        'hero_subtitle': 'Perfect Shipping Solution for Social Commerce & Small Businesses',
+    }
+    return render(request, 'webpages/seo/instagram_sellers_delivery.html', data)
+
+
+def express_delivery_qatar(request):
+    """Landing page for 'express delivery qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_express_delivery_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Express Delivery Qatar',
+        'hero_subtitle': 'Urgent Courier Service - 2 Hour Pickup Guarantee',
+    }
+    return render(request, 'webpages/seo/express_delivery_qatar.html', data)
+
+
+def courier_service_qatar(request):
+    """Landing page for 'courier service qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_courier_service_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Courier Service Qatar',
+        'hero_subtitle': 'Professional Courier & Logistics Solutions Across Qatar',
+    }
+    return render(request, 'webpages/seo/courier_service_qatar.html', data)
+
+
+def three_pl_qatar(request):
+    """Landing page for '3pl qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_3pl_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': '3PL Services Qatar',
+        'hero_subtitle': 'Third Party Logistics & Fulfillment Solutions for E-commerce',
+    }
+    return render(request, 'webpages/seo/3pl_qatar.html', data)
+
+
+def last_mile_delivery_qatar(request):
+    """Landing page for 'last mile delivery qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_last_mile_delivery_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Last Mile Delivery Qatar',
+        'hero_subtitle': 'Efficient Final-Mile Logistics for E-commerce & Businesses',
+    }
+    return render(request, 'webpages/seo/last_mile_delivery_qatar.html', data)
+
+
+def logistics_services_qatar(request):
+    """Landing page for 'logistics services qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_logistics_services_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Logistics Services Qatar',
+        'hero_subtitle': 'Complete Supply Chain & Delivery Solutions in Doha',
+    }
+    return render(request, 'webpages/seo/logistics_services_qatar.html', data)
+
+
+def online_store_delivery_qatar(request):
+    """Landing page for 'online store delivery qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_online_store_delivery_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Online Store Delivery Qatar',
+        'hero_subtitle': 'Reliable Shipping Partner for Your Online Business',
+    }
+    return render(request, 'webpages/seo/online_store_delivery_qatar.html', data)

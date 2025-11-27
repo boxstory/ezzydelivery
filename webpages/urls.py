@@ -37,6 +37,22 @@ urlpatterns = [
     path('help/guides/client/', webpages_views.client_guide, name='client_guide'),
     path('help/guides/driver/', webpages_views.driver_guide, name='driver_guide'),
 
+    # SEO Landing Pages (Based on Search Console Analysis)
+    path('delivery-companies-in-qatar/', webpages_views.delivery_companies_qatar, name='delivery_companies_qatar'),
+    path('delivery-service-in-qatar/', webpages_views.delivery_service_qatar, name='delivery_service_qatar'),
+    path('same-day-delivery-qatar/', webpages_views.same_day_delivery_qatar, name='same_day_delivery_qatar'),
+    path('cod-delivery-service-qatar/', webpages_views.cod_delivery_qatar, name='cod_delivery_qatar'),
+    path('ecommerce-delivery-qatar/', webpages_views.ecommerce_delivery_qatar, name='ecommerce_delivery_qatar'),
+    path('instagram-sellers-delivery-qatar/', webpages_views.instagram_sellers_delivery, name='instagram_sellers_delivery'),
+
+    # Additional SEO Landing Pages (Expanded Keywords)
+    path('express-delivery-qatar/', webpages_views.express_delivery_qatar, name='express_delivery_qatar'),
+    path('courier-service-qatar/', webpages_views.courier_service_qatar, name='courier_service_qatar'),
+    path('3pl-qatar/', webpages_views.three_pl_qatar, name='three_pl_qatar'),
+    path('last-mile-delivery-qatar/', webpages_views.last_mile_delivery_qatar, name='last_mile_delivery_qatar'),
+    path('logistics-services-qatar/', webpages_views.logistics_services_qatar, name='logistics_services_qatar'),
+    path('online-store-delivery-qatar/', webpages_views.online_store_delivery_qatar, name='online_store_delivery_qatar'),
+
     path('test/', webpages_views.test, name='test'),
     path('500/', TemplateView.as_view(template_name='page_not_found.html')),
 
