@@ -14,7 +14,7 @@ urlpatterns = [
     path('profile/<int:pk>/review/', core_views.profile_completion_test,
          name='profile_completion_test'),
     path('profile/<int:pk>/update/',
-         core_views.profile_update, name='profile_update'),
+         core_views.profile_update_redirect, name='profile_update'),
     path('profile/add/',
          core_views.profile_add, name='profile_add'),
      path('profile/photo/update/',

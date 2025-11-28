@@ -554,45 +554,10 @@ def profile_add(request):
 
 
 @login_required(login_url='/accounts/login/')
-def profile_update(request, pk):
-    """Update user profile"""
-    instance = get_object_or_404(core_models.Profile, user_id=pk)
-    form = core_forms.ProfileForm(request.POST or None, instance=instance)
-    form.fields['first_name'].widget.attrs['value'] = request.user.first_name or None
-    form.fields['last_name'].widget.attrs['value'] = request.user.last_name
-    form.fields['email'].widget.attrs['value'] = request.user.email
-
-    # Get or create profile picture
-    try:
-        profile_picture = core_models.ProfilePicture.objects.get(user_id=pk)
-    except core_models.ProfilePicture.DoesNotExist:
-        # Create default profile picture if it doesn't exist
-        profile_picture = core_models.ProfilePicture.objects.create(
-            user_id=pk,
-            profile_id=pk
-        )
-        logger.info(f"Created default profile picture for user {pk}")
-
-    if request.method == 'POST' and form.is_valid():
-        form.save()
-        logger.info(f"Profile updated for user {pk}")
-        messages.success(request, 'Your profile has been updated!')
-        return redirect('core:profile', pk=pk)
-    elif request.method == 'POST':
-        logger.warning(f"Invalid profile update form for user {pk}")
-        messages.error(request, "Please correct the errors below.")
-
-    # Calculate completion percentage
-    completion_percentage = instance.get_profile_completion_percentage()
-
-    context = {
-        'profileform': form,
-        'instance': instance,
-        'profile': instance,
-        'profile_picture': profile_picture,
-        'completion_percentage': completion_percentage
-    }
-    return render(request, 'core/profile_update.html', context)
+def profile_update_redirect(request, pk):
+    """Redirect old profile update URL to new profile complete update page"""
+    logger.info(f"Redirecting user {pk} from old profile_update to profile_complete_update")
+    return redirect('core:profile_complete_update')
 
 
 @login_required(login_url='/accounts/login/')
@@ -659,7 +624,7 @@ def profile_picture_update(request):
                     logger.error(f"Error processing image for user {request.user.id}: {str(e)}")
                     messages.warning(request, "Profile picture uploaded but image processing had issues.")
 
-                return redirect("core:profile_update", pk=request.user.id)
+                return redirect("core:profile_complete_update")
             except Exception as e:
                 logger.error(f"Error saving profile picture for user {request.user.id}: {str(e)}")
                 messages.error(request, "An error occurred while saving the profile picture.")
