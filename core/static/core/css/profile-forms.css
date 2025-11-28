@@ -3,162 +3,425 @@
    Using Brand Kit Reference
    =============================== */
 
-/* Completion Container */
-.completion-container {
-    max-width: 800px;
-    margin: var(--spacing-xl) auto;
-    padding: 0 var(--spacing-md);
+/* Section Background */
+#core_profile_add_section_main,
+#core_profile_update_section_main {
+    background: linear-gradient(180deg, var(--brand-grey-50) 0%, var(--brand-grey-100) 100%);
+    min-height: 100vh;
+    padding: 2rem 0;
 }
 
-/* Completion Header with Gradient */
-.completion-header {
-    background: var(--brand-gradient-black-navy);
-    color: var(--brand-white);
-    padding: var(--spacing-xl);
-    border-radius: var(--brand-radius-lg) var(--brand-radius-lg) 0 0;
-    text-align: center;
+#core_profile_update_section_main {
+    min-height: auto;
 }
 
-/* Completion Circle Progress */
-.completion-circle {
-    width: 120px;
-    height: 120px;
-    margin: 0 auto var(--spacing-md);
-    position: relative;
-}
-
-.completion-circle svg {
-    transform: rotate(-90deg);
-}
-
-.completion-circle circle {
-    fill: none;
-    stroke-width: 8;
-}
-
-.circle-bg {
-    stroke: rgba(255, 255, 255, 0.2);
-}
-
-.circle-progress {
-    stroke: #4ade80;
-    stroke-linecap: round;
-    transition: stroke-dashoffset 0.5s ease;
-}
-
-.completion-text {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: var(--brand-font-size-2xl);
-    font-weight: var(--brand-font-weight-heavy);
-    color: var(--brand-white);
-}
-
-/* Form Card */
-.form-card {
-    background: var(--brand-white);
-    border-radius: 0 0 var(--brand-radius-lg) var(--brand-radius-lg);
-    padding: var(--spacing-xl);
-    box-shadow: var(--brand-shadow-lg);
-}
-
-/* Form Group */
-.form-group {
-    margin-bottom: var(--spacing-lg);
-}
-
-/* Form Label */
-.form-label {
-    font-weight: var(--brand-font-weight-bold);
-    color: var(--brand-grey-700);
-    margin-bottom: var(--spacing-sm);
-    display: block;
-}
-
-/* Form Control */
+/* Form Controls - Base Styling */
 .form-control {
-    border-radius: var(--brand-radius-sm);
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: var(--brand-font-size-base);
+    line-height: 1.5;
+    color: var(--brand-grey-800);
+    background-color: var(--brand-white);
+    background-clip: padding-box;
     border: 2px solid var(--brand-grey-200);
-    padding: 0.75rem var(--spacing-md);
+    border-radius: var(--brand-radius-md);
     transition: var(--brand-transition);
 }
 
 .form-control:focus {
-    border-color: var(--gradient-purple-primary);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    color: var(--brand-grey-900);
+    background-color: var(--brand-white);
+    border-color: var(--brand-primary);
+    outline: 0;
+    box-shadow: 0 0 0 4px rgba(255, 211, 59, 0.2);
 }
 
-/* Disabled and Readonly Inputs */
-input[readonly],
-input:disabled {
-    background-color: var(--brand-grey-100) !important;
-    cursor: not-allowed;
+.form-control:disabled,
+.form-control[readonly] {
+    background-color: var(--brand-grey-100);
     opacity: 0.7;
+    cursor: not-allowed;
 }
 
-/* Action Buttons */
-.btn-action {
-    padding: 0.75rem var(--spacing-xl);
-    border-radius: var(--brand-radius-sm);
-    font-weight: var(--brand-font-weight-bold);
-    transition: var(--brand-transition);
-    border: none;
+/* Form Group Spacing */
+#core_profile_add_form_main .row,
+#core_profile_update_form_main .row {
+    margin-bottom: var(--spacing-md);
 }
 
-.btn-save {
-    background: var(--brand-gradient-yellow-white);
-    color: var(--gradient-purple-primary);
+#core_profile_add_form_main .row:last-child,
+#core_profile_update_form_main .row:last-child {
+    margin-bottom: 0;
 }
 
-.btn-save:hover {
-    background: var(--brand-gradient-black-navy);
+/* Label Styling */
+#core_profile_add_card_info .col-sm-3 p,
+#core_profile_update_card_info .col-sm-3 p {
+    font-weight: var(--brand-font-weight-semibold);
+    color: var(--brand-grey-700);
+    margin-bottom: 0;
+    font-size: var(--brand-font-size-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Form Field Containers */
+#core_profile_add_card_info .text-muted,
+#core_profile_update_card_info .text-muted {
+    color: var(--brand-grey-800) !important;
+}
+
+#core_profile_add_card_info p.text-muted,
+#core_profile_update_card_info p.text-muted {
+    margin-bottom: 0;
+}
+
+/* Crispy Forms Compatibility */
+.form-group {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: none; /* Hide crispy form labels as we have custom labels */
+}
+
+/* Input Styling for All Field Types */
+input[type="date"].form-control,
+input[type="text"].form-control,
+input[type="email"].form-control,
+input[type="tel"].form-control,
+input[type="number"].form-control,
+textarea.form-control,
+select.form-control {
+    display: block;
+    width: 100%;
+}
+
+/* Select Dropdown Styling */
+select.form-control {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right var(--spacing-md) center;
+    background-size: 16px 12px;
+    padding-right: 2.5rem;
+}
+
+/* Date Input Styling - Enhanced UI */
+input[type="date"].form-control {
+    position: relative;
+    padding-right: 3rem;
+    cursor: pointer;
+    background-color: var(--brand-white);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='16' y1='2' x2='16' y2='6'%3E%3C/line%3E%3Cline x1='8' y1='2' x2='8' y2='6'%3E%3C/line%3E%3Cline x1='3' y1='10' x2='21' y2='10'%3E%3C/line%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1.25rem;
+}
+
+input[type="date"].form-control:focus {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f7c000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='16' y1='2' x2='16' y2='6'%3E%3C/line%3E%3Cline x1='8' y1='2' x2='8' y2='6'%3E%3C/line%3E%3Cline x1='3' y1='10' x2='21' y2='10'%3E%3C/line%3E%3C/svg%3E");
+}
+
+input[type="date"].form-control:hover {
+    border-color: var(--brand-grey-400);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='16' y1='2' x2='16' y2='6'%3E%3C/line%3E%3Cline x1='8' y1='2' x2='8' y2='6'%3E%3C/line%3E%3Cline x1='3' y1='10' x2='21' y2='10'%3E%3C/line%3E%3C/svg%3E");
+}
+
+/* Hide Default Calendar Icon */
+input[type="date"].form-control::-webkit-calendar-picker-indicator {
+    position: absolute;
+    right: 0;
+    width: 3rem;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+/* Date Input - Remove Clear Button */
+input[type="date"].form-control::-webkit-clear-button {
+    display: none;
+}
+
+/* Date Input Placeholder Styling */
+input[type="date"].form-control:invalid {
+    color: var(--brand-grey-500);
+}
+
+/* Date Input with Value */
+input[type="date"].form-control:valid {
+    color: var(--brand-grey-800);
+    font-weight: var(--brand-font-weight-medium);
+}
+
+/* Firefox Date Input Styling */
+input[type="date"].form-control::-moz-focus-inner {
+    border: 0;
+}
+
+/* Error Styling */
+.alert-danger {
+    padding: var(--spacing-md) var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    border: 2px solid transparent;
+    border-radius: var(--brand-radius-md);
+    color: #721c24;
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    border-color: #ef4444;
+    font-weight: var(--brand-font-weight-medium);
+}
+
+.alert-danger ul {
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+/* Submit Buttons */
+#core_profile_add_btn_submit,
+#core_profile_update_btn_submit {
+    padding: var(--spacing-md) var(--spacing-2xl);
+    font-size: var(--brand-font-size-base);
+    font-weight: var(--brand-font-weight-heavy);
+    border-radius: var(--brand-radius-md);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    border: 2px solid transparent;
+    color: var(--brand-grey-800);
+    transition: all 0.3s ease;
+    box-shadow: var(--brand-shadow-lg);
+}
+
+#core_profile_add_btn_submit:hover,
+#core_profile_update_btn_submit:hover {
     transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(255, 211, 59, 0.5);
+    background: linear-gradient(135deg, var(--brand-primary-dark) 0%, var(--brand-primary) 100%);
+    color: var(--brand-grey-900);
+}
+
+/* Card Styling - Profile Info */
+#core_profile_add_card_info,
+#core_profile_update_card_info {
+    border: none;
+    border-radius: var(--brand-radius-xl);
+    box-shadow: var(--brand-shadow-lg);
+    background: var(--brand-white);
+}
+
+#core_profile_add_card_info .card-body,
+#core_profile_update_card_info .card-body {
+    padding: var(--spacing-2xl);
+}
+
+/* Horizontal Rule Styling */
+#core_profile_add_card_info hr,
+#core_profile_update_card_info hr {
+    margin: var(--spacing-lg) 0;
+    border: 0;
+    border-top: 2px solid var(--brand-grey-100);
+}
+
+/* Profile Picture Card */
+#core_profile_add_card_picture,
+#core_profile_update_card_picture {
+    border: none;
+    border-radius: var(--brand-radius-xl);
+    box-shadow: var(--brand-shadow-lg);
+    background: var(--brand-white);
+}
+
+#core_profile_add_card_picture .card-body,
+#core_profile_update_card_picture .card-body {
+    padding: var(--spacing-2xl);
+}
+
+/* Profile Picture Image */
+#core_profile_add_card_picture img,
+#core_profile_update_card_picture img {
+    border: 6px solid var(--brand-grey-100);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    transition: var(--brand-transition);
+}
+
+#core_profile_add_card_picture img:hover,
+#core_profile_update_card_picture img:hover {
+    transform: scale(1.02);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+}
+
+/* Profile Picture Update Section (Update Page Only) */
+#core_profile_container_picture_update {
+    max-width: 300px;
+    margin: var(--spacing-lg) auto 0;
+}
+
+#core_profile_input_picture {
+    font-size: var(--brand-font-size-sm);
+    padding: var(--spacing-md);
+    border: 3px dashed var(--brand-grey-300);
+    border-radius: var(--brand-radius-md);
+    background-color: var(--brand-grey-50);
+    cursor: pointer;
+    transition: var(--brand-transition);
+}
+
+#core_profile_input_picture:hover {
+    border-color: var(--brand-primary);
+    background-color: var(--brand-white);
+    box-shadow: var(--brand-shadow-sm);
+}
+
+#core_profile_input_picture:focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 4px rgba(255, 211, 59, 0.2);
+    background-color: var(--brand-white);
+    outline: none;
+}
+
+#core_profile_btn_picture_update {
+    font-weight: var(--brand-font-weight-heavy);
+    transition: all 0.3s ease;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    border: 2px solid transparent;
+    color: var(--brand-grey-800);
+    padding: var(--spacing-md) var(--spacing-xl);
+    border-radius: var(--brand-radius-md);
+    box-shadow: var(--brand-shadow-lg);
+}
+
+#core_profile_btn_picture_update:hover {
+    background: linear-gradient(135deg, var(--brand-primary-dark) 0%, var(--brand-primary) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(255, 211, 59, 0.4);
+    color: var(--brand-grey-900);
+}
+
+/* Dashboard Buttons */
+.btn-dark {
+    background: linear-gradient(135deg, var(--brand-grey-800) 0%, var(--brand-grey-700) 100%);
+    border: 2px solid transparent;
+    color: var(--brand-white);
+    font-weight: var(--brand-font-weight-heavy);
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border-radius: var(--brand-radius-md);
+    transition: all 0.3s ease;
+    box-shadow: var(--brand-shadow-lg);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: var(--brand-font-size-sm);
+}
+
+.btn-dark:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, var(--brand-grey-700) 0%, var(--brand-grey-600) 100%);
     color: var(--brand-white);
 }
 
-.btn-register {
-    background: var(--brand-gradient-yellow-white);
+.btn-outline-dark {
+    background: var(--brand-white);
+    border: 2px solid var(--brand-grey-700);
+    color: var(--brand-grey-700);
+    font-weight: var(--brand-font-weight-heavy);
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border-radius: var(--brand-radius-md);
+    transition: all 0.3s ease;
+    box-shadow: var(--brand-shadow-sm);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: var(--brand-font-size-sm);
+}
+
+.btn-outline-dark:hover {
+    background: linear-gradient(135deg, var(--brand-grey-800) 0%, var(--brand-grey-700) 100%);
+    color: var(--brand-white);
+    border-color: transparent;
+    transform: translateY(-2px);
+    box-shadow: var(--brand-shadow-lg);
+}
+
+/* Social Media Icons */
+#core_profile_add_card_picture .fa-brands,
+#core_profile_update_card_picture .fa-brands {
+    transition: all 0.3s ease;
     color: var(--brand-grey-700);
 }
 
-.btn-register:hover {
-    background: var(--brand-gradient-black-navy);
-    transform: translateY(-2px);
-    color: var(--brand-white);
+#core_profile_add_card_picture .fa-facebook:hover,
+#core_profile_update_card_picture .fa-facebook:hover {
+    color: #1877f2;
+    transform: translateY(-4px) scale(1.1);
 }
 
-.btn-register:disabled {
-    background: var(--brand-grey-500);
-    cursor: not-allowed;
-    transform: none;
+#core_profile_add_card_picture .fa-whatsapp:hover,
+#core_profile_update_card_picture .fa-whatsapp:hover {
+    color: #25d366;
+    transform: translateY(-4px) scale(1.1);
 }
 
-/* Alert Messages */
-.info-alert {
-    background: #dbeafe;
-    border-left: 4px solid var(--status-info);
+#core_profile_add_card_picture .fa-instagram:hover,
+#core_profile_update_card_picture .fa-instagram:hover {
+    color: #e4405f;
+    transform: translateY(-4px) scale(1.1);
+}
+
+/* Profile Picture Upload Styling (Add Page) */
+#core_profile_add_card_picture .text-muted {
+    background: var(--brand-grey-50);
+    border: 3px dashed var(--brand-grey-300);
+    border-radius: var(--brand-radius-md);
     padding: var(--spacing-md);
-    border-radius: var(--brand-radius-sm);
-    margin-bottom: var(--spacing-lg);
+    transition: var(--brand-transition);
 }
 
-.warning-alert {
-    background: #fef3c7;
-    border-left: 4px solid var(--status-warning);
-    padding: var(--spacing-md);
-    border-radius: var(--brand-radius-sm);
-    margin-bottom: var(--spacing-lg);
+#core_profile_add_card_picture .text-muted:hover {
+    border-color: var(--brand-primary);
+    background: var(--brand-white);
+    box-shadow: var(--brand-shadow-sm);
 }
 
-/* Role Selection Buttons */
-.role-selection {
-    display: flex;
-    gap: var(--spacing-md);
-     
-}
+/* Responsive Adjustments */
+@media (max-width: 576px) {
+    #core_profile_add_section_main {
+        padding: 1rem 0;
+    }
 
-.role-selection .btn {
-    flex: 1;
+    #core_profile_add_card_info .row,
+    #core_profile_update_card_info .row {
+        flex-direction: column;
+    }
+
+    #core_profile_add_card_info .col-sm-3,
+    #core_profile_add_card_info .col-sm-4,
+    #core_profile_add_card_info .col-sm-5,
+    #core_profile_add_card_info .col-sm-9,
+    #core_profile_update_card_info .col-sm-3,
+    #core_profile_update_card_info .col-sm-4,
+    #core_profile_update_card_info .col-sm-5,
+    #core_profile_update_card_info .col-sm-9 {
+        max-width: 100%;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    #core_profile_add_card_info .col-sm-3 p,
+    #core_profile_update_card_info .col-sm-3 p {
+        margin-bottom: 0.5rem;
+    }
+
+    #core_profile_add_card_picture .card-body,
+    #core_profile_add_card_info .card-body {
+        padding: var(--spacing-lg);
+    }
+
+    #core_profile_container_picture_update {
+        max-width: 100%;
+        padding: 0 1rem;
+    }
+
+    .d-grid.col-6 {
+        max-width: 100% !important;
+    }
 }
