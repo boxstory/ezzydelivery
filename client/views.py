@@ -359,44 +359,50 @@ def all_business(request):
 
 @login_required(login_url='/accounts/login/')
 def business_profile_update(request, business_id):
-    print('business_profile_update')
-    print('request.user.id', request.user.id)
-    print('business_id', business_id)
+    # Check if user has a profile
+    try:
+        profile = core_models.Profile.objects.get(user_id=request.user.id)
+    except core_models.Profile.DoesNotExist:
+        messages.warning(request, "Please complete your profile first.")
+        return redirect('core:profile_add')
+
+    # Check if user is a business user
+    if not profile.is_business:
+        messages.warning(request, "You need to register as a business first.")
+        return redirect('core:join_us')
+
+    # Check if business profile is completed
+    if not profile.is_business_profile_completed:
+        messages.warning(request, "Please complete your business registration first.")
+        return redirect('core:business_register')
+
+    # Verify user owns this business
+    if not request.user.user_business.exists():
+        messages.error(request, "No business found for your account.")
+        return redirect('core:business_register')
+
     if request.user.user_business.first().business_id == business_id:
-        print(':matched')
-        redirect('core:main_dashboard')
-        print('business_profile_update', business_id)
-        print('request.user.id', request.user.id)
-        business =  business_models.Business.objects.get(
-        business_id=request.user.user_business.first().business_id)
-        print('business', business)
-        print('business.business_id', business.business_id)
+        business = business_models.Business.objects.get(
+            business_id=request.user.user_business.first().business_id)
         form = business_forms.businessRegisterForm(instance=business)
-        print('form')
+
         if request.method == 'POST':
-            print('businessRegisterForm')
             form = business_forms.businessRegisterForm(
                 request.POST, request.FILES, instance=business)
             if form.is_valid():
-                f = form.save(commit=False)
-                print('f.user')
-
-                print(f.user)
-
                 form.save()
-                print('ok')
-                messages.success(request, "Successful Submission")
+                messages.success(request, "Business profile updated successfully!")
                 return redirect("business:business_dashboard")
             else:
-                print('driver_directory_add not valid')
-                messages.error(request, "Error")
+                messages.error(request, "Please correct the errors below.")
+
         context = {
             'form': form,
             'business_id': business.business_id
         }
-
         return render(request, 'client/frontend/business_profile_update.html', context)
     else:
+        messages.error(request, "You don't have permission to edit this business.")
         return redirect("business:business_dashboard")
 
 
