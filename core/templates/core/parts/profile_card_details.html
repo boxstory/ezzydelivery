@@ -1,0 +1,138 @@
+{% load static %}
+{#
+    Reusable Profile Card Component
+
+    Parameters:
+    - card_id: Unique ID for the card (e.g., 'core_profile_add_card_picture')
+    - profile_picture_url: URL to the profile picture (default: '/media/core/user/avatar.png')
+    - show_upload_form: Boolean to show the profile picture upload form (default: False)
+    - upload_form_action: Action URL for the upload form (required if show_upload_form=True)
+    - profile: Profile object (optional, for conditional dashboard links)
+    - show_dashboard_button: Boolean to show dashboard button (default: True)
+    - dashboard_url: Custom dashboard URL (optional)
+    - extra_content: Slot for additional content below the image (optional)
+#}
+
+<div class="col-lg-4">
+    <div class="card mb-4" id="{{ card_id|default:'profile_card' }}">
+        <div class="card-body text-center">
+            {# Profile Picture #}
+            <img src="{{ profile_picture_url|default:'/media/core/user/avatar.png' }}"
+                 alt="avatar"
+                 class="rounded-circle img-fluid"
+                 style="width: 180px">
+
+            {# Extra Content Slot (for name, zone, etc.) #}
+            {% if extra_content %}
+                {{ extra_content|safe }}
+            {% endif %}
+
+            {# Profile Picture Upload Form (for update page) #}
+            {% if show_upload_form %}
+                <div class="mt-3" id="core_profile_container_picture_update">
+                    <form id="core_profile_form_picture_update"
+                          method="post"
+                          action="{{ upload_form_action }}"
+                          enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-2">
+                            <input class="form-control"
+                                   type="file"
+                                   name="profile_picture"
+                                   id="core_profile_input_picture"
+                                   accept="image/*">
+                        </div>
+                        <div class="mb-3">
+                            <button id="core_profile_btn_picture_update"
+                                    type="submit"
+                                    class="btn btn-dark w-100">
+                                Update Photo
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            {% endif %}
+
+            {# Profile Picture Upload Placeholder (for add page) #}
+            {% if show_upload_placeholder %}
+                <div class="text-muted my-2 col-10 d-inline-block px-2">
+                    {{ upload_field|safe }}
+                </div>
+            {% endif %}
+
+            {# Dashboard Buttons #}
+            {% if show_dashboard_button %}
+                <div class="d-flex justify-content-center mb-2">
+                    {% if dashboard_url %}
+                        {# Custom dashboard URL provided #}
+                        <a type="button"
+                           class="btn btn-dark"
+                           href="{{ dashboard_url }}"
+                           id="{{ card_id }}_btn_dashboard">
+                            DASHBOARD
+                        </a>
+                    {% elif profile %}
+                        {# Profile object provided - use conditional logic #}
+                        {% if profile.is_business %}
+                            <a type="button"
+                               class="btn btn-dark"
+                               href="{% url 'client:business_dashboard' %}"
+                               id="{{ card_id }}_btn_dashboard_business">
+                                DASHBOARD
+                            </a>
+                        {% elif profile.is_driver %}
+                            <a type="button"
+                               class="btn btn-dark"
+                               href="{% url 'fleet:fleet_dashboard' %}"
+                               id="{{ card_id }}_btn_dashboard_driver">
+                                DASHBOARD
+                            </a>
+                        {% else %}
+                            <a type="button"
+                               class="btn btn-dark"
+                               href="{% url 'core:join_us' %}"
+                               id="{{ card_id }}_btn_select_role">
+                                SELECT ROLE
+                            </a>
+                        {% endif %}
+                    {% else %}
+                        {# Default dashboard button #}
+                        <button type="button"
+                                class="btn btn-dark"
+                                id="{{ card_id }}_btn_dashboard">
+                            Dashboard
+                        </button>
+                    {% endif %}
+
+                    <button type="button"
+                            class="btn btn-outline-dark ms-1"
+                            id="{{ card_id }}_btn_message">
+                        Message
+                    </button>
+                </div>
+            {% endif %}
+
+            {# Social Media Links #}
+            <div class="d-flex justify-content-center p-3">
+                <a href="{{ SOCIAL_MEDIA.facebook }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   aria-label="Follow us on Facebook">
+                    <i class="fa-brands fa-facebook fa-2xl me-3 text-dark"></i>
+                </a>
+                <a href="{{ SOCIAL_MEDIA.whatsapp }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   aria-label="Contact us on WhatsApp">
+                    <i class="fa-brands fa-whatsapp fa-2xl me-3 text-dark"></i>
+                </a>
+                <a href="{{ SOCIAL_MEDIA.instagram }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   aria-label="Follow us on Instagram">
+                    <i class="fa-brands fa-instagram fa-2xl text-dark"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

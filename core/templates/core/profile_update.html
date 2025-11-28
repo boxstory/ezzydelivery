@@ -13,45 +13,7 @@
         <form id="core_profile_update_form_main" method="POST">
             <div class="row">
                 {% csrf_token %}
-                <div class="col-lg-4">
-                    <div class="card mb-4" id="core_profile_update_card_picture">
-                        <div class="card-body text-center">
-                            <img src="{{ profile_picture.profile_picture.url }}" alt="avatar" class="rounded-circle img-fluid"
-                                style="width: 180px">
-
-                            <!-- Profile Picture Update Form - Inline -->
-                            <div class="mt-3" id="core_profile_container_picture_update">
-                                <form id="core_profile_form_picture_update" method="post" action="{% url 'core:profile_picture_update' %}" enctype="multipart/form-data">
-                                    {% csrf_token %}
-                                    <div class="mb-2">
-                                        <input class="form-control" type="file" name="profile_picture" id="core_profile_input_picture" accept="image/*">
-                                    </div>
-                                    <div class="mb-3">
-                                        <button id="core_profile_btn_picture_update" type="submit" class="btn btn-dark w-100">Update Photo</button>
-                                    </div>
-                                </form>
-                            </div>
-
-                            <div class="d-flex justify-content-center mb-2">
-                                {% if profileform.is_business %}
-                                <a type="button" class="btn btn-dark"
-                                    href="{% url 'core:business_dashboard' %}" id="core_profile_update_btn_dashboard_business">DASHBOARD</a>
-                                {% elif profileform.is_driver %}
-                                <a type="button" class="btn btn-dark"
-                                    href="{% url 'core:fleet_dashboard' %}" id="core_profile_update_btn_dashboard_driver">DASHBOARD</a>
-                                {% else %}
-                                <a type="button" class="btn btn-dark" href="/dashboard/" id="core_profile_update_btn_dashboard">DASHBOARD</a>
-                                {% endif %}
-                                <button type="button" class="btn btn-outline-dark ms-1" id="core_profile_update_btn_message">Message</button>
-                            </div>
-                            <div class="d-flex justify-content-center p-3">
-                                <a href="{{ SOCIAL_MEDIA.facebook }}" target="_blank" rel="noopener noreferrer" aria-label="Follow us on Facebook"><i class="fa-brands fa-facebook fa-2xl me-3 text-dark"></i></a>
-                                <a href="{{ SOCIAL_MEDIA.whatsapp }}" target="_blank" rel="noopener noreferrer" aria-label="Contact us on WhatsApp"><i class="fa-brands fa-whatsapp fa-2xl me-3 text-dark"></i></a>
-                                <a href="{{ SOCIAL_MEDIA.instagram }}" target="_blank" rel="noopener noreferrer" aria-label="Follow us on Instagram"><i class="fa-brands fa-instagram fa-2xl text-dark"></i></a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                {% include "core/parts/profile_card_details.html" with card_id="core_profile_update_card_picture" profile_picture_url=profile_picture.profile_picture.url show_upload_form=True upload_form_action="core:profile_picture_update" profile=profileform show_dashboard_button=True %}
                 <div class="col-lg-8">
                     <div class="card mb-4" id="core_profile_update_card_info">
                         <div class="card-body">
