@@ -31,15 +31,30 @@ class ProfileForm(forms.ModelForm):
         model = Profile
         fields = ['first_name', 'last_name', 'email', 'phone', 'address', 'instagram',
               'whatsapp', 'zone_name', 'nationlity', 'date_of_birth']
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'First Name'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Last Name'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email'}),
+            'phone': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Phone Number'}),
+            'whatsapp': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'WhatsApp Number'}),
+            'zone_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Zone/Area Name'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Full Address', 'rows': 3}),
+            'nationlity': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nationality'}),
+            'date_of_birth': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+                'placeholder': 'YYYY-MM-DD',
+                'min': '1930-01-01',
+                'max': '2010-12-31'
+            }),
+            'instagram': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '@username'}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_show_labels = False
-        self.fields['date_of_birth'].widget = forms.SelectDateWidget(
-            years=YEARS)
-        self.fields['date_of_birth'].widget.attrs = {
-             'type': "date"}
+        # Set required fields
         self.fields['phone'].required = True
         self.fields['nationlity'].required = True
         self.fields['date_of_birth'].required = True
@@ -66,7 +81,13 @@ class ProfileUpdateForm(forms.ModelForm):
             'zone_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Zone Name'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Full Address', 'rows': 3}),
             'nationlity': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nationality'}),
-            'date_of_birth': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'date_of_birth': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+                'placeholder': 'YYYY-MM-DD',
+                'min': '1930-01-01',
+                'max': '2010-12-31'
+            }),
             'instagram': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Instagram Handle'}),
         }
 
