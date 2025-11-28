@@ -385,11 +385,26 @@ def join_us(request):
             return redirect('core:profile', pk=request.user.id)
         else:
             logger.debug(f"Loading join us form for user {request.user.id}")
+
+            # Get or create profile picture
+            try:
+                profile_picture = core_models.ProfilePicture.objects.get(user_id=request.user.id)
+            except core_models.ProfilePicture.DoesNotExist:
+                profile_picture = core_models.ProfilePicture.objects.create(
+                    user_id=request.user.id,
+                    profile_id=request.user.id
+                )
+
+            # Calculate completion percentage
+            completion_percentage = profile.get_profile_completion_percentage()
+
             context = {
                 'joinusform': joinusform,
                 'driverjoinform': driverjoinform,
                 'businessjoinform': businessjoinform,
-                'profile': profile
+                'profile': profile,
+                'profile_picture': profile_picture,
+                'completion_percentage': completion_percentage
             }
         return render(request, 'core/join_us.html', context)
 
@@ -489,9 +504,13 @@ def profile(request, pk):
         profile_picture.save()
         logger.info(f"Created default profile picture for user {request.user.id}")
 
+    # Calculate completion percentage
+    completion_percentage = profile.get_profile_completion_percentage()
+
     context = {
         "profile": profile,
         "profile_picture": profile_picture,
+        "completion_percentage": completion_percentage
     }
 
     return render(request, 'core/profile.html', context)
@@ -563,10 +582,15 @@ def profile_update(request, pk):
         logger.warning(f"Invalid profile update form for user {pk}")
         messages.error(request, "Please correct the errors below.")
 
+    # Calculate completion percentage
+    completion_percentage = instance.get_profile_completion_percentage()
+
     context = {
         'profileform': form,
         'instance': instance,
-        'profile_picture': profile_picture
+        'profile': instance,
+        'profile_picture': profile_picture,
+        'completion_percentage': completion_percentage
     }
     return render(request, 'core/profile_update.html', context)
 

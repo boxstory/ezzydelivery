@@ -11,38 +11,7 @@
         {% include "core/parts/filepath.html" %}
         <div class="row">
             <!-- profile left side section -->
-            <div class="col-lg-4">
-                <div class="card mb-4 " id="core_join_card_profile">
-                    <div class="card-body text-center">
-                        <img src="/media/core/user/avatar.png" alt="avatar" class="rounded-circle img-fluid profile-avatar" width="180" height="180">
-                        <h5 class="my-3">{{joinusform.first_name}} {{joinusform.last_name}}</h5>
-                        <p class="text-muted mb-1">{{joinusform.profile_pic}}</p>
-                        <p class="text-muted mb-4">{{joinusform.zone_name}}</p>
-                        <div class="d-flex justify-content-center mb-2">
-                            {% if profile.is_business %}
-                            <a type="button" class="btn btn-dark" href="{% url 'business:business_dashboard' %}" id="core_join_btn_business_dashboard">
-                                Business Dashboard
-                            </a>
-                            {% elif profile.is_driver %}
-                            <a type="button" class="btn btn-dark" href="{% url 'fleet:fleet_dashboard' %}" id="core_join_btn_driver_dashboard">
-                                Driver Dashboard
-                            </a>
-                            {% else %}
-                            <a type="button" class="btn btn-dark" href="{% url 'core:join_us' %}" id="core_join_btn_select_role">
-                                SELECT ROLE
-                            </a>
-                            {% endif %}
-
-                            <button type="button" class="btn btn-outline-dark ms-1" id="core_join_btn_update">Update</button>
-                        </div>
-                        <div class="d-flex justify-content-center p-3">
-                            <a href="{{ SOCIAL_MEDIA.facebook }}" target="_blank" rel="noopener noreferrer" aria-label="Follow us on Facebook"><i class="fa-brands fa-facebook fa-2xl me-3 text-dark"></i></a>
-                            <a href="{{ SOCIAL_MEDIA.whatsapp }}" target="_blank" rel="noopener noreferrer" aria-label="Contact us on WhatsApp"><i class="fa-brands fa-whatsapp fa-2xl me-3 text-dark"></i></a>
-                            <a href="{{ SOCIAL_MEDIA.instagram }}" target="_blank" rel="noopener noreferrer" aria-label="Follow us on Instagram"><i class="fa-brands fa-instagram fa-2xl text-dark"></i></a>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {% include "core/parts/dashboard_sidebar_profile.html" %}
             <!-- profile join form section -->
             <div class="col-lg-8">
                 <div class="role-selection-card" id="core_join_card_role_selection">

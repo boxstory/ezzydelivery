@@ -47,9 +47,31 @@
 
     <!-- Profile Status Section -->
     <div class="card-body border-bottom p-4">
-        <h6 class="text-uppercase text-secondary fw-bold small mb-3">
-            <i class="fas fa-clipboard-check me-1"></i>Profile Status
-        </h6>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="text-uppercase text-secondary fw-bold small mb-0">
+                <i class="fas fa-clipboard-check me-1"></i>Profile Status
+            </h6>
+            <a href="{% url 'core:profile_complete_update' %}" class="badge bg-primary text-dark text-decoration-none" title="Complete your profile">
+                <i class="fas fa-edit me-1"></i>Update
+            </a>
+        </div>
+
+        <!-- Overall Completion Progress Bar -->
+        {% if completion_percentage is not None %}
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="small fw-semibold text-dark">Overall Progress</span>
+                <span class="small fw-bold text-primary">{{ completion_percentage }}%</span>
+            </div>
+            <div class="progress" style="height: 8px; border-radius: 10px;">
+                <div class="progress-bar bg-primary" role="progressbar"
+                     style="width: {{ completion_percentage }}%;"
+                     aria-valuenow="{{ completion_percentage }}"
+                     aria-valuemin="0"
+                     aria-valuemax="100"></div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Basic Profile Completion -->
         <div class="status-item position-relative bg-light border border-secondary-subtle rounded p-3 mb-2">
