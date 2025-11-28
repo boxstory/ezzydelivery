@@ -54,6 +54,10 @@ def calculate_completion_percentage(obj, required_fields):
 
 def validate_image_upload(uploaded_file):
     """Validate uploaded image file"""
+    # Check if it's an actual uploaded file (not an ImageFieldFile from database)
+    if not hasattr(uploaded_file, 'content_type'):
+        return False, "No file uploaded"
+
     # Check file size
     if uploaded_file.size > MAX_UPLOAD_SIZE:
         return False, "File size exceeds 5MB limit"
@@ -506,7 +510,6 @@ def profile_add(request):
             logger.info(f"Creating profile for user {request.user.id}")
             profile = profileaddform.save(commit=False)
             profile.user_id = request.user.id
-            profile.id = request.user.id
             profile.save()
             logger.info(f"Profile created successfully for user {request.user.id}")
             messages.success(request, 'Your profile has been created!')

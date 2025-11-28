@@ -10,11 +10,11 @@
 <section id="core_profile_update_section_main">
     <div class="container py-3">
         {% include "core/parts/filepath.html" %}
-        <form id="core_profile_update_form_main" method="POST">
-            <div class="row">
-                {% csrf_token %}
-                {% include "core/parts/profile_card_details.html" with card_id="core_profile_update_card_picture" profile_picture_url=profile_picture.profile_picture.url show_upload_form=True upload_form_action="core:profile_picture_update" profile=profileform show_dashboard_button=True %}
-                <div class="col-lg-8">
+        <div class="row">
+            {% include "core/parts/dashboard_sidebar_profile.html" %}
+            <div class="col-lg-8">
+                <form id="core_profile_update_form_main" method="POST">
+                    {% csrf_token %}
                     <div class="card mb-4" id="core_profile_update_card_info">
                         <div class="card-body">
                             {% if profileform.errors %}
@@ -120,9 +120,9 @@
                     <div class="text-end">
                         <button id="core_profile_update_btn_submit" class="btn btn-primary  p-2 px-4 me-2" type="submit" value="submit">Submit</button>
                     </div>
-                </div>
+                </form>
             </div>
-        </form>
+        </div>
     </div>
 </section>
 {% endblock content %}
