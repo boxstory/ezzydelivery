@@ -4,207 +4,223 @@
 {% block title %}Complete Your Profile - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'core/css/profile-forms.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/profile-complete.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<div class="completion-container" id="core_profile_complete_container_main">
-    <!-- Completion Header -->
-    <div class="completion-header" id="core_profile_complete_header">
-        <div class="completion-circle">
-            <svg width="120" height="120">
-                <circle class="circle-bg" cx="60" cy="60" r="52"></circle>
-                <circle class="circle-progress" cx="60" cy="60" r="52"
-                        stroke-dasharray="326.73"
-                        stroke-dashoffset="{{ 326.73|add:0|floatformat:0|add:'-'|add:completion_percentage|add:'*3.2673'|add:'='|floatformat:0 }}"
-                        style="stroke-dashoffset: calc(326.73 - (326.73 * {{ completion_percentage }} / 100));">
-                </circle>
-            </svg>
-            <div class="completion-text">{{ completion_percentage }}%</div>
-        </div>
-        <h2 class="mb-2">Complete Your Profile</h2>
-        <p class="mb-0">Fill in all required fields to proceed with registration</p>
-    </div>
-
-    <!-- Form Card -->
-    <div class="form-card" id="core_profile_complete_card_form">
-        {% if completion_percentage < 100 %}
-        <div class="info-alert">
-            <i class="fa-solid fa-circle-info me-2"></i>
-            <strong>Profile Incomplete:</strong> Please fill in all required fields to unlock the registration buttons.
-        </div>
-        {% else %}
-        <div class="warning-alert">
-            <i class="fa-solid fa-check-circle me-2"></i>
-            <strong>Profile Complete!</strong> Choose your role below to continue with registration.
-        </div>
-        {% endif %}
-
-        <form id="core_profile_complete_form_main" method="post">
-            {% csrf_token %}
-
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label class="form-label" for="{{ form.username.id_for_label }}">
-                            Username <span class="text-danger">*</span>
-                        </label>
-                        {{ form.username }}
-                        {% if form.username.errors %}
-                            <div class="text-danger small mt-1">{{ form.username.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label class="form-label" for="{{ form.email.id_for_label }}">
-                            Email <span class="text-danger">*</span>
-                        </label>
-                        {{ form.email }}
-                        {% if form.email.errors %}
-                            <div class="text-danger small mt-1">{{ form.email.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label class="form-label" for="{{ form.first_name.id_for_label }}">
-                            First Name <span class="text-danger">*</span>
-                        </label>
-                        {{ form.first_name }}
-                        {% if form.first_name.errors %}
-                            <div class="text-danger small mt-1">{{ form.first_name.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label class="form-label" for="{{ form.last_name.id_for_label }}">
-                            Last Name <span class="text-danger">*</span>
-                        </label>
-                        {{ form.last_name }}
-                        {% if form.last_name.errors %}
-                            <div class="text-danger small mt-1">{{ form.last_name.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label class="form-label" for="{{ form.phone.id_for_label }}">
-                            Phone Number <span class="text-danger">*</span>
-                        </label>
-                        {{ form.phone }}
-                        {% if form.phone.errors %}
-                            <div class="text-danger small mt-1">{{ form.phone.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label class="form-label" for="{{ form.whatsapp.id_for_label }}">
-                            WhatsApp Number <span class="text-danger">*</span>
-                        </label>
-                        {{ form.whatsapp }}
-                        {% if form.whatsapp.errors %}
-                            <div class="text-danger small mt-1">{{ form.whatsapp.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label class="form-label" for="{{ form.zone_name.id_for_label }}">
-                            Zone Name <span class="text-danger">*</span>
-                        </label>
-                        {{ form.zone_name }}
-                        {% if form.zone_name.errors %}
-                            <div class="text-danger small mt-1">{{ form.zone_name.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label class="form-label" for="{{ form.nationlity.id_for_label }}">
-                            Nationality <span class="text-danger">*</span>
-                        </label>
-                        {{ form.nationlity }}
-                        {% if form.nationlity.errors %}
-                            <div class="text-danger small mt-1">{{ form.nationlity.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label class="form-label" for="{{ form.date_of_birth.id_for_label }}">
-                            Date of Birth <span class="text-danger">*</span>
-                        </label>
-                        {{ form.date_of_birth }}
-                        {% if form.date_of_birth.errors %}
-                            <div class="text-danger small mt-1">{{ form.date_of_birth.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label class="form-label" for="{{ form.instagram.id_for_label }}">
-                            Instagram (Optional)
-                        </label>
-                        {{ form.instagram }}
-                        {% if form.instagram.errors %}
-                            <div class="text-danger small mt-1">{{ form.instagram.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="col-12">
-                    <div class="form-group">
-                        <label class="form-label" for="{{ form.address.id_for_label }}">
-                            Full Address <span class="text-danger">*</span>
-                        </label>
-                        {{ form.address }}
-                        {% if form.address.errors %}
-                            <div class="text-danger small mt-1">{{ form.address.errors }}</div>
-                        {% endif %}
-                    </div>
-                </div>
+<div class="auth-container" id="core_profile_complete_container_main">
+    <div class="auth-card" id="core_profile_complete_card_main">
+        <!-- Header with Progress Circle -->
+        <div class="auth-header" id="core_profile_complete_header">
+            <div class="completion-circle-container">
+                <svg class="completion-circle" width="120" height="120" viewBox="0 0 120 120">
+                    <circle class="circle-bg" cx="60" cy="60" r="52"></circle>
+                    <circle class="circle-progress" cx="60" cy="60" r="52"
+                            stroke-dasharray="326.73"
+                            style="stroke-dashoffset: calc(326.73 - (326.73 * {{ completion_percentage }} / 100));">
+                    </circle>
+                </svg>
+                <div class="completion-text">{{ completion_percentage }}%</div>
             </div>
+            <h1 id="core_profile_complete_title_main">Complete Your Profile</h1>
+            <p id="core_profile_complete_subtitle">Fill in all required fields to proceed with registration</p>
+        </div>
 
-            <!-- Action Buttons -->
-            <div class="d-flex justify-content-between align-items-center mt-4">
-                <button id="core_profile_complete_btn_save" type="submit" name="action" value="save" class="btn btn-action btn-save">
-                    <i class="fa-solid fa-floppy-disk me-2"></i>Save Progress
-                </button>
-
-                <div class="role-selection">
-                    <button id="core_profile_complete_btn_register_business" type="submit" name="action" value="register_business"
-                            class="btn btn-action btn-register"
-                            {% if completion_percentage < 100 %}disabled{% endif %}>
-                        <i class="fa-solid fa-building me-2"></i>Register as Business
-                    </button>
-
-                    <button id="core_profile_complete_btn_join_driver" type="submit" name="action" value="join_driver"
-                            class="btn btn-action btn-register"
-                            {% if completion_percentage < 100 %}disabled{% endif %}>
-                        <i class="fa-solid fa-car me-2"></i>Join as Driver
-                    </button>
-                </div>
-            </div>
-
+        <!-- Form Body -->
+        <div class="auth-body" id="core_profile_complete_section_body">
             {% if completion_percentage < 100 %}
-            <p class="text-muted small text-center mt-3">
-                <i class="fa-solid fa-info-circle me-1"></i>
-                Complete all required fields to enable role selection
-            </p>
+            <div class="info-alert">
+                <i class="fa-solid fa-circle-info me-2"></i>
+                <div>
+                    <strong>Profile Incomplete:</strong> Please fill in all required fields to unlock the registration buttons.
+                </div>
+            </div>
+            {% else %}
+            <div class="warning-alert">
+                <i class="fa-solid fa-check-circle me-2"></i>
+                <div>
+                    <strong>Profile Complete!</strong> Choose your role below to continue with registration.
+                </div>
+            </div>
             {% endif %}
-        </form>
+
+            <form id="core_profile_complete_form_main" method="post">
+                {% csrf_token %}
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.username.id_for_label }}">
+                                <i class="fa-solid fa-user me-1"></i>
+                                Username <span class="text-danger">*</span>
+                            </label>
+                            {{ form.username }}
+                            {% if form.username.errors %}
+                                <div class="text-danger small mt-1">{{ form.username.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.email.id_for_label }}">
+                                <i class="fa-solid fa-envelope me-1"></i>
+                                Email <span class="text-danger">*</span>
+                            </label>
+                            {{ form.email }}
+                            {% if form.email.errors %}
+                                <div class="text-danger small mt-1">{{ form.email.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.first_name.id_for_label }}">
+                                <i class="fa-solid fa-id-card me-1"></i>
+                                First Name <span class="text-danger">*</span>
+                            </label>
+                            {{ form.first_name }}
+                            {% if form.first_name.errors %}
+                                <div class="text-danger small mt-1">{{ form.first_name.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.last_name.id_for_label }}">
+                                <i class="fa-solid fa-id-card me-1"></i>
+                                Last Name <span class="text-danger">*</span>
+                            </label>
+                            {{ form.last_name }}
+                            {% if form.last_name.errors %}
+                                <div class="text-danger small mt-1">{{ form.last_name.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.phone.id_for_label }}">
+                                <i class="fa-solid fa-phone me-1"></i>
+                                Phone Number <span class="text-danger">*</span>
+                            </label>
+                            {{ form.phone }}
+                            {% if form.phone.errors %}
+                                <div class="text-danger small mt-1">{{ form.phone.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.whatsapp.id_for_label }}">
+                                <i class="fa-brands fa-whatsapp me-1"></i>
+                                WhatsApp Number <span class="text-danger">*</span>
+                            </label>
+                            {{ form.whatsapp }}
+                            {% if form.whatsapp.errors %}
+                                <div class="text-danger small mt-1">{{ form.whatsapp.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.zone_name.id_for_label }}">
+                                <i class="fa-solid fa-location-dot me-1"></i>
+                                Zone Name <span class="text-danger">*</span>
+                            </label>
+                            {{ form.zone_name }}
+                            {% if form.zone_name.errors %}
+                                <div class="text-danger small mt-1">{{ form.zone_name.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.nationlity.id_for_label }}">
+                                <i class="fa-solid fa-flag me-1"></i>
+                                Nationality <span class="text-danger">*</span>
+                            </label>
+                            {{ form.nationlity }}
+                            {% if form.nationlity.errors %}
+                                <div class="text-danger small mt-1">{{ form.nationlity.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.date_of_birth.id_for_label }}">
+                                <i class="fa-solid fa-calendar me-1"></i>
+                                Date of Birth <span class="text-danger">*</span>
+                            </label>
+                            {{ form.date_of_birth }}
+                            {% if form.date_of_birth.errors %}
+                                <div class="text-danger small mt-1">{{ form.date_of_birth.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.instagram.id_for_label }}">
+                                <i class="fa-brands fa-instagram me-1"></i>
+                                Instagram <span class="text-muted small">(Optional)</span>
+                            </label>
+                            {{ form.instagram }}
+                            {% if form.instagram.errors %}
+                                <div class="text-danger small mt-1">{{ form.instagram.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.address.id_for_label }}">
+                                <i class="fa-solid fa-map-location-dot me-1"></i>
+                                Full Address <span class="text-danger">*</span>
+                            </label>
+                            {{ form.address }}
+                            {% if form.address.errors %}
+                                <div class="text-danger small mt-1">{{ form.address.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-flex justify-content-between align-items-center mt-4" style="gap: 1rem;">
+                    <button id="core_profile_complete_btn_save" type="submit" name="action" value="save" class="btn-action btn-save">
+                        <i class="fa-solid fa-floppy-disk"></i>Save Progress
+                    </button>
+
+                    <div class="role-selection">
+                        <button id="core_profile_complete_btn_register_business" type="submit" name="action" value="register_business"
+                                class="btn-action btn-register"
+                                {% if completion_percentage < 100 %}disabled{% endif %}>
+                            <i class="fa-solid fa-building"></i>Register as Business
+                        </button>
+
+                        <button id="core_profile_complete_btn_join_driver" type="submit" name="action" value="join_driver"
+                                class="btn-action btn-register"
+                                {% if completion_percentage < 100 %}disabled{% endif %}>
+                            <i class="fa-solid fa-car"></i>Join as Driver
+                        </button>
+                    </div>
+                </div>
+
+                {% if completion_percentage < 100 %}
+                <p class="text-muted small text-center mt-3 mb-0">
+                    <i class="fa-solid fa-info-circle me-1"></i>
+                    Complete all required fields to enable role selection
+                </p>
+                {% endif %}
+            </form>
+        </div>
     </div>
 </div>
 {% endblock content %}
