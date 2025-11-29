@@ -36,7 +36,7 @@ class businessRegisterForm(forms.ModelForm):
     class Meta:
         model = business_models.Business
         fields = '__all__'
-        
+
         exclude = ['profile', 'business_id', 'user',
                    'business_status', 'business_code', 'updated_at', 'created_at']
         widgets = {
@@ -46,7 +46,7 @@ class businessRegisterForm(forms.ModelForm):
             'business_status': forms.Select(
                 choices=business_STATUS_CHOICES),
             'business_since' : forms.TextInput(attrs={'type': 'date'}),
-            
+
 
         }
         labels = {
@@ -56,6 +56,62 @@ class businessRegisterForm(forms.ModelForm):
             "business_qid": "Passport/QID/CR No",
 
         }
+
+    def clean_business_phone(self):
+        """Validate phone number contains only digits"""
+        phone = self.cleaned_data.get('business_phone')
+        if phone:
+            # Remove common separators and spaces
+            cleaned_phone = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '').replace('+', '')
+            if not cleaned_phone.isdigit():
+                raise forms.ValidationError("Phone number must contain only numbers (digits 0-9)")
+            # Return cleaned version
+            return cleaned_phone
+        return phone
+
+    def clean_business_whatsapp(self):
+        """Validate WhatsApp number contains only digits"""
+        whatsapp = self.cleaned_data.get('business_whatsapp')
+        if whatsapp:
+            # Remove common separators and spaces
+            cleaned_whatsapp = whatsapp.replace(' ', '').replace('-', '').replace('(', '').replace(')', '').replace('+', '')
+            if not cleaned_whatsapp.isdigit():
+                raise forms.ValidationError("WhatsApp number must contain only numbers (digits 0-9)")
+            # Return cleaned version
+            return cleaned_whatsapp
+        return whatsapp
+
+    def clean_business_facebook_page(self):
+        """Validate Facebook page contains only username (no slashes or spaces)"""
+        facebook = self.cleaned_data.get('business_facebook_page')
+        if facebook:
+            # Remove leading/trailing whitespace
+            facebook = facebook.strip()
+            # Check for slashes or spaces
+            if '/' in facebook or ' ' in facebook:
+                raise forms.ValidationError("Enter username only, without slashes (/) or spaces")
+            # Remove common URL prefixes if user added them
+            facebook = facebook.replace('https://', '').replace('http://', '')
+            facebook = facebook.replace('www.facebook.com/', '').replace('facebook.com/', '')
+            facebook = facebook.replace('@', '')
+            return facebook.strip()
+        return facebook
+
+    def clean_business_instagram(self):
+        """Validate Instagram contains only username (no slashes or spaces)"""
+        instagram = self.cleaned_data.get('business_instagram')
+        if instagram:
+            # Remove leading/trailing whitespace
+            instagram = instagram.strip()
+            # Check for slashes or spaces
+            if '/' in instagram or ' ' in instagram:
+                raise forms.ValidationError("Enter username only, without slashes (/) or spaces")
+            # Remove common URL prefixes if user added them
+            instagram = instagram.replace('https://', '').replace('http://', '')
+            instagram = instagram.replace('www.instagram.com/', '').replace('instagram.com/', '')
+            instagram = instagram.replace('@', '')
+            return instagram.strip()
+        return instagram
 
 class businessApiSettingsForm(forms.ModelForm):
     class Meta:

@@ -56,7 +56,7 @@ urlpatterns = [
     path('fleet/', include('fleet.urls', namespace='fleet')),
     path('delivery/', include('delivery.urls', namespace='delivery')),
 
-    
+    path('blog/', include('blog.urls', namespace='blog')),
 
 ]
 
