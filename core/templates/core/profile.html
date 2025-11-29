@@ -5,73 +5,22 @@
 
 {% block extra_css %}
 <link href="{% static 'core/css/profile-sidebar.css' %}" rel="stylesheet" type="text/css" />
-<style>
-/* Profile Info Card Styling */
-#core_profile_card_info {
-    border: none;
-    border-radius: var(--brand-radius-xl);
-    box-shadow: var(--brand-shadow-lg);
-    background: var(--brand-white);
-}
-
-#core_profile_card_info .card-body {
-    padding: var(--spacing-2xl);
-}
-
-#core_profile_card_info .row {
-    padding: var(--spacing-md) 0;
-}
-
-#core_profile_card_info p:not(.text-muted) {
-    font-weight: var(--brand-font-weight-semibold);
-    color: var(--brand-grey-700);
-    font-size: var(--brand-font-size-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-#core_profile_card_info .text-muted {
-    color: var(--brand-grey-800) !important;
-    font-weight: var(--brand-font-weight-medium);
-    font-size: var(--brand-font-size-base);
-}
-
-#core_profile_card_info hr {
-    border-top: 2px solid var(--brand-grey-100);
-    margin: var(--spacing-md) 0;
-}
-
-/* Edit Button Styling */
-#core_profile_section_main .btn-dark {
-    background: var(--brand-gradient-purple);
-    border: 2px solid transparent;
-    color: var(--brand-white);
-    font-weight: var(--brand-font-weight-heavy);
-    padding: var(--spacing-md) var(--spacing-2xl);
-    border-radius: var(--brand-radius-md);
-    transition: all 0.3s ease;
-    box-shadow: var(--shadow-purple);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-#core_profile_section_main .btn-dark:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 30px rgba(102, 126, 234, 0.5);
-    color: var(--brand-white);
-}
-</style>
+<link href="{% static 'core/css/profile.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
 <section id="core_profile_section_main">
-    <div class="container py-3">
+    <div class="p-3">
         {% include "core/parts/filepath.html" %}
-        <div class="row">
-            <div class=" col-12   d-flex justify-content-center mb-4 mb-lg-0">
+        <div class="row g-4">
+            <!-- Profile Sidebar - Responsive Column -->
+            <div class="col-12 col-lg-4">
                 {% include "core/parts/dashboard_sidebar_profile.html" %}
-                <div class="col-12 col-lg-8">
-                    <div class="card mb-4" id="core_profile_card_info">
+            </div>
+
+            <!-- Profile Content - Responsive Column -->
+            <div class="col-12 col-lg-8">
+                <div class="card mb-4" id="core_profile_card_info">
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-sm-3">
@@ -162,14 +111,15 @@
                                     <p class="text-muted mb-0">{{ profile.address }}</p>
                                 </div>
                             </div>
+                        
+                            <div class="d-grid gap-2 mt-3 align-content-end">
+                                <div class="text-end">
+                                    <a href="/profile/complete/" class="btn btn-warning fw-bold text-uppercase d-flex align-items-center justify-content-center gap-2">
+                                        <i class="fas fa-edit me-2"></i>Edit Profile
+                                    </a>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="d-grid gap-2 col align-content-end">
-                        {% if profile.user_id %}
-                        <a href="/profile/{{ profile.user_id }}/update" class="btn btn-primary btn-dark">Edit</a>
-                        {% else %}
-                        <a href="/profile/add/" class="btn btn-primary btn-dark">Edit</a>
-                        {% endif %}
                     </div>
                 </div>
             </div>
