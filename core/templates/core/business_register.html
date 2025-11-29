@@ -7,6 +7,10 @@
 <link rel="stylesheet" href="{% static 'core/css/business-forms.css' %}">
 {% endblock %}
 
+{% block extra_js %}
+<script src="{% static 'client/js/business-form-validation.js' %}"></script>
+{% endblock %}
+
 {% block content %}
 <div class="completion-container" id="core_business_register_container_main">
     <!-- Completion Header -->
@@ -115,6 +119,7 @@
                 <div class="col-md-6">
                     <label class="form-label">Business Phone <span class="text-danger">*</span></label>
                     {{ form.business_phone }}
+                    <small class="form-text text-muted">Enter numbers only (e.g., 97412345678)</small>
                     {% if form.business_phone.errors %}
                         <div class="text-danger small">{{ form.business_phone.errors }}</div>
                     {% endif %}
@@ -123,6 +128,7 @@
                 <div class="col-md-6">
                     <label class="form-label">Business WhatsApp <span class="text-danger">*</span></label>
                     {{ form.business_whatsapp }}
+                    <small class="form-text text-muted">Enter numbers only (e.g., 97412345678)</small>
                     {% if form.business_whatsapp.errors %}
                         <div class="text-danger small">{{ form.business_whatsapp.errors }}</div>
                     {% endif %}
@@ -154,11 +160,19 @@
                 <div class="col-md-6">
                     <label class="form-label">Facebook Page</label>
                     {{ form.business_facebook_page }}
+                    <small class="form-text text-muted">Username only - no slashes or spaces (e.g., yourbusinessname)</small>
+                    {% if form.business_facebook_page.errors %}
+                        <div class="text-danger small">{{ form.business_facebook_page.errors }}</div>
+                    {% endif %}
                 </div>
 
                 <div class="col-md-6">
                     <label class="form-label">Instagram</label>
                     {{ form.business_instagram }}
+                    <small class="form-text text-muted">Username only - no slashes or spaces (e.g., yourbusinessname)</small>
+                    {% if form.business_instagram.errors %}
+                        <div class="text-danger small">{{ form.business_instagram.errors }}</div>
+                    {% endif %}
                 </div>
 
                 <div class="col-md-6">
