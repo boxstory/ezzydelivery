@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ seo.title }}{% endblock %}
+{% block meta_description %}{{ seo.description }}{% endblock %}
+{% block meta_keywords %}{{ seo.keywords }}{% endblock %}
+
+{% block extra_head %}
+<!-- JSON-LD Schema for Blog Post -->
+<script type="application/ld+json">
+{{ schema_markup|safe }}
+</script>
+{% endblock %}
+
+{% block content %}
+<!-- Page Title -->
+<div class="page-title dark-background" style="background-image: url({% static 'blog/assets/img/page-title-bg.jpg' %});">
+    <div class="container">
+        <h1>{{ post.title }}</h1>
+        <nav class="breadcrumbs">
+            <ol>
+                <li><a href="{% url 'webpages:index' %}">Home</a></li>
+                <li><a href="{% url 'blog:index' %}">Blog</a></li>
+                {% if post.category %}
+                <li><a href="{% url 'blog:category' post.category.slug %}">{{ post.category.name }}</a></li>
+                {% endif %}
+                <li class="current">{{ post.title|truncatewords:5 }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+<!-- End Page Title -->
+
+<main class="main">
+    <!-- Blog Details Section -->
+    <section id="blog-details" class="blog-details section">
+        <div class="container">
+            <div class="row g-5">
+                <!-- Main Content -->
+                <div class="col-lg-8">
+                    <article class="article">
+                        <div class="post-img">
+                            {% if post.featured_image %}
+                                <img src="{{ post.featured_image.url }}" alt="{{ post.featured_image_alt }}" class="img-fluid">
+                            {% else %}
+                                <img src="{% static 'blog/assets/img/blog-1.jpg' %}" alt="{{ post.title }}" class="img-fluid">
+                            {% endif %}
+                        </div>
+
+                        <div class="meta-top">
+                            <ul>
+                                <li class="d-flex align-items-center">
+                                    <i class="bi bi-person"></i>
+                                    <a href="#">{{ post.author.get_full_name|default:"Ezzy Delivery Team" }}</a>
+                                </li>
+                                <li class="d-flex align-items-center">
+                                    <i class="bi bi-clock"></i>
+                                    <a href="#"><time datetime="{{ post.published_at|date:'c' }}">{{ post.published_at|date:"M j, Y" }}</time></a>
+                                </li>
+                                <li class="d-flex align-items-center">
+                                    <i class="bi bi-eye"></i>
+                                    <a href="#">{{ post.views }} views</a>
+                                </li>
+                                <li class="d-flex align-items-center">
+                                    <i class="bi bi-bookmark"></i>
+                                    <a href="#">{{ post.reading_time }} min read</a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="content">
+                            <h2>{{ post.title }}</h2>
+
+                            <p class="lead">{{ post.intro }}</p>
+
+                            <div class="post-content">
+                                {{ post.content|linebreaks }}
+                            </div>
+                        </div>
+
+                        <div class="meta-bottom">
+                            {% if post.category %}
+                            <i class="bi bi-folder"></i>
+                            <ul class="cats">
+                                <li><a href="{% url 'blog:category' post.category.slug %}">{{ post.category.name }}</a></li>
+                            </ul>
+                            {% endif %}
+
+                            {% if post.tags %}
+                            <i class="bi bi-tags"></i>
+                            <ul class="tags">
+                                {% for tag in post.tags.split %}
+                                <li><a href="#">{{ tag }}</a></li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                        </div>
+                    </article>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="col-lg-4">
+                    <!-- Trending Posts Widget -->
+                    {% if trending_posts %}
+                    <div class="widget trending-widget">
+                        <h3 class="widget-title">Trending Posts</h3>
+                        <ul class="trending-post">
+                            {% for trending_post in trending_posts %}
+                            <li>
+                                <a href="{% url 'blog:post_detail' trending_post.slug %}">
+                                    <span class="number">{{ forloop.counter }}</span>
+                                    <h3>{{ trending_post.title }}</h3>
+                                    <span class="author">{{ trending_post.author.get_full_name|default:"Ezzy Delivery Team" }}</span>
+                                </a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <!-- Related Posts Widget -->
+                    {% if related_posts %}
+                    <div class="widget related-posts-widget">
+                        <h3 class="widget-title">Related Posts</h3>
+                        {% for related_post in related_posts %}
+                        <div class="post-item">
+                            <a href="{% url 'blog:post_detail' related_post.slug %}">
+                                {% if related_post.featured_image %}
+                                    <img src="{{ related_post.featured_image.url }}" alt="{{ related_post.featured_image_alt }}" class="img-fluid">
+                                {% else %}
+                                    <img src="{% static 'blog/assets/img/blog-recent-1.jpg' %}" alt="{{ related_post.title }}" class="img-fluid">
+                                {% endif %}
+                            </a>
+                            <div>
+                                <h4><a href="{% url 'blog:post_detail' related_post.slug %}">{{ related_post.title }}</a></h4>
+                                <time datetime="{{ related_post.published_at|date:'c' }}">{{ related_post.published_at|date:"M j, Y" }}</time>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- End Blog Details Section -->
+</main>
+{% endblock %}
