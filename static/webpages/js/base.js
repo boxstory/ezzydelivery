@@ -1,14 +1,17 @@
-let userIsViewingPage = true;
+// Auto-refresh on focus disabled to prevent form data loss
+// Users can manually refresh if needed
 
-setInterval(focusChecker, 500);
+// let userIsViewingPage = true;
 
-function focusChecker() {
-  if (document.hasFocus()) {
-    if (!userIsViewingPage) {
-      location.reload();
-      userIsViewingPage = true;
-    }
-  } else {
-    userIsViewingPage = false;
-  }
-}
+// setInterval(focusChecker, 500);
+
+// function focusChecker() {
+//   if (document.hasFocus()) {
+//     if (!userIsViewingPage) {
+//       location.reload();
+//       userIsViewingPage = true;
+//     }
+//   } else {
+//     userIsViewingPage = false;
+//   }
+// }

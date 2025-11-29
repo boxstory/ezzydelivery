@@ -1,31 +1,55 @@
 {% load static %}
+<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta property="fb:pages" content="113704197128320" />
-<meta charset="UTF-8" />
-<!-- Replacable meta tags -->
-{% block seo %}
-    {% comment %} Default SEO Meta Tags - Can be overridden per page {% endcomment %}
-    <meta name="description" content="Fast, reliable, and affordable delivery services for e-commerce businesses in Qatar. Get a free quote for 3PL, fulfillment, and last-mile delivery.">
-    <meta name="keywords" content="delivery service Qatar, e-commerce delivery, 3PL Qatar, fulfillment center, last-mile delivery, courier service Doha, quick commerce">
 
-    {% comment %} Open Graph (OG) meta tags for social media sharing {% endcomment %}
-    <meta property="og:title" content="Ezzy Delivery | #1 E-commerce Delivery & Fulfillment Service in Qatar">
-    <meta property="og:description" content="Partner with Ezzy Delivery for fast, reliable, and affordable e-commerce delivery, 3PL, and fulfillment services across Qatar.">
+<!-- SEO Meta Tags - Dynamic from views or defaults -->
+{% if seo %}
+    <!-- Primary Meta Tags -->
+    <meta name="description" content="{{ seo.description }}">
+    <meta name="keywords" content="{{ seo.keywords }}">
+    <meta name="author" content="{{ seo.author }}">
+    <meta name="language" content="{{ seo.language }}">
+    <meta name="geo.region" content="{{ seo.region }}">
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="{{ seo.og_title }}">
+    <meta property="og:description" content="{{ seo.og_description }}">
+    <meta property="og:url" content="{{ seo.og_url }}">
+    <meta property="og:image" content="{{ seo.og_image }}">
+    <meta property="og:type" content="{{ seo.og_type }}">
+    <meta property="og:site_name" content="{{ seo.og_site_name }}">
+    <meta property="og:locale" content="{{ seo.og_locale }}">
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="{{ seo.twitter_card }}">
+    <meta name="twitter:title" content="{{ seo.twitter_title }}">
+    <meta name="twitter:description" content="{{ seo.twitter_description }}">
+    <meta name="twitter:image" content="{{ seo.twitter_image }}">
+    <meta name="twitter:site" content="{{ seo.twitter_site }}">
+
+    <!-- Mobile Optimization -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+    <!-- Search Engine -->
+    <meta name="robots" content="{{ seo.robots }}">
+    <meta name="revisit-after" content="{{ seo.revisit_after }}">
+    <meta name="distribution" content="{{ seo.distribution }}">
+    <meta name="rating" content="{{ seo.rating }}">
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="{{ seo.canonical_url }}">
+{% else %}
+    <!-- Fallback Default SEO -->
+    <meta name="description" content="EzzyDelivery - Qatar's #1 delivery service. Same day delivery in Doha, Al Wakrah, Lusail. E-commerce fulfillment, COD, real-time tracking.">
+    <meta name="keywords" content="delivery service Qatar, courier service Qatar, same day delivery Doha, e-commerce delivery, COD service Qatar">
+    <meta property="og:title" content="EzzyDelivery Qatar | Professional Delivery & Courier Service">
+    <meta property="og:description" content="Qatar's leading delivery and courier service. Same day delivery, COD, e-commerce fulfillment.">
     <meta property="og:image" content="{% static 'webpages/img/ezzy-logo-sqr-round.png' %}">
-    <meta property="og:url" content="{{ request.build_absolute_uri }}">
-    <meta property="og:site_name" content="Ezzy Delivery Qatar">
-    <meta property="og:type" content="website">
-
-    {% comment %} Twitter Card meta tags for Twitter sharing {% endcomment %}
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Ezzy Delivery | #1 E-commerce Delivery & Fulfillment Service in Qatar">
-    <meta name="twitter:description" content="Partner with Ezzy Delivery for fast, reliable, and affordable e-commerce delivery, 3PL, and fulfillment services across Qatar.">
-    <meta name="twitter:image" content="{% static 'webpages/img/ezzy-logo-sqr-round.png' %}">
-    <meta name="twitter:site" content="@ezzydelivery.qa">
-
-    {% comment %} Canonical URL to prevent duplicate content issues {% endcomment %}
     <link rel="canonical" href="{{ request.build_absolute_uri }}">
-{% endblock seo %}
+{% endif %}
 
 <!-- Dublin Core Metadata -->
 <meta name="DC.title" content="Ezzy Delivery Qatar - Delivering Seamless E-commerce Services in Qatar">
