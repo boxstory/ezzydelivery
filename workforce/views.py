@@ -128,6 +128,46 @@ def all_orders(request):
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
 
+@login_required(login_url='/accounts/login/')
+def orders_by_seller(request):
+    """
+    View to display orders grouped by seller/business
+    """
+    from django.db.models import Count, Q
+
+    # Get all businesses with their order counts
+    businesses = business_models.Business.objects.select_related(
+        'profile', 'business_profile'
+    ).annotate(
+        total_orders=Count('order'),
+        pending_orders=Count('order', filter=Q(order__order_status='pending')),
+        processing_orders=Count('order', filter=Q(order__order_status='processing')),
+        completed_orders=Count('order', filter=Q(order__order_status='delivered'))
+    ).filter(total_orders__gt=0)  # Only show businesses with orders
+
+    # Apply search filter
+    search = request.GET.get('search', '').strip()
+    if search:
+        businesses = businesses.filter(
+            Q(business_name__icontains=search) |
+            Q(business_email__icontains=search) |
+            Q(business_phone__icontains=search) |
+            Q(business_code__icontains=search)
+        )
+
+    # Order by total orders (most orders first)
+    businesses = businesses.order_by('-total_orders', '-business_id')
+
+    # Paginate
+    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+
+    context = {
+        'page_title': 'Orders by Seller',
+        'page_obj': page_obj,
+        'search': search,
+    }
+
+    return render(request, 'workforce/orders_by_seller.html', context)
 
 
 @login_required(login_url='/accounts/login/')
@@ -1689,5 +1729,176 @@ def business_license_detail(request, business_id):
     }
 
     return render(request, 'workforce/business_license_detail.html', context)
+
+
+# Sellers section  ------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
+def sellers_list(request):
+    """
+    View to display all sellers/businesses in the system
+    """
+    # Get all businesses
+    businesses = business_models.Business.objects.select_related(
+        'profile', 'business_profile'
+    ).all()
+
+    # Apply filters
+    search = request.GET.get('search', '').strip()
+    status = request.GET.get('status', '').strip()
+    verification_status = request.GET.get('verification', '').strip()
+
+    if search:
+        from django.db.models import Q
+        businesses = businesses.filter(
+            Q(business_name__icontains=search) |
+            Q(business_email__icontains=search) |
+            Q(business_phone__icontains=search) |
+            Q(profile__user__email__icontains=search)
+        )
+
+    if status:
+        businesses = businesses.filter(business_status=status)
+
+    if verification_status:
+        businesses = businesses.filter(profile__verification_status=verification_status)
+
+    # Order by most recent
+    businesses = businesses.order_by('-business_since', '-business_id')
+
+    # Paginate
+    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+
+    # Count statistics
+    total_sellers = business_models.Business.objects.count()
+    active_sellers = business_models.Business.objects.filter(business_status='active').count()
+    pending_sellers = business_models.Business.objects.filter(
+        profile__verification_status='pending'
+    ).count()
+    inactive_sellers = business_models.Business.objects.filter(business_status='inactive').count()
+
+    context = {
+        'page_title': 'All Sellers',
+        'page_obj': page_obj,
+        'total_sellers': total_sellers,
+        'active_sellers': active_sellers,
+        'pending_sellers': pending_sellers,
+        'inactive_sellers': inactive_sellers,
+        'search': search,
+        'status': status,
+        'verification': verification_status,
+    }
+
+    return render(request, 'workforce/sellers_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def sellers_pending(request):
+    """
+    View to display sellers pending approval
+    """
+    # Get businesses with pending verification
+    businesses = business_models.Business.objects.select_related(
+        'profile', 'business_profile'
+    ).filter(
+        profile__verification_status='pending'
+    ).order_by('-business_since', '-business_id')
+
+    # Apply search filter
+    search = request.GET.get('search', '').strip()
+    if search:
+        from django.db.models import Q
+        businesses = businesses.filter(
+            Q(business_name__icontains=search) |
+            Q(business_email__icontains=search) |
+            Q(business_phone__icontains=search)
+        )
+
+    # Paginate
+    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+
+    context = {
+        'page_title': 'Pending Sellers',
+        'page_obj': page_obj,
+        'search': search,
+    }
+
+    return render(request, 'workforce/sellers_pending.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def sellers_active(request):
+    """
+    View to display active verified sellers
+    """
+    # Get active and verified businesses
+    businesses = business_models.Business.objects.select_related(
+        'profile', 'business_profile'
+    ).filter(
+        business_status='active',
+        profile__verification_status='verified'
+    ).order_by('-business_since', '-business_id')
+
+    # Apply search filter
+    search = request.GET.get('search', '').strip()
+    if search:
+        from django.db.models import Q
+        businesses = businesses.filter(
+            Q(business_name__icontains=search) |
+            Q(business_email__icontains=search) |
+            Q(business_phone__icontains=search)
+        )
+
+    # Paginate
+    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+
+    # Get order statistics for active sellers
+    from django.db.models import Count
+    businesses_with_orders = page_obj.object_list
+    for business in businesses_with_orders:
+        business.total_orders = orders_models.Order.objects.filter(
+            business=business
+        ).count()
+
+    context = {
+        'page_title': 'Active Sellers',
+        'page_obj': page_obj,
+        'search': search,
+    }
+
+    return render(request, 'workforce/sellers_active.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def sellers_inactive(request):
+    """
+    View to display inactive or suspended sellers
+    """
+    # Get inactive businesses
+    businesses = business_models.Business.objects.select_related(
+        'profile', 'business_profile'
+    ).filter(
+        business_status='inactive'
+    ).order_by('-business_since', '-business_id')
+
+    # Apply search filter
+    search = request.GET.get('search', '').strip()
+    if search:
+        from django.db.models import Q
+        businesses = businesses.filter(
+            Q(business_name__icontains=search) |
+            Q(business_email__icontains=search) |
+            Q(business_phone__icontains=search)
+        )
+
+    # Paginate
+    page_obj = paginate_queryset(request, businesses, items_per_page=20)
+
+    context = {
+        'page_title': 'Inactive Sellers',
+        'page_obj': page_obj,
+        'search': search,
+    }
+
+    return render(request, 'workforce/sellers_inactive.html', context)
 
 

@@ -112,10 +112,8 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
                 order_id=instance.id, order_number= instance.order_number )
             instance.save()
 
-        if instance.id not in OrderProductList.objects.values_list('order', flat=True):
-            OrderProductList.objects.create(
-                order_id=instance.id, )
-            instance.save()
+        # OrderItem entries should be created when products are added to the order
+        # Not automatically on order creation
     
     # Handle verification status changes
     if not created:

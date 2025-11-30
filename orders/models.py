@@ -191,6 +191,7 @@ def upload_path_handler(instance, filename):
         os.makedirs(upload_dir)
     return os.path.join(upload_dir, filename)
 
+
 class OrderBarcode(models.Model):
     order =  models.ForeignKey(
         orders_models.Order, on_delete=models.CASCADE, related_name='order_barcode')
@@ -245,47 +246,7 @@ class OrderItem(models.Model):
         ordering = ['id']
 
 
-class OrderProductList(models.Model):
-    """DEPRECATED: Legacy model for backward compatibility. Use OrderItem instead."""
-    order =  models.ForeignKey(
-        orders_models.Order, on_delete=models.CASCADE, related_name='order_product_list')
-    product01_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product01_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product02_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product02_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product03_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product03_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product04_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product04_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product05_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product05_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product06_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product06_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product07_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product07_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product08_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product08_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product09_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product09_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product10_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product10_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product11_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product11_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product12_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product12_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product13_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product13_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product14_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product14_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-    product15_name = models.ForeignKey(product_models.Product, on_delete=models.DO_NOTHING, null=True, blank=True, related_name='+')
-    product15_qty = models.PositiveIntegerField(blank=True, null=True, default=0)
-
-
-    def __str__(self):
-        return str(self.order)
-
-    class Meta:
-        verbose_name_plural = "Order product lists (DEPRECATED)"
+# OrderProductList model removed - use OrderItem instead
 
 
 class OrderVerificationLog(models.Model):

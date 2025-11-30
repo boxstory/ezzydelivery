@@ -1,6 +1,6 @@
 .pricing-hero {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+  color: var(--brand-grey-800);
   padding: 3rem 0;
   margin-bottom: 2rem;
 }
@@ -50,10 +50,11 @@
 }
 
 .step-item.active .step-circle {
-  background: #667eea;
-  color: white;
-  border-color: #667eea;
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+  color: var(--brand-grey-800);
+  border-color: var(--brand-primary);
   transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(255, 211, 59, 0.3);
 }
 
 .step-item.completed .step-circle {
@@ -69,7 +70,8 @@
 }
 
 .step-item.active .step-label {
-  color: #667eea;
+  color: var(--brand-grey-800);
+  font-weight: 700;
 }
 
 .pricing-form-card {
@@ -89,8 +91,8 @@
 }
 
 .form-control:focus, .form-select:focus, textarea:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.1);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 0.2rem rgba(255, 211, 59, 0.15);
 }
 
 .form-label {
@@ -100,8 +102,9 @@
 }
 
 .btn-primary {
-  background: #667eea;
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
   border: none;
+  color: var(--brand-grey-800);
   padding: 0.75rem 2rem;
   font-weight: 700;
   border-radius: 50px;
@@ -109,9 +112,10 @@
 }
 
 .btn-primary:hover {
-  background: #5568d3;
+  background: linear-gradient(135deg, var(--brand-primary-dark) 0%, var(--brand-primary) 100%);
+  color: var(--brand-grey-900);
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 8px 20px rgba(255, 211, 59, 0.4);
 }
 
 .btn-secondary {
@@ -150,10 +154,10 @@
 .form-section-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #212529;
+  color: var(--brand-grey-800);
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 2px solid #667eea;
+  border-bottom: 2px solid var(--brand-primary);
 }
 
 .help-text {
@@ -162,30 +166,6 @@
   margin-top: 0.25rem;
 }
 
-.radio-group, .checkbox-group {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.radio-group .form-check, .checkbox-group .form-check {
-  padding: 0.75rem 1.25rem;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  margin: 0;
-}
-
-.radio-group .form-check:hover, .checkbox-group .form-check:hover {
-  border-color: #667eea;
-  background: #f8f9ff;
-}
-
-.radio-group .form-check-input:checked ~ .form-check-label,
-.checkbox-group .form-check-input:checked ~ .form-check-label {
-  color: #667eea;
-  font-weight: 600;
-}
 
 /* WhatsApp Modal Styles */
 .modal-content {
@@ -206,4 +186,89 @@
 
 .btn-close {
   filter: brightness(0) invert(1);
+}
+
+/* Modern Radio Button Group Styles */
+.radio-group {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.radio-group .form-check {
+  flex: 1;
+  min-width: 2rem;
+  margin: 0;
+}
+
+.radio-group .form-check-input {
+  display: none;
+}
+
+.radio-group .form-check-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 1rem 1.5rem;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  background: #cfcece;
+  color: #6c757d;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  text-align: center;
+}
+
+.radio-group .form-check-label:hover {
+  border-color: var(--brand-primary);
+  background: rgba(255, 211, 59, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.radio-group .form-check-input:checked + .form-check-label {
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+  border-color: var(--brand-primary);
+  color: var(--brand-grey-800);
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(255, 211, 59, 0.3);
+  transform: translateY(-2px);
+}
+
+.radio-group .form-check-input:checked + .form-check-label::before {
+  content: '\2713';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  background: var(--brand-grey-800);
+  color: var(--brand-primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.radio-group .form-check-input:focus + .form-check-label {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+/* Responsive adjustments for radio groups */
+@media (max-width: 576px) {
+  .radio-group {
+    flex-direction: column;
+  }
+
+  .radio-group .form-check {
+    width: 100%;
+    min-width: unset;
+  }
 }

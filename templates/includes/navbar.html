@@ -45,10 +45,17 @@
                 </li>
                 <li><hr class="dropdown-divider"></li>
                 <li>
-                  <a class="dropdown-item-modern" href="{% url 'core:main_dashboard' %}">
-                    <i class="fa-solid fa-gauge-high me-2"></i>
-                    Dashboard
-                  </a>
+                  {% if user.profile.is_staff %}
+                    <a class="dropdown-item-modern" href="{% url 'workforce:wf_dashboard' %}">
+                      <i class="fa-solid fa-gauge-high me-2"></i>
+                      Dashboard
+                    </a>
+                  {% else %}
+                    <a class="dropdown-item-modern" href="{% url 'core:main_dashboard' %}">
+                      <i class="fa-solid fa-gauge-high me-2"></i>
+                      Dashboard
+                    </a>
+                  {% endif %}
                 </li>
                 <li><hr class="dropdown-divider"></li>
                 <li>

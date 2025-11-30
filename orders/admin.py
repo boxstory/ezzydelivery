@@ -33,10 +33,13 @@ class OrderAdmin(ImportExportModelAdmin):
         }),
     )
 
-@admin.register(order_models.OrderProductList)
-class OrderProductListAdmin(ImportExportModelAdmin):
-    list_display = ('order', 'product01_name', 'product01_qty', 'product02_name', 'product02_qty')
-
+@admin.register(order_models.OrderItem)
+class OrderItemAdmin(ImportExportModelAdmin):
+    list_display = ('order', 'product', 'quantity', 'unit_price', 'total_price')
+    list_filter = ('order__created_at',)
+    search_fields = ('order__order_number', 'product__product_name')
+    raw_id_fields = ('order', 'product')
+    readonly_fields = ('created_at', 'updated_at')
 
 
 admin.site.register(order_models.OrderLog)

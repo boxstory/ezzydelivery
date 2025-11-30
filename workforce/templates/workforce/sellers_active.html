@@ -1,0 +1,125 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Active Sellers - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/wf_pages.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
+<!-- Page Title -->
+<h1 class="page-title">
+    <i class="fa-solid fa-circle-check me-2"></i>Active Sellers
+</h1>
+
+<!-- Search Section -->
+<div class="filter-section">
+    <form method="get" class="row g-3">
+        <div class="col-md-10">
+            <label for="searchInput" class="filter-label">
+                <i class="fa-solid fa-search me-2"></i>Search Sellers
+            </label>
+            <input type="text" id="searchInput" name="search" class="filter-input"
+                   placeholder="Search by name, email, phone..." value="{{ search }}">
+        </div>
+        <div class="col-md-2">
+            <label class="filter-label" style="visibility: hidden;">Action</label>
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="fa-solid fa-search me-2"></i>Search
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Sellers Table -->
+<div class="orders-table-container">
+    {% if page_obj %}
+    <table class="orders-table">
+        <thead>
+            <tr>
+                <th>Business Name</th>
+                <th>Contact</th>
+                <th>Total Orders</th>
+                <th>Member Since</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for business in page_obj %}
+            <tr>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="driver-icon me-3" style="width: 40px; height: 40px; background: #d4edda;">
+                            <i class="fa-solid fa-store" style="color: #28a745;"></i>
+                        </div>
+                        <div>
+                            <strong>{{ business.business_name|default:"Unknown Business" }}</strong>
+                            <br>
+                            <small class="text-muted">{{ business.business_code|default:"N/A" }}</small>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    {% if business.business_email %}
+                    <div><i class="fa-solid fa-envelope me-2"></i>{{ business.business_email }}</div>
+                    {% endif %}
+                    {% if business.business_phone %}
+                    <div><i class="fa-solid fa-phone me-2"></i>{{ business.business_phone }}</div>
+                    {% endif %}
+                </td>
+                <td>
+                    <strong>{{ business.total_orders|default:0 }}</strong> orders
+                </td>
+                <td>{{ business.business_since|date:"d M Y"|default:"N/A" }}</td>
+                <td>
+                    <span class="status-badge status-active">
+                        <i class="fa-solid fa-circle-check me-1"></i>Active & Verified
+                    </span>
+                </td>
+                <td>
+                    <a href="{% url 'workforce:business_license_detail' business.business_id %}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fa-solid fa-eye me-1"></i>View
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-container">
+        <nav aria-label="Page navigation">
+            <ul class="pagination">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}">Previous</a>
+                </li>
+                {% endif %}
+
+                <li class="page-item active">
+                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                </li>
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}">Next</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-store"></i>
+        <h3>No Active Sellers</h3>
+        <p>{% if search %}No sellers match your search criteria.{% else %}There are no active sellers yet.{% endif %}</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock content %}

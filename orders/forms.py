@@ -102,31 +102,30 @@ class AddOrderForm(forms.ModelForm):
 
 
 class AddOrderProductsForm(forms.ModelForm):
+    """Form for adding products to an order using OrderItem model"""
 
     class Meta:
-        model = OrderProductList
-        fields = '__all__'
+        model = OrderItem
+        fields = ['order', 'product', 'quantity', 'unit_price', 'notes']
 
         labels = {
-            'product01_name': 'Product 1',
-            'product01_qty': 'Quantity',
-            'product02_name': 'Product 2',
-            'product02_qty': 'Quantity',
-            'product03_name': 'Product 3',
-            'product03_qty': 'Quantity',
-            'product04_name': 'Product 4',
-            'product04_qty': 'Quantity',
-            'product05_name': 'Product 5',
-            'product05_qty': 'Quantity',
-            'product06_name': 'Product 6',
-            'product06_qty': 'Quantity',
-            'product07_name': 'Product 7',
-            'product07_qty': 'Quantity',
+            'product': 'Product',
+            'quantity': 'Quantity',
+            'unit_price': 'Unit Price',
+            'notes': 'Notes',
+        }
+
+        widgets = {
+            'order': forms.HiddenInput(),
+            'quantity': forms.NumberInput(attrs={'min': 1, 'class': 'form-control'}),
+            'unit_price': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
+            'notes': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['order'].widget = forms.TextInput(attrs={'readonly': 'readonly', 'hidden': 'hidden'})
+        self.fields['product'].widget.attrs.update({'class': 'form-control'})
+        self.fields['notes'].required = False
 
         # Filter products by business if order instance exists
         if self.instance and self.instance.order_id:

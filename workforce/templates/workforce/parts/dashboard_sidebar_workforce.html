@@ -12,6 +12,43 @@
 
   <div id="workforce_sidebar_nav" class="sidebar-nav">
     <ul id="workforce_sidebar_menu_main" class="nav flex-column">
+      <!-- Sellers Section -->
+      <li id="workforce_sidebar_menu_sellers" class="nav-item {% if request.resolver_match.url_name == 'sellers_list' or request.resolver_match.url_name == 'sellers_pending' or request.resolver_match.url_name == 'sellers_active' or request.resolver_match.url_name == 'sellers_inactive' %}active{% endif %}">
+        <a id="workforce_sidebar_link_sellers" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-sellers" href="#">
+          <i class="fa-solid fa-store me-2"></i>
+          <span>Sellers</span>
+          <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
+        </a>
+        <div class="collapse submenu" id="submenu-sellers">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_all_sellers" class="nav-link btn submenu-link" href="{% url 'workforce:sellers_list' %}">
+                <i class="fa-solid fa-list me-2"></i>
+                All Sellers
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_sellers_pending" class="nav-link btn submenu-link" href="{% url 'workforce:sellers_pending' %}">
+                <i class="fa-solid fa-clock me-2"></i>
+                Pending Approval
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_sellers_active" class="nav-link btn submenu-link" href="{% url 'workforce:sellers_active' %}">
+                <i class="fa-solid fa-circle-check me-2"></i>
+                Active Sellers
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_sellers_inactive" class="nav-link btn submenu-link" href="{% url 'workforce:sellers_inactive' %}">
+                <i class="fa-solid fa-circle-xmark me-2"></i>
+                Inactive Sellers
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
       <!-- Orders Section -->
       <li id="workforce_sidebar_menu_orders" class="nav-item {% if request.resolver_match.url_name == 'all_orders' or request.resolver_match.url_name == 'orders_to_publish' or request.resolver_match.url_name == 'orders_published' %}active{% endif %}">
         <a id="workforce_sidebar_link_orders" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-orders" href="#">
@@ -25,6 +62,12 @@
               <a id="workforce_sidebar_link_all_orders" class="nav-link btn submenu-link" href="{% url 'workforce:all_orders' %}">
                 <i class="fa-solid fa-list me-2"></i>
                 All Orders List
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_orders_by_seller" class="nav-link btn submenu-link" href="{% url 'workforce:orders_by_seller' %}">
+                <i class="fa-solid fa-store me-2"></i>
+                Order by Seller
               </a>
             </li>
             <li class="nav-item">

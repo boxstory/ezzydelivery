@@ -420,11 +420,11 @@ def main_dashboard(request):
     if core_models.Profile.objects.filter(user_id=request.user.id).exists():
         profile = core_models.Profile.objects.get(user_id=request.user.id)
 
-        # Staff users don't need verification
+        # Staff users don't need verification - check this FIRST before any other checks
         if profile.is_staff:
             return redirect('workforce:wf_dashboard')
 
-        # Check if profile is completed
+        # Check if profile is completed (only for non-staff users)
         if not profile.is_profile_completed:
             messages.warning(request, "Please complete your profile to access the dashboard.")
             return redirect('core:profile_complete_update')
@@ -686,6 +686,11 @@ def profile_complete_update(request):
         messages.error(request, "Please create a profile first!")
         return redirect('core:profile_add')
 
+    # Staff users don't need to complete profile or select role - redirect to staff dashboard
+    if profile.is_staff:
+        messages.info(request, "Welcome to the staff dashboard!")
+        return redirect('workforce:wf_dashboard')
+
     # Ensure profile username matches Django User username
     if profile.username != request.user.username:
         profile.username = request.user.username
@@ -763,6 +768,11 @@ def business_register(request):
     except core_models.Profile.DoesNotExist:
         messages.error(request, "Please complete your profile first!")
         return redirect('core:profile_complete_update')
+
+    # Staff users don't need to register as business - redirect to staff dashboard
+    if profile.is_staff:
+        messages.warning(request, "Staff users cannot register as business. Redirecting to staff dashboard.")
+        return redirect('workforce:wf_dashboard')
 
     # Check if profile is completed
     if not profile.is_profile_completed:
@@ -855,6 +865,11 @@ def driver_register(request):
     except core_models.Profile.DoesNotExist:
         messages.error(request, "Please complete your profile first!")
         return redirect('core:profile_complete_update')
+
+    # Staff users don't need to register as driver - redirect to staff dashboard
+    if profile.is_staff:
+        messages.warning(request, "Staff users cannot register as driver. Redirecting to staff dashboard.")
+        return redirect('workforce:wf_dashboard')
 
     # Check if profile is completed
     if not profile.is_profile_completed:

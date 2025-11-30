@@ -107,7 +107,8 @@ def all_delivery_tasks(request):
     ).prefetch_related(
         'assigned_drivers',               # M2M: DeliveryTask ← AssignedDriver → Driver
         'assigned_drivers__driver',       # Through AssignedDriver
-        'order__order_product_list',      # Reverse FK: Order ← OrderProductList
+        'order__order_items',             # Reverse FK: Order ← OrderItem (related_name='order_items')
+        'order__order_items__product',    # Through: OrderItem → Product
     ).order_by('-id')
 
     logger.debug(f"Fetched {dl_tasks.count()} delivery tasks")

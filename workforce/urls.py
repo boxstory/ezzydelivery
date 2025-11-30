@@ -9,8 +9,15 @@ app_name = 'workforce'
 urlpatterns = [
     path('dashboard/', workforce_views.wf_dashboard, name='wf_dashboard'),
 
+    # Sellers section urls -------------------------------------------------------------------
+    path('sellers/', workforce_views.sellers_list, name='sellers_list'),
+    path('sellers/pending/', workforce_views.sellers_pending, name='sellers_pending'),
+    path('sellers/active/', workforce_views.sellers_active, name='sellers_active'),
+    path('sellers/inactive/', workforce_views.sellers_inactive, name='sellers_inactive'),
+
     #Orders sections urls -------------------------------------------------------------------
     path('orders/all/', workforce_views.all_orders, name='all_orders'),
+    path('orders/by-seller/', workforce_views.orders_by_seller, name='orders_by_seller'),
     path('orders/to_publish/', workforce_views.orders_to_publish, name='orders_to_publish'),
     path('orders/published/', workforce_views.orders_published, name='orders_published'),
     path('orders/pending-verification/', workforce_views.orders_pending_verification, name='orders_pending_verification'),

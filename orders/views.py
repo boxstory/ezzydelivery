@@ -48,7 +48,8 @@ def orders_all_list(request):
         'address_verified_by',   # FK: Order → User (address verifier)
         'verified_by',           # FK: Order → User (order verifier)
     ).prefetch_related(
-        'order_product_list',          # Reverse FK: Order ← OrderProductList
+        'order_items',                 # Reverse FK: Order ← OrderItem (related_name='order_items')
+        'order_items__product',        # Through: OrderItem → Product
         'delivery_task',               # Reverse FK: Order ← DeliveryTask
         'delivery_task__driver',       # Through: DeliveryTask → Driver
         'delivery_task__business',     # Through: DeliveryTask → Business
@@ -396,29 +397,31 @@ def add_order_product(request, order_id):
 
         logger.info(f"User {request.user.id} adding products to order {order_id}")
 
-        try:
-            order_product_list = orders_models.OrderProductList.objects.get(order_id=order_id)
-        except orders_models.OrderProductList.DoesNotExist:
-            order_product_list = orders_models.OrderProductList.objects.create(order_id=order_id)
+        # Get existing items for this order
+        existing_items = orders_models.OrderItem.objects.filter(order=order)
 
         if request.method == 'POST':
             logger.info(f"Processing product addition for order {order_id}")
-            form = orders_forms.AddOrderProductsForm(request.POST, instance=order_product_list)
+            form = orders_forms.AddOrderProductsForm(request.POST)
 
+            # Set the order for the form
             if form.is_valid():
-                logger.info(f"Products added successfully to order {order_id}")
-                form.save()
-                messages.success(request, "Products added to order successfully")
+                order_item = form.save(commit=False)
+                order_item.order = order
+                order_item.save()
+                logger.info(f"Product added successfully to order {order_id}")
+                messages.success(request, "Product added to order successfully")
                 return redirect('orders:orders_all_list')
             else:
                 logger.warning(f"Invalid product form for order {order_id}: {form.errors}")
         else:
-            form = orders_forms.AddOrderProductsForm(instance=order_product_list)
+            form = orders_forms.AddOrderProductsForm(initial={'order': order})
 
         data = {
             'order': order,
             'form': form,
-            'business': business
+            'business': business,
+            'existing_items': existing_items
         }
         return render(request, 'orders/add_order_product.html', data)
 
@@ -437,20 +440,20 @@ def add_order_product(request, order_id):
 def add_order_with_product(request):
     business = business_models.Business.objects.get(
         user_id=request.user.id)
-    OrderFormset = inlineformset_factory(orders_models.Order, orders_models.OrderProductList, form=orders_forms.AddOrderProductsForm, extra=1)
+    OrderFormset = inlineformset_factory(orders_models.Order, orders_models.OrderItem, form=orders_forms.AddOrderProductsForm, extra=1)
     if request.method == 'POST':
-        order_product_formset = OrderFormset(queryset=orders_models.OrderProductList.objects.none())
-        
-        
-            
+        order_product_formset = OrderFormset(queryset=orders_models.OrderItem.objects.none())
+
+
+
         if order_product_formset.is_valid():
                 order_product_formset.save()
-                
+
                 return redirect('orders:orders_all_list')
-    
+
     else:
-        
-        order_product_formset = OrderFormset(queryset=orders_models.OrderProductList.objects.none())
+
+        order_product_formset = OrderFormset(queryset=orders_models.OrderItem.objects.none())
         
     
     context = {
@@ -589,60 +592,54 @@ def order_details(request, order_id):
 
 @login_required(login_url='account_login')
 def update_order_product(request, order_id):
+    """Update order product items using OrderItem model"""
     order = orders_models.Order.objects.get(id=order_id)
-    try:
-        order_product_list = orders_models.OrderProductList.objects.get(order_id=order_id)
-    except:
-        order_product_list = orders_models.OrderProductList.objects.create(order_id=order_id)
+    order_items = orders_models.OrderItem.objects.filter(order=order)
+
     if request.method == 'POST':
             print("POST form in views")
-            form = orders_forms.AddOrderProductsForm(request.POST, instance=order_product_list)
-            #print(form)
+            form = orders_forms.AddOrderProductsForm(request.POST)
+
             if form.is_valid():
                 print("valid form")
-                form.save()
+                order_item = form.save(commit=False)
+                order_item.order = order
+                order_item.save()
                 return  redirect('orders:orders_all_list')
     else:
-        form = orders_forms.AddOrderProductsForm(instance=order_product_list)
+        form = orders_forms.AddOrderProductsForm(initial={'order': order})
         print('else form')
+
     data = {
         'order': order,
-        'form': form
+        'form': form,
+        'order_items': order_items
     }
     return render(request, 'orders/update_order_product.html', data)
 
 def order_product_list(request, order_id):
+    """List all products in an order using OrderItem model"""
     order = get_object_or_404(orders_models.Order, id=order_id)
     print('order' + str(order))
-    ordered_products = order.order_product_list.all()
-    listed_product = []
-    processed_order_products = []
+    ordered_items = order.order_items.select_related('product').all()  # Using related_name='order_items'
 
-    for ordered_product in ordered_products:
-        product_list = []
-        for field in orders_models.OrderProductList._meta.get_fields():
-            if 'product' in field.name and 'name' in field.name:
-                qty_field = field.name.replace('name', 'qty')
-                product_name = getattr(ordered_product, field.name)
-                product_qty = getattr(ordered_product, qty_field)
-                if product_name and product_qty > 0:  # Filter out products with zero quantity
-                    product_list.append({
-                        'name': product_name,
-                        'qty': product_qty
-                    })
-        if product_list:  # Only add non-empty product lists
-            listed_product.append(product_list)
-      
-     
+    # Format items for display
+    listed_products = []
+    for item in ordered_items:
+        listed_products.append({
+            'product_name': item.product.product_name if item.product else 'Unknown Product',
+            'quantity': item.quantity,
+            'unit_price': item.unit_price,
+            'total_price': item.total_price or (item.quantity * item.unit_price if item.unit_price else 0)
+        })
 
-
-    print( ordered_products)
-    print( listed_product)
+    print('Ordered items:', ordered_items)
+    print('Listed products:', listed_products)
 
     data = {
         'order': order,
-        'ordered_products': ordered_products,
-        'listed_product': listed_product,
+        'ordered_items': ordered_items,
+        'listed_products': listed_products,
     }
     return render(request, 'orders/parts/order_product_list.html', data)
 
