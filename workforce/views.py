@@ -1093,7 +1093,7 @@ def orders_reported(request):
 def tasks_followup_list(request):
     """View for follow-up tasks list"""
     tasks_list = delivery_models.DeliveryTask.objects.filter(
-        dl_pickup_status='scheduled'
+        dl_task_status='pending'
     ).order_by('-created_at')
 
     tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
@@ -1109,7 +1109,7 @@ def tasks_followup_list(request):
 def tasks_dms_updated(request):
     """View for DMS updated tasks list"""
     tasks_list = delivery_models.DeliveryTask.objects.filter(
-        dl_dms_status__isnull=False
+        dl_task_status_dms__isnull=False
     ).order_by('-created_at')
 
     tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
@@ -1123,9 +1123,9 @@ def tasks_dms_updated(request):
 
 @login_required(login_url='/accounts/login/')
 def tasks_reported(request):
-    """View for reported tasks list"""
+    """View for reported tasks list - showing rejected/cancelled tasks"""
     tasks_list = delivery_models.DeliveryTask.objects.filter(
-        dl_pickup_status='reported'
+        dl_task_status__in=['rejected', 'cancelled']
     ).order_by('-created_at')
 
     tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
@@ -1144,8 +1144,8 @@ def dms_publish_order(request):
     from orders import models as orders_models
 
     orders_list = orders_models.Order.objects.filter(
-        order_status='verified',
-        order_dms_id__isnull=True
+        verification_status='verified',
+        task_created=False
     ).order_by('-created_at')
 
     orders_with_pagination = paginate_queryset(request, orders_list, items_per_page=20)
@@ -1234,10 +1234,10 @@ def staff_reports(request):
 
     total_tasks = delivery_models.DeliveryTask.objects.count()
     active_tasks = delivery_models.DeliveryTask.objects.filter(
-        dl_pickup_status__in=['assigned', 'in_transit', 'picked_up']
+        dl_task_status__in=['in_transit', 'pending', 'address_pending']
     ).count()
     completed_tasks = delivery_models.DeliveryTask.objects.filter(
-        dl_pickup_status='delivered'
+        dl_task_status='delivered'
     ).count()
 
     total_drivers = fleet_models.Driver.objects.count()
