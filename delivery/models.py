@@ -211,3 +211,76 @@ class AssignedDriver(models.Model):
     class Meta:
         verbose_name_plural = "Assigned Driver"
         app_label = 'delivery'
+
+
+def shipping_label_upload_path(instance, filename):
+    """Generate upload path for shipping labels"""
+    import os
+    return os.path.join('shipping_labels', str(instance.order.business.business_code), filename)
+
+
+class ShippingLabel(models.Model):
+    """Automated shipping label created when order is published to delivery task"""
+    LABEL_STATUS = (
+        ('generated', 'Generated'),
+        ('printed', 'Printed'),
+        ('attached', 'Attached to Package'),
+        ('void', 'Void'),
+    )
+
+    LABEL_FORMAT = (
+        ('pdf', 'PDF'),
+        ('png', 'PNG'),
+        ('zpl', 'ZPL (Zebra)'),
+    )
+
+    # Relationships - linked to both Order and DeliveryTask
+    order = models.ForeignKey(
+        orders_models.Order, on_delete=models.CASCADE, related_name='shipping_labels')
+    delivery_task = models.ForeignKey(
+        DeliveryTask, on_delete=models.CASCADE, related_name='shipping_labels')
+
+    # Label identification
+    label_number = models.CharField(max_length=100, unique=True, db_index=True)
+    barcode_data = models.CharField(max_length=255, blank=True, null=True)
+
+    # Label file
+    label_file = models.FileField(upload_to=shipping_label_upload_path, blank=True, null=True)
+    label_format = models.CharField(max_length=10, choices=LABEL_FORMAT, default='png')
+
+    # Label content (stored for regeneration)
+    sender_name = models.CharField(max_length=255)
+    sender_address = models.TextField()
+    sender_phone = models.CharField(max_length=20)
+
+    recipient_name = models.CharField(max_length=255)
+    recipient_address = models.TextField()
+    recipient_phone = models.CharField(max_length=20)
+    recipient_zone = models.PositiveIntegerField(blank=True, null=True)
+    recipient_street = models.PositiveIntegerField(blank=True, null=True)
+    recipient_building = models.PositiveIntegerField(blank=True, null=True)
+
+    # Delivery details on label
+    cod_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    delivery_notes = models.TextField(blank=True, null=True)
+
+    # Status tracking
+    status = models.CharField(max_length=20, choices=LABEL_STATUS, default='generated')
+    printed_at = models.DateTimeField(blank=True, null=True)
+    printed_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='printed_labels')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Label {self.label_number} - {self.order.order_number}"
+
+    class Meta:
+        verbose_name_plural = "Shipping Labels"
+        app_label = 'delivery'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['label_number'], name='label_number_idx'),
+            models.Index(fields=['order', 'delivery_task'], name='label_order_task_idx'),
+        ]
