@@ -27,6 +27,7 @@ urlpatterns = [
     #uploading order files
     path('upload_file/', orders_views.order_upload_file, name='order_upload_file'),
     path('review_data/', orders_views.order_upload_review_data, name='order_upload_review_data'),
+    path('bulk_entry/', orders_views.bulk_order_entry, name='bulk_order_entry'),
 
     # Products add to order list
     path('add_order_product/<int:order_id>/', 

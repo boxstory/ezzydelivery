@@ -55,12 +55,4 @@ urlpatterns = [
           fleet_views.driver_reports, name='driver_reports'),
      path('analytics/',
           fleet_views.driver_analytics, name='driver_analytics'),
-
-
-
-    #     path('delivery_tasks/<int:dl_id>/',
-    #          fleet_views.single_delivery_task, name='single_delivery_task'),
-    #     path('delivery_address_details/',
-    #          delivery_views.delivery_address_details, name='delivery_address_details'),
-
 ]

@@ -177,9 +177,9 @@
                     <i class="fa-solid fa-save"></i>
                     Save Changes
                 </button>
-                <button type="button" onclick="window.location.href='{% url 'workforce:business_licenses_list' %}'" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; color: var(--brand-grey-800);">
+                <a href="{% url 'workforce:business_licenses_list' %}" class="cancel-btn" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; color: var(--brand-grey-800); text-decoration: none; display: inline-block;">
                     Cancel
-                </button>
+                </a>
             </div>
         </div>
     </form>
@@ -191,11 +191,31 @@
 
 {% block extra_js %}
 <script>
+    // Safe message display helper (XSS-safe)
+    function showMessage(messageDiv, isSuccess, text) {
+        messageDiv.style.display = 'block';
+        messageDiv.style.background = isSuccess ? '#d4edda' : '#f8d7da';
+        messageDiv.style.color = isSuccess ? '#155724' : '#721c24';
+        // Use textContent for safe text insertion
+        messageDiv.textContent = '';
+        const icon = document.createElement('i');
+        icon.className = isSuccess ? 'fa-solid fa-check-circle' : 'fa-solid fa-exclamation-triangle';
+        icon.setAttribute('aria-hidden', 'true');
+        messageDiv.appendChild(icon);
+        messageDiv.appendChild(document.createTextNode(' ' + text));
+    }
+
     document.getElementById('updateForm').addEventListener('submit', function(e) {
         e.preventDefault();
 
         const formData = new FormData(this);
         const messageDiv = document.getElementById('updateMessage');
+        const submitBtn = this.querySelector('button[type="submit"]');
+
+        // Disable submit button during request
+        submitBtn.disabled = true;
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Saving...';
 
         fetch('{% url 'workforce:business_license_detail' business.business_id %}', {
             method: 'POST',
@@ -204,28 +224,28 @@
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
-                messageDiv.style.display = 'block';
-                messageDiv.style.background = '#d4edda';
-                messageDiv.style.color = '#155724';
-                messageDiv.innerHTML = '<i class="fa-solid fa-check-circle"></i> ' + data.message;
+                showMessage(messageDiv, true, data.message || 'Business license updated successfully');
                 setTimeout(() => {
                     window.location.reload();
                 }, 1500);
             } else {
-                messageDiv.style.display = 'block';
-                messageDiv.style.background = '#f8d7da';
-                messageDiv.style.color = '#721c24';
-                messageDiv.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> ' + data.error;
+                showMessage(messageDiv, false, data.error || 'Failed to update business license');
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
             }
         })
         .catch(error => {
-            messageDiv.style.display = 'block';
-            messageDiv.style.background = '#f8d7da';
-            messageDiv.style.color = '#721c24';
-            messageDiv.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Error updating business license';
+            showMessage(messageDiv, false, 'Error updating business license. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
         });
     });
 </script>

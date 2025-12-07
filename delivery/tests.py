@@ -40,8 +40,9 @@ class DeliveryTaskModelTestCase(TestCase):
         # Create profile
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Task User',
-            mobile_no='12345678'
+            first_name='Task',
+            last_name='User',
+            phone=12345678
         )
 
         # Create business
@@ -87,8 +88,9 @@ class DeliveryTaskModelTestCase(TestCase):
 
         self.driver_profile = Profile.objects.create(
             user=self.driver_user,
-            full_name='Test Driver',
-            mobile_no='22222222'
+            first_name='Test',
+            last_name='Driver',
+            phone=22222222
         )
 
         self.driver = Driver.objects.create(
@@ -169,8 +171,9 @@ class DeliveryTaskStatusTestCase(TestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Status User',
-            mobile_no='33333333'
+            first_name='Status',
+            last_name='User',
+            phone=33333333
         )
 
         self.business = Business.objects.create(
@@ -296,8 +299,9 @@ class DlAddressUpdateTestCase(TestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Address User',
-            mobile_no='55555555'
+            first_name='Address',
+            last_name='User',
+            phone=55555555
         )
 
         self.business = Business.objects.create(
@@ -398,8 +402,9 @@ class DriverAssignmentTestCase(TestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Assign User',
-            mobile_no='10101010'
+            first_name='Assign',
+            last_name='User',
+            phone=10101010
         )
 
         self.business = Business.objects.create(
@@ -442,8 +447,9 @@ class DriverAssignmentTestCase(TestCase):
 
         self.driver_profile1 = Profile.objects.create(
             user=self.driver_user1,
-            full_name='Driver Two',
-            mobile_no='22222222'
+            first_name='Driver',
+            last_name='Two',
+            phone=22222222
         )
 
         self.driver1 = Driver.objects.create(
@@ -499,8 +505,9 @@ class DriverAssignmentTestCase(TestCase):
 
         driver_profile2 = Profile.objects.create(
             user=driver_user2,
-            full_name='Driver Three',
-            mobile_no='33333333'
+            first_name='Driver',
+            last_name='Three',
+            phone=33333333
         )
 
         driver2 = Driver.objects.create(
@@ -547,8 +554,9 @@ class DMSPushTestCase(TransactionTestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='DMS User',
-            mobile_no='44444444'
+            first_name='DMS',
+            last_name='User',
+            phone=44444444
         )
 
         self.business = Business.objects.create(
@@ -665,8 +673,9 @@ class DeliveryTaskPricingTestCase(TestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Price User',
-            mobile_no='66666666'
+            first_name='Price',
+            last_name='User',
+            phone=66666666
         )
 
         self.business = Business.objects.create(

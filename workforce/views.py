@@ -385,12 +385,6 @@ def orders_pending_verification(request):
 
 
 
-# Order Uploading verification section  ------------------------------------------------------------------------------------------------------
-
-
-#@todo
-
-
 # Delivery Tasks section  ------------------------------------------------------------------------------------------------------
 
 @login_required(login_url='/accounts/login/')

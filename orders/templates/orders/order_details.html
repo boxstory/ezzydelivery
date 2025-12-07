@@ -1,0 +1,194 @@
+{% extends "client_dashboard_base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% block head_title %}Order Details - {{ order.order_number }}{% endblock %}
+{% block extra_css %}
+  <link href="{% static 'orders/css/orders_main.css' %}"
+        rel="stylesheet"
+        type="text/css" />
+{% endblock extra_css %}
+{% block content %}
+  <div class="col-12" id="order_details_container_main">
+    <section class="d--block" id="order_details_section_main">
+      <div class="col-12 pb-2">
+        <div class="ms-3">
+          <!-- Header -->
+          <div class="col-md-12 pt-md-4 d-flex flex-wrap justify-content-between pb-md-4"
+               id="order_details_header">
+            <div class="m-0 fs-4 fw-bolder" id="order_details_title">Order Details - #{{ order.order_number }}</div>
+            <div id="order_details_nav_actions">
+              <a class="btn btn-outline-dark pe-3"
+                 href="{% url 'orders:orders_all_list' %}"
+                 id="order_details_btn_back">
+                <i class="fa fa-arrow-left me-2"></i> Back to Orders
+              </a>
+              <a class="btn btn-dark pe-3 text-white"
+                 href="{% url 'orders:order_update' order.id %}"
+                 id="order_details_btn_edit">
+                <i class="fa fa-edit me-2"></i> Edit Order
+              </a>
+            </div>
+          </div>
+          <!-- Order Info Card -->
+          <div class="card mb-4" id="order_details_card_info">
+            <div class="card-header bg-dark text-white">
+              <h5 class="mb-0">Order Information</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <table class="table table-borderless">
+                    <tbody>
+                      <tr>
+                        <th scope="row">Order Number:</th>
+                        <td>{{ order.order_number }}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Client Order Code:</th>
+                        <td>{{ order.client_order_code }}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Order Status:</th>
+                        <td>
+                          <span class="badge {% if order.order_status == 'publish' %}bg-success{% elif order.order_status == 'to_review' %}bg-warning{% else %}bg-secondary{% endif %}">
+                            {{ order.get_order_status_display }}
+                          </span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Task Status:</th>
+                        <td>
+                          <span class="badge bg-info">{{ order.get_task_status_display }}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Order Date:</th>
+                        <td>{{ order.order_date }}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Deadline:</th>
+                        <td>{{ order.deadline_date|default:"-" }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <table class="table table-borderless">
+                    <tbody>
+                      <tr>
+                        <th scope="row">COD Amount:</th>
+                        <td>{{ order.cod_amount }}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Delivery Amount:</th>
+                        <td>{{ order.dl_amount }}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Delivery Included:</th>
+                        <td>
+                          {% if order.dl_included %}
+                            <i class="fa fa-check text-success"></i>
+                          {% else %}
+                            <i class="fa fa-times text-danger"></i>
+                          {% endif %}
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Verification Status:</th>
+                        <td>
+                          <span class="badge {% if order.verification_status == 'verified' %}bg-success{% elif order.verification_status == 'pending' %}bg-warning{% else %}bg-secondary{% endif %}">
+                            {{ order.get_verification_status_display }}
+                          </span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Created:</th>
+                        <td>{{ order.created_at }}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Updated:</th>
+                        <td>{{ order.updated_at }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {% if order.order_notes %}
+                <div class="row mt-3">
+                  <div class="col-12">
+                    <strong>Order Notes:</strong>
+                    <p class="mb-0">{{ order.order_notes }}</p>
+                  </div>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+          <!-- Customer Details Card -->
+          <div class="card mb-4" id="order_details_card_customer">
+            <div class="card-header bg-dark text-white">
+              <h5 class="mb-0">Customer Details</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <table class="table table-borderless">
+                    <tbody>
+                      <tr>
+                        <th scope="row">Name:</th>
+                        <td>{{ order.customer_name|default:"-" }}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Phone:</th>
+                        <td>{{ order.customer_phone|default:"-" }}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">WhatsApp:</th>
+                        <td>{{ order.customer_whatsapp|default:"-" }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <table class="table table-borderless">
+                    <tbody>
+                      <tr>
+                        <th scope="row">Address:</th>
+                        <td>{{ order.customer_address|default:"-" }}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Zone:</th>
+                        <td>{{ order.dl_zone|default:"-" }}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Building:</th>
+                        <td>{{ order.dl_building|default:"-" }}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Street:</th>
+                        <td>{{ order.dl_street|default:"-" }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Pickup Location Card -->
+          {% if order.pickup_location %}
+            <div class="card mb-4" id="order_details_card_pickup">
+              <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Pickup Location</h5>
+              </div>
+              <div class="card-body">
+                <p class="mb-0">{{ order.pickup_location }}</p>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+  </div>
+{% endblock content %}
+{% block extra_js %}
+  <script type="text/javascript" src="{% static 'orders/js/orders_main.js' %}"></script>
+{% endblock extra_js %}

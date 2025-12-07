@@ -1,0 +1,675 @@
+import uuid
+import logging
+from django.db import models
+from django.conf import settings
+
+from client import models as client_models
+from product import models as product_models
+
+logger = logging.getLogger('warehouse')
+
+
+# =============================================================================
+# CHOICES
+# =============================================================================
+
+LOCATION_TYPE_CHOICES = [
+    ('zone', 'Zone'),
+    ('aisle', 'Aisle'),
+    ('rack', 'Rack'),
+    ('shelf', 'Shelf'),
+    ('bin', 'Bin'),
+]
+
+TRANSACTION_TYPE_CHOICES = [
+    ('receive', 'Receive'),
+    ('ship', 'Ship'),
+    ('adjust_in', 'Adjustment In'),
+    ('adjust_out', 'Adjustment Out'),
+    ('transfer_in', 'Transfer In'),
+    ('transfer_out', 'Transfer Out'),
+    ('reserve', 'Reserve'),
+    ('unreserve', 'Unreserve'),
+    ('count', 'Cycle Count'),
+    ('return', 'Return'),
+]
+
+RESERVATION_STATUS_CHOICES = [
+    ('active', 'Active'),
+    ('released', 'Released'),
+    ('fulfilled', 'Fulfilled'),
+    ('cancelled', 'Cancelled'),
+]
+
+PICKLIST_STATUS_CHOICES = [
+    ('pending', 'Pending'),
+    ('assigned', 'Assigned'),
+    ('in_progress', 'In Progress'),
+    ('completed', 'Completed'),
+    ('cancelled', 'Cancelled'),
+]
+
+CYCLE_COUNT_STATUS_CHOICES = [
+    ('scheduled', 'Scheduled'),
+    ('in_progress', 'In Progress'),
+    ('pending_review', 'Pending Review'),
+    ('approved', 'Approved'),
+    ('completed', 'Completed'),
+]
+
+ABC_CLASSIFICATION_CHOICES = [
+    ('A', 'A - High Value'),
+    ('B', 'B - Medium Value'),
+    ('C', 'C - Low Value'),
+]
+
+ALERT_STATUS_CHOICES = [
+    ('active', 'Active'),
+    ('acknowledged', 'Acknowledged'),
+    ('resolved', 'Resolved'),
+]
+
+
+# =============================================================================
+# WAREHOUSE MODEL
+# =============================================================================
+
+class Warehouse(models.Model):
+    """
+    Represents a physical warehouse or storage facility.
+    Can optionally link to an existing PickupLocation.
+    """
+    business = models.ForeignKey(
+        client_models.Business,
+        on_delete=models.CASCADE,
+        related_name='warehouses',
+        db_index=True
+    )
+    name = models.CharField(max_length=200)
+    code = models.CharField(max_length=50, unique=True, db_index=True)
+    pickup_location = models.ForeignKey(
+        client_models.PickupLocation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='warehouses'
+    )
+    address = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Warehouse'
+        verbose_name_plural = 'Warehouses'
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            # Auto-generate code if not provided
+            self.code = f"WH-{self.business.business_code}-{uuid.uuid4().hex[:6].upper()}"
+        super().save(*args, **kwargs)
+
+
+# =============================================================================
+# STORAGE LOCATION MODEL
+# =============================================================================
+
+class StorageLocation(models.Model):
+    """
+    Hierarchical storage locations within a warehouse.
+    Supports zones, aisles, racks, shelves, and bins.
+    """
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.CASCADE,
+        related_name='locations',
+        db_index=True
+    )
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='children'
+    )
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=50, db_index=True)  # e.g., "A-01-03-B"
+    barcode = models.CharField(max_length=100, unique=True, db_index=True)
+    location_type = models.CharField(
+        max_length=20,
+        choices=LOCATION_TYPE_CHOICES,
+        default='bin'
+    )
+    is_pickable = models.BooleanField(default=True)  # Can pick from this location
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Storage Location'
+        verbose_name_plural = 'Storage Locations'
+        unique_together = ['warehouse', 'code']
+        ordering = ['warehouse', 'code']
+        indexes = [
+            models.Index(fields=['warehouse', 'location_type'], name='wh_loc_type_idx'),
+            models.Index(fields=['barcode'], name='wh_loc_barcode_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.warehouse.code}/{self.code}"
+
+    def save(self, *args, **kwargs):
+        if not self.barcode:
+            # Auto-generate barcode if not provided
+            self.barcode = f"LOC-{self.warehouse.code}-{self.code}-{uuid.uuid4().hex[:4].upper()}"
+        super().save(*args, **kwargs)
+
+    @property
+    def full_path(self):
+        """Returns the full path from zone to this location"""
+        path = [self.code]
+        parent = self.parent
+        while parent:
+            path.insert(0, parent.code)
+            parent = parent.parent
+        return '/'.join(path)
+
+
+# =============================================================================
+# STOCK LEVEL MODEL
+# =============================================================================
+
+class StockLevel(models.Model):
+    """
+    Tracks inventory quantities for a product at a specific warehouse/location.
+    """
+    product = models.ForeignKey(
+        product_models.Product,
+        on_delete=models.CASCADE,
+        related_name='stock_levels',
+        db_index=True
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.CASCADE,
+        related_name='stock_levels',
+        db_index=True
+    )
+    location = models.ForeignKey(
+        StorageLocation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='stock_levels'
+    )
+    quantity_on_hand = models.IntegerField(default=0)
+    quantity_reserved = models.IntegerField(default=0)  # Reserved for pending orders
+    quantity_incoming = models.IntegerField(default=0)  # Expected from POs
+    reorder_point = models.IntegerField(default=0)
+    reorder_quantity = models.IntegerField(default=0)
+    abc_classification = models.CharField(
+        max_length=1,
+        choices=ABC_CLASSIFICATION_CHOICES,
+        default='C',
+        db_index=True
+    )
+    last_count_date = models.DateTimeField(null=True, blank=True)
+    last_count_quantity = models.IntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Stock Level'
+        verbose_name_plural = 'Stock Levels'
+        unique_together = ['product', 'warehouse', 'location']
+        ordering = ['warehouse', 'product']
+        indexes = [
+            models.Index(fields=['product', 'warehouse'], name='wh_stock_prod_wh_idx'),
+            models.Index(fields=['warehouse', '-quantity_on_hand'], name='wh_stock_qty_idx'),
+            models.Index(fields=['abc_classification'], name='wh_stock_abc_idx'),
+        ]
+
+    def __str__(self):
+        loc = f"/{self.location.code}" if self.location else ""
+        return f"{self.product.item_sku} @ {self.warehouse.code}{loc}"
+
+    @property
+    def quantity_available(self):
+        """Available quantity = on hand - reserved"""
+        return self.quantity_on_hand - self.quantity_reserved
+
+    @property
+    def is_low_stock(self):
+        """Check if stock is at or below reorder point"""
+        return self.reorder_point > 0 and self.quantity_available <= self.reorder_point
+
+    @property
+    def is_out_of_stock(self):
+        """Check if completely out of stock"""
+        return self.quantity_available <= 0
+
+
+# =============================================================================
+# INVENTORY TRANSACTION MODEL
+# =============================================================================
+
+class InventoryTransaction(models.Model):
+    """
+    Audit trail for all inventory movements.
+    Every stock change is recorded with before/after quantities.
+    """
+    transaction_number = models.CharField(max_length=50, unique=True, db_index=True)
+    product = models.ForeignKey(
+        product_models.Product,
+        on_delete=models.PROTECT,
+        related_name='inventory_transactions',
+        db_index=True
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name='transactions',
+        db_index=True
+    )
+    location = models.ForeignKey(
+        StorageLocation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='transactions'
+    )
+    transaction_type = models.CharField(
+        max_length=20,
+        choices=TRANSACTION_TYPE_CHOICES,
+        db_index=True
+    )
+    quantity = models.IntegerField()  # Positive for in, negative for out
+    quantity_before = models.IntegerField()
+    quantity_after = models.IntegerField()
+    reference_type = models.CharField(max_length=50, blank=True)  # 'order', 'transfer', 'count'
+    reference_id = models.CharField(max_length=100, blank=True)  # Order number, etc.
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='inventory_transactions'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Inventory Transaction'
+        verbose_name_plural = 'Inventory Transactions'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['product', '-created_at'], name='wh_txn_prod_date_idx'),
+            models.Index(fields=['warehouse', 'transaction_type', '-created_at'], name='wh_txn_wh_type_idx'),
+            models.Index(fields=['reference_type', 'reference_id'], name='wh_txn_ref_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.transaction_number} - {self.transaction_type} - {self.quantity}"
+
+    def save(self, *args, **kwargs):
+        if not self.transaction_number:
+            # Auto-generate transaction number
+            self.transaction_number = f"TXN-{uuid.uuid4().hex[:12].upper()}"
+        super().save(*args, **kwargs)
+
+
+# =============================================================================
+# STOCK RESERVATION MODEL
+# =============================================================================
+
+class StockReservation(models.Model):
+    """
+    Reserves stock for pending orders.
+    Released when order is fulfilled or cancelled.
+    """
+    order = models.ForeignKey(
+        'orders.Order',
+        on_delete=models.CASCADE,
+        related_name='stock_reservations',
+        db_index=True
+    )
+    order_item = models.ForeignKey(
+        'orders.OrderItem',
+        on_delete=models.CASCADE,
+        related_name='stock_reservations'
+    )
+    stock_level = models.ForeignKey(
+        StockLevel,
+        on_delete=models.CASCADE,
+        related_name='reservations'
+    )
+    quantity = models.IntegerField()
+    status = models.CharField(
+        max_length=20,
+        choices=RESERVATION_STATUS_CHOICES,
+        default='active',
+        db_index=True
+    )
+    reserved_at = models.DateTimeField(auto_now_add=True)
+    released_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Stock Reservation'
+        verbose_name_plural = 'Stock Reservations'
+        ordering = ['-reserved_at']
+        indexes = [
+            models.Index(fields=['order', 'status'], name='wh_res_order_status_idx'),
+            models.Index(fields=['stock_level', 'status'], name='wh_res_stock_status_idx'),
+        ]
+
+    def __str__(self):
+        return f"Reservation {self.id} - Order {self.order.order_number} - {self.quantity} units"
+
+
+# =============================================================================
+# PICK LIST MODELS
+# =============================================================================
+
+class PickList(models.Model):
+    """
+    A pick list groups items to be picked from the warehouse.
+    Supports wave picking for multiple orders.
+    """
+    pick_number = models.CharField(max_length=50, unique=True, db_index=True)
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.CASCADE,
+        related_name='pick_lists'
+    )
+    wave_number = models.CharField(max_length=50, blank=True, db_index=True)
+    status = models.CharField(
+        max_length=20,
+        choices=PICKLIST_STATUS_CHOICES,
+        default='pending',
+        db_index=True
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_picks'
+    )
+    assigned_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    total_items = models.IntegerField(default=0)
+    picked_items = models.IntegerField(default=0)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_picks'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Pick List'
+        verbose_name_plural = 'Pick Lists'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.pick_number} - {self.status}"
+
+    def save(self, *args, **kwargs):
+        if not self.pick_number:
+            self.pick_number = f"PICK-{uuid.uuid4().hex[:10].upper()}"
+        super().save(*args, **kwargs)
+
+    @property
+    def progress_percentage(self):
+        """Calculate picking progress percentage"""
+        if self.total_items == 0:
+            return 0
+        return int((self.picked_items / self.total_items) * 100)
+
+
+class PickListItem(models.Model):
+    """
+    Individual items within a pick list.
+    """
+    pick_list = models.ForeignKey(
+        PickList,
+        on_delete=models.CASCADE,
+        related_name='items'
+    )
+    order = models.ForeignKey(
+        'orders.Order',
+        on_delete=models.CASCADE,
+        related_name='pick_list_items'
+    )
+    order_item = models.ForeignKey(
+        'orders.OrderItem',
+        on_delete=models.CASCADE,
+        related_name='pick_list_items'
+    )
+    product = models.ForeignKey(
+        product_models.Product,
+        on_delete=models.PROTECT,
+        related_name='pick_list_items'
+    )
+    location = models.ForeignKey(
+        StorageLocation,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='pick_list_items'
+    )
+    quantity_to_pick = models.IntegerField()
+    quantity_picked = models.IntegerField(default=0)
+    is_picked = models.BooleanField(default=False)
+    picked_at = models.DateTimeField(null=True, blank=True)
+    picked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='picked_items'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Pick List Item'
+        verbose_name_plural = 'Pick List Items'
+        ordering = ['pick_list', 'location__code']
+
+    def __str__(self):
+        return f"{self.pick_list.pick_number} - {self.product.item_sku} x {self.quantity_to_pick}"
+
+
+# =============================================================================
+# CYCLE COUNT MODELS
+# =============================================================================
+
+class CycleCount(models.Model):
+    """
+    Scheduled inventory counts for accuracy verification.
+    """
+    count_number = models.CharField(max_length=50, unique=True, db_index=True)
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.CASCADE,
+        related_name='cycle_counts'
+    )
+    location = models.ForeignKey(
+        StorageLocation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='cycle_counts'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=CYCLE_COUNT_STATUS_CHOICES,
+        default='scheduled',
+        db_index=True
+    )
+    scheduled_date = models.DateField(db_index=True)
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_counts'
+    )
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_counts'
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_counts'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Cycle Count'
+        verbose_name_plural = 'Cycle Counts'
+        ordering = ['-scheduled_date']
+
+    def __str__(self):
+        return f"{self.count_number} - {self.status}"
+
+    def save(self, *args, **kwargs):
+        if not self.count_number:
+            self.count_number = f"COUNT-{uuid.uuid4().hex[:10].upper()}"
+        super().save(*args, **kwargs)
+
+    @property
+    def total_items(self):
+        return self.items.count()
+
+    @property
+    def counted_items(self):
+        return self.items.filter(is_counted=True).count()
+
+    @property
+    def total_variance(self):
+        """Sum of all variances"""
+        return self.items.filter(variance__isnull=False).aggregate(
+            total=models.Sum('variance')
+        )['total'] or 0
+
+
+class CycleCountItem(models.Model):
+    """
+    Individual items within a cycle count.
+    """
+    cycle_count = models.ForeignKey(
+        CycleCount,
+        on_delete=models.CASCADE,
+        related_name='items'
+    )
+    product = models.ForeignKey(
+        product_models.Product,
+        on_delete=models.PROTECT,
+        related_name='cycle_count_items'
+    )
+    location = models.ForeignKey(
+        StorageLocation,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='cycle_count_items'
+    )
+    system_quantity = models.IntegerField()  # Expected quantity from system
+    counted_quantity = models.IntegerField(null=True, blank=True)
+    variance = models.IntegerField(null=True, blank=True)  # counted - system
+    variance_reason = models.TextField(blank=True)
+    is_counted = models.BooleanField(default=False)
+    counted_at = models.DateTimeField(null=True, blank=True)
+    counted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='counted_items'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Cycle Count Item'
+        verbose_name_plural = 'Cycle Count Items'
+        ordering = ['cycle_count', 'location__code']
+
+    def __str__(self):
+        return f"{self.cycle_count.count_number} - {self.product.item_sku}"
+
+    def save(self, *args, **kwargs):
+        # Auto-calculate variance when counted_quantity is set
+        if self.counted_quantity is not None:
+            self.variance = self.counted_quantity - self.system_quantity
+        super().save(*args, **kwargs)
+
+
+# =============================================================================
+# LOW STOCK ALERT MODEL
+# =============================================================================
+
+class LowStockAlert(models.Model):
+    """
+    Alerts generated when stock falls below reorder point.
+    """
+    stock_level = models.ForeignKey(
+        StockLevel,
+        on_delete=models.CASCADE,
+        related_name='alerts'
+    )
+    product = models.ForeignKey(
+        product_models.Product,
+        on_delete=models.CASCADE,
+        related_name='low_stock_alerts'
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.CASCADE,
+        related_name='low_stock_alerts'
+    )
+    quantity_available = models.IntegerField()
+    reorder_point = models.IntegerField()
+    status = models.CharField(
+        max_length=20,
+        choices=ALERT_STATUS_CHOICES,
+        default='active',
+        db_index=True
+    )
+    acknowledged_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='acknowledged_alerts'
+    )
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Low Stock Alert'
+        verbose_name_plural = 'Low Stock Alerts'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['warehouse', 'status', '-created_at'], name='wh_alert_status_idx'),
+        ]
+
+    def __str__(self):
+        return f"Alert: {self.product.item_sku} @ {self.warehouse.code} - {self.quantity_available} units"

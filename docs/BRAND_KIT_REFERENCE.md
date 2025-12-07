@@ -166,7 +166,7 @@ This document is the **single source of truth** for all design decisions in the 
 --spacing-lg: 1.5rem;               /* 24px - Comfortable spacing */
 --spacing-xl: 2rem;                 /* 32px - Generous spacing */
 --spacing-2xl: 2.5rem;              /* 40px - Section spacing */
---spacing-3xl: 3rem;                /* 48px - Large sections */
+--spacing-3xl: 2rem;                /* 48px - Large sections */
 ```
 
 **Usage Guide:**

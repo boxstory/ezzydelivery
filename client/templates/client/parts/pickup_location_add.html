@@ -1,34 +1,59 @@
 {% extends "client_dashboard_base.html" %}
 {% load static %}
-<!-- extra css -->
 {% load crispy_forms_tags %}
-{% block content %}
-<div class="p-3 col-12  " id="client_location_add_container_main">
-  <div class="container align-content-center">
-    <div class="row">
-      <div class="col-md-10 py-3 mx-auto  ">
 
-        <div class="col d-flex justify-content-between rounded-2 light border-bottom border-4" id="client_location_add_section_header">
-           <div class="col p-2">
-          <h2 class="m-0 text-center fw-bold" id="client_location_add_title_form">Add Store locations</h2>
-        </div>
-         
-          </a><a class="btn pe-3 text-dark d-none d-md-block" href="{% url 'business:pickup_location_list' %}">
-            <div class="btn btn-dark my-2">Back</div>
-          </a>
-        </div>
-      </div>
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'client/css/form-styles.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+
+<div class="form-container" id="client_location_add_container_main">
+    <!-- Header -->
+    <div class="form-header" id="client_location_add_section_header">
+        <h1 id="client_location_add_title_form">
+            <i class="fa-solid fa-store"></i>
+            Add Store Location
+        </h1>
+        <a href="{% url 'business:pickup_location_list' %}" class="back-link">
+            <i class="fa-solid fa-arrow-left"></i>
+            Back to Stores
+        </a>
     </div>
-    <div class="row">
-      <div class="col-md-10 mx-auto">
-            <form method="POST" id="client_location_add_form_main">
-              {% csrf_token %} {{ form | crispy }}
-              <div class="text-end">
-                <button type="submit" class="btn btn-dark w-100 w-md-50" id="client_location_add_btn_submit">Submit</button>
-              </div>
-            </form>
-          {% endblock content %}
+
+    <!-- Form Card -->
+    <div class="form-card">
+        <div class="form-card-header">
+            <i class="fa-solid fa-location-dot"></i>
+            <h2>Location Details</h2>
         </div>
-      </div>
+        <form method="POST" id="client_location_add_form_main">
+            {% csrf_token %}
+            <div class="form-card-body">
+                {{ form | crispy }}
+            </div>
+            <div class="form-card-footer">
+                <a href="{% url 'business:pickup_location_list' %}" class="btn-cancel" id="client_location_add_btn_back">
+                    <i class="fa-solid fa-xmark"></i>
+                    Cancel
+                </a>
+                <button type="submit" class="btn-submit" id="client_location_add_btn_submit">
+                    <i class="fa-solid fa-plus"></i>
+                    Add Store
+                </button>
+            </div>
+        </form>
     </div>
-  </div>
+
+    <!-- Info Note -->
+    <div class="form-info-note">
+        <div class="form-info-note-title">
+            <i class="fa-solid fa-circle-info"></i>
+            Tip
+        </div>
+        <p class="form-info-note-text">
+            Make sure to enter accurate address details including building number and zone for efficient pickup coordination. You can add multiple store locations for your business.
+        </p>
+    </div>
+</div>
+{% endblock content %}

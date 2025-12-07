@@ -76,15 +76,9 @@ class AddOrderForm(forms.ModelForm):
             self.fields['dl_building'].initial = '0'
             self.fields['dl_street'].initial = '0'
             self.fields['dl_zone'].initial = '0'
-            #@todo: check business code display in form and disabled fields
-            #self.fields['business_code'].disabled = business_code
 
             self.fields['cod_status_by_client'].widget = forms.RadioSelect(
                 choices=COD_STATUS_BY_CLIENT, attrs={'checked': 'checked'})
-
-            # @todo: need to specify business only products
-
-            #self.fields['product_list'].widget = forms.CheckboxSelectMultiple()
 
         # Access the form data to filter pickup_location choices
         if business_id is not None:

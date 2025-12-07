@@ -88,9 +88,18 @@
                 </div>
             </div>
 
-            <!-- Edit Button -->
-            <button onclick="openEditModal({{ vehicle.id }}, '{{ vehicle.vehicle_no }}', '{{ vehicle.vehicle_type }}', '{{ vehicle.vehicle_model }}', '{{ vehicle.vehicle_color }}', '{{ vehicle.vehicle_status }}')" style="margin-top: 1rem; background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.5rem 1rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
-                <i class="fa-solid fa-edit"></i>
+            <!-- Edit Button - Using data attributes for XSS prevention -->
+            <button type="button"
+                    class="btn-edit-vehicle"
+                    data-vehicle-id="{{ vehicle.id }}"
+                    data-vehicle-no="{{ vehicle.vehicle_no|escapejs }}"
+                    data-vehicle-type="{{ vehicle.vehicle_type|escapejs }}"
+                    data-vehicle-model="{{ vehicle.vehicle_model|escapejs }}"
+                    data-vehicle-color="{{ vehicle.vehicle_color|escapejs }}"
+                    data-vehicle-status="{{ vehicle.vehicle_status|escapejs }}"
+                    aria-label="Edit vehicle {{ vehicle.vehicle_no }}"
+                    style="margin-top: 1rem; background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.5rem 1rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-edit" aria-hidden="true"></i>
                 Edit Vehicle
             </button>
         </div>
@@ -154,7 +163,7 @@
                     <button type="submit" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer;">
                         Save Changes
                     </button>
-                    <button type="button" onclick="closeEditModal()" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; color: var(--brand-grey-800);">
+                    <button type="button" id="cancelEditBtn" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; color: var(--brand-grey-800);">
                         Cancel
                     </button>
                 </div>
@@ -169,25 +178,86 @@
 
 {% block extra_js %}
 <script>
-    function openEditModal(id, no, type, model, color, status) {
-        document.getElementById('vehicleId').value = id;
-        document.getElementById('vehicleNo').value = no;
-        document.getElementById('vehicleType').value = type;
-        document.getElementById('vehicleModel').value = model;
-        document.getElementById('vehicleColor').value = color;
-        document.getElementById('vehicleStatus').value = status;
+    // Use event delegation for edit buttons (XSS-safe approach)
+    document.addEventListener('DOMContentLoaded', function() {
+        // Event delegation for all edit vehicle buttons
+        document.addEventListener('click', function(e) {
+            const editBtn = e.target.closest('.btn-edit-vehicle');
+            if (editBtn) {
+                openEditModal(editBtn);
+            }
+        });
+
+        // Close modal on cancel button click
+        const cancelBtn = document.getElementById('cancelEditBtn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', closeEditModal);
+        }
+
+        // Close modal on backdrop click
+        const modal = document.getElementById('editModal');
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeEditModal();
+                }
+            });
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeEditModal();
+            }
+        });
+
+        // Form submission
+        const editForm = document.getElementById('editForm');
+        if (editForm) {
+            editForm.addEventListener('submit', handleFormSubmit);
+        }
+    });
+
+    function openEditModal(button) {
+        // Safely extract data from data attributes (XSS-safe)
+        document.getElementById('vehicleId').value = button.dataset.vehicleId || '';
+        document.getElementById('vehicleNo').value = button.dataset.vehicleNo || '';
+        document.getElementById('vehicleType').value = button.dataset.vehicleType || '';
+        document.getElementById('vehicleModel').value = button.dataset.vehicleModel || '';
+        document.getElementById('vehicleColor').value = button.dataset.vehicleColor || '';
+        document.getElementById('vehicleStatus').value = button.dataset.vehicleStatus || '';
         document.getElementById('editModal').style.display = 'flex';
+        // Focus on first input for accessibility
+        document.getElementById('vehicleNo').focus();
     }
 
     function closeEditModal() {
         document.getElementById('editModal').style.display = 'none';
     }
 
-    document.getElementById('editForm').addEventListener('submit', function(e) {
+    function showMessage(messageDiv, isSuccess, text) {
+        messageDiv.style.display = 'block';
+        messageDiv.style.background = isSuccess ? '#d4edda' : '#f8d7da';
+        messageDiv.style.color = isSuccess ? '#155724' : '#721c24';
+        // Use textContent for safe text insertion, then add icon
+        messageDiv.textContent = '';
+        const icon = document.createElement('i');
+        icon.className = isSuccess ? 'fa-solid fa-check-circle' : 'fa-solid fa-exclamation-triangle';
+        icon.setAttribute('aria-hidden', 'true');
+        messageDiv.appendChild(icon);
+        messageDiv.appendChild(document.createTextNode(' ' + text));
+    }
+
+    function handleFormSubmit(e) {
         e.preventDefault();
 
-        const formData = new FormData(this);
+        const formData = new FormData(e.target);
         const messageDiv = document.getElementById('updateMessage');
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+
+        // Disable submit button during request
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
 
         fetch('{% url 'workforce:vehicle_document_detail' driver.driver_id %}', {
             method: 'POST',
@@ -196,29 +266,29 @@
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
-                messageDiv.style.display = 'block';
-                messageDiv.style.background = '#d4edda';
-                messageDiv.style.color = '#155724';
-                messageDiv.innerHTML = '<i class="fa-solid fa-check-circle"></i> ' + data.message;
+                showMessage(messageDiv, true, data.message || 'Vehicle updated successfully');
                 setTimeout(() => {
                     window.location.reload();
                 }, 1500);
             } else {
-                messageDiv.style.display = 'block';
-                messageDiv.style.background = '#f8d7da';
-                messageDiv.style.color = '#721c24';
-                messageDiv.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> ' + data.error;
+                showMessage(messageDiv, false, data.error || 'Failed to update vehicle');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Changes';
             }
         })
         .catch(error => {
-            messageDiv.style.display = 'block';
-            messageDiv.style.background = '#f8d7da';
-            messageDiv.style.color = '#721c24';
-            messageDiv.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Error updating vehicle';
+            showMessage(messageDiv, false, 'Error updating vehicle. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Changes';
         });
-    });
+    }
 </script>
 {% endblock extra_js %}

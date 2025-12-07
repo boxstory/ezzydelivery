@@ -19,7 +19,7 @@ import json
 
 from orders.models import (
     Order, OrderItem, OrderBarcode, OrderComments, OrderVerificationLog,
-    AddressVerification, OrderProductList
+    AddressVerification
 )
 from delivery.models import DeliveryTask, DlAddressUpdate
 from client.models import Business, PickupLocation, BusinessApiSettings
@@ -44,8 +44,9 @@ class OrderModelTestCase(TestCase):
         # Create profile
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Test User',
-            mobile_no='12345678'
+            first_name='Test',
+            last_name='User',
+            phone=12345678
         )
 
         # Create business
@@ -184,8 +185,9 @@ class OrderVerificationTestCase(TransactionTestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Verifier User',
-            mobile_no='55555555'
+            first_name='Verifier',
+            last_name='User',
+            phone=55555555
         )
 
         self.business = Business.objects.create(
@@ -358,8 +360,9 @@ class OrderStatusTransitionTestCase(TestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Status User',
-            mobile_no='99999999'
+            first_name='Status',
+            last_name='User',
+            phone=99999999
         )
 
         self.business = Business.objects.create(
@@ -468,8 +471,9 @@ class OrderSignalTestCase(TransactionTestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Signal User',
-            mobile_no='12121212'
+            first_name='Signal',
+            last_name='User',
+            phone=12121212
         )
 
         self.business = Business.objects.create(
@@ -570,8 +574,9 @@ class OrderItemTestCase(TestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Item User',
-            mobile_no='13131313'
+            first_name='Item',
+            last_name='User',
+            phone=13131313
         )
 
         self.business = Business.objects.create(
@@ -595,8 +600,10 @@ class OrderItemTestCase(TestCase):
 
         self.product = Product.objects.create(
             business=self.business,
-            name='Test Product',
-            price=Decimal('50.00')
+            brand_name='Test Brand',
+            item_name='Test Product',
+            item_sku='TEST-SKU-001',
+            item_price=50
         )
 
         self.order = Order.objects.create(
@@ -650,8 +657,9 @@ class OrderCommentsTestCase(TestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Comment User',
-            mobile_no='14141414'
+            first_name='Comment',
+            last_name='User',
+            phone=14141414
         )
 
         self.business = Business.objects.create(
@@ -711,8 +719,9 @@ class OrderCODTestCase(TestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='COD User',
-            mobile_no='15151515'
+            first_name='COD',
+            last_name='User',
+            phone=15151515
         )
 
         self.business = Business.objects.create(
@@ -778,6 +787,6 @@ class OrderCODTestCase(TestCase):
         order.save()
         self.assertEqual(order.cod_status_by_staff, 'cod_with_ezzy')
 
-        order.cod_status_by_staff = 'cod_sattled_with_business'
+        order.cod_status_by_staff = 'cod_settled_with_business'
         order.save()
-        self.assertEqual(order.cod_status_by_staff, 'cod_sattled_with_business')
+        self.assertEqual(order.cod_status_by_staff, 'cod_settled_with_business')

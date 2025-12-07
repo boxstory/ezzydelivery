@@ -85,20 +85,3 @@ class WorkforcePagesSitemap(Sitemap):
 
     def location(self, item):
         return reverse(item)
-
-
-# You can add dynamic sitemaps for businesses, products, etc.
-# Example:
-# class BusinessProfileSitemap(Sitemap):
-#     changefreq = 'weekly'
-#     priority = 0.6
-#
-#     def items(self):
-#         from client.models import Business
-#         return Business.objects.filter(business_status='active')
-#
-#     def lastmod(self, obj):
-#         return obj.updated_at
-#
-#     def location(self, obj):
-#         return reverse('business:business_profile_display', args=[obj.business_id])

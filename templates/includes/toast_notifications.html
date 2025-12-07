@@ -1,0 +1,56 @@
+<style>
+.toast-container {
+  z-index: 9999 !important;
+}
+</style>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed top-0 end-0 p-3">
+  <!-- Django Messages as Bootstrap Toasts -->
+  {% if messages %}
+    {% for message in messages %}
+    <div class="toast align-items-center text-bg-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} border-0" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="{% if message.tags == 'error' %}8000{% else %}5000{% endif %}">
+      <div class="d-flex">
+        <div class="toast-body">
+          {% if message.tags == 'error' %}
+            <i class="fas fa-exclamation-circle me-2"></i>
+          {% elif message.tags == 'warning' %}
+            <i class="fas fa-exclamation-triangle me-2"></i>
+          {% elif message.tags == 'success' %}
+            <i class="fas fa-check-circle me-2"></i>
+          {% else %}
+            <i class="fas fa-info-circle me-2"></i>
+          {% endif %}
+          <strong>{{ message }}</strong>
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+    {% endfor %}
+  {% endif %}
+</div>
+
+<script>
+// Initialize and show all Bootstrap toasts on page load
+function initToasts() {
+  if (typeof bootstrap === 'undefined') {
+    // Bootstrap not loaded yet, wait and retry
+    setTimeout(initToasts, 100);
+    return;
+  }
+
+  const toastElList = document.querySelectorAll('.toast');
+  toastElList.forEach(function(toastEl) {
+    const toast = new bootstrap.Toast(toastEl);
+    toast.show();
+  });
+}
+
+// Start initialization when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initToasts);
+} else {
+  // DOM already loaded
+  initToasts();
+}
+</script>

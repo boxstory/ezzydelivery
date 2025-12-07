@@ -158,14 +158,22 @@
 
     // Toggle todo completion
     function toggleTodo(todoId) {
-        // TODO: Implement AJAX call to toggle todo status
-        console.log('Toggle todo:', todoId);
+        fetch('/workforce/api/toggle-todo/' + todoId + '/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        }).then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  location.reload();
+              }
+          });
     }
 
     // Form submission
     document.getElementById('reportForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        // TODO: Implement report generation and print
         alert('Report generation feature will be implemented soon.');
     });
 </script>

@@ -11,11 +11,12 @@ crispy_forms_tags %}
 {% endblock extra_css %}
 {% block content %}
   <!-- orders_list_view.html -->
-  <div class="col-12 col-md-9 col-lg-10" id="orders_get_api_container_main">
+  <div class="col-12" id="orders_get_api_container_main">
     <section class="d-none d-md-block" id="orders_get_api_section_desktop">
       <div class="flex-fill pb-2">
         <div class="p-3 col-12">
-          <div class="col-md-12 d-flex flex-row justify-content-between pb-md-4" id="orders_get_api_header">
+          <div class="col-md-12 d-flex flex-row justify-content-between pb-md-4"
+               id="orders_get_api_header">
             <h2 class="m-0" id="orders_get_api_title">New Orders list({{ orders|length }})</h2>
             <div id="orders_get_api_nav_actions">
               <a class="btn btn-dark pe-3 text-white"
@@ -39,7 +40,9 @@ crispy_forms_tags %}
             <h3>Orders List</h3>
             <!-- Date Selection Form -->
             {% csrf_token %}
-            <form method="get" action="{% url 'orders:get_order_by_api' %}" id="orders_get_api_form_filter">
+            <form method="get"
+                  action="{% url 'orders:get_order_by_api' %}"
+                  id="orders_get_api_form_filter">
               <label for="orders_get_api_input_start_date">Start Date:</label>
               <input class="px-3 py-1 fw-bold rounded-3"
                      type="date"
@@ -54,7 +57,9 @@ crispy_forms_tags %}
                      name="end_date"
                      required
                      value="{% now 'Y-m-d' %}" />
-              <button type="submit" class="btn btn-sm btn-dark" id="orders_get_api_btn_filter">Filter Orders</button>
+              <button type="submit"
+                      class="btn btn-sm btn-dark"
+                      id="orders_get_api_btn_filter">Filter Orders</button>
             </form>
           </div>
           <h1>Orders</h1>

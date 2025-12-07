@@ -1,4 +1,3 @@
-from multiprocessing import context
 import logging
 from django.forms.fields import DateTimeField
 from django.shortcuts import redirect, render, get_object_or_404
@@ -6,7 +5,6 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from decouple import config
-from django.views.decorators.csrf import csrf_exempt
 import geocoder
 import json
 
@@ -249,8 +247,13 @@ def dl_address_link_update(request, dl_task_code):
     return render(request, 'delivery/frontend/dl_address_link_update.html', data)
 
 
-@csrf_exempt
 def save_location_data(request, dl_task_code):
+    """
+    Save customer location data for delivery address.
+
+    CSRF token is required - sent via X-CSRFToken header from frontend.
+    The template already includes the CSRF token and sends it properly.
+    """
     logger.info(f"Saving location data for task {dl_task_code}")
 
     if request.method == 'POST':
@@ -258,6 +261,11 @@ def save_location_data(request, dl_task_code):
             data = json.loads(request.body.decode('utf-8'))
             dl_latitude = data.get('dl_latitude')
             dl_longitude = data.get('dl_longitude')
+
+            # Validate latitude and longitude
+            if dl_latitude is None or dl_longitude is None:
+                logger.warning(f"Missing coordinates in location update for task {dl_task_code}")
+                return JsonResponse({'error': 'Latitude and longitude are required'}, status=400)
 
             instance = delivery_models.DlAddressUpdate.objects.get(dl_task_number=dl_task_code)
             logger.debug(f"Found task {dl_task_code}, updating location: {dl_latitude}, {dl_longitude}")

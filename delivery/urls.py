@@ -14,7 +14,6 @@ urlpatterns = [
 
 
     # business side delivery data
-    #path('delivery_list/', delivery_views.delivery_list, name='delivery_list'),
     path('delivery_tasks/all/', delivery_views.all_delivery_tasks,
          name='all_delivery_tasks'),
     path('assigned_tasks/all/', delivery_views.assigned_tasks,

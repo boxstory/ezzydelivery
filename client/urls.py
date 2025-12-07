@@ -35,10 +35,9 @@ urlpatterns = [
          name='business_settings_api_test'),
     path('<int:business_id>/settings/api/<int:api_id>/test/result', business_views.business_settings_api_test_result,
          name='business_settings_api_test_result'),
-#     path('<int:business_id>/settings/api/<int:api_id>/test/call', business_views.business_settings_api_test_call,
-#          name='business_settings_api_test_call'),
+    path('<int:business_id>/settings/api/<int:api_id>/delete/', business_views.business_settings_api_delete,
+         name='business_settings_api_delete'),
 
-     
      # teams settings
      path('<int:business_id>/teams/', business_views.business_teams,
           name='business_teams'),

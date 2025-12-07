@@ -1,3 +1,4 @@
+import logging
 import random
 from urllib.parse import quote
 from django.forms.fields import DateTimeField
@@ -11,7 +12,8 @@ from django.core.mail import mail_admins, send_mail
 from client import models as business_models
 from fleet import models as fleet_models
 from core.seo import SEOMetadata
-# Create your views here.
+
+logger = logging.getLogger('webpages')
 
 
 def index(request):
@@ -147,15 +149,14 @@ def delivery_inquiry(request):
 def about(request):
     meta = SEOMetadata.get_about_meta()
     brands = list(business_models.Business.objects.all())
-    # brands = list(fleet_models.Driver.objects.all())
 
-    print(len(brands))
+    logger.debug(f'about page - found {len(brands)} brands')
     if len(brands) > 5:
         brands = random.sample(brands, 6)
     else:
         brands = random.sample(brands, len(brands))
 
-    print('brands', brands)
+    logger.debug(f'about page - sampled {len(brands)} brands')
 
     data = {
         'seo': meta,
@@ -178,13 +179,6 @@ def terms(request):
         'seo': meta,
     }
     return render(request, 'webpages/terms.html', data)
-
-
-def test(request):
-    data = {
-
-    }
-    return render(request, 'webpages/test.html', data)
 
 
 def fulfillment(request):

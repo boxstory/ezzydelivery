@@ -59,6 +59,7 @@ class Product(models.Model):
     brand_name = models.CharField(max_length=100)
     item_name = models.CharField(max_length=100)
     item_sku = models.CharField(max_length=100, db_index=True)  # INDEX: Frequently searched/filtered
+    barcode = models.CharField(max_length=100, blank=True, null=True, db_index=True)  # Product barcode (UPC/EAN/etc.)
     color = models.ForeignKey(
         ColorVariant, on_delete=models.SET_NULL, null=True, blank=True)
     size = models.CharField(max_length=100, null=True, blank=True)
@@ -87,6 +88,7 @@ class Product(models.Model):
         indexes = [
             models.Index(fields=['business', '-created_at'], name='product_business_created_idx'),
             models.Index(fields=['item_sku'], name='product_sku_idx'),
+            models.Index(fields=['barcode'], name='product_barcode_idx'),
         ]
 
 

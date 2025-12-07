@@ -174,11 +174,11 @@
     <div class="faq-section" id="core_join_driver_section_faq">
         <h3>Frequently Asked Questions</h3>
 
-        <div class="faq-item" onclick="toggleFAQ(this)">
+        <div class="faq-item" role="button" tabindex="0" aria-expanded="false">
             <div class="faq-question">
                 <span>How much can I earn as a driver?</span>
                 <div class="faq-toggle">
-                    <i class="fa-solid fa-chevron-down"></i>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </div>
             </div>
             <div class="faq-answer">
@@ -186,11 +186,11 @@
             </div>
         </div>
 
-        <div class="faq-item" onclick="toggleFAQ(this)">
+        <div class="faq-item" role="button" tabindex="0" aria-expanded="false">
             <div class="faq-question">
                 <span>When do I get paid?</span>
                 <div class="faq-toggle">
-                    <i class="fa-solid fa-chevron-down"></i>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </div>
             </div>
             <div class="faq-answer">
@@ -198,11 +198,11 @@
             </div>
         </div>
 
-        <div class="faq-item" onclick="toggleFAQ(this)">
+        <div class="faq-item" role="button" tabindex="0" aria-expanded="false">
             <div class="faq-question">
                 <span>Do I need my own vehicle?</span>
                 <div class="faq-toggle">
-                    <i class="fa-solid fa-chevron-down"></i>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </div>
             </div>
             <div class="faq-answer">
@@ -210,11 +210,11 @@
             </div>
         </div>
 
-        <div class="faq-item" onclick="toggleFAQ(this)">
+        <div class="faq-item" role="button" tabindex="0" aria-expanded="false">
             <div class="faq-question">
                 <span>What are the working hours?</span>
                 <div class="faq-toggle">
-                    <i class="fa-solid fa-chevron-down"></i>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </div>
             </div>
             <div class="faq-answer">
@@ -222,11 +222,11 @@
             </div>
         </div>
 
-        <div class="faq-item" onclick="toggleFAQ(this)">
+        <div class="faq-item" role="button" tabindex="0" aria-expanded="false">
             <div class="faq-question">
                 <span>How long does the application process take?</span>
                 <div class="faq-toggle">
-                    <i class="fa-solid fa-chevron-down"></i>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </div>
             </div>
             <div class="faq-answer">
@@ -234,11 +234,11 @@
             </div>
         </div>
 
-        <div class="faq-item" onclick="toggleFAQ(this)">
+        <div class="faq-item" role="button" tabindex="0" aria-expanded="false">
             <div class="faq-question">
                 <span>What support do drivers receive?</span>
                 <div class="faq-toggle">
-                    <i class="fa-solid fa-chevron-down"></i>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </div>
             </div>
             <div class="faq-answer">
@@ -252,16 +252,45 @@
 
 {% block extra_js %}
 <script>
-    function toggleFAQ(element) {
-        // Close all other FAQ items
-        document.querySelectorAll('.faq-item').forEach(item => {
-            if (item !== element) {
-                item.classList.remove('active');
+    // FAQ toggle using event delegation (no inline handlers)
+    document.addEventListener('DOMContentLoaded', function() {
+        const faqSection = document.querySelector('.faq-section');
+        if (!faqSection) return;
+
+        // Handle click events
+        faqSection.addEventListener('click', function(e) {
+            const faqItem = e.target.closest('.faq-item');
+            if (faqItem) {
+                toggleFAQ(faqItem);
             }
         });
 
-        // Toggle current item
-        element.classList.toggle('active');
-    }
+        // Handle keyboard events (Enter/Space for accessibility)
+        faqSection.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                const faqItem = e.target.closest('.faq-item');
+                if (faqItem) {
+                    e.preventDefault();
+                    toggleFAQ(faqItem);
+                }
+            }
+        });
+
+        function toggleFAQ(element) {
+            const isActive = element.classList.contains('active');
+
+            // Close all other FAQ items
+            document.querySelectorAll('.faq-item').forEach(item => {
+                item.classList.remove('active');
+                item.setAttribute('aria-expanded', 'false');
+            });
+
+            // Toggle current item
+            if (!isActive) {
+                element.classList.add('active');
+                element.setAttribute('aria-expanded', 'true');
+            }
+        }
+    });
 </script>
 {% endblock extra_js %}

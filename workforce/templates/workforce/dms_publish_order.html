@@ -16,22 +16,22 @@
 <!-- Summary Statistics -->
 <div class="stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
     <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #2196f3;">
-        <div style="font-size: 0.813rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Total Tasks</div>
+        <div style="font-size: 0.812rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Total Tasks</div>
         <div style="font-size: 1.75rem; font-weight: 800; color: #2196f3;">{{ delivery_tasks.paginator.count|default:"0" }}</div>
     </div>
 
     <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #28a745;">
-        <div style="font-size: 0.813rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Synced</div>
+        <div style="font-size: 0.812rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Synced</div>
         <div style="font-size: 1.75rem; font-weight: 800; color: #28a745;">{{ synced_count|default:"0" }}</div>
     </div>
 
     <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #dc3545;">
-        <div style="font-size: 0.813rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Not Synced</div>
+        <div style="font-size: 0.812rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Not Synced</div>
         <div style="font-size: 1.75rem; font-weight: 800; color: #dc3545;">{{ not_synced_count|default:"0" }}</div>
     </div>
 
     <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #ffc107;">
-        <div style="font-size: 0.813rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Unassigned</div>
+        <div style="font-size: 0.812rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Unassigned</div>
         <div style="font-size: 1.75rem; font-weight: 800; color: #f57c00;">{{ unassigned_count|default:"0" }}</div>
     </div>
 </div>
@@ -232,7 +232,12 @@
             const counter = document.createElement('div');
             counter.className = 'visible-counter';
             counter.style.cssText = 'padding: 0.75rem 1rem; background: #e7f3ff; border-radius: var(--brand-radius-sm); margin-bottom: 1rem; font-weight: 600; color: #1565c0;';
-            counter.innerHTML = '<i class="fa-solid fa-filter me-2"></i>Showing ' + count + ' tasks';
+            // Use DOM methods for XSS-safe content insertion
+            const icon = document.createElement('i');
+            icon.className = 'fa-solid fa-filter me-2';
+            icon.setAttribute('aria-hidden', 'true');
+            counter.appendChild(icon);
+            counter.appendChild(document.createTextNode('Showing ' + count + ' tasks'));
             tableContainer.insertBefore(counter, tableContainer.firstChild);
         }
     }
@@ -302,8 +307,13 @@
         if (header) {
             const indicator = document.createElement('div');
             indicator.className = 'last-refresh';
-            indicator.style.cssText = 'font-size: 0.813rem; color: var(--brand-grey-500); margin-top: 0.5rem;';
-            indicator.innerHTML = '<i class="fa-solid fa-clock me-1"></i>Last updated: ' + lastRefresh.toLocaleTimeString();
+            indicator.style.cssText = 'font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;';
+            // Use DOM methods for XSS-safe content insertion
+            const clockIcon = document.createElement('i');
+            clockIcon.className = 'fa-solid fa-clock me-1';
+            clockIcon.setAttribute('aria-hidden', 'true');
+            indicator.appendChild(clockIcon);
+            indicator.appendChild(document.createTextNode('Last updated: ' + lastRefresh.toLocaleTimeString()));
             header.parentElement.insertBefore(indicator, header.nextSibling);
         }
     }

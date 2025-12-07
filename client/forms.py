@@ -199,9 +199,7 @@ class BusinessTeamProfileForm(forms.ModelForm):
         fields = '__all__'
         exclude = ['business', 'updated_at', 'created_at', 'profile']
         widgets = {
-            'user': forms.Select(
-                choices=User.objects.all().values_list('username', 'username')),
-            'user': forms.TextInput(attrs={'class': 'form-control p-3'}),
+            'user': forms.Select(attrs={'class': 'form-control'}),
         }
 
         labels = {
@@ -209,5 +207,5 @@ class BusinessTeamProfileForm(forms.ModelForm):
             "team_phone": "Team Phone No",
             "team_email": "Team Email",
             "team_role": "Team Role",
-            'user' : 'Search member by username',
+            'user': 'Search member by username',
         }

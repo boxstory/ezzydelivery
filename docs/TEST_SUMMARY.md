@@ -43,7 +43,7 @@ This document summarizes the comprehensive test suite created for the EzzyDelive
 
 ##### `OrderCODTestCase`
 - `test_cod_order_creation()` - Order with COD amount and status
-- `test_cod_status_transitions()` - COD status: not_collected → cod_with_driver → cod_with_ezzy → cod_sattled_with_business
+- `test_cod_status_transitions()` - COD status: not_collected → cod_with_driver → cod_with_ezzy → cod_settled_with_business
 
 ---
 

@@ -24,9 +24,6 @@ urlpatterns = [
 
     path('join_us/',
          core_views.join_us, name='join_us'),
-# @todo need to check its needed
-#     path('update_role/',
-#          core_views.update_role, name='update_role'),
     path('join_us/business/',
          core_views.join_business, name='join_business'),
     path('join_us/driver/',

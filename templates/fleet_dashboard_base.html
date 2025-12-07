@@ -5,9 +5,15 @@
 
 <head>
   {% include "includes/head.html" %}
-  <!-- extra css -->
-  {% block extra_css %}
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+
+  <!-- Dashboard CSS - Always loaded for HTMX compatibility -->
   <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}" type="text/css" />
+  <link rel="stylesheet" href="{% static 'fleet/css/fleet_dashboard.css' %}" type="text/css" />
+  <link rel="stylesheet" href="{% static 'webpages/css/sidebar-common.css' %}" type="text/css" />
+
+  {% block extra_css %}
   {% endblock extra_css %}
   <title>
     {% block title %}
@@ -16,6 +22,9 @@
 </head>
 
 <body class="d-flex flex-column min-vh-100">
+  <!-- Toast Notifications -->
+  {% include "includes/toast_notifications.html" %}
+
   <div class="d-none d-md-block">
     {% include "includes/navbar.html" %}</div>
 
@@ -46,7 +55,7 @@
           charset="UTF-8"
           src="{%static 'delivery/js/fleet.js' %}"></script>
   <!-- Session timeout monitor -->
-  <script src="{% static 'js/session-monitor.js' %}"></script>
+  <script src="{% static 'webpages/js/session-monitor.js' %}"></script>
   {% block extra_js %}
   <!--  -->
   {% endblock extra_js %}

@@ -38,7 +38,7 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
             logger.exception(f"Error creating shipping label for task {instance.dl_task_number}: {str(e)}")
 
     # Update DMS when task status changes
-    elif not created and 'dl_task_status_dms' in kwargs.get('update_fields', []):
+    elif not created and 'dl_task_status_dms' in (kwargs.get('update_fields') or []):
         try:
             from ezzy_api.views import _push_task_to_dms
             result = _push_task_to_dms(instance)

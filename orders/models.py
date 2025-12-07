@@ -1,4 +1,17 @@
+"""
+Orders Models - Core order management for EzzyDelivery
+
+This module contains models for:
+- Order: Main order entity with status tracking and verification
+- OrderLog: Audit trail for order changes
+- OrderComments: Comments/notes on orders
+- OrderBarcode: Auto-generated barcodes for orders
+- OrderItem: Individual items within an order
+- OrderVerificationLog: Verification history tracking
+- AddressVerification: Customer address verification workflow
+"""
 import os
+import logging
 from django.conf import settings
 from django.db import models
 from django.db.models.signals import post_save, pre_save
@@ -15,6 +28,8 @@ from client import models as business_models
 from orders import models as orders_models
 from webpages import models as webpages_models
 from product import models as product_models
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -45,7 +60,7 @@ COD_STATUS_BY_STAFF = [
         ('fully_paid', 'Fully Collected'),
         ('cod_with_driver', 'COD Collected & with Driver'),
         ('cod_with_ezzy', 'COD handover to EZZY'),
-        ('cod_sattled_with_business', 'COD Sattled with Business'),
+        ('cod_settled_with_business', 'COD Settled with Business'),
     ]
 
 class Order(models.Model):
@@ -103,6 +118,9 @@ class Order(models.Model):
     # Original order data (proof/backup)
     original_order_data = models.JSONField(blank=True, null=True, help_text="Original order data as proof")
 
+    # Warehouse stock reservation tracking
+    stock_reserved = models.BooleanField(default=False, help_text="Whether stock has been reserved for this order")
+
     # Delivery customer details
     customer_name = models.CharField(max_length=100, blank=True)
     customer_phone = models.CharField(max_length=100, blank=True)
@@ -118,27 +136,33 @@ class Order(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def get_dirty_fields(self):
-        dirty_fields = {}  # Dictionary to hold modified fields
-        for field in self._meta.fields:  # Iterate through fields of the model
-            field_name = field.attname  # Get the name of the field
-            print(field_name + ' :field')  # Debug print
-            oldd_value = getattr(self, f'{field_name}')
-            print(oldd_value + ' :field')  # Debug print
-            #@todo log entry dict not getting
-            if hasattr(self, f'{field_name}'):  # Check if the model instance has an attribute to store the original value
-                print('hatt attr')  # Debug print
-                old_value = getattr(self, f'_{field_name}')  # Get the original value of the field
-                print(old_value + ' old_value :field')  # Debug print
-                new_value = getattr(self, field_name)  # Get the current value of the field
-                print(new_value + ' new_value :field')  # Debug print
-                if old_value != new_value:  # Check if the value has been modified
-                    dirty_fields[field_name] = {  # Record the modified field
+        """
+        Get dictionary of fields that have been modified since last save.
+
+        Returns:
+            dict: Dictionary with field names as keys and {'old_value': x, 'new_value': y} as values
+        """
+        dirty_fields = {}
+        for field in self._meta.fields:
+            field_name = field.attname
+            logger.debug(f"Checking field: {field_name}")
+
+            current_value = getattr(self, field_name, None)
+
+            # Check if we have stored the original value
+            original_attr = f'_{field_name}'
+            if hasattr(self, original_attr):
+                old_value = getattr(self, original_attr)
+                logger.debug(f"Field {field_name}: old={old_value}, new={current_value}")
+
+                if old_value != current_value:
+                    dirty_fields[field_name] = {
                         'old_value': old_value,
-                        'new_value': new_value
+                        'new_value': current_value
                     }
-        print('dirty_fields')  # Debug print
-        print(dirty_fields)  # Debug print
-        return dirty_fields  # Return the dictionary of modified fields
+
+        logger.debug(f"Dirty fields found: {dirty_fields}")
+        return dirty_fields
 
     
     def __str__(self):

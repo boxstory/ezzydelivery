@@ -177,7 +177,13 @@
         const counter = document.getElementById('resultsCounter');
 
         if (counter) {
-            counter.innerHTML = '<i class="fa-solid fa-address-book me-2"></i>Showing ' + visibleCards.length + ' of ' + cards.length + ' contacts';
+            // Use DOM methods instead of innerHTML for XSS safety
+            counter.textContent = '';
+            const icon = document.createElement('i');
+            icon.className = 'fa-solid fa-address-book me-2';
+            icon.setAttribute('aria-hidden', 'true');
+            counter.appendChild(icon);
+            counter.appendChild(document.createTextNode('Showing ' + visibleCards.length + ' of ' + cards.length + ' contacts'));
         }
     }
 
@@ -275,27 +281,30 @@
         cards.forEach(card => grid.appendChild(card));
     }
 
+    // Helper function to update sort button text (XSS-safe)
+    function updateSortButtonContent(btn, isAsc) {
+        btn.textContent = '';
+        const icon = document.createElement('i');
+        icon.className = isAsc ? 'fa-solid fa-arrow-down-a-z me-2' : 'fa-solid fa-arrow-up-z-a me-2';
+        icon.setAttribute('aria-hidden', 'true');
+        btn.appendChild(icon);
+        btn.appendChild(document.createTextNode(isAsc ? 'Sort A-Z' : 'Sort Z-A'));
+    }
+
     // Add sort button
     window.addEventListener('DOMContentLoaded', function() {
         const filterTabs = document.querySelector('.filter-tabs');
         if (filterTabs) {
             const sortBtn = document.createElement('button');
-            sortBtn.innerHTML = '<i class="fa-solid fa-arrow-down-a-z me-2"></i>Sort A-Z';
+            updateSortButtonContent(sortBtn, true);
             sortBtn.className = 'filter-tab';
             sortBtn.style.marginLeft = 'auto';
+            sortBtn.setAttribute('aria-label', 'Sort contacts alphabetically');
+            let isAscending = true;
             sortBtn.addEventListener('click', function() {
-                const icon = this.querySelector('i');
-                if (icon.classList.contains('fa-arrow-down-a-z')) {
-                    icon.classList.remove('fa-arrow-down-a-z');
-                    icon.classList.add('fa-arrow-up-z-a');
-                    this.innerHTML = '<i class="fa-solid fa-arrow-up-z-a me-2"></i>Sort Z-A';
-                    sortContacts('desc');
-                } else {
-                    icon.classList.remove('fa-arrow-up-z-a');
-                    icon.classList.add('fa-arrow-down-a-z');
-                    this.innerHTML = '<i class="fa-solid fa-arrow-down-a-z me-2"></i>Sort A-Z';
-                    sortContacts('asc');
-                }
+                isAscending = !isAscending;
+                updateSortButtonContent(this, isAscending);
+                sortContacts(isAscending ? 'asc' : 'desc');
             });
             filterTabs.appendChild(sortBtn);
         }

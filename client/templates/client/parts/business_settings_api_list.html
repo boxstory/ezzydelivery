@@ -1,427 +1,503 @@
 {% extends "client_dashboard_base.html" %}
 {% load static %}
+
 {% block extra_css %}
-<link href="{% static 'client/css/api-settings.css' %}" rel="stylesheet" type="text/css" />
+<link rel="stylesheet" href="{% static 'client/css/business_settings_api_list.css' %}">
 {% endblock extra_css %}
 
 {% block content %}
-  <div class="p-3 col-12" id="client_api_list_container_main">
-    <div class="api-section-header d-flex justify-content-between align-items-center" id="client_api_list_section_header">
-      <div>
-        <h2 class="mb-0 fw-bold" id="client_api_list_title_main">API SETTINGS</h2>
-        <p class="text-muted mb-0 mt-1" id="client_api_list_subtitle_main">Manage your e-commerce integrations and API keys</p>
+<div class="col-12 api-settings-container" id="client_api_list_container_main">
+
+  <!-- Hero Header -->
+  <div class="api-hero" id="client_api_list_hero">
+    <div class="api-hero-content">
+      <div class="api-hero-text">
+        <h1>
+          <i class="fa-solid fa-plug-circle-check"></i>
+          API Settings
+        </h1>
+        <p>Manage your e-commerce integrations, API keys, and developer access</p>
       </div>
-      <a href="{% url 'business:business_settings_api_add'  business.business_id %}"
-         class="btn btn-dark px-4"
-         id="client_api_list_btn_new_integration">
-        <i class="fa-solid fa-plus me-2"></i>
-        New Integration
-      </a>
-    </div>
-
-    <!-- E-Commerce API Integrations Section -->
-    <section class="mb-4" id="client_api_list_section_ecommerce">
-      <h3 class="section-title" id="client_api_list_title_ecommerce">
-        <i class="fa-solid fa-store"></i>
-        E-Commerce Platform Integrations
-      </h3>
-
-      <div class="row" id="client_api_list_section_integrations_list">
-        {% if business_apis %}
-          {% for api in business_apis %}
-            <div class="col-md-6 col-12">
-              <div class="api-card">
-                <div class="api-card-header">
-                  <h5 class="card-title mb-0 fw-bold">{{ api.api_type }} Integration</h5>
-                </div>
-                <div class="api-card-body">
-                  <div class="api-info-row">
-                    <span class="api-info-label">Platform:</span>
-                    <span class="api-info-value">{{ api.api_type }}</span>
-                  </div>
-                  <div class="api-info-row">
-                    <span class="api-info-label">Country:</span>
-                    <span class="api-info-value">{{ api.site_contry }}</span>
-                  </div>
-                  <div class="api-info-row">
-                    <span class="api-info-label">Site URL:</span>
-                    <span class="api-info-value text-truncate">{{ api.site_api_url }}</span>
-                  </div>
-                  <div class="api-info-row">
-                    <span class="api-info-label">Default:</span>
-                    <span class="api-info-value">
-                      {% if api.is_default %}
-                        <span class="status-badge status-active">
-                          <i class="fa-solid fa-circle-check"></i>
-                          Yes
-                        </span>
-                      {% else %}
-                        <span class="status-badge status-inactive">
-                          <i class="fa-solid fa-circle-xmark"></i>
-                          No
-                        </span>
-                      {% endif %}
-                    </span>
-                  </div>
-                  <div class="api-info-row">
-                    <span class="api-info-label">Status:</span>
-                    <span class="api-info-value">
-                      {% if api.is_verify_api %}
-                        <span class="status-badge status-verified">
-                          <i class="fa-solid fa-circle-check"></i>
-                          Verified
-                        </span>
-                      {% else %}
-                        <span class="status-badge status-pending">
-                          <i class="fa-solid fa-clock"></i>
-                          Pending Verification
-                        </span>
-                      {% endif %}
-                    </span>
-                  </div>
-                </div>
-                <div class="action-buttons px-3 pb-3">
-                  <a href="{% url 'business:business_settings_api_test' business.business_id api.id %}"
-                     class="btn btn-primary btn-action">
-                    <i class="fa-solid fa-vial me-2"></i>
-                    Test
-                  </a>
-                  <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
-                     class="btn btn-dark btn-action">
-                    <i class="fa-solid fa-pen-to-square me-2"></i>
-                    Edit
-                  </a>
-                  <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
-                     class="btn btn-danger btn-action">
-                    <i class="fa-solid fa-trash me-2"></i>
-                    Delete
-                  </a>
-                </div>
-              </div>
-            </div>
-          {% endfor %}
-        {% else %}
-          <div class="col-12">
-            <div class="alert alert-warning d-flex align-items-center" role="alert">
-              <i class="fa-solid fa-circle-info fa-2x me-3"></i>
-              <div>
-                <h5 class="alert-heading mb-1">No Platform Integrations Found</h5>
-                <p class="mb-0">Click the "New Integration" button above to add your first e-commerce platform integration.</p>
-              </div>
-            </div>
-          </div>
-        {% endif %}
-      </div>
-
-      {% if business_apis %}
-        <div class="alert alert-info mt-3" role="alert">
-          <i class="fa-solid fa-lightbulb me-2"></i>
-          <strong>Tip:</strong> Don't make multiple APIs default for your store. Update or delete extra APIs to avoid conflicts.
-        </div>
-      {% endif %}
-    </section>
-
-    <hr class="section-divider">
-
-    <!-- API Keys Section -->
-    <section id="client_api_list_section_api_keys">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3 class="section-title mb-0" id="client_api_list_title_api_keys">
+      <div class="api-hero-actions">
+        <a href="{% url 'business:business_settings_api_add' business.business_id %}"
+           class="btn-hero-primary"
+           id="client_api_list_btn_new_integration">
+          <i class="fa-solid fa-plus"></i>
+          New Integration
+        </a>
+        <button class="btn-hero-secondary"
+                data-bs-toggle="modal"
+                data-bs-target="#createApiKeyModal"
+                data-business-id="{{ business.business_id }}"
+                id="client_api_list_btn_generate_key_hero">
           <i class="fa-solid fa-key"></i>
-          API Keys & App Integrations
-        </h3>
-        <button class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#createApiKeyModal" data-business-id="{{ business.business_id }}" id="client_api_list_btn_generate_key">
-          <i class="fa-solid fa-plus me-2"></i>
           Generate API Key
         </button>
       </div>
-
-      <div class="row">
-        {% if api_keys %}
-          {% for key in api_keys %}
-            <div class="col-md-6 col-12">
-              <div class="api-card">
-                <div class="api-card-header">
-                  <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0 fw-bold">
-                      {% if key.key_name %}
-                        {{ key.key_name }}
-                      {% else %}
-                        API Key #{{ key.id }}
-                      {% endif %}
-                    </h5>
-                    {% if key.is_active %}
-                      <span class="status-badge status-active">
-                        <i class="fa-solid fa-circle"></i>
-                        Active
-                      </span>
-                    {% else %}
-                      <span class="status-badge status-inactive">
-                        <i class="fa-solid fa-circle"></i>
-                        Inactive
-                      </span>
-                    {% endif %}
-                  </div>
-                </div>
-                <div class="api-card-body">
-                  <div class="api-info-row">
-                    <span class="api-info-label">API Key:</span>
-                    <div class="api-info-value flex-grow-1">
-                      <div class="api-key-display">{{ key.api_key|slice:":20" }}...</div>
-                    </div>
-                  </div>
-                  {% if key.api_secret %}
-                    <div class="api-info-row">
-                      <span class="api-info-label">API Secret:</span>
-                      <div class="api-info-value flex-grow-1">
-                        <div class="api-key-display">{{ key.api_secret|slice:":20" }}...</div>
-                      </div>
-                    </div>
-                  {% endif %}
-                  <div class="api-info-row">
-                    <span class="api-info-label">Created:</span>
-                    <span class="api-info-value">{{ key.created_at|date:"M d, Y" }}</span>
-                  </div>
-                  {% if key.last_used %}
-                    <div class="api-info-row">
-                      <span class="api-info-label">Last Used:</span>
-                      <span class="api-info-value">{{ key.last_used|date:"M d, Y H:i" }}</span>
-                    </div>
-                  {% endif %}
-                  {% if key.expires_at %}
-                    <div class="api-info-row">
-                      <span class="api-info-label">Expires:</span>
-                      <span class="api-info-value">{{ key.expires_at|date:"M d, Y" }}</span>
-                    </div>
-                  {% endif %}
-                </div>
-                <div class="action-buttons px-3 pb-3">
-                  <button class="btn btn-outline-dark btn-action" onclick="copyToClipboard('{{ key.api_key }}')">
-                    <i class="fa-solid fa-copy me-2"></i>
-                    Copy Key
-                  </button>
-                  <button class="btn btn-outline-danger btn-action" onclick="if(confirm('Are you sure you want to revoke this API key?')) alert('Revoke feature coming soon!')">
-                    <i class="fa-solid fa-ban me-2"></i>
-                    Revoke
-                  </button>
-                </div>
-              </div>
-            </div>
-          {% endfor %}
-        {% else %}
-          <div class="col-12">
-            <div class="alert alert-info d-flex align-items-center" role="alert">
-              <i class="fa-solid fa-info-circle fa-2x me-3"></i>
-              <div>
-                <h5 class="alert-heading mb-1">No API Keys Generated</h5>
-                <p class="mb-0">Generate an API key to integrate your applications with Ezzy Delivery's API. Click "Generate API Key" above to get started.</p>
-              </div>
-            </div>
-          </div>
-        {% endif %}
-      </div>
-
-      {% if api_keys %}
-        <div class="alert alert-warning mt-3" role="alert">
-          <i class="fa-solid fa-shield-halved me-2"></i>
-          <strong>Security Note:</strong> Keep your API keys secure and never share them publicly. Revoke any keys that have been compromised.
-        </div>
-      {% endif %}
-    </section>
+    </div>
   </div>
 
-  <!-- Create API Key Modal -->
-  <div class="modal fade" id="createApiKeyModal" tabindex="-1" aria-labelledby="createApiKeyModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content" style="border-radius: 16px; border: none;" id="client_api_list_modal_create">
-        <div class="modal-header" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-bottom: 1px solid #dee2e6;">
-          <h5 class="modal-title fw-bold" id="createApiKeyModalLabel">
-            <i class="fa-solid fa-key me-2"></i>
-            Generate New API Key
-          </h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body p-4" id="client_api_list_modal_create_body">
-          <form id="createApiKeyForm">
-            {% csrf_token %}
-            <div class="mb-3">
-              <label for="keyName" class="form-label fw-semibold">
-                <i class="fa-solid fa-tag me-1"></i>
-                Key Name (Optional)
-              </label>
-              <input type="text" class="form-control" id="keyName" name="key_name"
-                     placeholder="e.g., Production API Key, Mobile App Key"
-                     style="border-radius: 8px; border: 2px solid #e9ecef;">
-              <small class="text-muted">Give your API key a descriptive name to help identify it later.</small>
-            </div>
-
-            <div class="mb-3">
-              <label for="expiresAt" class="form-label fw-semibold">
-                <i class="fa-solid fa-calendar me-1"></i>
-                Expiration Date (Optional)
-              </label>
-              <input type="date" class="form-control" id="expiresAt" name="expires_at"
-                     style="border-radius: 8px; border: 2px solid #e9ecef;">
-              <small class="text-muted">Leave empty for no expiration.</small>
-            </div>
-
-            <div class="alert alert-info mb-0" style="border-radius: 12px; background: #e7f3ff; border: none;">
-              <i class="fa-solid fa-info-circle me-2"></i>
-              <small><strong>Note:</strong> Your API key will be shown only once after creation. Make sure to copy and store it securely.</small>
-            </div>
-          </form>
-        </div>
-        <div class="modal-footer" style="border-top: 1px solid #dee2e6;">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="border-radius: 8px;">
-            Cancel
-          </button>
-          <button type="button" class="btn btn-dark" onclick="generateApiKey()" style="border-radius: 8px;">
-            <i class="fa-solid fa-plus me-2"></i>
-            Generate Key
-          </button>
-        </div>
+  <!-- Stats Row -->
+  <div class="stats-row" id="client_api_list_stats">
+    <div class="stat-card">
+      <div class="stat-icon integrations">
+        <i class="fa-solid fa-store"></i>
+      </div>
+      <div class="stat-info">
+        <h3>{{ business_apis|length|default:"0" }}</h3>
+        <p>Platform Integrations</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon keys">
+        <i class="fa-solid fa-key"></i>
+      </div>
+      <div class="stat-info">
+        <h3>{{ api_keys|length|default:"0" }}</h3>
+        <p>API Keys</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon active">
+        <i class="fa-solid fa-check-circle"></i>
+      </div>
+      <div class="stat-info">
+        <h3>{{ business_apis|length|default:"0" }}</h3>
+        <p>Active Connections</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon requests">
+        <i class="fa-solid fa-arrow-right-arrow-left"></i>
+      </div>
+      <div class="stat-info">
+        <h3>--</h3>
+        <p>API Requests Today</p>
       </div>
     </div>
   </div>
 
-  <!-- API Key Success Modal -->
-  <div class="modal fade" id="apiKeySuccessModal" tabindex="-1" aria-labelledby="apiKeySuccessModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content" style="border-radius: 16px; border: none;" id="client_api_list_modal_success">
-        <div class="modal-header" style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-bottom: 1px solid #c3e6cb;">
-          <h5 class="modal-title fw-bold text-success" id="apiKeySuccessModalLabel">
-            <i class="fa-solid fa-check-circle me-2"></i>
-            API Key Generated Successfully!
-          </h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  <!-- E-Commerce Integrations Section -->
+  <section class="api-section" id="client_api_list_section_ecommerce">
+    <div class="section-header">
+      <h2 class="section-title" id="client_api_list_title_ecommerce">
+        <i class="fa-solid fa-store"></i>
+        E-Commerce Integrations
+        <span class="section-badge">{{ business_apis|length|default:"0" }}</span>
+      </h2>
+      <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="btn-section">
+        <i class="fa-solid fa-plus"></i>
+        Add Integration
+      </a>
+    </div>
+
+    <div id="client_api_list_section_integrations_list">
+      {% if business_apis %}
+      <div class="api-grid" id="client_api_list_grid_integrations">
+        {% for api in business_apis %}
+        <article class="integration-card" id="client_api_list_card_integration_{{ api.id }}">
+          <div class="card-header-gradient">
+            <div class="card-header-info">
+              <div class="platform-logo {% if 'shopify' in api.api_type|lower %}shopify{% elif 'woo' in api.api_type|lower %}woocommerce{% elif 'magento' in api.api_type|lower %}magento{% elif 'custom' in api.api_type|lower %}custom{% else %}default{% endif %}">
+                {% if 'shopify' in api.api_type|lower %}
+                <i class="fa-brands fa-shopify"></i>
+                {% elif 'woo' in api.api_type|lower %}
+                <i class="fa-brands fa-wordpress"></i>
+                {% elif 'magento' in api.api_type|lower %}
+                <i class="fa-brands fa-magento"></i>
+                {% else %}
+                <i class="fa-solid fa-code"></i>
+                {% endif %}
+              </div>
+              <div>
+                <h3>{{ api.api_type }} Integration</h3>
+                <span class="platform-type">E-Commerce Platform</span>
+              </div>
+            </div>
+            {% if api.is_verify_api %}
+            <span class="status-pill verified">
+              <i class="fa-solid fa-circle"></i>
+              Verified
+            </span>
+            {% else %}
+            <span class="status-pill pending">
+              <i class="fa-solid fa-circle"></i>
+              Pending
+            </span>
+            {% endif %}
+          </div>
+
+          <div class="card-body-content">
+            <div class="url-display">
+              <span class="label">
+                <i class="fa-solid fa-link"></i>
+                Site URL
+              </span>
+              <span class="value">{{ api.site_api_url|default:"Not configured" }}</span>
+            </div>
+
+            <div class="details-grid">
+              <div class="detail-box">
+                <span class="label">Platform</span>
+                <span class="value">{{ api.api_type }}</span>
+              </div>
+              <div class="detail-box">
+                <span class="label">Country</span>
+                <span class="value">{{ api.site_contry|default:"N/A" }}</span>
+              </div>
+              <div class="detail-box">
+                <span class="label">Default</span>
+                <span class="value {% if api.is_default %}value-yes{% else %}value-no{% endif %}">
+                  {% if api.is_default %}
+                  <i class="fa-solid fa-circle-check"></i> Yes
+                  {% else %}
+                  <i class="fa-solid fa-circle-xmark"></i> No
+                  {% endif %}
+                </span>
+              </div>
+              <div class="detail-box">
+                <span class="label">Status</span>
+                <span class="value {% if api.is_verify_api %}value-active{% else %}value-pending{% endif %}">
+                  {% if api.is_verify_api %}Active{% else %}Pending{% endif %}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <a href="{% url 'business:business_settings_api_test' business.business_id api.id %}" class="action-test">
+              <i class="fa-solid fa-vial"></i>
+              Test
+            </a>
+            <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}" class="action-edit">
+              <i class="fa-solid fa-pen"></i>
+              Edit
+            </a>
+            <a href="{% url 'business:business_settings_api_delete' business.business_id api.id %}" class="action-delete"
+               onclick="return confirm('Are you sure you want to delete this integration?')">
+              <i class="fa-solid fa-trash"></i>
+              Delete
+            </a>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+
+      <div class="tip-banner">
+        <i class="fa-solid fa-lightbulb"></i>
+        <p><strong>Tip:</strong> Avoid setting multiple integrations as default to prevent order sync conflicts.</p>
+      </div>
+      {% else %}
+      <div class="empty-state" id="client_api_list_empty_integrations">
+        <div class="empty-state-icon">
+          <i class="fa-solid fa-plug"></i>
         </div>
-        <div class="modal-body p-4">
-          <div class="alert alert-warning mb-3" style="border-radius: 12px; background: #fff3cd; border: none;">
-            <i class="fa-solid fa-exclamation-triangle me-2"></i>
-            <strong>Important:</strong> This is the only time you'll see the full API key and secret. Copy them now!
+        <h4>No Platform Integrations Yet</h4>
+        <p>Connect your e-commerce platform to automatically sync orders and streamline deliveries</p>
+        <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="btn-empty">
+          <i class="fa-solid fa-plus"></i>
+          Add Your First Integration
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- API Keys Section -->
+  <section class="api-section" id="client_api_list_section_api_keys">
+    <div class="section-header">
+      <h2 class="section-title" id="client_api_list_title_api_keys">
+        <i class="fa-solid fa-key"></i>
+        API Keys
+        <span class="section-badge">{{ api_keys|length|default:"0" }}</span>
+      </h2>
+      <button class="btn-section"
+              data-bs-toggle="modal"
+              data-bs-target="#createApiKeyModal"
+              data-business-id="{{ business.business_id }}"
+              id="client_api_list_btn_generate_key">
+        <i class="fa-solid fa-plus"></i>
+        Generate Key
+      </button>
+    </div>
+
+    <div id="client_api_list_section_keys_list">
+      {% if api_keys %}
+      <div class="api-grid" id="client_api_list_grid_keys">
+        {% for key in api_keys %}
+        <article class="key-card" id="client_api_list_card_key_{{ key.id }}">
+          <div class="key-header">
+            <div class="key-header-info">
+              <div class="key-icon">
+                <i class="fa-solid fa-key"></i>
+              </div>
+              <h3>{% if key.key_name %}{{ key.key_name }}{% else %}API Key #{{ key.id }}{% endif %}</h3>
+            </div>
+            {% if key.is_active %}
+            <span class="status-pill active">
+              <i class="fa-solid fa-circle"></i>
+              Active
+            </span>
+            {% else %}
+            <span class="status-pill inactive">
+              <i class="fa-solid fa-circle"></i>
+              Inactive
+            </span>
+            {% endif %}
+          </div>
+
+          <div class="key-body">
+            <div class="key-display">
+              <div class="key-row">
+                <span class="label">API Key</span>
+                <span class="value">{{ key.api_key|slice:":28" }}...</span>
+              </div>
+              {% if key.api_secret %}
+              <div class="key-row">
+                <span class="label">API Secret</span>
+                <span class="value">{{ key.api_secret|slice:":28" }}...</span>
+              </div>
+              {% endif %}
+            </div>
+
+            <div class="key-meta">
+              <div class="meta-box">
+                <span class="label">Created</span>
+                <span class="value">{{ key.created_at|date:"M d, Y" }}</span>
+              </div>
+              <div class="meta-box">
+                <span class="label">Last Used</span>
+                <span class="value">{% if key.last_used %}{{ key.last_used|date:"M d" }}{% else %}Never{% endif %}</span>
+              </div>
+              <div class="meta-box">
+                <span class="label">Expires</span>
+                <span class="value">{% if key.expires_at %}{{ key.expires_at|date:"M d, Y" }}{% else %}Never{% endif %}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button class="action-copy" onclick="copyToClipboard('{{ key.api_key }}')">
+              <i class="fa-solid fa-copy"></i>
+              Copy
+            </button>
+            <button class="action-edit" onclick="alert('Edit feature coming soon!')">
+              <i class="fa-solid fa-pen"></i>
+              Edit
+            </button>
+            <button class="action-revoke" onclick="if(confirm('Revoke this API key? This cannot be undone.')) alert('Revoke feature coming soon!')">
+              <i class="fa-solid fa-ban"></i>
+              Revoke
+            </button>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+
+      <div class="security-banner">
+        <i class="fa-solid fa-shield-halved"></i>
+        <p><strong>Security:</strong> Keep your API keys secure. Never share them publicly or commit them to version control.</p>
+      </div>
+      {% else %}
+      <div class="empty-state" id="client_api_list_empty_keys">
+        <div class="empty-state-icon">
+          <i class="fa-solid fa-key"></i>
+        </div>
+        <h4>No API Keys Generated</h4>
+        <p>Generate an API key to integrate your custom applications with Ezzy Delivery</p>
+        
+      </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<!-- Create API Key Modal -->
+<div class="modal fade" id="createApiKeyModal" tabindex="-1" aria-labelledby="createApiKeyModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" id="client_api_list_modal_create">
+      <div class="modal-header modal-header-dark">
+        <h5 class="modal-title" id="createApiKeyModalLabel">
+          <i class="fa-solid fa-key"></i>
+          Generate New API Key
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="client_api_list_modal_create_body">
+        <form id="createApiKeyForm">
+          {% csrf_token %}
+          <div class="mb-4">
+            <label for="keyName" class="form-label-styled">
+              <i class="fa-solid fa-tag"></i>
+              Key Name (Optional)
+            </label>
+            <input type="text" class="form-control form-control-styled" id="keyName" name="key_name"
+                   placeholder="e.g., Production API Key, Mobile App">
+            <div class="form-hint">A descriptive name helps identify this key later</div>
           </div>
 
           <div class="mb-3">
-            <label class="form-label fw-semibold">API Key:</label>
-            <div class="input-group">
-              <input type="text" class="form-control api-key-display" id="generatedApiKey" readonly>
-              <button class="btn btn-outline-dark" type="button" onclick="copyToClipboard(document.getElementById('generatedApiKey').value)">
-                <i class="fa-solid fa-copy"></i>
-              </button>
-            </div>
+            <label for="expiresAt" class="form-label-styled">
+              <i class="fa-solid fa-calendar"></i>
+              Expiration Date (Optional)
+            </label>
+            <input type="date" class="form-control form-control-styled" id="expiresAt" name="expires_at">
+            <div class="form-hint">Leave empty for no expiration</div>
           </div>
 
-          <div class="mb-3" id="apiSecretContainer" style="display: none;">
-            <label class="form-label fw-semibold">API Secret:</label>
-            <div class="input-group">
-              <input type="text" class="form-control api-key-display" id="generatedApiSecret" readonly>
-              <button class="btn btn-outline-dark" type="button" onclick="copyToClipboard(document.getElementById('generatedApiSecret').value)">
-                <i class="fa-solid fa-copy"></i>
-              </button>
-            </div>
+          <div class="modal-info-box">
+            <p>
+              <i class="fa-solid fa-info-circle"></i>
+              <span>Your API key will only be shown once after creation. Make sure to copy and store it securely.</span>
+            </p>
           </div>
-
-          <div id="keyNameDisplay" class="mb-2" style="display: none;">
-            <small class="text-muted">
-              <i class="fa-solid fa-tag me-1"></i>
-              <strong>Name:</strong> <span id="displayKeyName"></span>
-            </small>
-          </div>
-        </div>
-        <div class="modal-footer" style="border-top: 1px solid #dee2e6;">
-          <button type="button" class="btn btn-success" onclick="window.location.reload()" style="border-radius: 8px;">
-            <i class="fa-solid fa-check me-2"></i>
-            Done
-          </button>
-        </div>
+        </form>
+      </div>
+      <div class="modal-footer modal-footer-styled">
+        <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-modal-primary" onclick="generateApiKey()">
+          <i class="fa-solid fa-plus"></i>
+          Generate Key
+        </button>
       </div>
     </div>
   </div>
+</div>
 
-  <script>
-    function copyToClipboard(text) {
-      navigator.clipboard.writeText(text).then(function() {
-        alert('Copied to clipboard!');
-      }, function(err) {
-        alert('Failed to copy to clipboard');
-      });
-    }
+<!-- API Key Success Modal -->
+<div class="modal fade" id="apiKeySuccessModal" tabindex="-1" aria-labelledby="apiKeySuccessModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" id="client_api_list_modal_success">
+      <div class="modal-header modal-header-success">
+        <h5 class="modal-title" id="apiKeySuccessModalLabel">
+          <i class="fa-solid fa-check-circle"></i>
+          API Key Generated!
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-warning-box">
+          <p>
+            <i class="fa-solid fa-exclamation-triangle"></i>
+            <span><strong>Important:</strong> This is the only time you'll see the full key. Copy it now!</span>
+          </p>
+        </div>
 
-    function getCookie(name) {
-      let cookieValue = null;
-      if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-          const cookie = cookies[i].trim();
-          if (cookie.substring(0, name.length + 1) === (name + '=')) {
-            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-            break;
-          }
+        <div class="generated-key-box">
+          <label>API Key</label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="generatedApiKey" readonly>
+            <button class="btn-copy-key" type="button" onclick="copyToClipboard(document.getElementById('generatedApiKey').value)">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="generated-key-box d-none" id="apiSecretContainer">
+          <label>API Secret</label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="generatedApiSecret" readonly>
+            <button class="btn-copy-key" type="button" onclick="copyToClipboard(document.getElementById('generatedApiSecret').value)">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+          </div>
+        </div>
+
+        <div id="keyNameDisplay" class="d-none mt-3">
+          <small class="text-muted">
+            <i class="fa-solid fa-tag me-1"></i>
+            <strong>Name:</strong> <span id="displayKeyName"></span>
+          </small>
+        </div>
+      </div>
+      <div class="modal-footer modal-footer-styled justify-content-center">
+        <button type="button" class="btn-modal-success" onclick="window.location.reload()">
+          <i class="fa-solid fa-check"></i>
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+      const toast = document.createElement('div');
+      toast.className = 'toast-notification';
+      toast.innerHTML = '<i class="fa-solid fa-check-circle"></i> Copied to clipboard!';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
+    }, function(err) {
+      alert('Failed to copy to clipboard');
+    });
+  }
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
         }
       }
-      return cookieValue;
     }
+    return cookieValue;
+  }
 
-    function generateApiKey() {
-      const keyName = document.getElementById('keyName').value;
-      const expiresAt = document.getElementById('expiresAt').value;
-      const businessId = parseInt(document.querySelector('[data-business-id]').getAttribute('data-business-id'));
+  function generateApiKey() {
+    const keyName = document.getElementById('keyName').value;
+    const expiresAt = document.getElementById('expiresAt').value;
+    const businessId = parseInt(document.querySelector('[data-business-id]').getAttribute('data-business-id'));
 
-      const data = {
-        business_id: businessId
-      };
+    const data = { business_id: businessId };
 
-      if (keyName) {
-        data.key_name = keyName;
-      }
+    if (keyName) data.key_name = keyName;
+    if (expiresAt) data.expires_at = expiresAt + 'T00:00:00Z';
 
-      if (expiresAt) {
-        data.expires_at = expiresAt + 'T00:00:00Z';
-      }
+    fetch('/api/v1/api-keys/create/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.api_key) {
+        const createModal = bootstrap.Modal.getInstance(document.getElementById('createApiKeyModal'));
+        createModal.hide();
 
-      fetch('/api/v1/api-keys/create/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify(data)
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.api_key) {
-          // Close create modal
-          const createModal = bootstrap.Modal.getInstance(document.getElementById('createApiKeyModal'));
-          createModal.hide();
+        document.getElementById('generatedApiKey').value = data.api_key.api_key;
 
-          // Show success modal with the generated key
-          document.getElementById('generatedApiKey').value = data.api_key.api_key;
-
-          if (data.api_key.api_secret) {
-            document.getElementById('generatedApiSecret').value = data.api_key.api_secret;
-            document.getElementById('apiSecretContainer').style.display = 'block';
-          }
-
-          if (data.api_key.key_name) {
-            document.getElementById('displayKeyName').textContent = data.api_key.key_name;
-            document.getElementById('keyNameDisplay').style.display = 'block';
-          }
-
-          const successModal = new bootstrap.Modal(document.getElementById('apiKeySuccessModal'));
-          successModal.show();
-
-          // Reset form
-          document.getElementById('createApiKeyForm').reset();
-        } else if (data.error) {
-          alert('Error: ' + data.error);
-        } else {
-          alert('An error occurred while generating the API key.');
+        if (data.api_key.api_secret) {
+          document.getElementById('generatedApiSecret').value = data.api_key.api_secret;
+          document.getElementById('apiSecretContainer').classList.remove('d-none');
         }
-      })
-      .catch(error => {
-        console.error('Error:', error);
+
+        if (data.api_key.key_name) {
+          document.getElementById('displayKeyName').textContent = data.api_key.key_name;
+          document.getElementById('keyNameDisplay').classList.remove('d-none');
+        }
+
+        const successModal = new bootstrap.Modal(document.getElementById('apiKeySuccessModal'));
+        successModal.show();
+
+        document.getElementById('createApiKeyForm').reset();
+      } else if (data.error) {
+        alert('Error: ' + data.error);
+      } else {
         alert('An error occurred while generating the API key.');
-      });
-    }
-  </script>
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('An error occurred while generating the API key.');
+    });
+  }
+</script>
 {% endblock content %}

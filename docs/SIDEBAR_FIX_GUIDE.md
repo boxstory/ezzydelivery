@@ -15,7 +15,7 @@ All sidebars should link to the common CSS file:
 
 ```html
 {% load static %}
-<link href="{% static 'css/sidebar-common.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static'webpages/css/sidebar-common.css' %}" rel="stylesheet" type="text/css" />
 ```
 
 ### Step 2: Fix Active State Logic
@@ -89,7 +89,7 @@ Remove all `<style>` tags from sidebar templates. The `sidebar-common.css` file 
 
 ```html
 {% load static %}
-<link href="{% static 'css/sidebar-common.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static'webpages/css/sidebar-common.css' %}" rel="stylesheet" type="text/css" />
 
 <div class="dashboard-sidebar">
     <!-- Header -->
@@ -203,7 +203,7 @@ For each sidebar file, follow these steps:
 1. Add CSS link at the top:
    ```html
    {% load static %}
-   <link href="{% static 'css/sidebar-common.css' %}" rel="stylesheet" type="text/css" />
+   <link href="{% static'webpages/css/sidebar-common.css' %}" rel="stylesheet" type="text/css" />
    ```
 
 2. Remove all `<style>` tags

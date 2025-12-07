@@ -182,9 +182,9 @@ def create_shipping_label(order, delivery_task):
 
         # Get sender info from pickup location
         pickup = order.pickup_location
-        sender_name = pickup.location_name if pickup else order.business.business_name
-        sender_address = pickup.location_address if pickup else ""
-        sender_phone = pickup.location_phone if pickup else ""
+        sender_name = pickup.pickup_location_title if pickup else order.business.business_name
+        sender_address = pickup.locality if pickup else ""
+        sender_phone = order.business.business_phone if order.business else ""
 
         # Generate label number
         label_number = generate_label_number(order, delivery_task)

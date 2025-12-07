@@ -59,3 +59,16 @@ def social_media_links(request):
             'privacy': '/privacy/',
         },
     }
+
+
+def htmx_request(request):
+    """
+    Detect HTMX requests and add flag to context
+    HTMX sends 'HX-Request' header with value 'true' for all requests
+    """
+    is_htmx = request.headers.get('HX-Request') == 'true'
+    return {
+        'is_htmx': is_htmx,
+        'htmx_target': request.headers.get('HX-Target', ''),
+        'htmx_trigger': request.headers.get('HX-Trigger', ''),
+    }

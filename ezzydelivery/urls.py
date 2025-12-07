@@ -42,7 +42,9 @@ urlpatterns = [
     path('accounts/', include('allauth.urls')),
 
     path('api-auth/', include('rest_framework.urls')),
-    path('api/', include('ezzy_api.urls')),
+    # API versioning: v1 is current version, unversioned path kept for backwards compatibility
+    path('api/v1/', include('ezzy_api.urls', namespace='ezzy_api_v1')),
+    path('api/', include('ezzy_api.urls')),  # Legacy support (defaults to v1)
 
     path('', include('core.urls', namespace='core')),
     path('', include('webpages.urls', namespace='webpages')),
@@ -57,6 +59,8 @@ urlpatterns = [
     path('delivery/', include('delivery.urls', namespace='delivery')),
 
     path('blog/', include('blog.urls', namespace='blog')),
+
+    path('warehouse/', include('warehouse.urls', namespace='warehouse')),
 
 ]
 

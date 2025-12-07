@@ -1,26 +1,59 @@
-{% extends "client_dashboard_base.html" %} {% load static %}
-<!-- extra css -->
-{% load crispy_forms_tags %} {% block content %}
-<div class="col-12  " id="client_api_add_container_main">
-    <div class="col p-2 mt-3" id="client_api_add_section_header">
-        <h2 class="m-0 text-center pb-3" id="client_api_add_title_form">{{form_title}}</h2>
+{% extends "client_dashboard_base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'client/css/form-styles.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+
+<div class="form-container" id="client_api_add_container_main">
+    <!-- Header -->
+    <div class="form-header" id="client_api_add_section_header">
+        <h1 id="client_api_add_title_form">
+            <i class="fa-solid fa-plug"></i>
+            {{ form_title|default:"Add API Integration" }}
+        </h1>
+        <a href="{% url 'business:business_settings' business.business_id %}" class="back-link">
+            <i class="fa-solid fa-arrow-left"></i>
+            Back to Settings
+        </a>
     </div>
-    <div class="d-flex col-12 justify-content-center">
-        <form method="POST" class="col-10" id="client_api_add_form_main">
+
+    <!-- Form Card -->
+    <div class="form-card">
+        <div class="form-card-header">
+            <i class="fa-solid fa-gear"></i>
+            <h2>API Configuration</h2>
+        </div>
+        <form method="POST" id="client_api_add_form_main">
             {% csrf_token %}
-            {{ form | crispy }}
-            <div class=" text-end d-block justify-content-evenly">
-                <a class="btn btn-dark  w-md-50 px-5" href="javascript:history.back()" id="client_api_add_btn_back">
-                    Back
+            <div class="form-card-body">
+                {{ form | crispy }}
+            </div>
+            <div class="form-card-footer">
+                <a href="{% url 'business:business_settings' business.business_id %}" class="btn-cancel" id="client_api_add_btn_back">
+                    <i class="fa-solid fa-xmark"></i>
+                    Cancel
                 </a>
-                <button type="submit" value="submit" methode="POST" class="btn btn-dark  w-md-50 px-5" href="{% url 'business:business_settings_api_add' business.business_id %}" id="client_api_add_btn_submit">
-                    Submit
+                <button type="submit" class="btn-submit" id="client_api_add_btn_submit">
+                    <i class="fa-solid fa-plus"></i>
+                    Add API
                 </button>
             </div>
-
         </form>
+    </div>
 
-        {% endblock content %}
+    <!-- Info Note -->
+    <div class="form-info-note">
+        <div class="form-info-note-title">
+            <i class="fa-solid fa-circle-info"></i>
+            Note
+        </div>
+        <p class="form-info-note-text">
+            After adding your API integration, it will need to be verified by an administrator before it can be used. You can test the connection once the API is added.
+        </p>
     </div>
 </div>
+{% endblock content %}

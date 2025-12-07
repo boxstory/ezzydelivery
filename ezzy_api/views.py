@@ -36,22 +36,6 @@ from django.views.decorators.csrf import csrf_exempt
 logger = logging.getLogger('ezzy_api')
 
 
-# class OrderList(APIView):
-#     permission_classes = [permissions.IsAuthenticated]
-
-#     def get(self, request, format=None):
-#         orders = orders_models.Order.objects.all()
-#         serializer = ezzy_api_serializers.OrderSerializer(orders, many=True)
-#         return Response(serializer.data)
-
-#     def post(self, request, format=None):
-#         serializer = ezzy_api_serializers.OrderSerializer(data=request.data)
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 class OrderList(generics.ListCreateAPIView):
 
     permission_classes = [permissions.IsAuthenticated]

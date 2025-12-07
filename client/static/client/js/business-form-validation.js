@@ -188,7 +188,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const alertDiv = document.createElement('div');
                 alertDiv.className = 'validation-alert alert alert-danger';
                 alertDiv.style.marginBottom = '1rem';
-                alertDiv.innerHTML = '<i class="fa-solid fa-exclamation-circle me-2"></i>Please fix the errors in the form before submitting.';
+                // Use DOM methods instead of innerHTML for XSS safety
+                const icon = document.createElement('i');
+                icon.className = 'fa-solid fa-exclamation-circle me-2';
+                icon.setAttribute('aria-hidden', 'true');
+                alertDiv.appendChild(icon);
+                alertDiv.appendChild(document.createTextNode('Please fix the errors in the form before submitting.'));
 
                 form.insertBefore(alertDiv, form.firstChild);
 

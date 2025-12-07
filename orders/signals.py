@@ -1,4 +1,4 @@
-
+import logging
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
@@ -6,6 +6,8 @@ from orders.models import *
 from delivery.models import *
 import uuid
 import json
+
+logger = logging.getLogger('orders')
 
 # Store old verification status for tracking changes
 _old_verification_status = {}
@@ -27,12 +29,12 @@ def order_pre_save_receiver(sender, instance, *args, **kwargs):
 
 @ receiver(post_save, sender=Order)
 def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
-    print('order_post_save_receiver')
+    logger.debug('order_post_save_receiver')
     if created:
-        print(instance)
+        logger.debug(f'New order created: {instance}')
         if instance.order_number == "" :
             instance.order_number = str(instance.business.business_code) + '-' + str(instance.client_order_code) + '-' + str(instance.id)
-            print(instance.order_number)
+            logger.debug(f'Generated order_number: {instance.order_number}')
         
         # Save original order data as proof
         if not instance.original_order_data:
@@ -82,15 +84,12 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
                         )
 
                         if result['success']:
-                            print(f"Location verification link sent for order {instance.order_number}")
+                            logger.info(f"Location verification link sent for order {instance.order_number}")
                         else:
-                            print(f"Failed to send location verification: {result.get('error', 'Unknown error')}")
+                            logger.warning(f"Failed to send location verification: {result.get('error', 'Unknown error')}")
                     else:
-                        print(f"Invalid phone number for order {instance.order_number}: {error_msg}")
+                        logger.warning(f"Invalid phone number for order {instance.order_number}: {error_msg}")
                 except Exception as e:
-                    print(f"Error sending location verification: {str(e)}")
-                    import logging
-                    logger = logging.getLogger(__name__)
                     logger.error(f"Error sending location verification for order {instance.id}: {str(e)}", exc_info=True)
         
         if instance.order_number not in DlAddressUpdate.objects.values_list('dl_task_number', flat=True):
@@ -186,9 +185,6 @@ def _create_delivery_task_from_order(order):
 
         return delivery_task
     except Exception as e:
-        print(f"Error creating delivery task: {str(e)}")
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Error creating delivery task for order {order.id}: {str(e)}", exc_info=True)
         return None
 

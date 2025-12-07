@@ -321,6 +321,113 @@ def order_upload_review_data(request):
     return render(request, 'orders/order_upload_review.html', {'data': data})
 
 
+@login_required(login_url='account_login')
+def bulk_order_entry(request):
+    """
+    Excel-like bulk order entry view for clients.
+    Allows entering multiple orders in a spreadsheet-style interface.
+    """
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        logger.info(f"User {request.user.id} accessing bulk order entry for business {business.business_id}")
+    except business_models.Business.DoesNotExist:
+        logger.warning(f"User {request.user.id} has no associated business")
+        messages.error(request, "No business associated with your account")
+        return redirect('business_dashboard')
+
+    pickup_locations = business_models.PickupLocation.objects.filter(
+        business_id=business.business_id
+    ).all()
+
+    if not pickup_locations.exists():
+        messages.warning(request, "Please add a pickup location first.")
+        return redirect('client:pickup_location_add')
+
+    if request.method == 'POST':
+        # Process bulk order data
+        success_count = 0
+        error_count = 0
+        errors = []
+
+        # Parse the form data
+        i = 0
+        while f'data[{i}][customer_name]' in request.POST:
+            row_data = {
+                'client_order_code': request.POST.get(f'data[{i}][order_id]', ''),
+                'customer_name': request.POST.get(f'data[{i}][customer_name]', ''),
+                'customer_phone': request.POST.get(f'data[{i}][phone1]', ''),
+                'customer_whatsapp': request.POST.get(f'data[{i}][phone2_whatsapp]', ''),
+                'customer_address': request.POST.get(f'data[{i}][customer_address]', ''),
+                'dl_zone': request.POST.get(f'data[{i}][zone_no]', '') or 0,
+                'dl_street': request.POST.get(f'data[{i}][street_no]', '') or 0,
+                'dl_building': request.POST.get(f'data[{i}][building_no]', '') or 0,
+                'deadline_date': request.POST.get(f'data[{i}][deadline_date]', ''),
+                'order_notes': request.POST.get(f'data[{i}][note]', ''),
+                'pickup_location': pickup_locations.first().id,
+            }
+
+            # Skip empty rows
+            if not row_data['customer_name'] and not row_data['client_order_code']:
+                i += 1
+                continue
+
+            # Create the order
+            try:
+                order = orders_models.Order(
+                    business=business,
+                    client_order_code=row_data['client_order_code'] or f"BULK-{datetime.now().strftime('%Y%m%d%H%M%S')}-{i}",
+                    customer_name=row_data['customer_name'],
+                    customer_phone=row_data['customer_phone'],
+                    customer_whatsapp=row_data['customer_whatsapp'] or row_data['customer_phone'],
+                    customer_address=row_data['customer_address'],
+                    dl_zone=int(row_data['dl_zone']) if row_data['dl_zone'] else 0,
+                    dl_street=int(row_data['dl_street']) if row_data['dl_street'] else 0,
+                    dl_building=int(row_data['dl_building']) if row_data['dl_building'] else 0,
+                    deadline_date=row_data['deadline_date'],
+                    order_notes=row_data['order_notes'],
+                    pickup_location=pickup_locations.first(),
+                )
+                order.save()
+
+                # Add products if provided
+                product_name = request.POST.get(f'data[{i}][product_name]', '')
+                qty = request.POST.get(f'data[{i}][qty]', '1')
+                price = request.POST.get(f'data[{i}][price]', '0')
+
+                if product_name:
+                    # Store product info in order notes for now
+                    order.order_notes = f"{order.order_notes} | Product: {product_name}, Qty: {qty}, Price: {price}".strip(' |')
+                    order.save()
+
+                success_count += 1
+                logger.info(f"Created order {order.order_number} via bulk entry")
+
+            except Exception as e:
+                error_count += 1
+                errors.append(f"Row {i+1}: {str(e)}")
+                logger.error(f"Error creating order in row {i+1}: {str(e)}")
+
+            i += 1
+
+        if success_count > 0:
+            messages.success(request, f"Successfully created {success_count} order(s).")
+        if error_count > 0:
+            messages.warning(request, f"Failed to create {error_count} order(s). Errors: {'; '.join(errors[:5])}")
+
+        return redirect('orders:orders_all_list')
+
+    # Get products for this business
+    from product import models as product_models
+    products = product_models.Product.objects.filter(
+        business=business
+    ).select_related('color', 'unit').order_by('item_name')
+
+    context = {
+        'business': business,
+        'pickup_locations': pickup_locations,
+        'products': products,
+    }
+    return render(request, 'orders/bulk_order_entry.html', context)
 
 
 
@@ -747,7 +854,7 @@ def get_order_by_api(request):
 
 
         }
-        return render(request, 'orders\get_order_by_api.html', data)
+        return render(request, 'orders/get_order_by_api.html', data)
     else:
         return JsonResponse({'status': 'error', 'message': 'Failed to fetch orders from Shopify'})
 
@@ -952,7 +1059,7 @@ def get_orders_by_base_api(request):
             'status': status,
             'result': result,
         }
-        return render(request, 'orders\orders_api_list.html', context)
+        return render(request, 'orders/orders_api_list.html', context)
 
     except Exception as e:
         logger.error(f"Error fetching orders: {str(e)}")

@@ -16,6 +16,49 @@ DEBUG = config("DEBUG", cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=lambda v: [s.strip() for s in v.split(',')])
 
+# ==========================================
+# SECURITY SETTINGS
+# ==========================================
+# These settings should be properly configured for production deployment
+
+# HTTPS/SSL Settings (enable in production with HTTPS)
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# HSTS (HTTP Strict Transport Security) - enable in production
+SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=0, cast=int)  # Set to 31536000 (1 year) in production
+SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False, cast=bool)
+SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=False, cast=bool)
+
+# Content Security
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True  # Legacy, but still useful for older browsers
+X_FRAME_OPTIONS = 'DENY'  # Prevent clickjacking
+
+# Cookie Security
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=False, cast=bool)  # True in production with HTTPS
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost,http://127.0.0.1',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
+
+# Referrer Policy
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Permissions Policy (formerly Feature-Policy)
+PERMISSIONS_POLICY = {
+    'geolocation': ['self'],
+    'camera': [],
+    'microphone': [],
+    'payment': ['self'],
+}
+# ==========================================
+# END SECURITY SETTINGS
+# ==========================================
+
 
 # Application definition
 
@@ -63,6 +106,7 @@ INSTALLED_APPS = [
     'orders',
     'workforce',
     'ezzy_api',
+    'warehouse',
 
 
 ]
@@ -136,9 +180,10 @@ ACCOUNT_FORMS = {
 SESSION_COOKIE_AGE = 3600  # 1 hour in seconds (3600 seconds = 60 minutes)
 SESSION_SAVE_EVERY_REQUEST = True  # Refresh session on every request (updates last activity)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Keep session even after browser close
-SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool)  # True in production with HTTPS
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
 SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+SESSION_COOKIE_NAME = 'ezzy_sessionid'  # Custom session cookie name for added security
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -173,6 +218,8 @@ TEMPLATES = [
                 'core.context_processors.site_info',
                 # Social media and contact links
                 'core.context_processors.social_media_links',
+                # HTMX request detection
+                'core.context_processors.htmx_request',
             ],
         },
     },
@@ -243,13 +290,15 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 STATIC_URL = '/static/'
 
-# Additional locations of static files
+# Additional locations of static files (for development)
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'templates/static/'),
+    os.path.join(BASE_DIR, 'static/'),
 ]
+
+# For production: collectstatic will copy files here
+# STATIC_ROOT = os.path.join(BASE_DIR, 'staticroot/')
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
@@ -259,6 +308,34 @@ MEDIA_URL = '/media/'
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# ==========================================
+# CACHE CONFIGURATION
+# ==========================================
+# Configure cache backend for sessions, rate limiting, and general caching
+# For production, use Redis or Memcached
+
+CACHES = {
+    'default': {
+        'BACKEND': config(
+            'CACHE_BACKEND',
+            default='django.core.cache.backends.locmem.LocMemCache'
+        ),
+        'LOCATION': config('CACHE_LOCATION', default='unique-snowflake'),
+        'TIMEOUT': 300,  # 5 minutes default
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,
+        }
+    }
+}
+
+# For Redis cache in production, add to .env:
+# CACHE_BACKEND=django.core.cache.backends.redis.RedisCache
+# CACHE_LOCATION=redis://127.0.0.1:6379/1
+# ==========================================
+# END CACHE CONFIGURATION
+# ==========================================
 
 
 REST_FRAMEWORK = {
@@ -271,6 +348,26 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    # API Rate Limiting / Throttling
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',      # Anonymous users: 100 requests per hour
+        'user': '1000/hour',     # Authenticated users: 1000 requests per hour
+        'burst': '60/minute',    # Burst rate for specific endpoints
+    },
+    # API Versioning
+    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
+    'DEFAULT_VERSION': 'v1',
+    'ALLOWED_VERSIONS': ['v1'],
+    'VERSION_PARAM': 'version',
+    # Exception handling
+    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+    # Date/time format
+    'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S%z',
+    'DATE_FORMAT': '%Y-%m-%d',
 }
 
 import mimetypes

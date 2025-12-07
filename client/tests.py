@@ -6,8 +6,6 @@ Tests cover:
 - API settings validation
 - Pickup location management
 - Team member management
-
-TODO: Implement all test methods according to TEST_SUMMARY.md
 """
 
 from decimal import Decimal
@@ -37,8 +35,9 @@ class BusinessModelTestCase(TestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Business Owner',
-            mobile_no='12345678'
+            first_name='Business',
+            last_name='Owner',
+            phone=12345678
         )
 
     def test_business_creation(self):
@@ -109,8 +108,9 @@ class BusinessApiSettingsTestCase(TestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='API User',
-            mobile_no='87654321'
+            first_name='API',
+            last_name='User',
+            phone=87654321
         )
 
         self.business = Business.objects.create(
@@ -203,8 +203,9 @@ class PickupLocationTestCase(TestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Pickup User',
-            mobile_no='11223344'
+            first_name='Pickup',
+            last_name='User',
+            phone=11223344
         )
 
         self.business = Business.objects.create(
@@ -305,8 +306,9 @@ class BusinessTeamProfileTestCase(TestCase):
 
         self.owner_profile = Profile.objects.create(
             user=self.owner,
-            full_name='Business Owner',
-            mobile_no='55555555'
+            first_name='Business',
+            last_name='Owner',
+            phone=55555555
         )
 
         self.business = Business.objects.create(
@@ -327,8 +329,9 @@ class BusinessTeamProfileTestCase(TestCase):
 
         self.team_profile = Profile.objects.create(
             user=self.team_user,
-            full_name='Team Member',
-            mobile_no='66666666'
+            first_name='Team',
+            last_name='Member',
+            phone=66666666
         )
 
     def test_team_member_creation(self):
@@ -360,8 +363,9 @@ class BusinessTeamProfileTestCase(TestCase):
             )
             profile = Profile.objects.create(
                 user=user,
-                full_name=f'Team {i}',
-                mobile_no=f'7777777{i}'
+                first_name='Team',
+                last_name=f'{i}',
+                phone=77777770 + i
             )
             team = BusinessTeamProfile.objects.create(
                 user=user,
@@ -407,8 +411,9 @@ class BusinessProfileTestCase(TestCase):
 
         self.profile = Profile.objects.create(
             user=self.user,
-            full_name='Profile User',
-            mobile_no='88888888'
+            first_name='Profile',
+            last_name='User',
+            phone=88888888
         )
 
         self.business = Business.objects.create(
@@ -434,12 +439,3 @@ class BusinessProfileTestCase(TestCase):
 
         self.assertEqual(business_profile.business, self.business)
         self.assertIsNotNone(business_profile.business_description)
-
-
-# TODO: Add more tests for:
-# - BusinessSocialInfo
-# - DriverDirectory
-# - BusinessLogo
-# - Complex business workflows
-# - Permission checks
-# - Validation tests

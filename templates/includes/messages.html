@@ -1,7 +1,10 @@
 {% if messages %}
+<!-- Messages are now displayed as toasts via toast_notifications.html -->
+<!-- If you want to show inline alerts instead of toasts, uncomment the code below -->
+<!--
 <div class="container mt-3">
     {% for message in messages %}
-    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         {% if message.tags == 'error' %}
             <i class="fas fa-exclamation-circle me-2"></i>
@@ -16,4 +19,5 @@
     </div>
     {% endfor %}
 </div>
+-->
 {% endif %}

@@ -1077,8 +1077,8 @@ COMPRESS_JS_FILTERS = [
 {% load compress %}
 
 {% compress css %}
-    <link rel="stylesheet" href="{% static 'css/bootstrap.css' %}">
-    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+    <link rel="stylesheet" href="{% static'webpages/css/bootstrap.css' %}">
+    <link rel="stylesheet" href="{% static'webpages/css/custom.css' %}">
 {% endcompress %}
 
 {% compress js %}

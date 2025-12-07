@@ -1,25 +1,70 @@
-{% extends "client_dashboard_base.html" %} {% load static %}
-<!-- extra css -->
-{% load crispy_forms_tags %} {% block content %}
-<div class="col-12  " id="client_location_update_container_main">
-  <div class="col p-2" id="client_location_update_section_header">
-    <h2 class="m-0 text-center pb-3" id="client_location_update_title_form">STORE LOCATION UPDATE</h2>
-  </div>
-  <div class="d-flex col-12 justify-content-center">
-    <form method="POST" class="col-8" id="client_location_update_form_main">
-      {% csrf_token %} {{ form | crispy }}
+{% extends "client_dashboard_base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
 
-      <button
-        type="submit"
-        methode="POST"
-        class="btn btn-dark w-100 w-md-50"
-        href="{% url 'business:pickup_location_update'  id %}"
-        id="client_location_update_btn_submit"
-      >
-        Submit
-      </button>
-    </form>
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'client/css/form-styles.css' %}">
+{% endblock extra_css %}
 
-    {% endblock content %}
-  </div>
+{% block content %}
+
+<div class="form-container" id="client_location_update_container_main">
+    <!-- Header -->
+    <div class="form-header" id="client_location_update_section_header">
+        <h1 id="client_location_update_title_form">
+            <i class="fa-solid fa-pen-to-square"></i>
+            Update Store Location
+        </h1>
+        <a href="{% url 'business:pickup_location_list' %}" class="back-link">
+            <i class="fa-solid fa-arrow-left"></i>
+            Back to Stores
+        </a>
+    </div>
+
+    <!-- Form Card -->
+    <div class="form-card">
+        <div class="form-card-header">
+            <h2>
+                <i class="fa-solid fa-location-dot"></i>
+                Location Details
+            </h2>
+            {% if store.pickup_status == 'active' %}
+            <span class="status-badge active">
+                <i class="fa-solid fa-check-circle"></i> Active
+            </span>
+            {% else %}
+            <span class="status-badge inactive">
+                <i class="fa-solid fa-circle-xmark"></i> {{ store.pickup_status|default:"Inactive"|title }}
+            </span>
+            {% endif %}
+        </div>
+        <form method="POST" id="client_location_update_form_main">
+            {% csrf_token %}
+            <div class="form-card-body">
+                {{ form | crispy }}
+            </div>
+            <div class="form-card-footer">
+                <a href="{% url 'business:pickup_location_list' %}" class="btn-cancel" id="client_location_update_btn_cancel">
+                    <i class="fa-solid fa-xmark"></i>
+                    Cancel
+                </a>
+                <button type="submit" class="btn-submit" id="client_location_update_btn_submit">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Info Note -->
+    <div class="form-info-note">
+        <div class="form-info-note-title">
+            <i class="fa-solid fa-circle-info"></i>
+            Tip
+        </div>
+        <p class="form-info-note-text">
+            Keep your store location details up to date to ensure smooth pickup operations. Any changes will be reflected immediately for new orders.
+        </p>
+    </div>
 </div>
+{% endblock content %}

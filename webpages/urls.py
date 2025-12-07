@@ -53,7 +53,6 @@ urlpatterns = [
     path('logistics-services-qatar/', webpages_views.logistics_services_qatar, name='logistics_services_qatar'),
     path('online-store-delivery-qatar/', webpages_views.online_store_delivery_qatar, name='online_store_delivery_qatar'),
 
-    path('test/', webpages_views.test, name='test'),
     path('500/', TemplateView.as_view(template_name='page_not_found.html')),
 
 ]

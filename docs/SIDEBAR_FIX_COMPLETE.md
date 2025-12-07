@@ -51,7 +51,7 @@ All sidebar files have been successfully updated to:
 **After**:
 ```html
 {% load static %}
-<link href="{% static 'css/sidebar-common.css' %}" rel="stylesheet" />
+<link href="{% static'webpages/css/sidebar-common.css' %}" rel="stylesheet" />
 
 <li class="nav-item {% if condition %}active{% endif %}">
   <div class="nav-link btn {% if condition %}active{% endif %}">Orders</div>
@@ -110,7 +110,7 @@ All sidebar files have been successfully updated to:
 **After**:
 ```html
 {% load static %}
-<link href="{% static 'css/sidebar-common.css' %}" rel="stylesheet" />
+<link href="{% static'webpages/css/sidebar-common.css' %}" rel="stylesheet" />
 <div class="min-vh-100 dashboard-sidebar the-sidebar">
   <li class="nav-item {% if condition %}active{% endif %}">
     <div class="nav-link btn {% if condition %}active{% endif %}"
@@ -181,7 +181,7 @@ All sidebar files have been successfully updated to:
 **After**:
 ```html
 {% load static %}
-<link href="{% static 'css/sidebar-common.css' %}" rel="stylesheet" />
+<link href="{% static'webpages/css/sidebar-common.css' %}" rel="stylesheet" />
 
 <li class="nav-item {% if condition %}active{% endif %}">
   <div class="nav-link btn {% if condition %}active{% endif %}">Orders</div>

@@ -21,7 +21,7 @@
             <i class="fa-solid fa-coins" style="font-size: 1.5rem; color: #28a745; opacity: 0.3;"></i>
         </div>
         <div style="font-size: 2rem; font-weight: 800; color: #28a745;">₹{{ total_earnings|default:"0.00" }}</div>
-        <div style="font-size: 0.813rem; color: var(--brand-grey-500); margin-top: 0.5rem;">Pending driver earnings</div>
+        <div style="font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;">Pending driver earnings</div>
     </div>
 
     <div style="background: var(--brand-white); padding: 1.5rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #2196f3;">
@@ -30,7 +30,7 @@
             <i class="fa-solid fa-truck-fast" style="font-size: 1.5rem; color: #2196f3; opacity: 0.3;"></i>
         </div>
         <div style="font-size: 2rem; font-weight: 800; color: #2196f3;">{{ total_deliveries|default:"0" }}</div>
-        <div style="font-size: 0.813rem; color: var(--brand-grey-500); margin-top: 0.5rem;">After last settlement</div>
+        <div style="font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;">After last settlement</div>
     </div>
 
     <div style="background: var(--brand-white); padding: 1.5rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid var(--brand-primary);">
@@ -39,7 +39,7 @@
             <i class="fa-solid fa-users" style="font-size: 1.5rem; color: var(--brand-primary); opacity: 0.3;"></i>
         </div>
         <div style="font-size: 2rem; font-weight: 800; color: var(--brand-grey-800);">{{ drivers.paginator.count|default:"0" }}</div>
-        <div style="font-size: 0.813rem; color: var(--brand-grey-500); margin-top: 0.5rem;">With pending earnings</div>
+        <div style="font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;">With pending earnings</div>
     </div>
 </div>
 
@@ -177,8 +177,16 @@
                 const grid = document.querySelector('.fleet-grid');
                 const message = document.createElement('div');
                 message.className = 'no-results-message';
-                message.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--brand-grey-500);';
-                message.innerHTML = '<i class="fa-solid fa-search" style="font-size: 3rem; margin-bottom: 1rem; display: block;"></i><p>No drivers found matching "' + searchTerm + '"</p>';
+                message.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--brand-grey-500);';
+                // Use DOM methods for XSS-safe content insertion
+                const icon = document.createElement('i');
+                icon.className = 'fa-solid fa-search';
+                icon.style.cssText = 'font-size: 2rem; margin-bottom: 1rem; display: block;';
+                icon.setAttribute('aria-hidden', 'true');
+                const paragraph = document.createElement('p');
+                paragraph.textContent = 'No drivers found matching "' + searchTerm + '"';
+                message.appendChild(icon);
+                message.appendChild(paragraph);
                 grid.appendChild(message);
             }
         }, 300);

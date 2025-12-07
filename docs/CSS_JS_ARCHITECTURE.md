@@ -97,10 +97,10 @@ ezzydelivery/
 
 ```html
 <!-- 1. BRAND KIT - Load FIRST to define CSS variables -->
-<link href="{% static 'css/brand-kit.css' %}" rel="stylesheet" />
+<link href="{% static'webpages/css/brand-kit.css' %}" rel="stylesheet" />
 
 <!-- 2. BASE CSS - Core utilities using brand variables -->
-<link href="{% static 'css/base.css' %}" rel="stylesheet" />
+<link href="{% static'webpages/css/base.css' %}" rel="stylesheet" />
 
 <!-- 3. EXTERNAL LIBRARIES -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />

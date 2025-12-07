@@ -1,0 +1,611 @@
+{% extends "client_dashboard_base.html" %}
+{% load static %}
+{% block content %}
+<div class="container-fluid p-3" id="bulk_order_entry_container">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="fas fa-table me-2"></i>Bulk Order Entry</h4>
+    <div class="btn-group">
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_add_row">
+        <i class="fas fa-plus me-1"></i>Add Row
+      </button>
+      <button type="button" class="btn btn-outline-danger btn-sm" id="btn_delete_selected">
+        <i class="fas fa-trash me-1"></i>Delete Selected
+      </button>
+      <button type="button" class="btn btn-outline-info btn-sm" id="btn_clear_all">
+        <i class="fas fa-eraser me-1"></i>Clear All
+      </button>
+    </div>
+  </div>
+
+  <form method="post" id="bulk_order_form">
+    {% csrf_token %}
+    <div class="excel-table-wrapper">
+      <table class="excel-table" id="bulk_order_table">
+        <thead>
+          <tr class="header-row">
+            <th class="col-checkbox"><input type="checkbox" id="select_all"></th>
+            <th class="col-no">No</th>
+            <th class="col-order-id">Order ID</th>
+            <th class="col-date">Date</th>
+            <th class="col-customer-name">Customer Name</th>
+            <th class="col-address">Customer Address</th>
+            <th class="col-city">Customer City/<br>Land mark</th>
+            <th class="col-building">Villa/<br>Building No</th>
+            <th class="col-street">Street No</th>
+            <th class="col-zone">Zone No</th>
+            <th class="col-deadline">Date<br>(If them have demand)</th>
+            <th class="col-phone1">Phone 1</th>
+            <th class="col-phone2">Phone 2/<br>Whatsapp</th>
+            <th class="col-sku">Stock SKU<br>(If-available)</th>
+            <th class="col-product">Product Name</th>
+            <th class="col-qty">Qty</th>
+            <th class="col-price">Price</th>
+            <th class="col-note">Note</th>
+            <th class="col-stock">Stock Status</th>
+            <th class="col-prod1">Product:1</th>
+            <th class="col-cnt1">Count:1</th>
+            <th class="col-prod2">Product:2</th>
+            <th class="col-cnt2">Count:2</th>
+            <th class="col-prod3">Product:3</th>
+            <th class="col-cnt3">Count:3</th>
+            <th class="col-prod4">Product:4</th>
+            <th class="col-cnt4">Count:4</th>
+            <th class="col-prod5">Product:5</th>
+            <th class="col-cnt5">Count:5</th>
+            <th class="col-stock2">Stock Status</th>
+            <th class="col-dlno">DL No:</th>
+            <th class="col-dlstatus">Delivery Status</th>
+            <th class="col-invoice">Invoice No</th>
+            <th class="col-notes-ezzy">Notes By Ezzy:</th>
+            <th class="col-notes-seller">Notes By Seller</th>
+          </tr>
+        </thead>
+        <tbody id="order_table_body">
+          <!-- Initial empty rows will be added by JavaScript -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-3 d-flex justify-content-between">
+      <div>
+        <span class="text-muted small">
+          <i class="fas fa-info-circle me-1"></i>
+          Use Tab to navigate between cells. Press Enter to move to next row.
+        </span>
+      </div>
+      <div class="btn-group">
+        <button type="button" class="btn btn-secondary" id="btn_save_draft">
+          <i class="fas fa-save me-1"></i>Save Draft
+        </button>
+        <button type="submit" class="btn btn-primary" id="btn_submit_orders">
+          <i class="fas fa-paper-plane me-1"></i>Submit Orders
+        </button>
+      </div>
+    </div>
+  </form>
+
+  {% if messages %}
+  <div class="mt-3">
+    {% for message in messages %}
+    <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<style>
+/* Excel-like Table Styles */
+.excel-table-wrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 70vh;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.excel-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  min-width: 100%;
+  table-layout: fixed;
+}
+
+.excel-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.excel-table th {
+  background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 1px solid #dee2e6;
+  padding: 8px 4px;
+  text-align: center;
+  font-weight: 600;
+  color: #495057;
+  white-space: nowrap;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.excel-table th.header-row th {
+  border-bottom: 2px solid #6c757d;
+}
+
+.excel-table td {
+  border: 1px solid #dee2e6;
+  padding: 0;
+  vertical-align: middle;
+}
+
+.excel-table tbody tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+.excel-table tbody tr:hover {
+  background-color: #e3f2fd !important;
+}
+
+.excel-table tbody tr.selected {
+  background-color: #fff3cd !important;
+}
+
+/* Cell Input Styles */
+.excel-table input[type="text"],
+.excel-table input[type="number"],
+.excel-table input[type="date"],
+.excel-table select {
+  width: 100%;
+  border: none;
+  padding: 6px 4px;
+  font-size: 12px;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.excel-table input:focus,
+.excel-table select:focus {
+  outline: 2px solid #0d6efd;
+  outline-offset: -2px;
+  background: #fff;
+}
+
+.excel-table input::placeholder {
+  color: #adb5bd;
+  font-style: italic;
+}
+
+/* Column Widths */
+.col-checkbox { width: 30px; }
+.col-no { width: 50px; }
+.col-order-id { width: 100px; }
+.col-date { width: 90px; }
+.col-customer-name { width: 150px; }
+.col-address { width: 200px; }
+.col-city { width: 120px; }
+.col-building { width: 70px; }
+.col-street { width: 70px; }
+.col-zone { width: 60px; }
+.col-deadline { width: 90px; }
+.col-phone1 { width: 100px; }
+.col-phone2 { width: 100px; }
+.col-sku { width: 100px; }
+.col-product { width: 200px; }
+.col-qty { width: 50px; }
+.col-price { width: 70px; }
+.col-note { width: 150px; }
+.col-stock { width: 80px; }
+.col-prod1, .col-prod2, .col-prod3, .col-prod4, .col-prod5 { width: 200px; }
+.col-cnt1, .col-cnt2, .col-cnt3, .col-cnt4, .col-cnt5 { width: 60px; }
+.col-stock2 { width: 80px; }
+.col-dlno { width: 120px; }
+.col-dlstatus { width: 100px; }
+.col-invoice { width: 100px; }
+.col-notes-ezzy { width: 150px; }
+.col-notes-seller { width: 150px; }
+
+/* Row Number Cell */
+.row-number {
+  background: #e9ecef;
+  text-align: center;
+  font-weight: 600;
+  color: #6c757d;
+  padding: 6px 4px;
+}
+
+/* Status Dropdown Styles */
+.excel-table select {
+  cursor: pointer;
+}
+
+.excel-table select option {
+  padding: 5px;
+}
+
+/* Product Select Styles */
+.excel-table select.product-select {
+  font-size: 11px;
+}
+
+/* Checkbox Styling */
+.excel-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Responsive Scrollbar */
+.excel-table-wrapper::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.excel-table-wrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.excel-table-wrapper::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 5px;
+}
+
+.excel-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Frozen First Columns */
+.excel-table th:first-child,
+.excel-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: #f8f9fa;
+}
+
+.excel-table th:nth-child(2),
+.excel-table td:nth-child(2) {
+  position: sticky;
+  left: 30px;
+  z-index: 5;
+  background: #f8f9fa;
+}
+
+.excel-table thead th:first-child,
+.excel-table thead th:nth-child(2) {
+  z-index: 15;
+}
+
+/* Status Colors */
+.status-delivered {
+  background-color: #d4edda !important;
+}
+
+.status-pending {
+  background-color: #fff3cd !important;
+}
+
+.status-cancelled {
+  background-color: #f8d7da !important;
+}
+
+/* Invalid Input */
+.excel-table input.invalid {
+  background-color: #f8d7da !important;
+}
+
+/* Cell with data */
+.has-data {
+  background-color: #fff !important;
+}
+</style>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const tableBody = document.getElementById('order_table_body');
+  const selectAllCheckbox = document.getElementById('select_all');
+  const addRowBtn = document.getElementById('btn_add_row');
+  const deleteSelectedBtn = document.getElementById('btn_delete_selected');
+  const clearAllBtn = document.getElementById('btn_clear_all');
+  const saveDraftBtn = document.getElementById('btn_save_draft');
+
+  let rowCounter = 0;
+
+  // Products list from database
+  const productsList = [
+    { id: '', name: '-- Select Product --', sku: '', price: 0 },
+    {% for product in products %}
+    {
+      id: '{{ product.id }}',
+      name: '{{ product.brand_name }} {{ product.item_name }}',
+      sku: '{{ product.item_sku }}',
+      price: {{ product.item_price }}
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  // Delivery status options
+  const deliveryStatusOptions = [
+    { value: '', text: '' },
+    { value: 'pending', text: 'Pending' },
+    { value: 'in_transit', text: 'In Transit' },
+    { value: 'delivered', text: 'Delivered' },
+    { value: 'cancelled', text: 'Cancelled' },
+    { value: 'returned', text: 'Returned' }
+  ];
+
+  // Stock status options
+  const stockStatusOptions = [
+    { value: '', text: '' },
+    { value: '0', text: 'Out of Stock' },
+    { value: '1', text: 'In Stock' }
+  ];
+
+  // Create product dropdown HTML
+  function createProductSelect(name, index, extraClass = '') {
+    let html = `<select name="data[${index}][${name}]" class="form-select-sm product-select ${extraClass}" data-field="${name}">`;
+    productsList.forEach(prod => {
+      html += `<option value="${prod.id}" data-sku="${prod.sku}" data-price="${prod.price}">${prod.name}</option>`;
+    });
+    html += '</select>';
+    return html;
+  }
+
+  // Create a single row
+  function createRow() {
+    rowCounter++;
+    const tr = document.createElement('tr');
+    tr.dataset.rowId = rowCounter;
+
+    // Get today's date formatted
+    const today = new Date();
+    const formattedDate = today.toISOString().split('T')[0];
+
+    tr.innerHTML = `
+      <td><input type="checkbox" class="row-select" name="row_select_${rowCounter}"></td>
+      <td class="row-number">${rowCounter}</td>
+      <td><input type="text" name="data[${rowCounter-1}][order_id]" placeholder="A${1000 + rowCounter}"></td>
+      <td><input type="date" name="data[${rowCounter-1}][date]" value="${formattedDate}"></td>
+      <td><input type="text" name="data[${rowCounter-1}][customer_name]" placeholder="Customer name"></td>
+      <td><input type="text" name="data[${rowCounter-1}][customer_address]" placeholder="Full address"></td>
+      <td><input type="text" name="data[${rowCounter-1}][city_landmark]" placeholder="City/Landmark"></td>
+      <td><input type="text" name="data[${rowCounter-1}][building_no]" placeholder="Bldg"></td>
+      <td><input type="text" name="data[${rowCounter-1}][street_no]" placeholder="St"></td>
+      <td><input type="text" name="data[${rowCounter-1}][zone_no]" placeholder="Zone"></td>
+      <td><input type="date" name="data[${rowCounter-1}][deadline_date]"></td>
+      <td><input type="tel" name="data[${rowCounter-1}][phone1]" placeholder="Phone"></td>
+      <td><input type="tel" name="data[${rowCounter-1}][phone2_whatsapp]" placeholder="WhatsApp"></td>
+      <td><input type="text" name="data[${rowCounter-1}][stock_sku]" placeholder="SKU" readonly class="sku-field"></td>
+      <td>${createProductSelect('product_name', rowCounter-1, 'main-product')}</td>
+      <td><input type="number" name="data[${rowCounter-1}][qty]" min="1" value="1"></td>
+      <td><input type="number" name="data[${rowCounter-1}][price]" min="0" step="0.01" placeholder="0.00" class="price-field"></td>
+      <td><input type="text" name="data[${rowCounter-1}][note]" placeholder="Note"></td>
+      <td>${createSelect('stock_status', stockStatusOptions, rowCounter-1)}</td>
+      <td>${createProductSelect('product_1', rowCounter-1)}</td>
+      <td><input type="number" name="data[${rowCounter-1}][count_1]" min="0" value=""></td>
+      <td>${createProductSelect('product_2', rowCounter-1)}</td>
+      <td><input type="number" name="data[${rowCounter-1}][count_2]" min="0" value=""></td>
+      <td>${createProductSelect('product_3', rowCounter-1)}</td>
+      <td><input type="number" name="data[${rowCounter-1}][count_3]" min="0" value=""></td>
+      <td>${createProductSelect('product_4', rowCounter-1)}</td>
+      <td><input type="number" name="data[${rowCounter-1}][count_4]" min="0" value=""></td>
+      <td>${createProductSelect('product_5', rowCounter-1)}</td>
+      <td><input type="number" name="data[${rowCounter-1}][count_5]" min="0" value=""></td>
+      <td>${createSelect('stock_status_2', stockStatusOptions, rowCounter-1)}</td>
+      <td><input type="text" name="data[${rowCounter-1}][dl_no]" placeholder="DL No" readonly></td>
+      <td>${createSelect('delivery_status', deliveryStatusOptions, rowCounter-1)}</td>
+      <td><input type="text" name="data[${rowCounter-1}][invoice_no]" placeholder="Invoice No"></td>
+      <td><input type="text" name="data[${rowCounter-1}][notes_ezzy]" placeholder="Ezzy notes"></td>
+      <td><input type="text" name="data[${rowCounter-1}][notes_seller]" placeholder="Seller notes"></td>
+    `;
+
+    return tr;
+  }
+
+  // Create select dropdown for status fields
+  function createSelect(name, options, index) {
+    let html = `<select name="data[${index}][${name}]" class="form-select-sm">`;
+    options.forEach(opt => {
+      html += `<option value="${opt.value}">${opt.text}</option>`;
+    });
+    html += '</select>';
+    return html;
+  }
+
+  // Add initial rows
+  function initializeTable(numRows = 10) {
+    for (let i = 0; i < numRows; i++) {
+      tableBody.appendChild(createRow());
+    }
+  }
+
+  // Add row button click
+  addRowBtn.addEventListener('click', function() {
+    tableBody.appendChild(createRow());
+    // Scroll to new row
+    const newRow = tableBody.lastElementChild;
+    newRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Focus first input
+    newRow.querySelector('input[type="text"]').focus();
+  });
+
+  // Select all checkbox
+  selectAllCheckbox.addEventListener('change', function() {
+    const checkboxes = tableBody.querySelectorAll('.row-select');
+    checkboxes.forEach(cb => {
+      cb.checked = this.checked;
+      cb.closest('tr').classList.toggle('selected', this.checked);
+    });
+  });
+
+  // Individual row selection
+  tableBody.addEventListener('change', function(e) {
+    if (e.target.classList.contains('row-select')) {
+      e.target.closest('tr').classList.toggle('selected', e.target.checked);
+
+      // Update select all state
+      const allCheckboxes = tableBody.querySelectorAll('.row-select');
+      const checkedBoxes = tableBody.querySelectorAll('.row-select:checked');
+      selectAllCheckbox.checked = allCheckboxes.length === checkedBoxes.length;
+      selectAllCheckbox.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < allCheckboxes.length;
+    }
+
+    // Handle product selection - auto-fill SKU and price
+    if (e.target.classList.contains('product-select')) {
+      const selectedOption = e.target.options[e.target.selectedIndex];
+      const row = e.target.closest('tr');
+
+      // If it's the main product dropdown
+      if (e.target.classList.contains('main-product')) {
+        const sku = selectedOption.dataset.sku || '';
+        const price = selectedOption.dataset.price || '0';
+
+        // Update SKU field
+        const skuField = row.querySelector('.sku-field');
+        if (skuField) skuField.value = sku;
+
+        // Update price field
+        const priceField = row.querySelector('.price-field');
+        if (priceField && price !== '0') priceField.value = price;
+      }
+    }
+  });
+
+  // Delete selected rows
+  deleteSelectedBtn.addEventListener('click', function() {
+    const selectedRows = tableBody.querySelectorAll('tr.selected');
+    if (selectedRows.length === 0) {
+      alert('Please select rows to delete');
+      return;
+    }
+    if (confirm(`Are you sure you want to delete ${selectedRows.length} row(s)?`)) {
+      selectedRows.forEach(row => row.remove());
+      updateRowNumbers();
+      selectAllCheckbox.checked = false;
+    }
+  });
+
+  // Clear all data
+  clearAllBtn.addEventListener('click', function() {
+    if (confirm('Are you sure you want to clear all data? This cannot be undone.')) {
+      tableBody.innerHTML = '';
+      rowCounter = 0;
+      initializeTable(10);
+      selectAllCheckbox.checked = false;
+    }
+  });
+
+  // Update row numbers after deletion
+  function updateRowNumbers() {
+    const rows = tableBody.querySelectorAll('tr');
+    rows.forEach((row, index) => {
+      row.querySelector('.row-number').textContent = index + 1;
+    });
+  }
+
+  // Keyboard navigation
+  tableBody.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab' || e.key === 'Enter') {
+      const currentCell = e.target.closest('td');
+      const currentRow = currentCell.closest('tr');
+
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        // Move to same cell in next row
+        const cellIndex = Array.from(currentRow.cells).indexOf(currentCell);
+        const nextRow = currentRow.nextElementSibling;
+        if (nextRow) {
+          const nextCell = nextRow.cells[cellIndex];
+          const nextInput = nextCell.querySelector('input, select');
+          if (nextInput) nextInput.focus();
+        } else {
+          // Add new row if at last row
+          tableBody.appendChild(createRow());
+          const newRow = tableBody.lastElementChild;
+          const newCell = newRow.cells[cellIndex];
+          const newInput = newCell.querySelector('input, select');
+          if (newInput) newInput.focus();
+        }
+      }
+    }
+  });
+
+  // Save draft to localStorage
+  saveDraftBtn.addEventListener('click', function() {
+    const formData = new FormData(document.getElementById('bulk_order_form'));
+    const data = {};
+    for (let [key, value] of formData.entries()) {
+      if (key !== 'csrfmiddlewaretoken') {
+        data[key] = value;
+      }
+    }
+    localStorage.setItem('bulk_order_draft', JSON.stringify(data));
+    alert('Draft saved successfully!');
+  });
+
+  // Load draft from localStorage
+  function loadDraft() {
+    const savedData = localStorage.getItem('bulk_order_draft');
+    if (savedData) {
+      const data = JSON.parse(savedData);
+      for (let [key, value] of Object.entries(data)) {
+        const input = document.querySelector(`[name="${key}"]`);
+        if (input) {
+          input.value = value;
+        }
+      }
+    }
+  }
+
+  // Auto-copy phone to whatsapp
+  tableBody.addEventListener('input', function(e) {
+    if (e.target.name && e.target.name.includes('[phone1]')) {
+      const row = e.target.closest('tr');
+      const whatsappInput = row.querySelector('[name*="[phone2_whatsapp]"]');
+      if (whatsappInput && !whatsappInput.value) {
+        whatsappInput.value = e.target.value;
+      }
+    }
+  });
+
+  // Delivery status color coding
+  tableBody.addEventListener('change', function(e) {
+    if (e.target.name && e.target.name.includes('[delivery_status]')) {
+      const row = e.target.closest('tr');
+      row.classList.remove('status-delivered', 'status-pending', 'status-cancelled');
+
+      switch(e.target.value) {
+        case 'delivered':
+          row.classList.add('status-delivered');
+          break;
+        case 'pending':
+        case 'in_transit':
+          row.classList.add('status-pending');
+          break;
+        case 'cancelled':
+        case 'returned':
+          row.classList.add('status-cancelled');
+          break;
+      }
+    }
+  });
+
+  // Initialize table with rows
+  initializeTable(10);
+
+  // Try to load any saved draft
+  if (localStorage.getItem('bulk_order_draft')) {
+    if (confirm('Would you like to restore your saved draft?')) {
+      loadDraft();
+    }
+  }
+});
+</script>
+{% endblock extra_js %}

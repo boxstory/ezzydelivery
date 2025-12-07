@@ -1,175 +1,407 @@
 {% extends "client_dashboard_base.html" %}
 {% load static %}
 {% block content %}
-    <div class="flex-fill pb-2" id="client_settings_container_main">
-        <div class="p-3 col-12 ">
-            <div class="h4 p-3 " id="client_settings_section_header">
-                <h2 id="client_settings_title_main">BUSINESS SETTINGS</h2>
-                <hr class="py-2 m-0 bg-black">
-                <!-- Stores Lisings -->
-                <div class=" col-12 " id="client_settings_section_stores">
-                    <div class="h4 py-1 d-flex bg-light justify-content-between  mx-auto">
-                        <div class=" my-auto">Stores Lisings</div>
-                        <a href="{% url 'business:pickup_location_add' %}"
-                           class=" text-center bg-dark text-white btn" id="client_settings_btn_new_store">New</a>
-                    </div>
-                    <div class="row px-3 d-flex flex-wrap">
-                        {% if stores %}
-                            {% for store in stores %}
-                                <div class="col-md-6 col-12">
-                                    <div class="card mb-4">
-                                        <div class="card-header">
-                                            <p class="  m-0 ">{{ store.pickup_location_title }}</p>
-                                        </div>
-                                        <div class="card-body ps-2">
-                                            <p>
-                                                <a href="https://maps.app.goo.gl/JmKFfjAiLhm28LUSA"
-                                                   target="_blank"
-                                                   class=" btn btn-dark  btn-lg  "><strong>{{ store.locality }}</strong>
-                                                    <i class="fa-solid  fa-location-arrow ps-3" style="color: #ff0000;"></i></a>
-                                            </p>
-                                            <p>
-                                                <strong>Building No:</strong>{{ storepickup_building_no }}
-                                            </p>
-                                            <p>
-                                                <strong>Zone No:</strong>{{ store.pickup_zone_no }}
-                                            </p>
-                                            <p>
-                                                <strong>Status:</strong>
-                                                {% if store.pickup_status == 'active' %}
-                                                    <span class="text-success  fw-bold">{{ store.pickup_status }}</span><i class="fa fa-check-circle text-success ps-2" aria-hidden="true"></i>
-                                                {% else %}
-                                                    <span class="text-danger  fw-bold">{{ store.pickup_status }}
-                                                        <i class="fa-solid fa-circle-xmark ps-2" style="color: #ff0000;"></i>
-                                                    </span>
-                                                {% endif %}
-                                            </p>
-                                        </div>
-                                        <a href="{% url 'business:pickup_location_update' store.id %}"
-                                           class="card-footer text-center bg-dark text-white btn">See More</a>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="col-12 d-flex flex-wrap justify-content-center pb-3">
-                                <div class="alert alert-warning m-0" role="alert">No stores Listed</div>
-                                <div class="card-footer text-center my-auto">
-                                    <a href="{% url 'business:pickup_location_add' %}">
-                                        <button class="btn btn-dark">Add</button>
-                                    </a>
-                                </div>
+<style>
+    .settings-container {
+        padding: 1.5rem;
+    }
+    .settings-header {
+        margin-bottom: 2rem;
+    }
+    .settings-header h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--brand-grey-800, #1f1f1f);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .settings-header h1 i {
+        color: var(--brand-primary, #f7c000);
+    }
+    .settings-section {
+        background: var(--brand-white, #fff);
+        border-radius: var(--brand-radius-md, 12px);
+        box-shadow: var(--brand-shadow-sm, 0 1px 3px rgba(0,0,0,0.08));
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+    }
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        background: linear-gradient(135deg, var(--brand-grey-100, #fafafa) 0%, var(--brand-grey-200, #f0f0f0) 100%);
+        border-bottom: 1px solid var(--brand-grey-300, #dcdcdc);
+    }
+    .section-header h2 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--brand-grey-800, #1f1f1f);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .section-header h2 i {
+        color: var(--brand-primary, #f7c000);
+        font-size: 1rem;
+    }
+    .btn-add-new {
+        background: var(--brand-primary, #f7c000);
+        color: var(--brand-grey-800, #1f1f1f);
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: var(--brand-radius-sm, 8px);
+        font-weight: 600;
+        font-size: 0.875rem;
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+    .btn-add-new:hover {
+        background: var(--brand-primary-dark, #e6b000);
+        color: var(--brand-grey-800, #1f1f1f);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
+    }
+    .section-body {
+        padding: 1.25rem;
+    }
+    .settings-card {
+        background: var(--brand-grey-100, #fafafa);
+        border: 1px solid var(--brand-grey-300, #dcdcdc);
+        border-radius: var(--brand-radius-sm, 8px);
+        padding: 1rem;
+        height: 100%;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+    }
+    .settings-card:hover {
+        border-color: var(--brand-primary, #f7c000);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    .settings-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--brand-grey-300, #dcdcdc);
+    }
+    .settings-card-title {
+        font-weight: 600;
+        color: var(--brand-grey-800, #1f1f1f);
+        font-size: 1rem;
+        margin: 0;
+    }
+    .status-badge {
+        padding: 0.25rem 0.625rem;
+        border-radius: 50px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .status-badge.active {
+        background: #d4edda;
+        color: #155724;
+    }
+    .status-badge.inactive {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .status-badge.verified {
+        background: #d4edda;
+        color: #155724;
+    }
+    .status-badge.not-verified {
+        background: #fff3cd;
+        color: #856404;
+    }
+    .settings-card-body {
+        flex: 1;
+    }
+    .info-row {
+        display: flex;
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+    }
+    .info-row:last-child {
+        margin-bottom: 0;
+    }
+    .info-label {
+        color: var(--brand-grey-500, #888);
+        min-width: 90px;
+        font-weight: 500;
+    }
+    .info-value {
+        color: var(--brand-grey-700, #333);
+        font-weight: 500;
+    }
+    .location-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        color: var(--brand-grey-700, #333);
+        text-decoration: none;
+        font-weight: 500;
+        padding: 0.375rem 0.75rem;
+        background: var(--brand-white, #fff);
+        border: 1px solid var(--brand-grey-300, #dcdcdc);
+        border-radius: var(--brand-radius-sm, 8px);
+        transition: all 0.2s ease;
+    }
+    .location-link:hover {
+        background: var(--brand-primary, #f7c000);
+        border-color: var(--brand-primary, #f7c000);
+        color: var(--brand-grey-800, #1f1f1f);
+    }
+    .location-link i {
+        color: #e74c3c;
+    }
+    .settings-card-footer {
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--brand-grey-300, #dcdcdc);
+    }
+    .btn-view-details {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.375rem;
+        width: 100%;
+        padding: 0.625rem 1rem;
+        background: var(--brand-grey-800, #1f1f1f);
+        color: var(--brand-white, #fff);
+        border: none;
+        border-radius: var(--brand-radius-sm, 8px);
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+    .btn-view-details:hover {
+        background: var(--brand-primary, #f7c000);
+        color: var(--brand-grey-800, #1f1f1f);
+    }
+    .empty-state {
+        text-align: center;
+        padding: 2rem 1rem;
+    }
+    .empty-state-icon {
+        font-size: 2.5rem;
+        color: var(--brand-grey-400, #b0b0b0);
+        margin-bottom: 0.75rem;
+    }
+    .empty-state-text {
+        color: var(--brand-grey-500, #888);
+        margin-bottom: 1rem;
+        font-size: 0.9375rem;
+    }
+    .btn-add-first {
+        background: var(--brand-primary, #f7c000);
+        color: var(--brand-grey-800, #1f1f1f);
+        border: none;
+        padding: 0.625rem 1.5rem;
+        border-radius: var(--brand-radius-sm, 8px);
+        font-weight: 600;
+        font-size: 0.875rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+    .btn-add-first:hover {
+        background: var(--brand-primary-dark, #e6b000);
+        color: var(--brand-grey-800, #1f1f1f);
+        transform: translateY(-1px);
+    }
+</style>
+
+<div class="settings-container" id="client_settings_container_main">
+    <!-- Page Header -->
+    <div class="settings-header" id="client_settings_section_header">
+        <h1><i class="fa-solid fa-gear"></i> Business Settings</h1>
+    </div>
+
+    <!-- Stores Section -->
+    <div class="settings-section" id="client_settings_section_stores">
+        <div class="section-header">
+            <h2><i class="fa-solid fa-store"></i> Store Locations</h2>
+            <a href="{% url 'business:pickup_location_add' %}" class="btn-add-new" id="client_settings_btn_new_store">
+                <i class="fa-solid fa-plus"></i> Add Store
+            </a>
+        </div>
+        <div class="section-body">
+            {% if stores %}
+            <div class="row g-3">
+                {% for store in stores %}
+                <div class="col-lg-6 col-12">
+                    <div class="settings-card">
+                        <div class="settings-card-header">
+                            <h3 class="settings-card-title">{{ store.pickup_location_title }}</h3>
+                            {% if store.pickup_status == 'active' %}
+                            <span class="status-badge active">
+                                <i class="fa-solid fa-check-circle"></i> Active
+                            </span>
+                            {% else %}
+                            <span class="status-badge inactive">
+                                <i class="fa-solid fa-circle-xmark"></i> {{ store.pickup_status|title }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="settings-card-body">
+                            <div class="info-row">
+                                <span class="info-label">Location</span>
+                                <a href="https://maps.google.com/?q={{ store.locality }}" target="_blank" class="location-link">
+                                    <i class="fa-solid fa-location-dot"></i> {{ store.locality }}
+                                </a>
                             </div>
-                        {% endif %}
+                            <div class="info-row">
+                                <span class="info-label">Building</span>
+                                <span class="info-value">{{ store.pickup_building_no|default:"-" }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Zone</span>
+                                <span class="info-value">{{ store.pickup_zone_no|default:"-" }}</span>
+                            </div>
+                        </div>
+                        <div class="settings-card-footer">
+                            <a href="{% url 'business:pickup_location_update' store.id %}" class="btn-view-details">
+                                <i class="fa-solid fa-pen-to-square"></i> Edit Details
+                            </a>
+                        </div>
                     </div>
                 </div>
-                <hr class="py-2 m-0 bg-black">
-                <!-- Teams Lisings -->
-                <div class=" col-12 " id="client_settings_section_teams">
-                    <div class="h4 py-1 d-flex justify-content-between  mx-auto">
-                        <div class=" my-auto">Teams Lisings</div>
-                        <a href="{% url 'business:pickup_location_add' %}"
-                           class=" text-center bg-dark text-white btn" id="client_settings_btn_new_team">New</a>
-                    </div>
-                    <div class="row px-3 d-flex flex-wrap">
-                        {% if teams %}
-                            {% for team in teams %}
-                                <div class="col-md-6 col-12">
-                                    <div class="card mb-4">
-                                        <div class="card-header">
-                                            <p class="card-title">Teams</p>
-                                        </div>
-                                        <div class="card-body ps-2">
-                                            <p>
-                                                <strong>Id:</strong> {{ team.team_profile.id }}
-                                            </p>
-                                            <p>
-                                                <strong>Name:</strong> {{ team.team_name }}
-                                            </p>
-                                            <p>
-                                                <strong>Phone:</strong> {{ team.team_phone }}
-                                            </p>
-                                            <p>
-                                                <strong>Status:</strong>
-                                                {% if team.team_status == 'active' %}
-                                                    <span class="text-success fw-bold">{{ team.team_status }}</span><i class="fa fa-check-circle text-success ps-2" aria-hidden="true"></i>
-                                                {% else %}
-                                                    <span class="text-danger  fw-bold">{{ team.team_status }}
-                                                        <i class="fa-solid fa-circle-xmark" style="color: #ff0000;"></i>
-                                                    </span>
-                                                {% endif %}
-                                            </p>
-                                        </div>
-                                        <a href="{% url 'business:business_teams_update'  business.business_id team.id %}"
-                                           class="card-footer text-center bg-dark text-white btn">See More</a>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="col-12 d-flex flex-wrap justify-content-center pb-3">
-                                <div class="alert alert-warning m-0" role="alert">No Staffs Listed</div>
-                                <div class="card-footer text-center my-auto">
-                                    <a href="{% url 'business:business_settings_api_add' business.business_id %}">
-                                        <button class="btn btn-dark">Add</button>
-                                    </a>
-                                </div>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-                <hr class="py-2 m-0 bg-black">
-                <!-- API SETTINGS -->
-                <div class=" col-12 " id="client_settings_section_api">
-                    <div class="h4 py-1 d-flex justify-content-between  mx-auto">
-                        <div class=" my-auto">API SETTINGS</div>
-                        <a href="{% url 'business:business_settings_api_add'  business.business_id %}"
-                           class=" text-center bg-dark text-white btn" id="client_settings_btn_new_api">New</a>
-                    </div>
-                    <div class="row px-3 d-flex flex-wrap">
-                        {% if business_apis %}
-                            {% for api in  business_apis %}
-                                <div class="col-md-6 col-12">
-                                    <div class="card mb-4">
-                                        <div class="card-header">
-                                            <p class="card-title">API SETTINGS</p>
-                                        </div>
-                                        <div class="card-body ps-3">
-                                            <p>
-                                                <strong>Code:</strong> {{ api.api_type }}
-                                            </p>
-                                            <p>
-                                                <strong>Site:</strong> {{ api.site_api_url }}
-                                            </p>
-                                            <p>
-                                                <strong>Status:</strong>
-                                                {% if api.is_verify_api == True %}
-                                                    <span class="text-success fw-bolder">Verified
-                                                        <i class="fa-solid fa-circle-check" style="color: #14cc0e;"></i></span>
-                                                {% elif api.is_verify_api == False %}
-                                                    <span class="text-danger  fw-bolder ">Not Verified
-                                                        <i class="fa-solid fa-circle-xmark" style="color: #ff0000;"></i>
-                                                    </span>
-                                                {% else %}
-                                                {% endif %}
-                                            </p>
-                                        </div>
-                                        <a href="{% url 'business:business_settings_api_test' business.business_id api.id %}"
-                                           class="card-footer text-center bg-dark ps-0 text-white btn">See More</a>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="col-12 d-flex flex-wrap justify-content-center pb-3">
-                                <div class="alert alert-warning m-0" role="alert">No API Listed</div>
-                                <div class="card-footer text-center my-auto">
-                                    <a href="{% url 'business:business_settings_api_add' business.business_id %}">
-                                        <button class="btn btn-dark">Add</button>
-                                    </a>
-                                </div>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
+                {% endfor %}
             </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="fa-solid fa-store-slash"></i></div>
+                <p class="empty-state-text">No store locations added yet</p>
+                <a href="{% url 'business:pickup_location_add' %}" class="btn-add-first">
+                    <i class="fa-solid fa-plus"></i> Add Your First Store
+                </a>
+            </div>
+            {% endif %}
         </div>
     </div>
+
+    <!-- Teams Section -->
+    <div class="settings-section" id="client_settings_section_teams">
+        <div class="section-header">
+            <h2><i class="fa-solid fa-users"></i> Team Members</h2>
+            <a href="{% url 'business:business_teams_add' business.business_id %}" class="btn-add-new" id="client_settings_btn_new_team">
+                <i class="fa-solid fa-plus"></i> Add Member
+            </a>
+        </div>
+        <div class="section-body">
+            {% if teams %}
+            <div class="row g-3">
+                {% for team in teams %}
+                <div class="col-lg-6 col-12">
+                    <div class="settings-card">
+                        <div class="settings-card-header">
+                            <h3 class="settings-card-title">{{ team.team_name }}</h3>
+                            {% if team.team_status == 'active' %}
+                            <span class="status-badge active">
+                                <i class="fa-solid fa-check-circle"></i> Active
+                            </span>
+                            {% else %}
+                            <span class="status-badge inactive">
+                                <i class="fa-solid fa-circle-xmark"></i> {{ team.team_status|title }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="settings-card-body">
+                            <div class="info-row">
+                                <span class="info-label">ID</span>
+                                <span class="info-value">#{{ team.team_profile.id }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Phone</span>
+                                <span class="info-value">{{ team.team_phone|default:"-" }}</span>
+                            </div>
+                        </div>
+                        <div class="settings-card-footer">
+                            <a href="{% url 'business:business_teams_update' business.business_id team.id %}" class="btn-view-details">
+                                <i class="fa-solid fa-pen-to-square"></i> Edit Details
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="fa-solid fa-user-plus"></i></div>
+                <p class="empty-state-text">No team members added yet</p>
+                <a href="{% url 'business:business_teams_add' business.business_id %}" class="btn-add-first">
+                    <i class="fa-solid fa-plus"></i> Add Your First Team Member
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- API Settings Section -->
+    <div class="settings-section" id="client_settings_section_api">
+        <div class="section-header">
+            <h2><i class="fa-solid fa-code"></i> API Integrations</h2>
+            <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="btn-add-new" id="client_settings_btn_new_api">
+                <i class="fa-solid fa-plus"></i> Add API
+            </a>
+        </div>
+        <div class="section-body">
+            {% if business_apis %}
+            <div class="row g-3">
+                {% for api in business_apis %}
+                <div class="col-lg-6 col-12">
+                    <div class="settings-card">
+                        <div class="settings-card-header">
+                            <h3 class="settings-card-title">{{ api.api_type|upper }}</h3>
+                            {% if api.is_verify_api == True %}
+                            <span class="status-badge verified">
+                                <i class="fa-solid fa-circle-check"></i> Verified
+                            </span>
+                            {% else %}
+                            <span class="status-badge not-verified">
+                                <i class="fa-solid fa-exclamation-triangle"></i> Not Verified
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="settings-card-body">
+                            <div class="info-row">
+                                <span class="info-label">Endpoint</span>
+                                <span class="info-value text-truncate" style="max-width: 200px;" title="{{ api.site_api_url }}">{{ api.site_api_url }}</span>
+                            </div>
+                        </div>
+                        <div class="settings-card-footer">
+                            <a href="{% url 'business:business_settings_api_test' business.business_id api.id %}" class="btn-view-details">
+                                <i class="fa-solid fa-flask"></i> Test & Configure
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="fa-solid fa-plug"></i></div>
+                <p class="empty-state-text">No API integrations configured yet</p>
+                <a href="{% url 'business:business_settings_api_add' business.business_id %}" class="btn-add-first">
+                    <i class="fa-solid fa-plus"></i> Add Your First API
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
 {% endblock content %}

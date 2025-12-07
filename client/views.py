@@ -1,7 +1,6 @@
-import binascii
-from multiprocessing import context
 import os
 import logging
+from django import forms
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
@@ -9,7 +8,6 @@ from django.contrib import messages
 from decouple import config
 from django.core.files.storage import default_storage
 from PIL import Image
-import numpy as np
 import requests, json
 import shopify
 from woocommerce import API as WooAPI
@@ -410,49 +408,41 @@ def business_profile_update(request, business_id):
 @login_required(login_url='/accounts/login/')
 def business_profile_info_update(request, business_id):
     if request.user.user_business.first().business_id == business_id:
-        print(':matched')
-        redirect('core:main_dashboard')
-        print('business_profile_update', business_id)
-        print('request.user.id', request.user.id)
-        business =  business_models.Business.objects.get(
-        business_id=request.user.user_business.first().business_id)
-        business_profile =  business_models.BusinessProfile.objects.get(business_id=business_id)
+        logger.debug(f'Business profile update matched for business_id={business_id}, user_id={request.user.id}')
+        business = business_models.Business.objects.get(
+            business_id=request.user.user_business.first().business_id)
+        business_profile = business_models.BusinessProfile.objects.get(business_id=business_id)
 
-        print('business', business)
-        print('business.business_id', business.business_id)
+        logger.debug(f'Updating business profile for business_id={business.business_id}')
         form = business_forms.BusinessProfileForm(instance=business_profile)
-        print('form')
+
         if request.method == 'POST':
-            print('BusinessProfileForm')
+            logger.debug('Processing BusinessProfileForm POST')
             form = business_forms.BusinessProfileForm(
-                request.POST,   instance=business_profile)
+                request.POST, instance=business_profile)
             if form.is_valid():
                 f = form.save(commit=False)
-                print('f.user')
                 website = f.business_website
 
-                if website and isinstance(website, str) and  not website.startswith('https://') and not website.startswith('http://'):
+                if website and isinstance(website, str) and not website.startswith('https://') and not website.startswith('http://'):
                     f.business_website = 'https://' + website
-                elif website and isinstance(website, str) and  website.startswith('http://'):
-                    f.business_website = 'https://' + website
+                elif website and isinstance(website, str) and website.startswith('http://'):
+                    f.business_website = 'https://' + website[7:]  # Replace http:// with https://
                 else:
                     f.business_website = website
-                
 
-                print(f.business_id)
                 f.business_id = business_id
-
                 form.save()
-                print('ok')
+                logger.info(f'Business profile updated successfully for business_id={business_id}')
                 messages.success(request, "Successful Submission")
                 return redirect("business:business_profile")
             else:
-                print('business_profile_info_update not valid')
+                logger.warning(f'Business profile form invalid: {form.errors}')
                 messages.error(request, "Error")
         context = {
             'form': form,
             'business': business,
-            'business_profile' : business_profile,
+            'business_profile': business_profile,
         }
 
         return render(request, 'client/frontend/business_profile_update.html', context)
@@ -460,18 +450,16 @@ def business_profile_info_update(request, business_id):
         return redirect("business:business_profile")
 
 
-# business settings links and veirfy status ---------------------------------------------------------------------------------------------------------------------
+# business settings links and verify status ---------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 def business_settings(request, business_id):
-    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    # N+1 FIX: Use select_related for FK relationships
+    business = business_models.Business.objects.select_related('user', 'profile').filter(business_id=business_id).first()
     business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
 
-    teams = business_models.BusinessTeamProfile.objects.filter(business_id=business_id).all()
-    stores = business_models.PickupLocation.objects.filter(business_id=business_id).all()
-    print('business', business)
-    print('business_apis', business_apis)
-    print('teams', teams)
-    print('stores', stores)
+    teams = business_models.BusinessTeamProfile.objects.select_related('user').filter(business_id=business_id)
+    stores = business_models.PickupLocation.objects.filter(business_id=business_id)
+    logger.debug(f'Loading business settings for business_id={business_id}: apis={business_apis.count()}, teams={teams.count()}, stores={stores.count()}')
 
     
     
@@ -488,36 +476,36 @@ def business_settings(request, business_id):
 
 #business_settings_api---------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
-def business_settings_api_update(request, business_id, api_id ):
+def business_settings_api_update(request, business_id, api_id):
     if request.user.id == request.user.user_business.first().user_id:
-        
-        business =  business_models.Business.objects.filter(business_id=business_id).first()
+        business = business_models.Business.objects.filter(business_id=business_id).first()
         business_apis = business_models.BusinessApiSettings.objects.filter(id=api_id).first()
         form = business_forms.businessApiSettingsForm(instance=business_apis)
-        form.fields['business'].queryset = business_models.Business.objects.filter(business_id=request.user.user_business.first().business_id)
-        
+        # Hide the business field and set it to the current business
+        form.fields['business'].widget = forms.HiddenInput()
+        form.fields['business'].initial = business
+
         if request.method == 'POST':
-            print('businessSettingsFormUpdate')
+            logger.debug(f'Updating API settings for business_id={business_id}, api_id={api_id}')
             form = business_forms.businessApiSettingsForm(
                 request.POST, instance=business_apis)
-            
+
             if form.is_valid():
                 f = form.save(commit=False)
-                if f.is_verify_api == True:
+                if f.is_verify_api:
                     f.is_verify_api = False
 
                 form.save()
-                print('businessSettingsForm Update ok')
+                logger.info(f'API settings updated successfully for business_id={business_id}, api_id={api_id}')
                 messages.success(request, "Successful Submission")
                 return redirect("business:business_settings", business_id)
             else:
-                print('businessSettingsForm_update not valid')
+                logger.warning(f'API settings form invalid: {form.errors}')
                 messages.error(request, "Error")
         context = {
             'business': business,
             'form': form,
             'api_id': api_id,
-
             'form_title': 'Business API Settings Add'
         }
 
@@ -530,32 +518,27 @@ def business_settings_api_update(request, business_id, api_id ):
 @login_required(login_url='/accounts/login/')
 def business_settings_api_add(request, business_id):
     if request.user.id == request.user.user_business.first().user_id:
-        
-        business =  business_models.Business.objects.filter(business_id=business_id).first()
-        business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
-        form = business_forms.businessApiSettingsForm()
-        form.fields['business'].queryset = business_models.Business.objects.filter(business_id=request.user.user_business.first().business_id)
-        
-        if request.method == 'POST':
-            print('businessSettingsForm')
-            form = business_forms.businessApiSettingsForm(
-                request.POST)
-            
-            if form.is_valid():
-                f = form.save(commit=False)
+        business = business_models.Business.objects.filter(business_id=business_id).first()
+        form = business_forms.businessApiSettingsForm(initial={'business': business})
+        # Hide the business field and set it to the current business
+        form.fields['business'].widget = forms.HiddenInput()
+        form.fields['business'].initial = business
 
-                
+        if request.method == 'POST':
+            logger.debug(f'Adding API settings for business_id={business_id}')
+            form = business_forms.businessApiSettingsForm(request.POST)
+
+            if form.is_valid():
                 form.save()
-                print('businessSettingsForm ok')
+                logger.info(f'API settings added successfully for business_id={business_id}')
                 messages.success(request, "Successful Submission")
                 return redirect("business:business_settings", business_id)
             else:
-                print('businessSettingsForm_update not valid')
+                logger.warning(f'API settings form invalid: {form.errors}')
                 messages.error(request, "Error")
         context = {
             'business': business,
             'form': form,
-
             'form_title': 'Business API Settings Adding Form'
         }
 
@@ -578,6 +561,19 @@ def business_settings_api_list(request, business_id):
         'api_keys': api_keys,
     }
     return render(request, 'client/parts/business_settings_api_list.html', context)
+
+@login_required(login_url='/accounts/login/')
+def business_settings_api_delete(request, business_id, api_id):
+    business = business_models.Business.objects.filter(business_id=business_id).first()
+    if not business:
+        return redirect("business:business_dashboard")
+
+    api_setting = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
+    if api_setting:
+        api_setting.delete()
+
+    return redirect("business:business_settings", business_id=business_id)
+
 
 @login_required(login_url='/accounts/login/')
 def business_settings_api_test(request, business_id, api_id):
@@ -611,51 +607,39 @@ def business_settings_api_test_result(request, business_id, api_id):
     BASE_API_STORE_NAME = BASE_API_STORE_NAME.replace('https://', '')
 
     if business_api.api_type == 'shopify':
-        shop_creds = {
-            'api_key': BASE_API_KEY,
-            'api_secret': BASE_API_SECRET,
-            'access_token': BASE_API_ACCESS_KEY, 
-        }
-
-        with open('shopify_creds.json', 'w') as f:
-            json.dump(shop_creds, f)
-
-        shop_url = "%s" % BASE_API_STORE_NAME
-        print('shopify shop_url', shop_url)
+        shop_url = BASE_API_STORE_NAME
+        logger.debug(f'Testing Shopify API for shop_url={shop_url}')
 
         order_base_url = 'https://' + shop_url + BASE_API_ORDER_ENDPINT
         product_base_url = 'https://' + shop_url + BASE_API_PRODUCT_ENDPINT
-        header_value = { 'X-Shopify-Access-Token': BASE_API_ACCESS_KEY, 'Content-Type': 'application/json' }
+        header_value = {'X-Shopify-Access-Token': BASE_API_ACCESS_KEY, 'Content-Type': 'application/json'}
 
         order_response = requests.get(order_base_url, headers=header_value, params={'status': 'any', 'limit': 10})
         order_count = len(order_response.json().get('orders', []))
+        logger.debug(f'Shopify order_count={order_count}')
 
-        print('order_count', order_count    )
-        product_response = requests.get(product_base_url, headers=header_value )
+        product_response = requests.get(product_base_url, headers=header_value)
         product_count = len(product_response.json().get('products', []))
-        print('product_count', product_count)
+        logger.debug(f'Shopify product_count={product_count}')
 
     elif business_api.api_type == 'woocommerce':
-        url="http://example.com",
-        shop_url = 'https://' + BASE_API_STORE_NAME 
-        print('woocommerce shop_url', shop_url)
- 
+        shop_url = 'https://' + BASE_API_STORE_NAME
+        logger.debug(f'Testing WooCommerce API for shop_url={shop_url}')
+
         wcapi = WooAPI(
-            url= shop_url,
-            consumer_key= BASE_API_KEY,
-            consumer_secret= BASE_API_SECRET,
+            url=shop_url,
+            consumer_key=BASE_API_KEY,
+            consumer_secret=BASE_API_SECRET,
             version="wc/v3",
         )
 
-        
-        #print(wcapi.get("products", params={"per_page": 20}).json())
-
         order_response = wcapi.get("orders")
         order_count = order_response.headers.get('X-WP-Total')
-        print('order_count', order_count)
+        logger.debug(f'WooCommerce order_count={order_count}')
+
         product_response = wcapi.get("products", params={"per_page": 20})
         product_count = product_response.headers.get('X-WP-Total')
-        print('product_count', product_count)
+        logger.debug(f'WooCommerce product_count={product_count}')
  
     else:
         order_response = None
@@ -685,52 +669,50 @@ def business_settings_api_test_result(request, business_id, api_id):
 
 #business_logo_update---------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
-def business_logo_update(request , business_id):
-    business_logos =  business_models.BusinessLogo.objects.get(business_id=business_id)
+def business_logo_update(request, business_id):
+    business_logos = business_models.BusinessLogo.objects.get(business_id=business_id)
     business_code = business_models.Business.objects.get(business_id=business_id)
-    
+
     # Check if the request user matches the business user
     if request.user.id != business_logos.business_id:
+        logger.warning(f'Unauthorized logo update attempt by user {request.user.id} for business {business_id}')
         return HttpResponseForbidden("You don't have permission to update this business logo.")
+
     form = business_forms.BusinessLogoForm()
     if request.method == 'POST':
-            print(business_logos)
-            print('business_id', business_logos.business_id)
-            print('BusinessLogoForm')
-            form = business_forms.BusinessLogoForm(
-                    request.POST, request.FILES, instance=business_logos)
-            if form.is_valid():
-                f = form.save(commit=False)
-                logo = business_logos.business_logo
-                print(logo)
+        logger.debug(f'Processing logo update for business_id={business_logos.business_id}')
+        form = business_forms.BusinessLogoForm(
+            request.POST, request.FILES, instance=business_logos)
+        if form.is_valid():
+            f = form.save(commit=False)
 
-                # Delete the old logo file
-                if business_logos.business_logo and business_logos.business_logo != 'business/avatar.png':
-                    print('if BusinessLogo', business_logos.business_logo.path)
-                    #os.remove(business_logo.business_logo.path)
-                f.business_id = request.user.id
-                print( business_id, f.business_id)
-                f.path = f'business/{business_code}'
-                print(f.path)
-                f.save()
-               
-                print('ok')
-                original_image = Image.open(f.business_logo.path)
-                title, ext = os.path.splitext(f.business_logo.path)
-                final_filepath = os.path.join(f.path, title + '_sm' + ext)
-                print(final_filepath)
-                new_width  = 200
-                new_height = 200
-                img = original_image.resize((new_width, new_height), Image.ANTIALIAS)
-                print(img)
-                img.save(final_filepath)
-                messages.success(request, "Successful Submission")
-                return redirect("business:business_profile")
-            
+            # Delete the old logo file if exists
+            if business_logos.business_logo and business_logos.business_logo != 'business/avatar.png':
+                logger.debug(f'Old logo found: {business_logos.business_logo.path}')
+
+            f.business_id = request.user.id
+            f.path = f'business/{business_code}'
+            f.save()
+
+            logger.info(f'Logo updated for business_id={business_id}')
+
+            # Create thumbnail
+            original_image = Image.open(f.business_logo.path)
+            title, ext = os.path.splitext(f.business_logo.path)
+            final_filepath = os.path.join(f.path, title + '_sm' + ext)
+            new_width = 200
+            new_height = 200
+            img = original_image.resize((new_width, new_height), Image.LANCZOS)  # ANTIALIAS is deprecated
+            img.save(final_filepath)
+            logger.debug(f'Thumbnail created: {final_filepath}')
+
+            messages.success(request, "Successful Submission")
+            return redirect("business:business_profile")
+
     context = {
-            'form': form,
-            'form_title': 'Business logo Update',
-        }   
+        'form': form,
+        'form_title': 'Business logo Update',
+    }   
   
         
         
@@ -743,71 +725,66 @@ def business_logo_update(request , business_id):
 
 @login_required(login_url='/accounts/login/')
 def business_teams(request, business_id):
-    business =  business_models.Business.objects.filter(business_id=business_id).first()
-    teams = business_models.BusinessTeamProfile.objects.filter(business_id=business_id).all()
-    print('business', business)
-    print('teams', teams)
+    # N+1 FIX: Use select_related for user FK
+    business = business_models.Business.objects.filter(business_id=business_id).first()
+    teams = business_models.BusinessTeamProfile.objects.select_related('user').filter(business_id=business_id)
+    logger.debug(f'Loading teams for business_id={business_id}, count={teams.count()}')
     context = {
         'business': business,
         'teams': teams,
     }
     return render(request, 'client/parts/business_teams_list.html', context)
 
+
 @login_required(login_url='/accounts/login/')
 def business_teams_add(request, business_id):
-    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    business = business_models.Business.objects.filter(business_id=business_id).first()
     form = business_forms.BusinessTeamProfileForm()
     if request.method == 'POST':
-        print('BusinessTeamProfileForm')
-        form = business_forms.BusinessTeamProfileForm(
-                request.POST)
+        logger.debug(f'Adding team member for business_id={business_id}')
+        form = business_forms.BusinessTeamProfileForm(request.POST)
         if form.is_valid():
             f = form.save(commit=False)
             f.business_id = business_id
             form.save()
-            print('ok')
+            logger.info(f'Team member added for business_id={business_id}')
             messages.success(request, "Successful Submission")
             return redirect("business:business_teams", business_id)
         else:
-            print('BusinessTeamProfileForm not valid')
+            logger.warning(f'Team profile form invalid: {form.errors}')
             messages.error(request, "Error")
     context = {
-            'business': business,
-            'form': form,
-            'form_title': 'Business Team Profile Adding Form'
-        }   
-  
-        
-        
+        'business': business,
+        'form': form,
+        'form_title': 'Business Team Profile Adding Form'
+    }
     return render(request, 'client/parts/business_teams_add.html', context)
-
 
 
 @login_required(login_url='/accounts/login/')
 def business_teams_update(request, business_id, team_id):
-    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    business = business_models.Business.objects.filter(business_id=business_id).first()
     team = business_models.BusinessTeamProfile.objects.filter(id=team_id).first()
-    form = business_forms.BusinessTeamProfileForm( instance=team)
+    form = business_forms.BusinessTeamProfileForm(instance=team)
     if request.method == 'POST':
-        print('BusinessTeamProfileForm')
-        form = business_forms.BusinessTeamProfileForm(
-                request.POST, instance=team)
+        logger.debug(f'Updating team member {team_id} for business_id={business_id}')
+        form = business_forms.BusinessTeamProfileForm(request.POST, instance=team)
         if form.is_valid():
             f = form.save(commit=False)
             f.business_id = business_id
             form.save()
-            print('ok')
+            logger.info(f'Team member {team_id} updated for business_id={business_id}')
             messages.success(request, "Successful Submission")
             return redirect("business:business_teams", business_id)
         else:
-            print('BusinessTeamProfileForm not valid')
+            logger.warning(f'Team profile form invalid: {form.errors}')
             messages.error(request, "Error")
     context = {
-            'business': business,
-            'form': form,
-            'team': team,
-            'form_title': 'Business Team Profile Update Form' 
-        }   
+        'business': business,
+        'form': form,
+        'team': team,
+        'form_title': 'Business Team Profile Update Form'
+    }   
 
 
 

@@ -287,7 +287,7 @@ def update_role(request):
         'profile': profile,
         'driver': driver,
     }
-    return render(request, 'core/prodile_role_update.html', context)
+    return render(request, 'core/profile_role_update.html', context)
 
 
 @login_required(login_url='/accounts/login/')
