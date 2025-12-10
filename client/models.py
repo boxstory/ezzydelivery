@@ -1,3 +1,41 @@
+"""
+Client/Business Models Module
+=============================
+
+This module contains models for business clients using the EzzyDelivery platform.
+
+Models:
+    Core Business Models:
+        - Business: Main business entity with contact info and status
+        - BusinessProfile: Extended business details (description, social media)
+        - BusinessLogo: Business logo images
+        - BusinessApiSettings: API credentials for integrations (Shopify, WooCommerce)
+        - BusinessTeamProfile: Team member access and roles
+
+    Location & Fulfillment:
+        - PickupLocation: Business pickup/warehouse locations
+        - DriverDirectory: Drivers associated with a business
+
+    E-commerce Integration:
+        - ShopifySettings: Shopify store credentials
+        - WoocommerceSettings: WooCommerce store credentials
+
+Business Status Flow:
+    pending -> active -> suspended (if issues)
+                     -> inactive (if deactivated)
+
+Team Roles:
+    - owner: Full access, can manage business
+    - admin: Can manage orders and team
+    - member: Can view and process orders
+    - viewer: Read-only access
+
+Related Apps:
+    - orders: Business places orders
+    - delivery: Orders create delivery tasks
+    - product: Business manages products
+"""
+
 from email.policy import default
 import os
 from django.conf import settings
@@ -6,10 +44,17 @@ from core import models as core_models
 from fleet import models as fleet_models
 
 
-# Create your models here.
-
-
 def upload_path_handler(instance, filename):
+    """
+    Generate upload path for business files.
+
+    Args:
+        instance: Model instance with 'path' attribute
+        filename: Original filename
+
+    Returns:
+        str: Path in format '{instance.path}/logo/{filename}'
+    """
     upload_dir = os.path.join(
         str(instance.path), 'logo')
     if not os.path.exists(upload_dir):
@@ -17,10 +62,44 @@ def upload_path_handler(instance, filename):
     return os.path.join(upload_dir, filename)
 
 
-# business---------------------------------------------------------------------------------------------------------------------
+# =============================================================================
+# BUSINESS MODELS
+# =============================================================================
 
 
 class Business(models.Model):
+    """
+    Main business entity model.
+
+    Represents a business client on the EzzyDelivery platform. Each business
+    can have multiple orders, products, pickup locations, and team members.
+
+    Attributes:
+        user (ForeignKey): Owner's user account
+        profile (ForeignKey): Owner's profile
+        business_id (int): Primary key, unique business identifier
+        business_code (str): Unique short code (e.g., 'SHOP001')
+        business_name (str): Display name
+        business_status (str): active, inactive, pending, suspended
+
+    Status Values:
+        - active: Business is operational
+        - inactive: Business deactivated by owner
+        - pending: Awaiting admin approval
+        - suspended: Suspended due to issues
+
+    Related Models:
+        - BusinessProfile: business.business_profile
+        - BusinessLogo: business.business_logo
+        - Order: business.orders
+        - PickupLocation: business.pickup_location
+        - Product: business.product
+        - BusinessTeamProfile: business.business_team
+
+    Usage:
+        >>> business = Business.objects.get(business_code='SHOP001')
+        >>> orders = business.orders.filter(order_status='pending')
+    """
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True, related_name='user_business')
     

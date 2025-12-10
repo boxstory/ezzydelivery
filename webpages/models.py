@@ -1,10 +1,49 @@
+"""
+Webpages Models Module
+======================
+
+This module contains models for public website forms and inquiries.
+
+Models:
+    - ContactUs: General contact form submissions
+    - Careers: Job application submissions
+    - PricingEnquiry: Detailed pricing inquiry (multi-step form)
+    - WhatsAppInquiry: Quick inquiry via WhatsApp
+    - DeliveryRequest: One-time delivery requests from non-business users
+
+Related:
+    - webpages.views: Form handling views
+    - webpages.forms: Form classes for these models
+"""
+
 from django.conf import settings
 from django.db import models
 
-# Create your models here.
+
+# =============================================================================
+# CONTACT US MODEL
+# =============================================================================
 
 
 class ContactUs(models.Model):
+    """
+    General contact form submissions from website visitors.
+
+    Purpose Options:
+        - Delivery Request
+        - Fulfillment Request
+        - Affiliate Marketing Program
+        - Driver Jobs
+        - Feedback
+        - Other
+
+    Usage:
+        Visitors fill out form on /contact page, data saved here
+        for admin review and follow-up.
+
+    Admin:
+        Accessible in Django admin under "Contact Us"
+    """
     full_name = models.CharField(max_length=100)
     email = models.EmailField()
     mobile = models.BigIntegerField()
@@ -19,7 +58,29 @@ class ContactUs(models.Model):
         verbose_name_plural = "Contact Us"
 
 
+# =============================================================================
+# CAREERS MODEL
+# =============================================================================
+
+
 class Careers(models.Model):
+    """
+    Job application submissions from the careers page.
+
+    Validation:
+        - QID must be 11 digits starting with 2 or 3 (Qatar ID format)
+
+    Fields:
+        - full_name: Applicant's name
+        - email: Contact email
+        - mobile: Contact phone
+        - qid: Qatar ID number (validated)
+        - job: Position applying for
+        - self_intro: Cover letter / introduction
+
+    Admin:
+        Accessible in Django admin under "Careers"
+    """
     full_name = models.CharField(max_length=100)
     email = models.EmailField()
     mobile = models.BigIntegerField()
@@ -35,7 +96,53 @@ class Careers(models.Model):
         verbose_name_plural = "Careers"
 
 
+# =============================================================================
+# PRICING ENQUIRY MODEL
+# =============================================================================
+
+
 class PricingEnquiry(models.Model):
+    """
+    Detailed pricing inquiry from potential business clients.
+
+    Multi-step form capturing comprehensive business information
+    to provide customized delivery pricing quotes.
+
+    Field Groups:
+        Personal Information:
+            - full_name, business_name, contact numbers
+
+        Contact Information:
+            - website_url, social_profile
+
+        Product Information:
+            - product_category, is_personalized_product
+
+        Company Status:
+            - is_registered_company_in_qatar
+            - is_located_in_qatar
+            - is_team_available_in_qatar
+
+        Service Requirements:
+            - is_required_COD_service
+            - is_required_fulfillment_service_*
+
+        Order Volumes:
+            - avarage_number_of_order_* (weekly, monthly, expected)
+
+        Delivery Details:
+            - speed_delivery_offer_to_customers
+            - preferred_delivery_time_window
+            - typical_package_size
+
+        Pickup Information:
+            - type_of_pickup_location (Home/Office/Store/Fulfillment)
+            - pickup_Location_area_name
+            - pickup_location_time_slab
+
+    Admin:
+        Accessible in Django admin under "Pricing Inquiries"
+    """
     # Personal Information
     full_name = models.CharField(max_length=100)
     business_name = models.CharField(max_length=100)

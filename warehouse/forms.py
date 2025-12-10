@@ -1,5 +1,38 @@
+"""
+Warehouse Forms Module
+======================
+
+This module contains forms for warehouse and inventory management.
+
+Forms:
+    Warehouse Setup:
+        - WarehouseForm: Create/edit warehouse facilities
+        - StorageLocationForm: Create/edit storage locations (zones/aisles/racks/bins)
+
+    Inventory:
+        - StockLevelForm: Configure stock levels and reorder points
+        - ReceiveStockForm: Receive new stock into warehouse
+        - AdjustmentForm: Manual inventory adjustments
+
+    Operations:
+        - CycleCountForm: Schedule inventory counts
+        - CycleCountItemForm: Record count results
+
+Related:
+    - warehouse.models: All warehouse models
+    - warehouse.views: Views that use these forms
+"""
+
 from django import forms
 from warehouse import models as warehouse_models
+
+
+# =============================================================================
+# WAREHOUSE FORM
+# Create/edit warehouse facilities.
+# Code auto-generated if not provided: WH-{business_code}-{uuid}
+# Can optionally link to existing PickupLocation.
+# =============================================================================
 
 
 class WarehouseForm(forms.ModelForm):
@@ -13,6 +46,14 @@ class WarehouseForm(forms.ModelForm):
             'pickup_location': forms.Select(attrs={'class': 'form-select'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+
+# =============================================================================
+# STORAGE LOCATION FORM
+# Create/edit storage locations within a warehouse.
+# Supports hierarchical structure: zone > aisle > rack > shelf > bin
+# Barcode auto-generated if not provided.
+# =============================================================================
 
 
 class StorageLocationForm(forms.ModelForm):
@@ -30,6 +71,13 @@ class StorageLocationForm(forms.ModelForm):
         }
 
 
+# =============================================================================
+# STOCK LEVEL FORM
+# Configure stock levels for products at specific warehouse/location.
+# Set reorder points and ABC classification for inventory management.
+# =============================================================================
+
+
 class StockLevelForm(forms.ModelForm):
     class Meta:
         model = warehouse_models.StockLevel
@@ -44,6 +92,14 @@ class StockLevelForm(forms.ModelForm):
             'reorder_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'abc_classification': forms.Select(attrs={'class': 'form-select'}),
         }
+
+
+# =============================================================================
+# RECEIVE STOCK FORM
+# Form for receiving new stock into warehouse.
+# Warehouse queryset filtered by business in __init__.
+# Creates InventoryTransaction with type='receive'.
+# =============================================================================
 
 
 class ReceiveStockForm(forms.Form):
@@ -73,6 +129,13 @@ class ReceiveStockForm(forms.Form):
         )
 
 
+# =============================================================================
+# CYCLE COUNT FORM
+# Schedule inventory counts for accuracy verification.
+# Can target specific warehouse/location or entire warehouse.
+# =============================================================================
+
+
 class CycleCountForm(forms.ModelForm):
     class Meta:
         model = warehouse_models.CycleCount
@@ -86,6 +149,13 @@ class CycleCountForm(forms.ModelForm):
         }
 
 
+# =============================================================================
+# CYCLE COUNT ITEM FORM
+# Record count results for individual items.
+# Variance auto-calculated: counted_quantity - system_quantity.
+# =============================================================================
+
+
 class CycleCountItemForm(forms.ModelForm):
     class Meta:
         model = warehouse_models.CycleCountItem
@@ -96,8 +166,15 @@ class CycleCountItemForm(forms.ModelForm):
         }
 
 
+# =============================================================================
+# ADJUSTMENT FORM
+# Manual inventory adjustments (add or remove stock).
+# Creates InventoryTransaction with type='adjust_in' or 'adjust_out'.
+# Reason required for audit trail.
+# =============================================================================
+
+
 class AdjustmentForm(forms.Form):
-    """Form for manual inventory adjustments"""
     ADJUSTMENT_TYPE_CHOICES = [
         ('adjust_in', 'Adjustment In (Add)'),
         ('adjust_out', 'Adjustment Out (Remove)'),

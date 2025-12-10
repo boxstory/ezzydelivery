@@ -1,9 +1,58 @@
+"""
+Core Models Module
+==================
+
+This module contains the core user-related models for the EzzyDelivery platform.
+
+Models:
+    - Profile: Extended user profile with personal info, roles, and verification
+    - ProfilePicture: User profile pictures
+    - WhatsAppVerification: OTP verification codes for WhatsApp
+
+Dependencies:
+    - Django auth system (User model)
+    - Used by: client, fleet, workforce, orders apps
+"""
+
 from django.conf import settings
 from django.db import models
 
 
-# Create your models here.
 class Profile(models.Model):
+    """
+    Extended user profile model for EzzyDelivery platform.
+
+    This model extends Django's built-in User model with additional fields
+    for personal information, role management, and verification status.
+
+    Attributes:
+        user (OneToOneField): Link to Django's auth User model
+        user_number (str): Unique identifier (format: EZZY{YEAR}{6-digits})
+
+    User Information:
+        username, first_name, last_name, email, phone, whatsapp,
+        instagram, zone_name, address, nationality, date_of_birth
+
+    Role Flags:
+        is_business (bool): User is a business owner/client
+        is_staff (bool): User is internal staff/workforce
+        is_driver (bool): User is a delivery driver
+
+    Verification:
+        verification_status: pending, under_review, verified, rejected, incomplete
+        verification_applied_at, verified_at, verified_by, rejection_reason
+
+    Usage:
+        >>> user = User.objects.get(username='john')
+        >>> profile = user.profile
+        >>> profile.is_business = True
+        >>> profile.save()
+
+    Related Models:
+        - Business (client app): profile.business_set
+        - Driver (fleet app): profile.driver
+        - BusinessTeamProfile (client app): profile.businessteam
+    """
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')
 
@@ -103,16 +152,39 @@ class Profile(models.Model):
 
 
 def user_directory_path(instance, filename):
-   return '%s/%s' % (instance.path, filename)
+    """
+    Generate upload path for user files.
+
+    Args:
+        instance: Model instance (ProfilePicture)
+        filename: Original filename
+
+    Returns:
+        str: Path in format '{instance.path}/{filename}'
+    """
+    return '%s/%s' % (instance.path, filename)
 
 
 class ProfilePicture(models.Model):
+    """
+    User profile picture model.
+
+    Stores profile images for users with automatic path generation.
+
+    Attributes:
+        user (OneToOneField): Link to User model
+        profile (ForeignKey): Link to Profile model
+        profile_picture (ImageField): The actual image file
+
+    Upload Path:
+        Files are stored at: media/{user_path}/{filename}
+    """
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile_picture')
-    profile = models.ForeignKey(Profile,  on_delete=models.CASCADE, related_name='profile_picture')
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='profile_picture')
     profile_picture = models.ImageField(
-        upload_to=user_directory_path , default='user/avatar.png', blank=True, null=True)
-    
+        upload_to=user_directory_path, default='user/avatar.png', blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -121,7 +193,40 @@ class ProfilePicture(models.Model):
 
 
 class WhatsAppVerification(models.Model):
-    """Model for storing WhatsApp verification codes"""
+    """
+    WhatsApp OTP verification model.
+
+    Stores verification codes sent via WhatsApp for various purposes
+    like password reset, phone verification, and account verification.
+
+    Attributes:
+        user (ForeignKey): Optional link to User (null for new registrations)
+        phone_number (str): WhatsApp number receiving the code
+        verification_code (str): 6-digit OTP code
+        verification_type (str): Purpose of verification
+        is_verified (bool): Whether code has been successfully verified
+        attempts (int): Number of verification attempts made
+        max_attempts (int): Maximum allowed attempts (default: 3)
+        expires_at (datetime): When the code expires
+
+    Verification Types:
+        - password_reset: For password recovery
+        - phone_add: Adding a new phone number
+        - phone_update: Updating existing phone number
+        - account_verify: Account verification
+
+    Methods:
+        is_expired(): Check if code has expired
+        can_attempt(): Check if more attempts are allowed
+
+    Usage:
+        >>> verification = WhatsAppVerification.objects.create(
+        ...     phone_number='97412345678',
+        ...     verification_code='123456',
+        ...     verification_type='password_reset',
+        ...     expires_at=timezone.now() + timedelta(minutes=10)
+        ... )
+    """
     VERIFICATION_TYPES = (
         ('password_reset', 'Password Reset'),
         ('phone_add', 'Phone Number Add'),

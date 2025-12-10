@@ -1,3 +1,43 @@
+"""
+Delivery Views Module
+=====================
+
+This module handles delivery task management and address verification.
+
+View Categories:
+    Address Management:
+        - dl_address_update: Update delivery address (authenticated)
+        - dl_address_link: Public address verification page for customers
+        - dl_address_link_update: Update address via link
+        - save_location_data: AJAX endpoint to save GPS coordinates
+
+    Task Management:
+        - all_delivery_tasks: List all tasks (driver view)
+        - assigned_tasks: List tasks assigned to current driver
+        - assign_driver: AJAX endpoint for self-assignment
+
+    Utility:
+        - get_zone_name: AJAX lookup for zone names
+        - get_zone_lat_long: AJAX lookup for coordinates
+
+    Business Views:
+        - delivery_business_update: Business-side delivery management
+
+Public Endpoints:
+    - dl_address_link: Allows customers to verify/update their delivery
+      address via a link sent to their phone. No authentication required.
+
+Security:
+    - Driver views verify user has driver profile
+    - CSRF protection on all POST endpoints
+    - Coordinate validation before saving
+
+Related:
+    - delivery.models: DeliveryTask, DlAddressUpdate, AssignedDriver
+    - delivery.forms: DlAddressUpdateForm
+    - fleet.models: Driver
+"""
+
 import logging
 from django.forms.fields import DateTimeField
 from django.shortcuts import redirect, render, get_object_or_404
@@ -22,10 +62,10 @@ from fleet import forms as fleet_forms
 
 logger = logging.getLogger('delivery')
 
-# Create your views here.
 
-
-# requst to user update address before delivery
+# =============================================================================
+# ADDRESS MANAGEMENT VIEWS
+# =============================================================================
 
 
 def dl_address_update(request, dl_task_number, mobile_no):

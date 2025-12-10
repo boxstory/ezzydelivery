@@ -1,3 +1,44 @@
+"""
+Core Views Module
+=================
+
+This module handles user profile management, registration flows, and verification
+processes for the EzzyDelivery platform.
+
+View Categories:
+    1. Profile Views:
+        - profile_view: Display user profile
+        - profile_add: Create/complete user profile
+        - profile_role_update: Update user roles (business/driver)
+        - profile_complete_update: Complete profile information
+
+    2. Registration Views:
+        - join_us: Role selection page
+        - join_us_business: Business registration flow
+        - join_us_driver: Driver registration flow
+        - business_register: Business account creation
+        - driver_register: Driver account creation
+
+    3. Verification Views:
+        - verification_pending: Pending verification status page
+
+    4. Password Reset Views:
+        - password_reset_request: Request password reset via WhatsApp
+        - password_reset_verify: Verify OTP code
+        - password_reset_confirm: Set new password
+
+Helper Functions:
+    - calculate_completion_percentage: Calculate profile completion %
+    - validate_image_upload: Validate uploaded images
+    - generate_secure_id: Generate cryptographically secure IDs
+
+Constants:
+    - VERIFICATION_STATUS_*: Profile verification states
+    - DRIVER_STATUS_*: Driver account states
+    - MAX_UPLOAD_SIZE: Maximum file upload size (5MB)
+    - ALLOWED_IMAGE_TYPES: Permitted image MIME types
+"""
+
 import logging
 import os
 import random

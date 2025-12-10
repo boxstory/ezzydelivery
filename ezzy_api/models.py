@@ -1,3 +1,47 @@
+"""
+Ezzy API Models Module
+======================
+
+This module contains models for API management, webhooks, and document storage.
+
+Models:
+    API Authentication:
+        - ClientApiKey: API keys for client authentication
+
+    Documents:
+        - TaskDocument: Documents attached to delivery tasks
+        - OrderDocument: Documents attached to orders
+
+    Integrations:
+        - EcommerceIntegration: Track e-commerce platform connections
+
+    Webhooks:
+        - WebhookEndpoint: Webhook configuration for external notifications
+        - WebhookDelivery: Track webhook delivery attempts
+
+API Key System:
+    - Auto-generates unique 32-char API keys
+    - Supports expiration dates
+    - Tracks last usage for monitoring
+
+Webhook Events:
+    - task_status_update: Delivery task status changes
+    - task_completed: Task completion notification
+    - task_accepted/rejected: Driver acceptance
+    - driver_location_update: Real-time driver location
+    - cod_collected: COD collection confirmation
+    - document_uploaded: New document notification
+
+Document Types:
+    Task: delivery_proof, signature, photo, invoice, receipt
+    Order: invoice, receipt, label, manifest
+
+Related:
+    - client.models.Business: API key owner
+    - delivery.models.DeliveryTask: Task documents
+    - orders.models.Order: Order documents
+"""
+
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils.crypto import get_random_string
@@ -7,6 +51,11 @@ from orders import models as orders_models
 import os
 
 User = get_user_model()
+
+
+# =============================================================================
+# UPLOAD PATH HANDLERS
+# =============================================================================
 
 
 def api_key_upload_path(instance, filename):

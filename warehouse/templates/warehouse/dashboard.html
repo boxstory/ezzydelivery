@@ -4,18 +4,18 @@
 {% block title %}Warehouse Dashboard{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div id="warehouse_dashboard_section_main" class="container-fluid py-4">
     <div class="row mb-4">
         <div class="col-12">
-            <h1 class="h3 mb-0">Warehouse Dashboard</h1>
+            <h1 id="warehouse_dashboard_header_title" class="h3 mb-0">Warehouse Dashboard</h1>
             <p class="text-muted">Manage inventory, stock levels, and warehouse operations</p>
         </div>
     </div>
 
     <!-- Summary Cards -->
-    <div class="row mb-4">
+    <div id="warehouse_dashboard_section_summary" class="row mb-4">
         <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card border-0 shadow-sm h-100">
+            <div id="warehouse_dashboard_card_total_stock" class="card border-0 shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -30,7 +30,7 @@
             </div>
         </div>
         <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card border-0 shadow-sm h-100">
+            <div id="warehouse_dashboard_card_reserved" class="card border-0 shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -45,7 +45,7 @@
             </div>
         </div>
         <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card border-0 shadow-sm h-100">
+            <div id="warehouse_dashboard_card_alerts" class="card border-0 shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -60,7 +60,7 @@
             </div>
         </div>
         <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card border-0 shadow-sm h-100">
+            <div id="warehouse_dashboard_card_picks" class="card border-0 shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -79,33 +79,33 @@
     <!-- Quick Actions -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card border-0 shadow-sm">
+            <div id="warehouse_dashboard_card_actions" class="card border-0 shadow-sm">
                 <div class="card-header bg-white border-0">
                     <h5 class="mb-0">Quick Actions</h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-3 col-sm-6 mb-3">
-                            <a href="{% url 'warehouse:receive_stock' %}" class="btn btn-outline-primary w-100 py-3">
-                                <i class="fas fa-truck-loading mb-2 d-block" style="font-size: 24px;"></i>
+                            <a id="warehouse_dashboard_btn_receive" href="{% url 'warehouse:receive_stock' %}" class="btn btn-outline-primary w-100 py-3">
+                                <i class="fas fa-truck-loading mb-2 d-block fs-4"></i>
                                 Receive Stock
                             </a>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
-                            <a href="{% url 'warehouse:inventory_list' %}" class="btn btn-outline-success w-100 py-3">
-                                <i class="fas fa-warehouse mb-2 d-block" style="font-size: 24px;"></i>
+                            <a id="warehouse_dashboard_btn_inventory" href="{% url 'warehouse:inventory_list' %}" class="btn btn-outline-success w-100 py-3">
+                                <i class="fas fa-warehouse mb-2 d-block fs-4"></i>
                                 View Inventory
                             </a>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
-                            <a href="{% url 'warehouse:pick_list_list' %}" class="btn btn-outline-info w-100 py-3">
-                                <i class="fas fa-tasks mb-2 d-block" style="font-size: 24px;"></i>
+                            <a id="warehouse_dashboard_btn_picks" href="{% url 'warehouse:pick_list_list' %}" class="btn btn-outline-info w-100 py-3">
+                                <i class="fas fa-tasks mb-2 d-block fs-4"></i>
                                 Pick Lists
                             </a>
                         </div>
                         <div class="col-md-3 col-sm-6 mb-3">
-                            <a href="{% url 'warehouse:low_stock_alerts' %}" class="btn btn-outline-danger w-100 py-3">
-                                <i class="fas fa-bell mb-2 d-block" style="font-size: 24px;"></i>
+                            <a id="warehouse_dashboard_btn_alerts" href="{% url 'warehouse:low_stock_alerts' %}" class="btn btn-outline-danger w-100 py-3">
+                                <i class="fas fa-bell mb-2 d-block fs-4"></i>
                                 Alerts ({{ low_stock_count }})
                             </a>
                         </div>
@@ -118,15 +118,15 @@
     <!-- Recent Transactions -->
     <div class="row">
         <div class="col-lg-8 mb-4">
-            <div class="card border-0 shadow-sm">
+            <div id="warehouse_dashboard_card_transactions" class="card border-0 shadow-sm">
                 <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Recent Transactions</h5>
-                    <a href="{% url 'warehouse:transaction_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                    <a id="warehouse_dashboard_btn_view_all" href="{% url 'warehouse:transaction_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="bg-light">
+                        <table id="warehouse_dashboard_table_transactions" class="table table-hover mb-0">
+                            <thead id="warehouse_dashboard_thead_transactions" class="bg-light">
                                 <tr>
                                     <th>Transaction #</th>
                                     <th>Product</th>
@@ -135,7 +135,7 @@
                                     <th>Date</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="warehouse_dashboard_tbody_transactions">
                                 {% for txn in recent_transactions %}
                                 <tr>
                                     <td><code>{{ txn.transaction_number|truncatechars:15 }}</code></td>
@@ -168,14 +168,14 @@
 
         <!-- Warehouses -->
         <div class="col-lg-4 mb-4">
-            <div class="card border-0 shadow-sm">
+            <div id="warehouse_dashboard_card_warehouses" class="card border-0 shadow-sm">
                 <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Warehouses</h5>
-                    <a href="{% url 'warehouse:warehouse_add' %}" class="btn btn-sm btn-outline-primary">
+                    <a id="warehouse_dashboard_btn_add_warehouse" href="{% url 'warehouse:warehouse_add' %}" class="btn btn-sm btn-outline-primary">
                         <i class="fas fa-plus"></i>
                     </a>
                 </div>
-                <div class="card-body">
+                <div id="warehouse_dashboard_list_warehouses" class="card-body">
                     {% for wh in warehouses %}
                     <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
                         <div>
@@ -188,7 +188,7 @@
                     </div>
                     {% empty %}
                     <div class="text-center text-muted py-4">
-                        <i class="fas fa-warehouse mb-2" style="font-size: 32px;"></i>
+                        <i class="fas fa-warehouse mb-2 fs-2"></i>
                         <p class="mb-2">No warehouses yet</p>
                         <a href="{% url 'warehouse:warehouse_add' %}" class="btn btn-primary btn-sm">Create Warehouse</a>
                     </div>

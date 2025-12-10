@@ -1,3 +1,62 @@
+"""
+Client/Business Views Module
+============================
+
+This module handles all business client operations including dashboard,
+settings, locations, teams, and API integrations.
+
+View Categories:
+    Dashboard:
+        - business_dashboard: Main business dashboard with orders overview
+
+    Pickup Locations:
+        - pickup_location_list: List all pickup/warehouse locations
+        - pickup_location_add: Add new pickup location
+        - pickup_location_update: Edit existing location
+        - pickup_location_delete: Remove pickup location
+
+    Driver Directory:
+        - driver_directory: List drivers associated with business
+        - driver_directory_add: Add driver to directory
+        - driver_directory_delete: Remove driver from directory
+
+    Business Profile:
+        - business_profile: View business profile (frontend)
+        - business_profile_display: Public business profile view
+        - business_profile_update: Update basic business info
+        - business_profile_info_update: Update extended profile info
+        - all_business: List all businesses (admin view)
+
+    Business Settings:
+        - business_settings: Main settings page
+        - business_logo_update: Update business logo
+
+    API Settings:
+        - business_settings_api_list: List API integrations
+        - business_settings_api_add: Add new API integration
+        - business_settings_api_update: Edit API settings
+        - business_settings_api_delete: Remove API integration
+        - business_settings_api_test: Test API connection
+        - business_settings_api_test_result: Show API test results
+
+    Team Management:
+        - business_teams: List team members
+        - business_teams_add: Add team member
+        - business_teams_update: Edit team member
+
+    Guides:
+        - workflow_guide: Step-by-step workflow guide for clients
+
+Security:
+    All views implement IDOR (Insecure Direct Object Reference) protection
+    by verifying the logged-in user owns the business being accessed.
+
+Related:
+    - client.models: Business, PickupLocation, BusinessApiSettings, etc.
+    - client.forms: businessRegisterForm, PickupLocationsAddForm, etc.
+    - client.urls: URL routing for all business views
+"""
+
 import os
 import logging
 from django import forms
@@ -23,10 +82,10 @@ from datetime import datetime
 
 logger = logging.getLogger('client')
 
-# Create your views here.
 
-
-# dashboard---------------------------------------------------------------------------------------------------------------------
+# =============================================================================
+# DASHBOARD VIEWS
+# =============================================================================
 
 
 @login_required(login_url='account_login')

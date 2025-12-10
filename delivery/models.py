@@ -1,3 +1,46 @@
+"""
+Delivery Models Module
+======================
+
+This module contains models for delivery task management and tracking.
+
+Models:
+    Task Management:
+        - DeliveryTask: Core delivery task linked to orders
+        - AssignedDriver: Driver assignment to delivery tasks
+        - DlAddressUpdate: Customer delivery address details
+
+    Location Data:
+        - ZoneName: Zone number to name mapping
+        - LatLonList: Coordinate database for addresses
+
+    Labels:
+        - ShippingLabel: Auto-generated shipping labels for packages
+
+Delivery Status Flow:
+    Order Created → for_review → pending → publish_to_dms → in_transit → delivered
+                                       ↘ address_pending (if address needs update)
+                                       ↘ customer_confirmation_pending
+                                       ↘ cancelled/rejected
+
+DMS Status Codes:
+    0: Assigned
+    1: Started
+    2: Successful
+    3: Failed
+    4: InProgress/Arrived
+    6: Unassigned
+    7: Accepted/Acknowledged
+    8: Decline
+    9: Cancel
+    10: Deleted
+
+Related:
+    - orders.models.Order: Source order for delivery task
+    - fleet.models.Driver: Driver assigned to task
+    - client.models.Business: Business that placed the order
+"""
+
 from django.db import models
 
 from core import models as core_models
@@ -7,14 +50,49 @@ from client import models as business_models
 from fleet import models as fleet_models
 
 
-# Create your models here.
+# =============================================================================
+# DELIVERY ADDRESS MODELS
+# =============================================================================
 
-# drivers---------------------------------------------------------------------------------------------------------------------
-
-
-# Task---------------------------------------------------------------------------------------------------------------------
 
 class DlAddressUpdate(models.Model):
+    """
+    Customer delivery address details.
+
+    Stores delivery address information that can be updated by customers
+    via a link sent to their phone. Used to verify and update delivery
+    coordinates before the delivery is made.
+
+    Fields:
+        Customer Info:
+            - full_name: Recipient name
+            - mobile_no: Contact number
+
+        Address Details:
+            - area_name: Area/locality name
+            - dl_zone: Zone number
+            - dl_street: Street number
+            - dl_building: Building number
+            - dl_unit: Unit/apartment number
+
+        Coordinates:
+            - dl_latitude, dl_longitude: GPS coordinates
+            - dl_pluscode: Google Plus Code
+
+        Property Type:
+            - is_villa_compound: Villa/compound delivery
+            - is_flat: Apartment delivery
+            - is_office: Office delivery
+
+        Task Reference:
+            - dl_task_number: Delivery task code
+            - dms_id: External DMS system ID
+            - order: Parent order
+            - time_slot: Preferred delivery time
+
+    Related:
+        delivery.views.dl_address_link - Customer address update page
+    """
     full_name = models.CharField(max_length=100)
     mobile_no = models.CharField(max_length=11)
     area_name = models.CharField(max_length=100, blank=True, null=True)

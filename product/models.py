@@ -1,12 +1,64 @@
+"""
+Product Models Module
+=====================
+
+This module contains models for product and inventory management.
+
+Models:
+    Product Catalog:
+        - ProductCategory: Hierarchical product categories
+        - ColorVariant: Color options for products
+        - UnitVariant: Unit types (kg, piece, box, etc.)
+        - Product: Main product entity with SKU, barcode, pricing
+
+    Inventory:
+        - ProductInventory: Stock quantity tracking per product
+
+    Services:
+        - services: Business service offerings
+
+Product Structure:
+    Category → Product → Inventory
+              ↳ ColorVariant
+              ↳ UnitVariant
+
+Indexes:
+    - Product.item_sku: SKU lookups
+    - Product.barcode: Barcode scanning
+    - Product.business + created_at: Business product listings
+
+Related:
+    - orders.models.OrderItem: Products in orders
+    - client.models.Business: Product owner
+"""
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils.translation import gettext_lazy as _
 from client import models as business_models
 from product import models as product_models
-# Create your models here.
+
+
+# =============================================================================
+# PRODUCT CATEGORY & VARIANTS
+# =============================================================================
 
 
 class ProductCategory(models.Model):
+    """
+    Hierarchical product category model.
+
+    Supports nested categories through self-referencing FK.
+
+    Fields:
+        - category_name: Display name
+        - sub_category: Parent category (null for top-level)
+        - discription: Category description
+
+    Usage:
+        >>> electronics = ProductCategory.objects.create(category_name='Electronics')
+        >>> phones = ProductCategory.objects.create(category_name='Phones', sub_category=electronics)
+    """
     category_name = models.CharField(max_length=100)
     sub_category = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True)

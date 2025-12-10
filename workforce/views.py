@@ -1,17 +1,73 @@
+"""
+Workforce Views Module
+======================
+
+This module handles internal staff/admin operations for managing
+orders, deliveries, drivers, businesses, and user verification.
+
+View Categories:
+    Dashboard:
+        - wf_dashboard: Main workforce dashboard with pending counts
+
+    Order Management:
+        - all_orders: List/filter all orders (paginated)
+        - order_detail_modal: AJAX order details
+        - publish_orders_to_dms: Publish orders to delivery management system
+        - update_order_dms: Update order DMS status
+
+    Delivery Management:
+        - all_deliveries: List all delivery tasks
+        - delivery_detail: View delivery details
+        - dms_publish_order: Publish single order to DMS
+
+    Driver Management:
+        - all_drivers: List all drivers with status
+        - driver_detail: Driver profile and documents
+        - driver_documents_verification: Verify driver documents
+        - fleet_cod_in_hand: View driver COD balances
+        - fleet_drivers_earnings: View driver earnings
+        - fleet_transactions: View financial transactions
+
+    Business Management:
+        - all_stores: List all businesses
+        - store_detail: Business profile details
+        - business_license_detail: Verify business documents
+
+    User Verification:
+        - user_verification: List pending verifications
+        - user_verification_detail: View user details
+        - approve_user_verification: Approve user
+        - reject_user_verification: Reject user
+
+    Reports:
+        - staff_reports: Staff activity reports
+        - staff_contacts: Contact management
+
+Integrations:
+    - ShipDay API: For DMS order publishing
+
+Security:
+    All views require authentication and typically staff permissions.
+    IDOR protection on all detail views.
+
+Related:
+    - workforce.models: (empty - uses core.Profile)
+    - All app models: orders, delivery, fleet, client
+"""
+
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 import json
 import logging
-# Add these imports at the top of your View file
 from django.core.paginator import (
     Paginator,
     EmptyPage,
     PageNotAnInteger,
 )
 from django.urls import reverse
-# Create your views here.
+
 from client import models as business_models
 from core import models as core_models
 from orders import models as orders_models
@@ -29,8 +85,12 @@ try:
 except ImportError:
     shipday_obj = None
 
-# Initialize logger
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
 
 
 def paginate_queryset(request, queryset, items_per_page=10):

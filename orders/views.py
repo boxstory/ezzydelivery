@@ -1,3 +1,54 @@
+"""
+Orders Views Module
+===================
+
+This module handles all order management operations for businesses.
+
+View Categories:
+    Order Lists:
+        - orders_all_list: All orders with pagination
+        - orders_pending_list: Orders pending delivery (DMS status 4,5,6)
+        - orders_successfull_list: Delivered orders (DMS status 2)
+        - orders_unsuccessfull_list: Failed/cancelled orders (DMS status 7,8,9)
+        - latest_orders_list: Dashboard widget showing latest 5 orders
+
+    Order Creation:
+        - add_order: Create single order with form
+        - add_order_product: Add products to existing order
+        - add_order_with_product: Create order with products in one step
+        - bulk_order_entry: Excel-like bulk order entry
+
+    Order Upload:
+        - order_upload_file: CSV/Excel file upload
+        - order_upload_review_data: Review and confirm uploaded data
+
+    Order Management:
+        - order_update: Edit existing order
+        - delete_order: Remove order
+        - order_details: View order details
+        - update_order_status: AJAX status update
+
+    Product Management:
+        - update_order_product: Edit order products
+        - order_product_list: List products in order
+
+    API Integration:
+        - get_order_by_api: Fetch orders from Shopify
+        - get_orders_by_base_api: Fetch from configured API (Shopify/WooCommerce)
+
+    Verification:
+        - verify_location: Public customer address verification page
+
+Security:
+    All views implement IDOR protection by verifying order ownership.
+    API credentials are loaded from environment variables.
+
+Related:
+    - orders.models: Order, OrderItem, AddressVerification
+    - orders.forms: AddOrderForm, UpdateOrderForm, etc.
+    - delivery.models: DeliveryTask (created from verified orders)
+"""
+
 import json
 import logging
 from django.shortcuts import get_object_or_404, redirect, render
@@ -16,7 +67,7 @@ from core import models as core_models
 from orders import forms, models as orders_models
 from client import models as business_models
 from orders import forms as orders_forms
-# Create your views here.
+
 from django.core.paginator import (
     Paginator,
     EmptyPage,
@@ -25,7 +76,10 @@ from django.core.paginator import (
 
 logger = logging.getLogger('orders')
 
-# orders---------------------------------------------------------------------------------------------------------------------
+
+# =============================================================================
+# ORDER LIST VIEWS
+# =============================================================================
 
 
 @login_required(login_url='account_login')
@@ -78,7 +132,7 @@ def orders_all_list(request):
         'business': business,
         'len': items.count()  # Use .count() instead of len() for better performance
     }
-    return render(request, 'orders/orders_all_list.html', context)
+    return render(request, 'orders/order_all_list.html', context)
 
 
 @login_required(login_url='account_login')
@@ -130,7 +184,7 @@ def orders_pending_list(request):
         'orders': orders,
         'business': business,
     }
-    return render(request, 'orders/orders_pending_list.html', context)
+    return render(request, 'orders/order_pending_list.html', context)
 
 @login_required(login_url='account_login')
 def orders_successfull_list(request):
@@ -181,7 +235,7 @@ def orders_successfull_list(request):
         'orders': orders,
         'business': business,
     }
-    return render(request, 'orders/orders_successfull_list.html', context)
+    return render(request, 'orders/order_successful_list.html', context)
 
 
 @login_required(login_url='account_login')
@@ -213,7 +267,7 @@ def orders_unsuccessfull_list(request):
         'orders': orders,
         'business': business,
     }
-    return render(request, 'orders/orders_unsuccessfull_list.html', context)
+    return render(request, 'orders/order_unsuccessful_list.html', context)
 
 
 @login_required(login_url='account_login')
@@ -246,7 +300,7 @@ def latest_orders_list(request):
         'orders': orders,
         'business': business,
     }
-    return render(request, 'orders/orders_list_view.html', context)
+    return render(request, 'orders/order_list_view.html', context)
 
 # order uploading section ----------------------------------------------------------------
 
@@ -275,7 +329,7 @@ def order_upload_file(request):
         'form': form,
         'business': business
     }
-    return render(request, 'orders/order_upload_file.html',  context)
+    return render(request, 'orders/order_file_upload.html',  context)
 
 def order_upload_review_data(request):
     if 'uploaded_data' not in request.session:
@@ -484,7 +538,7 @@ def add_order(request):
             }
         pickup_locations_json = json.dumps(pickup_locations_dict)
 
-    return render(request, 'orders/add_order.html', {
+    return render(request, 'orders/order_add.html', {
         'form': form,
         'business': business,
         'pickup_locations': pickup_locations,
@@ -530,7 +584,7 @@ def add_order_product(request, order_id):
             'business': business,
             'existing_items': existing_items
         }
-        return render(request, 'orders/add_order_product.html', data)
+        return render(request, 'orders/order_product_add.html', data)
 
     except orders_models.Order.DoesNotExist:
         logger.warning(f"Order {order_id} not found or unauthorized access by user {request.user.id}")
@@ -568,7 +622,7 @@ def add_order_with_product(request):
         
         'order_product_formset': order_product_formset,
     }
-    return render(request, 'orders/add_order_with_product.html', context)
+    return render(request, 'orders/order_with_product_add.html', context)
     
 
 
@@ -854,7 +908,7 @@ def get_order_by_api(request):
 
 
         }
-        return render(request, 'orders/get_order_by_api.html', data)
+        return render(request, 'orders/order_api_get.html', data)
     else:
         return JsonResponse({'status': 'error', 'message': 'Failed to fetch orders from Shopify'})
 
@@ -1059,7 +1113,7 @@ def get_orders_by_base_api(request):
             'status': status,
             'result': result,
         }
-        return render(request, 'orders/orders_api_list.html', context)
+        return render(request, 'orders/order_api_list.html', context)
 
     except Exception as e:
         logger.error(f"Error fetching orders: {str(e)}")

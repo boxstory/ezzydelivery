@@ -1,3 +1,20 @@
+"""
+Webpages Forms Module
+=====================
+
+This module contains forms for public website pages.
+
+Forms:
+    - ContactForm: General contact form (non-ModelForm)
+    - CareersForm: Job application form with QID validation
+    - PricingEnquiryForm: Multi-step pricing inquiry form
+    - DeliveryRequestForm: One-time delivery request form
+
+Related:
+    - webpages.models: ContactUs, Careers, PricingEnquiry, DeliveryRequest
+    - webpages.views: Views that process these forms
+"""
+
 from django import forms
 from webpages.models import *
 from crispy_forms.helper import FormHelper
@@ -6,7 +23,31 @@ from crispy_forms.layout import Layout, Field, Submit
 from fleet import models as fleet_models
 
 
+# =============================================================================
+# CONTACT FORM
+# =============================================================================
+
+
 class ContactForm(forms.Form):
+    """
+    General contact form for website visitors.
+
+    Note: This is a regular Form (not ModelForm) that manually
+    creates ContactUs instances in the save() method.
+
+    Fields:
+        - full_name: Visitor's name
+        - email: Contact email
+        - mobile: Phone number
+        - purpose: Multi-select checkboxes for inquiry type
+        - message: Detailed message (textarea)
+
+    Template:
+        webpages/contact.html
+
+    View:
+        webpages.views.contact
+    """
     DELIVERY_REQUEST = 'dr'
     fulfillment = 'fl'
     AFFLILIATE = 'af'
@@ -39,7 +80,33 @@ class ContactForm(forms.Form):
         return contactus
 
 
+# =============================================================================
+# CAREERS FORM
+# =============================================================================
+
+
 class CareersForm(forms.ModelForm):
+    """
+    Job application form for the careers page.
+
+    Validation:
+        - QID must be exactly 11 digits
+        - QID must start with 2 or 3 (Qatar ID format)
+
+    Fields:
+        - full_name: Applicant's name
+        - email: Contact email
+        - mobile: Phone number
+        - qid: Qatar ID (validated)
+        - job: Position applying for
+        - self_intro: Cover letter / introduction
+
+    Template:
+        webpages/careers.html
+
+    View:
+        webpages.views.careers
+    """
     class Meta:
         model = Careers
         fields = '__all__'
@@ -58,8 +125,36 @@ class CareersForm(forms.ModelForm):
 
   
 
+# =============================================================================
+# PRICING ENQUIRY FORM
+# =============================================================================
+
+
 class PricingEnquiryForm(forms.ModelForm):
-    # Override boolean fields with ChoiceField
+    """
+    Multi-step pricing inquiry form for potential business clients.
+
+    Overrides model boolean fields with ChoiceFields for better UX
+    (radio buttons instead of checkboxes).
+
+    Field Categories:
+        Personal Info: full_name, business_name
+        Company Status: is_registered_company_in_qatar, etc.
+        Service Needs: is_required_COD_service, fulfillment options
+        Order Volume: weekly/monthly/expected orders
+        Delivery Speed: speed options multi-select
+        Package Details: size, special handling
+        Pickup Info: location type, time slots
+
+    Uses crispy_forms for structured layout.
+
+    Template:
+        webpages/delivery_pricing_inquiry.html
+
+    View:
+        webpages.views.delivery_inquiry
+    """
+    # Override boolean fields with ChoiceField for Yes/No radio buttons
     is_personalized_product = forms.ChoiceField(choices=[ (False, 'No'),(True, 'Yes')])
     is_registered_company_in_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
     is_located_in_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
@@ -114,8 +209,52 @@ class PricingEnquiryForm(forms.ModelForm):
         )
 
 
+# =============================================================================
+# DELIVERY REQUEST FORM
+# =============================================================================
+
+
 class DeliveryRequestForm(forms.ModelForm):
-    """Form for delivery requests from users/non-sellers"""
+    """
+    One-time delivery request form for non-business users.
+
+    Allows individuals to request a single delivery without
+    registering as a business client.
+
+    Field Groups:
+        Delivery Type:
+            - pick_and_delivery: Pick up from one location, deliver to another
+            - store_pickup_and_delivery: Pick from a store, deliver to customer
+
+        Customer Info:
+            - customer_name, email, mobile
+
+        Pickup Details:
+            - address, zone, street, building
+            - GPS coordinates (lat/lng)
+            - contact name and mobile
+
+        Delivery Details:
+            - address, zone, street, building
+            - GPS coordinates (lat/lng)
+            - contact name and mobile
+
+        Package Info:
+            - description, weight, category
+
+        Preferences:
+            - preferred_date, preferred_time
+            - delivery_speed (Normal/Same Day/On Demand)
+            - special_instructions
+
+    Uses crispy_forms for structured layout.
+
+    Template:
+        webpages/delivery_request.html
+
+    View:
+        webpages.views.delivery_request
+    """
 
     class Meta:
         model = DeliveryRequest

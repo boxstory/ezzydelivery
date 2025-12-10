@@ -1,3 +1,38 @@
+"""
+Core Forms Module
+=================
+
+This module contains forms for user registration, profile management, and applications.
+
+Forms:
+    Authentication & Registration:
+        - CustomSignupForm: Extended signup with first/last name
+
+    Profile Management:
+        - ProfileForm: Initial profile creation form
+        - ProfileUpdateForm: Full profile editing form
+        - ProfilePictureForm: Profile image upload form
+        - JoinUsForm: Role selection form (business/driver)
+
+    Applications:
+        - DriverVacancyAplicationForm: Driver job application form
+
+Form Validation:
+    - Profile pictures are validated for size and type
+    - Required fields enforced for profile completion
+    - Date of birth range: 1930-2010
+
+Usage:
+    >>> from core.forms import ProfileForm
+    >>> form = ProfileForm(request.POST, instance=profile)
+    >>> if form.is_valid():
+    ...     form.save()
+
+Related:
+    - core.models: Profile, ProfilePicture
+    - core.views: profile_view, profile_add, join_us
+"""
+
 from urllib import request
 from django import forms
 from core.models import *
@@ -11,13 +46,32 @@ from fleet import models as fleet_models
 YEARS = [i for i in range(1930, 2020)]
 
 
-# SIGNUP FORM ---------------------------------------------------------------------------------------------------------------------
+# =============================================================================
+# AUTHENTICATION & REGISTRATION FORMS
+# =============================================================================
+
 
 class CustomSignupForm(SignupForm):
+    """
+    Extended signup form with first and last name fields.
+
+    Extends django-allauth's SignupForm to capture user's full name
+    during registration. The names are saved to the User model.
+
+    Fields:
+        first_name (CharField): User's first name (max 30 chars)
+        last_name (CharField): User's last name (max 30 chars)
+        + inherited fields from SignupForm (email, password1, password2)
+
+    Usage:
+        Used automatically by django-allauth when configured in settings:
+        ACCOUNT_FORMS = {'signup': 'core.forms.CustomSignupForm'}
+    """
     first_name = forms.CharField(max_length=30, label='First Name')
     last_name = forms.CharField(max_length=30, label='Last Name')
 
     def signup(self, request, user):
+        """Save first and last name to user model after signup."""
         user.first_name = self.cleaned_data['first_name']
         user.last_name = self.cleaned_data['last_name']
 
@@ -25,8 +79,33 @@ class CustomSignupForm(SignupForm):
         return user
 
 
-# PROFILE FORM ---------------------------------------------------------------------------------------------------------------------
+# =============================================================================
+# PROFILE MANAGEMENT FORMS
+# =============================================================================
+
+
 class ProfileForm(forms.ModelForm):
+    """
+    Initial profile creation form.
+
+    Used when users first complete their profile after registration.
+    Collects essential contact and personal information.
+
+    Fields:
+        - first_name, last_name: User's full name
+        - email: Contact email
+        - phone, whatsapp: Contact numbers (required)
+        - address, zone_name: Location info (zone_name required)
+        - nationlity: User's nationality (required)
+        - date_of_birth: DOB with date picker (required)
+        - instagram: Social media handle (optional)
+
+    Template:
+        core/profile_add.html
+
+    View:
+        core.views.profile_add
+    """
     class Meta:
         model = Profile
         fields = ['first_name', 'last_name', 'email', 'phone', 'address', 'instagram',
@@ -63,7 +142,28 @@ class ProfileForm(forms.ModelForm):
 
 
 class ProfileUpdateForm(forms.ModelForm):
-    """Enhanced profile update form with all required fields"""
+    """
+    Full profile editing form with all fields.
+
+    Used for updating existing profiles. All fields except instagram
+    are required to ensure profile completion for verification.
+
+    Fields:
+        - username: Unique display name
+        - first_name, last_name: Full name
+        - email: Contact email
+        - phone, whatsapp: Contact numbers
+        - zone_name, address: Location details
+        - nationlity: User's nationality
+        - date_of_birth: Date picker (range: 1930-2010)
+        - instagram: Social handle (optional)
+
+    Template:
+        core/profile_view.html
+
+    View:
+        core.views.profile_view
+    """
     class Meta:
         model = Profile
         fields = [
@@ -101,12 +201,32 @@ class ProfileUpdateForm(forms.ModelForm):
 
 
 class ProfilePictureForm(forms.ModelForm):
+    """
+    Profile picture upload form.
+
+    Handles profile image uploads with validation for file size and type.
+    Uses validate_image_upload() from core.views for validation.
+
+    Fields:
+        profile_picture (ImageField): The profile image file
+
+    Validation:
+        - File size limits
+        - Allowed image types (JPEG, PNG, etc.)
+        - Performed in clean_profile_picture()
+
+    Template:
+        Used within profile templates
+
+    View:
+        core.views.profile_view (handles image upload)
+    """
     class Meta:
         model = ProfilePicture
         fields = ['profile_picture',]
 
     def clean_profile_picture(self):
-        """Validate uploaded profile picture"""
+        """Validate uploaded profile picture for size and type."""
         from core.views import validate_image_upload
 
         picture = self.cleaned_data.get('profile_picture')
@@ -118,6 +238,27 @@ class ProfilePictureForm(forms.ModelForm):
 
 
 class JoinUsForm(forms.ModelForm):
+    """
+    Role selection form for new users.
+
+    Allows users to select their role on the platform (business owner
+    or delivery driver). Used during the onboarding process.
+
+    Fields:
+        id: Hidden field for profile ID
+        is_business (BooleanField): Select to register as business
+        is_driver (BooleanField): Select to register as driver
+
+    Note:
+        Users can only select one role. The form uses checkbox inputs
+        styled as cards for better UX.
+
+    Template:
+        core/join_us.html
+
+    View:
+        core.views.join_us
+    """
     class Meta:
         model = Profile
         fields = ['id', 'is_business', 'is_driver']
@@ -127,6 +268,11 @@ class JoinUsForm(forms.ModelForm):
 
         self.helper = FormHelper()
         self.helper.form_show_labels = False
+
+
+# =============================================================================
+# APPLICATION FORMS
+# =============================================================================
 
 
 VEHICLE_CHOICES = [
@@ -154,6 +300,37 @@ JOB_TYPE_CHOICES = [
 
 
 class DriverVacancyAplicationForm(forms.ModelForm):
+    """
+    Driver job application form.
+
+    Used by prospective drivers to apply for delivery positions.
+    Collects personal info, location, and vehicle/license details.
+
+    Fields:
+        Personal Info:
+            - full_name: Applicant's full name
+            - mobile_no: Mobile contact number
+            - whatsapp_no: WhatsApp number for communication
+
+        Location:
+            - landmark: Nearby landmark for reference
+            - zone_name: Area/zone of residence
+            - is_in_qatar: Whether applicant is currently in Qatar
+
+        Vehicle & License:
+            - licence: Type of driving license (2wheeler/4wheeler/heavy)
+            - own_vehicle: Types of vehicles owned (multi-select)
+            - job_type: Preferred job type (part_time/full_time/both)
+
+    Template:
+        core/join_us_driver.html
+
+    View:
+        core.views.join_us_driver
+
+    Related Model:
+        fleet.models.DriverVacancyAplication
+    """
     VEHICLE_CHOICES = [
         ('none', 'None'),
         ('bike', 'Bike'),

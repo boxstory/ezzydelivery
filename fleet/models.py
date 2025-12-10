@@ -1,3 +1,47 @@
+"""
+Fleet Models Module
+===================
+
+This module contains models for driver management, vehicles, documents,
+and financial tracking (wallet, transactions, settlements).
+
+Models:
+    Driver Management:
+        - Driver: Main driver entity with profile and wallet info
+        - DriverVacancyAplication: Job applications from prospective drivers
+
+    Vehicle Management:
+        - DriverVehicle: Driver's registered vehicles
+
+    Documents:
+        - DriverDocument: Driver documents (QID, license, passport)
+
+    Financial Tracking:
+        - DriverTransaction: All financial transactions (earnings, COD, etc.)
+        - DriverSettlement: Periodic payouts/settlements
+
+Driver Status Flow:
+    Applied → Pending on Review → Processing → Approved (or Rejected/Blocked)
+
+Wallet System:
+    - wallet_balance: Tracks COD credits/debits
+    - credit_limit: Maximum COD driver can hold
+    - cod_in_hand: Current COD with driver
+    - pending_earnings: Earnings awaiting settlement
+
+Transaction Types:
+    - earning: Task completion earnings
+    - cod_collection: COD collected from customer
+    - cod_deposit: COD submitted to admin
+    - settlement: Earnings paid out
+    - bonus/deduction/adjustment: Manual changes
+
+Related:
+    - delivery.models.DeliveryTask: Tasks assigned to drivers
+    - client.models.DriverDirectory: Business-driver associations
+    - fleet.wallet_service: Business logic for wallet operations
+"""
+
 from datetime import datetime
 from django.db import models
 from django.conf import settings
@@ -5,10 +49,10 @@ import os
 from core import models as core_models
 
 
-# Create your models here.
+# =============================================================================
+# CONSTANTS
+# =============================================================================
 
-
-# fleet---------------------------------------------------------------------------------------------------------------------
 VEHICLE_CHOICES = [
     ('none', 'None'),
     ('bike', 'Bike'),

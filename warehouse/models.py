@@ -1,3 +1,34 @@
+"""
+Warehouse Models Module
+=======================
+
+This module contains models for warehouse and inventory management.
+
+Models:
+    Warehouse Management:
+        - Warehouse: Physical warehouse/storage facility
+        - StorageLocation: Hierarchical storage locations (zone/aisle/rack/shelf/bin)
+
+    Inventory:
+        - StockLevel: Current stock quantities per product/location
+        - InventoryTransaction: Audit trail for all inventory movements
+        - StockReservation: Reserved stock for pending orders
+
+    Operations:
+        - PickList: Grouped items to be picked for orders
+        - PickListItem: Individual items within a pick list
+        - CycleCount: Scheduled inventory counts
+        - CycleCountItem: Items within a cycle count
+
+    Alerts:
+        - LowStockAlert: Notifications when stock falls below reorder point
+
+Related:
+    - product.models.Product: Products stored in warehouse
+    - orders.models.Order: Orders that reserve/consume inventory
+    - client.models.Business: Business that owns the warehouse
+"""
+
 import uuid
 import logging
 from django.db import models
@@ -10,8 +41,10 @@ logger = logging.getLogger('warehouse')
 
 
 # =============================================================================
-# CHOICES
+# CHOICES - Constants for model field choices
 # =============================================================================
+
+# Location types for hierarchical storage organization
 
 LOCATION_TYPE_CHOICES = [
     ('zone', 'Zone'),
@@ -72,13 +105,13 @@ ALERT_STATUS_CHOICES = [
 
 # =============================================================================
 # WAREHOUSE MODEL
+# Represents a physical warehouse or storage facility.
+# Can optionally link to an existing PickupLocation.
+# Auto-generates warehouse code if not provided: WH-{business_code}-{uuid}
 # =============================================================================
 
+
 class Warehouse(models.Model):
-    """
-    Represents a physical warehouse or storage facility.
-    Can optionally link to an existing PickupLocation.
-    """
     business = models.ForeignKey(
         client_models.Business,
         on_delete=models.CASCADE,

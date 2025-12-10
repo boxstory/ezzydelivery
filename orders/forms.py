@@ -1,3 +1,35 @@
+"""
+Orders Forms Module
+===================
+
+This module contains forms for order creation, editing, and management.
+
+Forms:
+    Order Management:
+        - AddOrderForm: Create new orders with customer and delivery details
+        - UpdateOrderForm: Edit existing orders
+        - AddOrderProductsForm: Add products/items to orders
+        - OrderFileUploadForm: CSV file upload for bulk order import
+
+Order Flow:
+    1. Business creates order with AddOrderForm
+    2. Products added with AddOrderProductsForm
+    3. Order goes through verification (workforce)
+    4. Delivery task created automatically
+    5. Updates via UpdateOrderForm as needed
+
+Validation:
+    - Auto-generates unique order numbers
+    - Validates COD amounts
+    - Filters pickup locations by business
+    - Filters products by business
+
+Related:
+    - orders.models: Order, OrderItem
+    - orders.views: Order creation and management views
+    - delivery.models: DeliveryTask (created from verified orders)
+"""
+
 from django import forms
 from django.utils.translation import gettext_lazy as _
 from datetime import timezone
@@ -7,6 +39,11 @@ from requests import request
 from orders.models import *
 from client import models as business_models
 from product import models as product_models
+
+
+# =============================================================================
+# CONSTANTS
+# =============================================================================
 
 ORDER_STATUS = {
     ('ready_to_pickup', 'Ready to pickup'),
@@ -23,10 +60,51 @@ COD_STATUS_BY_CLIENT = {
 }
 
 
-# ORDERS FORM ---------------------------------------------------------------------------------------------------------------------
+# =============================================================================
+# ORDER FORMS
+# =============================================================================
 
 
 class AddOrderForm(forms.ModelForm):
+    """
+    Order creation form.
+
+    Used by businesses to create new delivery orders with customer
+    and delivery information.
+
+    Fields:
+        Order Info:
+            - client_order_code: Business's internal order number
+            - order_notes: Short description/notes
+            - order_status: to_review, ready_to_pickup, publish, cancelled
+
+        Customer Details:
+            - customer_name: Recipient name
+            - customer_phone: Contact phone
+            - customer_whatsapp: WhatsApp number
+
+        Delivery Address:
+            - dl_zone: Zone number
+            - dl_street: Street number
+            - dl_building: Building number
+            - customer_address: Full address text
+
+        COD (Cash on Delivery):
+            - cod_status_by_client: no_cod or include
+            - cod_amount: Amount to collect
+
+        Pickup:
+            - pickup_location: Business pickup location (filtered by business)
+
+    Auto-generated:
+        - order_number: Unique order ID (BusinessCode-ClientCode-SystemID)
+
+    Template:
+        orders/order_add.html
+
+    View:
+        orders.views.order_add
+    """
     # Add a field to display the unique order number preview
     order_number_preview = forms.CharField(
         label='Unique Order Number (Auto-generated)',
@@ -96,7 +174,32 @@ class AddOrderForm(forms.ModelForm):
 
 
 class AddOrderProductsForm(forms.ModelForm):
-    """Form for adding products to an order using OrderItem model"""
+    """
+    Order product/item form.
+
+    Used to add individual products to an order. Each order can have
+    multiple OrderItems linked to it.
+
+    Fields:
+        - order: Parent order (hidden field)
+        - product: Product from business inventory
+        - quantity: Number of units
+        - unit_price: Price per unit
+        - notes: Item-specific notes
+
+    Auto-calculated:
+        - total_price: unit_price * quantity (in model save)
+
+    Template:
+        orders/order_product_add.html
+
+    View:
+        orders.views.order_product_add
+
+    Note:
+        Products are filtered to show only those belonging
+        to the order's business.
+    """
 
     class Meta:
         model = OrderItem
@@ -155,12 +258,54 @@ class AddOrderProductsForm(forms.ModelForm):
 
 
 class OrderFileUploadForm(forms.Form):
-    file = forms.FileField()
-    
+    """
+    CSV file upload form for bulk order import.
 
+    Allows businesses to upload multiple orders at once via CSV file.
+
+    Fields:
+        - file: CSV file with order data
+
+    Expected CSV Columns:
+        - client_order_code, customer_name, customer_phone
+        - customer_whatsapp, customer_address
+        - dl_zone, dl_street, dl_building
+        - cod_amount, order_notes
+
+    Template:
+        orders/order_file_upload.html
+
+    View:
+        orders.views.order_file_upload
+    """
+    file = forms.FileField()
 
 
 class UpdateOrderForm(forms.ModelForm):
+    """
+    Order update form.
+
+    Used to edit existing orders. Some fields are read-only to preserve
+    order integrity after creation.
+
+    Fields:
+        Editable:
+            - customer_name, customer_phone, customer_whatsapp
+            - cod_status_by_client, cod_amount
+            - dl_zone, customer_address
+            - pickup_location, order_notes
+            - task_created: Mark if delivery task was created
+
+        Read-only (via widget attrs):
+            - customer_name (disabled)
+            - customer_whatsapp (readonly)
+
+    Template:
+        orders/order_update.html (if exists)
+
+    View:
+        orders.views.order_update
+    """
     class Meta:
         model = Order
         fields = [ 'customer_name', 'customer_phone', 'customer_whatsapp',  'task_created', 'cod_status_by_client', 'cod_amount',

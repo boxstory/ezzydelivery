@@ -1,3 +1,55 @@
+"""
+Webpages Views Module
+=====================
+
+This module handles public-facing website pages and marketing content.
+
+View Categories:
+    Landing Pages:
+        - index: Homepage with hero section
+        - about: About us page
+        - contact: Contact information
+        - services: Services listing
+
+    Pricing & Inquiries:
+        - delivery_pricing: 3PL pricing information
+        - delivery_inquiry: Multi-step pricing inquiry form
+        - delivery_request: Delivery request form
+
+    For Businesses:
+        - for_fleets: Fleet partnership information
+        - join_us: Partnership onboarding
+
+    For Drivers:
+        - careers: Driver job listings
+        - join_us_driver: Driver application
+
+    Help & Support:
+        - help_center: Main help center
+        - help_guides: How-to guides
+        - faq: Frequently asked questions
+
+    SEO & Content:
+        - seo_landing: Dynamic SEO landing pages
+        - testimonials: Customer testimonials
+
+    Error Pages:
+        - error_403, error_404, error_500: Custom error handlers
+
+SEO:
+    All views include SEO metadata from core.seo.SEOMetadata
+    for optimal search engine indexing.
+
+Public Access:
+    Most views are accessible without authentication.
+    Some forms save to WhatsAppInquiry/PricingEnquiry models.
+
+Related:
+    - webpages.models: WhatsAppInquiry, PricingEnquiry
+    - webpages.forms: Contact and inquiry forms
+    - core.seo: SEOMetadata for page meta tags
+"""
+
 import logging
 import random
 from urllib.parse import quote
@@ -14,6 +66,11 @@ from fleet import models as fleet_models
 from core.seo import SEOMetadata
 
 logger = logging.getLogger('webpages')
+
+
+# =============================================================================
+# LANDING PAGES
+# =============================================================================
 
 
 def index(request):

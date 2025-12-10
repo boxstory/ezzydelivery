@@ -1,7 +1,7 @@
 /**
  * Session Timeout Monitor
  * Automatically logs out users after 1 hour of inactivity
- * Shows warning 5 minutes before logout
+ * Shows warning modal 5 minutes before logout
  */
 
 (function() {
@@ -151,7 +151,10 @@
     // Initialize
     function init() {
         // Only run on dashboard pages for authenticated users
-        if (!window.location.pathname.includes('dashboard')) {
+        if (!window.location.pathname.includes('dashboard') &&
+            !window.location.pathname.includes('workforce') &&
+            !window.location.pathname.includes('fleet') &&
+            !window.location.pathname.includes('business')) {
             return;
         }
 

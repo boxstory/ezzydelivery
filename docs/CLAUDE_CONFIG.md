@@ -657,6 +657,115 @@ user_number = request.user.profile.user_number
 
 ---
 
-**Last Updated**: 2025-11-20
-**Configuration Version**: 2.0
-**Major Update**: Added mandatory Brand Kit Reference as single source of truth for all styling
+## Code Documentation Style Rules
+
+### Module-Level Docstrings
+Add at the top of each file explaining purpose, contents, and related modules:
+
+```python
+"""
+Module Name
+===========
+
+Brief description of what this module does.
+
+Classes/Functions:
+    Category 1:
+        - item1: description
+        - item2: description
+
+    Category 2:
+        - item3: description
+
+Related:
+    - app.models: Description
+    - app.views: Description
+"""
+```
+
+### Section Headers
+Use these dividers to group related code:
+
+```python
+# =============================================================================
+# SECTION NAME
+# =============================================================================
+```
+
+### Comments Before Functions/Classes
+Add comments BEFORE each function or class (NOT docstrings inside):
+
+```python
+# -----------------------------------------------------------------------------
+# function_name: Brief description of what it does.
+# SECURITY: Any security notes (IDOR protection, authentication, etc.)
+# OPTIMIZATION: Query optimization notes (select_related, prefetch_related)
+# Template: path/to/template.html
+# Form: FormClassName (if applicable)
+# -----------------------------------------------------------------------------
+@login_required
+def function_name(request):
+    ...
+```
+
+### Form Documentation Format
+
+```python
+# =============================================================================
+# FORM NAME
+# Brief description of form purpose.
+# Used in: view_name1, view_name2
+# Template: template/path.html
+# =============================================================================
+class FormName(forms.ModelForm):
+    ...
+```
+
+### Model Documentation Format
+
+```python
+# =============================================================================
+# MODEL NAME
+# Brief description of what this model represents.
+# Related: OtherModel (FK), AnotherModel (M2M)
+# =============================================================================
+class ModelName(models.Model):
+    ...
+```
+
+### Key Information to Include
+
+**For Views:**
+- Purpose/description
+- Template path
+- Form class used
+- Security notes (authentication, IDOR protection)
+- Query optimization (select_related, prefetch_related)
+
+**For Models:**
+- Purpose/description
+- Related models and relationship types
+- Auto-generated fields
+- Validation rules
+
+**For Forms:**
+- Purpose/description
+- Views that use this form
+- Template path
+- Field validation notes
+- Excluded fields and why
+
+---
+
+## Template Naming Conventions
+
+- **Entity names:** Singular (`order_list.html` not `orders_list.html`)
+- **Mobile suffix:** `_mob` (e.g., `order_list_mob.html`)
+- **Action style:** Entity first (`order_add.html` not `add_order.html`)
+- **Parts folder:** Reusable components go in `parts/` subdirectory
+
+---
+
+**Last Updated**: 2025-12-08
+**Configuration Version**: 2.1
+**Major Update**: Added Code Documentation Style Rules for views, models, and forms

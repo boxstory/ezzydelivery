@@ -1,3 +1,39 @@
+"""
+Product Views Module
+====================
+
+This module handles product catalog management for businesses.
+
+Views:
+    Product List:
+        - product_all_list: Display all products (table view)
+        - product_all_list_card: Display all products (card view)
+
+    Product CRUD:
+        - product_single_add: Add new product
+        - product_single_update: Edit existing product
+        - product_single_delete: Delete product
+
+    Inventory:
+        - product_inventory: Display inventory management page
+
+    Categories:
+        - product_categories: Display product categories
+
+Security:
+    All views (except product_categories) require authentication.
+    IDOR protection ensures users can only access their business's products.
+
+Query Optimization:
+    Views use select_related() to prevent N+1 queries on ForeignKey fields
+    (color, unit, business, product_category).
+
+Related:
+    - product.models: Product, ProductCategory, ColorVariant, UnitVariant
+    - product.forms: AddItemsForm
+    - client.models: Business
+"""
+
 import logging
 from django.shortcuts import redirect, render
 from django.contrib.auth.decorators import login_required
@@ -10,12 +46,17 @@ from product import forms as product_forms
 
 logger = logging.getLogger('product')
 
-# Create your views here.
+
+# =============================================================================
+# PRODUCT LIST VIEWS
+# =============================================================================
 
 
-# ITEMS
-
-
+# -----------------------------------------------------------------------------
+# product_all_list: Display all products for the logged-in user's business.
+# Uses select_related to prevent N+1 queries on FK fields.
+# Template: product/product_all_list.html
+# -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
 def product_all_list(request):
     """
@@ -56,14 +97,13 @@ def product_all_list(request):
     return render(request, 'product/product_all_list.html', data)
 
 
+# -----------------------------------------------------------------------------
+# product_all_list_card: Display all products as cards (card view layout).
+# Uses select_related to prevent N+1 queries.
+# Template: product/product_all_list_card.html
+# -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
 def product_all_list_card(request):
-    """
-    Display all products as cards for the logged-in user's business.
-
-    OPTIMIZATION: Uses select_related to prevent N+1 queries.
-    Expected query reduction: 50-70%
-    """
     try:
         business = business_models.Business.objects.get(user_id=request.user.id)
         logger.info(f"User {request.user.id} accessing product card list for business {business.business_id}")
@@ -91,9 +131,14 @@ def product_all_list_card(request):
     return render(request, 'product/product_all_list_card.html', data)
 
 
+# -----------------------------------------------------------------------------
+# product_single_add: Add new product to business catalog.
+# Sets business FK automatically from logged-in user.
+# Template: product/product_single_add.html
+# Form: AddItemsForm
+# -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
 def product_single_add(request):
-    """Add a new product to the business catalog."""
     try:
         business = business_models.Business.objects.get(user_id=request.user.id)
         logger.info(f"User {request.user.id} accessing product add page for business {business.business_id}")
@@ -125,9 +170,13 @@ def product_single_add(request):
     return render(request, 'product/product_single_add.html', data)
 
 
+# -----------------------------------------------------------------------------
+# product_single_delete: Delete product from business catalog.
+# SECURITY: Verifies product belongs to user's business before deleting.
+# Template: product/product_single_delete.html
+# -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
 def product_single_delete(request, product_id):
-    """Delete a product from the business catalog."""
     try:
         # SECURITY FIX: Verify product belongs to user's business
         business = business_models.Business.objects.get(user_id=request.user.id)
@@ -148,9 +197,15 @@ def product_single_delete(request, product_id):
     return render(request, 'product/product_single_delete.html', data)
 
 
+# -----------------------------------------------------------------------------
+# product_single_update: Update existing product details.
+# SECURITY: Verifies product belongs to user's business.
+# OPTIMIZATION: Uses select_related to fetch related data.
+# Template: product/product_single_update.html
+# Form: AddItemsForm (with instance)
+# -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
 def product_single_update(request, product_id):
-    """Update an existing product."""
     try:
         business = business_models.Business.objects.get(user_id=request.user.id)
 
@@ -191,9 +246,12 @@ def product_single_update(request, product_id):
     return render(request, 'product/product_single_update.html', data)
 
 
+# -----------------------------------------------------------------------------
+# product_inventory: Display product inventory management page.
+# Template: product/product_inventory.html
+# -----------------------------------------------------------------------------
 @login_required(login_url='account_login')
 def product_inventory(request):
-    """Display product inventory page."""
     try:
         business = business_models.Business.objects.get(user_id=request.user.id)
         logger.info(f"User {request.user.id} accessing inventory for business {business.business_id}")
@@ -209,6 +267,11 @@ def product_inventory(request):
 
 
 
+# -----------------------------------------------------------------------------
+# product_categories: Display product categories page.
+# PUBLIC: Does not require authentication.
+# Template: product/product_categories.html
+# -----------------------------------------------------------------------------
 def product_categories(request):
     data = {
 

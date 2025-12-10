@@ -1,6 +1,29 @@
+"""
+Product Forms Module
+====================
+
+This module contains forms for product catalog management.
+
+Forms:
+    - AddItemsForm: Create/update products in business catalog
+
+Related:
+    - product.models: Product, ProductCategory, ColorVariant, UnitVariant
+    - product.views: product_single_add, product_single_update
+"""
+
 from django import forms
 from product import models as product_models
-# ITEMS FORM ----------------------------------------------------------------------------------------------------------------------
+
+
+# =============================================================================
+# ADD ITEMS FORM
+# Form for adding/editing products in the business catalog.
+# Excludes business field (set in view), inventory (managed separately),
+# and items_sku (auto-generated or manually set).
+# Used in: product_single_add, product_single_update views
+# Template: product/product_single_add.html, product/product_single_update.html
+# =============================================================================
 
 
 class AddItemsForm(forms.ModelForm):

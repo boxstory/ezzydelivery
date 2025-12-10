@@ -1,3 +1,53 @@
+"""
+Fleet Views Module
+==================
+
+This module handles all driver-facing operations including dashboard,
+documents, vehicles, wallet, and performance analytics.
+
+View Categories:
+    Dashboard:
+        - fleets: List all drivers (admin view)
+        - fleet_dashboard: Driver personal dashboard with wallet stats
+
+    Document Management:
+        - driver_documents: List driver's documents
+        - driver_documents_upload: Upload new document
+        - driver_documents_update: Edit document
+        - driver_documents_delete: Remove document
+
+    Vehicle Management:
+        - vehicle_own: List driver's vehicles
+        - vehicle_add: Register new vehicle
+        - vehicle_update: Edit vehicle details
+        - vehicle_delete: Remove vehicle
+
+    COD & Wallet:
+        - cod_collection: View COD collection history
+        - cod_submission: Submit COD to admin
+
+    Earnings & Finance:
+        - driver_earnings: View earnings breakdown
+        - transaction_history: Full transaction log
+
+    Analytics & Reports:
+        - driver_performance: Performance metrics dashboard
+        - driver_reports: Generate/download reports
+        - driver_analytics: Advanced visualizations
+
+    Frontend:
+        - driver_profile: Public driver profile page
+
+Security:
+    All views verify user is a registered driver.
+    IDOR protection on document and vehicle operations.
+
+Related:
+    - fleet.models: Driver, DriverDocument, DriverVehicle, etc.
+    - fleet.forms: DriverDocumentForm, DriverVehicleForm
+    - fleet.wallet_service: WalletService, WalletAlertService
+"""
+
 import logging
 from django.db import connection
 from django.shortcuts import redirect, render
@@ -13,10 +63,10 @@ from fleet.wallet_service import WalletService, WalletAlertService
 
 logger = logging.getLogger('fleet')
 
-# Create your views here.
 
-
-# dashboard---------------------------------------------------------------------------------------------------------------------
+# =============================================================================
+# DASHBOARD VIEWS
+# =============================================================================
 
 @login_required(login_url='/accounts/login/')
 def fleets(request):
