@@ -16,10 +16,10 @@ urlpatterns = [
     path('sellers/inactive/', workforce_views.sellers_inactive, name='sellers_inactive'),
 
     #Orders sections urls -------------------------------------------------------------------
-    path('orders/all/', workforce_views.all_orders, name='all_orders'),
-    path('orders/by-seller/', workforce_views.orders_by_seller, name='orders_by_seller'),
-    path('orders/to_publish/', workforce_views.orders_to_publish, name='orders_to_publish'),
-    path('orders/published/', workforce_views.orders_published, name='orders_published'),
+    path('orders/all/', workforce_views.all_orders, name='wf_orders_all'),
+    path('orders/by-seller/', workforce_views.orders_by_seller, name='wf_orders_by_seller'),
+    path('orders/to_publish/', workforce_views.orders_to_publish, name='wf_orders_to_publish'),
+    path('orders/published/', workforce_views.orders_published, name='wf_orders_published'),
     path('orders/pending-verification/', workforce_views.orders_pending_verification, name='orders_pending_verification'),
     path('orders/<int:order_id>/verify-address/', workforce_views.verify_order_address, name='verify_order_address'),
     path('orders/<int:order_id>/verify/', workforce_views.verify_order, name='verify_order'),
@@ -49,9 +49,9 @@ urlpatterns = [
     path('verification/<int:profile_id>/update-status/', workforce_views.update_verification_status, name='update_verification_status'),
 
     # Additional Orders URLs
-    path('orders/dms-updated/', workforce_views.orders_dms_updated, name='orders_dms_updated'),
+    path('orders/dms-updated/', workforce_views.orders_dms_updated, name='wf_orders_dms_updated'),
     path('orders/match-dms/', workforce_views.match_dms_task, name='match_dms_task'),
-    path('orders/reported/', workforce_views.orders_reported, name='orders_reported'),
+    path('orders/reported/', workforce_views.orders_reported, name='wf_orders_reported'),
 
     # Additional Tasks URLs
     path('tasks/followup-list/', workforce_views.tasks_followup_list, name='tasks_followup_list'),
