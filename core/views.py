@@ -458,12 +458,12 @@ def join_us(request):
 @login_required(login_url='/accounts/login/')
 def main_dashboard(request):
     """Main dashboard with verification status checking"""
+    # Check Django User is_staff FIRST - no other validations needed for staff
+    if request.user.is_staff:
+        return redirect('workforce:wf_dashboard')
+
     if core_models.Profile.objects.filter(user_id=request.user.id).exists():
         profile = core_models.Profile.objects.get(user_id=request.user.id)
-
-        # Staff users don't need verification - check this FIRST before any other checks
-        if profile.is_staff:
-            return redirect('workforce:wf_dashboard')
 
         # Check if profile is completed (only for non-staff users)
         if not profile.is_profile_completed:
@@ -539,7 +539,7 @@ def profile(request, pk):
         # Create default profile picture
         profile_picture = core_models.ProfilePicture(
             user=request.user,
-            profile_id=request.user.id,
+            profile=profile,
             profile_picture='core/user/avatar.png'
         )
         profile_picture.save()
@@ -721,16 +721,22 @@ def driverjobform(request):
 @login_required(login_url='/accounts/login/')
 def profile_complete_update(request):
     """Profile update with completion tracking and partial saves"""
-    try:
-        profile = core_models.Profile.objects.get(user_id=request.user.id)
-    except core_models.Profile.DoesNotExist:
+    # Check Django User is_staff FIRST - no other validations needed for staff
+    if request.user.is_staff:
+        return redirect('workforce:wf_dashboard')
+
+    # Use cached profile from context processor if available
+    profile = getattr(request, '_cached_profile', None)
+    if profile is None:
+        try:
+            profile = core_models.Profile.objects.select_related('user').get(user_id=request.user.id)
+            request._cached_profile = profile
+        except core_models.Profile.DoesNotExist:
+            messages.error(request, "Please create a profile first!")
+            return redirect('core:profile_add')
+    if profile is None:
         messages.error(request, "Please create a profile first!")
         return redirect('core:profile_add')
-
-    # Staff users don't need to complete profile or select role - redirect to staff dashboard
-    if profile.is_staff:
-        messages.info(request, "Welcome to the staff dashboard!")
-        return redirect('workforce:wf_dashboard')
 
     # Ensure profile username matches Django User username
     if profile.username != request.user.username:
@@ -996,3 +1002,26 @@ def driver_register(request):
         'is_update': is_update,
     }
     return render(request, 'core/driver_register.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def make_staff(request):
+    """
+    Temporary view to set current user as staff.
+    Only works for superusers. Remove after use.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, "Only superusers can access this.")
+        return redirect('core:main_dashboard')
+
+    try:
+        profile = core_models.Profile.objects.get(user_id=request.user.id)
+        profile.is_staff = True
+        profile.is_profile_completed = True
+        profile.save()
+        messages.success(request, f"Profile updated! is_staff={profile.is_staff}")
+        logger.info(f"User {request.user.id} set as staff")
+        return redirect('workforce:wf_dashboard')
+    except core_models.Profile.DoesNotExist:
+        messages.error(request, "Profile not found!")
+        return redirect('core:profile_add')

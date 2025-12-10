@@ -72,3 +72,24 @@ def htmx_request(request):
         'htmx_target': request.headers.get('HX-Target', ''),
         'htmx_trigger': request.headers.get('HX-Trigger', ''),
     }
+
+
+def user_profile(request):
+    """
+    Add user profile to template context to avoid duplicate queries.
+    Templates should use {{ user_profile }} instead of {{ user.profile }}.
+    Caches the profile on the request object for reuse by views.
+    """
+    if request.user.is_authenticated:
+        # Check if profile is already cached on request
+        if hasattr(request, '_cached_profile'):
+            return {'user_profile': request._cached_profile}
+
+        from core.models import Profile
+        try:
+            profile = Profile.objects.select_related('user').get(user_id=request.user.id)
+            request._cached_profile = profile
+            return {'user_profile': profile}
+        except Profile.DoesNotExist:
+            request._cached_profile = None
+    return {'user_profile': None}

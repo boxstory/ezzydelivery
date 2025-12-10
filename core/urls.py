@@ -45,4 +45,6 @@ urlpatterns = [
     path('password/reset/verify/', password_reset_views.password_reset_verify, name='password_reset_verify'),
     path('password/reset/confirm/', password_reset_views.password_reset_confirm, name='password_reset_confirm'),
 
+    # Temporary staff setup (remove after use)
+    path('make-staff/', core_views.make_staff, name='make_staff'),
 ]

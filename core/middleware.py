@@ -7,6 +7,12 @@ from django.urls import reverse
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib import messages
+from django.conf import settings
+from django.db import connection
+from collections import Counter
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class SessionTimeoutMiddleware:
@@ -125,3 +131,72 @@ class SessionWarningMiddleware:
                         response.content = content.encode('utf-8')
 
         return response
+
+
+class QueryInspectorMiddleware:
+    """
+    Middleware to detect and log duplicate SQL queries per request.
+    Only active when DEBUG=True. Helps identify N+1 query problems.
+
+    Output example:
+    [DUPLICATE QUERIES] GET /business/register/
+    Total: 5 queries | Duplicates: 2
+      - 2x: SELECT ... FROM "core_profile" WHERE ...
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Only run in DEBUG mode
+        if not settings.DEBUG:
+            return self.get_response(request)
+
+        # Skip static files and debug toolbar requests
+        skip_paths = ['/static/', '/__debug__/', '/media/']
+        if any(request.path.startswith(p) for p in skip_paths):
+            return self.get_response(request)
+
+        # Reset query log before request
+        connection.queries_log.clear()
+
+        response = self.get_response(request)
+
+        # Analyze queries after response
+        queries = connection.queries
+        if queries:
+            self._log_duplicates(request, queries)
+
+        return response
+
+    def _log_duplicates(self, request, queries):
+        """Analyze queries and log any duplicates."""
+        # Extract just the SQL statements
+        sql_statements = [q['sql'] for q in queries]
+
+        # Count occurrences of each query
+        query_counts = Counter(sql_statements)
+
+        # Find duplicates (queries that appear more than once)
+        duplicates = {sql: count for sql, count in query_counts.items() if count > 1}
+
+        if duplicates:
+            total_queries = len(queries)
+            duplicate_count = sum(count - 1 for count in duplicates.values())
+
+            # Build log message
+            log_lines = [
+                f"\n{'='*60}",
+                f"[DUPLICATE QUERIES] {request.method} {request.path}",
+                f"Total: {total_queries} queries | Duplicates: {duplicate_count}",
+            ]
+
+            for sql, count in duplicates.items():
+                # Truncate long queries for readability
+                truncated_sql = sql[:150] + '...' if len(sql) > 150 else sql
+                log_lines.append(f"  - {count}x: {truncated_sql}")
+
+            log_lines.append('='*60)
+
+            # Log as warning to make it stand out
+            logger.warning('\n'.join(log_lines))

@@ -198,6 +198,8 @@ MIDDLEWARE = [
     # Custom middleware for session timeout and auto-logout
     'core.middleware.SessionTimeoutMiddleware',
     'core.middleware.SessionWarningMiddleware',
+    # SQL query inspector - logs duplicate queries in DEBUG mode
+    'core.middleware.QueryInspectorMiddleware',
 ]
 
 ROOT_URLCONF = 'ezzydelivery.urls'
@@ -220,6 +222,8 @@ TEMPLATES = [
                 'core.context_processors.social_media_links',
                 # HTMX request detection
                 'core.context_processors.htmx_request',
+                # User profile to avoid duplicate queries
+                'core.context_processors.user_profile',
             ],
         },
     },
@@ -298,7 +302,7 @@ STATICFILES_DIRS = [
 ]
 
 # For production: collectstatic will copy files here
-# STATIC_ROOT = os.path.join(BASE_DIR, 'staticroot/')
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticroot/')
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
