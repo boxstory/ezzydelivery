@@ -4,86 +4,658 @@
 <!-- extra css -->
 {% block extra_css %}
 <link href="{% static 'orders/css/orders_main.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/wf_lists.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-<div class="col-md-10 col-lg-10 col-12 p-0">
+<div class="col-12 p-3">
+    <!-- Header -->
+    <div class="orders-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2><i class="fa-solid fa-clock-rotate-left me-2"></i>Incompleted Delivery Tasks</h2>
+                <p class="mb-0 opacity-75">View and manage pending delivery tasks</p>
+            </div>
+            <div class="text-end">
+                <div class="fs-3 fw-bold">{{ dl_tasks.paginator.count|default:"0" }}</div>
+                <small>Total Pending</small>
+            </div>
+        </div>
+    </div>
 
-    <table class="table table-hover  ">
-        <thead>
-            <tr>
-                <th scope="col">DL_Code</th>
-                <th scope="col">C_Code</th>
-                <th scope="col">Dms_Code</th>
-                <th scope="col">Date</th>
-                <th scope="col">Mobile</th>
-                <th scope="col">C_status</th>
-                <th scope="col">DMS_status</th>
-            </tr>
-        </thead>
-        <tbody>{% if items_page %}
-            {% for order in items_page %}
-            <tr>
-                <th scope="row" class="border-right border-bottom-0">{{ order.dl_task}}</th>
-                <td class="border-right border-bottom-0">{{ order.client_order_code }}</td>
-                <td class="border-right border-bottom-0">{{ order.customer_name }}</td>
-                <td class="border-right border-bottom-0">{{ order.customer_phone }}</td>
-                <td class="border-right border-bottom-0">{{ order.order_status }}</td>
-                <td class="border-right border-bottom-0">{{ order.dl_task.dl_task_status_dms }}</td>
-            </tr>
-            <tr>
-                <td></td>
-                <td colspan="2"><i class="fa-solid fa-location-pin" style="color: #008000;"></i>
-                    {{ order.pickup_location }}</td>
-                <td colspan="2"><i class="fa-solid fa-location-pin" style="color: #ff0000;"></i>
-                    {{ order.customer_address }}</td>
-                <td>{{ order.dl_task.dl_task_status_dms }}</td>
-            </tr> {% endfor %}
-        </tbody>
-    </table>
+    <!-- Filter Section -->
+    <div class="filter-section">
+        <div class="filter-toggle" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+            <div class="d-flex align-items-center gap-3">
+                <div>
+                    <i class="fa-solid fa-filter me-2"></i>
+                    <strong>Filter Tasks</strong>
+                </div>
+                <div id="activeFiltersCount" class="active-filters-count">
+                    <span class="badge bg-primary" id="filterCountBadge">0</span>
+                    <span class="small text-muted ms-1">active filters</span>
+                </div>
+            </div>
+            <i class="fa-solid fa-chevron-down"></i>
+        </div>
+        <div class="collapse" id="filterCollapse">
+            <form id="filterForm" method="get">
+                <div class="row g-3 mb-3">
+                    <!-- Search Filters -->
+                    <div class="col-md-6 col-lg-3">
+                        <label for="dlCode" class="form-label small fw-bold text-muted">
+                            <i class="fa-solid fa-hashtag me-1"></i>DL Code
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="fa-solid fa-search text-muted"></i>
+                            </span>
+                            <input type="text" class="form-control border-start-0 ps-0" name="dlCode" id="dlCode"
+                                   placeholder="Search DL Code..." value="{{ filters.dlCode }}"
+                                   autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label for="cCode" class="form-label small fw-bold text-muted">
+                            <i class="fa-solid fa-code me-1"></i>Client Code
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="fa-solid fa-search text-muted"></i>
+                            </span>
+                            <input type="text" class="form-control border-start-0 ps-0" name="cCode" id="cCode"
+                                   placeholder="Search Client Code..." value="{{ filters.cCode }}"
+                                   autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label for="mobile" class="form-label small fw-bold text-muted">
+                            <i class="fa-solid fa-mobile me-1"></i>Mobile Number
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="fa-solid fa-phone text-muted"></i>
+                            </span>
+                            <input type="text" class="form-control border-start-0 ps-0" name="mobile" id="mobile"
+                                   placeholder="Search Mobile..." value="{{ filters.mobile }}"
+                                   autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label for="driverName" class="form-label small fw-bold text-muted">
+                            <i class="fa-solid fa-user-tie me-1"></i>Driver Name
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="fa-solid fa-search text-muted"></i>
+                            </span>
+                            <input type="text" class="form-control border-start-0 ps-0" name="driverName" id="driverName"
+                                   placeholder="Search Driver..." value="{{ filters.driverName }}"
+                                   autocomplete="off">
+                        </div>
+                    </div>
+                </div>
 
+                <div class="row g-3">
+                    <!-- Status Filters -->
+                    <div class="col-md-6 col-lg-3">
+                        <label for="cStatus" class="form-label small fw-bold text-muted">
+                            <i class="fa-solid fa-circle-check me-1"></i>Client Status
+                        </label>
+                        <select class="form-select" name="cStatus" id="cStatus">
+                            <option value="">All Statuses</option>
+                            <option value="to_review" {% if filters.cStatus == 'to_review' %}selected{% endif %}>
+                                <i class="fa-solid fa-eye"></i> To Review
+                            </option>
+                            <option value="ready_to_pickup" {% if filters.cStatus == 'ready_to_pickup' %}selected{% endif %}>
+                                Ready to Pickup
+                            </option>
+                            <option value="publish" {% if filters.cStatus == 'publish' %}selected{% endif %}>
+                                Publish
+                            </option>
+                            <option value="cancelled" {% if filters.cStatus == 'cancelled' %}selected{% endif %}>
+                                Cancelled
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label for="dmsStatus" class="form-label small fw-bold text-muted">
+                            <i class="fa-solid fa-cloud me-1"></i>DMS Status
+                        </label>
+                        <select class="form-select" name="dmsStatus" id="dmsStatus">
+                            <option value="">All DMS Statuses</option>
+                            <option value="published" {% if filters.dmsStatus == 'published' %}selected{% endif %}>
+                                Published
+                            </option>
+                            <option value="assigned" {% if filters.dmsStatus == 'assigned' %}selected{% endif %}>
+                                Assigned
+                            </option>
+                            <option value="in_transit" {% if filters.dmsStatus == 'in_transit' %}selected{% endif %}>
+                                In Transit
+                            </option>
+                            <option value="failed" {% if filters.dmsStatus == 'failed' %}selected{% endif %}>
+                                Failed
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label for="dateFrom" class="form-label small fw-bold text-muted">
+                            <i class="fa-solid fa-calendar-days me-1"></i>Date From
+                        </label>
+                        <input type="date" class="form-control" name="dateFrom" id="dateFrom"
+                               value="{{ filters.dateFrom }}">
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label for="dateTo" class="form-label small fw-bold text-muted">
+                            <i class="fa-solid fa-calendar-days me-1"></i>Date To
+                        </label>
+                        <input type="date" class="form-control" name="dateTo" id="dateTo"
+                               value="{{ filters.dateTo }}">
+                    </div>
+                </div>
 
-    {% if items_page.has_other_pages %}
-    <ul class="pagination justify-content-center text-dark">
-        {% if items_page.has_previous %}
-        <li class="page-item pe-2">
-            <a class="page-link text-dark" href="?page={{ items_page.previous_page_number }}">Previous</a>
-        </li>
-        {% else %}
-        <li class="page-item disabled pe-2">
-            <a class="page-link text-dark" href="#">Previous</a>
-        </li>
-        {% endif %}
+                <!-- Action Buttons -->
+                <div class="row g-2 mt-3 pt-3 border-top">
+                    <div class="col-12">
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="submit" class="btn btn-dark px-4">
+                                <i class="fa fa-search me-2"></i>Apply Filters
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary px-4" id="clearFilter">
+                                <i class="fa fa-times me-2"></i>Clear All
+                            </button>
+                            <div class="ms-auto d-flex align-items-center gap-2">
+                                <span class="text-muted small">Quick Filters:</span>
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('today')">
+                                    Today
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('pending')">
+                                    Pending
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('in_transit')">
+                                    In Transit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-        {% for page_number in items_page.paginator.page_range %}
-        {% if items_page.number == page_number %}
-        <li class="page-item  btn btn-outline-dark active me-2">
-            {{ page_number }}
+                <!-- Active Filters Display -->
+                <div id="activeFilterTags" class="active-filter-tags mt-3">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="small fw-bold text-muted">Active Filters:</span>
+                        <div id="filterTagsContainer" class="d-flex gap-2 flex-wrap"></div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        </li>
+    <!-- Tasks List -->
+    {% if dl_tasks %}
+    <div class="tasks-list">
+        {% for dl in dl_tasks %}
+        <div class="task-card">
+            <!-- Task Header -->
+            <div class="task-header">
+                <div>
+                    <div class="task-id">
+                        <i class="fa-solid fa-hashtag me-1"></i>{{ dl.dl_task_number }}
+                    </div>
+                    <small class="text-muted">
+                        <i class="fa-solid fa-calendar me-1"></i>{{ dl.dl_task_date|default:"N/A" }}
+                    </small>
+                </div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    {% if dl.dl_task_status_client %}
+                    <span class="status-badge status-{{ dl.dl_task_status_client }}">
+                        {{ dl.dl_task_status_client|title }}
+                    </span>
+                    {% endif %}
+                    {% if dl.dl_task_status_dms %}
+                    <span class="status-badge status-{{ dl.dl_task_status_dms }}">
+                        DMS: {{ dl.dl_task_status_dms|title }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
 
-        {% else %}
-        <li class="page-item me-2"><a class="page-link text-dark" href="?page={{ page_number }}">
-                {{ page_number }}
-            </a>
-        </li>
-        {% endif %}
+            <!-- Task Details Grid -->
+            <div class="task-details">
+                <div class="detail-item">
+                    <div class="detail-label">Customer Name</div>
+                    <div class="detail-value">
+                        <i class="fa-solid fa-user me-1 text-muted"></i>{{ dl.order.customer_name|default:"N/A" }}
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Mobile</div>
+                    <div class="detail-value">
+                        <i class="fa-solid fa-phone me-1 text-muted"></i>{{ dl.order.customer_phone|default:"N/A" }}
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Order Status</div>
+                    <div class="detail-value">
+                        <i class="fa-solid fa-info-circle me-1 text-muted"></i>{{ dl.order_status|default:"N/A" }}
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">DMS Task Number</div>
+                    <div class="detail-value">
+                        <i class="fa-solid fa-code me-1 text-muted"></i>{{ dl.dl_task_number_dms|default:"N/A" }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location Section -->
+            <div class="location-section d-flex justify-content-between">
+                <div class="location-item">
+                    <i class="fa-solid fa-location-dot location-icon text-success"></i>
+                    <div class="location-text">
+                        <strong class="d-block mb-1">Pickup Location</strong>
+                        {{ dl.pickup_location|default:"N/A" }}
+                    </div>
+                </div>
+                {% if dl.order.customer_address %}
+                <div class="location-item">
+                    <i class="fa-solid fa-location-dot location-icon text-danger"></i>
+                    <div class="location-text">
+                        <strong class="d-block mb-1">Delivery Address</strong>
+                        {{ dl.order.customer_address }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Driver Info -->
+            {% if dl.driver %}
+            <div class="driver-info">
+                <div>
+                    <i class="fa-solid fa-user-tie me-2 text-primary"></i>
+                    <strong>Driver:</strong> {{ dl.driver }}
+                </div>
+                <span class="badge bg-primary">Assigned</span>
+            </div>
+            {% endif %}
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <div class="row g-2">
+                    <!-- Contact Customer -->
+                    <div class="col-md-6 col-lg-3">
+                        <a href="https://wa.me/{{ dl.order.customer_phone }}?text=Hello {{ dl.order.customer_name }}, this is regarding delivery task {{ dl.dl_task_number }}"
+                           target="_blank" class="btn btn-success btn-sm w-100">
+                            <i class="fa-brands fa-whatsapp me-1"></i>Contact Customer
+                        </a>
+                    </div>
+
+                    <!-- Publish to DMS -->
+                    <div class="col-md-6 col-lg-3">
+                        {% if dl.dl_task_publish %}
+                        <button class="btn btn-success btn-sm w-100" disabled>
+                            <i class="fa-solid fa-check-circle me-1"></i>Published to DMS
+                        </button>
+                        {% else %}
+                        <button class="btn btn-primary btn-sm w-100" onclick="publishToDMS({{ dl.id }})">
+                            <i class="fa-solid fa-cloud-arrow-up me-1"></i>Publish to DMS
+                        </button>
+                        {% endif %}
+                    </div>
+
+                    <!-- Publish to Driver App -->
+                    <div class="col-md-6 col-lg-3">
+                        {% if dl.dl_task_status_dms == '6' or dl.dl_task_status_dms == '0' or dl.dl_task_status_dms == '7' %}
+                        <button class="btn btn-success btn-sm w-100" disabled>
+                            <i class="fa-solid fa-check-circle me-1"></i>In Driver App
+                        </button>
+                        {% else %}
+                        <button class="btn btn-info btn-sm w-100" onclick="publishToDriverApp({{ dl.id }})">
+                            <i class="fa-solid fa-mobile-screen me-1"></i>Publish to App
+                        </button>
+                        {% endif %}
+                    </div>
+
+                    <!-- Update Status -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="dropdown w-100">
+                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle w-100" type="button"
+                                    id="statusDropdown{{ dl.id }}" data-bs-toggle="dropdown">
+                                <i class="fa-solid fa-sync me-1"></i>Update Status
+                            </button>
+                            <ul class="dropdown-menu" aria-labelledby="statusDropdown{{ dl.id }}">
+                                <li><a class="dropdown-item" href="#" onclick="updateTaskStatus({{ dl.id }}, 'pending')">
+                                    <i class="fa-solid fa-clock me-2 text-warning"></i>Pending
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" onclick="updateTaskStatus({{ dl.id }}, 'in_transit')">
+                                    <i class="fa-solid fa-truck me-2 text-info"></i>In Transit
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" onclick="updateTaskStatus({{ dl.id }}, 'delivered')">
+                                    <i class="fa-solid fa-check-circle me-2 text-success"></i>Delivered
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" onclick="updateTaskStatus({{ dl.id }}, 'rejected')">
+                                    <i class="fa-solid fa-times-circle me-2 text-danger"></i>Rejected
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" onclick="updateTaskStatus({{ dl.id }}, 'cancelled')">
+                                    <i class="fa-solid fa-ban me-2 text-danger"></i>Cancelled
+                                </a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Section -->
+            <div class="action-section">
+                <a href="#" class="btn btn-dark">
+                    <i class="fa-solid fa-eye me-2"></i>View Details
+                </a>
+            </div>
+        </div>
         {% endfor %}
+    </div>
 
-        {% if items_page.has_next %}
-        <li class="page-item pe-2"><a class="page-link text-dark"
-                href="?page={{ items_page.next_page_number }}">Next</a>
-        </li> {% endif %}
-    </ul>
+    <!-- Pagination -->
+    {% if dl_tasks.has_other_pages %}
+    <nav aria-label="Tasks pagination">
+        <ul class="pagination justify-content-center">
+            {% if dl_tasks.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ dl_tasks.previous_page_number }}&dlCode={{ filters.dlCode }}&cCode={{ filters.cCode }}&mobile={{ filters.mobile }}&cStatus={{ filters.cStatus }}&dmsStatus={{ filters.dmsStatus }}">
+                    <i class="fa-solid fa-chevron-left"></i> Previous
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link"><i class="fa-solid fa-chevron-left"></i> Previous</span>
+            </li>
+            {% endif %}
+
+            {% for page_number in dl_tasks.paginator.page_range %}
+            {% if dl_tasks.number == page_number %}
+            <li class="page-item active">
+                <span class="page-link">{{ page_number }}</span>
+            </li>
+            {% else %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_number }}&dlCode={{ filters.dlCode }}&cCode={{ filters.cCode }}&mobile={{ filters.mobile }}&cStatus={{ filters.cStatus }}&dmsStatus={{ filters.dmsStatus }}">{{ page_number }}</a>
+            </li>
+            {% endif %}
+            {% endfor %}
+
+            {% if dl_tasks.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ dl_tasks.next_page_number }}&dlCode={{ filters.dlCode }}&cCode={{ filters.cCode }}&mobile={{ filters.mobile }}&cStatus={{ filters.cStatus }}&dmsStatus={{ filters.dmsStatus }}">
+                    Next <i class="fa-solid fa-chevron-right"></i>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">Next <i class="fa-solid fa-chevron-right"></i></span>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
     {% endif %}
     {% else %}
-    <p>No items found.</p>
+    <!-- Empty State -->
+    <div class="text-center py-5">
+        <div class="mb-4">
+            <i class="fa-solid fa-inbox fa-4x text-muted opacity-50"></i>
+        </div>
+        <h4 class="text-muted mb-3">No Incompleted Tasks Found</h4>
+        <p class="text-muted mb-4">
+            {% if filters.dlCode or filters.cCode or filters.mobile or filters.cStatus or filters.dmsStatus %}
+            No tasks match your current filters. Try adjusting your search criteria.
+            {% else %}
+            All delivery tasks are completed. Great job!
+            {% endif %}
+        </p>
+        {% if filters.dlCode or filters.cCode or filters.mobile or filters.cStatus or filters.dmsStatus %}
+        <button type="button" class="btn btn-primary" id="clearFilterEmpty">
+            <i class="fa fa-times me-2"></i>Clear All Filters
+        </button>
+        {% endif %}
+    </div>
     {% endif %}
-
-
-
 </div>
 {% endblock content %}
+
 {% block extra_js %}
 <script type="text/javascript" language="JavaScript" charset="UTF-8"
-    src="{%static 'orders/js/orders_main.js' %}"></script>
+    src="{% static 'orders/js/orders_main.js' %}"></script>
+<script>
+    // Filter toggle animation
+    const filterToggle = document.querySelector('.filter-toggle');
+    const filterCollapse = document.getElementById('filterCollapse');
+
+    if (filterToggle && filterCollapse) {
+        filterCollapse.addEventListener('show.bs.collapse', function() {
+            filterToggle.classList.add('active');
+        });
+        filterCollapse.addEventListener('hide.bs.collapse', function() {
+            filterToggle.classList.remove('active');
+        });
+    }
+
+    // Clear filter functionality
+    function clearAllFilters() {
+        document.getElementById('dlCode').value = '';
+        document.getElementById('cCode').value = '';
+        document.getElementById('mobile').value = '';
+        document.getElementById('driverName').value = '';
+        document.getElementById('cStatus').value = '';
+        document.getElementById('dmsStatus').value = '';
+        document.getElementById('dateFrom').value = '';
+        document.getElementById('dateTo').value = '';
+        window.location.href = window.location.pathname;
+    }
+
+    document.getElementById('clearFilter').addEventListener('click', clearAllFilters);
+
+    // Clear filter from empty state
+    const clearFilterEmpty = document.getElementById('clearFilterEmpty');
+    if (clearFilterEmpty) {
+        clearFilterEmpty.addEventListener('click', clearAllFilters);
+    }
+
+    // Submit form on Enter key for input fields
+    const filterInputs = document.querySelectorAll('#filterForm input');
+    filterInputs.forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('filterForm').submit();
+            }
+        });
+    });
+
+    // Count and display active filters
+    function updateActiveFiltersDisplay() {
+        const filters = {
+            'dlCode': document.getElementById('dlCode').value,
+            'cCode': document.getElementById('cCode').value,
+            'mobile': document.getElementById('mobile').value,
+            'driverName': document.getElementById('driverName').value,
+            'cStatus': document.getElementById('cStatus').value,
+            'dmsStatus': document.getElementById('dmsStatus').value,
+            'dateFrom': document.getElementById('dateFrom').value,
+            'dateTo': document.getElementById('dateTo').value
+        };
+
+        const activeFilters = Object.entries(filters).filter(([key, value]) => value !== '');
+        const filterCount = activeFilters.length;
+
+        // Update count badge
+        const countDisplay = document.getElementById('activeFiltersCount');
+        const countBadge = document.getElementById('filterCountBadge');
+        if (filterCount > 0) {
+            countDisplay.classList.add('show');
+            countBadge.textContent = filterCount;
+        } else {
+            countDisplay.classList.remove('show');
+        }
+
+        // Update filter tags
+        const tagsContainer = document.getElementById('filterTagsContainer');
+        const tagsDisplay = document.getElementById('activeFilterTags');
+
+        if (filterCount > 0) {
+            tagsDisplay.classList.add('show');
+            tagsContainer.innerHTML = '';
+
+            const filterLabels = {
+                'dlCode': 'DL Code',
+                'cCode': 'Client Code',
+                'mobile': 'Mobile',
+                'driverName': 'Driver',
+                'cStatus': 'Client Status',
+                'dmsStatus': 'DMS Status',
+                'dateFrom': 'From',
+                'dateTo': 'To'
+            };
+
+            activeFilters.forEach(([key, value]) => {
+                const tag = document.createElement('span');
+                tag.className = 'filter-tag';
+                tag.innerHTML = `
+                    <strong>${filterLabels[key]}:</strong> ${value}
+                    <button type="button" class="btn-close btn-close-sm ms-1"
+                            onclick="removeFilter('${key}')" title="Remove filter"></button>
+                `;
+                tagsContainer.appendChild(tag);
+            });
+        } else {
+            tagsDisplay.classList.remove('show');
+        }
+    }
+
+    // Remove individual filter
+    function removeFilter(filterKey) {
+        document.getElementById(filterKey).value = '';
+        document.getElementById('filterForm').submit();
+    }
+
+    // Quick filter functions
+    function quickFilter(type) {
+        clearAllFilters();
+
+        switch(type) {
+            case 'today':
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('dateFrom').value = today;
+                document.getElementById('dateTo').value = today;
+                break;
+            case 'pending':
+                document.getElementById('cStatus').value = 'to_review';
+                break;
+            case 'in_transit':
+                document.getElementById('dmsStatus').value = 'in_transit';
+                break;
+        }
+
+        document.getElementById('filterForm').submit();
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        updateActiveFiltersDisplay();
+    });
+
+    // Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // Publish to DMS
+    function publishToDMS(taskId) {
+        if (confirm('Publish this task to the Delivery Management System?')) {
+            fetch(`/workforce/delivery-task/${taskId}/publish-dms/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Task published to DMS successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to publish to DMS'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while publishing to DMS');
+            });
+        }
+    }
+
+    // Publish to Driver App
+    function publishToDriverApp(taskId) {
+        if (confirm('Publish this task to the Driver Mobile App?')) {
+            fetch(`/workforce/delivery-task/${taskId}/publish-driver-app/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Task published to Driver App successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to publish to Driver App'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while publishing to Driver App');
+            });
+        }
+    }
+
+    // Update Task Status
+    function updateTaskStatus(taskId, status) {
+        event.preventDefault();
+        if (confirm(`Update task status to "${status.replace('_', ' ')}"?`)) {
+            fetch(`/workforce/delivery-task/${taskId}/update-status/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({ status: status })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Task status updated successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to update status'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while updating status');
+            });
+        }
+    }
+</script>
 {% endblock extra_js %}

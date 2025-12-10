@@ -1,0 +1,163 @@
+/* ===============================
+   PROFILE SIDEBAR STYLES - Core App
+   Minimal CSS - Using Bootstrap Classes
+   =============================== */
+
+/* Main Profile Card - Bootstrap card with custom shadow */
+#core_dashboard_sidebar_profile_card {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07), 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+#core_dashboard_sidebar_profile_card:hover {
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1), 0 20px 30px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+}
+
+/* Profile Picture - Simple size control */
+.profile-picture-wrapper img {
+    width: 140px;
+    height: 140px;
+    object-fit: cover;
+}
+
+/* Status Item - Vertical layout with left border accent */
+.status-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--brand-primary);
+    transform: scaleY(0);
+    transition: transform 0.3s ease;
+}
+
+.status-item:hover::before {
+    transform: scaleY(1);
+}
+
+/* Hide icons in role badges */
+.role-badge i {
+    display: none;
+}
+
+/* Social icon hover effects */
+.social-icon.whatsapp:hover {
+    background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+    color: white;
+    border-color: #25d366;
+}
+
+.social-icon.instagram:hover {
+    background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+    color: white;
+    border-color: #bc1888;
+}
+
+/* Progress Bar - Custom styling for completion percentage */
+.progress {
+    background-color: var(--brand-grey-200);
+    overflow: hidden;
+}
+
+.progress-bar {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    transition: width 0.6s ease;
+}
+
+/* Responsive Media Queries for Profile Sidebar */
+@media (max-width: 991px) {
+    /* On tablet and mobile, sidebar appears above content */
+    #core_dashboard_sidebar_profile_card {
+        margin-bottom: 1.5rem;
+    }
+
+    /* Reduce padding on smaller screens */
+    #core_dashboard_sidebar_profile_card .card-body {
+        padding: 1.5rem !important;
+    }
+
+    /* Make buttons more compact */
+    #core_dashboard_sidebar_profile_card .btn {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 767px) {
+    /* Mobile - Optimize for smaller screens */
+    .profile-picture-wrapper img {
+        width: 100px;
+        height: 100px;
+    }
+
+    .profile-picture-wrapper .position-absolute {
+        width: 35px !important;
+        height: 35px !important;
+    }
+
+    /* Reduce card padding on mobile */
+    #core_dashboard_sidebar_profile_card .card-body {
+        padding: 1rem !important;
+    }
+
+    /* Stack role badges on mobile */
+    #core_dashboard_sidebar_profile_card .text-center {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .role-badge {
+        display: block;
+        width: 100%;
+        padding: 0.5rem !important;
+    }
+
+    /* Smaller status items */
+    .status-item {
+        padding: 0.75rem !important;
+    }
+
+    /* Compact social icons */
+    .social-icon {
+        width: 45px !important;
+        height: 45px !important;
+    }
+}
+
+@media (max-width: 575px) {
+    /* Extra small devices */
+    .profile-picture-wrapper img {
+        width: 80px;
+        height: 80px;
+    }
+
+    .profile-picture-wrapper .position-absolute {
+        width: 30px !important;
+        height: 30px !important;
+    }
+
+    #core_dashboard_sidebar_profile_card .card-body {
+        padding: 0.75rem !important;
+    }
+
+    /* Smaller font sizes */
+    #core_dashboard_sidebar_profile_card h5 {
+        font-size: 1.1rem;
+    }
+
+    #core_dashboard_sidebar_profile_card h6 {
+        font-size: 0.85rem;
+    }
+
+    /* Full width buttons with less text */
+    #core_dashboard_sidebar_profile_card .btn span {
+        font-size: 0.85rem;
+    }
+
+    #core_dashboard_sidebar_profile_card .btn i {
+        font-size: 0.9rem;
+    }
+}

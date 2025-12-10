@@ -1,0 +1,306 @@
+/* ===============================
+   FORM IMPROVEMENTS - Brand-Styled Form Elements
+   Custom Radio Buttons, Checkboxes, and Selections
+   =============================== */
+
+/* ===== RADIO BUTTON IMPROVEMENTS ===== */
+
+/* Custom Radio Buttons with Brand Colors */
+.form-check-input[type="radio"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid var(--brand-grey-400);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.form-check-input[type="radio"]:hover {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(255, 211, 59, 0.1);
+}
+
+.form-check-input[type="radio"]:checked {
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='%23000'/%3e%3c/svg%3e");
+}
+
+.form-check-input[type="radio"]:focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 4px rgba(255, 211, 59, 0.2);
+}
+
+/* ===== CHECKBOX IMPROVEMENTS ===== */
+
+/* Custom Checkboxes with Brand Colors */
+.form-check-input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid var(--brand-grey-400);
+    border-radius: var(--brand-radius-sm);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.form-check-input[type="checkbox"]:hover {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(255, 211, 59, 0.1);
+}
+
+.form-check-input[type="checkbox"]:checked {
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+}
+
+.form-check-input[type="checkbox"]:focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 4px rgba(255, 211, 59, 0.2);
+}
+
+/* Form Check Label Improvements */
+.form-check-label {
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--brand-grey-700);
+    transition: color 0.3s ease;
+    user-select: none;
+}
+
+.form-check-label:hover {
+    color: var(--brand-grey-900);
+}
+
+.form-check-input:checked ~ .form-check-label {
+    color: var(--brand-grey-900);
+    font-weight: 600;
+}
+
+/* ===== BUTTON-STYLED RADIO/CHECKBOX (btn-check) ===== */
+
+/* Button Check - Radio Button Styled as Button */
+.btn-check:checked + .btn-outline-dark,
+.btn-check:checked + .btn-outline-primary,
+.btn-check:checked + .btn-outline-secondary {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+    border-color: var(--brand-primary);
+    color: var(--brand-grey-800);
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(255, 211, 59, 0.3);
+}
+
+.btn-check + .btn-outline-dark:hover,
+.btn-check + .btn-outline-primary:hover,
+.btn-check + .btn-outline-secondary:hover {
+    border-color: var(--brand-primary);
+    color: var(--brand-primary);
+    background-color: rgba(255, 211, 59, 0.05);
+}
+
+/* ===== ENHANCED FORM CHECK CONTAINERS ===== */
+
+/* Card-style Form Check Option */
+.form-check-card {
+    position: relative;
+    padding: 1rem 1.25rem;
+    border: 2px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-md);
+    background: var(--brand-white);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    margin-bottom: 0.75rem;
+}
+
+.form-check-card:hover {
+    border-color: var(--brand-primary);
+    background: rgba(255, 211, 59, 0.03);
+    box-shadow: 0 2px 8px rgba(255, 211, 59, 0.15);
+}
+
+.form-check-card .form-check-input {
+    margin-top: 0.25rem;
+}
+
+/* Active state for card when input is checked */
+.form-check-card:has(.form-check-input:checked) {
+    border-color: var(--brand-primary);
+    background: linear-gradient(135deg, rgba(255, 211, 59, 0.08) 0%, rgba(255, 211, 59, 0.03) 100%);
+    box-shadow: 0 4px 12px rgba(255, 211, 59, 0.2);
+}
+
+/* Add left border accent when checked */
+.form-check-card:has(.form-check-input:checked)::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--brand-primary);
+    border-radius: var(--brand-radius-md) 0 0 var(--brand-radius-md);
+}
+
+/* ===== ICON-BASED RADIO SELECTIONS ===== */
+
+/* Icon Radio Button Container */
+.icon-radio-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.icon-radio-option {
+    position: relative;
+}
+
+.icon-radio-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.icon-radio-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    border: 2px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-lg);
+    background: var(--brand-white);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    min-height: 140px;
+}
+
+.icon-radio-label:hover {
+    border-color: var(--brand-primary);
+    background: rgba(255, 211, 59, 0.03);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 211, 59, 0.15);
+}
+
+.icon-radio-option input[type="radio"]:checked ~ .icon-radio-label {
+    border-color: var(--brand-primary);
+    border-width: 3px;
+    background: linear-gradient(135deg, rgba(255, 211, 59, 0.1) 0%, rgba(255, 211, 59, 0.05) 100%);
+    box-shadow: 0 6px 20px rgba(255, 211, 59, 0.25);
+}
+
+.icon-radio-icon {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--brand-grey-100);
+    transition: all 0.3s ease;
+}
+
+.icon-radio-icon i {
+    font-size: 1.75rem;
+    color: var(--brand-grey-600);
+    transition: color 0.3s ease;
+}
+
+.icon-radio-option input[type="radio"]:checked ~ .icon-radio-label .icon-radio-icon {
+    background: var(--brand-primary);
+    transform: scale(1.1);
+}
+
+.icon-radio-option input[type="radio"]:checked ~ .icon-radio-label .icon-radio-icon i {
+    color: var(--brand-grey-800);
+}
+
+.icon-radio-title {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--brand-grey-800);
+    margin-bottom: 0.25rem;
+}
+
+.icon-radio-description {
+    font-size: 0.875rem;
+    color: var(--brand-grey-600);
+    line-height: 1.4;
+}
+
+/* ===== SELECT DROPDOWN IMPROVEMENTS ===== */
+
+.form-select {
+    border: 2px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm);
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    font-size: 1rem;
+    color: var(--brand-grey-800);
+    background-color: var(--brand-white);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.form-select:hover {
+    border-color: var(--brand-grey-400);
+}
+
+.form-select:focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 4px rgba(255, 211, 59, 0.15);
+    outline: none;
+}
+
+/* ===== FORM SWITCH IMPROVEMENTS ===== */
+
+.form-switch .form-check-input {
+    width: 2rem;
+    height: 1.5rem;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba(0,0,0,0.25)'/%3e%3c/svg%3e");
+    background-color: var(--brand-grey-300);
+    border: 2px solid var(--brand-grey-400);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.form-switch .form-check-input:hover {
+    background-color: var(--brand-grey-400);
+}
+
+.form-switch .form-check-input:checked {
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23000'/%3e%3c/svg%3e");
+}
+
+.form-switch .form-check-input:focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 4px rgba(255, 211, 59, 0.2);
+}
+
+/* ===== RESPONSIVE ADJUSTMENTS ===== */
+
+@media (max-width: 768px) {
+    .icon-radio-container {
+        grid-template-columns: 1fr;
+    }
+
+    .icon-radio-label {
+        flex-direction: row;
+        text-align: left;
+        padding: 1rem;
+        min-height: auto;
+    }
+
+    .icon-radio-icon {
+        width: 50px;
+        height: 50px;
+        margin-bottom: 0;
+        margin-right: 1rem;
+    }
+
+    .icon-radio-icon i {
+        font-size: 1.5rem;
+    }
+}

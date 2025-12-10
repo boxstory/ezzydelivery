@@ -1,0 +1,326 @@
+/* ========================================
+   PRODUCT APP STYLES
+   Custom styles for the product application
+   Uses variables from brand-kit.css
+   ======================================== */
+
+/* ========================================
+   1. PRODUCT CATALOG
+   ======================================== */
+
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: var(--spacing-lg, 1.5rem);
+    margin-bottom: var(--spacing-xl, 2rem);
+}
+
+.product-card {
+    background: var(--bg-primary, #fff);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--radius-lg, 0.5rem);
+    overflow: hidden;
+    transition: all var(--transition-base, 0.2s) ease;
+    cursor: pointer;
+}
+
+.product-card:hover {
+    border-color: var(--brand-primary, #ffde00);
+    box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
+    transform: translateY(-4px);
+}
+
+.product-image-container {
+    position: relative;
+    width: 100%;
+    padding-top: 100%; /* 1:1 Aspect Ratio */
+    overflow: hidden;
+    background: var(--bg-secondary, #f9fafb);
+}
+
+.product-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform var(--transition-base, 0.2s) ease;
+}
+
+.product-card:hover .product-image {
+    transform: scale(1.05);
+}
+
+.product-badge {
+    position: absolute;
+    top: var(--spacing-sm, 0.5rem);
+    right: var(--spacing-sm, 0.5rem);
+    padding: 0.25rem 0.75rem;
+    background: var(--status-error, #ff6b6b);
+    color: var(--color-white, #fff);
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: var(--radius-md, 0.375rem);
+    text-transform: uppercase;
+}
+
+.product-badge.new {
+    background: var(--status-success, #38ef7d);
+}
+
+.product-badge.sale {
+    background: var(--status-error, #ff6b6b);
+}
+
+.product-info {
+    padding: var(--spacing-md, 1rem);
+}
+
+.product-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary, #1f2937);
+    margin-bottom: var(--spacing-xs, 0.25rem);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.product-sku {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+    margin-bottom: var(--spacing-sm, 0.5rem);
+}
+
+.product-price {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm, 0.5rem);
+    margin-bottom: var(--spacing-sm, 0.5rem);
+}
+
+.product-price-current {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--brand-secondary, #667eea);
+}
+
+.product-price-original {
+    font-size: 1rem;
+    color: var(--text-secondary, #6b7280);
+    text-decoration: line-through;
+}
+
+.product-stock {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.product-stock.in-stock {
+    color: var(--status-success, #38ef7d);
+}
+
+.product-stock.low-stock {
+    color: var(--status-warning, #ffde00);
+}
+
+.product-stock.out-of-stock {
+    color: var(--status-error, #ff6b6b);
+}
+
+/* ========================================
+   2. PRODUCT DETAILS
+   ======================================== */
+
+.product-details-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-xl, 2rem);
+    margin-bottom: var(--spacing-xl, 2rem);
+}
+
+.product-gallery {
+    position: sticky;
+    top: var(--spacing-lg, 1.5rem);
+}
+
+.product-main-image {
+    width: 100%;
+    border-radius: var(--radius-lg, 0.5rem);
+    margin-bottom: var(--spacing-md, 1rem);
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
+}
+
+.product-thumbnails {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-sm, 0.5rem);
+}
+
+.product-thumbnail {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: var(--radius-md, 0.375rem);
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all var(--transition-base, 0.2s) ease;
+}
+
+.product-thumbnail:hover,
+.product-thumbnail.active {
+    border-color: var(--brand-primary, #ffde00);
+}
+
+.product-details-info {
+    /* Sticky on desktop */
+}
+
+.product-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary, #1f2937);
+    margin-bottom: var(--spacing-sm, 0.5rem);
+}
+
+.product-rating {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm, 0.5rem);
+    margin-bottom: var(--spacing-md, 1rem);
+}
+
+.product-stars {
+    color: var(--brand-primary, #ffde00);
+}
+
+.product-reviews-count {
+    font-size: 0.875rem;
+    color: var(--text-secondary, #6b7280);
+}
+
+.product-description {
+    line-height: 1.6;
+    color: var(--text-secondary, #6b7280);
+    margin-bottom: var(--spacing-lg, 1.5rem);
+}
+
+.product-meta {
+    display: grid;
+    gap: var(--spacing-sm, 0.5rem);
+    margin-bottom: var(--spacing-lg, 1.5rem);
+    padding: var(--spacing-md, 1rem);
+    background: var(--bg-secondary, #f9fafb);
+    border-radius: var(--radius-md, 0.375rem);
+}
+
+.product-meta-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+}
+
+.product-meta-label {
+    color: var(--text-secondary, #6b7280);
+}
+
+.product-meta-value {
+    font-weight: 600;
+    color: var(--text-primary, #1f2937);
+}
+
+/* ========================================
+   3. PRODUCT FORM
+   ======================================== */
+
+.product-form-section {
+    background: var(--bg-primary, #fff);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--radius-lg, 0.5rem);
+    padding: var(--spacing-lg, 1.5rem);
+    margin-bottom: var(--spacing-lg, 1.5rem);
+}
+
+.product-form-section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: var(--spacing-md, 1rem);
+    color: var(--text-primary, #1f2937);
+}
+
+/* ========================================
+   4. PRODUCT VARIANTS
+   ======================================== */
+
+.product-variants {
+    margin-bottom: var(--spacing-lg, 1.5rem);
+}
+
+.product-variant-group {
+    margin-bottom: var(--spacing-md, 1rem);
+}
+
+.product-variant-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary, #1f2937);
+    margin-bottom: var(--spacing-sm, 0.5rem);
+}
+
+.product-variant-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm, 0.5rem);
+}
+
+.product-variant-option {
+    padding: 0.5rem 1rem;
+    border: 2px solid var(--border-color, #e5e7eb);
+    border-radius: var(--radius-md, 0.375rem);
+    background: var(--bg-primary, #fff);
+    cursor: pointer;
+    transition: all var(--transition-base, 0.2s) ease;
+}
+
+.product-variant-option:hover {
+    border-color: var(--brand-secondary, #667eea);
+}
+
+.product-variant-option.active {
+    border-color: var(--brand-primary, #ffde00);
+    background: var(--brand-primary-light, #fff4b3);
+}
+
+.product-variant-option.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ========================================
+   5. RESPONSIVE ADJUSTMENTS
+   ======================================== */
+
+@media (max-width: 768px) {
+    .product-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: var(--spacing-md, 1rem);
+    }
+
+    .product-details-container {
+        grid-template-columns: 1fr;
+    }
+
+    .product-gallery {
+        position: static;
+    }
+
+    .product-title {
+        font-size: 1.5rem;
+    }
+}

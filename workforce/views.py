@@ -136,8 +136,10 @@ def wf_dashboard(request):
 def all_orders(request):
     from django.db.models import Count
 
-    # Start with all orders
-    orders = orders_models.Order.objects.all()
+    # Start with all orders, prefetch related data to avoid N+1 queries
+    orders = orders_models.Order.objects.select_related(
+        'business', 'delivery_task'
+    ).prefetch_related('order_comments')
 
     # Apply filters based on GET parameters
     dl_code = request.GET.get('dlCode', '').strip()
@@ -232,8 +234,9 @@ def orders_by_seller(request):
 
 @login_required(login_url='/accounts/login/')
 def orders_to_publish(request):
-    #orders = orders_models.Order.objects.filter(task_created = False).order_by('-created_at')
-    orders = orders_models.Order.objects.filter(task_created = False).order_by('-created_at')
+    orders = orders_models.Order.objects.select_related(
+        'business', 'delivery_task'
+    ).prefetch_related('order_comments').filter(task_created=False).order_by('-created_at')
     orders = paginate_queryset(request, orders)
 
     data = {
@@ -244,8 +247,9 @@ def orders_to_publish(request):
 
 @login_required(login_url='/accounts/login/')
 def orders_published(request):
-    #orders = orders_models.Order.objects.filter(task_created = False).order_by('-created_at')
-    orders = orders_models.Order.objects.filter(task_created = True).order_by('-created_at')
+    orders = orders_models.Order.objects.select_related(
+        'business', 'delivery_task'
+    ).prefetch_related('order_comments').filter(task_created=True).order_by('-created_at')
     orders = paginate_queryset(request, orders)
 
     data = {
@@ -426,8 +430,10 @@ def verify_order(request, order_id):
 def orders_pending_verification(request):
     """List orders pending verification"""
     verification_status = request.GET.get('verification_status', 'pending')
-    
-    orders = orders_models.Order.objects.filter(verification_status=verification_status).order_by('-created_at')
+
+    orders = orders_models.Order.objects.select_related(
+        'business', 'delivery_task'
+    ).prefetch_related('order_comments').filter(verification_status=verification_status).order_by('-created_at')
     orders = paginate_queryset(request, orders)
     
     data = {
@@ -459,11 +465,14 @@ def dl_list_all(request):
 
 @login_required(login_url='/accounts/login/')
 def dl_list_incompleted_details(request):
-    orders  = orders_models.Order.objects.all().order_by('-created_at')
-    orders = paginate_queryset(request, orders)
+    # Get incomplete delivery tasks (not delivered, not cancelled)
+    dl_tasks = delivery_models.DeliveryTask.objects.exclude(
+        dl_task_status_dms__in=['delivered', 'cancelled']
+    ).order_by('-created_at')
+    dl_tasks = paginate_queryset(request, dl_tasks)
 
     data = {
-        'orders': orders,
+        'dl_tasks': dl_tasks,
     }
     return render(request, 'workforce/parts/lists/dl_list_incompleted.html', data)
 
@@ -913,48 +922,39 @@ def update_task_status(request, task_id):
 def user_verification_list(request):
     """Staff view to see all users pending verification"""
     from core import models as core_models
-    from django.db.models import Q
+    from client import models as business_models
 
     # Get all profiles based on filter
     verification_filter = request.GET.get('status', 'all')
 
-    if verification_filter == 'pending':
-        profiles = core_models.Profile.objects.filter(verification_status='pending')
-    elif verification_filter == 'verified':
-        profiles = core_models.Profile.objects.filter(verification_status='verified')
-    elif verification_filter == 'rejected':
-        profiles = core_models.Profile.objects.filter(verification_status='rejected')
-    elif verification_filter == 'incomplete':
-        profiles = core_models.Profile.objects.filter(verification_status='incomplete')
-    else:
-        profiles = core_models.Profile.objects.all()
+    profiles = core_models.Profile.objects.select_related('user')
+    if verification_filter in ('pending', 'verified', 'rejected', 'incomplete'):
+        profiles = profiles.filter(verification_status=verification_filter)
 
     # Order by application date (most recent first)
     profiles = profiles.order_by('-verification_applied_at', '-created_at')
 
-    # Get additional data for each profile
+    # Prefetch related Business and Driver data to avoid N+1 queries
+    profile_list = list(profiles)
+    user_ids = [p.user_id for p in profile_list]
+
+    # Bulk fetch businesses and drivers
+    businesses_by_user = {
+        b.user_id: b for b in business_models.Business.objects.filter(user_id__in=user_ids)
+    }
+    drivers_by_user = {
+        d.user_id: d for d in fleet_models.Driver.objects.filter(user_id__in=user_ids)
+    }
+
+    # Build verification data efficiently
     verification_data = []
-    for profile in profiles:
+    for profile in profile_list:
         data = {
             'profile': profile,
-            'business': None,
-            'driver': None,
+            'business': businesses_by_user.get(profile.user_id) if profile.is_business else None,
+            'driver': drivers_by_user.get(profile.user_id) if profile.is_driver else None,
             'user': profile.user,
         }
-
-        if profile.is_business:
-            try:
-                from client import models as business_models
-                data['business'] = business_models.Business.objects.get(user=profile.user)
-            except:
-                pass
-
-        if profile.is_driver:
-            try:
-                data['driver'] = fleet_models.Driver.objects.get(user=profile.user)
-            except:
-                pass
-
         verification_data.append(data)
 
     context = {
@@ -1819,16 +1819,21 @@ def sellers_list(request):
     # Order by most recent
     businesses = businesses.order_by('-business_since', '-business_id')
 
+    # Count statistics using single aggregation query
+    from django.db.models import Count, Q as DQ
+    stats = business_models.Business.objects.aggregate(
+        total=Count('business_id'),
+        active=Count('business_id', filter=DQ(business_status='active')),
+        pending=Count('business_id', filter=DQ(profile__verification_status='pending')),
+        inactive=Count('business_id', filter=DQ(business_status='inactive')),
+    )
+    total_sellers = stats['total']
+    active_sellers = stats['active']
+    pending_sellers = stats['pending']
+    inactive_sellers = stats['inactive']
+
     # Paginate
     page_obj = paginate_queryset(request, businesses, items_per_page=20)
-
-    # Count statistics
-    total_sellers = business_models.Business.objects.count()
-    active_sellers = business_models.Business.objects.filter(business_status='active').count()
-    pending_sellers = business_models.Business.objects.filter(
-        profile__verification_status='pending'
-    ).count()
-    inactive_sellers = business_models.Business.objects.filter(business_status='inactive').count()
 
     context = {
         'page_title': 'All Sellers',
