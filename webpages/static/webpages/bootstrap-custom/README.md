@@ -117,7 +117,7 @@ After any changes to the custom build:
 2. Test all major pages:
    - Homepage (`/`)
    - Business dashboard (`/dashboard/`)
-   - Client portal
+   - Business portal
    - Fleet dashboard
    - Workforce dashboard
 3. Verify Bootstrap JavaScript components still work:
@@ -162,7 +162,7 @@ The custom build was created based on analysis of 50+ templates:
 
 **Top files with Bootstrap usage:**
 1. `templates/includes/navbar.html` - Heavy navbar/dropdown usage
-2. `client/templates/client/frontend/business_profile.html` - 6+ modals
+2. `business/templates/business/frontend/business_profile.html` - 6+ modals
 3. `templates/dashboard_base.html` - Dashboard layout
 4. `webpages/templates/webpages/index.html` - Homepage components
 5. `delivery/templates/delivery/frontend/dl_address_link.html` - Forms

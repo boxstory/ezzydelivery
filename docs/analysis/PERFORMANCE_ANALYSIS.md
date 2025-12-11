@@ -115,7 +115,7 @@ class Driver(models.Model):
             models.Index(fields=['user']),  # User lookup
         ]
 
-# client/models.py - Business model
+# business/models.py - Business model
 class Business(models.Model):
     class Meta:
         indexes = [

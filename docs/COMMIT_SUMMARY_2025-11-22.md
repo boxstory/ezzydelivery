@@ -240,7 +240,7 @@ python scripts/replace_colors.py --path . --ext .html --execute
 ### Code References
 - Brand Kit Variables: `webpages/static/webpages/css/brand-kit.css`
 - Bootstrap Overrides: `static/webpages/css/brand-kit-overrides.css`
-- Example Usage: `client/static/client/css/client_dashboard.css`
+- Example Usage: `business/static/business/css/client_dashboard.css`
 
 ---
 

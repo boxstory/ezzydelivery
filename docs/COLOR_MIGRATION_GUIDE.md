@@ -243,7 +243,7 @@ This means Bootstrap utility classes like `.bg-primary`, `.text-primary`, `.btn-
 - `webpages/static/webpages/css/base.css` - Core base styles
 - `templates/account/login.html` - Login page styles
 - `templates/account/signup.html` - Signup page styles
-- `client/static/client/css/client_dashboard.css` - Already using brandkit
+- `business/static/business/css/client_dashboard.css` - Already using brandkit
 - `workforce/static/workforce/css/wf_dashboard.css` - Already using brandkit
 - `fleet/static/fleet/css/fleet_dashboard.css` - Already using brandkit
 - `core/static/core/css/profile-sidebar.css` - Already using brandkit

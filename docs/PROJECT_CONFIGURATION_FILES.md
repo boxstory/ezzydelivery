@@ -238,7 +238,7 @@ AI **SHOULD** read these (not excluded):
 When working with AI assistants:
 1. Ask: "What files can you see in this project?"
 2. Verify it doesn't list `venv/`, `migrations/`, `static/`
-3. Verify it CAN see your app code: `client/`, `orders/`, etc.
+3. Verify it CAN see your app code: `business/`, `orders/`, etc.
 
 ---
 

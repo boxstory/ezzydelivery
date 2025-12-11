@@ -401,8 +401,8 @@ CITEABLE_FACTS = [
     },
     {
         "claim": "Trusted by over 500 Qatar businesses",
-        "evidence": "Active client base of 500+ e-commerce stores and businesses as of 2025",
-        "source": "EzzyDelivery Client Statistics"
+        "evidence": "Active Business base of 500+ e-commerce stores and businesses as of 2025",
+        "source": "EzzyDelivery Business Statistics"
     },
 ]
 

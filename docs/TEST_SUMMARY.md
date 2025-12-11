@@ -1,7 +1,7 @@
 # EzzyDelivery Test Suite - Comprehensive Summary
 
 ## Overview
-This document summarizes the comprehensive test suite created for the EzzyDelivery project, covering critical functionality across orders, delivery tasks, client management, and API endpoints.
+This document summarizes the comprehensive test suite created for the EzzyDelivery project, covering critical functionality across orders, delivery tasks, business management, and API endpoints.
 
 ## Test Files Created
 
@@ -86,9 +86,9 @@ This document summarizes the comprehensive test suite created for the EzzyDelive
 
 ---
 
-### 3. Client Tests (To be implemented - recommended structure)
+### 3. Business Tests (To be implemented - recommended structure)
 
-**File:** `client/tests.py`
+**File:** `business/tests.py`
 
 #### Recommended Test Classes:
 
@@ -234,7 +234,7 @@ python manage.py test orders.tests.OrderModelTestCase.test_order_creation
 - ✅ Pricing and category
 - ⚠️ Missing: DMS push actual integration (mocked), webhook callbacks
 
-#### Client App: ~20% (Not yet implemented)
+#### Business App: ~20% (Not yet implemented)
 - ⚠️ Business profile management
 - ⚠️ API settings validation
 - ⚠️ Pickup location management
@@ -417,7 +417,7 @@ DeliveryTask.objects.create(
 |-----------|--------------|---------------|---------------|
 | Orders | 24 tests | 783 lines | ~70% |
 | Delivery | 18 tests | 737 lines | ~65% |
-| Client | 0 tests (recommended) | 0 lines | ~0% |
+| Business | 0 tests (recommended) | 0 lines | ~0% |
 | API | 0 tests (recommended) | 0 lines | ~0% |
 | **Total** | **42 tests** | **1,520 lines** | **~35% overall** |
 
@@ -426,7 +426,7 @@ DeliveryTask.objects.create(
 |-----------|-------------|-------------|---------------|
 | Orders | 24 tests | 783 lines | ~70% |
 | Delivery | 18 tests | 737 lines | ~65% |
-| Client | 15 tests (est.) | 300 lines | ~60% |
+| Business | 15 tests (est.) | 300 lines | ~60% |
 | API | 35 tests (est.) | 800 lines | ~65% |
 | Integration | 10 tests (est.) | 400 lines | N/A |
 | **Total** | **102 tests** | **3,020 lines** | **~65% overall** |
@@ -435,7 +435,7 @@ DeliveryTask.objects.create(
 
 ## Next Steps
 
-1. **Implement Client Tests** (Priority: High)
+1. **Implement Business Tests** (Priority: High)
    - Business model tests
    - API settings validation
    - Pickup location tests
@@ -513,7 +513,7 @@ The test suite provides solid coverage of critical order and delivery functional
 - ✅ Mocking patterns established
 
 **Remaining Work:**
-- ⚠️ Client app tests needed
+- ⚠️ Business app tests needed
 - ⚠️ API endpoint tests needed
 - ⚠️ Security tests needed
 - ⚠️ Integration tests needed

@@ -93,7 +93,7 @@ Registered the new context processor in Django settings:
 
 ### Important Fixes
 
-#### 5. **client/templates/client/workflow_guide.html** ✅ FIXED
+#### 5. **business/templates/business/workflow_guide.html** ✅ FIXED
 **Line:** 199
 **Issue:** Contact support button linked to `href="#"`
 **Fix:**
@@ -105,7 +105,7 @@ Registered the new context processor in Django settings:
 <a href="{{ CONTACT_LINKS.support }}" class="btn btn-outline-primary" id="client_workflow_btn_contact_support">
 ```
 
-#### 6. **client/templates/client/parts/business_settings_api_add.html** ✅ FIXED
+#### 6. **business/templates/business/parts/business_settings_api_add.html** ✅ FIXED
 **Line:** 14
 **Issue:** Back button with `href="#"`
 **Fix:**

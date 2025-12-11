@@ -16,14 +16,14 @@ Successfully migrated inline `<style>` tags from HTML templates to external CSS 
 ### 1. CLIENT APP ✅ FULLY COMPLETED (3 files)
 
 **CSS Files Created:**
-- `client/static/client/css/workflow-guide.css` - Workflow guide styles
-- `client/static/client/css/api-settings.css` - API settings page styles
-- `client/static/client/css/business-profile-frontend.css` - Public business profile view styles
+- `business/static/business/css/workflow-guide.css` - Workflow guide styles
+- `business/static/business/css/api-settings.css` - API settings page styles
+- `business/static/business/css/business-profile-frontend.css` - Public business profile view styles
 
 **HTML Files Migrated:**
-1. ✅ `client/templates/client/workflow_guide.html` - 63 lines of CSS removed
-2. ✅ `client/templates/client/parts/business_settings_api_list.html` - 130 lines of CSS removed
-3. ✅ `client/templates/client/frontend/business_profile.html` - 311 lines of CSS removed
+1. ✅ `business/templates/business/workflow_guide.html` - 63 lines of CSS removed
+2. ✅ `business/templates/business/parts/business_settings_api_list.html` - 130 lines of CSS removed
+3. ✅ `business/templates/business/frontend/business_profile.html` - 311 lines of CSS removed
 
 **Total**: 504 lines of inline CSS externalized
 
@@ -300,9 +300,9 @@ After completing the migration:
 
 ### CSS Files Created (13 files):
 
-1. `client/static/client/css/workflow-guide.css`
-2. `client/static/client/css/api-settings.css`
-3. `client/static/client/css/business-profile-frontend.css`
+1. `business/static/business/css/workflow-guide.css`
+2. `business/static/business/css/api-settings.css`
+3. `business/static/business/css/business-profile-frontend.css`
 4. `core/static/core/css/profile.css`
 5. `core/static/core/css/profile-complete.css`
 6. `core/static/core/css/driver-register.css`
@@ -318,9 +318,9 @@ After completing the migration:
 ### HTML Files Migrated (19 files):
 
 **Client App:**
-1. `client/templates/client/workflow_guide.html`
-2. `client/templates/client/parts/business_settings_api_list.html`
-3. `client/templates/client/frontend/business_profile.html`
+1. `business/templates/business/workflow_guide.html`
+2. `business/templates/business/parts/business_settings_api_list.html`
+3. `business/templates/business/frontend/business_profile.html`
 
 **Core App:**
 4. `core/templates/core/profile.html`

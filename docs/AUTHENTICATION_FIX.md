@@ -33,7 +33,7 @@ Added `@login_required(login_url='/accounts/login/')` decorator to all dashboard
 10. **dl_list_published_to_dms** (Line 377) - Lists tasks published to DMS
 11. **dl_list_ready_to_published_to_dms** (Line 388) - Lists tasks ready to publish
 
-### Client Views (15 views) - [client/views.py](../client/views.py)
+### Business Views (15 views) - [business/views.py](../business/views.py)
 
 1. **business_profile** (Line 295) - Business profile view
 2. **business_profile_display** (Line 324) - Display business profile by ID
@@ -142,7 +142,7 @@ def view_name(request):
 ## Files Modified
 
 1. `workforce/views.py` - Added 11 decorators
-2. `client/views.py` - Added 15 decorators
+2. `business/views.py` - Added 15 decorators
 3. `fleet/views.py` - Added 9 decorators
 
 **Total:** 35 views protected

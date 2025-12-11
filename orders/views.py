@@ -65,7 +65,7 @@ from decouple import config
 
 from core import models as core_models
 from orders import forms, models as orders_models
-from client import models as business_models
+from business import models as business_models
 from orders import forms as orders_forms
 
 from django.core.paginator import (
@@ -395,7 +395,7 @@ def bulk_order_entry(request):
 
     if not pickup_locations.exists():
         messages.warning(request, "Please add a pickup location first.")
-        return redirect('client:pickup_location_add')
+        return redirect('business:pickup_location_add')
 
     if request.method == 'POST':
         # Process bulk order data
@@ -501,7 +501,7 @@ def add_order(request):
     print('pickup_locations : ', pickup_locations)
     if not pickup_locations:
         print("pickup_locations is None")
-        return redirect('client:pickup_location_add')
+        return redirect('business:pickup_location_add')
     else:
         if request.method == 'POST':
             print("POST form in views")

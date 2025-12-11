@@ -38,7 +38,7 @@ Transaction Types:
 
 Related:
     - delivery.models.DeliveryTask: Tasks assigned to drivers
-    - client.models.DriverDirectory: Business-driver associations
+    - business.models.DriverDirectory: Business-driver associations
     - fleet.wallet_service: Business logic for wallet operations
 """
 

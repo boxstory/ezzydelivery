@@ -786,7 +786,7 @@ class DeliveryProof(models.Model):
 ### Phase 1: Foundation (Week 1-2)
 - [ ] Project setup and architecture
 - [ ] Authentication implementation
-- [ ] API client setup
+- [ ] API business setup
 - [ ] Secure storage implementation
 - [ ] Basic navigation structure
 
@@ -824,7 +824,7 @@ class DeliveryProof(models.Model):
 
 ### Unit Tests
 - Authentication logic
-- API client methods
+- API business methods
 - Data models
 - Utility functions
 

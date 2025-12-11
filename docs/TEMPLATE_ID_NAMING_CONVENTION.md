@@ -83,7 +83,7 @@ This document defines the standardized naming convention for all HTML element ID
 <div id="core_profile_sidebar_main">
 ```
 
-### Client App (`client_`)
+### Business App (`client_`)
 ```html
 <!-- Business Dashboard -->
 <div id="client_dashboard_header">

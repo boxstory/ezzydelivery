@@ -103,7 +103,7 @@ class Careers(models.Model):
 
 class PricingEnquiry(models.Model):
     """
-    Detailed pricing inquiry from potential business clients.
+    Detailed pricing inquiry from potential business stores.
 
     Multi-step form capturing comprehensive business information
     to provide customized delivery pricing quotes.

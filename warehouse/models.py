@@ -26,7 +26,7 @@ Models:
 Related:
     - product.models.Product: Products stored in warehouse
     - orders.models.Order: Orders that reserve/consume inventory
-    - client.models.Business: Business that owns the warehouse
+    - business.models.Business: Business that owns the warehouse
 """
 
 import uuid
@@ -34,7 +34,7 @@ import logging
 from django.db import models
 from django.conf import settings
 
-from client import models as client_models
+from business import models as business_models
 from product import models as product_models
 
 logger = logging.getLogger('warehouse')
@@ -113,7 +113,7 @@ ALERT_STATUS_CHOICES = [
 
 class Warehouse(models.Model):
     business = models.ForeignKey(
-        client_models.Business,
+        business_models.Business,
         on_delete=models.CASCADE,
         related_name='warehouses',
         db_index=True
@@ -121,7 +121,7 @@ class Warehouse(models.Model):
     name = models.CharField(max_length=200)
     code = models.CharField(max_length=50, unique=True, db_index=True)
     pickup_location = models.ForeignKey(
-        client_models.PickupLocation,
+        business_models.PickupLocation,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

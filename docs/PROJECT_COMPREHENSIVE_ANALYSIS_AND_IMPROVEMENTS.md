@@ -73,7 +73,7 @@ docs/
 - **Technology Stack:** Django 4.2+, DRF, Celery (planned), Redis (planned)
 
 **Integration Points Documented:**
-- Client ↔ Orders (business management)
+- Business ↔ Orders (business management)
 - Orders ↔ Delivery (task creation)
 - Delivery ↔ Fleet (driver assignment)
 - All Apps ↔ ezzy_api (unified API layer)
@@ -241,7 +241,7 @@ docs/
 |-----------|-------|-------|----------|
 | Orders | 24 tests | 783 lines | ~70% |
 | Delivery | 18 tests | 737 lines | ~65% |
-| Client | 15 tests | 446 lines | ~60% |
+| Business | 15 tests | 446 lines | ~60% |
 | **Total** | **57 tests** | **1,966 lines** | **~65%** |
 
 **✅ Critical Workflows Tested:**

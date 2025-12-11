@@ -49,7 +49,7 @@ This document tracks the implementation of unique IDs across all Django template
 ### Phase 1: Critical User-Facing Pages (High Priority)
 1. **Dashboards** - Most frequently used pages
    - `workforce/templates/workforce/wf_base_dashboard.html`
-   - `client/templates/client/business_dashboard.html`
+   - `business/templates/business/business_dashboard.html`
    - `fleet/templates/fleet/fleet_dashboard.html`
    - `core/templates/core/main_dashboard.html`
 
@@ -62,7 +62,7 @@ This document tracks the implementation of unique IDs across all Django template
 3. **Forms & Add Pages** - User input pages
    - `orders/templates/orders/add_order.html`
    - `product/templates/product/product_single_add.html`
-   - `client/templates/client/business_profile_update.html`
+   - `business/templates/business/business_profile_update.html`
 
 ### Phase 2: Secondary Pages (Medium Priority)
 4. **Detail Pages**
@@ -72,7 +72,7 @@ This document tracks the implementation of unique IDs across all Django template
 
 5. **Sidebar & Navigation**
    - `workforce/templates/workforce/parts/dashboard_sidebar_workforce.html` ✅
-   - `client/templates/client/parts/dashboard_sidebar_client.html`
+   - `business/templates/business/parts/dashboard_sidebar_client.html`
    - `fleet/templates/fleet/parts/dashboard_sidebar_fleet.html`
 
 ### Phase 3: Supporting Pages (Low Priority)
@@ -232,9 +232,9 @@ python scripts/add_template_ids.py --template workforce/templates/workforce/orde
 3. ⏳ `workforce/templates/workforce/all_orders.html`
 4. ⏳ `workforce/templates/workforce/dl_list_all.html`
 
-#### Client App - High Priority
-5. ⏳ `client/templates/client/business_dashboard.html`
-6. ⏳ `client/templates/client/business_profile.html`
+#### Business App - High Priority
+5. ⏳ `business/templates/business/business_dashboard.html`
+6. ⏳ `business/templates/business/business_profile.html`
 
 #### Fleet App - High Priority
 7. ⏳ `fleet/templates/fleet/fleet_dashboard.html`
@@ -293,7 +293,7 @@ Last Updated: 2025-11-16
 | App | Templates | Elements | Completed | Progress |
 |-----|-----------|----------|-----------|----------|
 | Workforce | 34 | 306 | 1 | 3% |
-| Client | 23 | 247 | 0 | 0% |
+| Business | 23 | 247 | 0 | 0% |
 | Core | 21 | 111 | 0 | 0% |
 | Fleet | 16 | 96 | 0 | 0% |
 | Orders | 21 | 54 | 0 | 0% |
@@ -314,7 +314,7 @@ Last Updated: 2025-11-16
 ## Next Steps
 
 1. Continue with high-priority workforce templates
-2. Move to client dashboard
+2. Move to business dashboard
 3. Update fleet templates
 4. Complete orders app
 5. Finish remaining apps

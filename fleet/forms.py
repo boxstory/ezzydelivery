@@ -6,7 +6,7 @@ from django.contrib.admin import widgets
 from django.forms import ModelForm
 from core import models as core_models
 from fleet import models as fleet_models
-from client import models as business_models
+from business import models as business_models
 
 # DRIVER FORM ---------------------------------------------------------------------------------------------------------------------
 

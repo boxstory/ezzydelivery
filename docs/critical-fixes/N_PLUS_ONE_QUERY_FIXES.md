@@ -10,7 +10,7 @@
 ## 📊 Executive Summary
 
 ### Current State
-- **Total QuerySet Operations:** ~98 across orders, delivery, client apps
+- **Total QuerySet Operations:** ~98 across orders, delivery, business apps
 - **Using select_related/prefetch_related:** Only 2 (2% optimization!)
 - **N+1 Problems Identified:** 10+ critical views
 - **Performance Impact:** Page loads taking 2.5-4 seconds
@@ -85,11 +85,11 @@ orders = orders_models.Order.objects.filter(
 | orders_successfull_list | orders/views.py:92 | ~100-150 | 3-5 | 1.5-2s | 🔴 CRITICAL |
 | all_delivery_tasks | delivery/views.py:82 | ~80-120 | 2-4 | 1-1.5s | 🔴 CRITICAL |
 | assigned_tasks | delivery/views.py:121 | ~50-80 | 2-4 | 0.8-1s | 🔴 CRITICAL |
-| business_order_list | client/views.py:* | ~100-150 | 3-5 | 1.5-2s | 🟡 HIGH |
+| business_order_list | business/views.py:* | ~100-150 | 3-5 | 1.5-2s | 🟡 HIGH |
 | order_details | orders/views.py:* | ~30-50 | 2-3 | 0.5-0.8s | 🟡 HIGH |
 | delivery_task_details | delivery/views.py:* | ~25-40 | 2-3 | 0.4-0.6s | 🟡 HIGH |
 | driver_list | fleet/views.py:* | ~40-60 | 2-3 | 0.6-0.9s | 🟢 MEDIUM |
-| business_dashboard | client/views.py:* | ~60-90 | 3-5 | 0.9-1.2s | 🟢 MEDIUM |
+| business_dashboard | business/views.py:* | ~60-90 | 3-5 | 0.9-1.2s | 🟢 MEDIUM |
 
 ---
 
@@ -692,7 +692,7 @@ def test_view(request):
   - [ ] Commit
 
 #### Day 3: Remaining Views (3 hours)
-- [ ] Fix business order list views in client/views.py
+- [ ] Fix business order list views in business/views.py
 - [ ] Fix order details view
 - [ ] Fix delivery task details view
 - [ ] Fix driver list view

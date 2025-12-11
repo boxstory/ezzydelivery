@@ -39,7 +39,7 @@ Transformed the delivery tasks list from a basic HTML table to a modern card-bas
    - Added chevron rotation animation on collapse/expand
 
 4. **Status Badge System**
-   - Color-coded status indicators for both client and DMS statuses
+   - Color-coded status indicators for both business and DMS statuses
    - Pill-shaped badges with uppercase text
    - Distinct colors for each status type:
      - To Review: Yellow (#fff3cd)

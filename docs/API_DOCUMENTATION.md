@@ -363,7 +363,7 @@ APIs for business operations and management.
 
 **Query Parameters:**
 - `status` (optional): Filter by order status
-- `search` (optional): Search by order number or client name
+- `search` (optional): Search by order number or Business name
 - `limit` (optional): Number of results (default: 50)
 - `offset` (optional): Pagination offset (default: 0)
 

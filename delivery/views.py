@@ -51,7 +51,7 @@ import json
 
 from core import models as core_models
 from fleet import models as fleet_models
-from client import models as business_models
+from business import models as business_models
 from delivery import models as delivery_models
 from orders import models as order_models
 

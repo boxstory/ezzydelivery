@@ -20,7 +20,7 @@
 | File | Print Count | Priority | Estimated Time |
 |------|-------------|----------|----------------|
 | [orders/views.py](../../orders/views.py) | 83 | 🔴 CRITICAL | 3 hours |
-| [client/views.py](../../client/views.py) | 76 | 🔴 CRITICAL | 2.5 hours |
+| [business/views.py](../../business/views.py) | 76 | 🔴 CRITICAL | 2.5 hours |
 | [core/views.py](../../core/views.py) | 54 | 🔴 HIGH | 2 hours |
 | [fleet/views.py](../../fleet/views.py) | 25 | 🟡 MEDIUM | 1 hour |
 | [delivery/views.py](../../delivery/views.py) | 20 | 🟡 MEDIUM | 1 hour |
@@ -185,7 +185,7 @@ LOGGING = {
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
-        'client': {
+        'business': {
             'handlers': ['console', 'file_error'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
@@ -224,7 +224,7 @@ logger = logging.getLogger(__name__)
 - `orders/models.py` → `logger = logging.getLogger('orders')`
 - `orders/signals.py` → `logger = logging.getLogger('orders')`
 - `delivery/views.py` → `logger = logging.getLogger('delivery')`
-- `client/views.py` → `logger = logging.getLogger('client')`
+- `business/views.py` → `logger = logging.getLogger('business')`
 - `fleet/views.py` → `logger = logging.getLogger('fleet')`
 - `fleet/signals.py` → `logger = logging.getLogger('fleet')`
 - `ezzy_api/views.py` → `logger = logging.getLogger('ezzy_api')`
@@ -441,7 +441,7 @@ def main():
     # Files with print statements (from grep results)
     files = [
         'orders/views.py',      # 83 prints
-        'client/views.py',      # 76 prints
+        'business/views.py',      # 76 prints
         'core/views.py',        # 54 prints
         'fleet/views.py',       # 25 prints
         'delivery/views.py',    # 20 prints
@@ -519,7 +519,7 @@ python scripts/replace_print_with_logging.py --commit
 - [ ] `orders/views.py` - Add `logger = logging.getLogger('orders')`
 - [ ] `orders/models.py` - Add `logger = logging.getLogger('orders')`
 - [ ] `orders/signals.py` - Add `logger = logging.getLogger('orders')`
-- [ ] `client/views.py` - Add `logger = logging.getLogger('client')`
+- [ ] `business/views.py` - Add `logger = logging.getLogger('business')`
 - [ ] `delivery/views.py` - Add `logger = logging.getLogger('delivery')`
 - [ ] `fleet/views.py` - Add `logger = logging.getLogger('fleet')`
 - [ ] `fleet/signals.py` - Add `logger = logging.getLogger('fleet')`
@@ -541,7 +541,7 @@ python scripts/replace_print_with_logging.py --commit
   - [ ] Test critical order workflows
   - [ ] Commit: "refactor(orders): Replace print statements with logging"
 
-- [ ] **Day 2** - `client/views.py` (76 prints, 2.5 hours)
+- [ ] **Day 2** - `business/views.py` (76 prints, 2.5 hours)
   - [ ] Run conversion script
   - [ ] Manual review
   - [ ] Test business/client workflows
@@ -590,7 +590,7 @@ python scripts/replace_print_with_logging.py --commit
 - [ ] Check log file rotation works (max 10MB per file)
 - [ ] Verify no print statements remain:
   ```bash
-  grep -r "^\s*print(" --include="*.py" orders/ client/ delivery/ fleet/ core/ product/ ezzy_api/ webpages/
+  grep -r "^\s*print(" --include="*.py" orders/ business/ delivery/ fleet/ core/ product/ ezzy_api/ webpages/
   ```
 - [ ] Run tests: `python manage.py test`
 - [ ] Check for any broken functionality
@@ -604,7 +604,7 @@ python scripts/replace_print_with_logging.py --commit
 ### Phase 6: Final Verification (30 min)
 - [ ] Code quality check:
   ```bash
-  flake8 orders/ client/ delivery/ --count --select=E9,F63,F7,F82 --show-source --statistics
+  flake8 orders/ business/ delivery/ --count --select=E9,F63,F7,F82 --show-source --statistics
   ```
 - [ ] Security check:
   ```bash
@@ -721,7 +721,7 @@ logger.info("User clicked export button", extra={'user_id': user.id, 'action': '
 | Logging Setup | ⏳ Pending | - | - |
 | Logger Imports | ⏳ Pending | - | - |
 | orders/views.py | ⏳ Pending | - | 83 prints to convert |
-| client/views.py | ⏳ Pending | - | 76 prints to convert |
+| business/views.py | ⏳ Pending | - | 76 prints to convert |
 | core/views.py | ⏳ Pending | - | 54 prints to convert |
 | fleet/views.py | ⏳ Pending | - | 25 prints to convert |
 | delivery/views.py | ⏳ Pending | - | 20 prints to convert |

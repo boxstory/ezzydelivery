@@ -78,7 +78,7 @@ INSTALLED_APPS = [
     # Local Apps
     'core',
     'webpages',
-    'client',
+    'business',
     'product',
     'fleet',
     'delivery',

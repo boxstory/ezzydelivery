@@ -55,8 +55,8 @@ def add_logging_import(lines, file_path):
         logger_name = 'orders'
     elif 'delivery/' in str(file_path):
         logger_name = 'delivery'
-    elif 'client/' in str(file_path):
-        logger_name = 'client'
+    elif 'business/' in str(file_path):
+        logger_name = 'business'
     elif 'fleet/' in str(file_path):
         logger_name = 'fleet'
     elif 'ezzy_api/' in str(file_path):
@@ -199,7 +199,7 @@ def main():
     # Files with print statements (from grep results)
     default_files = [
         'orders/views.py',      # 83 prints
-        'client/views.py',      # 76 prints
+        'business/views.py',    # 76 prints
         'core/views.py',        # 54 prints
         'fleet/views.py',       # 25 prints
         'delivery/views.py',    # 20 prints

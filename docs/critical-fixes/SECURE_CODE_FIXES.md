@@ -371,7 +371,7 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        'client': {
+        'business': {
             'handlers': ['file', 'console'],
             'level': 'INFO',
             'propagate': False,
@@ -436,7 +436,7 @@ def order_update(request, order_id):
 - Line ~490: `add_order_product`
 - Line ~540: `update_order_product`
 
-**client/views.py:**
+**business/views.py:**
 - All views that access Business/PickupLocation/ApiSettings by ID
 
 **delivery/views.py:**
@@ -510,7 +510,7 @@ logger.debug(f"Brands list: {brands}")
 
 ```bash
 # Find all print statements
-grep -n "print(" --include="*.py" -r orders/ client/ delivery/ > print_statements.txt
+grep -n "print(" --include="*.py" -r orders/ business/ delivery/ > print_statements.txt
 
 # Count them
 grep -c "print(" --include="*.py" -r .
@@ -565,7 +565,7 @@ class DeliveryTask(models.Model):
         ]
 ```
 
-### File: `client/models.py`
+### File: `business/models.py`
 
 **ADD THESE INDEXES:**
 

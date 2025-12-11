@@ -11,7 +11,7 @@ Models:
 
 Dependencies:
     - Django auth system (User model)
-    - Used by: client, fleet, workforce, orders apps
+    - Used by: business, fleet, workforce, orders apps
 """
 
 from django.conf import settings
@@ -49,9 +49,9 @@ class Profile(models.Model):
         >>> profile.save()
 
     Related Models:
-        - Business (client app): profile.business_set
+        - Business (business app): profile.business_set
         - Driver (fleet app): profile.driver
-        - BusinessTeamProfile (client app): profile.businessteam
+        - BusinessTeamProfile (business app): profile.businessteam
     """
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')

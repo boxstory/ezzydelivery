@@ -1,7 +1,7 @@
 from django.contrib.sitemaps import Sitemap
 from django.urls import reverse
 from webpages import models as webpage_models
-from client import models as client_models
+from business import models as business_models
 from fleet import models as fleet_models
 from django.utils import timezone
 
@@ -22,7 +22,7 @@ class BusinessSitemap(Sitemap):
 
     def items(self):
         # Return only active businesses to be included in the sitemap
-        return client_models.Business.objects.filter(business_status='active')
+        return business_models.Business.objects.filter(business_status='active')
 
     def lastmod(self, obj):
         return obj.updated_at

@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 
 from warehouse import models as warehouse_models
-from client import models as client_models
+from business import models as business_models
 from product import models as product_models
 
 logger = logging.getLogger('warehouse')
@@ -17,8 +17,8 @@ logger = logging.getLogger('warehouse')
 def get_user_business(request):
     """Helper to get business for current user"""
     try:
-        return client_models.Business.objects.get(user_id=request.user.id)
-    except client_models.Business.DoesNotExist:
+        return business_models.Business.objects.get(user_id=request.user.id)
+    except business_models.Business.DoesNotExist:
         return None
 
 
@@ -32,7 +32,7 @@ def dashboard(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     # Get warehouses for this business
     warehouses = warehouse_models.Warehouse.objects.filter(
@@ -89,7 +89,7 @@ def inventory_list(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     # Filters
     warehouse_id = request.GET.get('warehouse')
@@ -140,7 +140,7 @@ def stock_card(request, product_id):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     product = get_object_or_404(product_models.Product, pk=product_id, business=business)
 
@@ -166,7 +166,7 @@ def transaction_list(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     transactions = warehouse_models.InventoryTransaction.objects.filter(
         warehouse__business=business
@@ -210,7 +210,7 @@ def receive_stock(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     if request.method == 'POST':
         # Handle stock receipt
@@ -294,7 +294,7 @@ def pick_list_list(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     pick_lists = warehouse_models.PickList.objects.filter(
         warehouse__business=business
@@ -323,7 +323,7 @@ def create_pick_list(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     # Placeholder - implement wave picking logic
     messages.info(request, "Pick list creation coming soon")
@@ -336,7 +336,7 @@ def pick_list_detail(request, pk):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     pick_list = get_object_or_404(
         warehouse_models.PickList,
@@ -388,7 +388,7 @@ def cycle_count_list(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     cycle_counts = warehouse_models.CycleCount.objects.filter(
         warehouse__business=business
@@ -416,7 +416,7 @@ def create_cycle_count(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     # Placeholder
     messages.info(request, "Cycle count creation coming soon")
@@ -429,7 +429,7 @@ def cycle_count_detail(request, pk):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     cycle_count = get_object_or_404(
         warehouse_models.CycleCount,
@@ -458,7 +458,7 @@ def low_stock_alerts(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     alerts = warehouse_models.LowStockAlert.objects.filter(
         warehouse__business=business
@@ -513,7 +513,7 @@ def warehouse_list(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     warehouses = warehouse_models.Warehouse.objects.filter(
         business=business
@@ -531,7 +531,7 @@ def warehouse_add(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     if request.method == 'POST':
         name = request.POST.get('name')
@@ -557,7 +557,7 @@ def warehouse_detail(request, pk):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     warehouse = get_object_or_404(
         warehouse_models.Warehouse,
@@ -585,7 +585,7 @@ def location_list(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     locations = warehouse_models.StorageLocation.objects.filter(
         warehouse__business=business
@@ -617,7 +617,7 @@ def location_add(request):
     business = get_user_business(request)
     if not business:
         messages.error(request, "No business associated with your account")
-        return redirect('client:business_dashboard')
+        return redirect('business:business_dashboard')
 
     if request.method == 'POST':
         warehouse_id = request.POST.get('warehouse')

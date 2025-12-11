@@ -212,7 +212,7 @@ Are you a platform provider? Let's integrate EzzyDelivery into your solution.
 
 ### For Customers
 - [Help Center](https://ezzydelivery.qa/help)
-- [FAQ - Client Guide](https://ezzydelivery.qa/client-faq)
+- [FAQ - Business Guide](https://ezzydelivery.qa/client-faq)
 - [Pricing Information](https://ezzydelivery.qa/pricing)
 - [Service Areas](https://ezzydelivery.qa/coverage)
 

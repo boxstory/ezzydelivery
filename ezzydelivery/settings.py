@@ -99,7 +99,7 @@ INSTALLED_APPS = [
     'core',
     'webpages',
     'blog',
-    'client',
+    'business',
     'product',
     'fleet',
     'delivery',
@@ -538,7 +538,7 @@ LOGGING = {
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
-        'client': {
+        'business': {
             'handlers': ['console', 'file_error'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,

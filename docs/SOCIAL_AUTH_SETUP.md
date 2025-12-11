@@ -87,7 +87,7 @@ https://console.cloud.google.com/
 
 #### 1.4. Create OAuth 2.0 Credentials
 - Go to "APIs & Services" → "Credentials"
-- Click "Create Credentials" → "OAuth client ID"
+- Click "Create Credentials" → "OAuth business ID"
 - Application type: "Web application"
 - Name: "EzzyDelivery Web Client"
 
@@ -138,13 +138,13 @@ https://yourdomain.com/accounts/facebook/login/callback/
 ```
 
 **Client OAuth Settings:**
-- Client OAuth Login: YES
+- Business OAuth Login: YES
 - Web OAuth Login: YES
 - Use Strict Mode for Redirect URIs: YES
 
 #### 2.5. Get App Credentials
 - Go to "Settings" → "Basic"
-- Copy **App ID** (this is your Client ID)
+- Copy **App ID** (this is your Business ID)
 - Copy **App Secret** (click "Show" to reveal)
 
 #### 2.6. Make App Live (When Ready for Production)
@@ -183,8 +183,8 @@ http://localhost:8000/admin/
 - Click "Add Social Application"
 - Provider: **Google**
 - Name: `Google OAuth`
-- Client ID: [Paste Google Client ID]
-- Secret key: [Paste Google Client Secret]
+- Business ID: [Paste Google Business ID]
+- Secret key: [Paste Google Business Secret]
 - Sites: Select "localhost:8000" (or your domain)
 - Save
 
@@ -192,7 +192,7 @@ http://localhost:8000/admin/
 - Click "Add Social Application" again
 - Provider: **Facebook**
 - Name: `Facebook Login`
-- Client ID: [Paste Facebook App ID]
+- Business ID: [Paste Facebook App ID]
 - Secret key: [Paste Facebook App Secret]
 - Sites: Select "localhost:8000" (or your domain)
 - Save

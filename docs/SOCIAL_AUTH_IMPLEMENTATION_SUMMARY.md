@@ -268,8 +268,8 @@ Interactive command-line setup tool:
 ### Placeholder Credentials
 
 Currently using placeholder values:
-- Google Client ID: `your-google-client-id`
-- Google Client Secret: `your-google-client-secret`
+- Google Business ID: `your-google-client-id`
+- Google Business Secret: `your-google-client-secret`
 - Facebook App ID: `your-facebook-app-id`
 - Facebook App Secret: `your-facebook-app-secret`
 

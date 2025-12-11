@@ -173,7 +173,7 @@ Heavy appliances
 
 ⭐ 13. How do I track my orders?
 
-You get access to a Client Portal with:
+You get access to a Business Portal with:
 
 Order status
 

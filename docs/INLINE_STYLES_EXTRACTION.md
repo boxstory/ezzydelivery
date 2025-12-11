@@ -81,7 +81,7 @@ Breakdown by app:
 
 #### Lower Priority (Internal pages):
 11. [ ] Workforce dashboard templates
-12. [ ] Client workflow guides
+12. [ ] Business workflow guides
 13. [ ] Orders verification pages
 14. [ ] Product listing pages
 
@@ -112,8 +112,8 @@ workforce/static/workforce/css/
 ├── workforce_inline.css     # Consolidated workforce styles
 └── wf_workflow.css         # Workflow guide specific
 
-client/static/client/css/
-└── client_inline.css        # Consolidated client styles
+business/static/business/css/
+└── client_inline.css        # Consolidated business styles
 
 orders/static/orders/css/
 └── orders_inline.css        # Order verification pages
@@ -191,7 +191,7 @@ For each extracted file, verify:
 | Core | 12 | 0 | 12 | 0% |
 | Workforce | 8 | 0 | 8 | 0% |
 | Webpages | 15 | 1 | 14 | 7% |
-| Client | 5 | 0 | 5 | 0% |
+| Business | 5 | 0 | 5 | 0% |
 | Orders | 4 | 0 | 4 | 0% |
 | Product | 1 | 0 | 1 | 0% |
 | Others | 7 | 0 | 7 | 0% |

@@ -1,4 +1,4 @@
-{% extends "workforce/wf_base_dashboard.html" %}
+{% extends "wf_dashboard_base.html" %}
 {% load static %}
 
 {% block title %}Fleet Transactions - Ezzy Delivery{% endblock title %}
@@ -16,11 +16,16 @@
 
 <!-- Fleet Filter Section -->
 <div class="filter-section">
-    <form method="get" action="">
+    <form method="get" action=""
+          hx-get=""
+          hx-target="#main-content"
+          hx-select="#main-content"
+          hx-swap="outerHTML"
+          hx-push-url="true">
         <label for="driverFilter" class="filter-label">
             <i class="fa-solid fa-filter me-2"></i>Filter by Fleet Driver
         </label>
-        <select id="driverFilter" name="driver_id" class="filter-input" onchange="this.form.submit()">
+        <select id="driverFilter" name="driver_id" class="filter-input" onchange="htmx.trigger(this.form, 'submit')">
             <option value="">All Drivers</option>
             {% for driver in all_drivers %}
             <option value="{{ driver.id }}" {% if request.GET.driver_id == driver.id|stringformat:"s" %}selected{% endif %}>

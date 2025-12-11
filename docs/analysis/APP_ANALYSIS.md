@@ -5,7 +5,7 @@ This document provides a detailed analysis of the three core apps: **Client**, *
 
 ---
 
-## 1. CLIENT APP (`client/`)
+## 1. CLIENT APP (`business/`)
 
 ### 1.1 Models
 
@@ -280,7 +280,7 @@ This document provides a detailed analysis of the three core apps: **Client**, *
 
 ```
 1. ORDER CREATION
-   ├─ Client creates order (via form, CSV upload, or API import)
+   ├─ Business creates order (via form, CSV upload, or API import)
    ├─ Order saved with `verification_status='pending'`
    ├─ Signal: `order_post_save_receiver` (on create)
    │  ├─ Saves `original_order_data` (PROOF)
@@ -356,7 +356,7 @@ This document provides a detailed analysis of the three core apps: **Client**, *
 
 ## 5. INTEGRATION POINTS BETWEEN APPS
 
-### 5.1 Client ↔ Orders
+### 5.1 Business ↔ Orders
 - `Order.business` → `Business`
 - `Order.pickup_location` → `PickupLocation`
 - `BusinessApiSettings` used for order imports
@@ -366,7 +366,7 @@ This document provides a detailed analysis of the three core apps: **Client**, *
 - `DlAddressUpdate.order` → `Order` (One-to-Many)
 - Order verification triggers delivery task creation
 
-### 5.3 Client ↔ Delivery
+### 5.3 Business ↔ Delivery
 - `DeliveryTask.business` → `Business`
 - `DeliveryTask.pickup_location` → `PickupLocation`
 

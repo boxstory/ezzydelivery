@@ -4,7 +4,7 @@ from core import password_reset_views
 from webpages import views as webpages_views
 from delivery import views as delivery_views
 from orders import views as orders_views
-from client import views as business_views
+from business import views as business_views
 
 
 app_name = 'core'

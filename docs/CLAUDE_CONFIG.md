@@ -35,7 +35,7 @@
 ```
 ezzydelivery/
 ├── core/           # User profiles, authentication, base models
-├── client/         # Business client management
+├── business/         # Business store management
 ├── workforce/      # Staff dashboard and operations
 ├── fleet/          # Driver and vehicle management
 ├── delivery/       # Delivery tasks and jobs
@@ -140,7 +140,7 @@ indexes = [
 <table id="workforce_orders_table_all">
 <button id="workforce_orders_btn_export">
 
-<!-- Client App -->
+<!-- Business App -->
 <form id="client_profile_form_update">
 <div id="client_dashboard_card_revenue">
 
@@ -240,8 +240,8 @@ python manage.py test {app}
   - Used for customer support, receipts, and public-facing identification
 - **User**: Django's built-in user model
 
-### Client Models
-- **Business**: Client businesses
+### Business Models
+- **Business**: Business Stores
 - **PickupLocation**: Business pickup locations
 - **BusinessTeam**: Team members for businesses
 

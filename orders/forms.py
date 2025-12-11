@@ -37,7 +37,7 @@ from datetime import timezone
 from requests import request
 
 from orders.models import *
-from client import models as business_models
+from business import models as business_models
 from product import models as product_models
 
 

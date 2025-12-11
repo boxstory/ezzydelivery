@@ -60,7 +60,7 @@ Added complete logging configuration with:
 # In any view/model/signal file
 import logging
 
-logger = logging.getLogger('orders')  # or 'delivery', 'client', etc.
+logger = logging.getLogger('orders')  # or 'delivery', 'business', etc.
 
 # Different log levels
 logger.debug("Detailed diagnostic information")
@@ -490,7 +490,7 @@ ab -n 100 -c 10 http://localhost:8000/orders/all/
 
 5. **N+1 Queries in Remaining Views**
    - **Remaining:** 5+ views still have N+1 problems
-   - **Files:** client/views.py, fleet/views.py, product/views.py
+   - **Files:** business/views.py, fleet/views.py, product/views.py
    - **Impact:** Still causing slow page loads
    - **Estimated Time:** 4-6 hours
 

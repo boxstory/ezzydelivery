@@ -35,7 +35,7 @@ Always start with the page or section identifier:
 |--------------|--------|---------|
 | Account Signup | `account_signup_` | `account_signup_form_main` |
 | Account Login | `account_login_` | `account_login_btn_submit` |
-| Client Dashboard | `client_dashboard_` | `client_dashboard_header_nav` |
+| Business Dashboard | `client_dashboard_` | `client_dashboard_header_nav` |
 | Workforce Dashboard | `workforce_dashboard_` | `workforce_dashboard_orders_table` |
 | Fleet Dashboard | `fleet_dashboard_` | `fleet_dashboard_vehicle_list` |
 | Profile | `profile_` | `profile_picture_upload` |
@@ -143,7 +143,7 @@ account_signup_password_requirement_length_icon
 ### Dashboard Examples
 
 ```html
-<!-- Client Dashboard -->
+<!-- Business Dashboard -->
 <div id="client_dashboard_header_nav">
     <button id="client_dashboard_btn_menu_toggle"></button>
     <div id="client_dashboard_user_profile_dropdown"></div>
@@ -322,7 +322,7 @@ grep -n "getElementById\|'#" script.js
 ```
 account_signup_         - Signup page elements
 account_login_          - Login page elements
-client_dashboard_       - Client dashboard elements
+client_dashboard_       - Business dashboard elements
 workforce_dashboard_    - Workforce dashboard elements
 fleet_dashboard_        - Fleet dashboard elements
 profile_               - Profile page elements

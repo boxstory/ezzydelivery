@@ -29,13 +29,13 @@ Indexes:
 
 Related:
     - orders.models.OrderItem: Products in orders
-    - client.models.Business: Product owner
+    - business.models.Business: Product owner
 """
 
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils.translation import gettext_lazy as _
-from client import models as business_models
+from business import models as business_models
 from product import models as product_models
 
 

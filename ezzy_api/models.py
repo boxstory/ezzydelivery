@@ -6,7 +6,7 @@ This module contains models for API management, webhooks, and document storage.
 
 Models:
     API Authentication:
-        - ClientApiKey: API keys for client authentication
+        - ClientApiKey: API keys for business authentication
 
     Documents:
         - TaskDocument: Documents attached to delivery tasks
@@ -37,7 +37,7 @@ Document Types:
     Order: invoice, receipt, label, manifest
 
 Related:
-    - client.models.Business: API key owner
+    - business.models.Business: API key owner
     - delivery.models.DeliveryTask: Task documents
     - orders.models.Order: Order documents
 """
@@ -45,7 +45,7 @@ Related:
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils.crypto import get_random_string
-from client import models as client_models
+from business import models as business_models
 from delivery import models as delivery_models
 from orders import models as orders_models
 import os
@@ -74,9 +74,9 @@ def order_document_upload_path(instance, filename):
 
 
 class ClientApiKey(models.Model):
-    """API Key model for client authentication"""
+    """API Key model for business authentication"""
     business = models.ForeignKey(
-        client_models.Business,
+        business_models.Business,
         on_delete=models.CASCADE,
         related_name='api_keys'
     )
@@ -209,13 +209,13 @@ class EcommerceIntegration(models.Model):
     )
     
     business = models.ForeignKey(
-        client_models.Business,
+        business_models.Business,
         on_delete=models.CASCADE,
         related_name='ecommerce_integrations'
     )
     platform = models.CharField(max_length=50)  # shopify, woocommerce, etc.
     api_settings = models.ForeignKey(
-        client_models.BusinessApiSettings,
+        business_models.BusinessApiSettings,
         on_delete=models.CASCADE,
         related_name='integrations'
     )
@@ -248,7 +248,7 @@ class WebhookEndpoint(models.Model):
     )
     
     business = models.ForeignKey(
-        client_models.Business,
+        business_models.Business,
         on_delete=models.CASCADE,
         related_name='webhook_endpoints',
         null=True,

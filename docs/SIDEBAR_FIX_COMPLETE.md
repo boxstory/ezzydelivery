@@ -16,7 +16,7 @@ All sidebar files have been successfully updated to:
 
 ## Files Fixed
 
-### 1. Client Dashboard Sidebar
+### 1. Business Dashboard Sidebar
 **File**: `templates/includes/dashboard_sidebar.html`
 
 **Changes Made**:
@@ -205,7 +205,7 @@ All sidebar files have been successfully updated to:
 ## Total Impact
 
 ### Lines of Code Reduced
-- Client Dashboard: -142 lines (inline styles removed)
+- Business Dashboard: -142 lines (inline styles removed)
 - Fleet Dashboard: Restructured complex markup, removed inline styles
 - Mobile Sidebar: -159 lines (inline styles removed)
 - **Total**: ~300+ lines of inline CSS eliminated

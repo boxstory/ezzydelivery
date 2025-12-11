@@ -1,4 +1,4 @@
-{% extends "workforce/wf_base_dashboard.html" %}
+{% extends "wf_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
 <!-- extra css -->
@@ -38,7 +38,12 @@
             <i class="fa-solid fa-chevron-down"></i>
         </div>
         <div class="collapse" id="filterCollapse">
-            <form id="filterForm" method="get">
+            <form id="filterForm" method="get"
+                  hx-get=""
+                  hx-target="#main-content"
+                  hx-select="#main-content"
+                  hx-swap="outerHTML"
+                  hx-push-url="true">
                 <div class="row g-3 mb-3">
                     <!-- Search Filters -->
                     <div class="col-md-6 col-lg-3">
@@ -63,7 +68,7 @@
                                 <i class="fa-solid fa-search text-muted"></i>
                             </span>
                             <input type="text" class="form-control border-start-0 ps-0" name="cCode" id="cCode"
-                                   placeholder="Search Client Code..." value="{{ filters.cCode }}"
+                                   placeholder="Search Business Code..." value="{{ filters.cCode }}"
                                    autocomplete="off">
                         </div>
                     </div>
@@ -445,18 +450,37 @@
 
     // Clear filter functionality
     function clearAllFilters() {
-        document.getElementById('dlCode').value = '';
-        document.getElementById('cCode').value = '';
-        document.getElementById('mobile').value = '';
-        document.getElementById('driverName').value = '';
-        document.getElementById('cStatus').value = '';
-        document.getElementById('dmsStatus').value = '';
-        document.getElementById('dateFrom').value = '';
-        document.getElementById('dateTo').value = '';
-        window.location.href = window.location.pathname;
+        const dlCode = document.getElementById('dlCode');
+        const cCode = document.getElementById('cCode');
+        const mobile = document.getElementById('mobile');
+        const driverName = document.getElementById('driverName');
+        const cStatus = document.getElementById('cStatus');
+        const dmsStatus = document.getElementById('dmsStatus');
+        const dateFrom = document.getElementById('dateFrom');
+        const dateTo = document.getElementById('dateTo');
+
+        if (dlCode) dlCode.value = '';
+        if (cCode) cCode.value = '';
+        if (mobile) mobile.value = '';
+        if (driverName) driverName.value = '';
+        if (cStatus) cStatus.value = '';
+        if (dmsStatus) dmsStatus.value = '';
+        if (dateFrom) dateFrom.value = '';
+        if (dateTo) dateTo.value = '';
+
+        // Use HTMX to navigate
+        htmx.ajax('GET', window.location.pathname, {
+            target: '#main-content',
+            select: '#main-content',
+            swap: 'outerHTML'
+        });
+        history.pushState({}, '', window.location.pathname);
     }
 
-    document.getElementById('clearFilter').addEventListener('click', clearAllFilters);
+    const clearFilter = document.getElementById('clearFilter');
+    if (clearFilter) {
+        clearFilter.addEventListener('click', clearAllFilters);
+    }
 
     // Clear filter from empty state
     const clearFilterEmpty = document.getElementById('clearFilterEmpty');
@@ -470,7 +494,7 @@
         input.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                document.getElementById('filterForm').submit();
+                htmx.trigger('#filterForm', 'submit');
             }
         });
     });
@@ -537,55 +561,76 @@
 
     // Remove individual filter
     function removeFilter(filterKey) {
-        document.getElementById(filterKey).value = '';
-        document.getElementById('filterForm').submit();
+        const element = document.getElementById(filterKey);
+        if (element) element.value = '';
+        htmx.trigger('#filterForm', 'submit');
     }
 
     // Quick filter functions
     function quickFilter(type) {
-        clearAllFilters();
+        // Clear all fields first
+        const dlCode = document.getElementById('dlCode');
+        const cCode = document.getElementById('cCode');
+        const mobile = document.getElementById('mobile');
+        const driverName = document.getElementById('driverName');
+        const cStatus = document.getElementById('cStatus');
+        const dmsStatus = document.getElementById('dmsStatus');
+        const dateFrom = document.getElementById('dateFrom');
+        const dateTo = document.getElementById('dateTo');
+
+        if (dlCode) dlCode.value = '';
+        if (cCode) cCode.value = '';
+        if (mobile) mobile.value = '';
+        if (driverName) driverName.value = '';
+        if (cStatus) cStatus.value = '';
+        if (dmsStatus) dmsStatus.value = '';
+        if (dateFrom) dateFrom.value = '';
+        if (dateTo) dateTo.value = '';
 
         switch(type) {
             case 'today':
                 const today = new Date().toISOString().split('T')[0];
-                document.getElementById('dateFrom').value = today;
-                document.getElementById('dateTo').value = today;
+                if (dateFrom) dateFrom.value = today;
+                if (dateTo) dateTo.value = today;
                 break;
             case 'pending':
-                document.getElementById('cStatus').value = 'to_review';
+                if (cStatus) cStatus.value = 'to_review';
                 break;
             case 'in_transit':
-                document.getElementById('dmsStatus').value = 'in_transit';
+                if (dmsStatus) dmsStatus.value = 'in_transit';
                 break;
         }
 
-        document.getElementById('filterForm').submit();
+        htmx.trigger('#filterForm', 'submit');
     }
 
     // Save filter preset
-    document.getElementById('saveFilter').addEventListener('click', function() {
-        const filterName = prompt('Enter a name for this filter preset:');
-        if (filterName) {
-            const filters = {
-                name: filterName,
-                dlCode: document.getElementById('dlCode').value,
-                cCode: document.getElementById('cCode').value,
-                mobile: document.getElementById('mobile').value,
-                driverName: document.getElementById('driverName').value,
-                cStatus: document.getElementById('cStatus').value,
-                dmsStatus: document.getElementById('dmsStatus').value,
-                dateFrom: document.getElementById('dateFrom').value,
-                dateTo: document.getElementById('dateTo').value
-            };
+    const saveFilter = document.getElementById('saveFilter');
+    if (saveFilter) {
+        saveFilter.addEventListener('click', function() {
+            const filterName = prompt('Enter a name for this filter preset:');
+            if (filterName) {
+                const filters = {
+                    name: filterName,
+                    dlCode: document.getElementById('dlCode')?.value || '',
+                    cCode: document.getElementById('cCode')?.value || '',
+                    mobile: document.getElementById('mobile')?.value || '',
+                    driverName: document.getElementById('driverName')?.value || '',
+                    cStatus: document.getElementById('cStatus')?.value || '',
+                    dmsStatus: document.getElementById('dmsStatus')?.value || '',
+                    dateFrom: document.getElementById('dateFrom')?.value || '',
+                    dateTo: document.getElementById('dateTo')?.value || ''
+                };
 
-            // Save to localStorage
-            let savedFilters = JSON.parse(localStorage.getItem('taskFilters') || '[]');
-            savedFilters.push(filters);
-            localStorage.setItem('taskFilters', JSON.stringify(savedFilters));
+                // Save to localStorage
+                let savedFilters = JSON.parse(localStorage.getItem('taskFilters') || '[]');
+                savedFilters.push(filters);
+                localStorage.setItem('taskFilters', JSON.stringify(savedFilters));
 
-            alert('Filter preset saved successfully!');
-        }
-    });
+                alert('Filter preset saved successfully!');
+            }
+        });
+    }
 
     // Auto-submit on select change
     document.querySelectorAll('#filterForm select').forEach(select => {
@@ -601,7 +646,7 @@
         updateActiveFiltersDisplay();
     });
 
-    // Get CSRF token
+    // Get CSRF token - retrieve fresh on each call to handle HTMX content swaps
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -616,7 +661,10 @@
         }
         return cookieValue;
     }
-    const csrftoken = getCookie('csrftoken');
+
+    function getCSRFToken() {
+        return getCookie('csrftoken');
+    }
 
     // Publish to DMS
     function publishToDMS(taskId) {
@@ -625,7 +673,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
+                    'X-CSRFToken': getCSRFToken()
                 }
             })
             .then(response => response.json())
@@ -651,7 +699,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
+                    'X-CSRFToken': getCSRFToken()
                 }
             })
             .then(response => response.json())
@@ -678,7 +726,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
+                    'X-CSRFToken': getCSRFToken()
                 },
                 body: JSON.stringify({ status: status })
             })

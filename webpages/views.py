@@ -61,7 +61,7 @@ from django.http import JsonResponse
 from webpages.forms import *
 from webpages.models import WhatsAppInquiry, PricingEnquiry
 from django.core.mail import mail_admins, send_mail
-from client import models as business_models
+from business import models as business_models
 from fleet import models as fleet_models
 from core.seo import SEOMetadata
 
@@ -455,7 +455,7 @@ def help_guides(request):
     meta = SEOMetadata.get_page_meta(
         title="Guides & Resources - Ezzy Delivery Qatar",
         description="Onboarding guides and resources for clients and drivers. Learn how to get started with Ezzy Delivery.",
-        keywords="onboarding guides, client kit, driver kit, delivery resources Qatar"
+        keywords="onboarding guides, business kit, driver kit, delivery resources Qatar"
     )
 
     data = {

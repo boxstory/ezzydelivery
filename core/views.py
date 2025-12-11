@@ -56,8 +56,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from PIL import Image
 
-from client import forms as business_forms
-from client import models as business_models
+from business import forms as business_forms
+from business import models as business_models
 from core import forms as core_forms
 from core import models as core_models
 from fleet import forms as fleet_forms
@@ -382,7 +382,7 @@ def business_profile_update(request):
     context = {
         'form': form,
     }
-    return render(request, 'client/frontend/business_profile_update.html', context)
+    return render(request, 'business/frontend/business_profile_update.html', context)
 
 
 @login_required(login_url='/accounts/login/')

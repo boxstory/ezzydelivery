@@ -18,7 +18,7 @@ import json
 
 from delivery.models import DeliveryTask, DlAddressUpdate, AssignedDriver, ZoneName, LatLonList
 from orders.models import Order
-from client.models import Business, PickupLocation
+from business.models import Business, PickupLocation
 from fleet.models import Driver, DriverVehicle
 from core.models import Profile
 

@@ -291,7 +291,7 @@ git commit -m "refactor: Replace 283 print statements with logging"
 
 ### Phase 3: Remaining Optimizations (6-10 hours)
 
-- Fix remaining N+1 queries in client/fleet/product views
+- Fix remaining N+1 queries in business/fleet/product views
 - Add database indexes to frequently queried fields
 - Fix IDOR vulnerabilities (10+ views)
 - Remove `@csrf_exempt` decorators

@@ -52,9 +52,9 @@ EzzyDelivery is a comprehensive last-mile delivery management platform for Qatar
 **Key Database Models:**
 - User/Profile system with multi-role support (business/driver/staff)
 - Business with team members, pickup locations, API settings
-- Order with verification workflow, COD tracking, dual status (client/staff)
+- Order with verification workflow, COD tracking, dual status (business/staff)
 - OrderItem (modern) + OrderProductList (legacy, deprecated)
-- DeliveryTask with triple status tracking (client/staff/DMS)
+- DeliveryTask with triple status tracking (business/staff/DMS)
 - Driver with vehicles, documents, rating system
 - Product with variants, categories, inventory
 - Comprehensive logging (OrderLog, OrderVerificationLog, AddressVerification)
@@ -159,9 +159,9 @@ Feature guides, tutorials, and how-tos:
 - (To be created)
 
 **User Guides (Built into Application):**
-- Client Onboarding Guide (`/help/guides/client/`)
+- Business Onboarding Guide (`/help/guides/business/`)
 - Driver Onboarding Guide (`/help/guides/driver/`)
-- Client FAQ (`/help/client-faq/`)
+- Business FAQ (`/help/client-faq/`)
 - Driver FAQ (`/help/driver-faq/`)
 - Business Workflow Guide (`/business/workflow-guide/`)
 - Staff Workflow Guide (`/workforce/workflow-guide/`)
@@ -196,7 +196,7 @@ Feature guides, tutorials, and how-tos:
 - Convert verified orders to delivery tasks
 - Assign drivers to tasks
 - Publish tasks to DMS (ShipDay)
-- Track delivery status (triple tracking: client/staff/DMS)
+- Track delivery status (triple tracking: business/staff/DMS)
 - Customer address updates via unique link
 - Zone/street/building mapping for Qatar
 - Proof of delivery documentation

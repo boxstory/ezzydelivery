@@ -175,7 +175,7 @@ sudo systemctl restart gunicorn
 
 ### Short-Term (Next 2 Weeks)
 4. Remove 283 print statements (tool ready: `scripts/replace_print_with_logging.py`)
-5. Fix remaining N+1 queries in client/fleet/product views
+5. Fix remaining N+1 queries in business/fleet/product views
 6. Add database indexes to frequently queried fields
 
 ### Medium-Term (Next Month)

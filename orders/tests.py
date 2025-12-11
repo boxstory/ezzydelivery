@@ -22,7 +22,7 @@ from orders.models import (
     AddressVerification
 )
 from delivery.models import DeliveryTask, DlAddressUpdate
-from client.models import Business, PickupLocation, BusinessApiSettings
+from business.models import Business, PickupLocation, BusinessApiSettings
 from product.models import Product
 from core.models import Profile
 

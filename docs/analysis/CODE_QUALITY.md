@@ -47,14 +47,14 @@
 The codebase contains 294 `print()` statements scattered across 12 files, indicating debug code left in production. This is a serious security and performance issue.
 
 **Affected Files:**
-- `client/views.py`: 78 occurrences
+- `business/views.py`: 78 occurrences
 - `orders/views.py`: 88 occurrences
 - `core/views.py`: 55 occurrences
 - `fleet/views.py`: 26 occurrences
 - `delivery/views.py`: 20 occurrences
 - Others: 27+ occurrences
 
-**Example from client/views.py (lines 32-47):**
+**Example from business/views.py (lines 32-47):**
 ```python
 @login_required(login_url='account_login')
 def business_dashboard(request):
@@ -147,7 +147,7 @@ def orders_all_list(request):
 
 **Critical Views to Fix:**
 1. `orders/views.py`: `orders_all_list`, `orders_pending_list`, `orders_successfull_list`
-2. `client/views.py`: `business_dashboard`, `business_profile`
+2. `business/views.py`: `business_dashboard`, `business_profile`
 3. `delivery/views.py`: `all_delivery_tasks`, `assigned_tasks`
 
 ---
@@ -256,7 +256,7 @@ except Exception as e:
 **File Size Analysis:**
 ```
 2,270 lines - ezzy_api/views.py (CRITICAL!)
-  814 lines - client/views.py (Needs refactoring)
+  814 lines - business/views.py (Needs refactoring)
   708 lines - orders/views.py (Needs refactoring)
   527 lines - core/seo.py (Acceptable but monitor)
 ```
@@ -364,7 +364,7 @@ def migrate_order_products():
 **Issue:**
 Multiple views repeatedly query `request.user.user_business.first()` multiple times in the same function, causing unnecessary database hits.
 
-**Example from client/views.py (lines 249-259):**
+**Example from business/views.py (lines 249-259):**
 ```python
 def business_profile_update(request, business_id):
     print('business_profile_update')
@@ -434,7 +434,7 @@ def business_profile_update(request, business_id):
 **Issue:**
 Almost no functions or classes have docstrings. Out of 205+ functions, fewer than 10 have proper documentation.
 
-**Example from client/views.py:**
+**Example from business/views.py:**
 ```python
 # NO DOCSTRING!
 @login_required(login_url='account_login')
@@ -451,7 +451,7 @@ def business_dashboard(request):
         # ... 30 lines of undocumented code ...
 ```
 
-**One Good Example Found (lines 688-691 in client/views.py):**
+**One Good Example Found (lines 688-691 in business/views.py):**
 ```python
 @login_required(login_url='account_login')
 def workflow_guide(request):
@@ -486,7 +486,7 @@ def business_dashboard(request):
         Redirect: If user has no associated business, redirects to main_dashboard
 
     Template:
-        client/business_dashboard.html
+        business/business_dashboard.html
 
     Permissions:
         Requires login and associated Business object
@@ -528,7 +528,7 @@ def business_dashboard(request):  # What type is request? What does it return?
 from typing import Optional
 from django.http import HttpRequest, HttpResponse
 from django.db.models import QuerySet
-from client.models import Business
+from business.models import Business
 
 def business_dashboard(request: HttpRequest) -> HttpResponse:
     """Display the main business dashboard with overview statistics."""
@@ -548,7 +548,7 @@ def business_dashboard(request: HttpRequest) -> HttpResponse:
         'business': business,
         'orders': orders,
     }
-    return render(request, 'client/business_dashboard.html', context)
+    return render(request, 'business/business_dashboard.html', context)
 ```
 
 **Benefits:**
@@ -588,7 +588,7 @@ def delete_order(request, order_id):
 4. No success/error message to user
 5. No logging
 
-**Example 2 - client/views.py (lines 211-213):**
+**Example 2 - business/views.py (lines 211-213):**
 ```python
 except business_models.Business.DoesNotExist:
     return redirect("/join_us/")  # Good - specific exception, graceful redirect
@@ -696,7 +696,7 @@ def save_location_data(request, dl_task_code):
 
 ### 13. ⚠️ **Security: Writing Credentials to File**
 
-**Files:** `client/views.py` (line 493), `orders/views.py` (line 598)
+**Files:** `business/views.py` (line 493), `orders/views.py` (line 598)
 ```python
 with open('shopify_creds.json', 'w') as f:
     json.dump(shop_creds, f)  # Writing credentials to file in project root!
@@ -709,7 +709,7 @@ with open('shopify_creds.json', 'w') as f:
 
 ### 14. ⚠️ **Code Duplication: Shopify API Code Repeated**
 
-**Files:** `client/views.py` (lines 486-510) and `orders/views.py` (lines 591-614)
+**Files:** `business/views.py` (lines 486-510) and `orders/views.py` (lines 591-614)
 
 Exact same Shopify API connection code duplicated. Should be extracted to utility function:
 
@@ -720,7 +720,7 @@ import requests
 
 def get_shopify_client(business_api: BusinessApiSettings) -> Tuple[str, dict]:
     """
-    Get Shopify API client configuration.
+    Get Shopify API business configuration.
 
     Args:
         business_api: BusinessApiSettings with API credentials
@@ -740,7 +740,7 @@ def get_shopify_client(business_api: BusinessApiSettings) -> Tuple[str, dict]:
 
 ### 15. 🟡 **Code Smell: God Object (Business Model)**
 
-**File:** `client/models.py`
+**File:** `business/models.py`
 
 The `Business` model has too many responsibilities and related objects:
 - Business info (name, email, phone, code)
@@ -843,7 +843,7 @@ def order_product_list(request, order_id):
 
 Many views contain business logic that should be in models, managers, or services:
 
-**Example from client/views.py (lines 315-320):**
+**Example from business/views.py (lines 315-320):**
 ```python
 if form.is_valid():
     f = form.save(commit=False)
@@ -857,7 +857,7 @@ if form.is_valid():
 
 **Should be in model:**
 ```python
-# client/models.py
+# business/models.py
 class BusinessProfile(models.Model):
     # ... fields ...
 
@@ -942,7 +942,7 @@ Start with critical path testing:
 ```python
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
-from client.models import Business
+from business.models import Business
 from orders.models import Order
 
 class OrderCreationTestCase(TestCase):
@@ -967,7 +967,7 @@ class OrderCreationTestCase(TestCase):
         """Test that order creation requires pickup location."""
         self.client.login(username='testuser', password='testpass123')
         response = self.client.get('/orders/add/')
-        self.assertRedirects(response, '/client/pickup_location/add/')
+        self.assertRedirects(response, '/business/pickup_location/add/')
 ```
 
 ---

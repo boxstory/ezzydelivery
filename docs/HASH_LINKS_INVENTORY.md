@@ -6,10 +6,10 @@ This document lists all HTML links containing hash fragments (`#`) found in the 
 
 ---
 
-## 1. Client App Templates (2 links)
+## 1. Business App Templates (2 links)
 
 ### Business Settings API Add
-**File:** `client/templates/client/parts/business_settings_api_add.html:14`
+**File:** `business/templates/business/parts/business_settings_api_add.html:14`
 ```html
 <a class="btn btn-dark w-md-50 px-5" href="#" id="client_api_add_btn_back">
 ```
@@ -17,7 +17,7 @@ This document lists all HTML links containing hash fragments (`#`) found in the 
 **Issue:** Should use `javascript:history.back()` or proper URL
 
 ### Workflow Guide
-**File:** `client/templates/client/workflow_guide.html:199`
+**File:** `business/templates/business/workflow_guide.html:199`
 ```html
 <a href="#" class="btn btn-outline-primary" id="client_workflow_btn_contact_support">
 ```

@@ -186,7 +186,7 @@ $(function () {
       $responseRawResponse.text(panelText)
     }
 
-    // Instantiate a client to make the outgoing request.
+    // Instantiate a business to make the outgoing request.
     var options = {
       requestCallback: requestCallback,
       responseCallback: responseCallback
@@ -213,7 +213,7 @@ $(function () {
       })
     }
 
-    var client = new coreapi.Client(options)
+    var business = new coreapi.Client(options)
     client.action(schema, key, params).then(function (data) {
       var response = JSON.stringify(data, null, 2)
       $requestAwaiting.addClass('hide')

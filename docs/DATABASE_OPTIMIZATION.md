@@ -9,7 +9,7 @@ This document details the database optimizations implemented to eliminate N+1 qu
 ## Executive Summary
 
 ### Problems Identified
-1. **N+1 Query Issues**: Product, fleet, and client views had severe N+1 query problems
+1. **N+1 Query Issues**: Product, fleet, and business views had severe N+1 query problems
 2. **Missing Indexes**: Frequently filtered/searched fields lacked database indexes
 3. **Slow List Views**: Product lists, driver lists, order lists all had performance issues
 

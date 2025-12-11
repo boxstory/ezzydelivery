@@ -175,7 +175,7 @@ Weekly
 
 Or store for future shipment
 
-⭐ 8. Client Portal Access
+⭐ 8. Business Portal Access
 
 You will receive login details for your dashboard:
 

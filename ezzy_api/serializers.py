@@ -3,7 +3,7 @@ from orders import models as orders_models
 from fleet import models as fleet_models
 from delivery import models as delivery_models
 from core import models as core_models
-from client import models as client_models
+from business import models as business_models
 from ezzy_api import models as ezzy_api_models
 from django.contrib.auth import get_user_model
 

@@ -31,7 +31,7 @@ Query Optimization:
 Related:
     - product.models: Product, ProductCategory, ColorVariant, UnitVariant
     - product.forms: AddItemsForm
-    - client.models: Business
+    - business.models: Business
 """
 
 import logging
@@ -41,7 +41,7 @@ from django.contrib import messages
 
 
 from product import models as product_models
-from client import models as business_models
+from business import models as business_models
 from product import forms as product_forms
 
 logger = logging.getLogger('product')

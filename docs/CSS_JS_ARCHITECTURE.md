@@ -46,11 +46,11 @@ ezzydelivery/
 │   └── js/
 │       └── base.js             # Core JavaScript utilities
 │
-├── client/static/client/
+├── business/static/business/
 │   ├── css/
-│   │   └── client.css          # Client app styles
+│   │   └── business.css        # Business app styles
 │   └── js/
-│       └── client.js           # Client app JavaScript
+│       └── business.js         # Business app JavaScript
 │
 ├── orders/static/orders/
 │   ├── css/
@@ -325,11 +325,11 @@ EzzyAPI.post('/api/business/orders/', {
 
 ## App-Specific CSS Files
 
-### Client App (`client/static/client/css/client.css`)
-- Client dashboard styles
-- Client profile styles
-- Client orders display
-- Client directory
+### Business App (`business/static/business/css/business.css`)
+- Business dashboard styles
+- Business profile styles
+- Business orders display
+- Business directory
 
 ### Orders App (`orders/static/orders/css/orders.css`)
 - Order list styles
@@ -559,7 +559,7 @@ EzzyAPI.post('/api/business/orders/', {
 ### CSS Files
 - [static/css/brand-kit.css](../static/css/brand-kit.css) - 800+ lines
 - [static/css/base.css](../static/css/base.css) - 650+ lines
-- [client/static/client/css/client.css](../client/static/client/css/client.css) - 80 lines
+- [business/static/business/css/business.css](../business/static/business/css/business.css) - 80 lines
 - [orders/static/orders/css/orders.css](../orders/static/orders/css/orders.css) - 160 lines
 - [delivery/static/delivery/css/delivery.css](../delivery/static/delivery/css/delivery.css) - 220 lines
 - [fleet/static/fleet/css/fleet.css](../fleet/static/fleet/css/fleet.css) - Existing (preserved)

@@ -68,7 +68,7 @@ Create new delivery orders for your business.
 
 #### Required Fields:
 - **Authentication Token** - Your API token
-- **Client ID** - The ID of the client (customer)
+- **Client ID** - The ID of the Business (customer)
 - **Delivery Address** - Full delivery address
 
 #### Optional Fields:
@@ -77,7 +77,7 @@ Create new delivery orders for your business.
 #### Steps:
 1. Click on the **"Create Order"** tab
 2. Enter your authentication token
-3. Fill in the client ID (e.g., `1`)
+3. Fill in the Business ID (e.g., `1`)
 4. Enter the delivery address
 5. Optionally enter pickup location ID
 6. Click **"📦 Create Order"**
@@ -103,7 +103,7 @@ View and filter your orders.
 #### Fields:
 - **Authentication Token** - Your API token
 - **Order Status** - Filter by status (optional)
-- **Search** - Search by order number or client name (optional)
+- **Search** - Search by order number or Business name (optional)
 - **Limit** - Number of results to return (default: 10)
 
 #### Available Status Filters:
@@ -160,7 +160,7 @@ Add new clients (customers) to your business.
 #### Steps:
 1. Click on the **"Create Client"** tab
 2. Enter your authentication token
-3. Enter client name
+3. Enter Business name
 4. Enter phone number (format: +1234567890)
 5. Optionally enter email and address
 6. Click **"👤 Create Client"**
@@ -275,7 +275,7 @@ Shows what was sent to the API:
 **Cause:** Resource doesn't exist or wrong ID
 
 **Solution:**
-1. Verify the client ID exists
+1. Verify the Business ID exists
 2. Check the order ID is correct
 3. Ensure the resource belongs to your business
 
@@ -506,7 +506,7 @@ Need help? Check these resources:
 - ✅ Initial release
 - ✅ Create Order functionality
 - ✅ List Orders with filters
-- ✅ Create Client functionality
+- ✅ Create Business functionality
 - ✅ Dashboard Statistics
 - ✅ Real-time API testing
 - ✅ Auto-generated cURL commands

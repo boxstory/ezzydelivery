@@ -178,7 +178,7 @@ LOGGING = {
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
-        'client': {
+        'business': {
             'handlers': ['console', 'file_error'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
@@ -510,10 +510,10 @@ def sync_shopify_orders(request):
 ### Example 5: Security Event Logging
 
 ```python
-# client/views.py
+# business/views.py
 import logging
 
-logger = logging.getLogger('client')
+logger = logging.getLogger('business')
 security_logger = logging.getLogger('security')
 
 def order_details(request, order_id):

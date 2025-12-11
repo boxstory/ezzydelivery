@@ -132,7 +132,7 @@ class CareersForm(forms.ModelForm):
 
 class PricingEnquiryForm(forms.ModelForm):
     """
-    Multi-step pricing inquiry form for potential business clients.
+    Multi-step pricing inquiry form for potential business stores.
 
     Overrides model boolean fields with ChoiceFields for better UX
     (radio buttons instead of checkboxes).
@@ -219,7 +219,7 @@ class DeliveryRequestForm(forms.ModelForm):
     One-time delivery request form for non-business users.
 
     Allows individuals to request a single delivery without
-    registering as a business client.
+    registering as a business store.
 
     Field Groups:
         Delivery Type:

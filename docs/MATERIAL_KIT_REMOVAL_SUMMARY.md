@@ -64,7 +64,7 @@ Successfully identified comprehensive brand kit variables in:
 
 #### Already Using Brand Kit ✅
 These files were found to already use brandkit variables:
-- `client/static/client/css/client_dashboard.css`
+- `business/static/business/css/client_dashboard.css`
 - `workforce/static/workforce/css/wf_dashboard.css`
 - `workforce/static/workforce/css/wf_sidebar.css`
 - `fleet/static/fleet/css/fleet_dashboard.css`
@@ -287,7 +287,7 @@ Test in:
 ### Code References
 - Brand Kit Variables: `webpages/static/webpages/css/brand-kit.css`
 - Bootstrap Overrides: `static/webpages/css/brand-kit-overrides.css`
-- Example Usage: `client/static/client/css/client_dashboard.css`
+- Example Usage: `business/static/business/css/client_dashboard.css`
 
 ---
 

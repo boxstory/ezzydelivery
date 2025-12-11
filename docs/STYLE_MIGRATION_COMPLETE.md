@@ -15,7 +15,7 @@ Successfully removed all inline `<style>` tags from HTML templates and moved the
 
 ### 1. CSS Files Created
 
-#### Client App ([client/static/client/css/](client/static/client/css/))
+#### Business App ([business/static/business/css/](business/static/business/css/))
 - `workflow-guide.css` - Workflow guide page styling
 - `api-settings.css` - API settings interface
 - `business-profile-frontend.css` - Business profile frontend pages
@@ -44,8 +44,8 @@ Successfully removed all inline `<style>` tags from HTML templates and moved the
 - `about.css` - About page
 - `affiliate.css` - Affiliate program page
 - `careers.css` - Careers page
-- `client_faq.css` - Client FAQ
-- `client_guide.css` - Client guide
+- `client_faq.css` - Business FAQ
+- `client_guide.css` - Business guide
 - `contactus.css` - Contact form
 - `delivery_pricing_inquiry.css` - Pricing inquiry
 - `delivery_request.css` - Delivery request form
@@ -70,7 +70,7 @@ Successfully removed all inline `<style>` tags from HTML templates and moved the
 
 **Other:**
 - `includes/footer.css` - Site footer
-- `client_dashboard_base.css` - Client dashboard base layout
+- `client_dashboard_base.css` - Business dashboard base layout
 - `ezzy_api/api-tester.css` - API testing interface
 
 ### 2. Django Settings Updated

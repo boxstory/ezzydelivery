@@ -228,13 +228,13 @@ grep -r "password.*=.*['\"]" --include="*.py" | grep -v "class"
 grep -r "secret.*=.*['\"]" --include="*.py" | grep -v "class"
 
 # Check specific files
-grep -n "api_key\|api_secret\|password\|token" client/views.py
+grep -n "api_key\|api_secret\|password\|token" business/views.py
 grep -n "api_key\|api_secret\|password\|token" ezzy_api/views.py
 ```
 
 ### Common Places to Check:
 - [ ] `orders/views.py` (KNOWN ISSUE)
-- [ ] `client/views.py` (check API settings)
+- [ ] `business/views.py` (check API settings)
 - [ ] `ezzy_api/views.py` (check DMS integration)
 - [ ] `settings.py` (check SECRET_KEY, DATABASE, etc.)
 - [ ] Any `*_creds.json` files
@@ -280,7 +280,7 @@ def order_update(request, order_id):
 - [ ] `add_order_product` (line ~490)
 - [ ] `update_order_product` (line ~540)
 
-**client/views.py:**
+**business/views.py:**
 - [ ] `business_profile_update` (line ~XX)
 - [ ] `business_settings_api_update` (line ~XX)
 - [ ] `pickup_location_update` (line ~XX)
@@ -381,7 +381,7 @@ grep -n "@csrf_exempt" --include="*.py" -r .
 ### Phase 2: URGENT (Do today)
 - [ ] Audit all files for hardcoded secrets
 - [ ] Fix IDOR in `orders/views.py` (5 functions)
-- [ ] Fix IDOR in `client/views.py` (3 functions)
+- [ ] Fix IDOR in `business/views.py` (3 functions)
 - [ ] Fix IDOR in `delivery/views.py` (2 functions)
 - [ ] Remove @csrf_exempt decorators
 - [ ] Test all fixed views
@@ -406,7 +406,7 @@ grep -n "@csrf_exempt" --include="*.py" -r .
 # Test new secure Shopify integration
 python manage.py shell
 
-from client.models import BusinessApiSettings
+from business.models import BusinessApiSettings
 api = BusinessApiSettings.objects.filter(api_type='shopify').first()
 print(api.api_access_token[:10] + "...")  # Should NOT print full token
 ```

@@ -8,20 +8,20 @@ This document summarizes the systematic migration of inline `<style>` tags from 
 ### 1. CLIENT APP (3 files processed - ✅ COMPLETED)
 
 #### CSS Files Created:
-- `client/static/client/css/workflow-guide.css` - Workflow guide styles
-- `client/static/client/css/api-settings.css` - API settings page styles
-- `client/static/client/css/business-profile-frontend.css` - Public business profile view styles
+- `business/static/business/css/workflow-guide.css` - Workflow guide styles
+- `business/static/business/css/api-settings.css` - API settings page styles
+- `business/static/business/css/business-profile-frontend.css` - Public business profile view styles
 
 #### HTML Files Updated:
-1. ✅ `client/templates/client/workflow_guide.html`
+1. ✅ `business/templates/business/workflow_guide.html`
    - Removed 63 lines of inline CSS
    - Linked to `workflow-guide.css`
 
-2. ✅ `client/templates/client/parts/business_settings_api_list.html`
+2. ✅ `business/templates/business/parts/business_settings_api_list.html`
    - Removed 130 lines of inline CSS
    - Linked to `api-settings.css`
 
-3. ✅ `client/templates/client/frontend/business_profile.html`
+3. ✅ `business/templates/business/frontend/business_profile.html`
    - Removed 311 lines of inline CSS
    - Linked to `business-profile-frontend.css`
 
@@ -218,7 +218,7 @@ Files with inline styles:
 ## Progress Summary
 
 ### Completed:
-- ✅ Client app: 3/3 files (100%)
+- ✅ Business app: 3/3 files (100%)
 - ✅ Core app: 2/9 files (22%)
 - ✅ Total CSS files created: 10
 - ✅ Total lines of CSS externalized: ~800+

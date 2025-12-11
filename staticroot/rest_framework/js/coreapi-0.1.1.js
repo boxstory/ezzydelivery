@@ -185,7 +185,7 @@ function lookupLink(node, keys) {
   return node;
 }
 
-var Client = function () {
+var Business = function () {
   function Client() {
     var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
 
@@ -577,7 +577,7 @@ module.exports = {
 'use strict';
 
 var auth = require('./auth');
-var client = require('./client');
+var business = require('./client');
 var codecs = require('./codecs');
 var document = require('./document');
 var errors = require('./errors');

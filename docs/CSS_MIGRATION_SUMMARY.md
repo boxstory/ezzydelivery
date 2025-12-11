@@ -78,7 +78,7 @@ workforce/static/workforce/css/
 fleet/static/fleet/css/
 └── fleet_dashboard.css     (41 lines) ✅
 
-client/static/client/css/
+business/static/business/css/
 └── client_dashboard.css    (Updated) ✅
 ```
 
@@ -229,7 +229,7 @@ color: var(--brand-grey-800);
 - profile_update.html
 - Other authentication pages
 
-### Phase 3: Client App
+### Phase 3: Business App
 - business_settings_api_list.html
 - business_profile.html
 - workflow_guide.html
@@ -304,7 +304,7 @@ color: var(--brand-grey-800);
 
 1. ✅ Complete Phase 1 (join_us, profile sidebar, profile forms)
 2. ⏳ Continue with remaining core templates
-3. ⏳ Migrate client app templates
+3. ⏳ Migrate business app templates
 4. ⏳ Migrate workforce app templates
 5. ⏳ Migrate fleet, orders, webpages templates
 6. ⏳ Comprehensive testing
@@ -342,11 +342,11 @@ Each dashboard type now has a distinctive header design using brand kit gradient
 - **Theme:** Staff/Admin interface - professional purple theme
 - **Decorative Element:** White semi-transparent circle (top-right)
 
-**2. Business Dashboard** ([client_dashboard.css](client/static/client/css/client_dashboard.css))
+**2. Business Dashboard** ([client_dashboard.css](business/static/business/css/client_dashboard.css))
 - **Gradient:** `--brand-gradient-yellow-white` (Ezzy Yellow to White)
 - **Text Color:** `--brand-grey-800`
 - **Border:** 2px solid `--brand-primary`
-- **Theme:** Business client interface - branded yellow theme
+- **Theme:** Business Store interface - branded yellow theme
 - **Decorative Element:** Yellow semi-transparent circle (bottom-left)
 
 **3. Fleet/Driver Dashboard** ([fleet_dashboard.css](fleet/static/fleet/css/fleet_dashboard.css))

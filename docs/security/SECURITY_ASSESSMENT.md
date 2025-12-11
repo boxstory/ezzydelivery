@@ -70,7 +70,7 @@ def delete_order(request, order_id):
         order.delete  # ❌ Missing () - doesn't actually delete!
 ```
 
-**client/views.py:**
+**business/views.py:**
 ```python
 # Line 107 - No authorization check
 def driver_directory_delete(request, id):
@@ -131,7 +131,7 @@ curl -X POST -H "Authorization: Token abc123" \
   -d "customer_address=Attacker Address"
 
 # 3. Delete another business's driver directory entry
-curl -X GET https://ezzydelivery.com/client/driver-directory/delete/25/
+curl -X GET https://ezzydelivery.com/business/driver-directory/delete/25/
 ```
 
 #### Impact:
@@ -402,7 +402,7 @@ def get_order_by_api(request):
 **1. Encrypt API credentials in database:**
 
 ```python
-# client/models.py
+# business/models.py
 
 from cryptography.fernet import Fernet
 from django.conf import settings
@@ -1002,7 +1002,7 @@ def custom_exception_handler(exc, context):
                 'error_id': f"ERR-{response.status_code}-{context.get('request').build_absolute_uri()}"
             }
         elif status.is_client_error(response.status_code):
-            # Client errors can be more descriptive
+            # Business errors can be more descriptive
             if 'detail' in response.data:
                 response.data = {
                     'error': response.data['detail']
@@ -1070,7 +1070,7 @@ def driver_login(request):
 
 **Severity:** MEDIUM
 **CVSS Score:** 5.8
-**Location:** client/views.py, fleet/views.py
+**Location:** business/views.py, fleet/views.py
 
 #### Description:
 File uploads (business logos, driver documents) lack proper validation, allowing malicious file uploads.
@@ -1078,7 +1078,7 @@ File uploads (business logos, driver documents) lack proper validation, allowing
 #### Affected Code:
 
 ```python
-# client/views.py:580
+# business/views.py:580
 business_logo = models.ImageField(
     upload_to=upload_path_handler,
     default="business/avatar.png"
@@ -1198,7 +1198,7 @@ def business_logo_update(request, business_id):
         form = business_forms.BusinessLogoForm()
 
     context = {'form': form, 'form_title': 'Business Logo Update'}
-    return render(request, 'client/parts/business_logo_update.html', context)
+    return render(request, 'business/parts/business_logo_update.html', context)
 ```
 
 **Additional file upload security:**
@@ -1518,7 +1518,7 @@ View Security Checklist:
 4. Is it an API endpoint? → Use @permission_classes
 """
 
-# Example: Secure all client views
+# Example: Secure all business views
 from django.contrib.auth.decorators import login_required
 
 @login_required(login_url='account_login')
@@ -1582,7 +1582,7 @@ class SecurityLoggingMiddleware:
 
     @staticmethod
     def get_client_ip(request):
-        """Get client IP address"""
+        """Get business IP address"""
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         if x_forwarded_for:
             ip = x_forwarded_for.split(',')[0]
@@ -2030,7 +2030,7 @@ ADMINS = [('Admin', 'admin@ezzydelivery.com')]
 1. **Fix IDOR Vulnerabilities** (3-5 days)
    - [ ] Audit all views for authorization checks
    - [ ] Implement ownership verification in orders/views.py
-   - [ ] Implement ownership verification in client/views.py
+   - [ ] Implement ownership verification in business/views.py
    - [ ] Implement ownership verification in fleet/views.py
    - [ ] Add authorization checks to all API endpoints
    - [ ] Write tests to verify authorization

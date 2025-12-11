@@ -74,7 +74,7 @@
                 "name": "Can I track my delivery in real-time with EzzyDelivery?",
                 "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "Yes, all EzzyDelivery shipments include real-time GPS tracking through our Client Portal. Features include: order status tracking, driver route visibility, delivery proof, payment status, and real-time updates. Customers also receive delivery notifications via SMS and WhatsApp."
+                    "text": "Yes, all EzzyDelivery shipments include real-time GPS tracking through our Business Portal. Features include: order status tracking, driver route visibility, delivery proof, payment status, and real-time updates. Customers also receive delivery notifications via SMS and WhatsApp."
                 }
             },
             {

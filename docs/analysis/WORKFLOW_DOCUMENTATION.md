@@ -20,7 +20,7 @@ This document describes the complete workflow from order creation to DMS push ac
 ### 1. Order Creation (Client → Orders App)
 
 **Entry Points:**
-- Client creates order via web form (`orders/views.py:add_order`)
+- Business creates order via web form (`orders/views.py:add_order`)
 - API endpoint creates order (`ezzy_api/views.py:import_shopify_orders`, `import_woocommerce_orders`)
 - Manual order creation by business
 

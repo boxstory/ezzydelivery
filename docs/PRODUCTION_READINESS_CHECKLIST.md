@@ -37,7 +37,7 @@ This checklist ensures the Django Ezzy Delivery application is ready for product
       ├── core/
       │   ├── profile.css
       │   └── dashboard.css
-      ├── client/
+      ├── business/
       │   └── dashboard.css
       ├── workforce/
       │   └── dashboard.css
@@ -54,7 +54,7 @@ This checklist ensures the Django Ezzy Delivery application is ready for product
 ### 1.2 Semantic IDs ⚠️ IN PROGRESS
 - [ ] **Add IDs to main elements** (following [ID Convention Guide](ID_CONVENTION_GUIDE.md))
   - Core templates: Profile, dashboard pages
-  - Client templates: Business settings, team management
+  - Business templates: Business settings, team management
   - Workforce templates: Order management, verification
   - Fleet templates: Documents, vehicles, driver profile
   - **Exclude:** `<li>`, `<span>`, `<h*>`, `<p>` (end-level tags)
@@ -462,7 +462,7 @@ This checklist ensures the Django Ezzy Delivery application is ready for product
   - Profile management
   - Dashboard navigation
   - Feature-by-feature guides:
-    - Client dashboard usage
+    - Business dashboard usage
     - Workforce order management
     - Fleet document management
     - Business settings configuration
@@ -622,7 +622,7 @@ This checklist ensures the Django Ezzy Delivery application is ready for product
 **High Impact Files** (Most inline styles):
 - `workforce/` templates: ~60% of instances
 - `webpages/` templates: ~15% of instances
-- `client/` templates: ~10% of instances
+- `business/` templates: ~10% of instances
 - `fleet/` templates: ~10% of instances
 - `core/` templates: ~5% of instances
 

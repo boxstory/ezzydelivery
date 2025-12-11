@@ -76,8 +76,8 @@ pip install black flake8 pytest pytest-django coverage
 # 4. Flake8 (ms-python.flake8)
 # 5. Django (batisteo.vscode-django)
 # 6. SQLite Viewer (alexcvzz.vscode-sqlite)
-# 7. REST Client (humao.rest-client)
-# 8. Thunder Client (rangav.vscode-thunder-client)
+# 7. REST Business (humao.rest-client)
+# 8. Thunder Business (rangav.vscode-thunder-client)
 ```
 
 **Checklist:**

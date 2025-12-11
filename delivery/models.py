@@ -38,7 +38,7 @@ DMS Status Codes:
 Related:
     - orders.models.Order: Source order for delivery task
     - fleet.models.Driver: Driver assigned to task
-    - client.models.Business: Business that placed the order
+    - business.models.Business: Business that placed the order
 """
 
 from django.db import models
@@ -46,7 +46,7 @@ from django.db import models
 from core import models as core_models
 from orders import models as orders_models
 from delivery import models as delivery_models
-from client import models as business_models
+from business import models as business_models
 from fleet import models as fleet_models
 
 

@@ -4,7 +4,7 @@ from delivery import views as delivery_views
 from orders import views as orders_views
 from core import views as core_views
 from fleet import views as fleet_views
-from client import views as business_views
+from business import views as business_views
 
 app_name = 'fleet'
 urlpatterns = [

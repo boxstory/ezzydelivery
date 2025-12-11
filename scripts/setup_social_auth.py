@@ -70,11 +70,11 @@ def setup_google(site):
         print("\n⏭️  Skipping Google setup. Configure later in Django admin.")
         return
 
-    client_id = input("\nEnter Google Client ID: ").strip()
-    client_secret = input("Enter Google Client Secret: ").strip()
+    client_id = input("\nEnter Google Business ID: ").strip()
+    client_secret = input("Enter Google Business Secret: ").strip()
 
     if not client_id or not client_secret:
-        print("\n❌ Both Client ID and Secret are required. Skipping.")
+        print("\n❌ Both Business ID and Secret are required. Skipping.")
         return
 
     # Check if Google app already exists
@@ -98,7 +98,7 @@ def setup_google(site):
 
     print("\n✅ Google OAuth configured successfully!")
     print(f"   Provider: Google")
-    print(f"   Client ID: {client_id[:20]}...")
+    print(f"   Business ID: {client_id[:20]}...")
     print(f"   Redirect URI: http://{site.domain}/accounts/google/login/callback/")
 
 
