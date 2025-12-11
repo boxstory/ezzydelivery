@@ -1,0 +1,101 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Orders List{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">Orders List</h1>
+            <p class="text-muted">View and manage your orders</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">All Orders</h5>
+                    <a href="{% url 'orders:add_order' %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus me-1"></i>Add Order
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Customer</th>
+                                    <th>Phone</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in orders %}
+                                <tr>
+                                    <td><strong>{{ order.client_order_code|default:order.order_number }}</strong></td>
+                                    <td>{{ order.customer_name }}</td>
+                                    <td>{{ order.customer_phone }}</td>
+                                    <td>
+                                        <span class="badge
+                                            {% if order.order_status == 'publish' %}bg-success
+                                            {% elif order.order_status == 'ready_to_pickup' %}bg-info
+                                            {% elif order.order_status == 'to_review' %}bg-warning text-dark
+                                            {% elif order.order_status == 'cancelled' %}bg-danger
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ order.get_order_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ order.order_date|date:"d M Y" }}</td>
+                                    <td>
+                                        <a href="{% url 'orders:order_details' order.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'orders:order_update' order.id %}" class="btn btn-sm btn-outline-secondary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-5">
+                                        <i class="fas fa-box-open fa-3x mb-3 d-block"></i>
+                                        No orders found
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {% if orders.has_other_pages %}
+                <div class="card-footer bg-white">
+                    <nav>
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if orders.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ orders.previous_page_number }}">Previous</a>
+                            </li>
+                            {% endif %}
+                            <li class="page-item active">
+                                <span class="page-link">Page {{ orders.number }} of {{ orders.paginator.num_pages }}</span>
+                            </li>
+                            {% if orders.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ orders.next_page_number }}">Next</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

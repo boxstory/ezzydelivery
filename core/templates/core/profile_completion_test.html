@@ -1,0 +1,59 @@
+{% extends 'client_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Profile Completion Test{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">Profile Completion Test</h1>
+            <p class="text-muted">Testing profile completion status</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0">
+                    <h5 class="mb-0">Profile Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tr>
+                            <th>User ID:</th>
+                            <td>{{ profile.user_id }}</td>
+                        </tr>
+                        <tr>
+                            <th>First Name:</th>
+                            <td>{{ profile.first_name|default:"Not set" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Last Name:</th>
+                            <td>{{ profile.last_name|default:"Not set" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Phone:</th>
+                            <td>{{ profile.phone_number|default:"Not set" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Role:</th>
+                            <td>{{ profile.user_type|default:"Not set" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Verified:</th>
+                            <td>
+                                {% if profile.is_profile_verified %}
+                                <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                <span class="badge bg-warning">No</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

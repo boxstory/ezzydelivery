@@ -1,0 +1,115 @@
+{% load static %}
+{% load crispy_forms_tags %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% include "includes/head.html" %}
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+
+    <!-- Dashboard CSS - Always loaded for HTMX compatibility -->
+    <link rel="stylesheet" href="{% static 'business_dashboard_base.css' %}">
+    <link rel="stylesheet" href="{% static 'webpages/css/sidebar-common.css' %}">
+    <link rel="stylesheet" href="{% static 'orders/css/orders_main.css' %}">
+    <link rel="stylesheet" href="{% static 'product/css/product_list.css' %}">
+    <link rel="stylesheet" href="{% static 'delivery/css/delivery_main.css' %}">
+    <link rel="stylesheet" href="{% static 'business/css/pickup_location_list.css' %}">
+    <link rel="stylesheet" href="{% static 'business/css/business_settings_api_list.css' %}">
+
+    {% block extra_css %}
+    {% endblock extra_css %}
+    <title>
+      {% block title %}
+      {% endblock title %}
+    Ezzy Dashboard</title>
+  </head>
+  <body class="d-flex flex-column min-vh-100" hx-boost="true">
+    <!-- Toast Notifications -->
+    {% include "includes/toast_notifications.html" %}
+
+    {% include "includes/navbar.html" %}
+    <main class="col-12 ps-2 flex-grow-1">
+      {% include "business/parts/dashboard_sidebar_business_mob.html" %}
+      <div class="col-12 d-flex">
+        <!-- sidebar -->
+        {% block sidebar %}
+          {% include "business/parts/dashboard_sidebar_business.html" %}
+        {% endblock sidebar %}
+        <!-- dashboard body content goes here -->
+        <div class="dashboard-content-area flex-grow-1" id="main-content">
+          {% include "includes/messages.html" %}
+          {% block content %}
+          {% endblock content %}
+        </div>
+      </div>
+    </main>
+    <!-- footer -->
+    {% include "includes/footer.html" %}
+    <!-- extra js -->
+    {% include "includes/scripts.html" %}
+    <!-- dashboard js -->
+    {% include "includes/main_dashboard_scripts.html" %}
+    <!-- Session timeout monitor -->
+    <script src="{% static 'webpages/js/session-monitor.js' %}"></script>
+    <!-- HTMX Configuration -->
+    <script>
+      // Update sidebar active states after HTMX navigation
+      document.body.addEventListener('htmx:afterSwap', function(evt) {
+        // Update active states in sidebar based on current URL
+        updateSidebarActiveStates();
+      });
+
+      function updateSidebarActiveStates() {
+        const currentPath = window.location.pathname;
+        const sidebarLinks = document.querySelectorAll('.dashboard-sidebar .nav-link');
+
+        sidebarLinks.forEach(link => {
+          const href = link.getAttribute('href');
+          if (href && currentPath.includes(href)) {
+            link.classList.add('active');
+            // Expand parent if in submenu
+            const parentCollapse = link.closest('.multi-level');
+            if (parentCollapse) {
+              parentCollapse.classList.add('show');
+              const parentNav = parentCollapse.closest('.nav-item');
+              if (parentNav) {
+                parentNav.classList.add('active');
+                const parentToggle = parentNav.querySelector('[data-bs-toggle="collapse"]');
+                if (parentToggle) {
+                  parentToggle.classList.add('active');
+                  parentToggle.setAttribute('aria-expanded', 'true');
+                }
+              }
+            }
+          } else {
+            link.classList.remove('active');
+          }
+        });
+      }
+
+      // Loading indicator for HTMX requests
+      document.body.addEventListener('htmx:beforeRequest', function(evt) {
+        const target = document.getElementById('main-content');
+        if (target) {
+          target.style.opacity = '0.5';
+          target.style.transition = 'opacity 0.2s ease';
+        }
+      });
+
+      document.body.addEventListener('htmx:afterRequest', function(evt) {
+        const target = document.getElementById('main-content');
+        if (target) {
+          target.style.opacity = '1';
+        }
+      });
+
+      // Update sidebar active states after HTMX swap
+      document.body.addEventListener('htmx:afterSettle', function(evt) {
+        updateSidebarActiveStates();
+      });
+    </script>
+    {% block extra_js %}
+      <!--  -->
+    {% endblock extra_js %}
+  </body>
+</html>

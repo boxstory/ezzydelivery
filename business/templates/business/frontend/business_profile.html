@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ business.business_name }} - Business Profile{% endblock title %}
+
+{% block extra_css %}
+<link href="{% static 'business/css/business-profile-frontend.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="profile-container" id="client_profile_container_main">
+    <!-- Hero Section -->
+    <section class="hero-section" id="client_profile_section_hero">
+        {% if business_logo_img %}
+            <img src="{{ business_logo_img }}" alt="{{ business.business_name }}" class="business-logo" id="client_profile_img_logo">
+        {% else %}
+            <img src="{% static 'webpages/img/ezzy-logo-sqr-round.png' %}" alt="{{ business.business_name }}" class="business-logo" id="client_profile_img_logo">
+        {% endif %}
+
+        <h1 class="business-name" id="client_profile_title_business_name">{{ business.business_name }}</h1>
+        <p class="business-bio" id="client_profile_text_bio">{{ business.business_bio|default:"Welcome to our business profile" }}</p>
+        <div class="business-meta" id="client_profile_section_meta">
+            <span><i class="fa-solid fa-calendar-days me-1"></i>Since {{ business.business_since|date:"Y"|default:"N/A" }}</span>
+            {% if business.business_id %}
+                <span class="mx-2">•</span>
+                <span><i class="fa-solid fa-building me-1"></i>ID: {{ business.business_id }}</span>
+            {% endif %}
+        </div>
+
+        {% if request.user.user_business.first.business_id == business.business_id %}
+            <a href="{% url 'business:business_profile_info_update' business.business_id %}" class="btn btn-edit" id="client_profile_btn_edit">
+                <i class="fa-solid fa-pen-to-square me-2"></i>Edit Profile
+            </a>
+        {% endif %}
+    </section>
+
+    <!-- Content Section -->
+    <div class="content-wrapper" id="client_profile_wrapper_content">
+        <div class="row g-4">
+            <!-- Business Information -->
+            <div class="col-lg-6">
+                <div class="info-card" id="client_profile_card_business_info">
+                    <div class="card-header">
+                        <h2 class="card-title" id="client_profile_title_business_info">
+                            <i class="fa-solid fa-briefcase"></i>
+                            Business Information
+                        </h2>
+                    </div>
+
+                    {% if business_profile %}
+                        <div class="info-row">
+                            <div class="info-label">Founders</div>
+                            <div class="info-value">{{ business_profile.business_founters_name|default:"Not specified" }}</div>
+                        </div>
+
+                        <div class="info-row">
+                            <div class="info-label">Category</div>
+                            <div class="info-value">{{ business_profile.business_catagory_main|default:"Not specified" }}</div>
+                        </div>
+
+                        <div class="info-row">
+                            <div class="info-label">Mission</div>
+                            <div class="info-value">{{ business_profile.business_mision|default:"Not specified" }}</div>
+                        </div>
+
+                        {% if business_profile.business_uniqueness_title %}
+                        <div class="info-row">
+                            <div class="info-label">What Makes Us Unique</div>
+                            <div class="info-value">{{ business_profile.business_uniqueness_title }}</div>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <p>No detailed business information available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- About & Details -->
+            <div class="col-lg-6">
+                <div class="info-card" id="client_profile_card_about">
+                    <div class="card-header">
+                        <h2 class="card-title" id="client_profile_title_about">
+                            <i class="fa-solid fa-circle-info"></i>
+                            About Us
+                        </h2>
+                    </div>
+
+                    {% if business_profile %}
+                        {% if business_profile.business_about_part_1 %}
+                        <div class="info-value mb-3">
+                            {{ business_profile.business_about_part_1 }}
+                        </div>
+                        {% endif %}
+
+                        {% if business_profile.business_about_part_2 %}
+                        <div class="info-value mb-3">
+                            {{ business_profile.business_about_part_2 }}
+                        </div>
+                        {% endif %}
+
+                        {% if business_profile.business_mision_detailed %}
+                        <div class="info-row">
+                            <div class="info-label">Our Mission</div>
+                            <div class="info-value">{{ business_profile.business_mision_detailed }}</div>
+                        </div>
+                        {% endif %}
+
+                        {% if business_profile.business_catagory_detailed %}
+                        <div class="info-row">
+                            <div class="info-label">What We Do</div>
+                            <div class="info-value">{{ business_profile.business_catagory_detailed }}</div>
+                        </div>
+                        {% endif %}
+
+                        {% if business_profile.business_uniqueness_description %}
+                        <div class="info-row">
+                            <div class="info-label">Why Choose Us</div>
+                            <div class="info-value">{{ business_profile.business_uniqueness_description }}</div>
+                        </div>
+                        {% endif %}
+
+                        {% if business_profile.business_founters_bio %}
+                        <div class="info-row">
+                            <div class="info-label">Founder's Story</div>
+                            <div class="info-value">{{ business_profile.business_founters_bio }}</div>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="fa-solid fa-book-open"></i>
+                            <p>No about information available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="col-12">
+                <div class="info-card" id="client_profile_card_contact">
+                    <div class="card-header">
+                        <h2 class="card-title" id="client_profile_title_contact">
+                            <i class="fa-solid fa-address-card"></i>
+                            Get In Touch
+                        </h2>
+                    </div>
+
+                    {% if business_profile %}
+                        <div class="social-links" id="client_profile_section_social">
+                            {% if business_profile.business_website %}
+                            <a href="http://{{ business_profile.business_website }}" class="social-link" target="_blank" rel="noopener">
+                                <i class="fa-solid fa-globe"></i>
+                                <span>Visit Website</span>
+                            </a>
+                            {% endif %}
+
+                            {% if business_profile.business_instagram %}
+                            <a href="https://www.instagram.com/{{ business_profile.business_instagram }}" class="social-link" target="_blank" rel="noopener">
+                                <i class="fa-brands fa-instagram"></i>
+                                <span>@{{ business_profile.business_instagram }}</span>
+                            </a>
+                            {% endif %}
+
+                            {% if business_profile.business_facebook_page %}
+                            <a href="https://www.facebook.com/{{ business_profile.business_facebook_page }}" class="social-link" target="_blank" rel="noopener">
+                                <i class="fa-brands fa-facebook"></i>
+                                <span>{{ business_profile.business_facebook_page }}</span>
+                            </a>
+                            {% endif %}
+
+                            {% if business.business_phone %}
+                            <a href="tel:{{ business.business_phone }}" class="social-link">
+                                <i class="fa-solid fa-phone"></i>
+                                <span>{{ business.business_phone }}</span>
+                            </a>
+                            {% endif %}
+
+                            {% if business.business_email %}
+                            <a href="mailto:{{ business.business_email }}" class="social-link">
+                                <i class="fa-solid fa-envelope"></i>
+                                <span>{{ business.business_email }}</span>
+                            </a>
+                            {% endif %}
+                        </div>
+
+                        {% if not business_profile.business_website and not business_profile.business_instagram and not business_profile.business_facebook_page %}
+                        <div class="empty-state">
+                            <i class="fa-solid fa-link-slash"></i>
+                            <p>No contact information available</p>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="fa-solid fa-address-book"></i>
+                            <p>No contact details available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Products/Services Section (Placeholder for future implementation) -->
+            <div class="col-12">
+                <div class="info-card" id="client_profile_card_products">
+                    <div class="card-header">
+                        <h2 class="card-title" id="client_profile_title_products">
+                            <i class="fa-solid fa-box-open"></i>
+                            Products & Services
+                        </h2>
+                    </div>
+
+                    <div class="empty-state">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                        <p>Product showcase coming soon</p>
+                        {% if request.user.user_business.first.business_id == business.business_id %}
+                            <p class="small text-muted">Add products from your dashboard to display them here</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

@@ -1,0 +1,237 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Purchase Orders - Fulfilled{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/wf_pages.css' %}" />
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/wf_lists.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3">
+<!-- Page Title -->
+<h1 class="page-title">
+    <i class="fa-solid fa-receipt me-2"></i>Purchase Orders (Fulfilled)
+</h1>
+
+<!-- Summary Stats -->
+<div class="stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+    <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #2196f3;">
+        <div style="font-size: 0.812rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Total Orders</div>
+        <div style="font-size: 1.75rem; font-weight: 800; color: #2196f3;">{{ total_count }}</div>
+    </div>
+    <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #28a745;">
+        <div style="font-size: 0.812rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Fulfilled</div>
+        <div style="font-size: 1.75rem; font-weight: 800; color: #28a745;">{{ fulfilled_count }}</div>
+    </div>
+    <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #17a2b8;">
+        <div style="font-size: 0.812rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Delivered</div>
+        <div style="font-size: 1.75rem; font-weight: 800; color: #17a2b8;">{{ delivered_count }}</div>
+    </div>
+    <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #ffc107;">
+        <div style="font-size: 0.812rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Total COD</div>
+        <div style="font-size: 1.75rem; font-weight: 800; color: #f57c00;">QAR {{ total_cod }}</div>
+    </div>
+</div>
+
+<!-- Filter Section -->
+<div class="filter-section">
+    <form method="get" class="row g-3"
+          hx-get=""
+          hx-target="#main-content"
+          hx-select="#main-content"
+          hx-swap="outerHTML"
+          hx-push-url="true">
+        <div class="col-md-6 col-lg-3">
+            <label for="search" class="filter-label">
+                <i class="fa-solid fa-search me-2"></i>Search
+            </label>
+            <input type="text" id="search" name="search" class="filter-input"
+                   placeholder="Order #, Customer, Phone..." value="{{ filters.search }}">
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <label for="business" class="filter-label">
+                <i class="fa-solid fa-store me-2"></i>Supplier
+            </label>
+            <select id="business" name="business" class="form-select">
+                <option value="">All Suppliers</option>
+                {% for supplier in suppliers %}
+                <option value="{{ supplier.business_id }}" {% if filters.business == supplier.business_id|stringformat:"s" %}selected{% endif %}>
+                    {{ supplier.business_name }} ({{ supplier.business_code|default:supplier.business_id }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-6 col-lg-2">
+            <label for="date_from" class="filter-label">
+                <i class="fa-solid fa-calendar me-2"></i>From Date
+            </label>
+            <input type="date" id="date_from" name="date_from" class="form-control" value="{{ filters.date_from }}">
+        </div>
+        <div class="col-md-6 col-lg-2">
+            <label for="date_to" class="filter-label">
+                <i class="fa-solid fa-calendar me-2"></i>To Date
+            </label>
+            <input type="date" id="date_to" name="date_to" class="form-control" value="{{ filters.date_to }}">
+        </div>
+        <div class="col-md-6 col-lg-2">
+            <label for="status" class="filter-label">
+                <i class="fa-solid fa-flag me-2"></i>Status
+            </label>
+            <select id="status" name="status" class="form-select">
+                <option value="">All Statuses</option>
+                <option value="delivered" {% if filters.status == 'delivered' %}selected{% endif %}>Delivered</option>
+                <option value="fulfilled" {% if filters.status == 'fulfilled' %}selected{% endif %}>Fulfilled</option>
+            </select>
+        </div>
+        <div class="col-12">
+            <div class="d-flex gap-2 justify-content-end">
+                <a href="{% url 'workforce:fulfilled_orders_list' %}" class="btn btn-outline-secondary">
+                    <i class="fa-solid fa-times me-1"></i>Clear
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-filter me-1"></i>Apply Filters
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Orders Table -->
+<div class="orders-table-container">
+    {% if page_obj %}
+    <table class="orders-table">
+        <thead>
+            <tr>
+                <th>Order #</th>
+                <th>Supplier</th>
+                <th>Customer</th>
+                <th>COD</th>
+                <th>Status</th>
+                <th>Delivered At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in page_obj %}
+            <tr>
+                <td>
+                    <div>
+                        <strong>#{{ order.order_number }}</strong>
+                        <br>
+                        <small class="text-muted">{{ order.client_order_code }}</small>
+                    </div>
+                </td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="driver-icon me-2" style="width: 30px; height: 30px; background: #e3f2fd;">
+                            <i class="fa-solid fa-store" style="color: #2196f3; font-size: 0.8rem;"></i>
+                        </div>
+                        <div>
+                            <span>{{ order.business.business_name|default:"N/A" }}</span>
+                            <br>
+                            <small class="text-muted">{{ order.business.business_code|default:"" }}</small>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div>
+                        <strong>{{ order.customer_name|default:"N/A" }}</strong>
+                        {% if order.customer_phone %}
+                        <br>
+                        <small class="text-muted"><i class="fa-solid fa-phone me-1"></i>{{ order.customer_phone }}</small>
+                        {% endif %}
+                    </div>
+                </td>
+                <td>
+                    {% if order.cod_status_by_client == 'include' %}
+                    <span class="badge bg-warning text-dark">QAR {{ order.cod_amount }}</span>
+                    {% else %}
+                    <span class="text-muted">No COD</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if order.order_status == 'fulfilled' %}
+                    <span class="status-badge" style="background: #d4edda; color: #155724;">
+                        <i class="fa-solid fa-box-check me-1"></i>Fulfilled
+                    </span>
+                    {% elif order.order_status == 'delivered' %}
+                    <span class="status-badge" style="background: #d1ecf1; color: #0c5460;">
+                        <i class="fa-solid fa-truck me-1"></i>Delivered
+                    </span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if order.delivered_at %}
+                    {{ order.delivered_at|date:"d M Y" }}
+                    <br>
+                    <small class="text-muted">{{ order.delivered_at|time:"h:i A" }}</small>
+                    {% else %}
+                    <span class="text-muted">N/A</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="btn-group">
+                        <a href="{% url 'workforce:wf_orders_all' %}?search={{ order.order_number }}"
+                           class="btn btn-sm btn-outline-primary" title="View Order">
+                            <i class="fa-solid fa-eye"></i>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-container">
+        <nav aria-label="Page navigation">
+            <ul class="pagination">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}">Previous</a>
+                </li>
+                {% endif %}
+
+                <li class="page-item active">
+                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                </li>
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.business %}&business={{ filters.business }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}">Next</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-receipt"></i>
+        <h3>No Purchase Orders Found</h3>
+        <p>{% if filters.search or filters.business or filters.date_from %}No orders match your filter criteria.{% else %}There are no fulfilled/delivered orders yet.{% endif %}</p>
+        {% if filters.search or filters.business or filters.date_from %}
+        <a href="{% url 'workforce:fulfilled_orders_list' %}" class="btn btn-outline-primary mt-3">
+            <i class="fa-solid fa-times me-1"></i>Clear Filters
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Auto-submit form on select change
+    document.querySelectorAll('#business, #status').forEach(select => {
+        select.addEventListener('change', function() {
+            htmx.trigger(this.form, 'submit');
+        });
+    });
+</script>
+{% endblock extra_js %}

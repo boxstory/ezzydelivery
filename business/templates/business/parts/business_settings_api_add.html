@@ -1,0 +1,59 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'business/css/form-styles.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+
+<div class="form-container" id="client_api_add_container_main">
+    <!-- Header -->
+    <div class="form-header" id="client_api_add_section_header">
+        <h1 id="client_api_add_title_form">
+            <i class="fa-solid fa-plug"></i>
+            {{ form_title|default:"Add API Integration" }}
+        </h1>
+        <a href="{% url 'business:business_settings' business.business_id %}" class="back-link">
+            <i class="fa-solid fa-arrow-left"></i>
+            Back to Settings
+        </a>
+    </div>
+
+    <!-- Form Card -->
+    <div class="form-card">
+        <div class="form-card-header">
+            <i class="fa-solid fa-gear"></i>
+            <h2>API Configuration</h2>
+        </div>
+        <form method="POST" id="client_api_add_form_main">
+            {% csrf_token %}
+            <div class="form-card-body">
+                {{ form | crispy }}
+            </div>
+            <div class="form-card-footer">
+                <a href="{% url 'business:business_settings' business.business_id %}" class="btn-cancel" id="client_api_add_btn_back">
+                    <i class="fa-solid fa-xmark"></i>
+                    Cancel
+                </a>
+                <button type="submit" class="btn-submit" id="client_api_add_btn_submit">
+                    <i class="fa-solid fa-plus"></i>
+                    Add API
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Info Note -->
+    <div class="form-info-note">
+        <div class="form-info-note-title">
+            <i class="fa-solid fa-circle-info"></i>
+            Note
+        </div>
+        <p class="form-info-note-text">
+            After adding your API integration, it will need to be verified by an administrator before it can be used. You can test the connection once the API is added.
+        </p>
+    </div>
+</div>
+{% endblock content %}

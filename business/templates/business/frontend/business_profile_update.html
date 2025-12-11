@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Update Business Profile{% endblock title %}
+
+{% block extra_css %}
+<link href="{% static 'business/css/business-profile-frontend.css' %}" rel="stylesheet" type="text/css" />
+<style>
+    .update-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+    .form-card {
+        background: var(--brand-white, #fff);
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        padding: 2rem;
+    }
+    .form-card .card-header {
+        border-bottom: 1px solid #eee;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .form-card .card-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .form-card .card-title i {
+        color: var(--brand-primary, #3498db);
+    }
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+    .form-group label {
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: border-color 0.2s;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: var(--brand-primary, #3498db);
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    }
+    .form-group .help-text {
+        font-size: 0.85rem;
+        color: #666;
+        margin-top: 0.35rem;
+    }
+    .btn-submit {
+        background: var(--brand-primary, #3498db);
+        color: white;
+        border: none;
+        padding: 0.875rem 2rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-submit:hover {
+        background: #2980b9;
+    }
+    .btn-cancel {
+        background: #f8f9fa;
+        color: #333;
+        border: 1px solid #ddd;
+        padding: 0.875rem 2rem;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        margin-right: 0.5rem;
+    }
+    .btn-cancel:hover {
+        background: #e9ecef;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="update-container">
+    <div class="form-card">
+        <div class="card-header">
+            <h1 class="card-title">
+                <i class="fa-solid fa-pen-to-square"></i>
+                Update Business Profile
+            </h1>
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+
+            {% for field in form %}
+            <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                <p class="help-text">{{ field.help_text }}</p>
+                {% endif %}
+                {% if field.errors %}
+                <div class="text-danger small mt-1">
+                    {% for error in field.errors %}
+                    {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <div class="d-flex justify-content-end mt-4">
+                <a href="{% url 'business:business_profile' %}" class="btn-cancel">Cancel</a>
+                <button type="submit" class="btn-submit">
+                    <i class="fa-solid fa-save me-2"></i>Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock content %}

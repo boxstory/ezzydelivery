@@ -24,7 +24,7 @@ from django.core.files import File
 from delivery import models as delivery_models
 from core import models as core_models
 from fleet import models as fleet_models
-from client import models as business_models
+from business import models as business_models
 from orders import models as orders_models
 from webpages import models as webpages_models
 from product import models as product_models
@@ -39,6 +39,8 @@ ORDER_STATUS_BY_CLIENT = [
         ('to_review', 'Hold for Review'),
         ('ready_to_pickup', 'Ready to pickup'),
         ('publish', 'Publish for start delivery'),
+        ('delivered', 'Delivered'),
+        ('fulfilled', 'Fulfilled'),
         ('cancelled', 'Cancelled'),
     ]
 
@@ -131,7 +133,11 @@ class Order(models.Model):
     dl_zone = models.PositiveIntegerField(blank=True)
     dl_building = models.PositiveIntegerField(blank=True)
     dl_street = models.PositiveIntegerField(blank=True)
-    
+
+    # Delivery completion tracking
+    delivered_at = models.DateTimeField(blank=True, null=True, help_text="When the order was delivered")
+    fulfilled_at = models.DateTimeField(blank=True, null=True, help_text="When the order was marked as fulfilled")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

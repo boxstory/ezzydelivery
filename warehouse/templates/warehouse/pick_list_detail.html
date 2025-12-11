@@ -1,0 +1,128 @@
+{% extends 'client_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Pick List {{ pick_list.pick_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'warehouse:pick_list_list' %}">Pick Lists</a></li>
+                    <li class="breadcrumb-item active">{{ pick_list.pick_number }}</li>
+                </ol>
+            </nav>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">{{ pick_list.pick_number }}</h1>
+                    <p class="text-muted">{{ pick_list.warehouse.name }}</p>
+                </div>
+                <div>
+                    <span class="badge fs-6 {% if pick_list.status == 'completed' %}bg-success{% elif pick_list.status == 'in_progress' %}bg-primary{% elif pick_list.status == 'assigned' %}bg-info{% else %}bg-warning text-dark{% endif %}">
+                        {{ pick_list.get_status_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pick List Info -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Warehouse</span>
+                        <strong>{{ pick_list.warehouse.name }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Created</span>
+                        <strong>{{ pick_list.created_at|date:"d M Y H:i" }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Assigned To</span>
+                        <strong>{{ pick_list.assigned_to.username|default:"Unassigned" }}</strong>
+                    </div>
+                    {% if pick_list.assigned_at %}
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Assigned At</span>
+                        <strong>{{ pick_list.assigned_at|date:"d M Y H:i" }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    {% if pick_list.status == 'pending' %}
+                    <form method="POST" action="{% url 'warehouse:assign_pick_list' pick_list.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-user-plus me-2"></i>Assign to Me
+                        </button>
+                    </form>
+                    {% elif pick_list.status == 'assigned' and pick_list.assigned_to == request.user %}
+                    <p class="text-success"><i class="fas fa-check-circle me-2"></i>Assigned to you</p>
+                    <button class="btn btn-success btn-lg">
+                        <i class="fas fa-play me-2"></i>Start Picking
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pick Items -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Items to Pick ({{ items|length }})</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Location</th>
+                                    <th>Product</th>
+                                    <th>Order #</th>
+                                    <th class="text-center">Qty to Pick</th>
+                                    <th class="text-center">Picked</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                <tr>
+                                    <td><code>{{ item.location.code|default:"-" }}</code></td>
+                                    <td>{{ item.product.item_name }}</td>
+                                    <td>{{ item.order.order_number|default:"-" }}</td>
+                                    <td class="text-center"><strong>{{ item.quantity_to_pick }}</strong></td>
+                                    <td class="text-center">{{ item.quantity_picked }}</td>
+                                    <td>
+                                        {% if item.quantity_picked >= item.quantity_to_pick %}
+                                        <span class="badge bg-success">Complete</span>
+                                        {% elif item.quantity_picked > 0 %}
+                                        <span class="badge bg-warning text-dark">Partial</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">No items in this pick list</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

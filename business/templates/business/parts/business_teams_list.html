@@ -1,0 +1,77 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+{% block content %}
+  <div class="p-3 col-12  " id="client_teams_list_container_main">
+
+    <section id="client_teams_list_section_main">
+
+        <!-- Stores Lisings -->
+        <div class=" col-12  pb-3" id="client_teams_list_section_teams">
+          <div class="h4 py-1 d-flex bg-light justify-content-between  mx-auto" id="client_teams_list_section_header">
+            <div class=" my-auto fs-3 fw-bolder" id="client_teams_list_title_main">Business Teams</div>
+            <a href="{% url 'business:business_teams_add' business.business_id %}"
+               class=" text-center btn-primary-fill" id="client_teams_list_btn_new">New</a>
+          </div>
+          <div class="row px-3 d-flex flex-wrap">
+            {% if teams %}
+              {% for team in teams %}
+                <div class=" col-md-6 col-12">
+                  <div class="card mb-4">
+                    <div class="card-header">
+                      <p class="  m-0 ">{{ form_title }}</p>
+                    </div>
+                    <div class="card-body ps-2">
+                      <img src="{{ team.team_logo.url }}" alt="avatar" class="rounded-circle img-fluid mx-auto d-block"
+        style="width: 180px">
+                      
+                        <p class="text-center fw-bolder fs-4 mx-auto d-block">{{ team.team_name }}</p>
+                      <p>
+                        <strong>Role : </strong>{{ team.team_role }}
+                      </p>
+                      <p>
+                        <strong>Code : </strong>{{ team.team_code }}
+                      </p>
+                      <p>
+                        <strong>Joined : </strong>{{ team.created_at | date:"d M Y" }}
+                      </p>
+                      
+                      <p>
+                        <strong>Verified : </strong>{{ team.team_verifed }}
+                      </p>
+                      <p>
+                        <strong>Status:</strong>
+                        {% if team.team_status == 'active' %}
+                          <span class="text-success fs-5 fw-bold">{{ team.team_status }}</span><i class="fa fa-check-circle text-success" aria-hidden="true"></i>
+                        {% else %}
+                          <span class="text-danger fs-5 fw-bold">{{ team.team_status }}
+                            <i class="fa-solid fa-circle-xmark" style="color: #ff0000;"></i>
+                          </span>
+                        {% endif %}
+                      </p>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                      <a href="{% url 'business:business_teams_update' business.business_id team.id %}"
+                         class="card-footer text-center bg-primary fw-bold btn col-6">Make Admin</a>
+                         
+                         <a href="{% url 'business:business_teams_update' business.business_id team.id %}"
+                         class="card-footer text-center bg-dark text-white btn col-3 "><i class="fa-solid fa-pen-to-square fa-lg"></i></a>
+                         <a href="{% url 'business:business_teams_update' business.business_id team.id %}"
+                             class="card-footer text-center bg-danger text-white btn col-3"><i class="fa-solid fa-trash fa-lg"></i></a>
+                  </div></div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="col-12 d-flex flex-wrap justify-content-center pb-3">
+                <div class="alert alert-warning m-0" role="alert">No stores Listed</div>
+                <div class="card-footer text-center my-auto">
+                  <a href="{% url 'business:business_teams_add' business.business_id %}">
+                    <button class="btn btn-dark">Add</button>
+                  </a>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </section>
+    </div>
+  {% endblock content %}

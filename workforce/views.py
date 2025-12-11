@@ -52,7 +52,7 @@ Security:
 
 Related:
     - workforce.models: (empty - uses core.Profile)
-    - All app models: orders, delivery, fleet, client
+    - All app models: orders, delivery, fleet, business
 """
 
 from django.http import HttpResponse, JsonResponse
@@ -68,13 +68,13 @@ from django.core.paginator import (
 )
 from django.urls import reverse
 
-from client import models as business_models
+from business import models as business_models
 from core import models as core_models
 from orders import models as orders_models
 from delivery import models as delivery_models
 from fleet import models as fleet_models
 
-from client import forms as business_forms
+from business import forms as business_forms
 
 # ShipDay API integration
 from decouple import config
@@ -138,8 +138,8 @@ def all_orders(request):
 
     # Start with all orders, prefetch related data to avoid N+1 queries
     orders = orders_models.Order.objects.select_related(
-        'business', 'delivery_task'
-    ).prefetch_related('order_comments')
+        'business'
+    ).prefetch_related('order_comments', 'delivery_task')
 
     # Apply filters based on GET parameters
     dl_code = request.GET.get('dlCode', '').strip()
@@ -147,12 +147,17 @@ def all_orders(request):
     mobile = request.GET.get('mobile', '').strip()
     c_status = request.GET.get('cStatus', '').strip()
     dms_status = request.GET.get('dmsStatus', '').strip()
+    business_id = request.GET.get('business', '').strip()
+
+    # Filter by Business ID
+    if business_id:
+        orders = orders.filter(business_id=business_id)
 
     # Filter by DL Code (delivery task code)
     if dl_code:
         orders = orders.filter(delivery_task__dl_task_code__icontains=dl_code)
 
-    # Filter by Client Order Code
+    # Filter by Business Order Code
     if c_code:
         orders = orders.filter(client_order_code__icontains=c_code)
 
@@ -177,14 +182,19 @@ def all_orders(request):
     # Paginate results
     orders = paginate_queryset(request, orders)
 
+    # Get all businesses for filter dropdown
+    all_businesses = business_models.Business.objects.all().order_by('business_name')
+
     data = {
         'orders': orders,
+        'all_businesses': all_businesses,
         'filters': {
             'dlCode': dl_code,
             'cCode': c_code,
             'mobile': mobile,
             'cStatus': c_status,
             'dmsStatus': dms_status,
+            'business': business_id,
         }
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
@@ -229,14 +239,14 @@ def orders_by_seller(request):
         'search': search,
     }
 
-    return render(request, 'workforce/orders_by_seller.html', context)
+    return render(request, 'workforce/wf_orders_by_seller.html', context)
 
 
 @login_required(login_url='/accounts/login/')
 def orders_to_publish(request):
     orders = orders_models.Order.objects.select_related(
-        'business', 'delivery_task'
-    ).prefetch_related('order_comments').filter(task_created=False).order_by('-created_at')
+        'business'
+    ).prefetch_related('order_comments', 'delivery_task').filter(task_created=False).order_by('-created_at')
     orders = paginate_queryset(request, orders)
 
     data = {
@@ -248,8 +258,8 @@ def orders_to_publish(request):
 @login_required(login_url='/accounts/login/')
 def orders_published(request):
     orders = orders_models.Order.objects.select_related(
-        'business', 'delivery_task'
-    ).prefetch_related('order_comments').filter(task_created=True).order_by('-created_at')
+        'business'
+    ).prefetch_related('order_comments', 'delivery_task').filter(task_created=True).order_by('-created_at')
     orders = paginate_queryset(request, orders)
 
     data = {
@@ -269,7 +279,7 @@ def submit_to_task(request, order_id):
     if order.verification_status != 'verified':
         from django.contrib import messages
         messages.warning(request, 'Order must be verified before creating delivery task')
-        return redirect(reverse('workforce:all_orders'))
+        return redirect(reverse('workforce:wf_orders_all'))
     
     # Use the automated function that handles DMS push
     delivery_task = _create_delivery_task_from_order(order)
@@ -281,7 +291,7 @@ def submit_to_task(request, order_id):
         from django.contrib import messages
         messages.error(request, 'Failed to create delivery task')
     
-    return redirect(reverse('workforce:all_orders'))
+    return redirect(reverse('workforce:wf_orders_all'))
 
 
 @login_required(login_url='/accounts/login/')
@@ -369,7 +379,7 @@ def verify_order_address(request, order_id):
         
         from django.contrib import messages
         messages.success(request, 'Address verified successfully')
-        return redirect(reverse('workforce:all_orders'))
+        return redirect(reverse('workforce:wf_orders_all'))
     
     # GET request - show verification form
     address_verification = AddressVerification.objects.filter(order=order).first()
@@ -417,7 +427,7 @@ def verify_order(request, order_id):
         else:
             messages.success(request, 'Order verified successfully')
         
-        return redirect(reverse('workforce:all_orders'))
+        return redirect(reverse('workforce:wf_orders_all'))
     
     # GET request - show verification form
     context = {
@@ -432,8 +442,8 @@ def orders_pending_verification(request):
     verification_status = request.GET.get('verification_status', 'pending')
 
     orders = orders_models.Order.objects.select_related(
-        'business', 'delivery_task'
-    ).prefetch_related('order_comments').filter(verification_status=verification_status).order_by('-created_at')
+        'business'
+    ).prefetch_related('order_comments', 'delivery_task').filter(verification_status=verification_status).order_by('-created_at')
     orders = paginate_queryset(request, orders)
     
     data = {
@@ -455,7 +465,9 @@ def orders_pending_verification(request):
 
 @login_required(login_url='/accounts/login/')
 def dl_list_all(request):
-    dl_tasks  = delivery_models.DeliveryTask.objects.all().order_by('-created_at')
+    dl_tasks = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).all().order_by('-created_at')
     dl_tasks = paginate_queryset(request, dl_tasks)
     data = {
         'dl_tasks': dl_tasks,
@@ -466,7 +478,9 @@ def dl_list_all(request):
 @login_required(login_url='/accounts/login/')
 def dl_list_incompleted_details(request):
     # Get incomplete delivery tasks (not delivered, not cancelled)
-    dl_tasks = delivery_models.DeliveryTask.objects.exclude(
+    dl_tasks = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).exclude(
         dl_task_status_dms__in=['delivered', 'cancelled']
     ).order_by('-created_at')
     dl_tasks = paginate_queryset(request, dl_tasks)
@@ -479,18 +493,22 @@ def dl_list_incompleted_details(request):
 
 @login_required(login_url='/accounts/login/')
 def dl_list_published_to_dms(request):
-    orders  = delivery_models.DeliveryTask.objects.filter().order_by('-created_at')
-    orders = paginate_queryset(request, orders)
+    dl_tasks = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).order_by('-created_at')
+    dl_tasks = paginate_queryset(request, dl_tasks)
 
     data = {
-        'orders': orders,
+        'dl_tasks': dl_tasks,
     }
     return render(request, 'workforce/parts/lists/dl_list_all.html', data)
 
 
 @login_required(login_url='/accounts/login/')
 def dl_list_ready_to_published_to_dms(request):
-    orders  = orders_models.Order.objects.filter(task_created = False).order_by('-created_at')
+    orders = orders_models.Order.objects.select_related(
+        'business'
+    ).filter(task_created=False).order_by('-created_at')
     orders = paginate_queryset(request, orders)
 
     data = {
@@ -922,7 +940,7 @@ def update_task_status(request, task_id):
 def user_verification_list(request):
     """Staff view to see all users pending verification"""
     from core import models as core_models
-    from client import models as business_models
+    from business import models as business_models
 
     # Get all profiles based on filter
     verification_filter = request.GET.get('status', 'all')
@@ -997,7 +1015,7 @@ def update_verification_status(request, profile_id):
             # Update business or driver status to active
             if profile.is_business:
                 try:
-                    from client import models as business_models
+                    from business import models as business_models
                     business = business_models.Business.objects.get(user=profile.user)
                     business.business_status = 'active'
                     business.save()
@@ -1079,7 +1097,7 @@ def orders_dms_updated(request):
         'has_orders': has_orders,
         'dms_configured': dms_configured,
     }
-    return render(request, 'workforce/orders_dms_updated_list.html', context)
+    return render(request, 'workforce/wf_orders_dms_updated.html', context)
 
 
 @login_required(login_url='/accounts/login/')
@@ -1095,7 +1113,7 @@ def match_dms_task(request):
         if not delivery_task_number or not dms_job_id:
             messages.error(request, 'Both Delivery Task Number and DMS Job ID are required.')
             logger.warning(f"Match attempt failed - missing fields. Task: {delivery_task_number}, DMS ID: {dms_job_id}")
-            return redirect('workforce:orders_dms_updated')
+            return redirect('workforce:wf_orders_dms_updated')
 
         try:
             # Find the delivery task
@@ -1121,7 +1139,7 @@ def match_dms_task(request):
             messages.error(request, f'An error occurred while matching: {str(e)}')
             logger.error(f"Error matching task {delivery_task_number} to DMS ID {dms_job_id}: {str(e)}")
 
-    return redirect('workforce:orders_dms_updated')
+    return redirect('workforce:wf_orders_dms_updated')
 
 
 @login_required(login_url='/accounts/login/')
@@ -1129,7 +1147,9 @@ def orders_reported(request):
     """View for reported orders list"""
     from orders import models as orders_models
 
-    orders_list = orders_models.Order.objects.filter(
+    orders_list = orders_models.Order.objects.select_related(
+        'business', 'delivery_task'
+    ).prefetch_related('order_comments').filter(
         order_status='reported'
     ).order_by('-created_at')
 
@@ -1139,14 +1159,16 @@ def orders_reported(request):
         'orders': orders_with_pagination,
         'page_title': 'Reported Orders',
     }
-    return render(request, 'workforce/orders_list.html', context)
+    return render(request, 'workforce/wf_orders_reported.html', context)
 
 
 # Tasks Section Functions
 @login_required(login_url='/accounts/login/')
 def tasks_followup_list(request):
     """View for follow-up tasks list"""
-    tasks_list = delivery_models.DeliveryTask.objects.filter(
+    tasks_list = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).filter(
         dl_task_status='pending'
     ).order_by('-created_at')
 
@@ -1162,7 +1184,9 @@ def tasks_followup_list(request):
 @login_required(login_url='/accounts/login/')
 def tasks_dms_updated(request):
     """View for DMS updated tasks list"""
-    tasks_list = delivery_models.DeliveryTask.objects.filter(
+    tasks_list = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).filter(
         dl_task_status_dms__isnull=False
     ).order_by('-created_at')
 
@@ -1178,7 +1202,9 @@ def tasks_dms_updated(request):
 @login_required(login_url='/accounts/login/')
 def tasks_reported(request):
     """View for reported tasks list - showing rejected/cancelled tasks"""
-    tasks_list = delivery_models.DeliveryTask.objects.filter(
+    tasks_list = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).filter(
         dl_task_status__in=['rejected', 'cancelled']
     ).order_by('-created_at')
 
@@ -1197,7 +1223,9 @@ def dms_publish_order(request):
     """View for publishing orders to DMS"""
     from orders import models as orders_models
 
-    orders_list = orders_models.Order.objects.filter(
+    orders_list = orders_models.Order.objects.select_related(
+        'business'
+    ).filter(
         verification_status='verified',
         task_created=False
     ).order_by('-created_at')
@@ -1279,35 +1307,40 @@ def inventory_restock_list(request):
 def staff_reports(request):
     """View for staff reports dashboard"""
     from orders import models as orders_models
+    from django.db.models import Count, Q
 
-    # Get statistics
-    total_orders = orders_models.Order.objects.count()
-    pending_orders = orders_models.Order.objects.filter(order_status='pending').count()
-    verified_orders = orders_models.Order.objects.filter(order_status='verified').count()
-    completed_orders = orders_models.Order.objects.filter(order_status='completed').count()
+    # Get order statistics in single query
+    order_stats = orders_models.Order.objects.aggregate(
+        total=Count('id'),
+        pending=Count('id', filter=Q(order_status='pending')),
+        verified=Count('id', filter=Q(order_status='verified')),
+        completed=Count('id', filter=Q(order_status='completed')),
+    )
 
-    total_tasks = delivery_models.DeliveryTask.objects.count()
-    active_tasks = delivery_models.DeliveryTask.objects.filter(
-        dl_task_status__in=['in_transit', 'pending', 'address_pending']
-    ).count()
-    completed_tasks = delivery_models.DeliveryTask.objects.filter(
-        dl_task_status='delivered'
-    ).count()
+    # Get task statistics in single query
+    task_stats = delivery_models.DeliveryTask.objects.aggregate(
+        total=Count('id'),
+        active=Count('id', filter=Q(dl_task_status__in=['in_transit', 'pending', 'address_pending'])),
+        completed=Count('id', filter=Q(dl_task_status='delivered')),
+    )
 
-    total_drivers = fleet_models.Driver.objects.count()
-    active_drivers = fleet_models.Driver.objects.filter(driver_status='Approved').count()
+    # Get driver statistics in single query
+    driver_stats = fleet_models.Driver.objects.aggregate(
+        total=Count('id'),
+        active=Count('id', filter=Q(driver_status='Approved')),
+    )
 
     context = {
         'page_title': 'Reports Dashboard',
-        'total_orders': total_orders,
-        'pending_orders': pending_orders,
-        'verified_orders': verified_orders,
-        'completed_orders': completed_orders,
-        'total_tasks': total_tasks,
-        'active_tasks': active_tasks,
-        'completed_tasks': completed_tasks,
-        'total_drivers': total_drivers,
-        'active_drivers': active_drivers,
+        'total_orders': order_stats['total'],
+        'pending_orders': order_stats['pending'],
+        'verified_orders': order_stats['verified'],
+        'completed_orders': order_stats['completed'],
+        'total_tasks': task_stats['total'],
+        'active_tasks': task_stats['active'],
+        'completed_tasks': task_stats['completed'],
+        'total_drivers': driver_stats['total'],
+        'active_drivers': driver_stats['active'],
     }
     return render(request, 'workforce/staff_reports.html', context)
 
@@ -1316,31 +1349,26 @@ def staff_reports(request):
 def staff_contacts(request):
     """View for staff contacts directory"""
     from core import models as core_models
+    from django.db.models import Count, Q
 
     # Get all staff members
-    staff_profiles = core_models.Profile.objects.filter(
+    staff_profiles = core_models.Profile.objects.select_related('user').filter(
         is_staff=True
     ).order_by('first_name')
 
-    # Get all business users
-    business_profiles = core_models.Profile.objects.filter(
-        is_business=True,
-        verification_status='verified'
-    ).order_by('first_name')
-
-    # Get all drivers
-    driver_profiles = core_models.Profile.objects.filter(
-        is_driver=True,
-        verification_status='verified'
-    ).order_by('first_name')
+    # Get business and driver counts in a single query
+    profile_counts = core_models.Profile.objects.aggregate(
+        business_count=Count('id', filter=Q(is_business=True, verification_status='verified')),
+        driver_count=Count('id', filter=Q(is_driver=True, verification_status='verified')),
+    )
 
     staff_with_pagination = paginate_queryset(request, staff_profiles, items_per_page=50)
 
     context = {
         'page_title': 'Contacts Directory',
         'staff_profiles': staff_with_pagination,
-        'business_count': business_profiles.count(),
-        'driver_count': driver_profiles.count(),
+        'business_count': profile_counts['business_count'],
+        'driver_count': profile_counts['driver_count'],
     }
     return render(request, 'workforce/staff_contacts.html', context)
 
@@ -1889,9 +1917,13 @@ def sellers_active(request):
     """
     View to display active verified sellers
     """
-    # Get active and verified businesses
+    from django.db.models import Count, Q
+
+    # Get active and verified businesses with order count annotation
     businesses = business_models.Business.objects.select_related(
         'profile', 'business_profile'
+    ).annotate(
+        total_orders=Count('order')
     ).filter(
         business_status='active',
         profile__verification_status='verified'
@@ -1900,7 +1932,6 @@ def sellers_active(request):
     # Apply search filter
     search = request.GET.get('search', '').strip()
     if search:
-        from django.db.models import Q
         businesses = businesses.filter(
             Q(business_name__icontains=search) |
             Q(business_email__icontains=search) |
@@ -1909,14 +1940,6 @@ def sellers_active(request):
 
     # Paginate
     page_obj = paginate_queryset(request, businesses, items_per_page=20)
-
-    # Get order statistics for active sellers
-    from django.db.models import Count
-    businesses_with_orders = page_obj.object_list
-    for business in businesses_with_orders:
-        business.total_orders = orders_models.Order.objects.filter(
-            business=business
-        ).count()
 
     context = {
         'page_title': 'Active Sellers',
@@ -1959,5 +1982,139 @@ def sellers_inactive(request):
     }
 
     return render(request, 'workforce/sellers_inactive.html', context)
+
+
+# =============================================================================
+# FULFILLMENT SERVICE & PURCHASE ORDERS
+# =============================================================================
+
+
+@login_required
+def suppliers_list(request):
+    """
+    List all businesses with fulfillment service enabled (Suppliers).
+    These are the sellers/clients using EzzyDelivery's fulfillment service.
+    """
+    suppliers = business_models.Business.objects.filter(
+        fulfillment_service_enabled=True,
+        business_status='active'
+    ).order_by('-fulfillment_activated_at', 'business_name')
+
+    # Search filter
+    search = request.GET.get('search', '')
+    if search:
+        suppliers = suppliers.filter(
+            Q(business_name__icontains=search) |
+            Q(business_code__icontains=search) |
+            Q(business_email__icontains=search) |
+            Q(business_phone__icontains=search)
+        )
+
+    # Calculate stats for each supplier
+    from django.db.models import Count, Sum, Q as DjangoQ
+    suppliers = suppliers.annotate(
+        total_orders=Count('order'),
+        fulfilled_orders=Count('order', filter=DjangoQ(order__order_status__in=['delivered', 'fulfilled'])),
+        pending_orders=Count('order', filter=DjangoQ(order__order_status__in=['to_review', 'ready_to_pickup', 'publish']))
+    )
+
+    # Summary stats
+    total_suppliers = suppliers.count()
+    total_fulfilled = orders_models.Order.objects.filter(
+        order_status__in=['delivered', 'fulfilled'],
+        business__fulfillment_service_enabled=True
+    ).count()
+
+    # Paginate
+    page_obj = paginate_queryset(request, suppliers, items_per_page=20)
+
+    context = {
+        'page_title': 'Suppliers (Fulfillment Service)',
+        'page_obj': page_obj,
+        'search': search,
+        'total_suppliers': total_suppliers,
+        'total_fulfilled': total_fulfilled,
+    }
+
+    return render(request, 'workforce/suppliers_list.html', context)
+
+
+@login_required
+def fulfilled_orders_list(request):
+    """
+    List all fulfilled/delivered orders (Purchase Orders).
+    Shows orders that have been successfully delivered.
+    """
+    from django.db.models import Q
+
+    orders = orders_models.Order.objects.filter(
+        order_status__in=['delivered', 'fulfilled']
+    ).select_related('business').order_by('-delivered_at', '-updated_at')
+
+    # Filters
+    business_id = request.GET.get('business', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    search = request.GET.get('search', '')
+    order_status = request.GET.get('status', '')
+
+    if business_id:
+        orders = orders.filter(business__business_id=business_id)
+
+    if date_from:
+        orders = orders.filter(delivered_at__date__gte=date_from)
+
+    if date_to:
+        orders = orders.filter(delivered_at__date__lte=date_to)
+
+    if search:
+        orders = orders.filter(
+            Q(order_number__icontains=search) |
+            Q(client_order_code__icontains=search) |
+            Q(customer_name__icontains=search) |
+            Q(customer_phone__icontains=search)
+        )
+
+    if order_status:
+        orders = orders.filter(order_status=order_status)
+
+    # Get suppliers for filter dropdown (businesses with fulfillment enabled)
+    suppliers = business_models.Business.objects.filter(
+        fulfillment_service_enabled=True,
+        business_status='active'
+    ).order_by('business_name')
+
+    # Summary stats
+    total_count = orders.count()
+    fulfilled_count = orders.filter(order_status='fulfilled').count()
+    delivered_count = orders.filter(order_status='delivered').count()
+
+    # Calculate total COD collected
+    from django.db.models import Sum
+    total_cod = orders.filter(
+        cod_status_by_client='include'
+    ).aggregate(total=Sum('cod_amount'))['total'] or 0
+
+    # Paginate
+    page_obj = paginate_queryset(request, orders, items_per_page=25)
+
+    context = {
+        'page_title': 'Purchase Orders (Fulfilled)',
+        'page_obj': page_obj,
+        'suppliers': suppliers,
+        'filters': {
+            'business': business_id,
+            'date_from': date_from,
+            'date_to': date_to,
+            'search': search,
+            'status': order_status,
+        },
+        'total_count': total_count,
+        'fulfilled_count': fulfilled_count,
+        'delivered_count': delivered_count,
+        'total_cod': total_cod,
+    }
+
+    return render(request, 'workforce/fulfilled_orders_list.html', context)
 
 

@@ -1,0 +1,21 @@
+{% extends "business_dashboard_base.html" %} {% load static %}
+<!-- extra css -->
+{% load crispy_forms_tags %} {% block content %}
+<div class="p-3 col-12  " id="client_driver_add_container_main">
+  <div class="h4 p-3 text-center" id="client_driver_add_section_header">
+    <h2 id="client_driver_add_title_form">Add Drivers to directory</h2>
+    <form method="POST" htmx-post id="client_driver_add_form_main">
+      {% csrf_token %} {{ form | crispy }}
+      <button
+        type="submit"
+        class="btn pe-3 text-dark"
+        href="{% url 'business:driver_directory_add'  %}"
+        id="client_driver_add_btn_submit"
+      >
+        Add
+      </button>
+    </form>
+
+    {% endblock content %}
+  </div>
+</div>

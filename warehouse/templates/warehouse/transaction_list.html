@@ -1,0 +1,120 @@
+{% extends 'client_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Inventory Transactions{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">Inventory Transactions</h1>
+            <p class="text-muted">View all inventory movements</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="type" class="form-label">Transaction Type</label>
+                            <select name="type" id="type" class="form-select">
+                                <option value="">All Types</option>
+                                {% for type_val, type_label in transaction_types %}
+                                <option value="{{ type_val }}" {% if selected_type == type_val %}selected{% endif %}>{{ type_label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="warehouse" class="form-label">Warehouse</label>
+                            <select name="warehouse" id="warehouse" class="form-select">
+                                <option value="">All Warehouses</option>
+                                {% for wh in warehouses %}
+                                <option value="{{ wh.id }}" {% if selected_warehouse == wh.id|stringformat:'s' %}selected{% endif %}>{{ wh.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary">Filter</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transactions Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">All Transactions</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Transaction #</th>
+                                    <th>Product</th>
+                                    <th>Warehouse</th>
+                                    <th>Type</th>
+                                    <th class="text-end">Qty</th>
+                                    <th>Notes</th>
+                                    <th>By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for txn in transactions %}
+                                <tr>
+                                    <td>{{ txn.created_at|date:"d M Y" }}<br><small class="text-muted">{{ txn.created_at|time:"H:i" }}</small></td>
+                                    <td><code>{{ txn.transaction_number|truncatechars:15 }}</code></td>
+                                    <td>{{ txn.product.item_name|truncatechars:25 }}</td>
+                                    <td>{{ txn.warehouse.name }}</td>
+                                    <td>
+                                        <span class="badge {% if 'receive' in txn.transaction_type %}bg-success{% elif 'ship' in txn.transaction_type %}bg-primary{% elif 'adjust' in txn.transaction_type %}bg-warning{% else %}bg-secondary{% endif %}">
+                                            {{ txn.get_transaction_type_display }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        {% if txn.quantity > 0 %}<span class="text-success fw-bold">+{{ txn.quantity }}</span>{% else %}<span class="text-danger fw-bold">{{ txn.quantity }}</span>{% endif %}
+                                    </td>
+                                    <td>{{ txn.notes|truncatechars:30|default:"-" }}</td>
+                                    <td>{{ txn.created_by.username|default:"-" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-5">
+                                        <i class="fas fa-exchange-alt fa-3x mb-3 d-block"></i>
+                                        No transactions found
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {% if transactions.has_other_pages %}
+                <div class="card-footer bg-white">
+                    <nav>
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if transactions.has_previous %}
+                            <li class="page-item"><a class="page-link" href="?page={{ transactions.previous_page_number }}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}">Previous</a></li>
+                            {% endif %}
+                            <li class="page-item active"><span class="page-link">{{ transactions.number }} / {{ transactions.paginator.num_pages }}</span></li>
+                            {% if transactions.has_next %}
+                            <li class="page-item"><a class="page-link" href="?page={{ transactions.next_page_number }}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}">Next</a></li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

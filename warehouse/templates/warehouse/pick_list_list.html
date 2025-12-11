@@ -1,0 +1,109 @@
+{% extends 'client_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Pick Lists{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">Pick Lists</h1>
+            <p class="text-muted">Manage order picking operations</p>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <form method="GET" class="d-flex gap-2">
+                <select name="status" class="form-select" style="max-width: 200px;">
+                    <option value="">All Statuses</option>
+                    {% for status_val, status_label in status_choices %}
+                    <option value="{{ status_val }}" {% if selected_status == status_val %}selected{% endif %}>{{ status_label }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">Filter</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Pick Lists Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">All Pick Lists</h5>
+                    <a href="{% url 'warehouse:create_pick_list' %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus me-1"></i>Create Pick List
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Pick List #</th>
+                                    <th>Warehouse</th>
+                                    <th>Status</th>
+                                    <th>Assigned To</th>
+                                    <th>Items</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pl in pick_lists %}
+                                <tr>
+                                    <td><strong>{{ pl.pick_number }}</strong></td>
+                                    <td>{{ pl.warehouse.name }}</td>
+                                    <td>
+                                        <span class="badge
+                                            {% if pl.status == 'completed' %}bg-success
+                                            {% elif pl.status == 'in_progress' %}bg-primary
+                                            {% elif pl.status == 'assigned' %}bg-info
+                                            {% else %}bg-warning text-dark{% endif %}">
+                                            {{ pl.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ pl.assigned_to.username|default:"-" }}</td>
+                                    <td>{{ pl.items.count }}</td>
+                                    <td>{{ pl.created_at|date:"d M Y H:i" }}</td>
+                                    <td>
+                                        <a href="{% url 'warehouse:pick_list_detail' pl.pk %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-5">
+                                        <i class="fas fa-clipboard-list fa-3x mb-3 d-block"></i>
+                                        No pick lists found
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {% if pick_lists.has_other_pages %}
+                <div class="card-footer bg-white">
+                    <nav>
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if pick_lists.has_previous %}
+                            <li class="page-item"><a class="page-link" href="?page={{ pick_lists.previous_page_number }}{% if selected_status %}&status={{ selected_status }}{% endif %}">Previous</a></li>
+                            {% endif %}
+                            <li class="page-item active"><span class="page-link">{{ pick_lists.number }} / {{ pick_lists.paginator.num_pages }}</span></li>
+                            {% if pick_lists.has_next %}
+                            <li class="page-item"><a class="page-link" href="?page={{ pick_lists.next_page_number }}{% if selected_status %}&status={{ selected_status }}{% endif %}">Next</a></li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

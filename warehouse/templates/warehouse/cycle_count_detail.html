@@ -1,0 +1,111 @@
+{% extends 'client_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Cycle Count {{ cycle_count.count_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'warehouse:cycle_count_list' %}">Cycle Counts</a></li>
+                    <li class="breadcrumb-item active">{{ cycle_count.count_number }}</li>
+                </ol>
+            </nav>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">{{ cycle_count.count_number }}</h1>
+                    <p class="text-muted">{{ cycle_count.warehouse.name }} - {{ cycle_count.location.code|default:"All Locations" }}</p>
+                </div>
+                <div>
+                    <span class="badge fs-6 {% if cycle_count.status == 'completed' %}bg-success{% elif cycle_count.status == 'in_progress' %}bg-primary{% else %}bg-info{% endif %}">
+                        {{ cycle_count.get_status_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Count Info -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Warehouse</span>
+                        <strong>{{ cycle_count.warehouse.name }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Location</span>
+                        <strong>{{ cycle_count.location.code|default:"All" }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Scheduled</span>
+                        <strong>{{ cycle_count.scheduled_date|date:"d M Y" }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Assigned To</span>
+                        <strong>{{ cycle_count.assigned_to.username|default:"Unassigned" }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Count Items -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Items to Count ({{ items|length }})</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Location</th>
+                                    <th>Product</th>
+                                    <th class="text-center">System Qty</th>
+                                    <th class="text-center">Counted Qty</th>
+                                    <th class="text-center">Variance</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                <tr {% if item.variance and item.variance != 0 %}class="table-warning"{% endif %}>
+                                    <td><code>{{ item.location.code|default:"-" }}</code></td>
+                                    <td>{{ item.product.item_name }}</td>
+                                    <td class="text-center">{{ item.system_quantity }}</td>
+                                    <td class="text-center">{{ item.counted_quantity|default:"-" }}</td>
+                                    <td class="text-center">
+                                        {% if item.variance %}
+                                        <span class="{% if item.variance > 0 %}text-success{% elif item.variance < 0 %}text-danger{% endif %}">
+                                            {% if item.variance > 0 %}+{% endif %}{{ item.variance }}
+                                        </span>
+                                        {% else %}-{% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.counted_quantity is not None %}
+                                        <span class="badge bg-success">Counted</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">No items in this cycle count</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

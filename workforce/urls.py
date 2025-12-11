@@ -91,5 +91,8 @@ urlpatterns = [
     # Workflow guide
     path('workflow-guide/', workforce_views.workflow_guide, name='workflow_guide'),
 
+    # Fulfillment Service & Purchase Orders
+    path('suppliers/', workforce_views.suppliers_list, name='suppliers_list'),
+    path('purchase-orders/', workforce_views.fulfilled_orders_list, name='fulfilled_orders_list'),
 
 ]

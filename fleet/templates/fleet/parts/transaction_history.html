@@ -1,0 +1,147 @@
+{% extends "fleet_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Transaction History{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">Transaction History</h1>
+            <p class="text-muted">View all your financial transactions</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="type" class="form-label">Transaction Type</label>
+                            <select name="type" id="type" class="form-select">
+                                <option value="all" {% if selected_type == 'all' %}selected{% endif %}>All Types</option>
+                                {% for type_val, type_label in transaction_types %}
+                                <option value="{{ type_val }}" {% if selected_type == type_val %}selected{% endif %}>{{ type_label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="days" class="form-label">Time Period</label>
+                            <select name="days" id="days" class="form-select">
+                                <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
+                                <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
+                                <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
+                                <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary">Apply Filter</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet Summary -->
+    {% if wallet_status %}
+    <div class="row mb-4">
+        <div class="col-md-4 col-sm-6 mb-3">
+            <div class="card border-0 shadow-sm h-100 border-start border-success border-3">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Available Balance</h6>
+                    <h3 class="mb-0">QAR {{ wallet_status.available_balance|default:0 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-sm-6 mb-3">
+            <div class="card border-0 shadow-sm h-100 border-start border-warning border-3">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">COD in Hand</h6>
+                    <h3 class="mb-0">QAR {{ wallet_status.cod_balance|default:0 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-sm-6 mb-3">
+            <div class="card border-0 shadow-sm h-100 border-start border-info border-3">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Pending Settlement</h6>
+                    <h3 class="mb-0">QAR {{ wallet_status.pending_settlement|default:0 }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Transactions Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Transactions</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Transaction ID</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Related Task</th>
+                                    <th class="text-end">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for txn in transactions %}
+                                <tr>
+                                    <td>{{ txn.created_at|date:"d M Y" }}<br><small class="text-muted">{{ txn.created_at|time:"H:i" }}</small></td>
+                                    <td><code>{{ txn.transaction_number|default:"-"|truncatechars:12 }}</code></td>
+                                    <td>
+                                        <span class="badge
+                                            {% if txn.transaction_type == 'earning' %}bg-success
+                                            {% elif txn.transaction_type == 'bonus' %}bg-info
+                                            {% elif txn.transaction_type == 'cod_collect' %}bg-warning text-dark
+                                            {% elif txn.transaction_type == 'cod_submit' %}bg-primary
+                                            {% elif txn.transaction_type == 'settlement' %}bg-secondary
+                                            {% elif txn.transaction_type == 'deduction' %}bg-danger
+                                            {% else %}bg-dark{% endif %}">
+                                            {{ txn.get_transaction_type_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ txn.description|default:"-" }}</td>
+                                    <td>
+                                        {% if txn.delivery_task %}
+                                        <small>{{ txn.delivery_task.dl_task_number|truncatechars:15 }}</small>
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if txn.amount >= 0 %}
+                                        <span class="text-success fw-bold">+QAR {{ txn.amount }}</span>
+                                        {% else %}
+                                        <span class="text-danger fw-bold">QAR {{ txn.amount }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-5">
+                                        <i class="fas fa-receipt fa-3x mb-3 d-block"></i>
+                                        No transactions found for the selected period
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

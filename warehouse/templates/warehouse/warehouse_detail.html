@@ -1,0 +1,126 @@
+{% extends 'client_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}{{ warehouse.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'warehouse:warehouse_list' %}">Warehouses</a></li>
+                    <li class="breadcrumb-item active">{{ warehouse.name }}</li>
+                </ol>
+            </nav>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">{{ warehouse.name }}</h1>
+                    <p class="text-muted">{{ warehouse.code }}</p>
+                </div>
+                <div>
+                    {% if warehouse.is_active %}
+                    <span class="badge bg-success fs-6">Active</span>
+                    {% else %}
+                    <span class="badge bg-secondary fs-6">Inactive</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Warehouse Info & Stats -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Warehouse Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="text-muted d-block">Address</label>
+                        <strong>{{ warehouse.address|default:"Not specified" }}</strong>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted d-block">Created</label>
+                        <strong>{{ warehouse.created_at|date:"d M Y H:i" }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Stock Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="mb-0">{{ stock_summary.total_on_hand|default:0 }}</h3>
+                                <small class="text-muted">Total On Hand</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="mb-0">{{ stock_summary.total_reserved|default:0 }}</h3>
+                                <small class="text-muted">Reserved</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Storage Locations -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Storage Locations ({{ locations|length }})</h5>
+                    <a href="{% url 'warehouse:location_add' %}?warehouse={{ warehouse.pk }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus me-1"></i>Add Location
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Parent</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for loc in locations %}
+                                <tr>
+                                    <td><code>{{ loc.code }}</code></td>
+                                    <td>{{ loc.name }}</td>
+                                    <td>{{ loc.get_location_type_display }}</td>
+                                    <td>{{ loc.parent.code|default:"-" }}</td>
+                                    <td>
+                                        {% if loc.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">No storage locations defined</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends 'client_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Receive Stock{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">Receive Stock</h1>
+            <p class="text-muted">Add new inventory to your warehouse</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Stock Receipt Form</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="warehouse" class="form-label">Warehouse <span class="text-danger">*</span></label>
+                            <select name="warehouse" id="warehouse" class="form-select" required>
+                                <option value="">Select Warehouse</option>
+                                {% for wh in warehouses %}
+                                <option value="{{ wh.id }}">{{ wh.name }} ({{ wh.code }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="product" class="form-label">Product <span class="text-danger">*</span></label>
+                            <select name="product" id="product" class="form-select" required>
+                                <option value="">Select Product</option>
+                                {% for p in products %}
+                                <option value="{{ p.id }}">{{ p.item_name }} {% if p.item_sku %}({{ p.item_sku }}){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="location" class="form-label">Storage Location</label>
+                            <select name="location" id="location" class="form-select">
+                                <option value="">Default Location</option>
+                            </select>
+                            <small class="text-muted">Locations will load based on selected warehouse</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="quantity" name="quantity" min="1" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="PO number, supplier info, etc."></textarea>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>Receive Stock
+                            </button>
+                            <a href="{% url 'warehouse:inventory_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">Quick Tips</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Select the warehouse first</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Choose the product to receive</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Enter the quantity received</li>
+                        <li class="mb-2"><i class="fas fa-info-circle text-info me-2"></i>Add notes for reference</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

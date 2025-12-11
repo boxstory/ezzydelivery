@@ -1,0 +1,118 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="col-12 locations-container" id="client_location_list_container_main">
+  <!-- Header -->
+  <div class="locations-header" id="client_location_list_section_header">
+    <h2 id="client_location_list_title_main">
+      <i class="fa-solid fa-location-dot"></i>
+      Store Locations
+    </h2>
+    <a href="{% url 'business:pickup_location_add' %}" class="add-location-btn" id="client_location_list_btn_new">
+      <i class="fa-solid fa-plus"></i>
+      Add Location
+    </a>
+  </div>
+
+  <!-- Info Banner -->
+  <div class="info-banner" role="alert" id="client_location_list_info_banner">
+    <h4><i class="fa-solid fa-circle-info me-2"></i>Manage Your Pickup Locations</h4>
+    <p class="mb-0">
+      Add multiple pickup locations for your store. Customers can choose where to collect their orders or request delivery from these locations.
+    </p>
+  </div>
+
+  <!-- Locations Grid -->
+  <section id="client_location_list_section_content">
+    {% if stores %}
+    <div class="locations-grid" id="client_location_list_grid">
+      {% for store in stores %}
+      <article class="location-card" id="client_location_list_card_{{ store.id }}">
+        <!-- Card Header -->
+        <div class="location-card-header">
+          <h3>
+            <i class="fa-solid fa-store"></i>
+            {{ store.pickup_location_title }}
+          </h3>
+          {% if store.pickup_status == 'active' %}
+          <span class="status-badge status-active">
+            <i class="fa-solid fa-check-circle me-1"></i>Active
+          </span>
+          {% else %}
+          <span class="status-badge status-inactive">
+            <i class="fa-solid fa-times-circle me-1"></i>Inactive
+          </span>
+          {% endif %}
+        </div>
+
+        <!-- Card Body -->
+        <div class="location-card-body">
+          <!-- Map Button -->
+          {% if store.google_maps_link %}
+          <a href="{{ store.google_maps_link }}" target="_blank" class="location-map-btn">
+            <i class="fa-solid fa-map-location-dot"></i>
+            {{ store.locality|default:"View on Google Maps" }}
+          </a>
+          {% else %}
+          <a href="https://maps.google.com/?q={{ store.locality }}" target="_blank" class="location-map-btn">
+            <i class="fa-solid fa-map-location-dot"></i>
+            {{ store.locality|default:"View Location" }}
+          </a>
+          {% endif %}
+
+          <!-- Location Details -->
+          <div class="location-details">
+            <div class="detail-item">
+              <span class="detail-label">Building No</span>
+              <span class="detail-value">{{ store.pickup_building_no|default:"N/A" }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Zone No</span>
+              <span class="detail-value">{{ store.pickup_zone_no|default:"N/A" }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Street</span>
+              <span class="detail-value">{{ store.pickup_street_no|default:"N/A" }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Area</span>
+              <span class="detail-value">{{ store.pickup_area|default:"N/A" }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card Footer Actions -->
+        <div class="location-card-footer">
+          <a href="{% url 'orders:deliver_to_here' store.id %}" class="btn-deliver">
+            <i class="fa-solid fa-truck-fast"></i>
+            Deliver Here
+          </a>
+          <a href="{% url 'business:pickup_location_update' store.id %}" class="btn-edit">
+            <i class="fa-solid fa-pen"></i>
+            Edit
+          </a>
+          <a href="{% url 'business:pickup_location_delete' store.id %}" class="btn-delete"
+             onclick="return confirm('Are you sure you want to delete this location?')">
+            <i class="fa-solid fa-trash"></i>
+            Delete
+          </a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <!-- Empty State -->
+    <div class="empty-state" id="client_location_list_empty">
+      <i class="fa-solid fa-map-marker-alt"></i>
+      <h4>No Locations Added Yet</h4>
+      <p>Add your first pickup location to start managing deliveries</p>
+      <a href="{% url 'business:pickup_location_add' %}" class="add-location-btn">
+        <i class="fa-solid fa-plus"></i>
+        Add Your First Location
+      </a>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock content %}

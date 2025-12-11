@@ -261,8 +261,8 @@
             </li>
             <li class="nav-item">
               <a id="workforce_sidebar_link_dms_manual_linking" class="nav-link btn submenu-link"
-                 href="{% url 'workforce:orders_dms_updated' %}"
-                 hx-get="{% url 'workforce:orders_dms_updated' %}"
+                 href="{% url 'workforce:wf_orders_dms_updated' %}"
+                 hx-get="{% url 'workforce:wf_orders_dms_updated' %}"
                  hx-target="#main-content"
                  hx-select="#main-content"
                  hx-swap="outerHTML"
@@ -428,6 +428,43 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-box-open me-2"></i>
                 Restock List
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Fulfillment Service Section -->
+      <li id="workforce_sidebar_menu_fulfillment" class="nav-item {% if request.resolver_match.url_name == 'suppliers_list' or request.resolver_match.url_name == 'fulfilled_orders_list' %}active{% endif %}">
+        <a id="workforce_sidebar_link_fulfillment" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-fulfillment" href="#">
+          <i class="fa-solid fa-warehouse me-2"></i>
+          <span>Fulfillment</span>
+          <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
+        </a>
+        <div class="collapse submenu" id="submenu-fulfillment">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_suppliers" class="nav-link btn submenu-link"
+                 href="{% url 'workforce:suppliers_list' %}"
+                 hx-get="{% url 'workforce:suppliers_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-truck-ramp-box me-2"></i>
+                Suppliers
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_purchase_orders" class="nav-link btn submenu-link"
+                 href="{% url 'workforce:fulfilled_orders_list' %}"
+                 hx-get="{% url 'workforce:fulfilled_orders_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-receipt me-2"></i>
+                Purchase Orders
               </a>
             </li>
           </ul>

@@ -1,0 +1,98 @@
+{% extends 'client_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Add Storage Location{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'warehouse:location_list' %}">Locations</a></li>
+                    <li class="breadcrumb-item active">Add New</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0">Add Storage Location</h1>
+            <p class="text-muted">Create a new storage location</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Location Details</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="warehouse" class="form-label">Warehouse <span class="text-danger">*</span></label>
+                            <select name="warehouse" id="warehouse" class="form-select" required>
+                                <option value="">Select Warehouse</option>
+                                {% for wh in warehouses %}
+                                <option value="{{ wh.id }}">{{ wh.name }} ({{ wh.code }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="code" class="form-label">Location Code <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="code" name="code" required placeholder="e.g., A-01-01">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Location Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name" required placeholder="e.g., Shelf A Row 1 Position 1">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="location_type" class="form-label">Location Type <span class="text-danger">*</span></label>
+                            <select name="location_type" id="location_type" class="form-select" required>
+                                <option value="">Select Type</option>
+                                {% for type_val, type_label in location_types %}
+                                <option value="{{ type_val }}">{{ type_label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="parent" class="form-label">Parent Location</label>
+                            <select name="parent" id="parent" class="form-select">
+                                <option value="">None (Top Level)</option>
+                            </select>
+                            <small class="text-muted">Locations will load based on selected warehouse</small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>Create Location
+                            </button>
+                            <a href="{% url 'warehouse:location_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">Location Code Tips</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-2">Use a consistent naming convention:</p>
+                    <ul class="small text-muted mb-0">
+                        <li><code>A-01</code> - Zone A, Row 1</li>
+                        <li><code>A-01-01</code> - Zone A, Row 1, Position 1</li>
+                        <li><code>RECV</code> - Receiving area</li>
+                        <li><code>SHIP</code> - Shipping area</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

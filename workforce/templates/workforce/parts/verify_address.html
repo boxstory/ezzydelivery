@@ -1,0 +1,120 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Verify Address - Order #{{ order.order_number }}{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/wf_pages.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'workforce:wf_orders_all' %}">Orders</a></li>
+            <li class="breadcrumb-item active">Verify Address</li>
+        </ol>
+    </nav>
+
+    <h1 class="page-title">
+        <i class="fa-solid fa-map-location-dot me-2"></i>Verify Delivery Address
+    </h1>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Order #{{ order.order_number|default:order.client_order_code }}</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Customer Info -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">Customer Information</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Name:</strong> {{ order.customer_name }}</p>
+                                <p class="mb-1"><strong>Phone:</strong> {{ order.customer_phone }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Business:</strong> {{ order.business.business_name|default:"N/A" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Current Address -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">Current Delivery Address</h6>
+                        <div class="p-3 bg-light rounded">
+                            <p class="mb-1"><strong>Zone:</strong> {{ order.delivery_zone|default:"Not specified" }}</p>
+                            <p class="mb-1"><strong>Address:</strong> {{ order.delivery_address|default:"Not specified" }}</p>
+                            {% if order.delivery_google_link %}
+                            <p class="mb-0">
+                                <a href="{{ order.delivery_google_link }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <i class="fa-solid fa-map me-1"></i>View on Map
+                                </a>
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if address_verification %}
+                    <!-- Verification Data -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">Customer Verified Location</h6>
+                        <div class="p-3 bg-success bg-opacity-10 rounded">
+                            {% if address_verification.latitude and address_verification.longitude %}
+                            <p class="mb-1"><strong>Coordinates:</strong> {{ address_verification.latitude }}, {{ address_verification.longitude }}</p>
+                            {% endif %}
+                            {% if address_verification.verified_address %}
+                            <p class="mb-1"><strong>Verified Address:</strong> {{ address_verification.verified_address }}</p>
+                            {% endif %}
+                            <p class="mb-0"><strong>Verified At:</strong> {{ address_verification.verified_at|date:"d M Y H:i" }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Verification Form -->
+                    <form method="POST">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="verification_notes" class="form-label">Verification Notes</label>
+                            <textarea class="form-control" id="verification_notes" name="verification_notes" rows="3" placeholder="Add any notes about the address verification..."></textarea>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fa-solid fa-check me-1"></i>Confirm Address Verified
+                            </button>
+                            <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">Order Summary</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Status</span>
+                        <span class="badge bg-{{ order.order_status|default:'secondary' }}">{{ order.get_order_status_display|default:"Pending" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Order Date</span>
+                        <strong>{{ order.order_date|date:"d M Y" }}</strong>
+                    </div>
+                    {% if order.cod_amount %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">COD Amount</span>
+                        <strong>QAR {{ order.cod_amount }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

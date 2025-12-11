@@ -20,7 +20,7 @@ from orders import models as orders_models
 from fleet import models as fleet_models
 from delivery import models as delivery_models
 from core import models as core_models
-from client import models as client_models
+from business import models as business_models
 from ezzy_api import models as ezzy_api_models
 from ezzy_api import serializers as ezzy_api_serializers
 from shipday import Shipday
@@ -1128,7 +1128,7 @@ def create_api_key(request):
         expires_at = serializer.validated_data.get('expires_at')
 
         try:
-            business = client_models.Business.objects.get(business_id=business_id)
+            business = business_models.Business.objects.get(business_id=business_id)
 
             # Check if user has permission to create API keys for this business
             if not request.user.is_staff and business.user and business.user != request.user:
@@ -1152,7 +1152,7 @@ def create_api_key(request):
                 'api_key': serializer.data
             }, status=status.HTTP_201_CREATED)
 
-        except client_models.Business.DoesNotExist:
+        except business_models.Business.DoesNotExist:
             logger.error(f"Business {business_id} not found")
             return Response(
                 {'error': 'Business not found'},
@@ -1175,7 +1175,7 @@ def list_api_keys(request):
     
     if business_id:
         try:
-            business = client_models.Business.objects.get(business_id=business_id)
+            business = business_models.Business.objects.get(business_id=business_id)
             # Check permission
             if not request.user.is_staff and business.user != request.user:
                 return Response(
@@ -1183,7 +1183,7 @@ def list_api_keys(request):
                     status=status.HTTP_403_FORBIDDEN
                 )
             api_keys = ezzy_api_models.ClientApiKey.objects.filter(business=business)
-        except client_models.Business.DoesNotExist:
+        except business_models.Business.DoesNotExist:
             return Response(
                 {'error': 'Business not found'},
                 status=status.HTTP_404_NOT_FOUND
@@ -1193,7 +1193,7 @@ def list_api_keys(request):
         if request.user.is_staff:
             api_keys = ezzy_api_models.ClientApiKey.objects.all()
         else:
-            businesses = client_models.Business.objects.filter(user=request.user)
+            businesses = business_models.Business.objects.filter(user=request.user)
             api_keys = ezzy_api_models.ClientApiKey.objects.filter(business__in=businesses)
     
     serializer = ezzy_api_serializers.ClientApiKeySerializer(api_keys, many=True)
@@ -1257,8 +1257,8 @@ def import_shopify_orders(request):
     limit = serializer.validated_data.get('limit', 50)
     
     try:
-        business = client_models.Business.objects.get(business_id=business_id)
-        api_settings = client_models.BusinessApiSettings.objects.filter(
+        business = business_models.Business.objects.get(business_id=business_id)
+        api_settings = business_models.BusinessApiSettings.objects.filter(
             business=business,
             api_type='shopify',
             is_verify_api=True
@@ -1329,7 +1329,7 @@ def import_shopify_orders(request):
             'errors': errors
         }, status=status.HTTP_200_OK)
     
-    except client_models.Business.DoesNotExist:
+    except business_models.Business.DoesNotExist:
         return Response(
             {'error': 'Business not found'},
             status=status.HTTP_404_NOT_FOUND
@@ -1358,8 +1358,8 @@ def import_woocommerce_orders(request):
     limit = serializer.validated_data.get('limit', 50)
     
     try:
-        business = client_models.Business.objects.get(business_id=business_id)
-        api_settings = client_models.BusinessApiSettings.objects.filter(
+        business = business_models.Business.objects.get(business_id=business_id)
+        api_settings = business_models.BusinessApiSettings.objects.filter(
             business=business,
             api_type='woocommerce',
             is_verify_api=True
@@ -1440,7 +1440,7 @@ def import_woocommerce_orders(request):
             'errors': errors
         }, status=status.HTTP_200_OK)
     
-    except client_models.Business.DoesNotExist:
+    except business_models.Business.DoesNotExist:
         return Response(
             {'error': 'Business not found'},
             status=status.HTTP_404_NOT_FOUND
@@ -1460,9 +1460,9 @@ def list_integrations(request):
     
     if business_id:
         try:
-            business = client_models.Business.objects.get(business_id=business_id)
+            business = business_models.Business.objects.get(business_id=business_id)
             integrations = ezzy_api_models.EcommerceIntegration.objects.filter(business=business)
-        except client_models.Business.DoesNotExist:
+        except business_models.Business.DoesNotExist:
             return Response(
                 {'error': 'Business not found'},
                 status=status.HTTP_404_NOT_FOUND
@@ -1471,7 +1471,7 @@ def list_integrations(request):
         if request.user.is_staff:
             integrations = ezzy_api_models.EcommerceIntegration.objects.all()
         else:
-            businesses = client_models.Business.objects.filter(user=request.user)
+            businesses = business_models.Business.objects.filter(user=request.user)
             integrations = ezzy_api_models.EcommerceIntegration.objects.filter(business__in=businesses)
     
     serializer = ezzy_api_serializers.EcommerceIntegrationSerializer(integrations, many=True)
@@ -1599,7 +1599,7 @@ def _push_task_to_dms(delivery_task, retry_count=0, max_retries=3):
             return _push_task_to_dms(delivery_task, retry_count + 1, max_retries)
 
         else:
-            # Client error or max retries reached
+            # Business error or max retries reached
             error_msg = f"DMS API error: {response.status_code} - {response.text}"
             logger.error(error_msg)
             return None
@@ -1886,16 +1886,32 @@ def webhook_receive_task_completion(request):
             task.dl_task_status = status_value
             if status_value == 'delivered':
                 task.dl_task_status_dms = '2'
+                task.completed_at = timezone.now()
             elif status_value == 'cancelled':
                 task.dl_task_status_dms = '9'
             elif status_value == 'rejected':
                 task.dl_task_status_dms = '8'
             task.save()
-            
-            # Handle COD
-            if cod_collected and cod_amount_collected and task.order:
-                task.order.cod_status_by_staff = 'cod_with_driver'
-                task.order.save()
+
+            # Handle COD and update Order status
+            if task.order:
+                order = task.order
+                if cod_collected and cod_amount_collected:
+                    order.cod_status_by_staff = 'cod_with_driver'
+
+                # Auto-update Order status based on delivery completion
+                if status_value == 'delivered':
+                    # Check if business has fulfillment service enabled
+                    if order.business and order.business.fulfillment_service_enabled:
+                        order.order_status = 'fulfilled'
+                        order.fulfilled_at = timezone.now()
+                    else:
+                        order.order_status = 'delivered'
+                    order.delivered_at = timezone.now()
+                elif status_value == 'cancelled':
+                    order.order_status = 'cancelled'
+
+                order.save()
             
             # Trigger webhooks
             webhook_payload = {
@@ -2009,13 +2025,13 @@ def create_webhook_endpoint(request):
     business_id = request.data.get('business')
     if business_id:
         try:
-            business = client_models.Business.objects.get(business_id=business_id)
+            business = business_models.Business.objects.get(business_id=business_id)
             if not request.user.is_staff and business.user != request.user:
                 return Response(
                     {'error': 'Permission denied'},
                     status=status.HTTP_403_FORBIDDEN
                 )
-        except client_models.Business.DoesNotExist:
+        except business_models.Business.DoesNotExist:
             return Response(
                 {'error': 'Business not found'},
                 status=status.HTTP_404_NOT_FOUND
@@ -2036,14 +2052,14 @@ def list_webhook_endpoints(request):
     
     if business_id:
         try:
-            business = client_models.Business.objects.get(business_id=business_id)
+            business = business_models.Business.objects.get(business_id=business_id)
             if not request.user.is_staff and business.user != request.user:
                 return Response(
                     {'error': 'Permission denied'},
                     status=status.HTTP_403_FORBIDDEN
                 )
             webhooks = ezzy_api_models.WebhookEndpoint.objects.filter(business=business)
-        except client_models.Business.DoesNotExist:
+        except business_models.Business.DoesNotExist:
             return Response(
                 {'error': 'Business not found'},
                 status=status.HTTP_404_NOT_FOUND
@@ -2052,7 +2068,7 @@ def list_webhook_endpoints(request):
         if request.user.is_staff:
             webhooks = ezzy_api_models.WebhookEndpoint.objects.all()
         else:
-            businesses = client_models.Business.objects.filter(user=request.user)
+            businesses = business_models.Business.objects.filter(user=request.user)
             webhooks = ezzy_api_models.WebhookEndpoint.objects.filter(business__in=businesses)
     
     serializer = ezzy_api_serializers.WebhookEndpointSerializer(webhooks, many=True)
@@ -2076,7 +2092,7 @@ def list_webhook_deliveries(request):
     
     # Filter by business if not staff
     if not request.user.is_staff:
-        businesses = client_models.Business.objects.filter(user=request.user)
+        businesses = business_models.Business.objects.filter(user=request.user)
         deliveries = deliveries.filter(webhook__business__in=businesses)
     
     serializer = ezzy_api_serializers.WebhookDeliverySerializer(deliveries[:100], many=True)
@@ -2097,7 +2113,7 @@ def orders_pending_verification(request):
     if business_id:
         orders = orders.filter(business_id=business_id)
     elif not request.user.is_staff:
-        businesses = client_models.Business.objects.filter(user=request.user)
+        businesses = business_models.Business.objects.filter(user=request.user)
         orders = orders.filter(business__in=businesses)
     
     orders = orders.order_by('-created_at')
@@ -2384,8 +2400,8 @@ def business_dashboard_stats(request):
             business=business, dl_task_status='delivered'
         ).count()
 
-        # Client statistics
-        total_clients = client_models.Client.objects.filter(business=business).count()
+        # Business statistics
+        total_clients = business_models.Client.objects.filter(business=business).count()
 
         logger.info(f"Dashboard stats retrieved for business {business.business_id}")
 
@@ -2495,12 +2511,12 @@ def business_orders_api(request):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Verify client belongs to business
+            # Verify business belongs to business
             try:
-                client = client_models.Client.objects.get(
+                business = business_models.Client.objects.get(
                     id=client_id, business=business
                 )
-            except client_models.Client.DoesNotExist:
+            except business_models.Client.DoesNotExist:
                 return Response(
                     {'error': 'Client not found'},
                     status=status.HTTP_404_NOT_FOUND
@@ -2656,7 +2672,7 @@ def business_clients_api(request):
             limit = int(request.query_params.get('limit', 50))
             offset = int(request.query_params.get('offset', 0))
 
-            clients = client_models.Client.objects.filter(business=business)
+            clients = business_models.Client.objects.filter(business=business)
 
             if search:
                 clients = clients.filter(
@@ -2668,7 +2684,7 @@ def business_clients_api(request):
             clients = clients.order_by('-created_at')[offset:offset + limit]
 
             data = []
-            for client in clients:
+            for business in clients:
                 data.append({
                     'id': client.id,
                     'name': client.client_name,
@@ -2685,7 +2701,7 @@ def business_clients_api(request):
             }, status=status.HTTP_200_OK)
 
         elif request.method == 'POST':
-            logger.info(f"Creating new client for business {business.business_id}")
+            logger.info(f"Creating new business for business {business.business_id}")
 
             client_name = request.data.get('name')
             client_phone = request.data.get('phone')
@@ -2696,7 +2712,7 @@ def business_clients_api(request):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            client = client_models.Client.objects.create(
+            business = business_models.Client.objects.create(
                 business=business,
                 client_name=client_name,
                 client_phone=client_phone,

@@ -1,0 +1,174 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Verify Order - #{{ order.order_number }}{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/wf_pages.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'workforce:wf_orders_all' %}">Orders</a></li>
+            <li class="breadcrumb-item active">Verify Order</li>
+        </ol>
+    </nav>
+
+    <h1 class="page-title">
+        <i class="fa-solid fa-clipboard-check me-2"></i>Verify Order
+    </h1>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Order #{{ order.order_number|default:order.client_order_code }}</h5>
+                    <span class="badge bg-warning text-dark">Pending Verification</span>
+                </div>
+                <div class="card-body">
+                    <!-- Customer Info -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">
+                            <i class="fa-solid fa-user me-2"></i>Customer Information
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Name:</strong> {{ order.customer_name }}</p>
+                                <p class="mb-1"><strong>Phone:</strong>
+                                    <a href="tel:{{ order.customer_phone }}">{{ order.customer_phone }}</a>
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Email:</strong> {{ order.customer_email|default:"Not provided" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Delivery Address -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">
+                            <i class="fa-solid fa-location-dot me-2"></i>Delivery Address
+                        </h6>
+                        <div class="p-3 bg-light rounded">
+                            <p class="mb-1"><strong>Zone:</strong> {{ order.delivery_zone|default:"Not specified" }}</p>
+                            <p class="mb-1"><strong>Address:</strong> {{ order.delivery_address|default:"Not specified" }}</p>
+                            {% if order.delivery_google_link %}
+                            <a href="{{ order.delivery_google_link }}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                                <i class="fa-solid fa-map me-1"></i>View on Map
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Order Details -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">
+                            <i class="fa-solid fa-box me-2"></i>Order Details
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Business:</strong> {{ order.business.business_name|default:"N/A" }}</p>
+                                <p class="mb-1"><strong>Order Date:</strong> {{ order.order_date|date:"d M Y" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>COD:</strong>
+                                    {% if order.cod_status_by_client == 'include' %}
+                                    <span class="badge bg-warning text-dark">QAR {{ order.cod_amount }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">No COD</span>
+                                    {% endif %}
+                                </p>
+                                <p class="mb-1"><strong>Parcel Type:</strong> {{ order.get_parcel_type_display|default:"Standard" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if order.order_note %}
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">
+                            <i class="fa-solid fa-sticky-note me-2"></i>Order Notes
+                        </h6>
+                        <div class="p-3 bg-light rounded">
+                            {{ order.order_note }}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Verification Form -->
+                    <form method="POST">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="verification_notes" class="form-label">Verification Notes</label>
+                            <textarea class="form-control" id="verification_notes" name="verification_notes" rows="3" placeholder="Add verification notes, corrections, or any special instructions..."></textarea>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="fa-solid fa-info-circle me-2"></i>
+                            Verifying this order will create a delivery task and mark the order ready for pickup.
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fa-solid fa-check me-1"></i>Verify & Create Delivery Task
+                            </button>
+                            <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-secondary btn-lg">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">Verification Checklist</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <i class="fa-solid fa-check-circle text-success me-2"></i>
+                            Customer name is correct
+                        </li>
+                        <li class="mb-2">
+                            <i class="fa-solid fa-check-circle text-success me-2"></i>
+                            Phone number is valid
+                        </li>
+                        <li class="mb-2">
+                            <i class="fa-solid fa-check-circle text-success me-2"></i>
+                            Delivery address is complete
+                        </li>
+                        <li class="mb-2">
+                            <i class="fa-solid fa-check-circle text-success me-2"></i>
+                            COD amount is correct (if applicable)
+                        </li>
+                        <li class="mb-0">
+                            <i class="fa-solid fa-check-circle text-success me-2"></i>
+                            Business/Pickup location confirmed
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">Quick Actions</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="tel:{{ order.customer_phone }}" class="btn btn-outline-primary">
+                            <i class="fa-solid fa-phone me-2"></i>Call Customer
+                        </a>
+                        {% if order.delivery_google_link %}
+                        <a href="{{ order.delivery_google_link }}" target="_blank" class="btn btn-outline-secondary">
+                            <i class="fa-solid fa-map me-2"></i>View Location
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
