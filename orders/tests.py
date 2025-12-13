@@ -17,14 +17,26 @@ from django.utils import timezone
 from unittest.mock import patch, MagicMock
 import json
 
-from orders.models import (
-    Order, OrderItem, OrderBarcode, OrderComments, OrderVerificationLog,
-    AddressVerification
-)
-from delivery.models import DeliveryTask, DlAddressUpdate
-from business.models import Business, PickupLocation, BusinessApiSettings
-from product.models import Product
-from core.models import Profile
+from orders import models as orders_models
+from delivery import models as delivery_models
+from business import models as business_models
+from product import models as product_models
+from core import models as core_models
+
+# Aliases for commonly used model classes
+Order = orders_models.Order
+OrderItem = orders_models.OrderItem
+OrderBarcode = orders_models.OrderBarcode
+OrderComments = orders_models.OrderComments
+OrderVerificationLog = orders_models.OrderVerificationLog
+AddressVerification = orders_models.AddressVerification
+DeliveryTask = delivery_models.DeliveryTask
+DlAddressUpdate = delivery_models.DlAddressUpdate
+Business = business_models.Business
+PickupLocation = business_models.PickupLocation
+BusinessApiSettings = business_models.BusinessApiSettings
+Product = product_models.Product
+Profile = core_models.Profile
 
 User = get_user_model()
 

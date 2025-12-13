@@ -16,11 +16,24 @@ from django.utils import timezone
 from unittest.mock import patch, MagicMock, Mock
 import json
 
-from delivery.models import DeliveryTask, DlAddressUpdate, AssignedDriver, ZoneName, LatLonList
-from orders.models import Order
-from business.models import Business, PickupLocation
-from fleet.models import Driver, DriverVehicle
-from core.models import Profile
+from delivery import models as delivery_models
+from orders import models as orders_models
+from business import models as business_models
+from fleet import models as fleet_models
+from core import models as core_models
+
+# Aliases for commonly used model classes
+DeliveryTask = delivery_models.DeliveryTask
+DlAddressUpdate = delivery_models.DlAddressUpdate
+AssignedDriver = delivery_models.AssignedDriver
+ZoneName = delivery_models.ZoneName
+LatLonList = delivery_models.LatLonList
+Order = orders_models.Order
+Business = business_models.Business
+PickupLocation = business_models.PickupLocation
+Driver = fleet_models.Driver
+DriverVehicle = fleet_models.DriverVehicle
+Profile = core_models.Profile
 
 User = get_user_model()
 

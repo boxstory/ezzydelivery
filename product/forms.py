@@ -15,6 +15,10 @@ Related:
 from django import forms
 from product import models as product_models
 
+# Local aliases for commonly used models
+Product = product_models.Product
+ProductCategory = product_models.ProductCategory
+
 
 # =============================================================================
 # ADD ITEMS FORM

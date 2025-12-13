@@ -298,7 +298,7 @@ STATIC_URL = '/static/'
 
 # Additional locations of static files (for development)
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static/'),
+    os.path.join(BASE_DIR, 'templates', 'static/'),
 ]
 
 # For production: collectstatic will copy files here

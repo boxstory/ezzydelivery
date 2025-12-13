@@ -63,6 +63,12 @@ from core import models as core_models
 from fleet import forms as fleet_forms
 from fleet import models as fleet_models
 
+# Local aliases for commonly used models
+Profile = core_models.Profile
+ProfilePicture = core_models.ProfilePicture
+Business = business_models.Business
+Driver = fleet_models.Driver
+
 # Initialize logger
 logger = logging.getLogger(__name__)
 

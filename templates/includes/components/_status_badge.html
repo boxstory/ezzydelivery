@@ -1,0 +1,19 @@
+{% comment %}
+Status Badge Component
+Usage:
+{% include "includes/components/_status_badge.html" with status="pending" label="Pending" %}
+
+Parameters:
+- status: Status key for styling (required)
+- label: Display text (required)
+- size: sm|md|lg (default: md)
+- prefix: Text before status (optional, e.g., "DMS:")
+{% endcomment %}
+
+<span class="status-badge status-{{ status }} {% if size == 'sm' %}status-badge-sm{% elif size == 'lg' %}status-badge-lg{% endif %}"
+      role="status"
+      aria-label="{% if prefix %}{{ prefix }} {% endif %}Status: {{ label }}">
+    {% if prefix %}<span class="status-prefix">{{ prefix }}</span>{% endif %}
+    <span class="visually-hidden">Status:</span>
+    {{ label }}
+</span>

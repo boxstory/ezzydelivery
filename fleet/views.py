@@ -55,11 +55,20 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
 from core import models as core_models
-from core.views import profile
+from core import views as core_views
 from fleet import models as fleet_models
 from delivery import models as delivery_models
 from fleet import forms as fleet_forms
 from fleet.wallet_service import WalletService, WalletAlertService
+
+# Local aliases for commonly used models
+Driver = fleet_models.Driver
+DriverDocument = fleet_models.DriverDocument
+DriverVehicle = fleet_models.DriverVehicle
+DriverTransaction = fleet_models.DriverTransaction
+DriverSettlement = fleet_models.DriverSettlement
+DeliveryTask = delivery_models.DeliveryTask
+Profile = core_models.Profile
 
 logger = logging.getLogger('fleet')
 

@@ -44,6 +44,13 @@ from product import models as product_models
 from business import models as business_models
 from product import forms as product_forms
 
+# Local aliases for commonly used models
+Product = product_models.Product
+ProductCategory = product_models.ProductCategory
+ColorVariant = product_models.ColorVariant
+UnitVariant = product_models.UnitVariant
+Business = business_models.Business
+
 logger = logging.getLogger('product')
 
 

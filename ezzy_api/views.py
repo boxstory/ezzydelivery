@@ -24,6 +24,14 @@ from business import models as business_models
 from ezzy_api import models as ezzy_api_models
 from ezzy_api import serializers as ezzy_api_serializers
 from shipday import Shipday
+
+# Local aliases for commonly used models
+Order = orders_models.Order
+OrderItem = orders_models.OrderItem
+DeliveryTask = delivery_models.DeliveryTask
+Driver = fleet_models.Driver
+Business = business_models.Business
+Profile = core_models.Profile
 from django.core.files.uploadedfile import InMemoryUploadedFile
 import shopify
 from woocommerce import API

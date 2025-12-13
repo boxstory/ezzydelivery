@@ -35,13 +35,17 @@ Related:
 
 from urllib import request
 from django import forms
-from core.models import *
+from core import models as core_models
 from allauth.account.forms import SignupForm
 from crispy_forms.helper import FormHelper, Layout
 from crispy_forms.bootstrap import InlineCheckboxes
 
 from webpages import models as webpages_models
 from fleet import models as fleet_models
+
+# Local aliases for commonly used models
+Profile = core_models.Profile
+ProfilePicture = core_models.ProfilePicture
 
 YEARS = [i for i in range(1930, 2020)]
 

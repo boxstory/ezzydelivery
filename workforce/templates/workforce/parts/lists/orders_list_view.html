@@ -357,13 +357,14 @@
                                     {% endif %}
                                 </div>
                                 <div class="col-md-6 col-lg-3">
-                                    {% if order.delivery_task %}
-                                    <a href="{% url 'workforce:delivery_task_detail' order.delivery_task.id %}"
+                                    {% with task=order.delivery_task.first %}
+                                    {% if task %}
+                                    <a href="{% url 'workforce:delivery_task_detail' task.id %}"
                                        class="btn btn-outline-info btn-sm w-100 py-2">
                                         <i class="fa-solid fa-truck-fast me-1"></i>View Task
-                                        {% if order.delivery_task.dl_task_status_dms %}
-                                        <span class="badge bg-{% if order.delivery_task.dl_task_status_dms == 'delivered' %}success{% elif order.delivery_task.dl_task_status_dms == 'in_transit' %}warning{% elif order.delivery_task.dl_task_status_dms == 'failed' %}danger{% else %}secondary{% endif %} ms-1">
-                                            {{ order.delivery_task.dl_task_status_dms|title }}
+                                        {% if task.dl_task_status_dms %}
+                                        <span class="badge bg-{% if task.dl_task_status_dms == 'delivered' %}success{% elif task.dl_task_status_dms == 'in_transit' %}warning{% elif task.dl_task_status_dms == 'failed' %}danger{% else %}secondary{% endif %} ms-1">
+                                            {{ task.dl_task_status_dms|title }}
                                         </span>
                                         {% endif %}
                                     </a>
@@ -372,6 +373,7 @@
                                         <i class="fa-solid fa-truck me-1"></i>No Task
                                     </button>
                                     {% endif %}
+                                    {% endwith %}
                                 </div>
                                 <div class="col-md-6 col-lg-3">
                                     <button class="btn btn-outline-secondary btn-sm w-100 py-2"

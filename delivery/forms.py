@@ -5,6 +5,10 @@ from crispy_forms.helper import FormHelper
 from requests import request
 from delivery import models as delivery_models
 
+# Local aliases for commonly used models
+DlAddressUpdate = delivery_models.DlAddressUpdate
+AssignedDriver = delivery_models.AssignedDriver
+
 
 class DlAddressUpdateForm(forms.ModelForm):
     class Meta:

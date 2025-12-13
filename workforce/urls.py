@@ -38,6 +38,9 @@ urlpatterns = [
     path('tasks/dl_list_published/', workforce_views.dl_list_published_to_dms, name='dl_list_published_to_dms'),
     path('tasks/dl_list_incompleted/', workforce_views.dl_list_incompleted_details, name='dl_list_incompleted_details'),
 
+    # Delivery task detail view
+    path('delivery-task/<int:task_id>/', workforce_views.delivery_task_detail, name='delivery_task_detail'),
+
     # AJAX endpoints for delivery tasks
     path('delivery-task/<int:task_id>/publish-dms/', workforce_views.publish_task_to_dms, name='publish_task_to_dms'),
     path('delivery-task/<int:task_id>/publish-driver-app/', workforce_views.publish_task_to_driver_app, name='publish_task_to_driver_app'),

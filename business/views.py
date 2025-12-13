@@ -80,6 +80,17 @@ from ezzy_api import models as ezzy_api_models
 from business import forms as business_forms
 from datetime import datetime
 
+# Local aliases for commonly used models
+Business = business_models.Business
+BusinessProfile = business_models.BusinessProfile
+PickupLocation = business_models.PickupLocation
+BusinessApiSettings = business_models.BusinessApiSettings
+BusinessLogo = business_models.BusinessLogo
+BusinessTeamProfile = business_models.BusinessTeamProfile
+DriverDirectory = business_models.DriverDirectory
+Profile = core_models.Profile
+Order = orders_models.Order
+
 logger = logging.getLogger('business')
 
 

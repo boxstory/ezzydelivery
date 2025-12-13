@@ -16,11 +16,17 @@ Related:
 """
 
 from django import forms
-from webpages.models import *
+from webpages import models as webpages_models
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Field, Submit
 
 from fleet import models as fleet_models
+
+# Local aliases for commonly used models
+ContactUs = webpages_models.ContactUs
+Careers = webpages_models.Careers
+PricingEnquiry = webpages_models.PricingEnquiry
+DeliveryRequest = webpages_models.DeliveryRequest
 
 
 # =============================================================================

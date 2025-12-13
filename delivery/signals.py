@@ -1,11 +1,13 @@
-
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
-from orders.models import *
-from delivery.models import DeliveryTask
+from orders import models as orders_models
+from delivery import models as delivery_models
 import uuid
 import logging
+
+# Local alias for commonly used model
+DeliveryTask = delivery_models.DeliveryTask
 
 logger = logging.getLogger(__name__)
 

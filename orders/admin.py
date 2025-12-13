@@ -1,12 +1,12 @@
 from atexit import register
 from django.contrib import admin
-from orders import models as order_models
+from orders import models as orders_models
 from import_export.admin import ImportExportModelAdmin
 
 # Register your models here.
 
 
-@admin.register(order_models.Order)
+@admin.register(orders_models.Order)
 class OrderAdmin(ImportExportModelAdmin):
     list_display = ('order_number', 'business', 'order_status', 'verification_status', 'task_created', 'address_verified', 'created_at')
     list_filter = ('order_status', 'verification_status', 'task_created', 'address_verified', 'created_at')
@@ -33,7 +33,7 @@ class OrderAdmin(ImportExportModelAdmin):
         }),
     )
 
-@admin.register(order_models.OrderItem)
+@admin.register(orders_models.OrderItem)
 class OrderItemAdmin(ImportExportModelAdmin):
     list_display = ('order', 'product', 'quantity', 'unit_price', 'total_price')
     list_filter = ('order__created_at',)
@@ -42,18 +42,18 @@ class OrderItemAdmin(ImportExportModelAdmin):
     readonly_fields = ('created_at', 'updated_at')
 
 
-admin.site.register(order_models.OrderLog)
+admin.site.register(orders_models.OrderLog)
 
 
-admin.site.register(order_models.OrderBarcode)
+admin.site.register(orders_models.OrderBarcode)
 
 
-@admin.register(order_models.OrderComments)
+@admin.register(orders_models.OrderComments)
 class OrderCommentsAdmin(ImportExportModelAdmin):
     list_display = ('order', 'name', 'body')
 
 
-@admin.register(order_models.OrderVerificationLog)
+@admin.register(orders_models.OrderVerificationLog)
 class OrderVerificationLogAdmin(ImportExportModelAdmin):
     list_display = ('order', 'action', 'verified_by', 'old_status', 'new_status', 'created_at')
     list_filter = ('action', 'created_at')
@@ -62,7 +62,7 @@ class OrderVerificationLogAdmin(ImportExportModelAdmin):
     date_hierarchy = 'created_at'
 
 
-@admin.register(order_models.AddressVerification)
+@admin.register(orders_models.AddressVerification)
 class AddressVerificationAdmin(ImportExportModelAdmin):
     list_display = ('order', 'verification_result', 'verified_by', 'verified_at', 'created_at')
     list_filter = ('verification_result', 'verified_at', 'created_at')

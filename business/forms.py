@@ -45,6 +45,17 @@ from core import models as core_models
 from fleet import models as fleet_models
 from business import models as business_models
 
+# Local aliases for commonly used models
+Business = business_models.Business
+BusinessProfile = business_models.BusinessProfile
+BusinessApiSettings = business_models.BusinessApiSettings
+BusinessLogo = business_models.BusinessLogo
+BusinessTeamProfile = business_models.BusinessTeamProfile
+PickupLocation = business_models.PickupLocation
+DriverDirectory = business_models.DriverDirectory
+Profile = core_models.Profile
+Driver = fleet_models.Driver
+
 
 # =============================================================================
 # CONSTANTS

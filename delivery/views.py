@@ -53,12 +53,23 @@ from core import models as core_models
 from fleet import models as fleet_models
 from business import models as business_models
 from delivery import models as delivery_models
-from orders import models as order_models
+from orders import models as orders_models
 
 from webpages import forms as webpages_forms
-from orders import forms as order_forms
+from orders import forms as orders_forms
 from delivery import forms as delivery_forms
 from fleet import forms as fleet_forms
+
+# Local aliases for commonly used models
+DeliveryTask = delivery_models.DeliveryTask
+DlAddressUpdate = delivery_models.DlAddressUpdate
+AssignedDriver = delivery_models.AssignedDriver
+ZoneName = delivery_models.ZoneName
+LatLonList = delivery_models.LatLonList
+Order = orders_models.Order
+Business = business_models.Business
+Driver = fleet_models.Driver
+Profile = core_models.Profile
 
 logger = logging.getLogger('delivery')
 

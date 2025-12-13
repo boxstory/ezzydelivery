@@ -68,6 +68,14 @@ from orders import forms, models as orders_models
 from business import models as business_models
 from orders import forms as orders_forms
 
+# Local aliases for commonly used models
+Order = orders_models.Order
+OrderItem = orders_models.OrderItem
+AddressVerification = orders_models.AddressVerification
+Business = business_models.Business
+PickupLocation = business_models.PickupLocation
+Profile = core_models.Profile
+
 from django.core.paginator import (
     Paginator,
     EmptyPage,

@@ -1,25 +1,49 @@
-{% extends 'client_dashboard_base.html' %}
+{% extends 'wf_dashboard_base.html' %}
 {% load static %}
 
 {% block title %}Inventory List{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
+    <!-- Page Header with Breadcrumb -->
     <div class="row mb-4">
         <div class="col-12">
-            <h1 class="h3 mb-0">Inventory</h1>
-            <p class="text-muted">View and manage stock levels</p>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{% url 'workforce:wf_dashboard' %}" class="text-decoration-none">Workforce</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'warehouse:dashboard' %}" class="text-decoration-none">Warehouse</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Inventory</li>
+                </ol>
+            </nav>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h1 class="h3 mb-1 fw-bold">
+                        <i class="fas fa-boxes-stacked text-success me-2"></i>Inventory
+                    </h1>
+                    <p class="text-muted mb-0">View and manage stock levels across warehouses</p>
+                </div>
+                <a href="{% url 'warehouse:receive_stock' %}" class="btn btn-primary"
+                   hx-get="{% url 'warehouse:receive_stock' %}"
+                   hx-target="#main-content"
+                   hx-select="#main-content"
+                   hx-swap="outerHTML"
+                   hx-push-url="true">
+                    <i class="fas fa-plus me-1"></i>Receive Stock
+                </a>
+            </div>
         </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Filters Card -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <form method="GET" class="row g-3">
+                <div class="card-body py-3">
+                    <form method="GET" class="row g-3 align-items-end">
                         <div class="col-md-3">
-                            <label for="warehouse" class="form-label">Warehouse</label>
+                            <label for="warehouse" class="form-label small fw-semibold text-muted">
+                                <i class="fas fa-warehouse me-1"></i>Warehouse
+                            </label>
                             <select name="warehouse" id="warehouse" class="form-select">
                                 <option value="">All Warehouses</option>
                                 {% for wh in warehouses %}
@@ -28,18 +52,23 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label for="search" class="form-label">Search</label>
+                            <label for="search" class="form-label small fw-semibold text-muted">
+                                <i class="fas fa-search me-1"></i>Search
+                            </label>
                             <input type="text" class="form-control" id="search" name="search" value="{{ search }}" placeholder="Product name or SKU...">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">&nbsp;</label>
-                            <div class="form-check">
+                            <div class="form-check mt-4">
                                 <input class="form-check-input" type="checkbox" name="low_stock" id="low_stock" value="1" {% if low_stock_only %}checked{% endif %}>
-                                <label class="form-check-label" for="low_stock">Low Stock Only</label>
+                                <label class="form-check-label" for="low_stock">
+                                    <span class="badge bg-warning text-dark"><i class="fas fa-exclamation-triangle me-1"></i>Low Stock Only</span>
+                                </label>
                             </div>
                         </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary w-100">Filter</button>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-filter me-1"></i>Filter
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -51,50 +80,77 @@
     <div class="row">
         <div class="col-12">
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Stock Levels</h5>
-                    <a href="{% url 'warehouse:receive_stock' %}" class="btn btn-primary btn-sm">
-                        <i class="fas fa-plus me-1"></i>Receive Stock
-                    </a>
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-semibold"><i class="fas fa-list-ul text-secondary me-2"></i>Stock Levels</h5>
+                    <span class="badge bg-secondary">{{ stock_levels.paginator.count|default:0 }} items</span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light">
                                 <tr>
-                                    <th>Product</th>
+                                    <th class="ps-3">Product</th>
                                     <th>SKU</th>
                                     <th>Warehouse</th>
                                     <th>Location</th>
-                                    <th class="text-end">On Hand</th>
-                                    <th class="text-end">Reserved</th>
-                                    <th class="text-end">Available</th>
-                                    <th>Actions</th>
+                                    <th class="text-center">On Hand</th>
+                                    <th class="text-center">Reserved</th>
+                                    <th class="text-center">Available</th>
+                                    <th class="text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for stock in stock_levels %}
-                                <tr {% if stock.quantity_on_hand <= stock.reorder_point %}class="table-warning"{% endif %}>
-                                    <td>{{ stock.product.item_name }}</td>
-                                    <td><code>{{ stock.product.item_sku|default:"-" }}</code></td>
-                                    <td>{{ stock.warehouse.name }}</td>
-                                    <td>{{ stock.location.code|default:"-" }}</td>
-                                    <td class="text-end">{{ stock.quantity_on_hand }}</td>
-                                    <td class="text-end">{{ stock.quantity_reserved }}</td>
-                                    <td class="text-end">
-                                        <strong>{{ stock.quantity_on_hand|add:stock.quantity_reserved|default:stock.quantity_on_hand }}</strong>
+                                <tr class="{% if stock.quantity_on_hand <= stock.reorder_point %}table-warning{% endif %}">
+                                    <td class="ps-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-primary bg-opacity-10 rounded p-2 me-2">
+                                                <i class="fas fa-cube text-primary"></i>
+                                            </div>
+                                            <div>
+                                                <span class="fw-medium">{{ stock.product.item_name }}</span>
+                                                {% if stock.quantity_on_hand <= stock.reorder_point %}
+                                                <span class="badge bg-warning text-dark ms-2"><i class="fas fa-exclamation-triangle"></i></span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td>
-                                        <a href="{% url 'warehouse:stock_card' stock.product.id %}" class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-chart-line"></i>
+                                    <td><code class="bg-light px-2 py-1 rounded">{{ stock.product.item_sku|default:"-" }}</code></td>
+                                    <td><span class="text-muted">{{ stock.warehouse.name }}</span></td>
+                                    <td><span class="badge bg-secondary">{{ stock.location.code|default:"Default" }}</span></td>
+                                    <td class="text-center">
+                                        <span class="fw-bold {% if stock.quantity_on_hand <= stock.reorder_point %}text-warning{% else %}text-success{% endif %}">
+                                            {{ stock.quantity_on_hand }}
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="text-muted">{{ stock.quantity_reserved }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-primary fs-6">{{ stock.quantity_on_hand|add:stock.quantity_reserved|default:stock.quantity_on_hand }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="{% url 'warehouse:stock_card' stock.product.id %}"
+                                           class="btn btn-sm btn-outline-primary rounded-pill"
+                                           title="View Stock Card"
+                                           hx-get="{% url 'warehouse:stock_card' stock.product.id %}"
+                                           hx-target="#main-content"
+                                           hx-select="#main-content"
+                                           hx-swap="outerHTML"
+                                           hx-push-url="true">
+                                            <i class="fas fa-chart-line me-1"></i>Details
                                         </a>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
                                     <td colspan="8" class="text-center text-muted py-5">
-                                        <i class="fas fa-boxes fa-3x mb-3 d-block"></i>
-                                        No inventory items found
+                                        <i class="fas fa-boxes fa-3x mb-3 d-block opacity-50"></i>
+                                        <p class="mb-2 fw-medium">No inventory items found</p>
+                                        <p class="small text-muted mb-3">Start by receiving stock into your warehouse</p>
+                                        <a href="{% url 'warehouse:receive_stock' %}" class="btn btn-primary">
+                                            <i class="fas fa-plus me-1"></i>Receive Stock
+                                        </a>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -104,15 +160,25 @@
                 </div>
 
                 {% if stock_levels.has_other_pages %}
-                <div class="card-footer bg-white">
+                <div class="card-footer bg-white border-top">
                     <nav>
                         <ul class="pagination justify-content-center mb-0">
                             {% if stock_levels.has_previous %}
-                            <li class="page-item"><a class="page-link" href="?page={{ stock_levels.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}">Previous</a></li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ stock_levels.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}">
+                                    <i class="fas fa-chevron-left me-1"></i>Previous
+                                </a>
+                            </li>
                             {% endif %}
-                            <li class="page-item active"><span class="page-link">{{ stock_levels.number }} / {{ stock_levels.paginator.num_pages }}</span></li>
+                            <li class="page-item active">
+                                <span class="page-link">Page {{ stock_levels.number }} of {{ stock_levels.paginator.num_pages }}</span>
+                            </li>
                             {% if stock_levels.has_next %}
-                            <li class="page-item"><a class="page-link" href="?page={{ stock_levels.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}">Next</a></li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ stock_levels.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}">
+                                    Next<i class="fas fa-chevron-right ms-1"></i>
+                                </a>
+                            </li>
                             {% endif %}
                         </ul>
                     </nav>

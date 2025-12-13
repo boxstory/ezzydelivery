@@ -16,8 +16,14 @@ from django.utils import timezone
 from django.db.models import Sum, Count, Q
 from datetime import datetime, timedelta
 
-from fleet.models import Driver, DriverTransaction, DriverSettlement
-from delivery.models import DeliveryTask
+from fleet import models as fleet_models
+from delivery import models as delivery_models
+
+# Local aliases for commonly used models
+Driver = fleet_models.Driver
+DriverTransaction = fleet_models.DriverTransaction
+DriverSettlement = fleet_models.DriverSettlement
+DeliveryTask = delivery_models.DeliveryTask
 
 
 class WalletService:

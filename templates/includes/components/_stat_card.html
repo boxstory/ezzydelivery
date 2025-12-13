@@ -1,0 +1,54 @@
+{% comment %}
+Stat Card Component
+Usage:
+{% include "includes/components/_stat_card.html" with title="Total Orders" value=order_count icon="fa-box" variant="primary" subtitle="All time orders" link_url=orders_url %}
+
+Parameters:
+- title: The card title (required)
+- value: The main value to display (required)
+- icon: FontAwesome icon class (required)
+- variant: primary|success|warning|danger|info (default: primary)
+- subtitle: Small text below the value (optional)
+- link_url: Make the card clickable (optional)
+- trend_value: Percentage change (optional)
+- trend_direction: up|down (optional)
+{% endcomment %}
+
+{% if link_url %}
+<a href="{{ link_url }}" class="stat-card stat-card-{{ variant|default:'primary' }} text-decoration-none"
+   {% if htmx %}
+   hx-get="{{ link_url }}"
+   hx-target="#main-content"
+   hx-select="#main-content"
+   hx-swap="outerHTML"
+   hx-push-url="true"
+   {% endif %}
+   role="button"
+   aria-label="{{ title }}: {{ value }}">
+{% else %}
+<article class="stat-card stat-card-{{ variant|default:'primary' }}" aria-label="{{ title }}">
+{% endif %}
+    <div class="stat-card-header">
+        <div>
+            <p class="stat-card-title">{{ title }}</p>
+            <h2 class="stat-card-value" aria-live="polite">{{ value|default:0 }}</h2>
+        </div>
+        <div class="stat-card-icon" aria-hidden="true">
+            <i class="fa-solid {{ icon }}"></i>
+        </div>
+    </div>
+    <div class="stat-card-meta">
+        <span>{{ subtitle|default:"" }}</span>
+        {% if trend_value %}
+        <span class="trend trend-{{ trend_direction|default:'up' }}">
+            <i class="fa-solid fa-arrow-{{ trend_direction|default:'up' }}" aria-hidden="true"></i>
+            <span class="visually-hidden">{{ trend_direction|default:'up' }} by</span>
+            {{ trend_value }}%
+        </span>
+        {% endif %}
+    </div>
+{% if link_url %}
+</a>
+{% else %}
+</article>
+{% endif %}

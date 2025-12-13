@@ -1,74 +1,98 @@
-{% extends 'client_dashboard_base.html' %}
+{% extends 'wf_dashboard_base.html' %}
 {% load static %}
 
 {% block title %}Warehouse Dashboard{% endblock %}
 
 {% block content %}
 <div id="warehouse_dashboard_section_main" class="container-fluid py-4">
+    <!-- Page Header with Breadcrumb -->
     <div class="row mb-4">
         <div class="col-12">
-            <h1 id="warehouse_dashboard_header_title" class="h3 mb-0">Warehouse Dashboard</h1>
-            <p class="text-muted">Manage inventory, stock levels, and warehouse operations</p>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{% url 'workforce:wf_dashboard' %}" class="text-decoration-none">Workforce</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Warehouse</li>
+                </ol>
+            </nav>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 id="warehouse_dashboard_header_title" class="h3 mb-1 fw-bold">
+                        <i class="fas fa-warehouse text-primary me-2"></i>Warehouse Dashboard
+                    </h1>
+                    <p class="text-muted mb-0">Manage inventory, stock levels, and warehouse operations</p>
+                </div>
+                <div class="d-none d-md-block">
+                    <a href="{% url 'warehouse:receive_stock' %}" class="btn btn-primary">
+                        <i class="fas fa-truck-loading me-1"></i> Receive Stock
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Summary Cards -->
-    <div id="warehouse_dashboard_section_summary" class="row mb-4">
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div id="warehouse_dashboard_card_total_stock" class="card border-0 shadow-sm h-100">
+    <div id="warehouse_dashboard_section_summary" class="row mb-4 g-3">
+        <div class="col-xl-3 col-md-6">
+            <div id="warehouse_dashboard_card_total_stock" class="card border-0 shadow-sm h-100 card-hover">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="text-muted mb-1">Total Stock</h6>
-                            <h3 class="mb-0">{{ total_on_hand|default:0 }}</h3>
+                            <p class="text-muted text-uppercase small fw-semibold mb-1">Total Stock</p>
+                            <h2 class="mb-0 fw-bold">{{ total_on_hand|default:0 }}</h2>
+                            <small class="text-success"><i class="fas fa-arrow-up me-1"></i>Units in stock</small>
                         </div>
-                        <div class="bg-primary bg-opacity-10 rounded-circle p-3">
-                            <i class="fas fa-boxes text-primary"></i>
+                        <div class="bg-primary bg-opacity-10 rounded-3 p-3">
+                            <i class="fas fa-boxes fa-2x text-primary"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div id="warehouse_dashboard_card_reserved" class="card border-0 shadow-sm h-100">
+        <div class="col-xl-3 col-md-6">
+            <div id="warehouse_dashboard_card_reserved" class="card border-0 shadow-sm h-100 card-hover">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="text-muted mb-1">Reserved</h6>
-                            <h3 class="mb-0">{{ total_reserved|default:0 }}</h3>
+                            <p class="text-muted text-uppercase small fw-semibold mb-1">Reserved</p>
+                            <h2 class="mb-0 fw-bold">{{ total_reserved|default:0 }}</h2>
+                            <small class="text-warning"><i class="fas fa-lock me-1"></i>Allocated to orders</small>
                         </div>
-                        <div class="bg-warning bg-opacity-10 rounded-circle p-3">
-                            <i class="fas fa-lock text-warning"></i>
+                        <div class="bg-warning bg-opacity-10 rounded-3 p-3">
+                            <i class="fas fa-lock fa-2x text-warning"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div id="warehouse_dashboard_card_alerts" class="card border-0 shadow-sm h-100">
+        <div class="col-xl-3 col-md-6">
+            <div id="warehouse_dashboard_card_alerts" class="card border-0 shadow-sm h-100 card-hover {% if low_stock_count > 0 %}border-start border-danger border-4{% endif %}">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="text-muted mb-1">Low Stock Alerts</h6>
-                            <h3 class="mb-0 {% if low_stock_count > 0 %}text-danger{% endif %}">{{ low_stock_count }}</h3>
+                            <p class="text-muted text-uppercase small fw-semibold mb-1">Low Stock Alerts</p>
+                            <h2 class="mb-0 fw-bold {% if low_stock_count > 0 %}text-danger{% endif %}">{{ low_stock_count }}</h2>
+                            <small class="{% if low_stock_count > 0 %}text-danger{% else %}text-success{% endif %}">
+                                {% if low_stock_count > 0 %}<i class="fas fa-exclamation-circle me-1"></i>Need attention{% else %}<i class="fas fa-check-circle me-1"></i>All good{% endif %}
+                            </small>
                         </div>
-                        <div class="bg-danger bg-opacity-10 rounded-circle p-3">
-                            <i class="fas fa-exclamation-triangle text-danger"></i>
+                        <div class="bg-danger bg-opacity-10 rounded-3 p-3">
+                            <i class="fas fa-exclamation-triangle fa-2x text-danger"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div id="warehouse_dashboard_card_picks" class="card border-0 shadow-sm h-100">
+        <div class="col-xl-3 col-md-6">
+            <div id="warehouse_dashboard_card_picks" class="card border-0 shadow-sm h-100 card-hover">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="text-muted mb-1">Pending Picks</h6>
-                            <h3 class="mb-0">{{ pending_picks }}</h3>
+                            <p class="text-muted text-uppercase small fw-semibold mb-1">Pending Picks</p>
+                            <h2 class="mb-0 fw-bold">{{ pending_picks }}</h2>
+                            <small class="text-info"><i class="fas fa-clipboard-list me-1"></i>Awaiting picking</small>
                         </div>
-                        <div class="bg-info bg-opacity-10 rounded-circle p-3">
-                            <i class="fas fa-clipboard-list text-info"></i>
+                        <div class="bg-info bg-opacity-10 rounded-3 p-3">
+                            <i class="fas fa-clipboard-list fa-2x text-info"></i>
                         </div>
                     </div>
                 </div>
@@ -80,33 +104,62 @@
     <div class="row mb-4">
         <div class="col-12">
             <div id="warehouse_dashboard_card_actions" class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-0">
-                    <h5 class="mb-0">Quick Actions</h5>
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-semibold"><i class="fas fa-bolt text-warning me-2"></i>Quick Actions</h5>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3 col-sm-6 mb-3">
-                            <a id="warehouse_dashboard_btn_receive" href="{% url 'warehouse:receive_stock' %}" class="btn btn-outline-primary w-100 py-3">
-                                <i class="fas fa-truck-loading mb-2 d-block fs-4"></i>
-                                Receive Stock
+                    <div class="row g-3">
+                        <div class="col-lg-3 col-md-6">
+                            <a id="warehouse_dashboard_btn_receive" href="{% url 'warehouse:receive_stock' %}"
+                               class="btn btn-outline-primary w-100 py-4 d-flex flex-column align-items-center gap-2 rounded-3 action-btn"
+                               hx-get="{% url 'warehouse:receive_stock' %}"
+                               hx-target="#main-content"
+                               hx-select="#main-content"
+                               hx-swap="outerHTML"
+                               hx-push-url="true">
+                                <i class="fas fa-truck-loading fa-2x"></i>
+                                <span class="fw-semibold">Receive Stock</span>
                             </a>
                         </div>
-                        <div class="col-md-3 col-sm-6 mb-3">
-                            <a id="warehouse_dashboard_btn_inventory" href="{% url 'warehouse:inventory_list' %}" class="btn btn-outline-success w-100 py-3">
-                                <i class="fas fa-warehouse mb-2 d-block fs-4"></i>
-                                View Inventory
+                        <div class="col-lg-3 col-md-6">
+                            <a id="warehouse_dashboard_btn_inventory" href="{% url 'warehouse:inventory_list' %}"
+                               class="btn btn-outline-success w-100 py-4 d-flex flex-column align-items-center gap-2 rounded-3 action-btn"
+                               hx-get="{% url 'warehouse:inventory_list' %}"
+                               hx-target="#main-content"
+                               hx-select="#main-content"
+                               hx-swap="outerHTML"
+                               hx-push-url="true">
+                                <i class="fas fa-warehouse fa-2x"></i>
+                                <span class="fw-semibold">View Inventory</span>
                             </a>
                         </div>
-                        <div class="col-md-3 col-sm-6 mb-3">
-                            <a id="warehouse_dashboard_btn_picks" href="{% url 'warehouse:pick_list_list' %}" class="btn btn-outline-info w-100 py-3">
-                                <i class="fas fa-tasks mb-2 d-block fs-4"></i>
-                                Pick Lists
+                        <div class="col-lg-3 col-md-6">
+                            <a id="warehouse_dashboard_btn_picks" href="{% url 'warehouse:pick_list_list' %}"
+                               class="btn btn-outline-info w-100 py-4 d-flex flex-column align-items-center gap-2 rounded-3 action-btn"
+                               hx-get="{% url 'warehouse:pick_list_list' %}"
+                               hx-target="#main-content"
+                               hx-select="#main-content"
+                               hx-swap="outerHTML"
+                               hx-push-url="true">
+                                <i class="fas fa-tasks fa-2x"></i>
+                                <span class="fw-semibold">Pick Lists</span>
                             </a>
                         </div>
-                        <div class="col-md-3 col-sm-6 mb-3">
-                            <a id="warehouse_dashboard_btn_alerts" href="{% url 'warehouse:low_stock_alerts' %}" class="btn btn-outline-danger w-100 py-3">
-                                <i class="fas fa-bell mb-2 d-block fs-4"></i>
-                                Alerts ({{ low_stock_count }})
+                        <div class="col-lg-3 col-md-6">
+                            <a id="warehouse_dashboard_btn_alerts" href="{% url 'warehouse:low_stock_alerts' %}"
+                               class="btn btn-outline-danger w-100 py-4 d-flex flex-column align-items-center gap-2 rounded-3 action-btn position-relative"
+                               hx-get="{% url 'warehouse:low_stock_alerts' %}"
+                               hx-target="#main-content"
+                               hx-select="#main-content"
+                               hx-swap="outerHTML"
+                               hx-push-url="true">
+                                <i class="fas fa-bell fa-2x"></i>
+                                <span class="fw-semibold">Alerts</span>
+                                {% if low_stock_count > 0 %}
+                                <span class="position-absolute top-0 end-0 translate-middle badge rounded-pill bg-danger">
+                                    {{ low_stock_count }}
+                                </span>
+                                {% endif %}
                             </a>
                         </div>
                     </div>
@@ -115,48 +168,61 @@
         </div>
     </div>
 
-    <!-- Recent Transactions -->
-    <div class="row">
-        <div class="col-lg-8 mb-4">
-            <div id="warehouse_dashboard_card_transactions" class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Recent Transactions</h5>
-                    <a id="warehouse_dashboard_btn_view_all" href="{% url 'warehouse:transaction_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+    <!-- Recent Transactions and Warehouses -->
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div id="warehouse_dashboard_card_transactions" class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-semibold"><i class="fas fa-history text-secondary me-2"></i>Recent Transactions</h5>
+                    <a id="warehouse_dashboard_btn_view_all" href="{% url 'warehouse:transaction_list' %}"
+                       class="btn btn-sm btn-outline-primary"
+                       hx-get="{% url 'warehouse:transaction_list' %}"
+                       hx-target="#main-content"
+                       hx-select="#main-content"
+                       hx-swap="outerHTML"
+                       hx-push-url="true">
+                        View All <i class="fas fa-arrow-right ms-1"></i>
+                    </a>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table id="warehouse_dashboard_table_transactions" class="table table-hover mb-0">
+                        <table id="warehouse_dashboard_table_transactions" class="table table-hover align-middle mb-0">
                             <thead id="warehouse_dashboard_thead_transactions" class="bg-light">
                                 <tr>
-                                    <th>Transaction #</th>
+                                    <th class="ps-3">Transaction #</th>
                                     <th>Product</th>
                                     <th>Type</th>
-                                    <th>Qty</th>
+                                    <th class="text-center">Qty</th>
                                     <th>Date</th>
                                 </tr>
                             </thead>
                             <tbody id="warehouse_dashboard_tbody_transactions">
                                 {% for txn in recent_transactions %}
                                 <tr>
-                                    <td><code>{{ txn.transaction_number|truncatechars:15 }}</code></td>
-                                    <td>{{ txn.product.item_name|truncatechars:20 }}</td>
+                                    <td class="ps-3"><code class="bg-light px-2 py-1 rounded">{{ txn.transaction_number|truncatechars:12 }}</code></td>
                                     <td>
-                                        <span class="badge {% if 'receive' in txn.transaction_type %}bg-success{% elif 'ship' in txn.transaction_type %}bg-primary{% elif 'adjust' in txn.transaction_type %}bg-warning{% else %}bg-secondary{% endif %}">
+                                        <span class="fw-medium">{{ txn.product.item_name|truncatechars:25 }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge rounded-pill {% if 'receive' in txn.transaction_type %}bg-success{% elif 'ship' in txn.transaction_type %}bg-primary{% elif 'adjust' in txn.transaction_type %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
                                             {{ txn.get_transaction_type_display }}
                                         </span>
                                     </td>
-                                    <td>
+                                    <td class="text-center">
                                         {% if txn.quantity > 0 %}
-                                            <span class="text-success">+{{ txn.quantity }}</span>
+                                            <span class="badge bg-success-subtle text-success fw-semibold">+{{ txn.quantity }}</span>
                                         {% else %}
-                                            <span class="text-danger">{{ txn.quantity }}</span>
+                                            <span class="badge bg-danger-subtle text-danger fw-semibold">{{ txn.quantity }}</span>
                                         {% endif %}
                                     </td>
-                                    <td>{{ txn.created_at|date:"M d, H:i" }}</td>
+                                    <td><small class="text-muted">{{ txn.created_at|date:"M d, H:i" }}</small></td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted py-4">No transactions yet</td>
+                                    <td colspan="5" class="text-center text-muted py-5">
+                                        <i class="fas fa-inbox fa-3x mb-3 d-block opacity-50"></i>
+                                        <p class="mb-0">No transactions yet</p>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -167,30 +233,56 @@
         </div>
 
         <!-- Warehouses -->
-        <div class="col-lg-4 mb-4">
-            <div id="warehouse_dashboard_card_warehouses" class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Warehouses</h5>
-                    <a id="warehouse_dashboard_btn_add_warehouse" href="{% url 'warehouse:warehouse_add' %}" class="btn btn-sm btn-outline-primary">
+        <div class="col-lg-4">
+            <div id="warehouse_dashboard_card_warehouses" class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-semibold"><i class="fas fa-building text-secondary me-2"></i>Warehouses</h5>
+                    <a id="warehouse_dashboard_btn_add_warehouse" href="{% url 'warehouse:warehouse_add' %}"
+                       class="btn btn-sm btn-primary rounded-circle"
+                       title="Add Warehouse"
+                       hx-get="{% url 'warehouse:warehouse_add' %}"
+                       hx-target="#main-content"
+                       hx-select="#main-content"
+                       hx-swap="outerHTML"
+                       hx-push-url="true">
                         <i class="fas fa-plus"></i>
                     </a>
                 </div>
                 <div id="warehouse_dashboard_list_warehouses" class="card-body">
                     {% for wh in warehouses %}
-                    <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
-                        <div>
-                            <h6 class="mb-0">{{ wh.name }}</h6>
-                            <small class="text-muted">{{ wh.code }}</small>
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-3 {% if not forloop.last %}border-bottom{% endif %}">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-primary bg-opacity-10 rounded-3 p-2 me-3">
+                                <i class="fas fa-warehouse text-primary"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 fw-semibold">{{ wh.name }}</h6>
+                                <small class="text-muted"><code>{{ wh.code }}</code></small>
+                            </div>
                         </div>
-                        <a href="{% url 'warehouse:warehouse_detail' wh.pk %}" class="btn btn-sm btn-outline-secondary">
+                        <a href="{% url 'warehouse:warehouse_detail' wh.pk %}"
+                           class="btn btn-sm btn-outline-secondary rounded-pill"
+                           hx-get="{% url 'warehouse:warehouse_detail' wh.pk %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">
                             View
                         </a>
                     </div>
                     {% empty %}
                     <div class="text-center text-muted py-4">
-                        <i class="fas fa-warehouse mb-2 fs-2"></i>
-                        <p class="mb-2">No warehouses yet</p>
-                        <a href="{% url 'warehouse:warehouse_add' %}" class="btn btn-primary btn-sm">Create Warehouse</a>
+                        <i class="fas fa-warehouse fa-3x mb-3 opacity-50"></i>
+                        <p class="mb-3">No warehouses yet</p>
+                        <a href="{% url 'warehouse:warehouse_add' %}"
+                           class="btn btn-primary"
+                           hx-get="{% url 'warehouse:warehouse_add' %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">
+                            <i class="fas fa-plus me-1"></i>Create Warehouse
+                        </a>
                     </div>
                     {% endfor %}
                 </div>
@@ -198,4 +290,27 @@
         </div>
     </div>
 </div>
+
+<style>
+.card-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.1) !important;
+}
+.action-btn {
+    transition: all 0.2s ease;
+}
+.action-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 .25rem .5rem rgba(0,0,0,.1);
+}
+.bg-success-subtle {
+    background-color: rgba(25, 135, 84, 0.1);
+}
+.bg-danger-subtle {
+    background-color: rgba(220, 53, 69, 0.1);
+}
+</style>
 {% endblock %}

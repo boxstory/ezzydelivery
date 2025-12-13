@@ -76,6 +76,15 @@ from fleet import models as fleet_models
 
 from business import forms as business_forms
 
+# Local aliases for commonly used models
+Business = business_models.Business
+BusinessProfile = business_models.BusinessProfile
+Profile = core_models.Profile
+Order = orders_models.Order
+DeliveryTask = delivery_models.DeliveryTask
+Driver = fleet_models.Driver
+DriverDocument = fleet_models.DriverDocument
+
 # ShipDay API integration
 from decouple import config
 try:
@@ -468,9 +477,59 @@ def dl_list_all(request):
     dl_tasks = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
     ).all().order_by('-created_at')
+
+    # Get filter parameters
+    dl_code = request.GET.get('dlCode', '')
+    c_code = request.GET.get('cCode', '')
+    mobile = request.GET.get('mobile', '')
+    driver_name = request.GET.get('driverName', '')
+    c_status = request.GET.get('cStatus', '')
+    dms_status = request.GET.get('dmsStatus', '')
+    date_from = request.GET.get('dateFrom', '')
+    date_to = request.GET.get('dateTo', '')
+    business_id = request.GET.get('business', '')
+
+    # Apply filters
+    if dl_code:
+        dl_tasks = dl_tasks.filter(dl_task_number__icontains=dl_code)
+    if c_code:
+        dl_tasks = dl_tasks.filter(order__client_order_code__icontains=c_code)
+    if mobile:
+        dl_tasks = dl_tasks.filter(order__customer_phone__icontains=mobile)
+    if driver_name:
+        dl_tasks = dl_tasks.filter(driver__name__icontains=driver_name)
+    if c_status:
+        dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
+    if dms_status:
+        dl_tasks = dl_tasks.filter(dl_task_status_dms=dms_status)
+    if date_from:
+        dl_tasks = dl_tasks.filter(dl_task_date__gte=date_from)
+    if date_to:
+        dl_tasks = dl_tasks.filter(dl_task_date__lte=date_to)
+    if business_id:
+        dl_tasks = dl_tasks.filter(order__business_id=business_id)
+
+    # Get all businesses for the filter dropdown
+    businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).order_by('business_name')
+
     dl_tasks = paginate_queryset(request, dl_tasks)
+
     data = {
         'dl_tasks': dl_tasks,
+        'businesses': businesses,
+        'filters': {
+            'dlCode': dl_code,
+            'cCode': c_code,
+            'mobile': mobile,
+            'driverName': driver_name,
+            'cStatus': c_status,
+            'dmsStatus': dms_status,
+            'dateFrom': date_from,
+            'dateTo': date_to,
+            'business': business_id,
+        }
     }
     return render(request, 'workforce/parts/lists/dl_list_all.html', data)
 
@@ -810,6 +869,43 @@ def add_order_comment(request, order_id):
             'success': False,
             'error': str(e)
         }, status=400)
+
+
+# Delivery Task Detail View ------------------------------------------------------------------------------------------------------
+
+@login_required(login_url='/accounts/login/')
+def delivery_task_detail(request, task_id):
+    """
+    Display detailed information about a delivery task.
+    Shows task status, driver updates, timeline, and allows quick actions.
+    """
+    task = get_object_or_404(
+        delivery_models.DeliveryTask.objects.select_related(
+            'order', 'order__business', 'driver', 'business', 'pickup_location'
+        ),
+        id=task_id
+    )
+
+    # Get status history (if available - placeholder for now)
+    status_history = []
+
+    # Get driver updates (placeholder - would come from driver app integration)
+    driver_updates = []
+
+    # Get seller comments (placeholder - would come from comments model)
+    seller_comments = []
+    unread_seller_comments_count = 0
+
+    context = {
+        'page_title': f'Delivery Task #{task.dl_task_number}',
+        'task': task,
+        'status_history': status_history,
+        'driver_updates': driver_updates,
+        'seller_comments': seller_comments,
+        'unread_seller_comments_count': unread_seller_comments_count,
+    }
+
+    return render(request, 'workforce/parts/delivery_task_detail.html', context)
 
 
 # AJAX Endpoints for Delivery Tasks ------------------------------------------------------------------------------------------------------
@@ -2018,15 +2114,15 @@ def suppliers_list(request):
         pending_orders=Count('order', filter=DjangoQ(order__order_status__in=['to_review', 'ready_to_pickup', 'publish']))
     )
 
-    # Summary stats
-    total_suppliers = suppliers.count()
+    # Paginate first to avoid duplicate count query
+    page_obj = paginate_queryset(request, suppliers, items_per_page=20)
+
+    # Summary stats - reuse count from paginator to avoid duplicate query
+    total_suppliers = page_obj.paginator.count
     total_fulfilled = orders_models.Order.objects.filter(
         order_status__in=['delivered', 'fulfilled'],
         business__fulfillment_service_enabled=True
     ).count()
-
-    # Paginate
-    page_obj = paginate_queryset(request, suppliers, items_per_page=20)
 
     context = {
         'page_title': 'Suppliers (Fulfillment Service)',

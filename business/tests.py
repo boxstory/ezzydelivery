@@ -13,11 +13,19 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from business.models import (
-    Business, BusinessProfile, BusinessApiSettings, BusinessLogo,
-    BusinessTeamProfile, PickupLocation, DriverDirectory, BusinessSocialInfo
-)
-from core.models import Profile
+from business import models as business_models
+from core import models as core_models
+
+# Aliases for commonly used model classes
+Business = business_models.Business
+BusinessProfile = business_models.BusinessProfile
+BusinessApiSettings = business_models.BusinessApiSettings
+BusinessLogo = business_models.BusinessLogo
+BusinessTeamProfile = business_models.BusinessTeamProfile
+PickupLocation = business_models.PickupLocation
+DriverDirectory = business_models.DriverDirectory
+BusinessSocialInfo = business_models.BusinessSocialInfo
+Profile = core_models.Profile
 
 User = get_user_model()
 

@@ -122,9 +122,9 @@
 .task-card,
 .order-card {
     background: var(--brand-white);
-    border-radius: var(--brand-radius-md);
-    padding: var(--spacing-lg);
-    margin-bottom: var(--spacing-md);
+    border-radius: var(--brand-radius-sm);
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
     box-shadow: var(--brand-shadow-sm);
     border: 1px solid var(--brand-grey-300);
     transition: var(--brand-transition);
@@ -133,7 +133,7 @@
 .task-card:hover,
 .order-card:hover {
     box-shadow: var(--brand-shadow-md);
-    transform: translateY(-2px);
+    transform: translateY(-1px);
 }
 
 .task-header,
@@ -141,25 +141,26 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: var(--spacing-md);
-    border-bottom: 2px solid var(--brand-grey-200);
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--brand-grey-200);
 }
 
 .task-id,
 .order-id {
     font-weight: 700;
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     color: var(--brand-grey-800);
 }
 
 /* ---------- STATUS BADGES ---------- */
 .status-badge {
-    padding: 0.35rem 0.75rem;
-    border-radius: 10px;
-    font-size: 0.8rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
 }
 
 .status-to_review {
@@ -226,9 +227,9 @@
 .task-details,
 .order-details {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--spacing-md);
-    padding-bottom: var(--spacing-md);
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.5rem;
+    padding-bottom: 0.5rem;
 }
 
 .detail-item {
@@ -237,16 +238,16 @@
 }
 
 .detail-label {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     color: var(--brand-grey-500);
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.1rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
 }
 
 .detail-value {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     color: var(--brand-grey-800);
     font-weight: 500;
 }
@@ -255,13 +256,14 @@
 .location-section {
     background: var(--brand-grey-100);
     border-radius: var(--brand-radius-sm);
-    padding: var(--spacing-md);
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
 }
 
 .location-item {
     display: flex;
     align-items: start;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.35rem;
 }
 
 .location-item:last-child {
@@ -269,45 +271,62 @@
 }
 
 .location-icon {
-    font-size: 1.2rem;
-    margin-right: 0.75rem;
-    margin-top: 0.2rem;
+    font-size: 0.9rem;
+    margin-right: 0.5rem;
+    margin-top: 0.1rem;
 }
 
 .location-text {
     flex: 1;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     color: var(--brand-grey-600);
+}
+
+.location-text strong {
+    font-size: 0.75rem;
 }
 
 /* ---------- DRIVER INFO ---------- */
 .driver-info {
     background: #e7f3ff;
     border-radius: var(--brand-radius-sm);
-    padding: 0.75rem var(--spacing-md);
-    margin-top: var(--spacing-md);
+    padding: 0.4rem 0.6rem;
+    margin-bottom: 0.5rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    font-size: 0.8rem;
 }
 
 /* ---------- QUICK ACTIONS ---------- */
 .quick-actions {
-    padding: var(--spacing-md);
+    padding: 0.5rem;
     background: var(--brand-grey-100);
     border-radius: var(--brand-radius-sm);
 }
 
 .quick-actions .btn {
     white-space: nowrap;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.quick-actions .row {
+    --bs-gutter-y: 0.35rem;
+    --bs-gutter-x: 0.35rem;
 }
 
 .action-section {
     display: flex;
     justify-content: flex-end;
-    margin-top: var(--spacing-md);
-    padding-top: var(--spacing-md);
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
     border-top: 1px solid var(--brand-grey-300);
+}
+
+.action-section .btn {
+    font-size: 0.8rem;
+    padding: 0.35rem 0.75rem;
 }
 
 /* ---------- PAGINATION ---------- */
@@ -384,6 +403,18 @@
 }
 
 /* ---------- RESPONSIVE DESIGN ---------- */
+@media (max-width: 992px) {
+    .filter-section .row {
+        --bs-gutter-x: 0.75rem;
+    }
+
+    .filter-section .col-lg-2,
+    .filter-section .col-lg-4 {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+}
+
 @media (max-width: 768px) {
     .task-details,
     .order-details {
@@ -407,6 +438,110 @@
 
     .quick-actions .row {
         gap: 0.5rem;
+    }
+
+    /* Improve touch targets */
+    .quick-actions .btn {
+        min-height: 44px;
+        font-size: 0.8rem;
+        padding: 0.5rem 0.75rem;
+    }
+
+    /* Stack quick actions */
+    .quick-actions .col-md-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+
+    /* Prevent iOS zoom on focus */
+    .form-control,
+    .form-select {
+        font-size: 16px !important;
+    }
+
+    /* Better pagination on mobile */
+    .pagination {
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+
+    .pagination .page-link {
+        padding: 0.5rem 0.75rem;
+        min-width: 44px;
+        text-align: center;
+    }
+
+    /* Improve header layout */
+    .orders-header {
+        padding: var(--spacing-md);
+    }
+
+    .orders-header h1,
+    .orders-header h2 {
+        font-size: 1.25rem;
+    }
+
+    /* Filter section improvements */
+    .filter-section .col-md-6,
+    .filter-section .col-lg-2,
+    .filter-section .col-lg-4 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+
+    /* Location section stacking */
+    .location-section {
+        flex-direction: column;
+    }
+
+    .location-item {
+        margin-bottom: 0.75rem;
+    }
+
+    /* Breadcrumb compact */
+    .breadcrumb {
+        font-size: 0.8rem;
+    }
+
+    .breadcrumb-item + .breadcrumb-item::before {
+        padding: 0 0.25rem;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Extra small screens */
+    .task-card,
+    .order-card {
+        padding: 0.5rem;
+    }
+
+    .detail-label {
+        font-size: 0.65rem;
+    }
+
+    .detail-value {
+        font-size: 0.8rem;
+    }
+
+    .status-badge {
+        font-size: 0.6rem;
+        padding: 0.15rem 0.4rem;
+    }
+
+    /* Stack filter buttons */
+    .filter-section .d-flex.gap-2 {
+        flex-direction: column;
+    }
+
+    .filter-section .ms-auto {
+        margin-left: 0 !important;
+        margin-top: 0.5rem;
+    }
+
+    /* Quick filter buttons wrap */
+    .filter-section .btn-sm {
+        flex: 1;
+        min-width: 0;
     }
 }
 

@@ -1,0 +1,104 @@
+{% comment %}
+Pagination Component
+Usage:
+{% include "includes/components/_pagination.html" with page_obj=orders filter_params="&status=pending" %}
+
+Parameters:
+- page_obj: Django paginator page object (required)
+- filter_params: URL query string to preserve filters (optional)
+- htmx_target: HTMX target element (default: #main-content)
+{% endcomment %}
+
+{% if page_obj.has_other_pages %}
+<nav aria-label="Page navigation" class="mt-4">
+    <ul class="pagination justify-content-center mb-0">
+        <!-- Previous Page -->
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ page_obj.previous_page_number }}{{ filter_params }}"
+               aria-label="Go to previous page"
+               {% if htmx_target %}
+               hx-get="?page={{ page_obj.previous_page_number }}{{ filter_params }}"
+               hx-target="{{ htmx_target|default:'#main-content' }}"
+               hx-select="{{ htmx_target|default:'#main-content' }}"
+               hx-swap="outerHTML"
+               hx-push-url="true"
+               {% endif %}>
+                <i class="fa-solid fa-chevron-left me-1" aria-hidden="true"></i>
+                <span class="d-none d-sm-inline">Previous</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link" aria-disabled="true">
+                <i class="fa-solid fa-chevron-left me-1" aria-hidden="true"></i>
+                <span class="d-none d-sm-inline">Previous</span>
+            </span>
+        </li>
+        {% endif %}
+
+        <!-- Page Numbers -->
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+            <li class="page-item active" aria-current="page">
+                <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+            <li class="page-item">
+                <a class="page-link"
+                   href="?page={{ num }}{{ filter_params }}"
+                   aria-label="Go to page {{ num }}"
+                   {% if htmx_target %}
+                   hx-get="?page={{ num }}{{ filter_params }}"
+                   hx-target="{{ htmx_target|default:'#main-content' }}"
+                   hx-select="{{ htmx_target|default:'#main-content' }}"
+                   hx-swap="outerHTML"
+                   hx-push-url="true"
+                   {% endif %}>
+                    {{ num }}
+                </a>
+            </li>
+            {% elif num == page_obj.number|add:'-3' or num == page_obj.number|add:'3' %}
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+            {% endif %}
+        {% endfor %}
+
+        <!-- Next Page -->
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ page_obj.next_page_number }}{{ filter_params }}"
+               aria-label="Go to next page"
+               {% if htmx_target %}
+               hx-get="?page={{ page_obj.next_page_number }}{{ filter_params }}"
+               hx-target="{{ htmx_target|default:'#main-content' }}"
+               hx-select="{{ htmx_target|default:'#main-content' }}"
+               hx-swap="outerHTML"
+               hx-push-url="true"
+               {% endif %}>
+                <span class="d-none d-sm-inline">Next</span>
+                <i class="fa-solid fa-chevron-right ms-1" aria-hidden="true"></i>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link" aria-disabled="true">
+                <span class="d-none d-sm-inline">Next</span>
+                <i class="fa-solid fa-chevron-right ms-1" aria-hidden="true"></i>
+            </span>
+        </li>
+        {% endif %}
+    </ul>
+
+    <!-- Page Info -->
+    <div class="text-center mt-2 text-muted small">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        <span class="d-none d-sm-inline">
+            ({{ page_obj.paginator.count }} total items)
+        </span>
+    </div>
+</nav>
+{% endif %}

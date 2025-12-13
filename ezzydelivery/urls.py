@@ -60,7 +60,7 @@ urlpatterns = [
 
     path('blog/', include('blog.urls', namespace='blog')),
 
-    path('warehouse/', include('warehouse.urls', namespace='warehouse')),
+    path('workforce/warehouse/', include('warehouse.urls', namespace='warehouse')),
 
 ]
 

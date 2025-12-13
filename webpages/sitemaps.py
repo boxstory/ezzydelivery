@@ -1,6 +1,6 @@
 from django.contrib.sitemaps import Sitemap
 from django.urls import reverse
-from webpages import models as webpage_models
+from webpages import models as webpages_models
 from business import models as business_models
 from fleet import models as fleet_models
 from django.utils import timezone

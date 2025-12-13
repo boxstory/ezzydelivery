@@ -36,9 +36,13 @@ from datetime import timezone
 
 from requests import request
 
-from orders.models import *
+from orders import models as orders_models
 from business import models as business_models
 from product import models as product_models
+
+# Local aliases for commonly used models
+Order = orders_models.Order
+OrderItem = orders_models.OrderItem
 
 
 # =============================================================================

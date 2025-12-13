@@ -213,6 +213,7 @@ class BusinessProfile(models.Model):
 
     class Meta:
         verbose_name_plural = "Business Profile"
+        db_table = 'client_businessprofile'
 
 
 
@@ -251,6 +252,7 @@ class BusinessApiSettings(models.Model):
 
     class Meta:
         verbose_name_plural = "Business Settings"
+        db_table = 'client_businessapisettings'
 
     def __str__(self):
         return self.business.business_name
@@ -267,6 +269,7 @@ class BusinessLogo(models.Model):
 
     class Meta:
         verbose_name_plural = "Business Logo"
+        db_table = 'client_businesslogo'
 
     def __str__(self):
         return str(self.business.business_name)
@@ -292,6 +295,7 @@ class BusinessPoster(models.Model):
 
     class Meta:
         verbose_name_plural = "Business Posters"
+        db_table = 'client_businessposter'
         ordering = ['poster_order', '-created_at']
 
     def __str__(self):
@@ -332,6 +336,7 @@ class BusinessTeamProfile(models.Model):
     
     class Meta:
         verbose_name_plural = "Staff Profile"
+        db_table = 'client_businessteamprofile'
         unique_together = ('business', 'team_code')
 
 
@@ -362,6 +367,7 @@ class PickupLocation(models.Model):
 
     class Meta:
         verbose_name_plural = "Pickup Location"
+        db_table = 'client_pickuplocation'
 
 
 class DriverDirectory(models.Model):
@@ -377,6 +383,7 @@ class DriverDirectory(models.Model):
 
     class Meta:
         verbose_name_plural = "Drivers Directories"
+        db_table = 'client_driverdirectory'
 
 
 class BusinessSocialInfo(models.Model):
@@ -390,3 +397,7 @@ class BusinessSocialInfo(models.Model):
 
     def __str__(self):
         return str(self.business)
+
+    class Meta:
+        verbose_name_plural = "Business Social Info"
+        db_table = 'client_businesssocialinfo'

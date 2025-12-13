@@ -5,8 +5,7 @@
 
 <head>
   {% include "includes/head.html" %}
-  <!-- HTMX -->
-  <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+  <!-- HTMX is loaded via main_dashboard_scripts.html at end of body -->
 
   <!-- Dashboard CSS - Always loaded for HTMX compatibility -->
   <link rel="stylesheet" href="{% static 'webpages/css/sidebar-common.css' %}" type="text/css" />
@@ -22,13 +21,22 @@
 
   {% block extra_css %}
   {% endblock extra_css %}
-  <title>
-    {% block title %}
-    {% endblock title %}
-    Ezzy Dashaoard</title>
+  <title>{% block title %}Dashboard{% endblock title %} | Ezzy Delivery</title>
 </head>
 
 <body class="d-flex flex-column min-vh-100">
+  <!-- HTMX Loading Indicator -->
+  <div id="htmx-loading-indicator" class="htmx-indicator">
+    <div class="loading-overlay">
+      <div class="loading-spinner">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="loading-text mt-2 mb-0">Loading...</p>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notifications -->
   {% include "includes/toast_notifications.html" %}
 
@@ -42,7 +50,7 @@
       {% include "workforce/parts/dashboard_sidebar_workforce.html" %}
       {% endblock sidebar %}
       <!-- dashboard body content goes here -->
-       <div id="main-content" class="container m-0 p-0 ">
+       <div id="main-content" class="container m-0 p-0" hx-indicator="#htmx-loading-indicator">
         {% include "includes/messages.html" %}
         {% block content %}
         {% endblock content %}

@@ -26,6 +26,13 @@ Related:
 from django import forms
 from warehouse import models as warehouse_models
 
+# Local aliases for commonly used models
+Warehouse = warehouse_models.Warehouse
+StorageLocation = warehouse_models.StorageLocation
+StockLevel = warehouse_models.StockLevel
+CycleCount = warehouse_models.CycleCount
+CycleCountItem = warehouse_models.CycleCountItem
+
 
 # =============================================================================
 # WAREHOUSE FORM

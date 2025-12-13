@@ -54,7 +54,7 @@
               </a>
             </li>
             <li class="nav-item">
-              <a id="workforce_sidebar_link_wf_orders_to_publish" class="nav-link btn submenu-link"
+              <a id="workforce_sidebar_link_wf_orders_to_publish" class="nav-link btn submenu-link d-flex align-items-center"
                  href="{% url 'workforce:wf_orders_to_publish' %}"
                  hx-get="{% url 'workforce:wf_orders_to_publish' %}"
                  hx-target="#main-content"
@@ -62,7 +62,8 @@
                  hx-swap="outerHTML"
                  hx-push-url="true">
                 <i class="fa-solid fa-spinner me-2"></i>
-                Publish to Task
+                <span class="flex-grow-1">Publish to Task</span>
+                {% if pending_publish_count %}<span class="badge bg-warning text-dark ms-auto" data-badge="pending_publish">{{ pending_publish_count }}</span>{% endif %}
               </a>
             </li>
             <li class="nav-item">
@@ -127,7 +128,7 @@
               </a>
             </li>
             <li class="nav-item">
-              <a id="workforce_sidebar_link_tasks_unpublished_dms" class="nav-link btn submenu-link"
+              <a id="workforce_sidebar_link_tasks_unpublished_dms" class="nav-link btn submenu-link d-flex align-items-center"
                  href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}"
                  hx-get="{% url 'workforce:dl_list_ready_to_published_to_dms' %}"
                  hx-target="#main-content"
@@ -135,7 +136,8 @@
                  hx-swap="outerHTML"
                  hx-push-url="true">
                 <i class="fa-solid fa-spinner me-2"></i>
-                UnPublished-DMS
+                <span class="flex-grow-1">UnPublished-DMS</span>
+                {% if unpublished_dms_count %}<span class="badge bg-info ms-auto" data-badge="unpublished_dms">{{ unpublished_dms_count }}</span>{% endif %}
               </a>
             </li>
             <li class="nav-item">
@@ -151,7 +153,7 @@
               </a>
             </li>
             <li class="nav-item">
-              <a id="workforce_sidebar_link_tasks_followup" class="nav-link btn submenu-link"
+              <a id="workforce_sidebar_link_tasks_followup" class="nav-link btn submenu-link d-flex align-items-center"
                  href="{% url 'workforce:tasks_followup_list' %}"
                  hx-get="{% url 'workforce:tasks_followup_list' %}"
                  hx-target="#main-content"
@@ -159,7 +161,8 @@
                  hx-swap="outerHTML"
                  hx-push-url="true">
                 <i class="fa-solid fa-phone me-2"></i>
-                FollowUp List
+                <span class="flex-grow-1">FollowUp List</span>
+                {% if followup_count %}<span class="badge bg-danger ms-auto" data-badge="followup">{{ followup_count }}</span>{% endif %}
               </a>
             </li>
             <li class="nav-item">
@@ -437,7 +440,7 @@
       <!-- Fulfillment Service Section -->
       <li id="workforce_sidebar_menu_fulfillment" class="nav-item {% if request.resolver_match.url_name == 'suppliers_list' or request.resolver_match.url_name == 'fulfilled_orders_list' %}active{% endif %}">
         <a id="workforce_sidebar_link_fulfillment" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-fulfillment" href="#">
-          <i class="fa-solid fa-warehouse me-2"></i>
+          <i class="fa-solid fa-truck-ramp-box me-2"></i>
           <span>Fulfillment</span>
           <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
         </a>
@@ -451,7 +454,7 @@
                  hx-select="#main-content"
                  hx-swap="outerHTML"
                  hx-push-url="true">
-                <i class="fa-solid fa-truck-ramp-box me-2"></i>
+                <i class="fa-solid fa-building me-2"></i>
                 Suppliers
               </a>
             </li>
@@ -465,6 +468,128 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-receipt me-2"></i>
                 Purchase Orders
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Warehouse Management Section -->
+      <li id="workforce_sidebar_menu_warehouse" class="nav-item {% if request.resolver_match.app_name == 'warehouse' %}active{% endif %}">
+        <a id="workforce_sidebar_link_warehouse" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-warehouse" href="#">
+          <i class="fa-solid fa-warehouse me-2"></i>
+          <span>Warehouse</span>
+          <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
+        </a>
+        <div class="collapse submenu" id="submenu-warehouse">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_dashboard" class="nav-link btn submenu-link"
+                 href="{% url 'warehouse:dashboard' %}"
+                 hx-get="{% url 'warehouse:dashboard' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-gauge-high me-2"></i>
+                WH Dashboard
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_inventory" class="nav-link btn submenu-link"
+                 href="{% url 'warehouse:inventory_list' %}"
+                 hx-get="{% url 'warehouse:inventory_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-boxes-stacked me-2"></i>
+                Inventory
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_receive" class="nav-link btn submenu-link"
+                 href="{% url 'warehouse:receive_stock' %}"
+                 hx-get="{% url 'warehouse:receive_stock' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-truck-loading me-2"></i>
+                Receive Stock
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_pick_lists" class="nav-link btn submenu-link"
+                 href="{% url 'warehouse:pick_list_list' %}"
+                 hx-get="{% url 'warehouse:pick_list_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-clipboard-list me-2"></i>
+                Pick Lists
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_cycle_counts" class="nav-link btn submenu-link"
+                 href="{% url 'warehouse:cycle_count_list' %}"
+                 hx-get="{% url 'warehouse:cycle_count_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-calculator me-2"></i>
+                Cycle Counts
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_alerts" class="nav-link btn submenu-link d-flex align-items-center"
+                 href="{% url 'warehouse:low_stock_alerts' %}"
+                 hx-get="{% url 'warehouse:low_stock_alerts' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                <span class="flex-grow-1">Low Stock Alerts</span>
+                {% if low_stock_count %}<span class="badge bg-danger ms-auto" data-badge="low_stock">{{ low_stock_count }}</span>{% endif %}
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_warehouses" class="nav-link btn submenu-link"
+                 href="{% url 'warehouse:warehouse_list' %}"
+                 hx-get="{% url 'warehouse:warehouse_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-building-warehouse me-2"></i>
+                Warehouses
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_locations" class="nav-link btn submenu-link"
+                 href="{% url 'warehouse:location_list' %}"
+                 hx-get="{% url 'warehouse:location_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-location-dot me-2"></i>
+                Locations
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_transactions" class="nav-link btn submenu-link"
+                 href="{% url 'warehouse:transaction_list' %}"
+                 hx-get="{% url 'warehouse:transaction_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-arrow-right-arrow-left me-2"></i>
+                Transactions
               </a>
             </li>
           </ul>

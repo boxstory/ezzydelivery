@@ -5,7 +5,11 @@ Management command to create 5 SEO-optimized blog posts targeting Qatar delivery
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.contrib.auth.models import User
-from blog.models import BlogPost, BlogCategory
+from blog import models as blog_models
+
+# Local aliases for commonly used models
+BlogPost = blog_models.BlogPost
+BlogCategory = blog_models.BlogCategory
 
 
 class Command(BaseCommand):

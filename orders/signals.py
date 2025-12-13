@@ -2,10 +2,18 @@ import logging
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
-from orders.models import *
-from delivery.models import *
+from orders import models as orders_models
+from delivery import models as delivery_models
 import uuid
 import json
+
+# Local aliases for commonly used models
+Order = orders_models.Order
+OrderBarcode = orders_models.OrderBarcode
+AddressVerification = orders_models.AddressVerification
+OrderVerificationLog = orders_models.OrderVerificationLog
+DlAddressUpdate = delivery_models.DlAddressUpdate
+DeliveryTask = delivery_models.DeliveryTask
 
 logger = logging.getLogger('orders')
 
@@ -54,8 +62,7 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
         
         # Create initial address verification record and send verification link
         if instance.customer_address:
-            from orders.models import AddressVerification
-            address_verification, addr_created = AddressVerification.objects.get_or_create(
+            address_verification, addr_created = orders_models.AddressVerification.objects.get_or_create(
                 order=instance,
                 defaults={
                     'original_address': instance.customer_address,
@@ -118,11 +125,10 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
     if not created:
         old_status = _old_verification_status.get(instance.pk, '')
         if old_status != instance.verification_status:
-            from orders.models import OrderVerificationLog
             from django.utils import timezone
-            
+
             # Log verification status change
-            OrderVerificationLog.objects.create(
+            orders_models.OrderVerificationLog.objects.create(
                 order=instance,
                 action='verification_status_changed',
                 old_status=old_status,
@@ -142,7 +148,6 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
 def _create_delivery_task_from_order(order):
     """Create delivery task from verified order (DMS push handled by delivery signal)"""
     from django.utils import timezone
-    from delivery.models import DeliveryTask, DlAddressUpdate
     from decimal import Decimal
 
     try:

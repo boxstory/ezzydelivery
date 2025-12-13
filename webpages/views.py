@@ -58,12 +58,22 @@ from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from webpages.forms import *
-from webpages.models import WhatsAppInquiry, PricingEnquiry
+from webpages import forms as webpages_forms
+from webpages import models as webpages_models
 from django.core.mail import mail_admins, send_mail
 from business import models as business_models
 from fleet import models as fleet_models
 from core.seo import SEOMetadata
+
+# Local aliases for commonly used models/forms
+WhatsAppInquiry = webpages_models.WhatsAppInquiry
+PricingEnquiry = webpages_models.PricingEnquiry
+ContactForm = webpages_forms.ContactForm
+CareersForm = webpages_forms.CareersForm
+PricingEnquiryForm = webpages_forms.PricingEnquiryForm
+DeliveryRequestForm = webpages_forms.DeliveryRequestForm
+Business = business_models.Business
+Driver = fleet_models.Driver
 
 logger = logging.getLogger('webpages')
 

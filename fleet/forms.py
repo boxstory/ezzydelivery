@@ -1,4 +1,3 @@
-
 from django import forms
 from django.contrib.auth.models import User
 from crispy_forms.helper import FormHelper
@@ -7,6 +6,13 @@ from django.forms import ModelForm
 from core import models as core_models
 from fleet import models as fleet_models
 from business import models as business_models
+
+# Local aliases for commonly used models
+Driver = fleet_models.Driver
+DriverVehicle = fleet_models.DriverVehicle
+DriverDocument = fleet_models.DriverDocument
+Profile = core_models.Profile
+Business = business_models.Business
 
 # DRIVER FORM ---------------------------------------------------------------------------------------------------------------------
 
