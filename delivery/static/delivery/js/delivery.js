@@ -1,3 +1,8 @@
+/* ============================================
+   DELIVERY APP - MERGED JAVASCRIPT
+   ============================================ */
+
+/* ---------- FLEET ---------- */
 $(document).ready(function () {
   $(function () {
     $("table tr td").find("div").hide();
