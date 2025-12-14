@@ -128,15 +128,12 @@
   }
 </style>
 
-<!-- 1. BRAND KIT - Remaining styles (non-critical, loaded sync for compatibility) -->
-<link href="{% static 'webpages/css/brand-kit.css' %}" rel="stylesheet" type="text/css" />
+<!-- 1. BRANDKIT - Modular design system (imports all brandkit-*.css files) -->
+<link href="{% static 'webpages/css/brandkit.css' %}" rel="stylesheet" type="text/css" />
 
 <!-- 2. BOOTSTRAP - CRITICAL for layout (must load synchronously) -->
 <!-- Custom minimal Bootstrap build (190KB vs 226KB CDN) - 15.6% smaller -->
 <link href="{% static 'webpages/css/bootstrap-custom.min.css' %}" rel="stylesheet" type="text/css" />
-
-<!-- 3. BRAND KIT OVERRIDES - CRITICAL for brand appearance -->
-<link href="{% static 'webpages/css/brand-kit-overrides.css' %}" rel="stylesheet" type="text/css" />
 
 <!-- 4. FONT AWESOME - NON-CRITICAL (async loading with fallback) -->
 <link rel="preload" href="{% static 'fontawesomefree/css/fontawesome.css' %}" as="style" onload="this.onload=null;this.rel='stylesheet'">
@@ -168,8 +165,8 @@
 <!-- 8. APP-SPECIFIC CSS - Loaded via extra_css block in child templates -->
 {% block extra_css %}{% endblock extra_css %}
 
-<!-- 9. BRAND KIT OVERRIDES FINAL - MUST BE LAST (final override layer) -->
-<link href="{% static 'webpages/css/brand-kit-overrides.css' %}" rel="stylesheet" type="text/css" />
+<!-- 9. BRANDKIT OVERRIDES FINAL - MUST BE LAST (final override layer) -->
+<link href="{% static 'webpages/css/brandkit-overrides.css' %}" rel="stylesheet" type="text/css" />
 
 <!-- ========================================
      JAVASCRIPT LOADING STRATEGY - OPTIMIZED FOR PERFORMANCE
