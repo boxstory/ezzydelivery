@@ -107,6 +107,7 @@ INSTALLED_APPS = [
     'workforce',
     'ezzy_api',
     'warehouse',
+    'dispatch',
 
 
 ]
@@ -224,6 +225,8 @@ TEMPLATES = [
                 'core.context_processors.htmx_request',
                 # User profile to avoid duplicate queries
                 'core.context_processors.user_profile',
+                # User business to avoid duplicate queries in sidebar
+                'core.context_processors.user_business',
             ],
         },
     },
@@ -339,6 +342,60 @@ CACHES = {
 # CACHE_LOCATION=redis://127.0.0.1:6379/1
 # ==========================================
 # END CACHE CONFIGURATION
+# ==========================================
+
+
+# ==========================================
+# CELERY CONFIGURATION
+# ==========================================
+# Added: December 2024
+# Purpose: Async task processing for batch timer engine
+# ==========================================
+
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Qatar'
+CELERY_ENABLE_UTC = True
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes max per task
+CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # Soft limit 25 minutes
+
+# Celery Beat settings
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Task result expiration
+CELERY_RESULT_EXPIRES = 3600  # 1 hour
+
+# Worker settings
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Fair task distribution
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000  # Restart worker after 1000 tasks
+
+# ==========================================
+# END CELERY CONFIGURATION
+# ==========================================
+
+
+# ==========================================
+# DISPATCH & BATCHING CONFIGURATION
+# ==========================================
+# Added: December 2024
+# Purpose: Order batching and dispatch optimization
+# ==========================================
+
+# Feature flag - set to True to enable batching system
+DISPATCH_BATCHING_ENABLED = config('DISPATCH_BATCHING_ENABLED', default=False, cast=bool)
+
+# Default batching parameters (can be overridden per pickup location)
+DISPATCH_DEFAULT_HOLD_SECONDS = config('DISPATCH_DEFAULT_HOLD_SECONDS', default=180, cast=int)
+DISPATCH_DEFAULT_SLA_MINUTES = config('DISPATCH_DEFAULT_SLA_MINUTES', default=60, cast=int)
+DISPATCH_MAX_BATCH_SIZE = config('DISPATCH_MAX_BATCH_SIZE', default=2, cast=int)
+DISPATCH_MAX_ORDERS_PER_RIDER = config('DISPATCH_MAX_ORDERS_PER_RIDER', default=2, cast=int)
+
+# ==========================================
+# END DISPATCH CONFIGURATION
 # ==========================================
 
 
@@ -505,6 +562,17 @@ LOGGING = {
             'backupCount': 10,
             'formatter': 'verbose',
         },
+
+        # Query log (SQL queries and duplicates)
+        'file_queries': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'queries.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 3,
+            'formatter': 'verbose',
+            'filters': ['require_debug_true'],
+        },
     },
 
     # ===== LOGGERS =====
@@ -522,7 +590,13 @@ LOGGING = {
         },
         'django.db.backends': {
             # Log SQL queries in DEBUG mode (for N+1 query debugging)
-            'handlers': ['console'] if DEBUG else [],
+            'handlers': ['file_queries'] if DEBUG else [],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'queries': {
+            # Custom query logger for duplicate detection
+            'handlers': ['console', 'file_queries'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
@@ -565,6 +639,11 @@ LOGGING = {
         },
         'webpages': {
             'handlers': ['console', 'file_error'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'dispatch': {
+            'handlers': ['console', 'file_delivery', 'file_error'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
