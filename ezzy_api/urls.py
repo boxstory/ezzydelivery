@@ -87,4 +87,5 @@ urlpatterns = [
     path('qnas/search/', ezzy_api_views.qnas_search_address, name='qnas_search_address'),
     path('qnas/address-details/', ezzy_api_views.qnas_get_address_details, name='qnas_get_address_details'),
     path('qnas/geocode/', ezzy_api_views.qnas_geocode, name='qnas_geocode'),
+    path('qnas/get-zone-polygon/<str:zone_number>/', ezzy_api_views.qnas_get_zone_polygon, name='qnas_get_zone_polygon'),
 ]

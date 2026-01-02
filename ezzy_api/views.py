@@ -3116,3 +3116,36 @@ def qnas_geocode(request):
     )
 
 
+@csrf_exempt
+def qnas_get_zone_polygon(request, zone_number):
+    """
+    Proxy endpoint for QNAS get_zone_polygon API.
+    Returns zone polygon boundaries.
+
+    URL params:
+    - zone_number: Zone number to get polygon for
+
+    Frontend must call with credentials:
+    fetch("/api/qnas/get-zone-polygon/1/", { method: "GET", credentials: "include" })
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    if not zone_number:
+        return JsonResponse({'error': 'Zone number is required'}, status=400)
+
+    logger.info(f"QNAS proxy: Fetching polygon for zone {zone_number}")
+
+    resp = _make_qnas_request(request, f"get_zone_polygon?zone={zone_number}")
+
+    if resp is None:
+        return JsonResponse({'error': 'QNAS API request failed'}, status=502)
+
+    from django.http import HttpResponse
+    return HttpResponse(
+        resp.content,
+        status=resp.status_code,
+        content_type=resp.headers.get("Content-Type", "application/json")
+    )
+
+
