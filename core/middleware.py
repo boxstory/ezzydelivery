@@ -13,6 +13,7 @@ from collections import Counter
 import logging
 
 logger = logging.getLogger(__name__)
+query_logger = logging.getLogger('queries')
 
 
 class SessionTimeoutMiddleware:
@@ -198,5 +199,6 @@ class QueryInspectorMiddleware:
 
             log_lines.append('='*60)
 
-            # Log as warning to make it stand out
-            logger.warning('\n'.join(log_lines))
+            # Log to both console and query log file
+            log_message = '\n'.join(log_lines)
+            query_logger.warning(log_message)

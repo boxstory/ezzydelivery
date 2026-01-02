@@ -100,6 +100,11 @@ class SEOMetadata:
     TWITTER_HANDLE = "@ezzydeliveryqa"
 
     @staticmethod
+    def get_default_meta(title=None, description=None, keywords=None, url=None, image=None, page_type="website"):
+        """Alias for get_page_meta for backwards compatibility"""
+        return SEOMetadata.get_page_meta(title, description, keywords, url, image, page_type)
+
+    @staticmethod
     def get_page_meta(
         title=None,
         description=None,

@@ -93,3 +93,24 @@ def user_profile(request):
         except Profile.DoesNotExist:
             request._cached_profile = None
     return {'user_profile': None}
+
+
+def user_business(request):
+    """
+    Add user's business to template context to avoid duplicate queries.
+    Templates should use {{ user_business }} instead of {{ request.user.user_business.first }}.
+    Caches the business on the request object for reuse.
+    """
+    if request.user.is_authenticated:
+        # Check if business is already cached on request
+        if hasattr(request, '_cached_user_business'):
+            return {'user_business': request._cached_user_business}
+
+        from business.models import Business
+        try:
+            business = Business.objects.filter(user_id=request.user.id).first()
+            request._cached_user_business = business
+            return {'user_business': business}
+        except Exception:
+            request._cached_user_business = None
+    return {'user_business': None}
