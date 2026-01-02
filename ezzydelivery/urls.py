@@ -62,6 +62,9 @@ urlpatterns = [
 
     path('workforce/warehouse/', include('warehouse.urls', namespace='warehouse')),
 
+    # Dispatch & Batching (Store Portal + Rider API)
+    path('dispatch/', include('dispatch.urls', namespace='dispatch')),
+
 ]
 
 handler404 = 'webpages.views.handler404'

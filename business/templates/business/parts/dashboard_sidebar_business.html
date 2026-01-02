@@ -5,6 +5,10 @@
 {% with orders_active=current_url|slice:":6" products_active=current_url|slice:":7" settings_active=current_url|slice:":8" %}
 
 <div class="min-vh-100 d-none d-md-flex flex-column flex-shrink-0 p-3 col-md-3 col-lg-2 the-sidebar dashboard-sidebar" id="client_sidebar_container_main">
+  <!-- Sidebar Toggle Button -->
+  <button type="button" class="btn btn-sm btn-outline-secondary sidebar-toggle-btn" id="sidebar_toggle_btn" title="Toggle sidebar">
+    <i class="fas fa-chevron-left" id="sidebar_toggle_icon"></i>
+  </button>
   <div class="text-center fw-bold sidebar-header" id="client_sidebar_header">
     <a class="nav-link p-3 my-0 w-100"
        href="{% url 'business:business_dashboard' %}"
@@ -13,9 +17,10 @@
        hx-select="#main-content"
        hx-swap="outerHTML"
        hx-push-url="true"
+       data-title="Dashboard"
        id="client_sidebar_link_dashboard">
        <i class="fa-solid fa-gauge-high me-2"></i>
-       Clients Dashboard
+       <span>Clients Dashboard</span>
     </a>
   </div>
   <hr />
@@ -27,6 +32,7 @@
         <div class="nav-link d-flex justify-content-start align-items-center {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' %}active{% endif %}"
              data-bs-toggle="collapse"
              data-bs-target="#submenu-orders"
+             data-title="Orders"
              aria-expanded="{% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' %}true{% else %}false{% endif %}">
           <i class="fa-solid fa-basket-shopping me-2"></i>
           <span class="flex-fill text-start">Orders</span>
@@ -107,6 +113,7 @@
         <div class="nav-link d-flex justify-content-start align-items-center {% if current_url == 'product_all_list' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'product_all_list_card' %}active{% endif %}"
              data-bs-toggle="collapse"
              data-bs-target="#submenu-product"
+             data-title="Products"
              aria-expanded="{% if current_url == 'product_all_list' or current_url == 'product_single_add' or current_url == 'product_categories' or current_url == 'product_all_list_card' %}true{% else %}false{% endif %}">
           <i class="fa-solid fa-box-open me-2"></i>
           <span class="flex-fill text-start">Products</span>
@@ -166,7 +173,8 @@
            hx-target="#main-content"
            hx-select="#main-content"
            hx-swap="outerHTML"
-           hx-push-url="true">
+           hx-push-url="true"
+           data-title="Inventory">
           <i class="fa-solid fa-chart-bar me-2"></i>
           <span>Inventory Report</span>
         </a>
@@ -179,7 +187,8 @@
            hx-target="#main-content"
            hx-select="#main-content"
            hx-swap="outerHTML"
-           hx-push-url="true">
+           hx-push-url="true"
+           data-title="Fleet">
           <i class="fa-solid fa-address-book me-2"></i>
           <span>Fleet List</span>
         </a>
@@ -187,7 +196,8 @@
 
       <li class="nav-item {% if current_url == 'business_profile' %}active{% endif %}">
         <a class="nav-link d-flex align-items-center {% if current_url == 'business_profile' %}active{% endif %}"
-           href="{% url 'business:business_profile' %}">
+           href="{% url 'business:business_profile' %}"
+           data-title="Public View">
           <i class="fa-solid fa-store me-2"></i>
           <span>Public View</span>
         </a>
@@ -200,6 +210,7 @@
         <div class="nav-link d-flex justify-content-start align-items-center {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'pickup_location_list' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'pickup_location_add' or current_url == 'pickup_location_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}active{% endif %}"
              data-bs-toggle="collapse"
              data-bs-target="#submenu-settings"
+             data-title="Settings"
              aria-expanded="{% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'pickup_location_list' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'pickup_location_add' or current_url == 'pickup_location_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}true{% else %}false{% endif %}">
           <i class="fa-solid fa-gear me-2"></i>
           <span class="flex-fill text-start">Settings</span>
@@ -209,11 +220,11 @@
              role="list"
              id="submenu-settings">
           <ul class="flex-column nav text-black">
-            {% if request.user.user_business.first %}
+            {% if user_business %}
             <li class="nav-item {% if current_url == 'business_settings' %}active{% endif %}">
               <a class="nav-link d-flex align-items-center {% if current_url == 'business_settings' %}active{% endif %}"
-                 href="{% url 'business:business_settings' request.user.user_business.first.business_id %}"
-                 hx-get="{% url 'business:business_settings' request.user.user_business.first.business_id %}"
+                 href="{% url 'business:business_settings' user_business.business_id %}"
+                 hx-get="{% url 'business:business_settings' user_business.business_id %}"
                  hx-target="#main-content"
                  hx-select="#main-content"
                  hx-swap="outerHTML"
@@ -224,8 +235,8 @@
             </li>
             <li class="nav-item {% if current_url == 'business_teams' or current_url == 'business_teams_add' or current_url == 'business_teams_update' %}active{% endif %}">
               <a class="nav-link d-flex align-items-center {% if current_url == 'business_teams' or current_url == 'business_teams_add' or current_url == 'business_teams_update' %}active{% endif %}"
-                 href="{% url 'business:business_teams' request.user.user_business.first.business_id %}"
-                 hx-get="{% url 'business:business_teams' request.user.user_business.first.business_id %}"
+                 href="{% url 'business:business_teams' user_business.business_id %}"
+                 hx-get="{% url 'business:business_teams' user_business.business_id %}"
                  hx-target="#main-content"
                  hx-select="#main-content"
                  hx-swap="outerHTML"
@@ -248,8 +259,8 @@
             </li>
             <li class="nav-item {% if current_url == 'business_settings_api_list' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}active{% endif %}">
               <a class="nav-link d-flex align-items-center {% if current_url == 'business_settings_api_list' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}active{% endif %}"
-                 href="{% url 'business:business_settings_api_list' request.user.user_business.first.business_id %}"
-                 hx-get="{% url 'business:business_settings_api_list' request.user.user_business.first.business_id %}"
+                 href="{% url 'business:business_settings_api_list' user_business.business_id %}"
+                 hx-get="{% url 'business:business_settings_api_list' user_business.business_id %}"
                  hx-target="#main-content"
                  hx-select="#main-content"
                  hx-swap="outerHTML"
@@ -269,7 +280,8 @@
       <li class="nav-item {% if current_url == 'help_center' %}active{% endif %}">
         <a class="nav-link d-flex align-items-center {% if current_url == 'help_center' %}active{% endif %}"
            href="{% url 'webpages:help_center' %}"
-           target="_blank">
+           target="_blank"
+           data-title="Help">
           <i class="fa-solid fa-circle-question me-2"></i>
           <span>Help Center</span>
         </a>

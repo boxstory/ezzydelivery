@@ -907,7 +907,7 @@ def workflow_guide(request):
                 'Set as default if successful',
             ],
             'status': 'pending',
-            'url': 'business:business_settings_api_list',
+            'url': None,  # Requires business_id parameter - accessed via sidebar
         },
         {
             'number': 4,
@@ -978,7 +978,7 @@ def workflow_guide(request):
                 'Team members can view and manage orders',
             ],
             'status': 'pending',
-            'url': 'business:business_teams',
+            'url': None,  # Requires business_id parameter - accessed via sidebar
         },
     ]
 

@@ -106,6 +106,40 @@
       document.body.addEventListener('htmx:afterSettle', function(evt) {
         updateSidebarActiveStates();
       });
+
+      // Sidebar toggle functionality
+      function initSidebarToggle() {
+        const sidebar = document.getElementById('client_sidebar_container_main');
+        const toggleBtn = document.getElementById('sidebar_toggle_btn');
+
+        if (sidebar && toggleBtn) {
+          // Restore collapsed state from localStorage
+          const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+          if (isCollapsed) {
+            sidebar.classList.add('collapsed');
+          }
+
+          // Toggle sidebar on button click
+          toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            sidebar.classList.toggle('collapsed');
+            const nowCollapsed = sidebar.classList.contains('collapsed');
+            localStorage.setItem('sidebarCollapsed', nowCollapsed);
+            console.log('Sidebar toggled:', nowCollapsed ? 'collapsed' : 'expanded');
+          });
+        }
+      }
+
+      // Initialize on DOMContentLoaded
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSidebarToggle);
+      } else {
+        initSidebarToggle();
+      }
+
+      // Re-initialize after HTMX swaps (in case sidebar is replaced)
+      document.body.addEventListener('htmx:afterSettle', initSidebarToggle);
     </script>
     {% block extra_js %}
       <!--  -->
