@@ -1,0 +1,193 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Dispatch KPI Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kpi-card {
+        background: white;
+        border-radius: var(--brand-radius-md, 12px);
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: var(--brand-shadow-sm);
+        height: 100%;
+    }
+
+    .kpi-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--brand-navy);
+    }
+
+    .kpi-label {
+        font-size: 0.85rem;
+        color: var(--brand-grey-600);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .kpi-card.primary { border-top: 4px solid var(--brand-primary); }
+    .kpi-card.success { border-top: 4px solid #28a745; }
+    .kpi-card.warning { border-top: 4px solid #ffc107; }
+    .kpi-card.info { border-top: 4px solid #17a2b8; }
+
+    .performance-bar {
+        height: 8px;
+        background: var(--brand-grey-200);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .performance-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">
+            <i class="fa-solid fa-chart-line me-2"></i>KPI Dashboard
+        </h4>
+        <div>
+            <a href="{% url 'workforce:dispatch_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Date Filter -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Date</label>
+                    <input type="date" name="date" class="form-control" value="{{ selected_date|date:'Y-m-d' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select name="location" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if request.GET.location == loc.id|stringformat:"s" %}selected{% endif %}>
+                            {{ loc.pickup_location_title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-filter me-1"></i> Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary KPIs -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="kpi-card primary">
+                <div class="kpi-value">{{ summary.total_orders|default:0 }}</div>
+                <div class="kpi-label">Total Orders</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="kpi-card success">
+                <div class="kpi-value">{{ summary.batching_percentage|floatformat:1|default:0 }}%</div>
+                <div class="kpi-label">Batching Rate</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="kpi-card warning">
+                <div class="kpi-value">{{ summary.sla_compliance|floatformat:1|default:0 }}%</div>
+                <div class="kpi-label">SLA Compliance</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="kpi-card info">
+                <div class="kpi-value">{{ summary.avg_orders_per_hour|floatformat:1|default:0 }}</div>
+                <div class="kpi-label">Orders/Hour Avg</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rider Performance Table -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fa-solid fa-users me-2"></i>Rider Performance</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Rider</th>
+                        <th>Location</th>
+                        <th>Total Orders</th>
+                        <th>Batched</th>
+                        <th>Single</th>
+                        <th>Batching %</th>
+                        <th>SLA Compliant</th>
+                        <th>SLA Breached</th>
+                        <th>SLA %</th>
+                        <th>Orders/Hour</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for kpi in kpis %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'workforce:dispatch_rider_kpi_detail' kpi.rider.id %}?date={{ selected_date|date:'Y-m-d' }}">
+                                <div class="d-flex align-items-center">
+                                    <div class="rider-avatar me-2" style="width: 32px; height: 32px; background: var(--brand-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600;">
+                                        {{ kpi.rider.driver_code|slice:":2" }}
+                                    </div>
+                                    <strong>{{ kpi.rider.driver_code }}</strong>
+                                </div>
+                            </a>
+                        </td>
+                        <td>{{ kpi.pickup_location.pickup_location_title|truncatechars:15|default:"-" }}</td>
+                        <td><strong>{{ kpi.total_orders }}</strong></td>
+                        <td>{{ kpi.batched_orders }}</td>
+                        <td>{{ kpi.single_orders }}</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span>{{ kpi.batching_percentage|floatformat:0 }}%</span>
+                                <div class="performance-bar flex-grow-1" style="width: 60px;">
+                                    <div class="performance-bar-fill bg-success" style="width: {{ kpi.batching_percentage }}%;"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-success">{{ kpi.sla_compliant_orders }}</td>
+                        <td class="text-danger">{{ kpi.sla_breached_orders }}</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="{% if kpi.sla_compliance_rate >= 90 %}text-success{% elif kpi.sla_compliance_rate >= 70 %}text-warning{% else %}text-danger{% endif %}">
+                                    {{ kpi.sla_compliance_rate|floatformat:0 }}%
+                                </span>
+                                <div class="performance-bar flex-grow-1" style="width: 60px;">
+                                    <div class="performance-bar-fill {% if kpi.sla_compliance_rate >= 90 %}bg-success{% elif kpi.sla_compliance_rate >= 70 %}bg-warning{% else %}bg-danger{% endif %}"
+                                         style="width: {{ kpi.sla_compliance_rate }}%;"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ kpi.orders_per_hour|floatformat:1 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="text-center text-muted py-4">
+                            No KPI data available for the selected date.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

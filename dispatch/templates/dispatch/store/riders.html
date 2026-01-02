@@ -1,0 +1,65 @@
+{% extends 'dispatch/store/base.html' %}
+
+{% block page_title %}Today's Riders{% endblock %}
+
+{% block store_content %}
+<p class="text-muted mb-4">
+    <i class="fa-solid fa-info-circle me-1"></i>
+    Riders scheduled for today at {{ current_location.pickup_location_title }}.
+</p>
+
+{% if shifts %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Rider</th>
+                <th>Code</th>
+                <th>Shift</th>
+                <th>Status</th>
+                <th>Started</th>
+                <th>Batches</th>
+                <th>Orders</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for shift in shifts %}
+            <tr>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="rider-avatar me-2" style="width: 40px; height: 40px; font-size: 1rem;">
+                            {{ shift.rider.driver_code|slice:":2" }}
+                        </div>
+                        <div>
+                            {{ shift.rider.user.first_name }} {{ shift.rider.user.last_name }}
+                        </div>
+                    </div>
+                </td>
+                <td><code>{{ shift.rider.driver_code }}</code></td>
+                <td>
+                    {{ shift.scheduled_start|time:"H:i" }} - {{ shift.scheduled_end|time:"H:i" }}
+                </td>
+                <td>
+                    <span class="batch-status {{ shift.status }}">{{ shift.get_status_display }}</span>
+                </td>
+                <td>
+                    {% if shift.actual_start %}
+                    {{ shift.actual_start|time:"H:i" }}
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>{{ shift.batches_completed }}</td>
+                <td>{{ shift.orders_delivered }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-warning">
+    <i class="fa-solid fa-exclamation-triangle me-2"></i>
+    No riders scheduled for today at this location.
+</div>
+{% endif %}
+{% endblock %}

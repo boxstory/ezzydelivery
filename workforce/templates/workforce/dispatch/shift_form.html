@@ -1,0 +1,158 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}{% if shift %}Edit Shift{% else %}Create Shift{% endif %}{% endblock %}
+
+{% block content %}
+<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">
+            <i class="fa-solid fa-calendar-plus me-2"></i>
+            {% if shift %}Edit Shift {{ shift.shift_code }}{% else %}Create New Shift{% endif %}
+        </h4>
+        <a href="{% url 'workforce:dispatch_shift_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left me-1"></i> Back to Shifts
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <strong>Please correct the errors below:</strong>
+                            <ul class="mb-0">
+                                {% for field in form %}
+                                    {% for error in field.errors %}
+                                    <li>{{ field.label }}: {{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% for error in form.non_field_errors %}
+                                <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="id_rider" class="form-label">Rider *</label>
+                                <select name="rider" id="id_rider" class="form-select" required>
+                                    <option value="">Select Rider</option>
+                                    {% for rider in riders %}
+                                    <option value="{{ rider.id }}"
+                                            {% if form.rider.value == rider.id|stringformat:"s" or shift.rider_id == rider.id %}selected{% endif %}>
+                                        {{ rider.driver_code }} - {{ rider.user.first_name }} {{ rider.user.last_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="id_pickup_location" class="form-label">Pickup Location *</label>
+                                <select name="pickup_location" id="id_pickup_location" class="form-select" required>
+                                    <option value="">Select Location</option>
+                                    {% for loc in locations %}
+                                    <option value="{{ loc.id }}"
+                                            {% if form.pickup_location.value == loc.id|stringformat:"s" or shift.pickup_location_id == loc.id %}selected{% endif %}>
+                                        {{ loc.pickup_location_title }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="id_scheduled_start" class="form-label">Scheduled Start *</label>
+                                <input type="datetime-local" name="scheduled_start" id="id_scheduled_start"
+                                       class="form-control" required
+                                       value="{{ form.scheduled_start.value|date:'Y-m-d\TH:i'|default:'' }}">
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="id_scheduled_end" class="form-label">Scheduled End *</label>
+                                <input type="datetime-local" name="scheduled_end" id="id_scheduled_end"
+                                       class="form-control" required
+                                       value="{{ form.scheduled_end.value|date:'Y-m-d\TH:i'|default:'' }}">
+                            </div>
+                        </div>
+
+                        {% if shift %}
+                        <div class="mb-3">
+                            <label for="id_status" class="form-label">Status</label>
+                            <select name="status" id="id_status" class="form-select">
+                                <option value="scheduled" {% if shift.status == 'scheduled' %}selected{% endif %}>Scheduled</option>
+                                <option value="active" {% if shift.status == 'active' %}selected{% endif %}>Active</option>
+                                <option value="break" {% if shift.status == 'break' %}selected{% endif %}>On Break</option>
+                                <option value="completed" {% if shift.status == 'completed' %}selected{% endif %}>Completed</option>
+                            </select>
+                        </div>
+                        {% endif %}
+
+                        <hr>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'workforce:dispatch_shift_list' %}" class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa-solid fa-save me-1"></i>
+                                {% if shift %}Update Shift{% else %}Create Shift{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fa-solid fa-info-circle me-2"></i>Tips</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li class="mb-2">Riders are locked to one store per shift</li>
+                        <li class="mb-2">Shifts should not overlap for the same rider</li>
+                        <li class="mb-2">Recommended shift duration: 4-8 hours</li>
+                        <li class="mb-2">Rider must be approved to be assigned shifts</li>
+                    </ul>
+                </div>
+            </div>
+
+            {% if shift and shift.status != 'scheduled' %}
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fa-solid fa-chart-simple me-2"></i>Shift Stats</h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-6">Batches</dt>
+                        <dd class="col-6">{{ shift.batches_completed }}</dd>
+
+                        <dt class="col-6">Orders</dt>
+                        <dd class="col-6">{{ shift.orders_delivered }}</dd>
+
+                        {% if shift.actual_start %}
+                        <dt class="col-6">Started</dt>
+                        <dd class="col-6">{{ shift.actual_start|time:"H:i" }}</dd>
+                        {% endif %}
+
+                        {% if shift.actual_end %}
+                        <dt class="col-6">Ended</dt>
+                        <dd class="col-6">{{ shift.actual_end|time:"H:i" }}</dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

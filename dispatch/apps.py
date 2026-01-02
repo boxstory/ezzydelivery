@@ -1,0 +1,10 @@
+from django.apps import AppConfig
+
+
+class DispatchConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'dispatch'
+    verbose_name = 'Dispatch & Batching'
+
+    def ready(self):
+        import dispatch.signals  # noqa

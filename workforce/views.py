@@ -1244,8 +1244,8 @@ def orders_reported(request):
     from orders import models as orders_models
 
     orders_list = orders_models.Order.objects.select_related(
-        'business', 'delivery_task'
-    ).prefetch_related('order_comments').filter(
+        'business'
+    ).prefetch_related('order_comments', 'delivery_task').filter(
         order_status='reported'
     ).order_by('-created_at')
 
@@ -1422,8 +1422,8 @@ def staff_reports(request):
 
     # Get driver statistics in single query
     driver_stats = fleet_models.Driver.objects.aggregate(
-        total=Count('id'),
-        active=Count('id', filter=Q(driver_status='Approved')),
+        total=Count('driver_id'),
+        active=Count('driver_id', filter=Q(driver_status='Approved')),
     )
 
     context = {
@@ -1531,15 +1531,15 @@ def dms_analytics(request):
     try:
         # Get statistics from local database
         total_tasks = delivery_models.DeliveryTask.objects.count()
-        synced_tasks = delivery_models.DeliveryTask.objects.filter(is_published_to_dms=True).count()
-        pending_tasks = delivery_models.DeliveryTask.objects.filter(is_published_to_dms=False).count()
+        synced_tasks = delivery_models.DeliveryTask.objects.filter(dl_task_number_dms__isnull=False).count()
+        pending_tasks = delivery_models.DeliveryTask.objects.filter(dl_task_number_dms__isnull=True).count()
 
         # Get driver statistics
-        total_drivers = fleet_models.Driver.objects.filter(is_active=True).count()
+        total_drivers = fleet_models.Driver.objects.filter(driver_status='Approved').count()
 
         # Get order statistics
         total_orders = orders_models.Order.objects.count()
-        published_orders = orders_models.Order.objects.filter(is_published=True).count()
+        published_orders = orders_models.Order.objects.filter(task_created=True).count()
 
         context = {
             'page_title': 'DMS Analytics',
@@ -1566,13 +1566,13 @@ def dms_sync_monitor(request):
     try:
         # Get recently synced tasks
         recently_synced = delivery_models.DeliveryTask.objects.filter(
-            is_published_to_dms=True
+            dl_task_number_dms__isnull=False
         ).order_by('-updated_at')[:50]
 
         # Get failed sync attempts
         failed_sync = delivery_models.DeliveryTask.objects.filter(
-            is_published_to_dms=False,
-            status__in=['assigned', 'in_transit']
+            dl_task_number_dms__isnull=True,
+            dl_task_status__in=['in_transit', 'pending', 'address_pending']
         ).order_by('-created_at')[:50]
 
         context = {

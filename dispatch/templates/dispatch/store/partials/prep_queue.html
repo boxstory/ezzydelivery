@@ -1,0 +1,88 @@
+{% if prep_batches %}
+{% for batch in prep_batches %}
+<div class="batch-card {{ batch.status }} mb-3">
+    <div class="batch-header">
+        <div>
+            <span class="batch-code">{{ batch.batch_code }}</span>
+            <span class="badge bg-secondary ms-2">Zone {{ batch.destination_zone }}</span>
+        </div>
+        <span class="batch-status {{ batch.status }}">{{ batch.get_status_display }}</span>
+    </div>
+
+    {% if batch.status == 'holding' %}
+    <div class="alert alert-warning py-2 mb-2">
+        <i class="fa-solid fa-clock me-1"></i>
+        Waiting for more orders...
+        <span class="hold-timer fw-bold" data-expires="{{ batch.hold_expires_at|date:'c' }}">
+            {{ batch.hold_remaining_seconds }}s
+        </span>
+    </div>
+    {% endif %}
+
+    <table class="table table-sm mb-0">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Items</th>
+                <th>COD</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for batch_order in batch.batch_orders.all %}
+            <tr>
+                <td><strong>{{ batch_order.sequence }}</strong></td>
+                <td>{{ batch_order.order.order_number }}</td>
+                <td>
+                    {{ batch_order.order.customer_name }}
+                    <br><small class="text-muted">{{ batch_order.order.customer_phone }}</small>
+                </td>
+                <td>
+                    {% if batch_order.order.items.exists %}
+                        {% for item in batch_order.order.items.all %}
+                        <span class="badge bg-light text-dark">{{ item.quantity }}x {{ item.product_name|truncatechars:20 }}</span>
+                        {% endfor %}
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if batch_order.order.cod_amount > 0 %}
+                    <span class="badge bg-warning text-dark">{{ batch_order.order.cod_amount }} QR</span>
+                    {% else %}
+                    <span class="text-muted">Paid</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if batch_order.is_sla_at_risk %}
+                    <span class="badge bg-danger">SLA Risk</span>
+                    {% elif batch.status == 'assigned' %}
+                    <span class="badge bg-primary">Rider Assigned</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Pending</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if batch.assigned_rider %}
+    <div class="mt-2 pt-2 border-top">
+        <i class="fa-solid fa-motorcycle me-1"></i>
+        Assigned to: <strong>{{ batch.assigned_rider.driver_code }}</strong>
+        {% if batch.assigned_at %}
+        <span class="text-muted ms-2">{{ batch.assigned_at|timesince }} ago</span>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="alert alert-success">
+    <i class="fa-solid fa-check-circle me-2"></i>
+    No orders in prep queue. All caught up!
+</div>
+{% endif %}

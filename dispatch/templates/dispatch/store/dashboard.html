@@ -1,0 +1,83 @@
+{% extends 'dispatch/store/base.html' %}
+
+{% block page_title %}Store Dashboard{% endblock %}
+
+{% block store_content %}
+<!-- Stats Grid -->
+<div class="stat-grid">
+    <div class="stat-card holding">
+        <div class="stat-value">{{ batch_stats.holding|default:0 }}</div>
+        <div class="stat-label">Holding</div>
+    </div>
+    <div class="stat-card ready">
+        <div class="stat-value">{{ batch_stats.ready|default:0 }}</div>
+        <div class="stat-label">Ready</div>
+    </div>
+    <div class="stat-card assigned">
+        <div class="stat-value">{{ batch_stats.assigned|default:0 }}</div>
+        <div class="stat-label">Assigned</div>
+    </div>
+    <div class="stat-card in-progress">
+        <div class="stat-value">{{ batch_stats.in_progress|default:0 }}</div>
+        <div class="stat-label">In Progress</div>
+    </div>
+    <div class="stat-card completed">
+        <div class="stat-value">{{ batch_stats.completed|default:0 }}</div>
+        <div class="stat-label">Completed Today</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ active_rider_count|default:0 }}</div>
+        <div class="stat-label">Active Riders</div>
+    </div>
+</div>
+
+<!-- Active Batches -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">
+        <i class="fa-solid fa-boxes-stacked me-2"></i>Active Batches
+    </h5>
+    <button class="btn btn-sm btn-outline-secondary"
+            hx-get="{% url 'dispatch:store_batch_list_partial' %}?location={{ current_location.id }}"
+            hx-target="#batch-list"
+            hx-swap="innerHTML">
+        <i class="fa-solid fa-refresh me-1"></i> Refresh
+    </button>
+</div>
+
+<div id="batch-list"
+     hx-get="{% url 'dispatch:store_batch_list_partial' %}?location={{ current_location.id }}"
+     hx-trigger="every 15s"
+     hx-swap="innerHTML">
+    {% include 'dispatch/store/partials/batch_list.html' %}
+</div>
+
+<!-- Active Riders Section -->
+<div class="mt-4">
+    <h5 class="mb-3">
+        <i class="fa-solid fa-motorcycle me-2"></i>Active Riders ({{ active_rider_count }})
+    </h5>
+
+    {% if active_shifts %}
+    <div class="riders-grid">
+        {% for shift in active_shifts %}
+        <div class="rider-card">
+            <div class="rider-avatar">
+                {{ shift.rider.driver_code|slice:":2" }}
+            </div>
+            <div class="rider-name">{{ shift.rider.user.first_name }} {{ shift.rider.user.last_name }}</div>
+            <div class="rider-code">{{ shift.rider.driver_code }}</div>
+            <div class="rider-stats">
+                <span><i class="fa-solid fa-box me-1"></i>{{ shift.orders_delivered }}</span>
+                <span><i class="fa-solid fa-boxes-stacked me-1"></i>{{ shift.batches_completed }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        <i class="fa-solid fa-exclamation-triangle me-2"></i>
+        No active riders at this location.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

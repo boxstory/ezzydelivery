@@ -1,0 +1,181 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Rider Shifts{% endblock %}
+
+{% block content %}
+<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">
+            <i class="fa-solid fa-calendar-days me-2"></i>Rider Shifts
+        </h4>
+        <div>
+            <a href="{% url 'workforce:dispatch_shift_create' %}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-plus me-1"></i> New Shift
+            </a>
+            <a href="{% url 'workforce:dispatch_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">All Statuses</option>
+                        <option value="scheduled" {% if request.GET.status == 'scheduled' %}selected{% endif %}>Scheduled</option>
+                        <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="break" {% if request.GET.status == 'break' %}selected{% endif %}>On Break</option>
+                        <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>Completed</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select name="location" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if request.GET.location == loc.id|stringformat:"s" %}selected{% endif %}>
+                            {{ loc.pickup_location_title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Date</label>
+                    <input type="date" name="date" class="form-control" value="{{ request.GET.date|default:today }}">
+                </div>
+
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fa-solid fa-filter me-1"></i> Filter
+                    </button>
+                    <a href="{% url 'workforce:dispatch_shift_list' %}" class="btn btn-outline-secondary">
+                        Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Shifts Table -->
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Shift Code</th>
+                        <th>Rider</th>
+                        <th>Location</th>
+                        <th>Scheduled</th>
+                        <th>Actual</th>
+                        <th>Status</th>
+                        <th>Batches</th>
+                        <th>Orders</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for shift in shifts %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'workforce:dispatch_shift_detail' shift.id %}" class="text-decoration-none">
+                                <code>{{ shift.shift_code }}</code>
+                            </a>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="rider-avatar me-2" style="width: 32px; height: 32px; background: var(--brand-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600;">
+                                    {{ shift.rider.driver_code|slice:":2" }}
+                                </div>
+                                <div>
+                                    <strong>{{ shift.rider.driver_code }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ shift.rider.user.first_name }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ shift.pickup_location.pickup_location_title|truncatechars:20 }}</td>
+                        <td>
+                            {{ shift.scheduled_start|time:"H:i" }} - {{ shift.scheduled_end|time:"H:i" }}
+                        </td>
+                        <td>
+                            {% if shift.actual_start %}
+                            {{ shift.actual_start|time:"H:i" }}
+                            {% if shift.actual_end %} - {{ shift.actual_end|time:"H:i" }}{% endif %}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge
+                                {% if shift.status == 'active' %}bg-success
+                                {% elif shift.status == 'break' %}bg-warning text-dark
+                                {% elif shift.status == 'completed' %}bg-secondary
+                                {% else %}bg-info{% endif %}">
+                                {{ shift.get_status_display }}
+                            </span>
+                        </td>
+                        <td>{{ shift.batches_completed }}</td>
+                        <td>{{ shift.orders_delivered }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'workforce:dispatch_shift_detail' shift.id %}"
+                                   class="btn btn-outline-primary" title="View Details">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                {% if shift.status == 'scheduled' %}
+                                <a href="{% url 'workforce:dispatch_shift_edit' shift.id %}"
+                                   class="btn btn-outline-secondary" title="Edit">
+                                    <i class="fa-solid fa-edit"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            No shifts found for the selected criteria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if shifts.has_other_pages %}
+    <nav aria-label="Shift pagination" class="mt-3">
+        <ul class="pagination justify-content-center">
+            {% if shifts.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ shifts.previous_page_number }}">
+                    Previous
+                </a>
+            </li>
+            {% endif %}
+
+            <li class="page-item disabled">
+                <span class="page-link">Page {{ shifts.number }} of {{ shifts.paginator.num_pages }}</span>
+            </li>
+
+            {% if shifts.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ shifts.next_page_number }}">
+                    Next
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

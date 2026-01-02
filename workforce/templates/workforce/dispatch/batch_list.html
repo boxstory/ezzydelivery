@@ -1,0 +1,188 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}All Batches{% endblock %}
+
+{% block content %}
+<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">
+            <i class="fa-solid fa-boxes-stacked me-2"></i>All Batches
+        </h4>
+        <a href="{% url 'workforce:dispatch_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">All Statuses</option>
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Pickup Location</label>
+                    <select name="location" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if request.GET.location == loc.id|stringformat:"s" %}selected{% endif %}>
+                            {{ loc.pickup_location_title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Zone</label>
+                    <input type="number" name="zone" class="form-control"
+                           value="{{ request.GET.zone }}" placeholder="Zone #">
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Date</label>
+                    <input type="date" name="date" class="form-control" value="{{ request.GET.date }}">
+                </div>
+
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fa-solid fa-filter me-1"></i> Filter
+                    </button>
+                    <a href="{% url 'workforce:dispatch_batch_list' %}" class="btn btn-outline-secondary">
+                        Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Batches Table -->
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Batch Code</th>
+                        <th>Location</th>
+                        <th>Zone</th>
+                        <th>Orders</th>
+                        <th>COD</th>
+                        <th>Status</th>
+                        <th>Rider</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for batch in batches %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'workforce:dispatch_batch_detail' batch.id %}" class="text-decoration-none">
+                                <code>{{ batch.batch_code }}</code>
+                            </a>
+                        </td>
+                        <td>{{ batch.pickup_location.pickup_location_title|truncatechars:20 }}</td>
+                        <td><span class="badge bg-secondary">Zone {{ batch.destination_zone }}</span></td>
+                        <td>{{ batch.order_count }}/2</td>
+                        <td>
+                            {% if batch.total_cod > 0 %}
+                            <span class="badge bg-warning text-dark">{{ batch.total_cod }} QR</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge
+                                {% if batch.status == 'completed' %}bg-success
+                                {% elif batch.status == 'in_progress' %}bg-primary
+                                {% elif batch.status == 'assigned' %}bg-info
+                                {% elif batch.status == 'ready' %}bg-warning text-dark
+                                {% elif batch.status == 'holding' %}bg-secondary
+                                {% elif batch.status == 'cancelled' %}bg-danger
+                                {% else %}bg-light text-dark{% endif %}">
+                                {{ batch.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if batch.assigned_rider %}
+                            <code>{{ batch.assigned_rider.driver_code }}</code>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ batch.created_at|date:"M d, H:i" }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'workforce:dispatch_batch_detail' batch.id %}"
+                                   class="btn btn-outline-primary" title="View Details">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                {% if batch.status == 'holding' %}
+                                <button type="button" class="btn btn-outline-warning"
+                                        hx-post="{% url 'workforce:dispatch_batch_release' batch.id %}"
+                                        hx-confirm="Release this batch immediately?"
+                                        title="Release Now">
+                                    <i class="fa-solid fa-bolt"></i>
+                                </button>
+                                {% endif %}
+                                {% if batch.status in 'pending,holding,ready' %}
+                                <button type="button" class="btn btn-outline-danger"
+                                        hx-post="{% url 'workforce:dispatch_batch_cancel' batch.id %}"
+                                        hx-confirm="Cancel this batch? Orders will be unassigned."
+                                        title="Cancel">
+                                    <i class="fa-solid fa-times"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            No batches found matching your criteria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if batches.has_other_pages %}
+    <nav aria-label="Batch pagination" class="mt-3">
+        <ul class="pagination justify-content-center">
+            {% if batches.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ batches.previous_page_number }}">
+                    Previous
+                </a>
+            </li>
+            {% endif %}
+
+            <li class="page-item disabled">
+                <span class="page-link">Page {{ batches.number }} of {{ batches.paginator.num_pages }}</span>
+            </li>
+
+            {% if batches.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ batches.next_page_number }}">
+                    Next
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

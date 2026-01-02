@@ -1,0 +1,25 @@
+{% extends 'dispatch/store/base.html' %}
+
+{% block page_title %}Prep Queue{% endblock %}
+
+{% block store_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <p class="text-muted mb-0">
+        <i class="fa-solid fa-info-circle me-1"></i>
+        Orders to prepare, grouped by batch. Prepare items in batch order for efficient pickup.
+    </p>
+    <button class="btn btn-sm btn-outline-secondary"
+            hx-get="{% url 'dispatch:store_prep_queue_partial' %}?location={{ current_location.id }}"
+            hx-target="#prep-queue"
+            hx-swap="innerHTML">
+        <i class="fa-solid fa-refresh me-1"></i> Refresh
+    </button>
+</div>
+
+<div id="prep-queue"
+     hx-get="{% url 'dispatch:store_prep_queue_partial' %}?location={{ current_location.id }}"
+     hx-trigger="every 30s"
+     hx-swap="innerHTML">
+    {% include 'dispatch/store/partials/prep_queue.html' %}
+</div>
+{% endblock %}

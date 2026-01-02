@@ -1,0 +1,277 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --store-primary: var(--brand-primary, #f7c000);
+        --store-navy: var(--brand-navy, #001f3f);
+    }
+
+    .store-container {
+        padding: 1rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .store-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .store-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--store-navy);
+        margin: 0;
+    }
+
+    .store-location-badge {
+        background: var(--store-primary);
+        color: var(--store-navy);
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-weight: 500;
+    }
+
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--store-navy);
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+
+    .stat-card.holding .stat-value { color: #ffc107; }
+    .stat-card.ready .stat-value { color: #17a2b8; }
+    .stat-card.assigned .stat-value { color: #007bff; }
+    .stat-card.in-progress .stat-value { color: #fd7e14; }
+    .stat-card.completed .stat-value { color: #28a745; }
+
+    .batch-card {
+        background: white;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border-left: 4px solid #6c757d;
+    }
+
+    .batch-card.holding { border-left-color: #ffc107; }
+    .batch-card.ready { border-left-color: #17a2b8; }
+    .batch-card.assigned { border-left-color: #007bff; }
+    .batch-card.in-progress { border-left-color: #fd7e14; }
+    .batch-card.completed { border-left-color: #28a745; }
+
+    .batch-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .batch-code {
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+
+    .batch-status {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+
+    .batch-status.holding { background: #fff3cd; color: #856404; }
+    .batch-status.ready { background: #d1ecf1; color: #0c5460; }
+    .batch-status.assigned { background: #cce5ff; color: #004085; }
+    .batch-status.in-progress { background: #ffe5d0; color: #8a4500; }
+    .batch-status.completed { background: #d4edda; color: #155724; }
+
+    .batch-meta {
+        display: flex;
+        gap: 1.5rem;
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-bottom: 0.75rem;
+    }
+
+    .batch-orders {
+        border-top: 1px solid #e9ecef;
+        padding-top: 0.75rem;
+    }
+
+    .order-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px dashed #e9ecef;
+    }
+
+    .order-item:last-child {
+        border-bottom: none;
+    }
+
+    .hold-timer {
+        font-weight: 600;
+        color: #ffc107;
+    }
+
+    .nav-tabs-store {
+        border-bottom: 2px solid var(--store-primary);
+        margin-bottom: 1.5rem;
+    }
+
+    .nav-tabs-store .nav-link {
+        border: none;
+        color: #6c757d;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+    }
+
+    .nav-tabs-store .nav-link.active {
+        color: var(--store-navy);
+        background: var(--store-primary);
+        border-radius: 0.5rem 0.5rem 0 0;
+    }
+
+    .riders-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .rider-card {
+        background: white;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+
+    .rider-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: var(--store-primary);
+        color: var(--store-navy);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0 auto 0.75rem;
+    }
+
+    .rider-name {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .rider-code {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+
+    .rider-stats {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 0.75rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="store-container">
+    <!-- Header -->
+    <div class="store-header">
+        <h1 class="store-title">{% block page_title %}Store Portal{% endblock %}</h1>
+        {% if current_location %}
+        <span class="store-location-badge">
+            <i class="fa-solid fa-store me-1"></i>
+            {{ current_location.pickup_location_title }}
+        </span>
+        {% endif %}
+    </div>
+
+    <!-- Navigation -->
+    <ul class="nav nav-tabs-store">
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'store_dashboard' %}active{% endif %}"
+               href="{% url 'dispatch:store_dashboard' %}{% if current_location %}?location={{ current_location.id }}{% endif %}">
+                <i class="fa-solid fa-gauge-high me-1"></i> Dashboard
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'store_prep_queue' %}active{% endif %}"
+               href="{% url 'dispatch:store_prep_queue' %}{% if current_location %}?location={{ current_location.id }}{% endif %}">
+                <i class="fa-solid fa-clipboard-list me-1"></i> Prep Queue
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'store_riders' %}active{% endif %}"
+               href="{% url 'dispatch:store_riders' %}{% if current_location %}?location={{ current_location.id }}{% endif %}">
+                <i class="fa-solid fa-motorcycle me-1"></i> Riders
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'store_batches' %}active{% endif %}"
+               href="{% url 'dispatch:store_batches' %}{% if current_location %}?location={{ current_location.id }}{% endif %}">
+                <i class="fa-solid fa-boxes-stacked me-1"></i> All Batches
+            </a>
+        </li>
+    </ul>
+
+    {% block store_content %}{% endblock %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Countdown timer for holding batches
+function updateCountdowns() {
+    document.querySelectorAll('[data-expires]').forEach(el => {
+        const expires = new Date(el.dataset.expires);
+        const now = new Date();
+        const diff = Math.max(0, Math.floor((expires - now) / 1000));
+
+        if (diff > 0) {
+            const mins = Math.floor(diff / 60);
+            const secs = diff % 60;
+            el.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        } else {
+            el.textContent = 'Releasing...';
+        }
+    });
+}
+
+setInterval(updateCountdowns, 1000);
+updateCountdowns();
+</script>
+{% endblock %}

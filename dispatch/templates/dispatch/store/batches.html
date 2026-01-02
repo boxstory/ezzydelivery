@@ -1,0 +1,125 @@
+{% extends 'dispatch/store/base.html' %}
+
+{% block page_title %}All Batches{% endblock %}
+
+{% block store_content %}
+<!-- Filters -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <input type="hidden" name="location" value="{{ current_location.id }}">
+
+            <div class="col-md-4">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select">
+                    <option value="">All Statuses</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Date</label>
+                <input type="date" name="date" class="form-control" value="{{ date_filter }}">
+            </div>
+
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="fa-solid fa-filter me-1"></i> Filter
+                </button>
+                <a href="{% url 'dispatch:store_batches' %}?location={{ current_location.id }}" class="btn btn-outline-secondary">
+                    Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Batches Table -->
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Batch</th>
+                <th>Zone</th>
+                <th>Orders</th>
+                <th>COD</th>
+                <th>Status</th>
+                <th>Rider</th>
+                <th>Created</th>
+                <th>Completed</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for batch in batches %}
+            <tr>
+                <td><code>{{ batch.batch_code }}</code></td>
+                <td>{{ batch.destination_zone }}</td>
+                <td>{{ batch.order_count }}/2</td>
+                <td>
+                    {% if batch.total_cod > 0 %}
+                    {{ batch.total_cod }} QR
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="batch-status {{ batch.status }}">{{ batch.get_status_display }}</span>
+                </td>
+                <td>
+                    {% if batch.assigned_rider %}
+                    {{ batch.assigned_rider.driver_code }}
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>{{ batch.created_at|date:"M d, H:i" }}</td>
+                <td>
+                    {% if batch.completed_at %}
+                    {{ batch.completed_at|date:"H:i" }}
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="text-center text-muted py-4">
+                    No batches found matching your criteria.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if batches.has_other_pages %}
+<nav aria-label="Batch pagination">
+    <ul class="pagination justify-content-center">
+        {% if batches.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?location={{ current_location.id }}&status={{ status_filter }}&date={{ date_filter }}&page={{ batches.previous_page_number }}">
+                Previous
+            </a>
+        </li>
+        {% endif %}
+
+        <li class="page-item disabled">
+            <span class="page-link">Page {{ batches.number }} of {{ batches.paginator.num_pages }}</span>
+        </li>
+
+        {% if batches.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?location={{ current_location.id }}&status={{ status_filter }}&date={{ date_filter }}&page={{ batches.next_page_number }}">
+                Next
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

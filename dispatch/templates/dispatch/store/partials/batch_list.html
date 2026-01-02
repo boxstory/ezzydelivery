@@ -1,0 +1,52 @@
+{% if active_batches %}
+{% for batch in active_batches %}
+<div class="batch-card {{ batch.status }}">
+    <div class="batch-header">
+        <span class="batch-code">{{ batch.batch_code }}</span>
+        <span class="batch-status {{ batch.status }}">{{ batch.get_status_display }}</span>
+    </div>
+
+    <div class="batch-meta">
+        <span><i class="fa-solid fa-location-dot me-1"></i>Zone {{ batch.destination_zone }}</span>
+        <span><i class="fa-solid fa-box me-1"></i>{{ batch.order_count }}/2 orders</span>
+        {% if batch.total_cod > 0 %}
+        <span><i class="fa-solid fa-money-bill me-1"></i>{{ batch.total_cod }} QR</span>
+        {% endif %}
+        {% if batch.status == 'holding' %}
+        <span class="hold-timer">
+            <i class="fa-solid fa-clock me-1"></i>
+            <span data-expires="{{ batch.hold_expires_at|date:'c' }}">{{ batch.hold_remaining_seconds }}s</span>
+        </span>
+        {% endif %}
+        {% if batch.assigned_rider %}
+        <span><i class="fa-solid fa-motorcycle me-1"></i>{{ batch.assigned_rider.driver_code }}</span>
+        {% endif %}
+    </div>
+
+    <div class="batch-orders">
+        {% for batch_order in batch.batch_orders.all %}
+        <div class="order-item">
+            <div>
+                <strong>#{{ batch_order.sequence }}</strong>
+                {{ batch_order.order.customer_name }}
+                <span class="text-muted ms-2">{{ batch_order.order.customer_phone }}</span>
+            </div>
+            <div>
+                {% if batch_order.order.cod_amount > 0 %}
+                <span class="badge bg-warning text-dark">COD {{ batch_order.order.cod_amount }}</span>
+                {% endif %}
+                {% if batch_order.is_sla_at_risk %}
+                <span class="badge bg-danger">SLA Risk</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="alert alert-info">
+    <i class="fa-solid fa-info-circle me-2"></i>
+    No active batches at the moment.
+</div>
+{% endif %}

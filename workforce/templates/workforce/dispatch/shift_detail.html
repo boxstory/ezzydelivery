@@ -1,0 +1,179 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Shift {{ shift.shift_code }}{% endblock %}
+
+{% block content %}
+<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">
+            <i class="fa-solid fa-calendar-day me-2"></i>Shift <code>{{ shift.shift_code }}</code>
+        </h4>
+        <div>
+            {% if shift.status == 'scheduled' %}
+            <a href="{% url 'workforce:dispatch_shift_edit' shift.id %}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-edit me-1"></i> Edit
+            </a>
+            {% endif %}
+            <a href="{% url 'workforce:dispatch_shift_list' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Back to Shifts
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Shift Info -->
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fa-solid fa-info-circle me-2"></i>Shift Details</h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-5">Status</dt>
+                        <dd class="col-7">
+                            <span class="badge
+                                {% if shift.status == 'active' %}bg-success
+                                {% elif shift.status == 'break' %}bg-warning text-dark
+                                {% elif shift.status == 'completed' %}bg-secondary
+                                {% else %}bg-info{% endif %}">
+                                {{ shift.get_status_display }}
+                            </span>
+                        </dd>
+
+                        <dt class="col-5">Location</dt>
+                        <dd class="col-7">{{ shift.pickup_location.pickup_location_title }}</dd>
+
+                        <dt class="col-5">Scheduled</dt>
+                        <dd class="col-7">
+                            {{ shift.scheduled_start|date:"M d" }}<br>
+                            {{ shift.scheduled_start|time:"H:i" }} - {{ shift.scheduled_end|time:"H:i" }}
+                        </dd>
+
+                        {% if shift.actual_start %}
+                        <dt class="col-5">Actual Start</dt>
+                        <dd class="col-7">{{ shift.actual_start|date:"M d, H:i" }}</dd>
+                        {% endif %}
+
+                        {% if shift.actual_end %}
+                        <dt class="col-5">Actual End</dt>
+                        <dd class="col-7">{{ shift.actual_end|date:"M d, H:i" }}</dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Rider Info -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fa-solid fa-motorcycle me-2"></i>Rider</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rider-avatar me-3" style="width: 56px; height: 56px; background: var(--brand-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; font-weight: 600;">
+                            {{ shift.rider.driver_code|slice:":2" }}
+                        </div>
+                        <div>
+                            <strong>{{ shift.rider.driver_code }}</strong>
+                            <br>
+                            {{ shift.rider.user.first_name }} {{ shift.rider.user.last_name }}
+                            <br>
+                            <small class="text-muted">{{ shift.rider.user.email }}</small>
+                        </div>
+                    </div>
+                    <a href="{% url 'fleet:rider_profile' shift.rider.id %}" class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="fa-solid fa-user me-1"></i> View Rider Profile
+                    </a>
+                </div>
+            </div>
+
+            <!-- Performance -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fa-solid fa-chart-simple me-2"></i>Performance</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <div class="display-6 fw-bold text-primary">{{ shift.batches_completed }}</div>
+                            <small class="text-muted">Batches</small>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="display-6 fw-bold text-success">{{ shift.orders_delivered }}</div>
+                            <small class="text-muted">Orders</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Batches Completed -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fa-solid fa-boxes-stacked me-2"></i>Batches This Shift</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Batch</th>
+                                <th>Zone</th>
+                                <th>Orders</th>
+                                <th>COD</th>
+                                <th>Status</th>
+                                <th>Assigned</th>
+                                <th>Completed</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for batch in batches %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'workforce:dispatch_batch_detail' batch.id %}">
+                                        <code>{{ batch.batch_code }}</code>
+                                    </a>
+                                </td>
+                                <td><span class="badge bg-secondary">Zone {{ batch.destination_zone }}</span></td>
+                                <td>{{ batch.order_count }}</td>
+                                <td>
+                                    {% if batch.total_cod > 0 %}
+                                    {{ batch.total_cod }} QR
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge
+                                        {% if batch.status == 'completed' %}bg-success
+                                        {% elif batch.status == 'in_progress' %}bg-primary
+                                        {% elif batch.status == 'assigned' %}bg-info
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ batch.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>{{ batch.assigned_at|time:"H:i" }}</td>
+                                <td>
+                                    {% if batch.completed_at %}
+                                    {{ batch.completed_at|time:"H:i" }}
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    No batches assigned during this shift.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

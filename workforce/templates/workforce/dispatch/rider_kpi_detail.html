@@ -1,0 +1,136 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}KPI - {{ rider.driver_code }}{% endblock %}
+
+{% block content %}
+<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">
+            <i class="fa-solid fa-chart-line me-2"></i>KPI Details - {{ rider.driver_code }}
+        </h4>
+        <a href="{% url 'workforce:dispatch_kpi_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Rider Info & Summary -->
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fa-solid fa-user me-2"></i>Rider Info</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rider-avatar me-3" style="width: 64px; height: 64px; background: var(--brand-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 600;">
+                            {{ rider.driver_code|slice:":2" }}
+                        </div>
+                        <div>
+                            <strong class="fs-5">{{ rider.driver_code }}</strong>
+                            <br>
+                            {{ rider.user.first_name }} {{ rider.user.last_name }}
+                            <br>
+                            <small class="text-muted">{{ rider.user.email }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 30-Day Summary -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fa-solid fa-calendar-days me-2"></i>30-Day Summary</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center mb-3">
+                        <div class="col-6">
+                            <div class="display-6 fw-bold text-primary">{{ stats.total_orders|default:0 }}</div>
+                            <small class="text-muted">Total Orders</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="display-6 fw-bold text-success">{{ stats.total_batched|default:0 }}</div>
+                            <small class="text-muted">Batched Orders</small>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <dl class="row mb-0">
+                        <dt class="col-7">Avg Batching %</dt>
+                        <dd class="col-5 text-end">
+                            <span class="badge {% if stats.avg_batching >= 50 %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                {{ stats.avg_batching|floatformat:1|default:0 }}%
+                            </span>
+                        </dd>
+
+                        <dt class="col-7">Avg Orders/Hour</dt>
+                        <dd class="col-5 text-end">{{ stats.avg_orders_hour|floatformat:1|default:0 }}</dd>
+
+                        <dt class="col-7">Avg SLA Compliance</dt>
+                        <dd class="col-5 text-end">
+                            <span class="badge {% if stats.avg_sla >= 90 %}bg-success{% elif stats.avg_sla >= 70 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                {{ stats.avg_sla|floatformat:1|default:0 }}%
+                            </span>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daily KPIs -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fa-solid fa-table me-2"></i>Daily KPIs (Last 30 Days)</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Location</th>
+                                <th>Total</th>
+                                <th>Batched</th>
+                                <th>Single</th>
+                                <th>Batching %</th>
+                                <th>SLA %</th>
+                                <th>Orders/Hr</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for kpi in kpis %}
+                            <tr>
+                                <td>{{ kpi.date|date:"M d" }}</td>
+                                <td>{{ kpi.pickup_location.pickup_location_title|truncatechars:15|default:"-" }}</td>
+                                <td><strong>{{ kpi.total_orders }}</strong></td>
+                                <td>{{ kpi.batched_orders }}</td>
+                                <td>{{ kpi.single_orders }}</td>
+                                <td>
+                                    <span class="badge {% if kpi.batching_percentage >= 50 %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                        {{ kpi.batching_percentage|floatformat:0 }}%
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge {% if kpi.sla_compliance_rate >= 90 %}bg-success{% elif kpi.sla_compliance_rate >= 70 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                        {{ kpi.sla_compliance_rate|floatformat:0 }}%
+                                    </span>
+                                </td>
+                                <td>{{ kpi.orders_per_hour|floatformat:1 }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    No KPI data available for this rider.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% if active_batches %}
+{% for batch in active_batches %}
+<div class="batch-item">
+    <div class="d-flex align-items-center gap-3">
+        <span class="batch-code">{{ batch.batch_code }}</span>
+        <span class="batch-zone">Zone {{ batch.destination_zone }}</span>
+        <span class="text-muted">{{ batch.order_count }}/2 orders</span>
+        {% if batch.total_cod > 0 %}
+        <span class="badge bg-warning text-dark">{{ batch.total_cod }} QR COD</span>
+        {% endif %}
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        {% if batch.status == 'holding' %}
+        <span class="hold-countdown" data-expires="{{ batch.hold_expires_at|date:'c' }}">
+            {{ batch.hold_remaining_seconds|default:"--" }}
+        </span>
+        {% endif %}
+
+        <span class="batch-status-badge {{ batch.status }}">{{ batch.get_status_display }}</span>
+
+        {% if batch.assigned_rider %}
+        <span class="badge bg-dark">{{ batch.assigned_rider.driver_code }}</span>
+        {% endif %}
+
+        <a href="{% url 'workforce:dispatch_batch_detail' batch.id %}"
+           class="btn btn-sm btn-outline-primary">
+            <i class="fa-solid fa-eye"></i>
+        </a>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="text-center text-muted py-4">
+    <i class="fa-solid fa-inbox fa-2x mb-2"></i>
+    <p class="mb-0">No active batches</p>
+</div>
+{% endif %}

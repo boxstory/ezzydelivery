@@ -1,6 +1,7 @@
 from django.urls import path
 from webpages import views as webpages_views
 from workforce import views as workforce_views
+from workforce import dispatch_views
 from delivery import views as delivery_views
 from orders import views as orders_views
 from core import views as core_views
@@ -97,5 +98,32 @@ urlpatterns = [
     # Fulfillment Service & Purchase Orders
     path('suppliers/', workforce_views.suppliers_list, name='suppliers_list'),
     path('purchase-orders/', workforce_views.fulfilled_orders_list, name='fulfilled_orders_list'),
+
+    # ==========================================
+    # DISPATCH & BATCHING SECTION
+    # ==========================================
+    path('dispatch/', dispatch_views.dispatch_dashboard, name='dispatch_dashboard'),
+    path('dispatch/batches/', dispatch_views.batch_list, name='dispatch_batch_list'),
+    path('dispatch/batches/<int:batch_id>/', dispatch_views.batch_detail, name='dispatch_batch_detail'),
+    path('dispatch/batches/<int:batch_id>/release/', dispatch_views.manual_release_batch, name='dispatch_release_batch'),
+    path('dispatch/batches/<int:batch_id>/cancel/', dispatch_views.cancel_batch, name='dispatch_cancel_batch'),
+
+    # Shift Management
+    path('dispatch/shifts/', dispatch_views.shift_list, name='dispatch_shift_list'),
+    path('dispatch/shifts/create/', dispatch_views.shift_create, name='dispatch_shift_create'),
+    path('dispatch/shifts/<int:shift_id>/', dispatch_views.shift_detail, name='dispatch_shift_detail'),
+    path('dispatch/shifts/<int:shift_id>/edit/', dispatch_views.shift_edit, name='dispatch_shift_edit'),
+
+    # KPI Dashboard
+    path('dispatch/kpis/', dispatch_views.kpi_dashboard, name='dispatch_kpi_dashboard'),
+    path('dispatch/kpis/rider/<int:rider_id>/', dispatch_views.rider_kpi_detail, name='dispatch_rider_kpi'),
+
+    # Config Management
+    path('dispatch/config/', dispatch_views.config_list, name='dispatch_config_list'),
+    path('dispatch/config/<int:location_id>/', dispatch_views.config_edit, name='dispatch_config_edit'),
+
+    # HTMX Partials
+    path('dispatch/partials/batch-monitor/', dispatch_views.batch_monitor_partial, name='dispatch_batch_monitor_partial'),
+    path('dispatch/partials/shift-status/', dispatch_views.shift_status_partial, name='dispatch_shift_status_partial'),
 
 ]
