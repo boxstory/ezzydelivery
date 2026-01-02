@@ -2,8 +2,77 @@ body {
   background: #f5f5f5;
 }
 
+/* Dashboard flex container */
+.col-12.d-flex {
+  display: flex;
+  flex-wrap: nowrap;
+  width: 100%;
+}
+
 .dashboard-content-area {
   background: #f5f5f5;
-  min-height: calc(100vh - 56px);
+  min-height: calc(100vh - 3.5rem);
   padding: 1.5rem;
+  width: 100%;
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Ensure content fills remaining space after sidebar */
+@media (min-width: 768px) {
+  .dashboard-content-area {
+    width: calc(100% - 25%);
+    max-width: calc(100% - 25%);
+  }
+}
+
+@media (min-width: 992px) {
+  .dashboard-content-area {
+    width: calc(100% - 16.666667%);
+    max-width: calc(100% - 16.666667%);
+  }
+}
+
+/* Mobile fixes - ensure content displays */
+@media (max-width: 767.98px) {
+  /* Ensure main content area is visible */
+  main.col-12 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .dashboard-content-area {
+    padding: 0.75rem;
+    min-height: auto;
+    width: 100% !important;
+    display: block !important;
+  }
+
+  /* Ensure flex container stacks vertically and doesn't hide content */
+  .col-12.d-flex {
+    flex-direction: column;
+    display: flex !important;
+  }
+
+  /* Ensure order cards display properly on mobile */
+  .order-card {
+    display: block !important;
+  }
+
+  /* Mobile sidebar toggle container - don't take full height */
+  .mobile-sidebar-toggle {
+    flex-shrink: 0;
+  }
+
+  /* Mobile sidebar nav - collapsible section */
+  .mobile-sidebar-nav {
+    flex-shrink: 0;
+  }
+
+  /* Force content area to grow and fill space */
+  #main-content {
+    flex: 1 1 auto !important;
+    min-height: 0;
+  }
 }
