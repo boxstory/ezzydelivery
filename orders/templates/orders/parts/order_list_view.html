@@ -1,11 +1,19 @@
 {% load static %}
 <link rel="stylesheet" href="{% static 'orders/css/orders.css' %}">
 
+{% if not orders %}
+<div class="text-center py-5">
+  <i class="fa-solid fa-box-open fa-3x mb-3" style="color: var(--brand-grey-400);"></i>
+  <h4 class="text-muted">No orders found</h4>
+  <p class="text-muted">Start by adding your first order</p>
+</div>
+{% endif %}
+
 {% for order in orders %}
   <div class="order-card my-2" id="order-card-{{ order.id }}" data-card-id="orders_list_card_order">
     <!-- Order Card Header (Clickable) -->
     <div class="order-card-header" onclick="toggleOrderCard({{ order.id }})" data-header-id="orders_list_header_order_card">
-      <div class="d-flex flex-wrap align-items-center justify-content-between w-100">
+      <div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
         <div class="order-number">
           <i class="fa-solid fa-receipt"></i>
           <span>{{ order.order_number }}</span>
@@ -13,7 +21,7 @@
             <i class="fa-solid fa-chevron-down"></i>
           </span>
         </div>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex flex-wrap align-items-center gap-2">
           {% if order.task_created %}
             <span class="order-status-badge status-delivered">Task Created</span>
           {% else %}
@@ -22,6 +30,10 @@
           <div class="order-date">
             <i class="fa-regular fa-calendar"></i>
             <span>{{ order.order_date|date:"d/m" }}</span>
+          </div>
+          <div class="order-id">
+            <i class="fa-solid fa-hashtag"></i>
+            <span>{{ order.id }}</span>
           </div>
         </div>
       </div>
@@ -114,15 +126,6 @@
             <span class="status-value">{{ order.order_status }}</span>
           </span>
         </div>
-
-        {% if order.delivery_task %}
-        <div class="detail-row">
-          <span class="detail-label">DMS Status</span>
-          <span class="detail-value">
-            <span class="status-value">{{ order.delivery_task.dl_task_status_dms|default:"Not assigned" }}</span>
-          </span>
-        </div>
-        {% endif %}
 
         <!-- COD Amount -->
         {% if order.cod_amount %}

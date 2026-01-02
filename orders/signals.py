@@ -138,7 +138,20 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
             
             # Auto-create delivery task when order is verified
             if instance.verification_status == 'verified' and not instance.task_created:
-                _create_delivery_task_from_order(instance)
+                # Check if batching is enabled
+                from django.conf import settings
+                if getattr(settings, 'DISPATCH_BATCHING_ENABLED', False):
+                    # Route to batching system (async via Celery)
+                    try:
+                        from dispatch.tasks import process_verified_order
+                        process_verified_order.delay(instance.id)
+                        logger.info(f"Order {instance.order_number} queued for batch processing")
+                    except Exception as e:
+                        logger.error(f"Error queuing order for batching: {e}, falling back to direct task creation")
+                        _create_delivery_task_from_order(instance)
+                else:
+                    # Legacy: direct task creation
+                    _create_delivery_task_from_order(instance)
         
         # Clean up stored old status
         if instance.pk in _old_verification_status:

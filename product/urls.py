@@ -11,18 +11,21 @@ urlpatterns = [
          product_views.product_all_list, name='product_all_list'),
     path('all/cards/',
          product_views.product_all_list_card, name='product_all_list_card'),
+    path('all/table/',
+         product_views.product_all_list_table, name='product_all_list_table'),
     path('add/',
          product_views.product_single_add, name='product_single_add'),
     path('<int:product_id>/delete/',
          product_views.product_single_delete, name='product_single_delete'),
     path('<int:product_id>/update/',
          product_views.product_single_update, name='product_single_update'),
-  
+    path('<int:product_id>/inline-update/',
+         product_views.product_inline_update, name='product_inline_update'),
 
-     # Product categories
-     path('product_categories_list/', product_views.product_categories, name='product_categories'),
+    # Product categories
+    path('product_categories_list/', product_views.product_categories, name='product_categories'),
 
-     # Product Inventory
-     path('product_inventory/', product_views.product_inventory, name='product_inventory'),
+    # Product Inventory
+    path('product_inventory/', product_views.product_inventory, name='product_inventory'),
 
 ]

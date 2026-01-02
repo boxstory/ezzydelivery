@@ -138,7 +138,7 @@ def orders_all_list(request):
     context = {
         'orders': orders,
         'business': business,
-        'len': items.count()  # Use .count() instead of len() for better performance
+        'len': paginator.count  # Use paginator.count (cached) instead of items.count()
     }
     return render(request, 'orders/order_all_list.html', context)
 
@@ -164,7 +164,7 @@ def orders_pending_list(request):
         'address_verified_by',
         'verified_by',
     ).prefetch_related(
-        'order_product_list',
+        'order_items',
         'delivery_task',
         'delivery_task__driver',
         'delivery_task__business',
@@ -215,7 +215,7 @@ def orders_successfull_list(request):
         'address_verified_by',
         'verified_by',
     ).prefetch_related(
-        'order_product_list',
+        'order_items',
         'delivery_task',
         'delivery_task__driver',
         'delivery_task__business',
@@ -554,6 +554,97 @@ def add_order(request):
     })
 
 
+@login_required(login_url='account_login')
+def add_order_bulk(request):
+    """
+    Handle bulk order submission from Excel-like table view.
+    Processes multiple orders submitted via the table interface.
+    """
+    import json
+    from django.contrib import messages
+
+    if request.method != 'POST':
+        return redirect('orders:add_order')
+
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+    except business_models.Business.DoesNotExist:
+        messages.error(request, 'Business not found.')
+        return redirect('orders:add_order')
+
+    # Parse the form data - orders are submitted as orders[0][field], orders[1][field], etc.
+    orders_data = {}
+    for key, value in request.POST.items():
+        if key.startswith('orders['):
+            # Parse orders[0][customer_name] format
+            import re
+            match = re.match(r'orders\[(\d+)\]\[(\w+)\]', key)
+            if match:
+                index = int(match.group(1))
+                field = match.group(2)
+                if index not in orders_data:
+                    orders_data[index] = {}
+                orders_data[index][field] = value
+
+    # Process each order
+    created_count = 0
+    errors = []
+
+    for index in sorted(orders_data.keys()):
+        order_data = orders_data[index]
+
+        # Skip empty rows (no customer name)
+        if not order_data.get('customer_name', '').strip():
+            continue
+
+        try:
+            # Get pickup location if provided
+            pickup_location = None
+            if order_data.get('pickup_location'):
+                try:
+                    pickup_location = business_models.PickupLocation.objects.get(
+                        id=order_data['pickup_location'],
+                        business=business
+                    )
+                except business_models.PickupLocation.DoesNotExist:
+                    pass
+
+            # Create order
+            order = orders_models.Order(
+                business=business,
+                pickup_location=pickup_location,
+                client_order_code=order_data.get('client_order_code', ''),
+                customer_name=order_data.get('customer_name', ''),
+                customer_phone=order_data.get('customer_phone', ''),
+                customer_whatsapp=order_data.get('customer_whatsapp', ''),
+                dl_zone=order_data.get('dl_zone', '0'),
+                dl_street=order_data.get('dl_street', '0'),
+                dl_building=order_data.get('dl_building', '0'),
+                customer_address=order_data.get('customer_address', ''),
+                cod_status_by_client=order_data.get('cod_status_by_client', 'no_cod'),
+                cod_amount=order_data.get('cod_amount') or 0,
+                order_notes=order_data.get('order_notes', ''),
+                order_status=order_data.get('order_status', 'to_review'),
+            )
+            order.save()
+            created_count += 1
+
+        except Exception as e:
+            errors.append(f"Row {index + 1}: {str(e)}")
+
+    if created_count > 0:
+        messages.success(request, f'Successfully created {created_count} order(s).')
+
+    if errors:
+        for error in errors[:5]:  # Show max 5 errors
+            messages.warning(request, error)
+        if len(errors) > 5:
+            messages.warning(request, f'... and {len(errors) - 5} more errors.')
+
+    if created_count == 0 and not errors:
+        messages.info(request, 'No orders were created. Please fill in at least the customer name.')
+
+    return redirect('orders:orders_all_list')
 
 
 # add products to order
@@ -862,7 +953,7 @@ def get_order_by_api(request):
     if not api_data:
         logger.warning(f"No API settings found for business {business.business_id}")
         messages.error(request, "No API configuration found. Please configure your Shopify API settings.")
-        return redirect('business_settings')
+        return redirect('business:business_settings_api_list', business.business_id)
 
     logger.debug(f"Using API settings for business {business.business_id}")
 
@@ -871,7 +962,7 @@ def get_order_by_api(request):
     if not shopify_token:
         logger.error("SHOPIFY_ACCESS_TOKEN not configured in .env file")
         messages.error(request, "Shopify API token not configured")
-        return redirect('business_settings')
+        return redirect('business:business_settings_api_list', business.business_id)
 
     headers = {
         'Content-Type': 'application/json',

@@ -3,11 +3,21 @@
 {% load crispy_forms_tags %}
 {% block content %}
 <div class="p-3 col-12  " id="orders_add_container_main">
-  <div class="container align-content-center">
     <div class="row">
       <div class="col-md-12 pb-3">
         <div class="col p-2">
           <h2 class="m-0 text-center" id="orders_add_header_title">Add Order</h2>
+        </div>
+        <!-- View Toggle Buttons -->
+        <div class="col d-flex justify-content-center mb-3" id="view_toggle_container">
+          <div class="btn-group" role="group" aria-label="View toggle">
+            <button type="button" class="btn btn-dark active" id="btn_form_view">
+              <i class="fas fa-wpforms me-1"></i>Form View
+            </button>
+            <button type="button" class="btn btn-outline-dark" id="btn_table_view">
+              <i class="fas fa-table me-1"></i>Table View (Excel)
+            </button>
+          </div>
         </div>
         <div class="col d-flex justify-content-between rounded-2 bg-light" id="orders_add_nav_actions">
           <a class="btn pe-3 text-dark" href="{% url 'business:pickup_location_list' %}">
@@ -25,9 +35,9 @@
             <div class="btn btn-dark my-2" id="orders_add_btn_back">Back</div>
           </a>
         </div>
-      </div>
     </div>
-    <div class="row">
+    <!-- Form View (Default) -->
+    <div class="row" id="form_view_container">
       <div class="col-md-12">
         <form method="POST" id="orders_add_form_main">
           {% if form.non_field_errors %}
@@ -42,12 +52,284 @@
         </form>
       </div>
     </div>
+
+    <!-- Table View (Excel-like) -->
+    <div class="row d-none" id="table_view_container">
+      <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="btn-group">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_add_row">
+              <i class="fas fa-plus me-1"></i>Add Row
+            </button>
+            <button type="button" class="btn btn-outline-danger btn-sm" id="btn_delete_selected">
+              <i class="fas fa-trash me-1"></i>Delete Selected
+            </button>
+            <button type="button" class="btn btn-outline-info btn-sm" id="btn_clear_all">
+              <i class="fas fa-eraser me-1"></i>Clear All
+            </button>
+          </div>
+          <span class="text-muted small">
+            <i class="fas fa-info-circle me-1"></i>
+            Use Tab to navigate. Enter moves to next row.
+          </span>
+        </div>
+
+        <form method="POST" id="bulk_orders_form" action="{% url 'orders:add_order_bulk' %}">
+          {% csrf_token %}
+          <div class="excel-table-wrapper">
+            <table class="excel-table" id="orders_excel_table">
+              <thead>
+                <tr class="header-row">
+                  <th class="col-checkbox"><input type="checkbox" id="select_all"></th>
+                  <th class="col-no">#</th>
+                  <th class="col-order-id">Order ID</th>
+                  <th class="col-customer-name">Customer Name</th>
+                  <th class="col-phone">Phone</th>
+                  <th class="col-whatsapp">WhatsApp</th>
+                  <th class="col-zone">Zone</th>
+                  <th class="col-street">Street</th>
+                  <th class="col-building">Building</th>
+                  <th class="col-address">Address</th>
+                  <th class="col-cod">COD</th>
+                  <th class="col-cod-amount">COD Amount</th>
+                  <th class="col-pickup">Pickup Location</th>
+                  <th class="col-notes">Notes</th>
+                  <th class="col-status">Status</th>
+                </tr>
+              </thead>
+              <tbody id="orders_table_body">
+                <!-- Rows added by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-3 d-flex justify-content-between">
+            <div>
+              <span class="badge bg-secondary me-2" id="row_count_badge">0 orders</span>
+            </div>
+            <div class="btn-group">
+              <button type="button" class="btn btn-secondary" id="btn_save_draft">
+                <i class="fas fa-save me-1"></i>Save Draft
+              </button>
+              <button type="submit" class="btn btn-dark" id="btn_submit_orders">
+                <i class="fas fa-paper-plane me-1"></i>Submit All Orders
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock content %}
+
+{% block extra_css %}
+<style>
+/* Excel-like Table Styles */
+.excel-table-wrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 65vh;
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+  background: #fff;
+}
+
+.excel-table {
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  min-width: 100%;
+  table-layout: fixed;
+}
+
+.excel-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.excel-table th {
+  background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 1px solid #dee2e6;
+  padding: 0.5rem 0.25rem;
+  text-align: center;
+  font-weight: 600;
+  color: #495057;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.excel-table td {
+  border: 1px solid #dee2e6;
+  padding: 0;
+  vertical-align: middle;
+}
+
+.excel-table tbody tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+.excel-table tbody tr:hover {
+  background-color: #e3f2fd !important;
+}
+
+.excel-table tbody tr.selected {
+  background-color: #fff3cd !important;
+}
+
+/* Cell Input Styles */
+.excel-table input[type="text"],
+.excel-table input[type="number"],
+.excel-table input[type="tel"],
+.excel-table select {
+  width: 100%;
+  border: none;
+  padding: 0.375rem 0.25rem;
+  font-size: 0.75rem;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.excel-table input:focus,
+.excel-table select:focus {
+  outline: 2px solid #0d6efd;
+  outline-offset: -2px;
+  background: #fff;
+}
+
+.excel-table input::placeholder {
+  color: #adb5bd;
+  font-style: italic;
+}
+
+/* Column Widths */
+.col-checkbox { width: 1.875rem; }
+.col-no { width: 2.5rem; }
+.col-order-id { width: 6.25rem; }
+.col-customer-name { width: 9.375rem; }
+.col-phone { width: 6.875rem; }
+.col-whatsapp { width: 6.875rem; }
+.col-zone { width: 3.75rem; }
+.col-street { width: 3.75rem; }
+.col-building { width: 4.375rem; }
+.col-address { width: 12.5rem; }
+.col-cod { width: 4.375rem; }
+.col-cod-amount { width: 5.625rem; }
+.col-pickup { width: 9.375rem; }
+.col-notes { width: 9.375rem; }
+.col-status { width: 6.25rem; }
+
+/* Row Number Cell */
+.row-number {
+  background: #e9ecef;
+  text-align: center;
+  font-weight: 600;
+  color: #6c757d;
+  padding: 0.375rem 0.25rem;
+}
+
+/* Checkbox Styling */
+.excel-table input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+/* Frozen First Columns */
+.excel-table th:first-child,
+.excel-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: #f8f9fa;
+}
+
+.excel-table th:nth-child(2),
+.excel-table td:nth-child(2) {
+  position: sticky;
+  left: 1.875rem;
+  z-index: 5;
+  background: #f8f9fa;
+}
+
+.excel-table thead th:first-child,
+.excel-table thead th:nth-child(2) {
+  z-index: 15;
+}
+
+/* Scrollbar */
+.excel-table-wrapper::-webkit-scrollbar {
+  width: 0.625rem;
+  height: 0.625rem;
+}
+
+.excel-table-wrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.excel-table-wrapper::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 0.3125rem;
+}
+
+.excel-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* View toggle active state */
+#view_toggle_container .btn.active {
+  background-color: #212529;
+  border-color: #212529;
+  color: #fff;
+}
+</style>
+{% endblock extra_css %}
+
 {% block extra_js %}
 <script>
   $(document).ready(function () {
+    // ========== VIEW TOGGLE LOGIC ==========
+    const btnFormView = document.getElementById('btn_form_view');
+    const btnTableView = document.getElementById('btn_table_view');
+    const formViewContainer = document.getElementById('form_view_container');
+    const tableViewContainer = document.getElementById('table_view_container');
+
+    // Toggle to Form View
+    btnFormView.addEventListener('click', function() {
+      btnFormView.classList.add('btn-dark', 'active');
+      btnFormView.classList.remove('btn-outline-dark');
+      btnTableView.classList.remove('btn-dark', 'active');
+      btnTableView.classList.add('btn-outline-dark');
+      formViewContainer.classList.remove('d-none');
+      tableViewContainer.classList.add('d-none');
+      localStorage.setItem('orderAddView', 'form');
+    });
+
+    // Toggle to Table View
+    btnTableView.addEventListener('click', function() {
+      btnTableView.classList.add('btn-dark', 'active');
+      btnTableView.classList.remove('btn-outline-dark');
+      btnFormView.classList.remove('btn-dark', 'active');
+      btnFormView.classList.add('btn-outline-dark');
+      tableViewContainer.classList.remove('d-none');
+      formViewContainer.classList.add('d-none');
+      localStorage.setItem('orderAddView', 'table');
+
+      // Initialize table if empty
+      if (document.getElementById('orders_table_body').children.length === 0) {
+        initializeTable(5);
+      }
+    });
+
+    // Restore saved view preference
+    const savedView = localStorage.getItem('orderAddView');
+    if (savedView === 'table') {
+      btnTableView.click();
+    }
+
+    // ========== FORM VIEW LOGIC ==========
     // Get references to the input fields
     const id_customer_phone = $("#id_customer_phone");
     const id_customer_whatsapp = $("#id_customer_whatsapp");
@@ -106,13 +388,239 @@
         console.log('Auto-filled from pickup location:', location.title);
       }
     });
+
+    // Initialize select2 in pickuplocation search field
+    if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
+      $("#id_pickup_location").select2();
+      $("#id_product_list").select2();
+    }
+
+    // ========== TABLE VIEW LOGIC ==========
+    const tableBody = document.getElementById('orders_table_body');
+    const selectAllCheckbox = document.getElementById('select_all');
+    const addRowBtn = document.getElementById('btn_add_row');
+    const deleteSelectedBtn = document.getElementById('btn_delete_selected');
+    const clearAllBtn = document.getElementById('btn_clear_all');
+    const saveDraftBtn = document.getElementById('btn_save_draft');
+    const rowCountBadge = document.getElementById('row_count_badge');
+
+    let rowCounter = 0;
+
+    // Fulfillment service status
+    const isFulfillmentEnabled = {{ business.fulfillment_service_enabled|yesno:"true,false" }};
+
+    // Pickup locations for dropdown
+    const pickupLocations = [
+      {% if business.fulfillment_service_enabled %}
+      { id: '{{ pickup_locations.first.id }}', name: 'Ezzy Fulfillment' },
+      {% else %}
+      {% for location in pickup_locations %}
+      { id: '{{ location.id }}', name: '{{ location.pickup_location_title }}' }{% if not forloop.last %},{% endif %}
+      {% endfor %}
+      {% endif %}
+    ];
+
+    // Default pickup location (first one or fulfillment)
+    const defaultPickupId = pickupLocations.length > 0 ? pickupLocations[0].id : '';
+
+    // Order status options
+    const orderStatusOptions = [
+      { value: 'to_review', text: 'To Review' },
+      { value: 'ready_to_pickup', text: 'Ready to Pickup' },
+      { value: 'publish', text: 'Publish' },
+      { value: 'cancelled', text: 'Cancelled' }
+    ];
+
+    // COD options
+    const codOptions = [
+      { value: 'no_cod', text: 'No COD' },
+      { value: 'include', text: 'Include' }
+    ];
+
+    // Create dropdown HTML
+    function createSelect(name, options, index, defaultVal = '') {
+      let html = `<select name="orders[${index}][${name}]">`;
+      options.forEach(opt => {
+        const selected = opt.value === defaultVal ? 'selected' : '';
+        html += `<option value="${opt.value}" ${selected}>${opt.text}</option>`;
+      });
+      html += '</select>';
+      return html;
+    }
+
+    // Create pickup location dropdown (auto-select first/default)
+    function createPickupSelect(index) {
+      let html = `<select name="orders[${index}][pickup_location]">`;
+      pickupLocations.forEach((loc, i) => {
+        const selected = (i === 0) ? 'selected' : '';
+        html += `<option value="${loc.id}" ${selected}>${loc.name}</option>`;
+      });
+      html += '</select>';
+      return html;
+    }
+
+    // Create a single row
+    function createRow() {
+      rowCounter++;
+      const tr = document.createElement('tr');
+      tr.dataset.rowId = rowCounter;
+
+      tr.innerHTML = `
+        <td><input type="checkbox" class="row-select"></td>
+        <td class="row-number">${rowCounter}</td>
+        <td><input type="text" name="orders[${rowCounter-1}][client_order_code]" placeholder="ORD-${1000 + rowCounter}"></td>
+        <td><input type="text" name="orders[${rowCounter-1}][customer_name]" placeholder="Customer name" required></td>
+        <td><input type="tel" name="orders[${rowCounter-1}][customer_phone]" placeholder="Phone" class="phone-input"></td>
+        <td><input type="tel" name="orders[${rowCounter-1}][customer_whatsapp]" placeholder="WhatsApp" class="whatsapp-input"></td>
+        <td><input type="text" name="orders[${rowCounter-1}][dl_zone]" placeholder="Zone" value="0"></td>
+        <td><input type="text" name="orders[${rowCounter-1}][dl_street]" placeholder="Street" value="0"></td>
+        <td><input type="text" name="orders[${rowCounter-1}][dl_building]" placeholder="Bldg" value="0"></td>
+        <td><input type="text" name="orders[${rowCounter-1}][customer_address]" placeholder="Full address"></td>
+        <td>${createSelect('cod_status_by_client', codOptions, rowCounter-1, 'no_cod')}</td>
+        <td><input type="number" name="orders[${rowCounter-1}][cod_amount]" placeholder="0.00" min="0" step="0.01"></td>
+        <td>${createPickupSelect(rowCounter-1)}</td>
+        <td><input type="text" name="orders[${rowCounter-1}][order_notes]" placeholder="Notes"></td>
+        <td>${createSelect('order_status', orderStatusOptions, rowCounter-1, 'to_review')}</td>
+      `;
+
+      return tr;
+    }
+
+    // Update row count badge
+    function updateRowCount() {
+      const count = tableBody.querySelectorAll('tr').length;
+      rowCountBadge.textContent = count + ' order' + (count !== 1 ? 's' : '');
+    }
+
+    // Update row numbers after deletion
+    function updateRowNumbers() {
+      const rows = tableBody.querySelectorAll('tr');
+      rows.forEach((row, index) => {
+        row.querySelector('.row-number').textContent = index + 1;
+      });
+      updateRowCount();
+    }
+
+    // Initialize table with rows
+    function initializeTable(numRows = 5) {
+      for (let i = 0; i < numRows; i++) {
+        tableBody.appendChild(createRow());
+      }
+      updateRowCount();
+    }
+
+    // Add row button
+    if (addRowBtn) {
+      addRowBtn.addEventListener('click', function() {
+        tableBody.appendChild(createRow());
+        updateRowCount();
+        const newRow = tableBody.lastElementChild;
+        newRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        newRow.querySelector('input[type="text"]').focus();
+      });
+    }
+
+    // Select all checkbox
+    if (selectAllCheckbox) {
+      selectAllCheckbox.addEventListener('change', function() {
+        const checkboxes = tableBody.querySelectorAll('.row-select');
+        checkboxes.forEach(cb => {
+          cb.checked = this.checked;
+          cb.closest('tr').classList.toggle('selected', this.checked);
+        });
+      });
+    }
+
+    // Individual row selection
+    if (tableBody) {
+      tableBody.addEventListener('change', function(e) {
+        if (e.target.classList.contains('row-select')) {
+          e.target.closest('tr').classList.toggle('selected', e.target.checked);
+          const allCheckboxes = tableBody.querySelectorAll('.row-select');
+          const checkedBoxes = tableBody.querySelectorAll('.row-select:checked');
+          selectAllCheckbox.checked = allCheckboxes.length === checkedBoxes.length;
+          selectAllCheckbox.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < allCheckboxes.length;
+        }
+      });
+
+      // Auto-copy phone to WhatsApp
+      tableBody.addEventListener('input', function(e) {
+        if (e.target.classList.contains('phone-input')) {
+          const row = e.target.closest('tr');
+          const whatsappInput = row.querySelector('.whatsapp-input');
+          if (whatsappInput && !whatsappInput.value) {
+            whatsappInput.value = '974' + e.target.value;
+          }
+        }
+      });
+
+      // Keyboard navigation
+      tableBody.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          const currentCell = e.target.closest('td');
+          const currentRow = currentCell.closest('tr');
+          const cellIndex = Array.from(currentRow.cells).indexOf(currentCell);
+          const nextRow = currentRow.nextElementSibling;
+
+          if (nextRow) {
+            const nextCell = nextRow.cells[cellIndex];
+            const nextInput = nextCell.querySelector('input, select');
+            if (nextInput) nextInput.focus();
+          } else {
+            tableBody.appendChild(createRow());
+            updateRowCount();
+            const newRow = tableBody.lastElementChild;
+            const newCell = newRow.cells[cellIndex];
+            const newInput = newCell.querySelector('input, select');
+            if (newInput) newInput.focus();
+          }
+        }
+      });
+    }
+
+    // Delete selected rows
+    if (deleteSelectedBtn) {
+      deleteSelectedBtn.addEventListener('click', function() {
+        const selectedRows = tableBody.querySelectorAll('tr.selected');
+        if (selectedRows.length === 0) {
+          alert('Please select rows to delete');
+          return;
+        }
+        if (confirm(`Delete ${selectedRows.length} row(s)?`)) {
+          selectedRows.forEach(row => row.remove());
+          updateRowNumbers();
+          selectAllCheckbox.checked = false;
+        }
+      });
+    }
+
+    // Clear all
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener('click', function() {
+        if (confirm('Clear all data?')) {
+          tableBody.innerHTML = '';
+          rowCounter = 0;
+          initializeTable(5);
+          selectAllCheckbox.checked = false;
+        }
+      });
+    }
+
+    // Save draft
+    if (saveDraftBtn) {
+      saveDraftBtn.addEventListener('click', function() {
+        const formData = new FormData(document.getElementById('bulk_orders_form'));
+        const data = {};
+        for (let [key, value] of formData.entries()) {
+          if (key !== 'csrfmiddlewaretoken') {
+            data[key] = value;
+          }
+        }
+        localStorage.setItem('bulk_orders_draft', JSON.stringify(data));
+        alert('Draft saved!');
+      });
+    }
   });
-
-  // Initialize select2 in pickuplocation search field
-  if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
-    $("#id_pickup_location").select2();
-    $("#id_product_list").select2();
-  }
-
 </script>
 {% endblock extra_js %}
