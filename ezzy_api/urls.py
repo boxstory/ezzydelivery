@@ -77,4 +77,14 @@ urlpatterns = [
 
     # ==================== API TESTING UI ====================
     path('tester/', ezzy_api_views.api_tester_view, name='api_tester'),
+
+    # ==================== QNAS PROXY APIs ====================
+    # Proxy endpoints for QNAS (Qatar National Address System)
+    # These forward browser cookies to bypass Cloudflare protection
+    path('qnas/get-zones/', ezzy_api_views.qnas_get_zones, name='qnas_get_zones'),
+    path('qnas/get-streets/', ezzy_api_views.qnas_get_streets, name='qnas_get_streets'),
+    path('qnas/get-buildings/', ezzy_api_views.qnas_get_buildings, name='qnas_get_buildings'),
+    path('qnas/search/', ezzy_api_views.qnas_search_address, name='qnas_search_address'),
+    path('qnas/address-details/', ezzy_api_views.qnas_get_address_details, name='qnas_get_address_details'),
+    path('qnas/geocode/', ezzy_api_views.qnas_geocode, name='qnas_geocode'),
 ]

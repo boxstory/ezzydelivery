@@ -2858,12 +2858,261 @@ def business_pickup_locations_api(request):
         )
 
 
-# ==================== API TESTING UI ====================
+# ==================== QNAS PROXY APIs ====================
+# These endpoints proxy requests to QNAS API (qnas.qa)
+# Cloudflare protection requires browser cookies to be forwarded
 
-@login_required(login_url='account_login')
-def api_tester_view(request):
-    """Render the API testing UI for clients"""
-    logger.info(f"User {request.user.id} accessing API tester UI")
-    return render(request, 'ezzy_api/api_tester.html')
+QNAS_BASE_URL = "https://qnas.qa"
+QNAS_TOKEN = config("QNAS_TOKEN", default="")
+QNAS_DOMAIN = config("QNAS_DOMAIN", default="ezzydelivery.qa")
+
+
+def _make_qnas_request(request, endpoint, method='GET', data=None):
+    """
+    Helper function to make requests to QNAS API with proper headers and cookies.
+    Forwards browser cookies to bypass Cloudflare protection.
+    """
+    url = f"{QNAS_BASE_URL}/{endpoint}"
+
+    headers = {
+        "X-Token": QNAS_TOKEN,
+        "X-Domain": QNAS_DOMAIN,
+        "Accept": "application/json",
+        "User-Agent": request.META.get("HTTP_USER_AGENT", "Mozilla/5.0"),
+        "Referer": f"https://{QNAS_DOMAIN}/",
+        "Origin": f"https://{QNAS_DOMAIN}",
+    }
+
+    # Forward browser cookies (critical for Cloudflare bypass)
+    cookies = request.COOKIES
+
+    try:
+        if method == 'GET':
+            resp = requests.get(url, headers=headers, cookies=cookies, timeout=15)
+        elif method == 'POST':
+            headers["Content-Type"] = "application/json"
+            resp = requests.post(url, headers=headers, cookies=cookies, json=data, timeout=15)
+        else:
+            resp = requests.request(method, url, headers=headers, cookies=cookies, json=data, timeout=15)
+
+        return resp
+    except requests.exceptions.Timeout:
+        logger.error(f"QNAS API timeout for endpoint: {endpoint}")
+        return None
+    except requests.exceptions.RequestException as e:
+        logger.error(f"QNAS API request error for endpoint {endpoint}: {str(e)}")
+        return None
+
+
+@csrf_exempt
+def qnas_get_zones(request):
+    """
+    Proxy endpoint for QNAS get_zones API.
+
+    Frontend must call with credentials:
+    fetch("/api/qnas/get-zones/", { method: "GET", credentials: "include" })
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    logger.info("QNAS proxy: Fetching zones")
+
+    resp = _make_qnas_request(request, "get_zones")
+
+    if resp is None:
+        return JsonResponse({'error': 'QNAS API request failed'}, status=502)
+
+    from django.http import HttpResponse
+    return HttpResponse(
+        resp.content,
+        status=resp.status_code,
+        content_type=resp.headers.get("Content-Type", "application/json")
+    )
+
+
+@csrf_exempt
+def qnas_get_streets(request):
+    """
+    Proxy endpoint for QNAS get_streets API.
+
+    Query params:
+    - zone: Zone number to get streets for
+
+    Frontend must call with credentials:
+    fetch("/api/qnas/get-streets/?zone=1", { method: "GET", credentials: "include" })
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    zone = request.GET.get('zone', '')
+    if not zone:
+        return JsonResponse({'error': 'Zone parameter is required'}, status=400)
+
+    logger.info(f"QNAS proxy: Fetching streets for zone {zone}")
+
+    resp = _make_qnas_request(request, f"get_streets?zone={zone}")
+
+    if resp is None:
+        return JsonResponse({'error': 'QNAS API request failed'}, status=502)
+
+    from django.http import HttpResponse
+    return HttpResponse(
+        resp.content,
+        status=resp.status_code,
+        content_type=resp.headers.get("Content-Type", "application/json")
+    )
+
+
+@csrf_exempt
+def qnas_get_buildings(request):
+    """
+    Proxy endpoint for QNAS get_buildings API.
+
+    Query params:
+    - zone: Zone number
+    - street: Street number
+
+    Frontend must call with credentials:
+    fetch("/api/qnas/get-buildings/?zone=1&street=123", { method: "GET", credentials: "include" })
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    zone = request.GET.get('zone', '')
+    street = request.GET.get('street', '')
+
+    if not zone or not street:
+        return JsonResponse({'error': 'Zone and street parameters are required'}, status=400)
+
+    logger.info(f"QNAS proxy: Fetching buildings for zone {zone}, street {street}")
+
+    resp = _make_qnas_request(request, f"get_buildings?zone={zone}&street={street}")
+
+    if resp is None:
+        return JsonResponse({'error': 'QNAS API request failed'}, status=502)
+
+    from django.http import HttpResponse
+    return HttpResponse(
+        resp.content,
+        status=resp.status_code,
+        content_type=resp.headers.get("Content-Type", "application/json")
+    )
+
+
+@csrf_exempt
+def qnas_search_address(request):
+    """
+    Proxy endpoint for QNAS address search API.
+
+    Query params:
+    - q: Search query (address text)
+
+    Frontend must call with credentials:
+    fetch("/api/qnas/search/?q=Al Sadd", { method: "GET", credentials: "include" })
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    query = request.GET.get('q', '')
+    if not query:
+        return JsonResponse({'error': 'Search query (q) is required'}, status=400)
+
+    logger.info(f"QNAS proxy: Searching address: {query}")
+
+    # URL encode the query
+    import urllib.parse
+    encoded_query = urllib.parse.quote(query)
+
+    resp = _make_qnas_request(request, f"search?q={encoded_query}")
+
+    if resp is None:
+        return JsonResponse({'error': 'QNAS API request failed'}, status=502)
+
+    from django.http import HttpResponse
+    return HttpResponse(
+        resp.content,
+        status=resp.status_code,
+        content_type=resp.headers.get("Content-Type", "application/json")
+    )
+
+
+@csrf_exempt
+def qnas_get_address_details(request):
+    """
+    Proxy endpoint for QNAS address details API.
+
+    Query params:
+    - zone: Zone number
+    - street: Street number
+    - building: Building number
+
+    Frontend must call with credentials:
+    fetch("/api/qnas/address-details/?zone=1&street=123&building=45", {
+        method: "GET",
+        credentials: "include"
+    })
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    zone = request.GET.get('zone', '')
+    street = request.GET.get('street', '')
+    building = request.GET.get('building', '')
+
+    if not all([zone, street, building]):
+        return JsonResponse({'error': 'Zone, street, and building parameters are required'}, status=400)
+
+    logger.info(f"QNAS proxy: Getting address details for zone={zone}, street={street}, building={building}")
+
+    resp = _make_qnas_request(request, f"get_address_details?zone={zone}&street={street}&building={building}")
+
+    if resp is None:
+        return JsonResponse({'error': 'QNAS API request failed'}, status=502)
+
+    from django.http import HttpResponse
+    return HttpResponse(
+        resp.content,
+        status=resp.status_code,
+        content_type=resp.headers.get("Content-Type", "application/json")
+    )
+
+
+@csrf_exempt
+def qnas_geocode(request):
+    """
+    Proxy endpoint for QNAS geocoding API.
+
+    Query params:
+    - lat: Latitude
+    - lng: Longitude
+
+    Frontend must call with credentials:
+    fetch("/api/qnas/geocode/?lat=25.2854&lng=51.5310", {
+        method: "GET",
+        credentials: "include"
+    })
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    lat = request.GET.get('lat', '')
+    lng = request.GET.get('lng', '')
+
+    if not lat or not lng:
+        return JsonResponse({'error': 'lat and lng parameters are required'}, status=400)
+
+    logger.info(f"QNAS proxy: Geocoding lat={lat}, lng={lng}")
+
+    resp = _make_qnas_request(request, f"geocode?lat={lat}&lng={lng}")
+
+    if resp is None:
+        return JsonResponse({'error': 'QNAS API request failed'}, status=502)
+
+    from django.http import HttpResponse
+    return HttpResponse(
+        resp.content,
+        status=resp.status_code,
+        content_type=resp.headers.get("Content-Type", "application/json")
+    )
 
 

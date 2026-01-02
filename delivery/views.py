@@ -144,18 +144,17 @@ def all_delivery_tasks(request):
     except fleet_models.Driver.DoesNotExist:
         logger.warning(f"User {request.user.id} is not a driver")
         messages.error(request, "No driver profile found for your account")
-        return redirect('homepage')
+        return redirect('webpages:index')
 
     # FIX: Optimize with select_related and prefetch_related
     dl_tasks = delivery_models.DeliveryTask.objects.select_related(
         'order',                    # FK: DeliveryTask → Order
         'order__business',          # Through: Order → Business
-        'order__customer',          # Through: Order → Customer
         'order__pickup_location',   # Through: Order → PickupLocation
         'driver',                   # FK: DeliveryTask → Driver (if assigned)
     ).prefetch_related(
-        'assigned_drivers',               # M2M: DeliveryTask ← AssignedDriver → Driver
-        'assigned_drivers__driver',       # Through AssignedDriver
+        'assigneddriver_set',             # Reverse FK: DeliveryTask ← AssignedDriver
+        'assigneddriver_set__driver',     # Through AssignedDriver → Driver
         'order__order_items',             # Reverse FK: Order ← OrderItem (related_name='order_items')
         'order__order_items__product',    # Through: OrderItem → Product
     ).order_by('-id')
@@ -229,13 +228,12 @@ def assigned_tasks(request):
         ).select_related(
             'order',
             'order__business',
-            'order__customer',
             'order__pickup_location',
             'driver',
         ).prefetch_related(
-            'assigned_drivers',
-            'assigned_drivers__driver',
-            'order__order_product_list',
+            'assigneddriver_set',
+            'assigneddriver_set__driver',
+            'order__order_items',
         ).order_by('-id')
 
         logger.info(f"Driver {driver.driver_id} has {assigned_tasks.count()} assigned tasks")
@@ -249,7 +247,7 @@ def assigned_tasks(request):
     except fleet_models.Driver.DoesNotExist:
         logger.warning(f"User {request.user.id} attempted to view driver tasks but has no driver profile")
         messages.error(request, "No driver profile found")
-        return redirect('homepage')
+        return redirect('webpages:index')
 
 
 # business side delivery data --------------------------------------------------------------
