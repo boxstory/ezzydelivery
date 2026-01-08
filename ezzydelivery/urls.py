@@ -6,7 +6,7 @@ from django.conf.urls.static import static
 from orders import views as orders_views
 from django.contrib.sitemaps.views import sitemap
 from webpages.sitemaps import StaticViewSitemap, BusinessSitemap, DriverSitemap
-from core.sitemaps import StaticViewSitemap as CoreStaticSitemap, BusinessPagesSitemap, WorkforcePagesSitemap, SEOLandingPageSitemap
+from core.sitemaps import StaticViewSitemap as CoreStaticSitemap, BusinessPagesSitemap, WorkforcePagesSitemap, SEOLandingPageSitemap, BlogPostSitemap, BlogCategorySitemap
 from core.views_seo import robots_txt, security_txt, humans_txt
 from django.views.generic import TemplateView
 
@@ -19,7 +19,9 @@ sitemaps = {
     'core': CoreStaticSitemap,
     'business_pages': BusinessPagesSitemap,
     'workforce_pages': WorkforcePagesSitemap,
-    'seo_landing_pages': SEOLandingPageSitemap,  # NEW: Highest priority SEO pages
+    'seo_landing_pages': SEOLandingPageSitemap,
+    'blog_posts': BlogPostSitemap,
+    'blog_categories': BlogCategorySitemap,
 }
 
 admin.site.site_header = 'Ezzy Delivery Admin'

@@ -4,6 +4,7 @@ Helps search engines discover and index pages
 """
 from django.contrib.sitemaps import Sitemap
 from django.urls import reverse
+from blog.models import BlogPost, BlogCategory
 
 
 class StaticViewSitemap(Sitemap):
@@ -85,3 +86,30 @@ class WorkforcePagesSitemap(Sitemap):
 
     def location(self, item):
         return reverse(item)
+
+
+class BlogPostSitemap(Sitemap):
+    """Sitemap for blog posts - Critical for content authority"""
+    priority = 0.9
+    changefreq = 'weekly'
+
+    def items(self):
+        return BlogPost.objects.filter(status='published').order_by('-published_at')
+
+    def lastmod(self, obj):
+        return obj.updated_at
+
+    def location(self, obj):
+        return obj.get_absolute_url()
+
+
+class BlogCategorySitemap(Sitemap):
+    """Sitemap for blog categories"""
+    priority = 0.7
+    changefreq = 'weekly'
+
+    def items(self):
+        return BlogCategory.objects.all()
+
+    def location(self, obj):
+        return obj.get_absolute_url()
