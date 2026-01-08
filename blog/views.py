@@ -22,18 +22,22 @@ def blog_category(request, slug=None):
     # Get all categories with post counts
     categories = BlogCategory.objects.annotate(post_count=Count('posts'))
 
-    # SEO metadata
+    # SEO metadata - unique for each category/blog index
     if category:
-        meta = SEOMetadata.get_default_meta(
-            title=category.seo_title or f"{category.name} - Ezzy Delivery Blog",
-            description=category.seo_description or category.description,
-            keywords=f"{category.name}, delivery blog Qatar, logistics insights"
+        meta = SEOMetadata.get_page_meta(
+            title=category.seo_title or f"{category.name} Articles | EzzyDelivery Qatar Blog",
+            description=category.seo_description or (
+                f"Read {category.name} articles on EzzyDelivery Qatar blog. "
+                f"Tips, insights & guides for delivery and logistics in Qatar."
+            )[:155],
         )
     else:
-        meta = SEOMetadata.get_default_meta(
-            title="Blog - Ezzy Delivery Qatar",
-            description="Latest insights, tips and news about delivery services, logistics and e-commerce in Qatar",
-            keywords="delivery blog Qatar, logistics news, ecommerce tips"
+        meta = SEOMetadata.get_page_meta(
+            title="Delivery & Logistics Blog Qatar | EzzyDelivery",  # 50 chars
+            description=(
+                "EzzyDelivery Qatar blog: tips, insights & guides for e-commerce delivery, "
+                "logistics, and supply chain management. Expert advice for Qatar businesses."
+            ),  # 155 chars
         )
 
     data = {
@@ -65,11 +69,10 @@ def blog_post_detail(request, slug):
     # Get trending posts
     trending_posts = BlogPost.objects.filter(status='published').order_by('-views')[:5]
 
-    # SEO metadata
-    meta = SEOMetadata.get_default_meta(
+    # SEO metadata - unique per blog post from DB fields
+    meta = SEOMetadata.get_page_meta(
         title=post.get_seo_title,
         description=post.get_seo_description,
-        keywords=post.seo_keywords or post.tags
     )
 
     data = {

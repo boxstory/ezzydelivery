@@ -205,7 +205,17 @@ def delivery_inquiry(request):
     # Get saved data from session
     saved_data = request.session.get('inquiry_data', {})
 
+    # SEO metadata for inquiry form
+    meta = SEOMetadata.get_page_meta(
+        title="Get Delivery Quote Qatar | 3PL Pricing Inquiry",  # 50 chars
+        description=(
+            "Request a customized delivery quote for your Qatar business. Fill out our 3PL pricing "
+            "inquiry form. Fast response, competitive rates, no obligation."
+        ),  # 152 chars
+    )
+
     data = {
+        'seo': meta,
         'current_step': current_step,
         'saved_data': saved_data,
         'total_steps': 3,
@@ -265,15 +275,29 @@ def qcommerce(request):
 
 
 def affiliate(request):
+    meta = SEOMetadata.get_page_meta(
+        title="Affiliate Program Qatar | Earn with EzzyDelivery",  # 50 chars
+        description=(
+            "Join EzzyDelivery's affiliate program in Qatar. Earn commissions by referring "
+            "businesses to our delivery services. Simple signup, competitive payouts."
+        ),  # 152 chars
+    )
     data = {
-
+        'seo': meta,
     }
     return render(request, 'webpages/affiliate.html', data)
 
 
 def fleets(request):
+    meta = SEOMetadata.get_page_meta(
+        title="Fleet Partnership Qatar | Join Our Delivery Network",  # 53 chars
+        description=(
+            "Partner with EzzyDelivery as a fleet operator in Qatar. Grow your business with "
+            "consistent delivery jobs, flexible schedules & reliable payments."
+        ),  # 150 chars
+    )
     data = {
-
+        'seo': meta,
     }
     return render(request, 'webpages/fleets.html', data)
 
@@ -329,10 +353,12 @@ def testimonials(request):
     """
     Testimonials page with sample customer reviews
     """
-    meta = SEOMetadata.get_default_meta(
-        title="Customer Testimonials - Ezzy Delivery",
-        description="Read what our customers say about Ezzy Delivery's reliable and fast delivery services in Qatar.",
-        keywords="testimonials, reviews, customer feedback, delivery service Qatar"
+    meta = SEOMetadata.get_page_meta(
+        title="Customer Reviews Qatar | EzzyDelivery Testimonials",  # 51 chars
+        description=(
+            "Read reviews from 500+ satisfied businesses using EzzyDelivery in Qatar. "
+            "Real testimonials about our same-day delivery, COD & fulfillment services."
+        ),  # 153 chars
     )
 
     # Sample testimonials data
@@ -398,10 +424,12 @@ def delivery_request(request):
     """
     Delivery request page for users/non-sellers
     """
-    meta = SEOMetadata.get_default_meta(
-        title="Request Delivery - Ezzy Delivery",
-        description="Request a delivery service in Qatar. Choose from Pick and Delivery or Store Pickup and Delivery options.",
-        keywords="delivery request, Qatar delivery, pick and delivery, store pickup"
+    meta = SEOMetadata.get_page_meta(
+        title="Request a Delivery Qatar | Book Pickup & Drop-off",  # 51 chars
+        description=(
+            "Request delivery service in Qatar. Easy online booking for pickup & delivery. "
+            "Same-day available across Doha. Track your shipment in real-time."
+        ),  # 148 chars
     )
 
     form = DeliveryRequestForm(request.POST or None)
@@ -421,9 +449,11 @@ def delivery_request(request):
 def help_center(request):
     """Main help center page with overview of all help resources"""
     meta = SEOMetadata.get_page_meta(
-        title="Help Center - Ezzy Delivery Qatar",
-        description="Get help with Ezzy Delivery services. Find FAQs, guides, and support for clients and drivers.",
-        keywords="help center, support, FAQs, guides, delivery help Qatar"
+        title="Help Center | EzzyDelivery Qatar Support & FAQs",  # 50 chars
+        description=(
+            "Get help with EzzyDelivery services. FAQs, guides & support for businesses and "
+            "drivers. Find answers to delivery questions or contact our Qatar team."
+        ),  # 152 chars
     )
 
     data = {
@@ -435,9 +465,11 @@ def help_center(request):
 def client_faq(request):
     """Client FAQ page"""
     meta = SEOMetadata.get_page_meta(
-        title="Client FAQ - Ezzy Delivery Qatar",
-        description="Frequently asked questions for e-commerce sellers and online stores using Ezzy Delivery services in Qatar.",
-        keywords="client FAQ, seller questions, ecommerce delivery Qatar"
+        title="Client FAQ | E-commerce Seller Questions Qatar",  # 49 chars
+        description=(
+            "FAQs for e-commerce sellers using EzzyDelivery in Qatar. Answers about pricing, "
+            "COD, order management, integrations & delivery tracking for businesses."
+        ),  # 154 chars
     )
 
     data = {
@@ -449,9 +481,11 @@ def client_faq(request):
 def driver_faq(request):
     """Driver FAQ page"""
     meta = SEOMetadata.get_page_meta(
-        title="Driver FAQ - Ezzy Delivery Qatar",
-        description="Frequently asked questions for delivery drivers and couriers working with Ezzy Delivery in Qatar.",
-        keywords="driver FAQ, courier questions, delivery driver Qatar"
+        title="Driver FAQ | Courier Questions EzzyDelivery Qatar",  # 51 chars
+        description=(
+            "FAQs for delivery drivers working with EzzyDelivery Qatar. Answers about pay, "
+            "schedules, requirements, app usage & COD handling for couriers."
+        ),  # 147 chars
     )
 
     data = {
@@ -463,9 +497,11 @@ def driver_faq(request):
 def help_guides(request):
     """Help guides and onboarding kits overview"""
     meta = SEOMetadata.get_page_meta(
-        title="Guides & Resources - Ezzy Delivery Qatar",
-        description="Onboarding guides and resources for clients and drivers. Learn how to get started with Ezzy Delivery.",
-        keywords="onboarding guides, business kit, driver kit, delivery resources Qatar"
+        title="Onboarding Guides | Get Started with EzzyDelivery",  # 51 chars
+        description=(
+            "Step-by-step guides to get started with EzzyDelivery Qatar. Onboarding resources "
+            "for e-commerce businesses and delivery drivers. Start shipping today."
+        ),  # 153 chars
     )
 
     data = {
@@ -477,9 +513,11 @@ def help_guides(request):
 def client_guide(request):
     """Client onboarding guide"""
     meta = SEOMetadata.get_page_meta(
-        title="Client Onboarding Guide - Ezzy Delivery Qatar",
-        description="Complete onboarding guide for eCommerce sellers and online stores. Learn how to get started with Ezzy Delivery services.",
-        keywords="client onboarding, seller guide, ecommerce setup Qatar"
+        title="Business Onboarding Guide | Start with EzzyDelivery",  # 53 chars
+        description=(
+            "Complete setup guide for e-commerce sellers joining EzzyDelivery Qatar. Learn to "
+            "connect your store, manage orders & configure delivery preferences."
+        ),  # 154 chars
     )
 
     data = {
@@ -491,9 +529,11 @@ def client_guide(request):
 def driver_guide(request):
     """Driver onboarding guide"""
     meta = SEOMetadata.get_page_meta(
-        title="Driver Onboarding Guide - Ezzy Delivery Qatar",
-        description="Complete onboarding guide for delivery drivers and couriers. Learn about requirements, workflow, and getting started.",
-        keywords="driver onboarding, courier guide, delivery driver Qatar"
+        title="Driver Onboarding Guide | Join EzzyDelivery Qatar",  # 51 chars
+        description=(
+            "Complete guide for new EzzyDelivery drivers in Qatar. Requirements, app setup, "
+            "delivery workflow & earning tips. Start your courier career today."
+        ),  # 150 chars
     )
 
     data = {

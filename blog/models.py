@@ -57,9 +57,9 @@ class BlogPost(models.Model):
     tags = models.CharField(max_length=500, blank=True, help_text="Comma-separated tags")
 
     # SEO fields
-    seo_title = models.CharField(max_length=70, blank=True, help_text="SEO title (60-70 chars)")
-    seo_description = models.CharField(max_length=160, blank=True, help_text="Meta description (150-160 chars)")
-    seo_keywords = models.CharField(max_length=500, blank=True, help_text="Comma-separated keywords")
+    seo_title = models.CharField(max_length=70, blank=True, help_text="SEO title (50-60 chars)")
+    seo_description = models.CharField(max_length=160, blank=True, help_text="Meta description (140-155 chars)")
+    seo_keywords = models.CharField(max_length=500, blank=True, help_text="DEPRECATED - Meta keywords no longer used by search engines")
     canonical_url = models.URLField(blank=True)
 
     # Metadata

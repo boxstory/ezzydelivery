@@ -60,6 +60,7 @@ from fleet import models as fleet_models
 from delivery import models as delivery_models
 from fleet import forms as fleet_forms
 from fleet.wallet_service import WalletService, WalletAlertService
+from core.seo import SEOMetadata
 
 # Local aliases for commonly used models
 Driver = fleet_models.Driver
@@ -748,11 +749,22 @@ def driver_profile(request, fleet_id):
     driver_documents = driver.driver_document.all()
     logger.debug(f'driver_documents count={driver_documents.count()}')
 
+    # Dynamic SEO for driver profile page
+    driver_name = profile.user.first_name or "Driver"
+    meta = SEOMetadata.get_page_meta(
+        title=f"{driver_name} - Delivery Driver Qatar | EzzyDelivery",
+        description=(
+            f"View {driver_name}'s driver profile on EzzyDelivery Qatar. "
+            f"Professional delivery driver serving Doha and surrounding areas."
+        )[:155],
+    )
+
     context = {
+        'seo': meta,
         'profile': profile,
         'driver': driver,
         'driver_documents': driver_documents,
         'driver_vehicle': driver_vehicle,
-        'profile_picture' : profile_picture
+        'profile_picture': profile_picture
     }
     return render(request, 'fleet/frontend/driver_profile.html', context)

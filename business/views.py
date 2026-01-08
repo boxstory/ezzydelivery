@@ -79,6 +79,7 @@ from ezzy_api import models as ezzy_api_models
 
 from business import forms as business_forms
 from datetime import datetime
+from core.seo import SEOMetadata
 
 # Local aliases for commonly used models
 Business = business_models.Business
@@ -396,28 +397,45 @@ def business_profile_display(request, business_id):
             business_id=business_id)
         location = business_models.PickupLocation.objects.filter(
             business_id=business.business_id).values_list('pickup_location_title', flat=True)[:2]
-        business_logo = business_models.BusinessLogo.objects.select_related('business').get(business_id = business.business_id )
+        business_logo = business_models.BusinessLogo.objects.select_related('business').get(business_id=business.business_id)
         business_logo = business_logo.business_logo.url
 
+        # Dynamic SEO for business profile
+        business_name = business.business_name or "Business"
+        meta = SEOMetadata.get_page_meta(
+            title=f"{business_name} | Qatar Store on EzzyDelivery",
+            description=(
+                f"View {business_name}'s profile on EzzyDelivery Qatar. "
+                f"E-commerce store with same-day delivery available in Doha."
+            )[:155],
+        )
 
         context = {
+            'seo': meta,
             'business': business,
             'location': location,
             'business_logo_img': business_logo,
         }
         return render(request, 'business/frontend/business_profile.html', context)
     except business_models.Business.DoesNotExist:
-        
         return redirect("/profile/")
 
 
 @login_required(login_url='/accounts/login/')
 def all_business(request):
     business = business_models.Business.objects.all()
-    
-    
+
+    # SEO metadata for business directory
+    meta = SEOMetadata.get_page_meta(
+        title="Business Directory Qatar | EzzyDelivery Partners",  # 52 chars
+        description=(
+            "Browse businesses using EzzyDelivery in Qatar. E-commerce stores, retailers & "
+            "sellers across Doha offering same-day delivery through our network."
+        ),  # 150 chars
+    )
 
     context = {
+        'seo': meta,
         'all_business': business,
     }
     return render(request, 'business/frontend/all_business.html', context)
