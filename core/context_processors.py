@@ -2,7 +2,7 @@
 Context processors for EzzyDelivery
 Makes data available to all templates
 """
-from core.seo import SEOMetadata, QATAR_KEYWORDS
+from core.seo import SEOMetadata
 import json
 
 
@@ -22,7 +22,6 @@ def seo_defaults(request):
         'site_name': SEOMetadata.SITE_NAME,
         'business_phone': SEOMetadata.BUSINESS_PHONE,
         'business_email': SEOMetadata.BUSINESS_EMAIL,
-        'qatar_keywords': QATAR_KEYWORDS,
     }
 
 

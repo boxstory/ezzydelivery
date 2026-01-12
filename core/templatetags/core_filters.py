@@ -1,4 +1,4 @@
-# core/templatetags/custom_filters.py
+# core/templatetags/core_filters.py
 from django import template
 
 from datetime import datetime, timedelta
