@@ -36,6 +36,29 @@
             </button>
         </div>
     </form>
+
+    <!-- Quick Seller Selection -->
+    {% if all_sellers %}
+    <div class="mt-3">
+        <label class="filter-label mb-2">
+            <i class="fa-solid fa-store me-2"></i>Quick Select Seller
+        </label>
+        <div class="d-flex flex-wrap gap-2">
+            {% for seller in all_sellers %}
+            <a href="?search={{ seller.business_name }}"
+               class="btn btn-sm {% if search == seller.business_name %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+               title="{{ seller.business_code }}">
+                {{ seller.business_name }}
+            </a>
+            {% endfor %}
+            {% if search %}
+            <a href="?" class="btn btn-sm btn-outline-danger" title="Clear filter">
+                <i class="fa-solid fa-times me-1"></i>Clear
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Sellers with Orders Table -->

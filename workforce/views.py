@@ -216,6 +216,11 @@ def orders_by_seller(request):
     """
     from django.db.models import Count, Q
 
+    # Get all seller names for quick selection (active businesses only)
+    all_sellers = business_models.Business.objects.filter(
+        business_status='active'
+    ).values('business_id', 'business_name', 'business_code').order_by('business_name')
+
     # Get all businesses with their order counts
     businesses = business_models.Business.objects.select_related(
         'profile', 'business_profile'
@@ -246,6 +251,7 @@ def orders_by_seller(request):
         'page_title': 'Orders by Seller',
         'page_obj': page_obj,
         'search': search,
+        'all_sellers': all_sellers,
     }
 
     return render(request, 'workforce/wf_orders_by_seller.html', context)
