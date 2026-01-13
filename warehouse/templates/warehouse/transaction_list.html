@@ -98,21 +98,8 @@
                     </div>
                 </div>
 
-                {% if transactions.has_other_pages %}
-                <div class="card-footer bg-white">
-                    <nav>
-                        <ul class="pagination justify-content-center mb-0">
-                            {% if transactions.has_previous %}
-                            <li class="page-item"><a class="page-link" href="?page={{ transactions.previous_page_number }}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}">Previous</a></li>
-                            {% endif %}
-                            <li class="page-item active"><span class="page-link">{{ transactions.number }} / {{ transactions.paginator.num_pages }}</span></li>
-                            {% if transactions.has_next %}
-                            <li class="page-item"><a class="page-link" href="?page={{ transactions.next_page_number }}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}">Next</a></li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                </div>
-                {% endif %}
+                <!-- Pagination -->
+                {% include "includes/components/_pagination.html" with page_obj=transactions filter_params=filter_params %}
             </div>
         </div>
     </div>

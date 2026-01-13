@@ -15,8 +15,8 @@
 </h1>
 
 <!-- Back Button -->
-<div style="margin-bottom: 1.5rem;">
-    <a href="{% url 'workforce:vehicle_documents_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--brand-grey-700); text-decoration: none; font-weight: 600;">
+<div class="document-back-section">
+    <a href="{% url 'workforce:vehicle_documents_list' %}" class="document-back-link">
         <i class="fa-solid fa-arrow-left"></i>
         Back to Vehicles
     </a>
@@ -57,7 +57,7 @@
 
     {% if vehicles %}
         {% for vehicle in vehicles %}
-        <div style="background: var(--brand-white); border: 2px solid var(--brand-grey-200); border-radius: var(--brand-radius-md); padding: 1.5rem; margin-bottom: 1.5rem;">
+        <div class="document-detail-container">
             <div class="info-grid">
                 <div class="info-row">
                     <span class="info-label">Vehicle Number</span>
@@ -91,15 +91,14 @@
 
             <!-- Edit Button - Using data attributes for XSS prevention -->
             <button type="button"
-                    class="btn-edit-vehicle"
+                    class="btn-edit-vehicle document-action-btn"
                     data-vehicle-id="{{ vehicle.id }}"
                     data-vehicle-no="{{ vehicle.vehicle_no|escapejs }}"
                     data-vehicle-type="{{ vehicle.vehicle_type|escapejs }}"
                     data-vehicle-model="{{ vehicle.vehicle_model|escapejs }}"
                     data-vehicle-color="{{ vehicle.vehicle_color|escapejs }}"
                     data-vehicle-status="{{ vehicle.vehicle_status|escapejs }}"
-                    aria-label="Edit vehicle {{ vehicle.vehicle_no }}"
-                    style="margin-top: 1rem; background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.5rem 1rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+                    aria-label="Edit vehicle {{ vehicle.vehicle_no }}">
                 <i class="fa-solid fa-edit" aria-hidden="true"></i>
                 Edit Vehicle
             </button>
@@ -115,22 +114,22 @@
 </div>
 
 <!-- Edit Modal -->
-<div id="editModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-    <div style="background: var(--brand-white); border-radius: var(--brand-radius-lg); padding: 2rem; max-width: 500px; width: 90%;">
-        <h2 style="margin-bottom: 1.5rem;">Edit Vehicle</h2>
+<div id="editModal" class="document-modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+    <div class="document-modal-content">
+        <h2 class="document-modal-title" id="editModalTitle">Edit Vehicle</h2>
 
         <form id="editForm">
             {% csrf_token %}
             <input type="hidden" id="vehicleId" name="vehicle_id">
 
-            <div style="display: grid; gap: 1rem;">
-                <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Vehicle Number</label>
+            <div class="document-form-grid">
+                <div class="document-form-group">
+                    <label class="document-form-label">Vehicle Number</label>
                     <input type="text" id="vehicleNo" name="vehicle_no" class="filter-input" required>
                 </div>
 
-                <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Vehicle Type</label>
+                <div class="document-form-group">
+                    <label class="document-form-label">Vehicle Type</label>
                     <select id="vehicleType" name="vehicle_type" class="filter-input">
                         <option value="none">None</option>
                         <option value="bike">Bike</option>
@@ -142,36 +141,36 @@
                     </select>
                 </div>
 
-                <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Model</label>
+                <div class="document-form-group">
+                    <label class="document-form-label">Model</label>
                     <input type="text" id="vehicleModel" name="vehicle_model" class="filter-input">
                 </div>
 
-                <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Color</label>
+                <div class="document-form-group">
+                    <label class="document-form-label">Color</label>
                     <input type="text" id="vehicleColor" name="vehicle_color" class="filter-input">
                 </div>
 
-                <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Status</label>
+                <div class="document-form-group">
+                    <label class="document-form-label">Status</label>
                     <select id="vehicleStatus" name="vehicle_status" class="filter-input">
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
                 </div>
 
-                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                    <button type="submit" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer;">
+                <div class="document-form-actions">
+                    <button type="submit" class="document-submit-btn">
                         Save Changes
                     </button>
-                    <button type="button" id="cancelEditBtn" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; color: var(--brand-grey-800);">
+                    <button type="button" id="cancelEditBtn" class="document-cancel-btn" aria-label="Cancel and close modal">
                         Cancel
                     </button>
                 </div>
             </div>
         </form>
 
-        <div id="updateMessage" style="display: none; margin-top: 1rem; padding: 1rem; border-radius: var(--brand-radius-sm);"></div>
+        <div id="updateMessage" class="document-update-message"></div>
     </div>
 </div>
 
@@ -228,19 +227,19 @@
         document.getElementById('vehicleModel').value = button.dataset.vehicleModel || '';
         document.getElementById('vehicleColor').value = button.dataset.vehicleColor || '';
         document.getElementById('vehicleStatus').value = button.dataset.vehicleStatus || '';
-        document.getElementById('editModal').style.display = 'flex';
+        document.getElementById('editModal').classList.add('show');
         // Focus on first input for accessibility
         document.getElementById('vehicleNo').focus();
     }
 
     function closeEditModal() {
-        document.getElementById('editModal').style.display = 'none';
+        document.getElementById('editModal').classList.remove('show');
     }
 
     function showMessage(messageDiv, isSuccess, text) {
-        messageDiv.style.display = 'block';
-        messageDiv.style.background = isSuccess ? '#d4edda' : '#f8d7da';
-        messageDiv.style.color = isSuccess ? '#155724' : '#721c24';
+        // Remove any existing state classes and add appropriate one
+        messageDiv.classList.remove('success', 'error');
+        messageDiv.classList.add('show', isSuccess ? 'success' : 'error');
         // Use textContent for safe text insertion, then add icon
         messageDiv.textContent = '';
         const icon = document.createElement('i');

@@ -7,17 +7,25 @@ Parameters:
 - page_obj: Django paginator page object (required)
 - filter_params: URL query string to preserve filters (optional)
 - htmx_target: HTMX target element (default: #main-content)
+- show_per_page: Show per-page selector (default: true)
+- show_goto: Show go-to-page input (default: true)
+- per_page: Current items per page (optional)
+- variant: 'default', 'compact', or 'minimal' (optional)
 {% endcomment %}
 
-{% if page_obj.has_other_pages %}
-<nav aria-label="Page navigation" class="mt-4">
-    <ul class="pagination justify-content-center mb-0">
-        <!-- Previous Page -->
-        {% if page_obj.has_previous %}
-        <li class="page-item">
+{% load static %}
+<link href="{% static 'webpages/css/pagination.css' %}" rel="stylesheet" type="text/css" />
+
+{% if page_obj.has_other_pages or page_obj.paginator.count > 0 %}
+<nav aria-label="Page navigation" class="pagination-wrapper {{ variant|default:'' }}">
+
+    <!-- Previous Button -->
+    <ul class="pagination-nav">
+        <li class="page-item prev {% if not page_obj.has_previous %}disabled{% endif %}">
+            {% if page_obj.has_previous %}
             <a class="page-link"
                href="?page={{ page_obj.previous_page_number }}{{ filter_params }}"
-               aria-label="Go to previous page"
+               aria-label="Previous page"
                {% if htmx_target %}
                hx-get="?page={{ page_obj.previous_page_number }}{{ filter_params }}"
                hx-target="{{ htmx_target|default:'#main-content' }}"
@@ -25,18 +33,14 @@ Parameters:
                hx-swap="outerHTML"
                hx-push-url="true"
                {% endif %}>
-                <i class="fa-solid fa-chevron-left me-1" aria-hidden="true"></i>
-                <span class="d-none d-sm-inline">Previous</span>
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
             </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled">
+            {% else %}
             <span class="page-link" aria-disabled="true">
-                <i class="fa-solid fa-chevron-left me-1" aria-hidden="true"></i>
-                <span class="d-none d-sm-inline">Previous</span>
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
             </span>
+            {% endif %}
         </li>
-        {% endif %}
 
         <!-- Page Numbers -->
         {% for num in page_obj.paginator.page_range %}
@@ -45,10 +49,10 @@ Parameters:
                 <span class="page-link">{{ num }}</span>
             </li>
             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-            <li class="page-item">
+            <li class="page-item {% if num < page_obj.number|add:'-1' or num > page_obj.number|add:'1' %}hide-mobile{% endif %}">
                 <a class="page-link"
                    href="?page={{ num }}{{ filter_params }}"
-                   aria-label="Go to page {{ num }}"
+                   aria-label="Page {{ num }}"
                    {% if htmx_target %}
                    hx-get="?page={{ num }}{{ filter_params }}"
                    hx-target="{{ htmx_target|default:'#main-content' }}"
@@ -60,18 +64,18 @@ Parameters:
                 </a>
             </li>
             {% elif num == page_obj.number|add:'-3' or num == page_obj.number|add:'3' %}
-            <li class="page-item disabled">
+            <li class="page-item ellipsis hide-mobile">
                 <span class="page-link">...</span>
             </li>
             {% endif %}
         {% endfor %}
 
-        <!-- Next Page -->
-        {% if page_obj.has_next %}
-        <li class="page-item">
+        <!-- Next Button -->
+        <li class="page-item next {% if not page_obj.has_next %}disabled{% endif %}">
+            {% if page_obj.has_next %}
             <a class="page-link"
                href="?page={{ page_obj.next_page_number }}{{ filter_params }}"
-               aria-label="Go to next page"
+               aria-label="Next page"
                {% if htmx_target %}
                hx-get="?page={{ page_obj.next_page_number }}{{ filter_params }}"
                hx-target="{{ htmx_target|default:'#main-content' }}"
@@ -79,26 +83,51 @@ Parameters:
                hx-swap="outerHTML"
                hx-push-url="true"
                {% endif %}>
-                <span class="d-none d-sm-inline">Next</span>
-                <i class="fa-solid fa-chevron-right ms-1" aria-hidden="true"></i>
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
             </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled">
+            {% else %}
             <span class="page-link" aria-disabled="true">
-                <span class="d-none d-sm-inline">Next</span>
-                <i class="fa-solid fa-chevron-right ms-1" aria-hidden="true"></i>
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
             </span>
+            {% endif %}
         </li>
-        {% endif %}
     </ul>
 
+    {% if show_per_page != 'false' %}
+    <!-- Per Page Selector -->
+    <div class="pagination-per-page">
+        <select id="pagination-per-page-select"
+                onchange="window.location.href='?page=1&per_page=' + this.value + '{{ filter_params|default:"" }}'">
+            <option value="10" {% if per_page == 10 or not per_page %}selected{% endif %}>10 / page</option>
+            <option value="25" {% if per_page == 25 %}selected{% endif %}>25 / page</option>
+            <option value="50" {% if per_page == 50 %}selected{% endif %}>50 / page</option>
+            <option value="100" {% if per_page == 100 %}selected{% endif %}>100 / page</option>
+        </select>
+    </div>
+    {% endif %}
+
+    {% if show_goto != 'false' %}
+    <!-- Go To Page -->
+    <div class="pagination-goto">
+        <label for="pagination-goto-input">Go to</label>
+        <input type="number"
+               id="pagination-goto-input"
+               min="1"
+               max="{{ page_obj.paginator.num_pages }}"
+               value="{{ page_obj.number }}"
+               onkeypress="if(event.key==='Enter'){var p=Math.min(Math.max(1,this.value),{{ page_obj.paginator.num_pages }});window.location.href='?page='+p+'{{ filter_params|default:"" }}';}"
+               aria-label="Go to page number">
+        <label>Page</label>
+    </div>
+    {% endif %}
+
     <!-- Page Info -->
-    <div class="text-center mt-2 text-muted small">
-        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    <div class="pagination-info">
+        Page <strong>{{ page_obj.number }}</strong> of <strong>{{ page_obj.paginator.num_pages }}</strong>
         <span class="d-none d-sm-inline">
-            ({{ page_obj.paginator.count }} total items)
+            &bull; <strong>{{ page_obj.paginator.count }}</strong> total items
         </span>
     </div>
+
 </nav>
 {% endif %}

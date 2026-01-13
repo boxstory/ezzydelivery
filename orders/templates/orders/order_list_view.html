@@ -22,24 +22,27 @@
                     </a>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
+                    <div class="table-responsive table-responsive-orders order-table-wrapper">
+                        <table class="table table-hover mb-0 order-table">
                             <thead class="bg-light">
                                 <tr>
                                     <th>Order #</th>
-                                    <th>Customer</th>
-                                    <th>Phone</th>
+                                    <th class="d-none d-md-table-cell">Customer</th>
+                                    <th class="d-none d-lg-table-cell">Phone</th>
                                     <th>Status</th>
-                                    <th>Date</th>
+                                    <th class="d-none d-sm-table-cell">Date</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for order in orders %}
                                 <tr>
-                                    <td><strong>{{ order.client_order_code|default:order.order_number }}</strong></td>
-                                    <td>{{ order.customer_name }}</td>
-                                    <td>{{ order.customer_phone }}</td>
+                                    <td>
+                                        <strong>{{ order.client_order_code|default:order.order_number }}</strong>
+                                        <div class="d-md-none small text-muted">{{ order.customer_name }}</div>
+                                    </td>
+                                    <td class="d-none d-md-table-cell">{{ order.customer_name }}</td>
+                                    <td class="d-none d-lg-table-cell">{{ order.customer_phone }}</td>
                                     <td>
                                         <span class="badge
                                             {% if order.order_status == 'publish' %}bg-success
@@ -50,14 +53,16 @@
                                             {{ order.get_order_status_display }}
                                         </span>
                                     </td>
-                                    <td>{{ order.order_date|date:"d M Y" }}</td>
+                                    <td class="d-none d-sm-table-cell">{{ order.order_date|date:"d M Y" }}</td>
                                     <td>
-                                        <a href="{% url 'orders:order_details' order.id %}" class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <a href="{% url 'orders:order_update' order.id %}" class="btn btn-sm btn-outline-secondary">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
+                                        <div class="order-actions d-flex flex-wrap gap-1">
+                                            <a href="{% url 'orders:order_details' order.id %}" class="btn btn-sm btn-outline-primary" title="View Order">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'orders:order_update' order.id %}" class="btn btn-sm btn-outline-secondary" title="Edit Order">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% empty %}
@@ -73,27 +78,8 @@
                     </div>
                 </div>
 
-                {% if orders.has_other_pages %}
-                <div class="card-footer bg-white">
-                    <nav>
-                        <ul class="pagination justify-content-center mb-0">
-                            {% if orders.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ orders.previous_page_number }}">Previous</a>
-                            </li>
-                            {% endif %}
-                            <li class="page-item active">
-                                <span class="page-link">Page {{ orders.number }} of {{ orders.paginator.num_pages }}</span>
-                            </li>
-                            {% if orders.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ orders.next_page_number }}">Next</a>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                </div>
-                {% endif %}
+                <!-- Pagination -->
+                {% include "includes/components/_pagination.html" with page_obj=orders filter_params=filter_params %}
             </div>
         </div>
     </div>

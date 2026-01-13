@@ -35,44 +35,46 @@ body {
 }
 
 /* Mobile fixes - ensure content displays */
+/* Using .business-dashboard parent selector for increased specificity to override Bootstrap */
 @media (max-width: 767.98px) {
-  /* Ensure main content area is visible */
-  main.col-12 {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+  /* Ensure main content area is visible - high specificity to override Bootstrap padding */
+  .business-dashboard main.col-12 {
+    padding-left: 0;
+    padding-right: 0;
   }
 
-  .dashboard-content-area {
+  /* Dashboard content area mobile styles - specificity increased via parent selector */
+  .business-dashboard .dashboard-content-area {
     padding: 0.75rem;
     min-height: auto;
-    width: 100% !important;
-    display: block !important;
+    width: 100%;
+    display: block;
   }
 
   /* Ensure flex container stacks vertically and doesn't hide content */
-  .col-12.d-flex {
+  .business-dashboard .col-12.d-flex {
     flex-direction: column;
-    display: flex !important;
+    display: flex;
   }
 
   /* Ensure order cards display properly on mobile */
-  .order-card {
-    display: block !important;
+  .business-dashboard .order-card {
+    display: block;
   }
 
   /* Mobile sidebar toggle container - don't take full height */
-  .mobile-sidebar-toggle {
+  .business-dashboard .mobile-sidebar-toggle {
     flex-shrink: 0;
   }
 
   /* Mobile sidebar nav - collapsible section */
-  .mobile-sidebar-nav {
+  .business-dashboard .mobile-sidebar-nav {
     flex-shrink: 0;
   }
 
-  /* Force content area to grow and fill space */
-  #main-content {
-    flex: 1 1 auto !important;
+  /* Force content area to grow and fill space - ID selector provides high specificity */
+  .business-dashboard #main-content {
+    flex: 1 1 auto;
     min-height: 0;
   }
 }

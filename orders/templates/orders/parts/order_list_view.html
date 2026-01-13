@@ -140,16 +140,59 @@
         </div>
         {% endif %}
 
+        <!-- Order Barcode -->
+        <div class="detail-row barcode-row">
+          <span class="detail-label">Barcode</span>
+          <div class="detail-value">
+            <div class="order-barcode">
+              {% if order.order_barcode.first.barcode %}
+              <img src="{{ order.order_barcode.first.barcode.url }}" alt="Order Barcode" class="barcode-image">
+              {% else %}
+              <div class="barcode-placeholder">
+                <i class="fa-solid fa-barcode"></i>
+                <span>No barcode</span>
+              </div>
+              {% endif %}
+              <div class="barcode-number">{{ order.order_number }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Comments Section (visible when published) -->
+        {% if order.order_status == 'publish' %}
+        <div class="detail-row comments-section">
+          <span class="detail-label">Comments</span>
+          <div class="detail-value" id="comments-container-{{ order.id }}"
+               hx-get="{% url 'orders:get_order_comments' order.id %}"
+               hx-trigger="load"
+               hx-swap="innerHTML">
+            <div class="comments-loading">
+              <i class="fa-solid fa-spinner fa-spin"></i>
+              <span>Loading comments...</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
         <!-- Action Buttons -->
-        <div class="detail-row">
-          <a href="{% url 'orders:order_update' order.id %}" class="contact-link">
-            <i class="fa fa-edit"></i>
-            <span>Edit Order</span>
-          </a>
-          <a href="{% url 'orders:delete_order' order.id %}" class="contact-link" style="background: #ffe8e8;">
-            <i class="fa fa-trash"></i>
-            <span>Delete</span>
-          </a>
+        <div class="detail-row order-actions-row">
+          <div class="order-actions d-flex flex-wrap gap-2">
+            {% if order.order_status == 'publish' %}
+            <span class="contact-link disabled" title="Cannot edit published orders">
+              <i class="fa fa-edit"></i>
+              <span>Edit Order</span>
+            </span>
+            {% else %}
+            <a href="{% url 'orders:order_update' order.id %}" class="contact-link">
+              <i class="fa fa-edit"></i>
+              <span>Edit Order</span>
+            </a>
+            {% endif %}
+            <a href="{% url 'orders:delete_order' order.id %}" class="contact-link delete-link">
+              <i class="fa fa-trash"></i>
+              <span>Delete</span>
+            </a>
+          </div>
         </div>
       </div>
 
@@ -204,42 +247,4 @@ function loadProducts(orderId, event) {
   });
 }
 </script>
-{% if orders.has_other_pages %}
-  <ul class="pagination justify-content-end text-dark">
-    {% if orders.has_previous %}
-      <li class="page-item pe-2">
-        <a class="page-link text-dark btn btn-dark"
-           href="?page={{ orders.previous_page_number }}">Previous</a>
-      </li>
-    {% else %}
-      <li class="page-item disabled pe-2">
-        <a class="page-link text-dark" href="#">Previous</a>
-      </li>
-    {% endif %}
-    {% for page_number in orders.paginator.page_range %}
-      {% if orders.number == page_number %}
-        <li class="page-item  btn btn-dark active me-2">{{ page_number }}</li>
-      {% else %}
-        <li class="page-item me-2">
-          <a class="page-link text-dark" href="?page={{ page_number }}">{{ page_number }}</a>
-        </li>
-      {% endif %}
-    {% endfor %}
-    {% if orders.has_next %}
-      <li class="page-item pe-2">
-        <a class="page-link text-dark"
-           href="?page={{ orders.next_page_number }}">Next</a>
-      </li>
-    {% endif %}
-  </ul>
-{% else %}
-  <ul class="pagination justify-content-end text-dark">
-    <li class="page-item disabled pe-2">
-      <a class="page-link text-dark" href="#">Previous</a>
-    </li>
-    <li class="page-item  btn btn-dark active me-2">1</li>
-    <li class="page-item disabled me-2">
-      <a class="page-link text-dark" href="#">Next</a>
-    </li>
-  </ul>
-{% endif %}
+{% include "includes/components/_pagination.html" with page_obj=orders %}

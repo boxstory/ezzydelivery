@@ -67,6 +67,13 @@ from core import models as core_models
 from orders import forms, models as orders_models
 from business import models as business_models
 from orders import forms as orders_forms
+from business.decorators import (
+    business_permission_required,
+    business_access_required,
+    get_user_business_access,
+    user_has_business_permission,
+)
+from business.permissions import BusinessPermissions
 
 # Local aliases for commonly used models
 Order = orders_models.Order
@@ -91,15 +98,11 @@ logger = logging.getLogger('orders')
 
 
 @login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_VIEW)
 def orders_all_list(request):
-    # Get user's business (with authorization check)
-    try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
-        logger.info(f"User {request.user.id} accessing orders list for business {business.business_id}")
-    except business_models.Business.DoesNotExist:
-        logger.warning(f"User {request.user.id} has no associated business")
-        messages.error(request, "No business associated with your account")
-        return redirect('business_dashboard')
+    # Business is injected by the decorator
+    business = request.current_business
+    logger.info(f"User {request.user.id} accessing orders list for business {business.business_id}")
 
     # FIX: Use select_related for ForeignKeys and prefetch_related for reverse relations
     items = orders_models.Order.objects.filter(
@@ -138,21 +141,21 @@ def orders_all_list(request):
     context = {
         'orders': orders,
         'business': business,
-        'len': paginator.count  # Use paginator.count (cached) instead of items.count()
+        'len': paginator.count,  # Use paginator.count (cached) instead of items.count()
+        # Permission checks for template buttons
+        'can_create_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_CREATE),
+        'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
+        'can_delete_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_DELETE),
     }
     return render(request, 'orders/order_all_list.html', context)
 
 
 @login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_VIEW)
 def orders_pending_list(request):
-    # Get user's business (with authorization check)
-    try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
-        logger.info(f"User {request.user.id} accessing pending orders for business {business.business_id}")
-    except business_models.Business.DoesNotExist:
-        logger.warning(f"User {request.user.id} has no associated business")
-        messages.error(request, "No business associated with your account")
-        return redirect('business_dashboard')
+    # Business is injected by the decorator
+    business = request.current_business
+    logger.info(f"User {request.user.id} accessing pending orders for business {business.business_id}")
 
     # FIX: Optimize with select_related and prefetch_related
     orders = orders_models.Order.objects.filter(
@@ -195,15 +198,11 @@ def orders_pending_list(request):
     return render(request, 'orders/order_pending_list.html', context)
 
 @login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_VIEW)
 def orders_successfull_list(request):
-    # Get user's business (with authorization check)
-    try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
-        logger.info(f"User {request.user.id} accessing successful orders for business {business.business_id}")
-    except business_models.Business.DoesNotExist:
-        logger.warning(f"User {request.user.id} has no associated business")
-        messages.error(request, "No business associated with your account")
-        return redirect('business_dashboard')
+    # Business is injected by the decorator
+    business = request.current_business
+    logger.info(f"User {request.user.id} accessing successful orders for business {business.business_id}")
 
     # FIX: Optimize with select_related and prefetch_related
     orders = orders_models.Order.objects.filter(
@@ -247,29 +246,45 @@ def orders_successfull_list(request):
 
 
 @login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_VIEW)
 def orders_unsuccessfull_list(request):
-    business = business_models.Business.objects.get(user_id=request.user.id)
+    # Business is injected by the decorator
+    business = request.current_business
+    logger.info(f"User {request.user.id} accessing unsuccessful orders for business {business.business_id}")
 
-    print(business, "business order list")
+    # FIX: Optimize with select_related and prefetch_related
     orders = orders_models.Order.objects.filter(
-        delivery_task__dl_task_status_dms__in=[ '7', '8', '9'], business=business.business_id
+        delivery_task__dl_task_status_dms__in=['7', '8', '9'],
+        business=business.business_id
+    ).select_related(
+        'business',
+        'pickup_location',
+        'address_verified_by',
+        'verified_by',
+    ).prefetch_related(
+        'order_items',
+        'delivery_task',
+        'delivery_task__driver',
+        'delivery_task__business',
     ).order_by('-id')
-    print(orders)
-    
+
+    logger.debug(f"Fetching unsuccessful orders for business {business.business_id}")
+
     default_page = 1
     page = request.GET.get('page', default_page)
     # Paginate items
     items_per_page = 10
-    paginator = Paginator(orders , items_per_page)
+    paginator = Paginator(orders, items_per_page)
+
     try:
         orders = paginator.page(page)
-        print(orders)
+        logger.debug(f"Displaying page {page} with {len(orders)} unsuccessful orders")
     except PageNotAnInteger:
         orders = paginator.page(default_page)
-        print(orders)
+        logger.debug(f"Invalid page number, displaying page {default_page}")
     except EmptyPage:
         orders = paginator.page(paginator.num_pages)
-        print(orders)
+        logger.debug(f"Empty page, displaying last page {paginator.num_pages}")
 
     context = {
         'orders': orders,
@@ -281,28 +296,32 @@ def orders_unsuccessfull_list(request):
 @login_required(login_url='account_login')
 def latest_orders_list(request):
     business = business_models.Business.objects.get(user_id=request.user.id)
+    logger.debug(f"User {request.user.id} accessing latest orders for business {business.business_id}")
 
-    print(business, "latest 10 order list")
     orders = orders_models.Order.objects.filter(
-        business=business.business_id).order_by('-id')[:5]
-    
-    
-    print(orders)
-    
+        business=business.business_id
+    ).select_related(
+        'business',
+        'pickup_location',
+    ).order_by('-id')[:5]
+
+    logger.debug(f"Fetched {len(orders)} latest orders")
+
     default_page = 1
     page = request.GET.get('page', default_page)
     # Paginate items
     items_per_page = 10
-    paginator = Paginator(orders , items_per_page)
+    paginator = Paginator(orders, items_per_page)
+
     try:
         orders = paginator.page(page)
-        print(orders)
+        logger.debug(f"Displaying page {page}")
     except PageNotAnInteger:
         orders = paginator.page(default_page)
-        print(orders)
+        logger.debug(f"Invalid page number, displaying page {default_page}")
     except EmptyPage:
         orders = paginator.page(paginator.num_pages)
-        print(orders)
+        logger.debug(f"Empty page, displaying last page {paginator.num_pages}")
 
     context = {
         'orders': orders,
@@ -314,6 +333,7 @@ def latest_orders_list(request):
 
 
 
+@login_required(login_url='account_login')
 def order_upload_file(request):
     if request.method == 'POST':
         form = orders_forms.OrderFileUploadForm(request.POST, request.FILES)
@@ -339,43 +359,39 @@ def order_upload_file(request):
     }
     return render(request, 'orders/order_file_upload.html',  context)
 
+@login_required(login_url='account_login')
 def order_upload_review_data(request):
     if 'uploaded_data' not in request.session:
         messages.error(request, 'No data to review. Please upload a file first.')
         return redirect('orders:order_upload_file')
-    print(request.session['uploaded_data'])
+
     data = request.session['uploaded_data']
+    logger.debug(f"Review data: {len(data)} rows to process")
 
     if request.method == 'POST':
-        print("post request")
-        print(len(data))
+        logger.debug(f"Processing POST request with {len(data)} rows")
         # Process edited data
         edited_data = []
         for i, row in enumerate(data):
-            print("processing row {}".format(i))
-            
+            logger.debug(f"Processing row {i}")
+
             edited_row = {}
             for key in row.keys():
                 field_name = f'data[{i}][{key}]'
                 edited_row[key] = request.POST.get(field_name, row[key])
-                print('edited_row')
-                print(edited_row)
             edited_data.append(edited_row)
-            print('edited_data')
-            print(edited_data)
+            logger.debug(f"Row {i} edited data prepared")
+
             for row in edited_data:
-                print('row')
-                print(row)
                 order_form = orders_forms.AddOrderForm(row)
                 if order_form.is_valid():
-                    print("order_form is valid")
+                    logger.debug(f"Order form valid for row {i}")
                     order_form.save()
                 else:
-
+                    logger.warning(f"Order form invalid for row {i}: {order_form.errors}")
                     messages.error(request, f'Error in row {i}: {order_form.errors}')
-                    print(messages.error)
                     return redirect('orders:order_upload_review_data')
-        
+
         del request.session['uploaded_data']
         messages.success(request, 'Data successfully uploaded to the database.')
         return redirect('orders:orders_all_list')
@@ -384,18 +400,15 @@ def order_upload_review_data(request):
 
 
 @login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_CREATE)
 def bulk_order_entry(request):
     """
     Excel-like bulk order entry view for clients.
     Allows entering multiple orders in a spreadsheet-style interface.
     """
-    try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
-        logger.info(f"User {request.user.id} accessing bulk order entry for business {business.business_id}")
-    except business_models.Business.DoesNotExist:
-        logger.warning(f"User {request.user.id} has no associated business")
-        messages.error(request, "No business associated with your account")
-        return redirect('business_dashboard')
+    # Business is injected by the decorator
+    business = request.current_business
+    logger.info(f"User {request.user.id} accessing bulk order entry for business {business.business_id}")
 
     pickup_locations = business_models.PickupLocation.objects.filter(
         business_id=business.business_id
@@ -497,36 +510,36 @@ def bulk_order_entry(request):
 # order creation ----------------------------------------------------------------
 
 @login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_CREATE)
 def add_order(request):
     import json
 
-    business = business_models.Business.objects.get(
-        user_id=request.user.id)
-    print(business.business_id)
+    # Business is injected by the decorator
+    business = request.current_business
+    logger.debug(f"User {request.user.id} adding order for business {business.business_id}")
+
     pickup_locations = business_models.PickupLocation.objects.filter(
         business_id=business.business_id).all()
 
-    print('pickup_locations : ', pickup_locations)
     if not pickup_locations:
-        print("pickup_locations is None")
+        logger.debug("No pickup locations, redirecting to add")
         return redirect('business:pickup_location_add')
     else:
         if request.method == 'POST':
-            print("POST form in views")
+            logger.debug("Processing POST form for add_order")
             form = orders_forms.AddOrderForm(request.POST)
 
             if form.is_valid():
-                print("valid form")
+                logger.debug("Form is valid, saving order")
                 order = form.save(commit=False)
                 order.business = business_models.Business.objects.get(
                     business_id=business.business_id)
-                print(order.business_id)
+                logger.debug(f"Order business_id: {order.business_id}")
                 order = form.save()
-                print('order.id')
-                print(order.id)
-                return  redirect('orders:add_order_product', order_id=order.id)
+                logger.info(f"Order created with id: {order.id}")
+                return redirect('orders:add_order_product', order_id=order.id)
         else:
-            print("load add_order form")
+            logger.debug("Loading add_order form")
             form = orders_forms.AddOrderForm(
                 business_id=business.business_id,
                 business_code=business.business_code
@@ -697,9 +710,11 @@ def add_order_product(request, order_id):
 
 
 #AddOrderWithProduct
+@login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_CREATE)
 def add_order_with_product(request):
-    business = business_models.Business.objects.get(
-        user_id=request.user.id)
+    # Business is injected by the decorator
+    business = request.current_business
     OrderFormset = inlineformset_factory(orders_models.Order, orders_models.OrderItem, form=orders_forms.AddOrderProductsForm, extra=1)
     if request.method == 'POST':
         order_product_formset = OrderFormset(queryset=orders_models.OrderItem.objects.none())
@@ -751,15 +766,67 @@ def deliver_to_here(request, pickup_id):
         form = orders_forms.UpdateOrderForm()
 
     context = {
-        'form': form, 
+        'form': form,
     }
     return render(request, 'orders/order_update.html', context)
 
+
 @login_required(login_url='account_login')
+def pick_from_here(request, pickup_id):
+    """Add order with a pre-selected pickup location."""
+    import json
+
+    business = business_models.Business.objects.get(user_id=request.user.id)
+    pickup_location = business_models.PickupLocation.objects.filter(
+        id=pickup_id, business_id=business.business_id).first()
+
+    if not pickup_location:
+        messages.error(request, "Pickup location not found.")
+        return redirect('business:pickup_location_list')
+
+    pickup_locations = business_models.PickupLocation.objects.filter(
+        business_id=business.business_id).all()
+
+    if request.method == 'POST':
+        form = orders_forms.AddOrderForm(request.POST)
+        if form.is_valid():
+            order = form.save(commit=False)
+            order.business = business
+            order.save()
+            return redirect('orders:add_order_product', order_id=order.id)
+    else:
+        form = orders_forms.AddOrderForm(
+            business_id=business.business_id,
+            business_code=business.business_code,
+            initial={'pickup_location': pickup_location}
+        )
+
+    # Prepare pickup locations data for JavaScript
+    pickup_locations_dict = {}
+    for location in pickup_locations:
+        pickup_locations_dict[str(location.id)] = {
+            'id': location.id,
+            'title': location.pickup_location_title,
+            'zone': location.pickup_zone_no if location.pickup_zone_no else None,
+            'street': location.pickup_street_no if location.pickup_street_no else None,
+            'building': location.pickup_building_no if location.pickup_building_no else None,
+            'lat': float(location.pickup_lat) if location.pickup_lat else None,
+            'lon': float(location.pickup_lon) if location.pickup_lon else None,
+        }
+    pickup_locations_json = json.dumps(pickup_locations_dict)
+
+    return render(request, 'orders/order_add.html', {
+        'form': form,
+        'pickup_locations': pickup_locations,
+        'pickup_locations_json': pickup_locations_json,
+    })
+
+@login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_EDIT)
 def order_update(request, order_id):
     try:
-        # IDOR FIX: Verify order belongs to user's business
-        business = business_models.Business.objects.get(user_id=request.user.id)
+        # Business is injected by the decorator, verify order belongs to it
+        business = request.current_business
         order = orders_models.Order.objects.get(id=order_id, business=business)
 
         logger.info(f"User {request.user.id} updating order {order_id}")
@@ -800,10 +867,11 @@ def order_update(request, order_id):
 
 
 @login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_DELETE)
 def delete_order(request, order_id):
     try:
-        # IDOR FIX: Verify order belongs to user's business
-        business = business_models.Business.objects.get(user_id=request.user.id)
+        # Business is injected by the decorator, verify order belongs to it
+        business = request.current_business
         order = orders_models.Order.objects.get(id=order_id, business=business)
 
         logger.info(f"User {request.user.id} deleting order {order_id}")
@@ -816,17 +884,14 @@ def delete_order(request, order_id):
         logger.warning(f"Order {order_id} not found or unauthorized access by user {request.user.id}")
         messages.error(request, "Order not found")
         return redirect('orders:orders_all_list')
-    except business_models.Business.DoesNotExist:
-        logger.error(f"Business not found for user {request.user.id}")
-        messages.error(request, "Business not found")
-        return redirect('business:business_dashboard')
 
 
 @login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_VIEW)
 def order_details(request, order_id):
     try:
-        # IDOR FIX: Verify order belongs to user's business
-        business = business_models.Business.objects.get(user_id=request.user.id)
+        # Business is injected by the decorator, verify order belongs to it
+        business = request.current_business
         order = orders_models.Order.objects.select_related(
             'business', 'pickup_location', 'address_verified_by', 'verified_by'
         ).get(id=order_id, business=business)
@@ -834,7 +899,9 @@ def order_details(request, order_id):
         logger.info(f"User {request.user.id} viewing order details for order {order_id}")
 
         data = {
-            'order': order
+            'order': order,
+            'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
+            'can_delete_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_DELETE),
         }
         return render(request, 'orders/order_details.html', data)
 
@@ -842,10 +909,6 @@ def order_details(request, order_id):
         logger.warning(f"Order {order_id} not found or unauthorized access by user {request.user.id}")
         messages.error(request, "Order not found")
         return redirect('orders:orders_all_list')
-    except business_models.Business.DoesNotExist:
-        logger.error(f"Business not found for user {request.user.id}")
-        messages.error(request, "Business not found")
-        return redirect('business:business_dashboard')
 
 
 
@@ -877,6 +940,7 @@ def update_order_product(request, order_id):
     }
     return render(request, 'orders/update_order_product.html', data)
 
+@login_required(login_url='account_login')
 def order_product_list(request, order_id):
     """List all products in an order using OrderItem model"""
     order = get_object_or_404(orders_models.Order, id=order_id)
@@ -924,6 +988,66 @@ def update_order_status(request):
     # Return a JSON response indicating failure
     return JsonResponse({'status': 'error'})
 
+
+@require_POST
+def add_order_comment(request, order_id):
+    """Add a comment to order's comment chain via HTMX"""
+    try:
+        order = orders_models.Order.objects.get(pk=order_id)
+        comment_text = request.POST.get('comment', '').strip()
+
+        if comment_text:
+            # Get commenter name from user
+            if request.user.is_authenticated:
+                name = request.user.get_full_name() or request.user.username
+            else:
+                name = 'Anonymous'
+
+            # Create comment
+            orders_models.OrderComments.objects.create(
+                order=order,
+                name=name,
+                body=comment_text
+            )
+
+        # Get all comments for this order
+        comments = order.order_comments.all().order_by('created_at')
+
+        # Check referer to determine which template to use
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'workforce' in referer:
+            template = 'orders/parts/order_comments_workforce.html'
+        else:
+            template = 'orders/parts/order_comments_list.html'
+
+        return render(request, template, {
+            'order': order,
+            'comments': comments
+        })
+    except orders_models.Order.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Order not found'}, status=404)
+
+
+@login_required(login_url='account_login')
+def get_order_comments(request, order_id):
+    """Get comments list for an order"""
+    try:
+        order = orders_models.Order.objects.get(pk=order_id)
+        comments = order.order_comments.all().order_by('created_at')
+
+        # Check referer to determine which template to use
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'workforce' in referer:
+            template = 'orders/parts/order_comments_workforce.html'
+        else:
+            template = 'orders/parts/order_comments_list.html'
+
+        return render(request, template, {
+            'order': order,
+            'comments': comments
+        })
+    except orders_models.Order.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Order not found'}, status=404)
 
 
 #get_by_api from shopify

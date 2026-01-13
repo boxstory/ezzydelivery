@@ -620,7 +620,14 @@ def warehouse_add(request):
         address = request.POST.get('address', '')
         business_id = request.POST.get('business')  # For staff to assign to a business
 
-        if is_staff and business_id:
+        if is_staff:
+            if not business_id:
+                messages.error(request, "Please select a business")
+                context = {
+                    'is_staff': is_staff,
+                    'businesses': business_models.Business.objects.filter(business_status='active'),
+                }
+                return render(request, 'warehouse/warehouse_add.html', context)
             selected_business = business_models.Business.objects.get(pk=business_id)
         else:
             selected_business = business

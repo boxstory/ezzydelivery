@@ -45,6 +45,12 @@ urlpatterns = [
                name='business_teams_add'),
      path('<int:business_id>/teams/<int:team_id>/update/', business_views.business_teams_update,
                name='business_teams_update'),
+     path('<int:business_id>/teams/<int:team_id>/permissions/', business_views.business_team_permissions,
+               name='business_team_permissions'),
+     path('<int:business_id>/teams/<int:team_id>/remove/', business_views.business_team_remove,
+               name='business_team_remove'),
+     path('<int:business_id>/teams/<int:team_id>/status/', business_views.business_team_status_change,
+               name='business_team_status_change'),
 
     # frontend
      #listing all business profiels cards

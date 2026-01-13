@@ -436,51 +436,238 @@
 }
 
 /* ============================================
+   RADIO BUTTON PILL STYLES (Crispy Forms Bootstrap 5)
+   Styled pill buttons for RadioSelect widgets
+   Higher specificity to override mobile-app.css
+   ============================================ */
+
+/* Radio select container - make horizontal */
+#div_id_cod_status_by_client,
+#div_id_order_status,
+#div_id_delivery_type,
+.radio-pill-container {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.75rem !important;
+  padding: 0.5rem 0 !important;
+}
+
+/* Target Bootstrap 5 crispy forms radio structure */
+#div_id_cod_status_by_client .form-check,
+#div_id_order_status .form-check,
+#div_id_delivery_type .form-check,
+.radio-pill-container .form-check {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: auto !important;
+}
+
+/* Hide the default radio input visually but keep accessible */
+#div_id_cod_status_by_client .form-check-input[type="radio"],
+#div_id_order_status .form-check-input[type="radio"],
+#div_id_delivery_type .form-check-input[type="radio"],
+.radio-pill-container .form-check-input[type="radio"] {
+  position: absolute !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+}
+
+/* Style label as pill button */
+#div_id_cod_status_by_client .form-check-input[type="radio"] + .form-check-label,
+#div_id_order_status .form-check-input[type="radio"] + .form-check-label,
+#div_id_delivery_type .form-check-input[type="radio"] + .form-check-label,
+.radio-pill-container .form-check-input[type="radio"] + .form-check-label {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0.625rem 1.5rem !important;
+  border: 2px solid var(--brand-grey-300, #dcdcdc) !important;
+  border-radius: var(--brand-radius-md, 12px) !important;
+  background: var(--brand-white, #fff) !important;
+  color: var(--brand-grey-600, #555) !important;
+  font-weight: 500 !important;
+  font-size: 0.9375rem !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  min-width: 5.5rem !important;
+  text-align: center !important;
+  margin: 0 !important;
+  line-height: 1.4 !important;
+}
+
+/* Hover state */
+#div_id_cod_status_by_client .form-check-input[type="radio"] + .form-check-label:hover,
+#div_id_order_status .form-check-input[type="radio"] + .form-check-label:hover,
+#div_id_delivery_type .form-check-input[type="radio"] + .form-check-label:hover,
+.radio-pill-container .form-check-input[type="radio"] + .form-check-label:hover {
+  border-color: var(--brand-primary, #f7c000) !important;
+  background: rgba(247, 192, 0, 0.08) !important;
+  color: var(--brand-grey-800, #1f1f1f) !important;
+}
+
+/* Checked/Selected state */
+#div_id_cod_status_by_client .form-check-input[type="radio"]:checked + .form-check-label,
+#div_id_order_status .form-check-input[type="radio"]:checked + .form-check-label,
+#div_id_delivery_type .form-check-input[type="radio"]:checked + .form-check-label,
+.radio-pill-container .form-check-input[type="radio"]:checked + .form-check-label {
+  background: linear-gradient(135deg, var(--brand-primary, #f7c000) 0%, var(--brand-primary-dark, #e6b000) 100%) !important;
+  border-color: var(--brand-primary, #f7c000) !important;
+  color: var(--brand-grey-800, #1f1f1f) !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3) !important;
+}
+
+/* Focus state for accessibility */
+#div_id_cod_status_by_client .form-check-input[type="radio"]:focus + .form-check-label,
+#div_id_order_status .form-check-input[type="radio"]:focus + .form-check-label,
+#div_id_delivery_type .form-check-input[type="radio"]:focus + .form-check-label,
+.radio-pill-container .form-check-input[type="radio"]:focus + .form-check-label {
+  outline: none !important;
+  box-shadow: 0 0 0 4px rgba(247, 192, 0, 0.25) !important;
+}
+
+/* Responsive - stack vertically on mobile */
+@media (max-width: 576px) {
+  #div_id_cod_status_by_client,
+  #div_id_order_status,
+  #div_id_delivery_type,
+  .radio-pill-container {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+
+  #div_id_cod_status_by_client .form-check-input[type="radio"] + .form-check-label,
+  #div_id_order_status .form-check-input[type="radio"] + .form-check-label,
+  #div_id_delivery_type .form-check-input[type="radio"] + .form-check-label,
+  .radio-pill-container .form-check-input[type="radio"] + .form-check-label {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}
+
+/* ============================================
+   CHECKBOX TOGGLE STYLES (Crispy Forms Bootstrap 5)
+   ============================================ */
+
+/* Checkbox container - task_created field */
+#div_id_task_created .form-check,
+.checkbox-toggle-container .form-check {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 0.5rem 0 !important;
+  margin: 0 !important;
+  min-height: auto !important;
+}
+
+/* Style checkbox with brand colors */
+#div_id_task_created .form-check-input[type="checkbox"],
+.checkbox-toggle-container .form-check-input[type="checkbox"] {
+  width: 1.375rem !important;
+  height: 1.375rem !important;
+  border: 2px solid var(--brand-grey-300, #dcdcdc) !important;
+  border-radius: 0.375rem !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  margin-right: 0.75rem !important;
+  flex-shrink: 0 !important;
+  accent-color: var(--brand-primary, #f7c000) !important;
+}
+
+#div_id_task_created .form-check-input[type="checkbox"]:hover,
+.checkbox-toggle-container .form-check-input[type="checkbox"]:hover {
+  border-color: var(--brand-primary, #f7c000) !important;
+}
+
+#div_id_task_created .form-check-input[type="checkbox"]:checked,
+.checkbox-toggle-container .form-check-input[type="checkbox"]:checked {
+  background-color: var(--brand-primary, #f7c000) !important;
+  border-color: var(--brand-primary, #f7c000) !important;
+}
+
+#div_id_task_created .form-check-input[type="checkbox"]:focus,
+.checkbox-toggle-container .form-check-input[type="checkbox"]:focus {
+  box-shadow: 0 0 0 4px rgba(247, 192, 0, 0.2) !important;
+  outline: none !important;
+}
+
+#div_id_task_created .form-check-label,
+.checkbox-toggle-container .form-check-label {
+  cursor: pointer !important;
+  font-weight: 500 !important;
+  color: var(--brand-grey-700, #333) !important;
+  font-size: 1rem !important;
+}
+
+/* ============================================
+   SELECT & FORM CONTROL FOCUS STYLES
+   Subtle focus states for all form inputs
+   ============================================ */
+
+/* Standard form controls - subtle focus */
+.form-control:focus,
+.form-select:focus,
+select:focus,
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="tel"]:focus,
+input[type="email"]:focus,
+textarea:focus {
+  border-color: var(--brand-grey-400, #b0b0b0) !important;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05) !important;
+  outline: none !important;
+}
+
+/* ============================================
    SELECT2 INTEGRATION - ENHANCED
    ============================================ */
 
 .select2-container--default .select2-selection--single {
-  border: 0.125rem solid #e8e8e8;
-  border-radius: 0.625rem;
-  height: auto;
-  padding: 0.75rem 1rem;
-  transition: all 0.3s ease;
+  border: 2px solid var(--brand-grey-300, #dcdcdc) !important;
+  border-radius: 0.625rem !important;
+  height: auto !important;
+  padding: 0.625rem 1rem !important;
+  transition: all 0.3s ease !important;
+  background: #fff !important;
 }
 
 .select2-container--default .select2-selection--single:focus,
-.select2-container--default.select2-container--focus
-  .select2-selection--single {
-  border-color: #f7c000;
-  box-shadow: 0 0 0 0.25rem rgba(247, 192, 0, 0.12);
-  outline: none;
+.select2-container--default.select2-container--focus .select2-selection--single,
+.select2-container--default.select2-container--open .select2-selection--single {
+  border-color: var(--brand-grey-400, #b0b0b0) !important;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05) !important;
+  outline: none !important;
 }
 
-.select2-container--default
-  .select2-selection--single
-  .select2-selection__rendered {
+.select2-container--default .select2-selection--single .select2-selection__rendered {
   line-height: 1.5;
   padding-left: 0;
   color: #1f1f1f;
   font-size: 0.9375rem;
 }
 
-.select2-container--default
-  .select2-selection--single
-  .select2-selection__arrow {
+.select2-container--default .select2-selection--single .select2-selection__arrow {
   height: 100%;
   right: 1rem;
 }
 
 .select2-dropdown {
-  border: 0.125rem solid #f7c000;
-  border-radius: 0.625rem;
-  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.12);
+  border: 2px solid var(--brand-grey-300, #dcdcdc) !important;
+  border-radius: 0.625rem !important;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.12) !important;
+  margin-top: 4px !important;
 }
 
-.select2-container--default
-  .select2-results__option--highlighted[aria-selected] {
-  background-color: #f7c000;
-  color: #1f1f1f;
+.select2-container--default .select2-results__option--highlighted[aria-selected] {
+  background-color: var(--brand-primary, #f7c000) !important;
+  color: #1f1f1f !important;
+}
+
+.select2-container--default .select2-results__option--selected {
+  background-color: rgba(247, 192, 0, 0.15) !important;
 }
 
 /* ============================================

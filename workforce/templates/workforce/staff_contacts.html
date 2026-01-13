@@ -16,25 +16,25 @@
 
 <!-- Search Filter Section -->
 <div class="filter-section">
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 250px;">
+    <div class="filter-actions-container">
+        <div class="filter-search-wrapper">
             <label for="contactFilter" class="filter-label">
                 <i class="fa-solid fa-search me-2"></i>Search Contacts
             </label>
             <input type="text" id="contactFilter" class="filter-input" placeholder="Search by name, phone, or company...">
         </div>
-        <div style="display: flex; gap: 0.75rem;">
-            <button onclick="window.print()" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+        <div class="filter-buttons-group">
+            <button onclick="window.print()" class="btn-print">
                 <i class="fa-solid fa-print"></i>
                 Print
             </button>
-            <button onclick="exportToCSV()" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+            <button onclick="exportToCSV()" class="btn-export">
                 <i class="fa-solid fa-file-export"></i>
                 Export
             </button>
         </div>
     </div>
-    <div id="resultsCounter" style="margin-top: 1rem; font-size: 0.875rem; color: var(--brand-grey-600); font-weight: 600;"></div>
+    <div id="resultsCounter" class="results-counter"></div>
 </div>
 
 <!-- Filter Tabs -->
@@ -114,47 +114,7 @@
 </div>
 
 <!-- Pagination -->
-{% if contacts.has_other_pages %}
-<nav aria-label="Contacts pagination">
-    <ul class="pagination justify-content-center">
-        {% if contacts.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ contacts.previous_page_number }}" aria-label="Previous">
-                <span aria-hidden="true">&laquo;</span>
-            </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled">
-            <span class="page-link">&laquo;</span>
-        </li>
-        {% endif %}
-
-        {% for num in contacts.paginator.page_range %}
-        {% if contacts.number == num %}
-        <li class="page-item active">
-            <span class="page-link">{{ num }}</span>
-        </li>
-        {% elif num > contacts.number|add:'-3' and num < contacts.number|add:'3' %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-        </li>
-        {% endif %}
-        {% endfor %}
-
-        {% if contacts.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ contacts.next_page_number }}" aria-label="Next">
-                <span aria-hidden="true">&raquo;</span>
-            </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled">
-            <span class="page-link">&raquo;</span>
-        </li>
-        {% endif %}
-    </ul>
-</nav>
-{% endif %}
+{% include "includes/components/_pagination.html" with page_obj=contacts %}
 
 {% else %}
 <!-- Empty State -->

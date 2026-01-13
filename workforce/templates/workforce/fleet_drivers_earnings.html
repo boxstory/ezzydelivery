@@ -53,12 +53,12 @@
             </label>
             <input type="text" id="fleetFilter" class="filter-input" placeholder="Search by driver name or ID...">
         </div>
-        <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
-            <button onclick="window.print()" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+        <div class="fleet-report-actions">
+            <button onclick="window.print()" class="btn-print-report">
                 <i class="fa-solid fa-print"></i>
                 Print
             </button>
-            <button onclick="exportToCSV()" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+            <button onclick="exportToCSV()" class="btn-export-report">
                 <i class="fa-solid fa-file-export"></i>
                 Export CSV
             </button>
@@ -95,47 +95,7 @@
 </div>
 
 <!-- Pagination -->
-{% if drivers.has_other_pages %}
-<nav aria-label="Fleet pagination" style="margin-top: 2rem;">
-    <ul class="pagination justify-content-center">
-        {% if drivers.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ drivers.previous_page_number }}" aria-label="Previous">
-                <span aria-hidden="true">&laquo;</span>
-            </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled">
-            <span class="page-link">&laquo;</span>
-        </li>
-        {% endif %}
-
-        {% for num in drivers.paginator.page_range %}
-        {% if drivers.number == num %}
-        <li class="page-item active">
-            <span class="page-link">{{ num }}</span>
-        </li>
-        {% elif num > drivers.number|add:'-3' and num < drivers.number|add:'3' %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-        </li>
-        {% endif %}
-        {% endfor %}
-
-        {% if drivers.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ drivers.next_page_number }}" aria-label="Next">
-                <span aria-hidden="true">&raquo;</span>
-            </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled">
-            <span class="page-link">&raquo;</span>
-        </li>
-        {% endif %}
-    </ul>
-</nav>
-{% endif %}
+{% include "includes/components/_pagination.html" with page_obj=drivers filter_params=filter_params %}
 
 {% else %}
 <!-- Empty State -->

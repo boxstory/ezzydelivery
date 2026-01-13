@@ -19,6 +19,7 @@ urlpatterns = [
     path('add_order_bulk/', orders_views.add_order_bulk, name='add_order_bulk'),
     path('add_order_with_product/', orders_views.add_order_with_product, name='add_order_with_product'),
     path('add_order/<int:pickup_id>', orders_views.deliver_to_here, name='deliver_to_here'),
+    path('pick_from_here/<int:pickup_id>/', orders_views.pick_from_here, name='pick_from_here'),
     path('order_update/<int:order_id>/',
          orders_views.order_update, name='order_update'),
     path('delete_order/<int:order_id>/',
@@ -39,8 +40,14 @@ urlpatterns = [
 
 
     # operation links
-    path('update_order_status/', 
+    path('update_order_status/',
          orders_views.update_order_status, name='update_order_status'),
+
+    # Order comments
+    path('order/<int:order_id>/comments/',
+         orders_views.get_order_comments, name='get_order_comments'),
+    path('order/<int:order_id>/comments/add/',
+         orders_views.add_order_comment, name='add_order_comment'),
 
 
      # orders by API

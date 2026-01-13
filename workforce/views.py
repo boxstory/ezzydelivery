@@ -164,7 +164,7 @@ def all_orders(request):
 
     # Filter by DL Code (delivery task code)
     if dl_code:
-        orders = orders.filter(delivery_task__dl_task_code__icontains=dl_code)
+        orders = orders.filter(delivery_task__dl_task_number__icontains=dl_code)
 
     # Filter by Business Order Code
     if c_code:
@@ -482,6 +482,8 @@ def orders_pending_verification(request):
 def dl_list_all(request):
     dl_tasks = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).prefetch_related(
+        'order__order_comments'
     ).all().order_by('-created_at')
 
     # Get filter parameters

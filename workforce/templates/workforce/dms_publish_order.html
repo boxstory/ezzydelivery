@@ -127,47 +127,7 @@
 </div>
 
 <!-- Pagination -->
-{% if delivery_tasks.has_other_pages %}
-<nav aria-label="Tasks pagination">
-    <ul class="pagination justify-content-center">
-        {% if delivery_tasks.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ delivery_tasks.previous_page_number }}" aria-label="Previous">
-                <span aria-hidden="true">&laquo;</span>
-            </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled">
-            <span class="page-link">&laquo;</span>
-        </li>
-        {% endif %}
-
-        {% for num in delivery_tasks.paginator.page_range %}
-        {% if delivery_tasks.number == num %}
-        <li class="page-item active">
-            <span class="page-link">{{ num }}</span>
-        </li>
-        {% elif num > delivery_tasks.number|add:'-3' and num < delivery_tasks.number|add:'3' %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-        </li>
-        {% endif %}
-        {% endfor %}
-
-        {% if delivery_tasks.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ delivery_tasks.next_page_number }}" aria-label="Next">
-                <span aria-hidden="true">&raquo;</span>
-            </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled">
-            <span class="page-link">&raquo;</span>
-        </li>
-        {% endif %}
-    </ul>
-</nav>
-{% endif %}
+{% include "includes/components/_pagination.html" with page_obj=delivery_tasks filter_params=filter_params %}
 
 {% else %}
 <!-- Empty State -->

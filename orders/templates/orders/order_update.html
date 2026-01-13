@@ -1,9 +1,15 @@
-{% extends "base.html" %} {% load crispy_forms_tags %}
+{% extends "business_dashboard_base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
 
- {% block head_title %}Update Orders{% endblock %} 
+{% block head_title %}Update Orders{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'orders/css/orders.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="container col-md-8 align-content-center" id="orders_update_container_main">
+<div class="p-3 col-12" id="orders_update_container_main">
   <div class="row">
     <div class="col-md-12 pb-3 d-flex justify-content-between">
       <h2 class="my-2" id="orders_update_header_title">Update Order</h2>
@@ -15,31 +21,50 @@
   <div class="row">
     <div class="col-md-12">
       <form method="POST" id="orders_update_form_main">
-        {% csrf_token %} {% if form.non_field_errors %}
-        {% for error in form.non_field_errors %}
-        <div>{{error}}</div>
-        {% endfor %} {% endif %} {{ form | crispy }}
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+          {% for error in form.non_field_errors %}
+          <div class="invalid-feedback d-block">{{ error }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {{ form | crispy }}
         {% if order.order_status == 'publish' %}
         <div class="submit my-3 text-center">
-          <button class="btn btn-success w-25 align-content-center" id="orders_update_btn_published">
-
-            <P class="m-0"> Already Published</P>
+          <button class="btn btn-success w-25 align-content-center" id="orders_update_btn_published" disabled>
+            <span class="m-0">Already Published</span>
           </button>
         </div>
         {% else %}
-
-
-
         <div class="submit my-3 text-center">
-          <button type="submit" class="btn btn-dark w-25 align-content-center" id="orders_update_btn_submit">
-            Update Order
+          <button type="submit" class="btn btn-dark btn-submit w-25 align-content-center" id="orders_update_btn_submit">
+            <span class="btn-text">Update Order</span>
           </button>
-          <a href="{% url 'orders:add_order_product' order.id %} " class="btn btn-dark w-25 align-content-center me-2 " id="orders_update_btn_add_product">
-            <i class="me-2 fa-brands fa-plus"></i>Product
+          <a href="{% url 'orders:add_order_product' order.id %}" class="btn btn-dark w-25 align-content-center me-2" id="orders_update_btn_add_product">
+            <i class="me-2 fa-solid fa-plus"></i>Product
           </a>
-        </div>{% endif %}
+        </div>
+        {% endif %}
       </form>
     </div>
   </div>
 </div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('orders_update_form_main');
+  const submitBtn = document.getElementById('orders_update_btn_submit');
+
+  if (form && submitBtn) {
+    form.addEventListener('submit', function() {
+      // Add loading state to submit button
+      submitBtn.classList.add('is-loading');
+      submitBtn.querySelector('.btn-text').textContent = 'Updating...';
+    });
+  }
+});
+</script>
+{% endblock %}

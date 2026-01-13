@@ -11,13 +11,13 @@
 <div class="verification-container" id="orders_verify_location_container_main">
     <div class="verification-card" id="orders_verify_location_card_main">
         <div class="verification-header" id="orders_verify_location_header">
-            <i class="fa-solid fa-map-location-dot" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+            <i class="fa-solid fa-map-location-dot verify-title"></i>
             <h1>Verify Your Delivery Location</h1>
             <p>Order #{{ order.order_number }}</p>
         </div>
 
         <div class="order-info" id="orders_verify_location_section_order_info">
-            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-grey-800); margin-bottom: 1rem;">
+            <h2 class="verify-section-title">
                 Order Details
             </h2>
             <div class="info-grid">
@@ -61,7 +61,7 @@
                     </div>
                 </div>
 
-                <div class="info-item" style="grid-column: 1 / -1;">
+                <div class="info-item full-width-column">
                     <div class="info-icon">
                         <i class="fa-solid fa-location-dot"></i>
                     </div>
@@ -284,7 +284,7 @@ function updateLatLng(lat, lng) {
 }
 
 // Form validation
-document.getElementById('verificationForm').addEventListener('submit', function(e) {
+document.getElementById('orders_verify_location_form_main').addEventListener('submit', function(e) {
     const lat = document.getElementById('latitude').value;
     const lng = document.getElementById('longitude').value;
 
@@ -295,7 +295,7 @@ document.getElementById('verificationForm').addEventListener('submit', function(
     }
 
     // Disable submit button to prevent double submission
-    const submitBtn = document.getElementById('submitBtn');
+    const submitBtn = document.getElementById('orders_verify_location_btn_submit');
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Confirming...';
 });

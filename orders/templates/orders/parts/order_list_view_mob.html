@@ -1,5 +1,12 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'orders/css/orders.css' %}">
+
 {% if not orders %}
-<div class="h4 p-3 text-center" id="orders_list_mob_message_no_orders">No orders</div>
+<div class="text-center py-5">
+  <i class="fa-solid fa-box-open fa-3x mb-3" style="color: var(--brand-grey-400);"></i>
+  <h4 class="text-muted">No orders found</h4>
+  <p class="text-muted">Start by adding your first order</p>
+</div>
 {% else %}
 {% for order in orders %}
 <div class="p-2 mb-2 m-0 bg-light border border-white border-5 rounded" data-card-id="orders_list_mob_card_order">
@@ -46,21 +53,21 @@
         </div>
 
 
-        <div class="d-flex justify-content-end pt-2 m-0 p-0">
-
-          <a class="border rounded-pill p-1  px-2  me-3 text-dark text-decoration-none"
+        <div class="order-actions d-flex flex-wrap justify-content-end gap-2 pt-2">
+          <a class="btn btn-outline-secondary btn-sm rounded-pill"
             hx-get="{% url 'orders:order_product_list' order.id %}" hx-target="#collapses_mob-product-{{ order.id }}"
             hx-trigger="click" aria-expanded="true" data-bs-target="#collapses_mob-product-{{ order.id }}"
             aria-controls="collapses_mob-product-{{ order.id }}" data-bs-toggle="collapsess">
-            <i class="me-2 fa-brands fa-product-hunt"></i>Product
+            <i class="fa-brands fa-product-hunt me-1"></i>Product
           </a>
-          <a href="{% url 'orders:order_update' order.id %} "
-            class="border rounded-pill p-1  px-2  me-2 text-dark text-decoration-none">
-            <i class="fa fa-lg fa-edit me-2"></i>Edit Order
+          <a href="{% url 'orders:order_update' order.id %}"
+            class="btn btn-outline-primary btn-sm rounded-pill">
+            <i class="fa fa-edit me-1"></i>Edit
           </a>
-          <a class="btn border rounded-pill p-1  px-2  text-dark text-decoration-none m-0 p-0"
-            href="{% url 'orders:delete_order' order.id %} ">
-            <i class="fa fa-trash"></i></a>
+          <a class="btn btn-outline-danger btn-sm rounded-pill"
+            href="{% url 'orders:delete_order' order.id %}">
+            <i class="fa fa-trash"></i>
+          </a>
         </div>
       </div>
       <div class="pb-1 collapsess" id="collapses_mob-product-{{ order.id }}">
@@ -69,4 +76,5 @@
   </div>
 </div>
 {% endfor %}
+{% include "includes/components/_pagination.html" with page_obj=orders %}
 {% endif %}

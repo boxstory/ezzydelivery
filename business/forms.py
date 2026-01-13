@@ -289,6 +289,42 @@ class BusinessProfileForm(forms.ModelForm):
         model = business_models.BusinessProfile
         fields = '__all__'
         exclude = ['business', 'updated_at', 'created_at']
+        widgets = {
+            'business_start_date': forms.DateInput(attrs={
+                'type': 'text',
+                'class': 'form-control datepicker',
+                'placeholder': 'Select date'
+            }),
+            'business_description': forms.Textarea(attrs={
+                'rows': 3,
+                'class': 'form-control',
+                'placeholder': 'Tell us about your business'
+            }),
+            'business_mision': forms.Textarea(attrs={
+                'rows': 2,
+                'class': 'form-control'
+            }),
+            'business_mision_detailed': forms.Textarea(attrs={
+                'rows': 3,
+                'class': 'form-control'
+            }),
+            'business_about_part_1': forms.Textarea(attrs={
+                'rows': 3,
+                'class': 'form-control'
+            }),
+            'business_about_part_2': forms.Textarea(attrs={
+                'rows': 3,
+                'class': 'form-control'
+            }),
+            'business_uniqueness_description': forms.Textarea(attrs={
+                'rows': 3,
+                'class': 'form-control'
+            }),
+            'business_catagory_detailed': forms.Textarea(attrs={
+                'rows': 2,
+                'class': 'form-control'
+            }),
+        }
 
     def __init__(self, *args, **kwargs):
         super(BusinessProfileForm, self).__init__(*args, **kwargs)
@@ -306,6 +342,7 @@ class BusinessProfileForm(forms.ModelForm):
             "business_instagram": "Business Instagram : Enter username only",
             "business_tiktok": "Business Tiktok : Enter username only",
             "business_youtube": "Business Youtube : Enter your complete url",
+            "business_start_date": "Business Start Date",
         }
 
         for field_name, label in labels.items():
@@ -404,18 +441,22 @@ class BusinessTeamProfileForm(forms.ModelForm):
     Business team member profile form.
 
     Used to add or update team members who can access the business account.
+    The team_role field determines base permissions for the member.
 
     Fields:
         - user: Django User account to link
-        - team_code: Unique team member code
         - team_name: Display name
         - team_phone: Contact phone
         - team_email: Contact email
-        - team_role: Role in the business
+        - team_role: Role (manager, staff, viewer) determining base permissions
         - team_bio: Brief bio
         - team_logo: Profile picture
-        - team_verifed: Verification status
         - team_status: active, inactive, pending, suspended
+
+    Roles:
+        - manager: Full operational access (orders, products, customers, reports, team view)
+        - staff: Create/edit orders and products, view customers
+        - viewer: Read-only access
 
     Template:
         business/parts/business_teams_add.html
@@ -427,16 +468,121 @@ class BusinessTeamProfileForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.BusinessTeamProfile
-        fields = '__all__'
-        exclude = ['business', 'updated_at', 'created_at', 'profile']
+        fields = ['user', 'team_name', 'team_phone', 'team_email',
+                  'team_role', 'team_bio', 'team_logo', 'team_status']
+        exclude = ['business', 'profile', 'team_code', 'team_verifed',
+                   'invited_by', 'invited_at', 'updated_at', 'created_at']
         widgets = {
             'user': forms.Select(attrs={'class': 'form-control'}),
+            'team_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'team_phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'team_email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'team_role': forms.Select(attrs={'class': 'form-control'}),
+            'team_bio': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'team_status': forms.Select(attrs={'class': 'form-control'}),
         }
 
         labels = {
-            "team_name": "Team Name",
-            "team_phone": "Team Phone No",
-            "team_email": "Team Email",
-            "team_role": "Team Role",
-            'user': 'Search member by username',
+            'user': 'Select User',
+            'team_name': 'Display Name',
+            'team_phone': 'Phone Number',
+            'team_email': 'Email Address',
+            'team_role': 'Role',
+            'team_bio': 'Bio',
+            'team_logo': 'Profile Picture',
+            'team_status': 'Status',
         }
+
+        help_texts = {
+            'team_role': 'Manager: Full access. Staff: Create/edit orders & products. Viewer: Read-only.',
+            'team_status': 'Only active members can access the business.',
+        }
+
+
+class TeamMemberAddForm(forms.ModelForm):
+    """
+    Simplified form for adding new team members.
+
+    Only includes essential fields for initial team member creation.
+    Additional permissions can be configured after creation.
+
+    Fields:
+        - user: Django User account to link
+        - team_name: Display name
+        - team_email: Contact email
+        - team_role: Role (manager, staff, viewer)
+
+    Views:
+        business.views.business_teams_add
+    """
+    class Meta:
+        model = business_models.BusinessTeamProfile
+        fields = ['user', 'team_name', 'team_email', 'team_role']
+        widgets = {
+            'user': forms.Select(attrs={'class': 'form-control', 'id': 'user-select'}),
+            'team_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Display name'}),
+            'team_email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email address'}),
+            'team_role': forms.Select(attrs={'class': 'form-control'}),
+        }
+        labels = {
+            'user': 'Select User',
+            'team_name': 'Display Name',
+            'team_email': 'Email',
+            'team_role': 'Role',
+        }
+
+    def __init__(self, *args, business=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if business:
+            # Exclude users who are already team members of this business
+            existing_user_ids = business_models.BusinessTeamProfile.objects.filter(
+                business=business
+            ).values_list('user_id', flat=True)
+
+            # Also exclude the business owner
+            if business.user:
+                existing_user_ids = list(existing_user_ids) + [business.user.id]
+
+            self.fields['user'].queryset = User.objects.exclude(
+                id__in=existing_user_ids
+            ).order_by('username')
+
+
+class TeamPermissionForm(forms.Form):
+    """
+    Form for managing individual team member permissions.
+
+    Used to grant or revoke specific permissions for a team member,
+    overriding their role-based defaults.
+
+    Fields:
+        - permission_code: Permission to modify
+        - action: grant or revoke
+    """
+    from business.permissions import BusinessPermissions
+
+    permission_code = forms.ChoiceField(
+        choices=BusinessPermissions.PERMISSION_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    action = forms.ChoiceField(
+        choices=[
+            ('grant', 'Grant Permission'),
+            ('revoke', 'Revoke Permission'),
+        ],
+        widget=forms.RadioSelect()
+    )
+
+
+class ChangeRoleForm(forms.Form):
+    """
+    Form for changing a team member's role.
+
+    Changing the role will affect the base permissions.
+    Custom permission overrides are preserved.
+    """
+    role = forms.ChoiceField(
+        choices=business_models.BusinessTeamProfile.ROLE_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )

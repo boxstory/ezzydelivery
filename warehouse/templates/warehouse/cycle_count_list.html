@@ -87,21 +87,8 @@
                     </div>
                 </div>
 
-                {% if cycle_counts.has_other_pages %}
-                <div class="card-footer bg-white">
-                    <nav>
-                        <ul class="pagination justify-content-center mb-0">
-                            {% if cycle_counts.has_previous %}
-                            <li class="page-item"><a class="page-link" href="?page={{ cycle_counts.previous_page_number }}{% if selected_status %}&status={{ selected_status }}{% endif %}">Previous</a></li>
-                            {% endif %}
-                            <li class="page-item active"><span class="page-link">{{ cycle_counts.number }} / {{ cycle_counts.paginator.num_pages }}</span></li>
-                            {% if cycle_counts.has_next %}
-                            <li class="page-item"><a class="page-link" href="?page={{ cycle_counts.next_page_number }}{% if selected_status %}&status={{ selected_status }}{% endif %}">Next</a></li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                </div>
-                {% endif %}
+                <!-- Pagination -->
+                {% include "includes/components/_pagination.html" with page_obj=cycle_counts filter_params=filter_params %}
             </div>
         </div>
     </div>

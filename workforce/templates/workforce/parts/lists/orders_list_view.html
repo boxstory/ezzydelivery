@@ -217,17 +217,20 @@
                                         title="Save current filter as preset">
                                     <i class="fa fa-bookmark me-2"></i>Save Filter
                                 </button>
-                                <div class="ms-auto d-flex align-items-center gap-2">
-                                    <span class="text-muted small">Quick Filters:</span>
+                                <div class="ms-auto d-flex align-items-center gap-2" role="group" aria-label="Quick Filters">
+                                    <span class="text-muted small" id="quickFilterLabel">Quick Filters:</span>
                                     <button type="button"
                                             class="btn btn-sm btn-outline-info"
-                                            onclick="quickFilter('today')">Today</button>
+                                            onclick="quickFilter('today')"
+                                            aria-describedby="quickFilterLabel">Today</button>
                                     <button type="button"
                                             class="btn btn-sm btn-outline-info"
-                                            onclick="quickFilter('pending')">Pending</button>
+                                            onclick="quickFilter('pending')"
+                                            aria-describedby="quickFilterLabel">Pending</button>
                                     <button type="button"
                                             class="btn btn-sm btn-outline-info"
-                                            onclick="quickFilter('in_transit')">In Transit</button>
+                                            onclick="quickFilter('in_transit')"
+                                            aria-describedby="quickFilterLabel">In Transit</button>
                                 </div>
                             </div>
                         </div>
@@ -255,16 +258,25 @@
                                     <span class="ms-2 text-muted">| <i class="fa-solid fa-store me-1"></i>{{ order.business.business_name|default:"N/A" }}</span>
                                 </div>
                                 <small class="text-muted">
-                                    <i class="fa-solid fa-truck me-1"></i>{{ order.delivery_task|default:"No DL Code" }}
+                                    <i class="fa-solid fa-truck me-1"></i>
+                                    {% with task=order.delivery_task.first %}
+                                        {% if task %}
+                                            {{ task.dl_task_number|default:"No DL Code" }}
+                                        {% else %}
+                                            No DL Code
+                                        {% endif %}
+                                    {% endwith %}
                                 </small>
                             </div>
                             <div class="d-flex flex-wrap gap-2 align-items-center">
-                                <span class="status-badge p-2 status-{{ order.order_status }}">{{ order.order_status|title }}</span>
-                                {% if order.delivery_task.dl_task_status_dms %}
-                                    <span class="status-badge status-{{ order.delivery_task.dl_task_status_dms }}">
-                                        DMS: {{ order.delivery_task.dl_task_status_dms|title }}
-                                    </span>
-                                {% endif %}
+                                <span class="status-badge p-2 status-{{ order.order_status }}">{{ order.get_order_status_display }}</span>
+                                {% with task=order.delivery_task.first %}
+                                    {% if task and task.dl_task_status_dms %}
+                                        <span class="status-badge status-{{ task.dl_task_status_dms }}">
+                                            DMS: {{ task.get_dl_task_status_dms_display }}
+                                        </span>
+                                    {% endif %}
+                                {% endwith %}
                                 <!-- Main Action Section -->
                                 <div class="">
                                     {% if order.task_created %}
@@ -363,8 +375,8 @@
                                        class="btn btn-outline-info btn-sm w-100 py-2">
                                         <i class="fa-solid fa-truck-fast me-1"></i>View Task
                                         {% if task.dl_task_status_dms %}
-                                        <span class="badge bg-{% if task.dl_task_status_dms == 'delivered' %}success{% elif task.dl_task_status_dms == 'in_transit' %}warning{% elif task.dl_task_status_dms == 'failed' %}danger{% else %}secondary{% endif %} ms-1">
-                                            {{ task.dl_task_status_dms|title }}
+                                        <span class="badge bg-{% if task.dl_task_status_dms == '2' %}success{% elif task.dl_task_status_dms == '1' or task.dl_task_status_dms == '4' %}warning{% elif task.dl_task_status_dms == '3' or task.dl_task_status_dms == '8' or task.dl_task_status_dms == '9' %}danger{% else %}secondary{% endif %} ms-1">
+                                            {{ task.get_dl_task_status_dms_display }}
                                         </span>
                                         {% endif %}
                                     </a>
@@ -391,43 +403,52 @@
                                     data-bs-toggle="collapse"
                                     data-bs-target="#comments{{ order.id }}">
                                 <i class="fa-solid fa-comments me-1"></i>Comments
-                                {% if order.unread_comments_count %}
-                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                                        {{ order.unread_comments_count }}
-                                        <span class="visually-hidden">unread comments</span>
-                                    </span>
-                                {% endif %}
+                                <span class="badge bg-secondary ms-1">{{ order.order_comments.count }}</span>
                             </button>
                             <div class="collapse mt-2" id="comments{{ order.id }}">
                                 <div class="card card-body bg-light">
-                                    <div class="comments-list d-flex flex-wrap-reverse" style="max-height: 200px; overflow-y: auto;">
+                                    <!-- Comments Container -->
+                                    <div id="comments-list-{{ order.id }}"
+                                         class="comments-list"
+                                         style="max-height: 200px; overflow-y: auto;">
                                         {% if order.order_comments.all %}
                                             {% for comment in order.order_comments.all %}
-                                                <div class="comment-item mb-2 p-2 bg-white rounded">
-                                                    <small class="text-muted d-block">
-                                                        <strong>{{ comment.name }}</strong> - {{ comment.created_at|date:"M d, Y H:i" }}
-                                                    </small>
-                                                    <p class="mb-0 small">{{ comment.body }}</p>
+                                                <div class="comment-item mb-2 p-2 bg-white rounded border-start border-primary border-3">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <small class="text-primary fw-bold">
+                                                            <i class="fa-solid fa-user-circle me-1"></i>{{ comment.name }}
+                                                        </small>
+                                                        <small class="text-muted">{{ comment.created_at|timesince }} ago</small>
+                                                    </div>
+                                                    <p class="mb-0 small mt-1">{{ comment.body }}</p>
                                                 </div>
                                             {% endfor %}
                                         {% else %}
-                                            <p class="text-muted small mb-0">No comments yet</p>
+                                            <div class="text-center py-3">
+                                                <i class="fa-regular fa-comment-dots fa-2x text-muted mb-2"></i>
+                                                <p class="text-muted small mb-0">No comments yet</p>
+                                            </div>
                                         {% endif %}
-                                    </div></div>
-                                    <div class="mt-2">
-                                        <form onsubmit="addComment(event, {{ order.id }})">
+                                    </div>
+                                    <!-- Add Comment Form -->
+                                    <div class="mt-2 pt-2 border-top">
+                                        <form hx-post="{% url 'orders:add_order_comment' order.id %}"
+                                              hx-target="#comments-list-{{ order.id }}"
+                                              hx-swap="innerHTML"
+                                              hx-on::after-request="this.reset()">
+                                            {% csrf_token %}
                                             <div class="input-group input-group-sm">
                                                 <input type="text"
                                                        class="form-control"
+                                                       name="comment"
                                                        placeholder="Add a comment..."
-                                                       id="commentInput{{ order.id }}"
                                                        required>
                                                 <button class="btn btn-primary" type="submit">
                                                     <i class="fa-solid fa-paper-plane"></i>
                                                 </button>
                                             </div>
                                         </form>
-                                    
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -472,48 +493,7 @@
                 {% endfor %}
             </div>
             <!-- Pagination -->
-            {% if orders.has_other_pages %}
-                <nav aria-label="Orders pagination">
-                    <ul class="pagination justify-content-center">
-                        {% if orders.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link"
-                                   href="?page={{ orders.previous_page_number }}&dlCode={{ filters.dlCode }}&cCode={{ filters.cCode }}&mobile={{ filters.mobile }}&cStatus={{ filters.cStatus }}&dmsStatus={{ filters.dmsStatus }}">
-                                    <i class="fa-solid fa-chevron-left"></i> Previous
-                                </a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link"><i class="fa-solid fa-chevron-left"></i> Previous</span>
-                            </li>
-                        {% endif %}
-                        {% for page_number in orders.paginator.page_range %}
-                            {% if orders.number == page_number %}
-                                <li class="page-item active">
-                                    <span class="page-link">{{ page_number }}</span>
-                                </li>
-                            {% else %}
-                                <li class="page-item">
-                                    <a class="page-link"
-                                       href="?page={{ page_number }}&dlCode={{ filters.dlCode }}&cCode={{ filters.cCode }}&mobile={{ filters.mobile }}&cStatus={{ filters.cStatus }}&dmsStatus={{ filters.dmsStatus }}">{{ page_number }}</a>
-                                </li>
-                            {% endif %}
-                        {% endfor %}
-                        {% if orders.has_next %}
-                            <li class="page-item">
-                                <a class="page-link"
-                                   href="?page={{ orders.next_page_number }}&dlCode={{ filters.dlCode }}&cCode={{ filters.cCode }}&mobile={{ filters.mobile }}&cStatus={{ filters.cStatus }}&dmsStatus={{ filters.dmsStatus }}">
-                                    Next <i class="fa-solid fa-chevron-right"></i>
-                                </a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">Next <i class="fa-solid fa-chevron-right"></i></span>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            {% endif %}
+            {% include "includes/components/_pagination.html" with page_obj=orders filter_params=filter_params %}
         {% else %}
             <!-- Empty State -->
             <div class="text-center py-5">

@@ -15,8 +15,8 @@
 </h1>
 
 <!-- Back Button -->
-<div style="margin-bottom: 1.5rem;">
-    <a href="{% url 'workforce:store_documents_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--brand-grey-700); text-decoration: none; font-weight: 600;">
+<div class="document-back-section">
+    <a href="{% url 'workforce:store_documents_list' %}" class="document-back-link">
         <i class="fa-solid fa-arrow-left"></i>
         Back to Stores
     </a>
@@ -109,29 +109,29 @@
 
     <form id="updateForm">
         {% csrf_token %}
-        <div style="display: grid; gap: 1rem;">
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Business Name</label>
+        <div class="document-form-grid">
+            <div class="document-form-group">
+                <label class="document-form-label">Business Name</label>
                 <input type="text" name="business_name" value="{{ business.business_name }}" class="filter-input" required>
             </div>
 
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Phone</label>
+            <div class="document-form-group">
+                <label class="document-form-label">Phone</label>
                 <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="filter-input">
             </div>
 
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Email</label>
+            <div class="document-form-group">
+                <label class="document-form-label">Email</label>
                 <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="filter-input">
             </div>
 
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">QID</label>
+            <div class="document-form-group">
+                <label class="document-form-label">QID</label>
                 <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="filter-input">
             </div>
 
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Status</label>
+            <div class="document-form-group">
+                <label class="document-form-label">Status</label>
                 <select name="business_status" class="filter-input">
                     <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
                     <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
@@ -140,19 +140,19 @@
                 </select>
             </div>
 
-            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                <button type="submit" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+            <div class="document-form-actions">
+                <button type="submit" class="document-submit-btn">
                     <i class="fa-solid fa-save"></i>
                     Save Changes
                 </button>
-                <a href="{% url 'workforce:store_documents_list' %}" class="cancel-btn" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; color: var(--brand-grey-800); text-decoration: none; display: inline-block;">
+                <a href="{% url 'workforce:store_documents_list' %}" class="document-cancel-btn">
                     Cancel
                 </a>
             </div>
         </div>
     </form>
 
-    <div id="updateMessage" style="display: none; margin-top: 1rem; padding: 1rem; border-radius: var(--brand-radius-sm);"></div>
+    <div id="updateMessage" class="document-update-message"></div>
 </div>
 
 </div>
@@ -162,9 +162,9 @@
 <script>
     // Safe message display helper (XSS-safe)
     function showMessage(messageDiv, isSuccess, text) {
-        messageDiv.style.display = 'block';
-        messageDiv.style.background = isSuccess ? '#d4edda' : '#f8d7da';
-        messageDiv.style.color = isSuccess ? '#155724' : '#721c24';
+        // Remove any existing state classes and add appropriate one
+        messageDiv.classList.remove('success', 'error');
+        messageDiv.classList.add('show', isSuccess ? 'success' : 'error');
         // Use textContent for safe text insertion
         messageDiv.textContent = '';
         const icon = document.createElement('i');

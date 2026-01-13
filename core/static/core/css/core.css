@@ -2,6 +2,27 @@
    CORE APP - MERGED STYLES
    ============================================ */
 
+/* ---------- ACCESSIBILITY - FOCUS INDICATORS ---------- */
+/* Focus indicators for accessibility - WCAG 2.1 AA compliance */
+
+.btn:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--brand-primary, #0d6efd);
+  outline-offset: 2px;
+}
+
+.form-control:focus-visible,
+.form-select:focus-visible {
+  outline: 2px solid var(--brand-primary, #0d6efd);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--brand-primary, #0d6efd);
+  outline-offset: 2px;
+}
+
 /* ---------- BREADCRUMB ---------- */
 /* Breadcrumb Navigation Styles */
 
@@ -1403,9 +1424,9 @@ select:focus {
         margin-bottom: 1.5rem;
     }
 
-    /* Reduce padding on smaller screens */
-    #core_dashboard_sidebar_profile_card .card-body {
-        padding: 1.5rem !important;
+    /* Reduce padding on smaller screens - increased specificity replaces !important */
+    #core_dashboard_sidebar_profile_card.card .card-body {
+        padding: 1.5rem;
     }
 
     /* Make buttons more compact */
@@ -1417,19 +1438,20 @@ select:focus {
 
 @media (max-width: 767px) {
     /* Mobile - Optimize for smaller screens */
-    .profile-picture-wrapper img {
+    #core_dashboard_sidebar_profile_card .profile-picture-wrapper img {
         width: 6.25rem;
         height: 6.25rem;
     }
 
-    .profile-picture-wrapper .position-absolute {
-        width: 2.1875rem !important;
-        height: 2.1875rem !important;
+    /* Increased specificity with parent ID replaces !important */
+    #core_dashboard_sidebar_profile_card .profile-picture-wrapper .position-absolute {
+        width: 2.1875rem;
+        height: 2.1875rem;
     }
 
-    /* Reduce card padding on mobile */
-    #core_dashboard_sidebar_profile_card .card-body {
-        padding: 1rem !important;
+    /* Reduce card padding on mobile - increased specificity replaces !important */
+    #core_dashboard_sidebar_profile_card.card .card-body {
+        padding: 1rem;
     }
 
     /* Stack role badges on mobile */
@@ -1439,38 +1461,41 @@ select:focus {
         gap: 0.5rem;
     }
 
-    .role-badge {
+    /* Increased specificity with parent ID replaces !important */
+    #core_dashboard_sidebar_profile_card .role-badge {
         display: block;
         width: 100%;
-        padding: 0.5rem !important;
+        padding: 0.5rem;
     }
 
-    /* Smaller status items */
-    .status-item {
-        padding: 0.75rem !important;
+    /* Smaller status items - increased specificity with parent ID replaces !important */
+    #core_dashboard_sidebar_profile_card .status-item {
+        padding: 0.75rem;
     }
 
-    /* Compact social icons */
-    .social-icon {
-        width: 2.8125rem !important;
-        height: 2.8125rem !important;
+    /* Compact social icons - increased specificity with parent ID replaces !important */
+    #core_dashboard_sidebar_profile_card .social-icon {
+        width: 2.8125rem;
+        height: 2.8125rem;
     }
 }
 
 @media (max-width: 575px) {
     /* Extra small devices */
-    .profile-picture-wrapper img {
+    #core_dashboard_sidebar_profile_card .profile-picture-wrapper img {
         width: 5rem;
         height: 5rem;
     }
 
-    .profile-picture-wrapper .position-absolute {
-        width: 1.875rem !important;
-        height: 1.875rem !important;
+    /* Increased specificity with parent ID replaces !important */
+    #core_dashboard_sidebar_profile_card .profile-picture-wrapper .position-absolute {
+        width: 1.875rem;
+        height: 1.875rem;
     }
 
-    #core_dashboard_sidebar_profile_card .card-body {
-        padding: 0.75rem !important;
+    /* Increased specificity replaces !important */
+    #core_dashboard_sidebar_profile_card.card .card-body {
+        padding: 0.75rem;
     }
 
     /* Smaller font sizes */

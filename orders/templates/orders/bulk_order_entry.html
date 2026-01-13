@@ -1,29 +1,29 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
 {% block content %}
-<div class="container-fluid p-3" id="bulk_order_entry_container">
+<div class="container-fluid p-3" id="bulk-order-entry-container">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0"><i class="fas fa-table me-2"></i>Bulk Order Entry</h4>
     <div class="btn-group">
-      <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_add_row">
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-add-row">
         <i class="fas fa-plus me-1"></i>Add Row
       </button>
-      <button type="button" class="btn btn-outline-danger btn-sm" id="btn_delete_selected">
+      <button type="button" class="btn btn-outline-danger btn-sm" id="btn-delete-selected">
         <i class="fas fa-trash me-1"></i>Delete Selected
       </button>
-      <button type="button" class="btn btn-outline-info btn-sm" id="btn_clear_all">
+      <button type="button" class="btn btn-outline-info btn-sm" id="btn-clear-all">
         <i class="fas fa-eraser me-1"></i>Clear All
       </button>
     </div>
   </div>
 
-  <form method="post" id="bulk_order_form">
+  <form method="post" id="bulk-order-form">
     {% csrf_token %}
     <div class="excel-table-wrapper">
-      <table class="excel-table" id="bulk_order_table">
+      <table class="excel-table" id="bulk-order-table">
         <thead>
           <tr class="header-row">
-            <th class="col-checkbox"><input type="checkbox" id="select_all"></th>
+            <th class="col-checkbox"><input type="checkbox" id="select-all"></th>
             <th class="col-no">No</th>
             <th class="col-order-id">Order ID</th>
             <th class="col-date">Date</th>
@@ -60,7 +60,7 @@
             <th class="col-notes-seller">Notes By Seller</th>
           </tr>
         </thead>
-        <tbody id="order_table_body">
+        <tbody id="order-table-body">
           <!-- Initial empty rows will be added by JavaScript -->
         </tbody>
       </table>
@@ -74,10 +74,10 @@
         </span>
       </div>
       <div class="btn-group">
-        <button type="button" class="btn btn-secondary" id="btn_save_draft">
+        <button type="button" class="btn btn-secondary" id="btn-save-draft">
           <i class="fas fa-save me-1"></i>Save Draft
         </button>
-        <button type="submit" class="btn btn-primary" id="btn_submit_orders">
+        <button type="submit" class="btn btn-primary" id="btn-submit-orders">
           <i class="fas fa-paper-plane me-1"></i>Submit Orders
         </button>
       </div>
@@ -89,7 +89,7 @@
     {% for message in messages %}
     <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show">
       {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
     {% endfor %}
   </div>
@@ -309,12 +309,12 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  const tableBody = document.getElementById('order_table_body');
-  const selectAllCheckbox = document.getElementById('select_all');
-  const addRowBtn = document.getElementById('btn_add_row');
-  const deleteSelectedBtn = document.getElementById('btn_delete_selected');
-  const clearAllBtn = document.getElementById('btn_clear_all');
-  const saveDraftBtn = document.getElementById('btn_save_draft');
+  const tableBody = document.getElementById('order-table-body');
+  const selectAllCheckbox = document.getElementById('select-all');
+  const addRowBtn = document.getElementById('btn-add-row');
+  const deleteSelectedBtn = document.getElementById('btn-delete-selected');
+  const clearAllBtn = document.getElementById('btn-clear-all');
+  const saveDraftBtn = document.getElementById('btn-save-draft');
 
   let rowCounter = 0;
 
@@ -539,7 +539,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Save draft to localStorage
   saveDraftBtn.addEventListener('click', function() {
-    const formData = new FormData(document.getElementById('bulk_order_form'));
+    const formData = new FormData(document.getElementById('bulk-order-form'));
     const data = {};
     for (let [key, value] of formData.entries()) {
       if (key !== 'csrfmiddlewaretoken') {

@@ -302,42 +302,288 @@ class BusinessPoster(models.Model):
         return f"{self.business.business_name} - Poster {self.poster_order + 1}"
 
 
-# @todo: link team profile with business
+# =============================================================================
+# TEAM & PERMISSION MODELS
+# =============================================================================
 
 
 class BusinessTeamProfile(models.Model):
+    """
+    Business team member profile.
+
+    Represents a user's membership in a business team with role-based permissions.
+    The business owner (Business.user) is NOT stored here - they have implicit
+    full access. This model is only for additional team members.
+
+    Roles:
+        - manager: Full operational access (no settings/API management)
+        - staff: Create/edit orders and products, view customers
+        - viewer: Read-only access
+
+    Attributes:
+        user: The Django user account for this team member
+        profile: Link to the user's Profile
+        business: The business this team member belongs to
+        team_role: Role determining base permissions
+        team_status: active, pending, inactive, suspended
+
+    Permission System:
+        - Base permissions come from team_role (see business/permissions.py)
+        - Custom overrides stored in BusinessTeamPermission
+        - Use get_effective_permissions() to get final permission set
+        - Use has_permission() to check specific permission
+    """
+    ROLE_CHOICES = [
+        ('manager', 'Manager'),
+        ('staff', 'Staff'),
+        ('viewer', 'Viewer'),
+    ]
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending Approval'),
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('suspended', 'Suspended'),
+    ]
+
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='team_profile')
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='team_profile'
+    )
     profile = models.ForeignKey(
-        core_models.Profile, on_delete=models.SET_NULL, blank=True, null=True, related_name='team_profile')
+        core_models.Profile,
+        on_delete=models.SET_NULL,
+        blank=True, null=True,
+        related_name='team_profile'
+    )
     business = models.ForeignKey(
-        Business, on_delete=models.CASCADE, related_name='team_profile')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+        Business,
+        on_delete=models.CASCADE,
+        related_name='team_members'
+    )
+
+    # Basic info
     team_code = models.CharField(max_length=100, blank=True, null=True)
-    team_role = models.CharField(max_length=100, blank=True, null=True)
     team_name = models.CharField(max_length=100, blank=True, null=True)
     team_phone = models.CharField(max_length=100, blank=True, null=True)
     team_email = models.CharField(max_length=100, blank=True, null=True)
     team_bio = models.CharField(max_length=225, blank=True, null=True)
     team_logo = models.ImageField(
-        upload_to=upload_path_handler, default="business/avatar.png", blank=True, null=True)
-    team_verifed = models.BooleanField(default=False)
-    team_status_choices = (
-        ('aproval pending', 'Aproval Pending'),
-        ('active', 'Active'),
-        ('inactive', 'Inactive'),
-        ('suspended', 'Suspended'),
-
+        upload_to=upload_path_handler,
+        default="business/avatar.png",
+        blank=True, null=True
     )
 
+    # Role-based permissions
+    team_role = models.CharField(
+        max_length=20,
+        choices=ROLE_CHOICES,
+        default='staff',
+        db_index=True,
+        help_text="Base role determining default permissions"
+    )
+
+    # Status
     team_status = models.CharField(
-        max_length=100, choices=team_status_choices, default='aproval pending')
-    
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
+        db_index=True
+    )
+    team_verifed = models.BooleanField(default=False)
+
+    # Invitation tracking
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='invited_team_members'
+    )
+    invited_at = models.DateTimeField(null=True, blank=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
-        verbose_name_plural = "Staff Profile"
+        verbose_name = "Team Member"
+        verbose_name_plural = "Team Members"
         db_table = 'client_businessteamprofile'
-        unique_together = ('business', 'team_code')
+        unique_together = [
+            ('business', 'team_code'),
+            ('business', 'user'),
+        ]
+        indexes = [
+            models.Index(fields=['business', 'team_status']),
+            models.Index(fields=['user', 'team_status']),
+        ]
+
+    def __str__(self):
+        return f"{self.team_name or self.user.username} ({self.team_role}) - {self.business.business_name}"
+
+    def get_effective_permissions(self):
+        """
+        Get all effective permissions for this team member.
+
+        Combines role-based permissions with custom overrides:
+        - Start with role default permissions
+        - Add explicitly granted permissions
+        - Remove explicitly revoked permissions
+
+        Returns:
+            set: Set of permission code strings
+        """
+        from business.permissions import get_role_permissions
+
+        # Start with role permissions
+        permissions = set(get_role_permissions(self.team_role))
+
+        # Apply custom overrides
+        for custom_perm in self.custom_permissions.all():
+            if custom_perm.is_granted:
+                permissions.add(custom_perm.permission_code)
+            else:
+                permissions.discard(custom_perm.permission_code)
+
+        return permissions
+
+    def has_permission(self, permission_code):
+        """
+        Check if team member has a specific permission.
+
+        Args:
+            permission_code: Permission code string from BusinessPermissions
+
+        Returns:
+            bool: True if team member has the permission and is active
+        """
+        if self.team_status != 'active':
+            return False
+        return permission_code in self.get_effective_permissions()
+
+    def has_any_permission(self, permission_codes):
+        """
+        Check if team member has any of the given permissions.
+
+        Args:
+            permission_codes: List of permission code strings
+
+        Returns:
+            bool: True if team member has at least one permission
+        """
+        if self.team_status != 'active':
+            return False
+        effective = self.get_effective_permissions()
+        return bool(set(permission_codes) & effective)
+
+    def has_all_permissions(self, permission_codes):
+        """
+        Check if team member has all of the given permissions.
+
+        Args:
+            permission_codes: List of permission code strings
+
+        Returns:
+            bool: True if team member has all permissions
+        """
+        if self.team_status != 'active':
+            return False
+        effective = self.get_effective_permissions()
+        return set(permission_codes).issubset(effective)
+
+    def grant_permission(self, permission_code, granted_by=None):
+        """
+        Explicitly grant a permission beyond role defaults.
+
+        Args:
+            permission_code: Permission code to grant
+            granted_by: User granting the permission
+
+        Returns:
+            BusinessTeamPermission: The created/updated permission record
+        """
+        perm, created = BusinessTeamPermission.objects.update_or_create(
+            team_member=self,
+            permission_code=permission_code,
+            defaults={
+                'is_granted': True,
+                'granted_by': granted_by
+            }
+        )
+        return perm
+
+    def revoke_permission(self, permission_code, revoked_by=None):
+        """
+        Explicitly revoke a permission from role defaults.
+
+        Args:
+            permission_code: Permission code to revoke
+            revoked_by: User revoking the permission
+
+        Returns:
+            BusinessTeamPermission: The created/updated permission record
+        """
+        perm, created = BusinessTeamPermission.objects.update_or_create(
+            team_member=self,
+            permission_code=permission_code,
+            defaults={
+                'is_granted': False,
+                'granted_by': revoked_by
+            }
+        )
+        return perm
+
+    def reset_to_role_defaults(self):
+        """Remove all custom permission overrides, resetting to role defaults."""
+        self.custom_permissions.all().delete()
+
+
+class BusinessTeamPermission(models.Model):
+    """
+    Custom permission overrides for team members.
+
+    Allows granting or revoking specific permissions beyond what
+    the team member's role provides by default.
+
+    Attributes:
+        team_member: The team member this permission applies to
+        permission_code: Permission code from BusinessPermissions
+        is_granted: True = explicitly granted, False = explicitly revoked
+        granted_by: User who made this change
+        granted_at: When this change was made
+    """
+    team_member = models.ForeignKey(
+        BusinessTeamProfile,
+        on_delete=models.CASCADE,
+        related_name='custom_permissions'
+    )
+    permission_code = models.CharField(
+        max_length=50,
+        db_index=True,
+        help_text="Permission code from BusinessPermissions"
+    )
+    is_granted = models.BooleanField(
+        default=True,
+        help_text="True = explicitly granted, False = explicitly revoked"
+    )
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='granted_team_permissions'
+    )
+    granted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Team Permission"
+        verbose_name_plural = "Team Permissions"
+        db_table = 'business_team_permission'
+        unique_together = ('team_member', 'permission_code')
+
+    def __str__(self):
+        status = "granted" if self.is_granted else "revoked"
+        return f"{self.team_member.team_name} - {self.permission_code} ({status})"
 
 
 class PickupLocation(models.Model):

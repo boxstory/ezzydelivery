@@ -1,33 +1,38 @@
-<div class="card col-12 col-lg-6 " id="product_card_single">
-    <div class="m-2" id="product_card_wrapper">
-        <div class="img-avatar" id="product_card_brand_logo_wrapper">
+<style>
+    #product_card_image_bg_{{ product.id }} {
+        background-image: url('{{ product.product_image.url }}');
+    }
+</style>
+<div class="card col-12 col-lg-6 product-card-single" id="product_card_single">
+    <div class="m-2 product-card-wrapper" id="product_card_wrapper">
+        <div class="img-avatar product-card-brand-logo-wrapper" id="product_card_brand_logo_wrapper">
             <div>
                 {% if product.brand_logo %}
-                <img src="{{ product.brand_logo.url }}" alt="{{ product.brand_name|default:'Brand logo' }}" id="product_card_brand_logo_img">
+                <img src="{{ product.brand_logo.url }}" loading="lazy" alt="{{ product.brand_name|default:'Brand logo' }}" class="product-card-brand-logo-img" id="product_card_brand_logo_img">
                 {% else %}
-                <img src="/media/business/product_images/brand_logo_default.jpg" alt="Default brand logo" id="product_card_brand_logo_default">
+                <img src="/media/business/product_images/brand_logo_default.jpg" loading="lazy" alt="Default brand logo" class="product-card-brand-logo-default" id="product_card_brand_logo_default">
                 {% endif %}
             </div>
         </div>
-        <div class="card-text " id="product_card_content">
-            <div class="portada" style="background-image: url('{{ product.product_image.url }}')" id="product_card_image_bg"></div>
-            <div class="title-total" id="product_card_info">
-                <div class="title" id="product_card_category">{{ product.product_category }}</div>
-                <h2 id="product_card_title">{{ product.item_name }}</h2>
-                <div class="desc" id="product_card_description">
+        <div class="card-text product-card-content" id="product_card_content">
+            <div class="portada product-card-bg-image" id="product_card_image_bg_{{ product.id }}"></div>
+            <div class="title-total product-card-info" id="product_card_info">
+                <div class="title product-card-category" id="product_card_category">{{ product.product_category }}</div>
+                <h2 class="product-card-title" id="product_card_title">{{ product.item_name }}</h2>
+                <div class="desc product-card-description" id="product_card_description">
                     {{ product.item_discription }}
                     Morgan has collected ants since they were six years old and now has many dozen ants but none
                     in
                     their pants.
                 </div>
-                <div class="actions" id="product_card_actions">
-                    <button id="product_card_btn_wishlist">
+                <div class="actions product-card-actions" id="product_card_actions">
+                    <button class="product-card-btn-wishlist" id="product_card_btn_wishlist">
                         <i class="far fa-heart"></i>
                     </button>
-                    <button id="product_card_btn_add_cart">
+                    <button class="product-card-btn-add-cart" id="product_card_btn_add_cart">
                         <i class="fa-solid fa-cart-plus"></i>
                     </button>
-                    <button id="product_card_btn_share">
+                    <button class="product-card-btn-share" id="product_card_btn_share">
                         <i class="fas fa-user-friends"></i>
                     </button>
                 </div>

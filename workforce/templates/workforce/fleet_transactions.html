@@ -150,47 +150,7 @@
 </div>
 
 <!-- Pagination -->
-{% if transactions.has_other_pages %}
-<nav aria-label="Transactions pagination">
-    <ul class="pagination justify-content-center">
-        {% if transactions.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ transactions.previous_page_number }}{% if request.GET.driver_id %}&driver_id={{ request.GET.driver_id }}{% endif %}" aria-label="Previous">
-                <span aria-hidden="true">&laquo;</span>
-            </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled">
-            <span class="page-link">&laquo;</span>
-        </li>
-        {% endif %}
-
-        {% for num in transactions.paginator.page_range %}
-        {% if transactions.number == num %}
-        <li class="page-item active">
-            <span class="page-link">{{ num }}</span>
-        </li>
-        {% elif num > transactions.number|add:'-3' and num < transactions.number|add:'3' %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ num }}{% if request.GET.driver_id %}&driver_id={{ request.GET.driver_id }}{% endif %}">{{ num }}</a>
-        </li>
-        {% endif %}
-        {% endfor %}
-
-        {% if transactions.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?page={{ transactions.next_page_number }}{% if request.GET.driver_id %}&driver_id={{ request.GET.driver_id }}{% endif %}" aria-label="Next">
-                <span aria-hidden="true">&raquo;</span>
-            </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled">
-            <span class="page-link">&raquo;</span>
-        </li>
-        {% endif %}
-    </ul>
-</nav>
-{% endif %}
+{% include "includes/components/_pagination.html" with page_obj=transactions filter_params=filter_params %}
 
 {% else %}
 <!-- Empty State -->

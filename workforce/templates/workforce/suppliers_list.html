@@ -15,14 +15,14 @@
 </h1>
 
 <!-- Summary Stats -->
-<div class="stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-    <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #2196f3;">
-        <div style="font-size: 0.812rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Total Suppliers</div>
-        <div style="font-size: 1.75rem; font-weight: 800; color: #2196f3;">{{ total_suppliers }}</div>
+<div class="supplier-stats-grid">
+    <div class="supplier-stat-card stat-primary">
+        <div class="supplier-stat-label">Total Suppliers</div>
+        <div class="supplier-stat-value text-primary">{{ total_suppliers }}</div>
     </div>
-    <div style="background: var(--brand-white); padding: 1.25rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #28a745;">
-        <div style="font-size: 0.812rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase; margin-bottom: 0.5rem;">Total Fulfilled Orders</div>
-        <div style="font-size: 1.75rem; font-weight: 800; color: #28a745;">{{ total_fulfilled }}</div>
+    <div class="supplier-stat-card stat-success">
+        <div class="supplier-stat-label">Total Fulfilled Orders</div>
+        <div class="supplier-stat-value text-success">{{ total_fulfilled }}</div>
     </div>
 </div>
 
@@ -42,7 +42,7 @@
                    placeholder="Search by name, code, email, phone..." value="{{ search }}">
         </div>
         <div class="col-md-2">
-            <label class="filter-label" style="visibility: hidden;">Action</label>
+            <label class="filter-label label-hidden">Action</label>
             <button type="submit" class="btn btn-primary w-100">
                 <i class="fa-solid fa-search me-2"></i>Search
             </button>
@@ -70,8 +70,8 @@
             <tr>
                 <td>
                     <div class="d-flex align-items-center">
-                        <div class="driver-icon me-3" style="width: 40px; height: 40px; background: #e3f2fd;">
-                            <i class="fa-solid fa-boxes-stacked" style="color: #2196f3;"></i>
+                        <div class="supplier-icon me-3">
+                            <i class="fa-solid fa-boxes-stacked"></i>
                         </div>
                         <div>
                             <strong>{{ supplier.business_name|default:"Unknown Business" }}</strong>
@@ -89,10 +89,10 @@
                     {% endif %}
                 </td>
                 <td>
-                    <span class="badge bg-success" style="font-size: 0.9rem;">{{ supplier.fulfilled_orders|default:0 }}</span>
+                    <span class="badge bg-success badge-count">{{ supplier.fulfilled_orders|default:0 }}</span>
                 </td>
                 <td>
-                    <span class="badge bg-warning text-dark" style="font-size: 0.9rem;">{{ supplier.pending_orders|default:0 }}</span>
+                    <span class="badge bg-warning text-dark badge-count">{{ supplier.pending_orders|default:0 }}</span>
                 </td>
                 <td>
                     <strong>{{ supplier.total_orders|default:0 }}</strong>
@@ -116,29 +116,7 @@
     </table>
 
     <!-- Pagination -->
-    {% if page_obj.has_other_pages %}
-    <div class="pagination-container">
-        <nav aria-label="Page navigation">
-            <ul class="pagination">
-                {% if page_obj.has_previous %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}">Previous</a>
-                </li>
-                {% endif %}
-
-                <li class="page-item active">
-                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-                </li>
-
-                {% if page_obj.has_next %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}">Next</a>
-                </li>
-                {% endif %}
-            </ul>
-        </nav>
-    </div>
-    {% endif %}
+    {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params %}
 
     {% else %}
     <div class="empty-state">

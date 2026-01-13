@@ -159,31 +159,9 @@
                     </div>
                 </div>
 
-                {% if stock_levels.has_other_pages %}
                 <div class="card-footer bg-white border-top">
-                    <nav>
-                        <ul class="pagination justify-content-center mb-0">
-                            {% if stock_levels.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ stock_levels.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}">
-                                    <i class="fas fa-chevron-left me-1"></i>Previous
-                                </a>
-                            </li>
-                            {% endif %}
-                            <li class="page-item active">
-                                <span class="page-link">Page {{ stock_levels.number }} of {{ stock_levels.paginator.num_pages }}</span>
-                            </li>
-                            {% if stock_levels.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ stock_levels.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}">
-                                    Next<i class="fas fa-chevron-right ms-1"></i>
-                                </a>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </nav>
+                    {% include "includes/components/_pagination.html" with page_obj=stock_levels filter_params=filter_params %}
                 </div>
-                {% endif %}
             </div>
         </div>
     </div>

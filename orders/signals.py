@@ -2,6 +2,8 @@ import logging
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
+from django.utils import timezone
+from django.db.models import Max
 from orders import models as orders_models
 from delivery import models as delivery_models
 import uuid
@@ -20,12 +22,63 @@ logger = logging.getLogger('orders')
 # Store old verification status for tracking changes
 _old_verification_status = {}
 
+
+def generate_sequence_code(number):
+    """
+    Generate sequence code: AA001-AA999, AB001-AB999, AC001-AC999, etc.
+    After AZ999 -> BA001, etc.
+
+    - number: 1-based order count
+    - Returns: AA001, AA002, ... AA999, AB001, ... AZ999, BA001, ...
+    """
+    # Calculate which group of 999 we're in (0-indexed)
+    group = (number - 1) // 999
+    # Position within the group (1-999)
+    position = ((number - 1) % 999) + 1
+
+    # First letter: A, B, C, ... Z (group // 26)
+    # Second letter: A, B, C, ... Z (group % 26)
+    first_letter = chr(ord('A') + (group // 26) % 26)
+    second_letter = chr(ord('A') + (group % 26))
+
+    return f"{first_letter}{second_letter}{position:03d}"
+
+
+def generate_order_number(business, client_order_code):
+    """
+    Generate order number in format: {business_code}-{client_order_code}-{YMMDD}-{sequence}
+    Example: BIZCODE-CLIENTREF-60113-AA001
+
+    - YMMDD: Year(last digit) + Month(2 digits) + Day(2 digits)
+    - Sequence: AA001-AA999, AB001-AB999, ... never resets, continues globally per business
+    """
+    now = timezone.localtime()
+
+    # Format date as YMMDD (e.g., 60113 for Jan 13, 2026)
+    year_digit = str(now.year)[-1]  # Last digit of year
+    date_part = f"{year_digit}{now.month:02d}{now.day:02d}"
+
+    # Get total order count for this business (never resets)
+    total_orders = Order.objects.filter(business=business).count()
+
+    # Generate sequence: AA001, AA002, ... AA999, AB001, etc.
+    sequence = generate_sequence_code(total_orders + 1)
+
+    # Build order number
+    business_code = business.business_code or 'EZY'
+    order_number = f"{business_code}-{client_order_code}-{date_part}-{sequence}"
+
+    return order_number
+
 @receiver(pre_save, sender=Order)
 def order_pre_save_receiver(sender, instance, *args, **kwargs):
     if not instance.order_number:
-        instance.order_number = str(uuid.uuid4()).replace('-', '').upper()[:10]
-        #instance.order_number = "1"
-    
+        # Generate order number: {business_code}-{client_order_code}-{YMMDD}-{sequence}
+        instance.order_number = generate_order_number(
+            instance.business,
+            instance.client_order_code or 'ORD'
+        )
+
     # Store old verification status if instance exists
     if instance.pk:
         try:

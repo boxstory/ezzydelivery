@@ -170,7 +170,7 @@
                     {% empty %}
                         <tr>
                             <td colspan="9" class="text-center text-muted py-4">
-                                <i class="fa-solid fa-inbox fa-3x mb-3 d-block" style="opacity: 0.3;"></i>
+                                <i class="fa-solid fa-inbox fa-3x mb-3 d-block opacity-30"></i>
                                 No DMS-matched orders found
                             </td>
                         </tr>
@@ -181,31 +181,7 @@
     </div>
 
     <!-- Pagination -->
-    {% if orders.has_other_pages %}
-    <div id="workforce_dms_orders_pagination" class="pagination-wrapper">
-        {% if orders.has_previous %}
-            <a href="?page=1" class="page-link" id="workforce_dms_orders_btn_first_page">
-                <i class="fa-solid fa-angles-left"></i> First
-            </a>
-            <a href="?page={{ orders.previous_page_number }}" class="page-link" id="workforce_dms_orders_btn_prev_page">
-                <i class="fa-solid fa-angle-left"></i> Previous
-            </a>
-        {% endif %}
-
-        <span class="page-link active" id="workforce_dms_orders_page_current">
-            Page {{ orders.number }} of {{ orders.paginator.num_pages }}
-        </span>
-
-        {% if orders.has_next %}
-            <a href="?page={{ orders.next_page_number }}" class="page-link" id="workforce_dms_orders_btn_next_page">
-                Next <i class="fa-solid fa-angle-right"></i>
-            </a>
-            <a href="?page={{ orders.paginator.num_pages }}" class="page-link" id="workforce_dms_orders_btn_last_page">
-                Last <i class="fa-solid fa-angles-right"></i>
-            </a>
-        {% endif %}
-    </div>
-    {% endif %}
+    {% include "includes/components/_pagination.html" with page_obj=orders filter_params=filter_params %}
     {% else %}
     <div id="workforce_dms_orders_alert_getting_started" class="alert-info-custom">
         <i class="fa-solid fa-circle-info me-2"></i>

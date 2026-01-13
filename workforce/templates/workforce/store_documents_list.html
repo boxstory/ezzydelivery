@@ -24,12 +24,12 @@
             <input type="text" id="searchInput" class="filter-input" placeholder="Search by store name, code, phone..." value="{{ search_query }}">
         </div>
         <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
-            <button onclick="toggleView('card')" id="cardViewBtn" class="view-toggle-btn {% if view_type == 'card' %}active{% endif %}">
-                <i class="fa-solid fa-grip"></i>
+            <button type="button" onclick="toggleView('card')" id="cardViewBtn" class="view-toggle-btn {% if view_type == 'card' %}active{% endif %}" aria-pressed="{% if view_type == 'card' %}true{% else %}false{% endif %}">
+                <i class="fa-solid fa-grip" aria-hidden="true"></i>
                 Card
             </button>
-            <button onclick="toggleView('table')" id="tableViewBtn" class="view-toggle-btn {% if view_type == 'table' %}active{% endif %}">
-                <i class="fa-solid fa-list"></i>
+            <button type="button" onclick="toggleView('table')" id="tableViewBtn" class="view-toggle-btn {% if view_type == 'table' %}active{% endif %}" aria-pressed="{% if view_type == 'table' %}true{% else %}false{% endif %}">
+                <i class="fa-solid fa-list" aria-hidden="true"></i>
                 Table
             </button>
         </div>
@@ -143,25 +143,7 @@
 </div>
 
 <!-- Pagination -->
-{% if businesses.has_other_pages %}
-<div class="pagination">
-    {% if businesses.has_previous %}
-    <a href="?page={{ businesses.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if view_type %}&view={{ view_type }}{% endif %}" class="pagination-link">
-        <i class="fa-solid fa-chevron-left"></i> Previous
-    </a>
-    {% endif %}
-
-    <span class="pagination-info">
-        Page {{ businesses.number }} of {{ businesses.paginator.num_pages }}
-    </span>
-
-    {% if businesses.has_next %}
-    <a href="?page={{ businesses.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if view_type %}&view={{ view_type }}{% endif %}" class="pagination-link">
-        Next <i class="fa-solid fa-chevron-right"></i>
-    </a>
-    {% endif %}
-</div>
-{% endif %}
+{% include "includes/components/_pagination.html" with page_obj=businesses filter_params=filter_params %}
 
 </div>
 {% endblock content %}

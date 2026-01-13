@@ -977,6 +977,7 @@
 }
 
 .info-card {
+    display: block;
     background: white;
     border-radius: 0.75rem;
     padding: 1.5rem;
@@ -2118,12 +2119,9 @@ li.instafeed img {
 .timeline-item {
   position: relative;
   margin-bottom: 2rem;
-}
-
-.timeline-item::after {
-  content: '';
-  display: table;
-  clear: both;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .timeline-image {
@@ -2162,12 +2160,15 @@ li.instafeed img {
   box-shadow: var(--brand-shadow-lg);
 }
 
+/* Flexbox layout for timeline panels (converted from float-based) */
 .timeline-item:nth-child(odd) .timeline-panel {
-  float: left;
+  order: 1;
+  margin-right: auto;
 }
 
 .timeline-item:nth-child(even) .timeline-panel {
-  float: right;
+  order: 2;
+  margin-left: auto;
   border-left: none;
   border-right: 0.25rem solid var(--brand-primary);
 }
@@ -3721,4 +3722,357 @@ li.instafeed img {
 .status-automated {
   background-color: #17a2b8;
   color: white;
+}
+
+/* ==================== PICKUP LOCATIONS ==================== */
+/* Pickup Locations List Styles */
+
+.locations-container {
+  padding: 1.5rem;
+}
+
+.locations-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.locations-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--brand-grey-800, #1f1f1f);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.locations-header h2 i {
+  color: var(--brand-primary, #f7c000);
+}
+
+.add-location-btn {
+  background: var(--brand-primary, #f7c000);
+  color: var(--brand-grey-800, #1f1f1f);
+  border: none;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--brand-radius-sm, 8px);
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.add-location-btn:hover {
+  background: var(--brand-primary-dark, #e6b000);
+  color: var(--brand-grey-800, #1f1f1f);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
+  text-decoration: none;
+}
+
+.info-banner {
+  background: linear-gradient(135deg, var(--brand-grey-100, #fafafa) 0%, var(--brand-grey-200, #f0f0f0) 100%);
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-left: 4px solid var(--brand-primary, #f7c000);
+  border-radius: var(--brand-radius-sm, 8px);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.info-banner h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--brand-grey-800, #1f1f1f);
+  margin-bottom: 0.5rem;
+}
+
+.info-banner h4 i {
+  color: var(--brand-primary, #f7c000);
+}
+
+.info-banner p {
+  font-size: 0.875rem;
+  color: var(--brand-grey-600, #666);
+  line-height: 1.5;
+}
+
+.locations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.25rem;
+}
+
+.location-card {
+  background: var(--brand-white, #fff);
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-md, 12px);
+  box-shadow: var(--brand-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.08));
+  overflow: hidden;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.location-card:hover {
+  border-color: var(--brand-primary, #f7c000);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.location-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, var(--brand-grey-100, #fafafa) 0%, var(--brand-grey-200, #f0f0f0) 100%);
+  border-bottom: 1px solid var(--brand-grey-300, #dcdcdc);
+}
+
+.location-card-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--brand-grey-800, #1f1f1f);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.location-card-header h3 i {
+  color: var(--brand-primary, #f7c000);
+}
+
+.location-card-body {
+  padding: 1.25rem;
+  flex: 1;
+}
+
+.location-map-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--brand-grey-100, #fafafa);
+  color: var(--brand-grey-700, #333);
+  padding: 0.625rem 1rem;
+  border-radius: var(--brand-radius-sm, 8px);
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  margin-bottom: 1rem;
+  transition: all 0.2s ease;
+}
+
+.location-map-btn:hover {
+  background: var(--brand-primary, #f7c000);
+  border-color: var(--brand-primary, #f7c000);
+  color: var(--brand-grey-800, #1f1f1f);
+  text-decoration: none;
+}
+
+.location-map-btn i {
+  color: #e74c3c;
+}
+
+.location-map-btn:hover i {
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+.location-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand-grey-500, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+.location-card-footer {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--brand-grey-100, #fafafa);
+  border-top: 1px solid var(--brand-grey-300, #dcdcdc);
+}
+
+.location-card-footer a {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--brand-radius-sm, 8px);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.btn-pick {
+  background: var(--brand-primary, #f7c000);
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+.btn-pick:hover {
+  background: var(--brand-primary-dark, #e6b000);
+  color: var(--brand-grey-800, #1f1f1f);
+  box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
+}
+
+.btn-deliver {
+  background: var(--brand-grey-800, #1f1f1f);
+  color: var(--brand-white, #fff);
+}
+
+.btn-deliver:hover {
+  background: var(--brand-primary, #f7c000);
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+.btn-edit {
+  background: var(--brand-white, #fff);
+  color: var(--brand-grey-700, #333);
+  border: 1px solid var(--brand-grey-300, #dcdcdc);
+}
+
+.btn-edit:hover {
+  background: var(--brand-primary, #f7c000);
+  border-color: var(--brand-primary, #f7c000);
+  color: var(--brand-grey-800, #1f1f1f);
+}
+
+.btn-delete {
+  background: var(--brand-white, #fff);
+  color: #dc3545;
+  border: 1px solid #f8d7da;
+}
+
+.btn-delete:hover {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: var(--brand-white, #fff);
+}
+
+/* Empty State */
+.locations-container .empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: var(--brand-white, #fff);
+  border: 2px dashed var(--brand-grey-300, #dcdcdc);
+  border-radius: var(--brand-radius-md, 12px);
+}
+
+.locations-container .empty-state i {
+  font-size: 3rem;
+  color: var(--brand-grey-400, #b0b0b0);
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.locations-container .empty-state h4 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--brand-grey-700, #333);
+  margin-bottom: 0.5rem;
+}
+
+.locations-container .empty-state p {
+  font-size: 0.9rem;
+  color: var(--brand-grey-500, #888);
+  margin-bottom: 1.5rem;
+}
+
+/* Mobile Responsive */
+@media (max-width: 576px) {
+  .locations-container {
+    padding: 1rem;
+  }
+
+  .locations-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .locations-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .add-location-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .locations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .location-details {
+    grid-template-columns: 1fr;
+  }
+
+  .location-card-footer {
+    flex-direction: column;
+  }
+
+  .location-card-footer a {
+    width: 100%;
+  }
+}
+
+/* ==========================================================================
+   Team card mobile fixes
+   ========================================================================== */
+@media (max-width: 576px) {
+  .card-footer .btn-group {
+    flex-direction: column;
+    width: 100%;
+  }
+  .card-footer .btn-group .btn {
+    border-radius: 0.25rem;
+    margin-bottom: 0.25rem;
+  }
+  .team-empty-state {
+    text-align: center;
+    padding: 2rem 1rem;
+  }
+  .team-empty-state .fa {
+    display: block;
+    margin: 0 auto 1rem;
+  }
+}
+
+/* Remove confirmation mobile */
+@media (max-width: 576px) {
+  .d-flex.gap-2 {
+    flex-direction: column;
+  }
+  .d-flex.gap-2 .btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
 }

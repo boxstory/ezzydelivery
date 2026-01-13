@@ -168,15 +168,15 @@
                             <button type="button" class="btn btn-outline-secondary px-4" id="clearFilter">
                                 <i class="fa fa-times me-2"></i>Clear All
                             </button>
-                            <div class="ms-auto d-flex align-items-center gap-2">
-                                <span class="text-muted small">Quick Filters:</span>
-                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('today')">
+                            <div class="ms-auto d-flex align-items-center gap-2" role="group" aria-label="Quick Filters">
+                                <span class="text-muted small" id="quickFilterLabel">Quick Filters:</span>
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('today')" aria-describedby="quickFilterLabel">
                                     Today
                                 </button>
-                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('pending')">
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('pending')" aria-describedby="quickFilterLabel">
                                     Pending
                                 </button>
-                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('in_transit')">
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('in_transit')" aria-describedby="quickFilterLabel">
                                     In Transit
                                 </button>
                             </div>
@@ -213,12 +213,12 @@
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                     {% if dl.dl_task_status_client %}
                     <span class="status-badge status-{{ dl.dl_task_status_client }}">
-                        {{ dl.dl_task_status_client|title }}
+                        {{ dl.get_dl_task_status_client_display }}
                     </span>
                     {% endif %}
                     {% if dl.dl_task_status_dms %}
                     <span class="status-badge status-{{ dl.dl_task_status_dms }}">
-                        DMS: {{ dl.dl_task_status_dms|title }}
+                        DMS: {{ dl.get_dl_task_status_dms_display }}
                     </span>
                     {% endif %}
                 </div>
@@ -360,47 +360,7 @@
     </div>
 
     <!-- Pagination -->
-    {% if dl_tasks.has_other_pages %}
-    <nav aria-label="Tasks pagination">
-        <ul class="pagination justify-content-center">
-            {% if dl_tasks.has_previous %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ dl_tasks.previous_page_number }}&dlCode={{ filters.dlCode }}&cCode={{ filters.cCode }}&mobile={{ filters.mobile }}&cStatus={{ filters.cStatus }}&dmsStatus={{ filters.dmsStatus }}">
-                    <i class="fa-solid fa-chevron-left"></i> Previous
-                </a>
-            </li>
-            {% else %}
-            <li class="page-item disabled">
-                <span class="page-link"><i class="fa-solid fa-chevron-left"></i> Previous</span>
-            </li>
-            {% endif %}
-
-            {% for page_number in dl_tasks.paginator.page_range %}
-            {% if dl_tasks.number == page_number %}
-            <li class="page-item active">
-                <span class="page-link">{{ page_number }}</span>
-            </li>
-            {% else %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ page_number }}&dlCode={{ filters.dlCode }}&cCode={{ filters.cCode }}&mobile={{ filters.mobile }}&cStatus={{ filters.cStatus }}&dmsStatus={{ filters.dmsStatus }}">{{ page_number }}</a>
-            </li>
-            {% endif %}
-            {% endfor %}
-
-            {% if dl_tasks.has_next %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ dl_tasks.next_page_number }}&dlCode={{ filters.dlCode }}&cCode={{ filters.cCode }}&mobile={{ filters.mobile }}&cStatus={{ filters.cStatus }}&dmsStatus={{ filters.dmsStatus }}">
-                    Next <i class="fa-solid fa-chevron-right"></i>
-                </a>
-            </li>
-            {% else %}
-            <li class="page-item disabled">
-                <span class="page-link">Next <i class="fa-solid fa-chevron-right"></i></span>
-            </li>
-            {% endif %}
-        </ul>
-    </nav>
-    {% endif %}
+    {% include "includes/components/_pagination.html" with page_obj=dl_tasks filter_params=filter_params %}
     {% else %}
     <!-- Empty State -->
     <div class="text-center py-5">

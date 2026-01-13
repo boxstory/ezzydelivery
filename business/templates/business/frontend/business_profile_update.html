@@ -5,6 +5,9 @@
 
 {% block extra_css %}
 <link href="{% static 'business/css/business.css' %}" rel="stylesheet" type="text/css" />
+<!-- Flatpickr Datepicker CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_gold.css">
 <style>
     .update-container {
         max-width: 800px;
@@ -133,3 +136,20 @@
     </div>
 </div>
 {% endblock content %}
+
+{% block extra_js %}
+<!-- Flatpickr Datepicker JS -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize datepicker for business_start_date field
+        flatpickr('.datepicker', {
+            dateFormat: 'Y-m-d',
+            altInput: true,
+            altFormat: 'F j, Y',
+            allowInput: true,
+            maxDate: 'today'
+        });
+    });
+</script>
+{% endblock extra_js %}

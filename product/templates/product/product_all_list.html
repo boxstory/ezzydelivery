@@ -74,7 +74,7 @@ Products
           <span class="product-label">Price</span>
           <span class="product-price">
             <i class="fa-solid fa-money-bill-wave"></i>
-            Qr {{ product.item_price }}
+            QAR {{ product.item_price }}
           </span>
         </div>
 
@@ -121,4 +121,52 @@ Products
   </div>
   {% endif %}
 </div>
+
+<script>
+// Remember view preference using localStorage
+(function() {
+  const viewToggle = document.querySelector('.view-toggle');
+  if (viewToggle) {
+    const viewButtons = viewToggle.querySelectorAll('.view-toggle-btn');
+    const savedView = localStorage.getItem('productView');
+
+    // Apply saved view on page load by highlighting the correct button
+    if (savedView) {
+      viewButtons.forEach(function(btn) {
+        const href = btn.getAttribute('href');
+        if ((savedView === 'grid' && href.includes('product_all_list') && !href.includes('card') && !href.includes('table')) ||
+            (savedView === 'card' && href.includes('card')) ||
+            (savedView === 'table' && href.includes('table'))) {
+          // If not on the saved view page, redirect
+          if (!btn.classList.contains('active') && savedView !== getCurrentView()) {
+            window.location.href = href;
+          }
+        }
+      });
+    }
+
+    // Save view preference when clicking toggle buttons
+    viewButtons.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const href = this.getAttribute('href');
+        let viewType = 'grid';
+        if (href.includes('card')) {
+          viewType = 'card';
+        } else if (href.includes('table')) {
+          viewType = 'table';
+        }
+        localStorage.setItem('productView', viewType);
+      });
+    });
+  }
+
+  // Get current view based on URL
+  function getCurrentView() {
+    const path = window.location.pathname;
+    if (path.includes('card')) return 'card';
+    if (path.includes('table')) return 'table';
+    return 'grid';
+  }
+})();
+</script>
 {% endblock %}

@@ -1,0 +1,46 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+{% block content %}
+<div class="p-3 col-12">
+  <section>
+    <div class="row justify-content-center">
+      <div class="col-md-6 col-lg-4">
+        <div class="card border-danger">
+          <div class="card-header bg-danger text-white">
+            <strong>Remove Team Member</strong>
+          </div>
+          <div class="card-body text-center">
+            <img src="{% if team_member.team_logo %}{{ team_member.team_logo.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}" alt="{{ team_member.team_name|default:team_member.user.username }} avatar" class="rounded-circle mb-3"
+                 style="width: 80px; height: 80px; object-fit: cover;">
+            <h5 class="mb-1">{{ team_member.team_name|default:team_member.user.username }}</h5>
+            <p class="text-muted mb-3">{{ team_member.team_email|default:team_member.user.email }}</p>
+
+            <div class="alert alert-warning text-start">
+              <i class="fa fa-exclamation-triangle me-2"></i>
+              <strong>Warning:</strong> This action cannot be undone.
+              <ul class="mb-0 mt-2">
+                <li>The user will lose access to this business</li>
+                <li>All custom permissions will be deleted</li>
+                <li>The user account will NOT be deleted</li>
+              </ul>
+            </div>
+
+            <form method="POST">
+              {% csrf_token %}
+              <div class="d-flex gap-2">
+                <a href="{% url 'business:business_teams' business.business_id %}"
+                   class="btn btn-secondary flex-fill">
+                  Cancel
+                </a>
+                <button type="submit" class="btn btn-danger flex-fill">
+                  <i class="fa fa-trash me-2"></i>Remove
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock content %}

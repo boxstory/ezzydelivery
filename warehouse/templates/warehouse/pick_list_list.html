@@ -87,21 +87,8 @@
                     </div>
                 </div>
 
-                {% if pick_lists.has_other_pages %}
-                <div class="card-footer bg-white">
-                    <nav>
-                        <ul class="pagination justify-content-center mb-0">
-                            {% if pick_lists.has_previous %}
-                            <li class="page-item"><a class="page-link" href="?page={{ pick_lists.previous_page_number }}{% if selected_status %}&status={{ selected_status }}{% endif %}">Previous</a></li>
-                            {% endif %}
-                            <li class="page-item active"><span class="page-link">{{ pick_lists.number }} / {{ pick_lists.paginator.num_pages }}</span></li>
-                            {% if pick_lists.has_next %}
-                            <li class="page-item"><a class="page-link" href="?page={{ pick_lists.next_page_number }}{% if selected_status %}&status={{ selected_status }}{% endif %}">Next</a></li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                </div>
-                {% endif %}
+                <!-- Pagination -->
+                {% include "includes/components/_pagination.html" with page_obj=pick_lists filter_params=filter_params %}
             </div>
         </div>
     </div>

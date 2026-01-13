@@ -167,39 +167,57 @@ def driver_directory(request):
 
 @login_required(login_url='account_login')
 def driver_directory_add(request):
-    if request.method == 'POST':
+    """
+    Add a driver to the business directory (AJAX endpoint).
+
+    Returns proper JSON responses with appropriate HTTP status codes:
+    - 200: Success
+    - 400: Validation error (missing driver_id, driver already exists)
+    - 404: Business not found
+    - 405: Invalid request method
+    - 500: Server error
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=405)
+
+    try:
+        # IDOR FIX: Verify user has business
         try:
-            # IDOR FIX: Verify user has business
             business = business_models.Business.objects.get(user_id=request.user.id)
-            driver_id = request.POST.get('driver_id')
-
-            if not driver_id:
-                return JsonResponse({'success': False, 'error': 'Driver ID is required'})
-
-            logger.info(f"User {request.user.id} attempting to add driver {driver_id} to business {business.business_id}")
-
-            # Check if driver already exists in directory
-            if business_models.DriverDirectory.objects.filter(
-                business_id=business.business_id, driver_id=driver_id
-            ).exists():
-                logger.info(f"Driver {driver_id} already in directory for business {business.business_id}")
-                return JsonResponse({'success': False, 'error': 'Driver Already Added'})
-
-            # Create new directory entry
-            business_models.DriverDirectory.objects.create(
-                business_id=business.business_id, driver_id=driver_id
-            )
-            logger.info(f"Driver {driver_id} added to directory for business {business.business_id}")
-            return JsonResponse({'success': True, 'message': 'Driver Added'})
-
         except business_models.Business.DoesNotExist:
             logger.warning(f"Business not found for user {request.user.id}")
-            return JsonResponse({'success': False, 'error': 'Business not found'})
-        except Exception as e:
-            logger.error(f"Error adding driver to directory: {e}")
-            return JsonResponse({'success': False, 'error': 'Error adding driver'})
+            return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
 
-    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+        driver_id = request.POST.get('driver_id')
+
+        if not driver_id:
+            return JsonResponse({'success': False, 'error': 'Driver ID is required'}, status=400)
+
+        # Validate driver_id is a valid integer
+        try:
+            driver_id = int(driver_id)
+        except (ValueError, TypeError):
+            return JsonResponse({'success': False, 'error': 'Invalid driver ID format'}, status=400)
+
+        logger.info(f"User {request.user.id} attempting to add driver {driver_id} to business {business.business_id}")
+
+        # Check if driver already exists in directory
+        if business_models.DriverDirectory.objects.filter(
+            business_id=business.business_id, driver_id=driver_id
+        ).exists():
+            logger.info(f"Driver {driver_id} already in directory for business {business.business_id}")
+            return JsonResponse({'success': False, 'error': 'Driver already added'}, status=400)
+
+        # Create new directory entry
+        business_models.DriverDirectory.objects.create(
+            business_id=business.business_id, driver_id=driver_id
+        )
+        logger.info(f"Driver {driver_id} added to directory for business {business.business_id}")
+        return JsonResponse({'success': True, 'message': 'Driver added successfully'})
+
+    except Exception as e:
+        logger.error(f"Error adding driver to directory: {e}")
+        return JsonResponse({'success': False, 'error': 'Server error'}, status=500)
 
 
 @login_required(login_url='account_login')
@@ -809,74 +827,339 @@ def business_logo_update(request, business_id):
 
 
 
-#business_teams---------------------------------------------------------------------------------------------------------------------
+# =============================================================================
+# TEAM MANAGEMENT VIEWS
+# =============================================================================
+
+from django.utils import timezone
+from business.decorators import (
+    business_permission_required,
+    business_manager_or_owner_required,
+    business_owner_required,
+    get_user_business_access,
+    user_has_business_permission,
+)
+from business.permissions import BusinessPermissions, TeamRoles, get_role_permissions
+
 
 @login_required(login_url='/accounts/login/')
+@business_permission_required(BusinessPermissions.TEAM_VIEW)
 def business_teams(request, business_id):
-    # N+1 FIX: Use select_related for user FK
-    business = business_models.Business.objects.filter(business_id=business_id).first()
-    teams = business_models.BusinessTeamProfile.objects.select_related('user').filter(business_id=business_id)
+    """
+    List all team members for a business.
+
+    Requires TEAM_VIEW permission.
+    Shows team members with their roles, status, and permission counts.
+    """
+    business = request.current_business
+
+    # Verify business_id matches user's business
+    if business.business_id != business_id:
+        messages.error(request, "Access denied.")
+        return redirect('business:business_dashboard')
+
+    # Get team members with custom permissions count
+    teams = business_models.BusinessTeamProfile.objects.select_related(
+        'user', 'invited_by'
+    ).prefetch_related(
+        'custom_permissions'
+    ).filter(business_id=business_id).order_by('-created_at')
+
+    # Add permission count to each team member
+    for team in teams:
+        team.permission_count = len(team.get_effective_permissions())
+
     logger.debug(f'Loading teams for business_id={business_id}, count={teams.count()}')
+
     context = {
         'business': business,
         'teams': teams,
+        'can_manage_team': user_has_business_permission(
+            request.user, BusinessPermissions.TEAM_MANAGE
+        ),
     }
     return render(request, 'business/parts/business_teams_list.html', context)
 
 
 @login_required(login_url='/accounts/login/')
+@business_permission_required(BusinessPermissions.TEAM_MANAGE)
 def business_teams_add(request, business_id):
-    business = business_models.Business.objects.filter(business_id=business_id).first()
-    form = business_forms.BusinessTeamProfileForm()
+    """
+    Add a new team member to the business.
+
+    Requires TEAM_MANAGE permission.
+    Creates a new BusinessTeamProfile with the selected user and role.
+    """
+    business = request.current_business
+
+    if business.business_id != business_id:
+        messages.error(request, "Access denied.")
+        return redirect('business:business_dashboard')
+
+    form = business_forms.TeamMemberAddForm(business=business)
+
     if request.method == 'POST':
         logger.debug(f'Adding team member for business_id={business_id}')
-        form = business_forms.BusinessTeamProfileForm(request.POST)
+        form = business_forms.TeamMemberAddForm(request.POST, business=business)
+
         if form.is_valid():
-            f = form.save(commit=False)
-            f.business_id = business_id
-            form.save()
-            logger.info(f'Team member added for business_id={business_id}')
-            messages.success(request, "Successful Submission")
+            team_member = form.save(commit=False)
+            team_member.business_id = business_id
+            team_member.invited_by = request.user
+            team_member.invited_at = timezone.now()
+            team_member.team_status = 'active'  # Direct add = immediate access
+            team_member.save()
+
+            logger.info(f'Team member {team_member.id} added by user {request.user.id} for business_id={business_id}')
+            messages.success(request, f"Team member '{team_member.team_name or team_member.user.username}' added successfully.")
             return redirect("business:business_teams", business_id)
         else:
             logger.warning(f'Team profile form invalid: {form.errors}')
-            messages.error(request, "Error")
+            messages.error(request, "Please correct the errors below.")
+
     context = {
         'business': business,
         'form': form,
-        'form_title': 'Business Team Profile Adding Form'
+        'form_title': 'Add Team Member',
+        'role_choices': TeamRoles.ROLE_CHOICES,
     }
     return render(request, 'business/parts/business_teams_add.html', context)
 
 
 @login_required(login_url='/accounts/login/')
+@business_permission_required(BusinessPermissions.TEAM_MANAGE)
 def business_teams_update(request, business_id, team_id):
-    business = business_models.Business.objects.filter(business_id=business_id).first()
-    team = business_models.BusinessTeamProfile.objects.filter(id=team_id).first()
+    """
+    Update an existing team member.
+
+    Requires TEAM_MANAGE permission.
+    Allows updating team member details and role.
+    """
+    business = request.current_business
+
+    if business.business_id != business_id:
+        messages.error(request, "Access denied.")
+        return redirect('business:business_dashboard')
+
+    team = get_object_or_404(
+        business_models.BusinessTeamProfile,
+        id=team_id,
+        business_id=business_id
+    )
+
     form = business_forms.BusinessTeamProfileForm(instance=team)
+
     if request.method == 'POST':
         logger.debug(f'Updating team member {team_id} for business_id={business_id}')
         form = business_forms.BusinessTeamProfileForm(request.POST, instance=team)
+
         if form.is_valid():
-            f = form.save(commit=False)
-            f.business_id = business_id
             form.save()
             logger.info(f'Team member {team_id} updated for business_id={business_id}')
-            messages.success(request, "Successful Submission")
+            messages.success(request, "Team member updated successfully.")
             return redirect("business:business_teams", business_id)
         else:
             logger.warning(f'Team profile form invalid: {form.errors}')
-            messages.error(request, "Error")
+            messages.error(request, "Please correct the errors below.")
+
     context = {
         'business': business,
         'form': form,
         'team': team,
-        'form_title': 'Business Team Profile Update Form'
-    }   
-
-
+        'form_title': 'Update Team Member'
+    }
 
     return render(request, 'business/parts/business_teams_update.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@business_manager_or_owner_required()
+def business_team_permissions(request, business_id, team_id):
+    """
+    Manage individual team member permissions.
+
+    Requires manager or owner access.
+    Allows granting/revoking specific permissions beyond role defaults.
+    """
+    business = request.current_business
+
+    if business.business_id != business_id:
+        messages.error(request, "Access denied.")
+        return redirect('business:business_dashboard')
+
+    team_member = get_object_or_404(
+        business_models.BusinessTeamProfile.objects.select_related('user').prefetch_related('custom_permissions'),
+        id=team_id,
+        business_id=business_id
+    )
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        permission_code = request.POST.get('permission_code')
+
+        if action == 'grant' and permission_code:
+            team_member.grant_permission(permission_code, granted_by=request.user)
+            messages.success(request, f"Permission '{permission_code}' granted.")
+            logger.info(f'Permission {permission_code} granted to team member {team_id} by user {request.user.id}')
+
+        elif action == 'revoke' and permission_code:
+            team_member.revoke_permission(permission_code, revoked_by=request.user)
+            messages.success(request, f"Permission '{permission_code}' revoked.")
+            logger.info(f'Permission {permission_code} revoked from team member {team_id} by user {request.user.id}')
+
+        elif action == 'reset':
+            team_member.reset_to_role_defaults()
+            messages.success(request, "Permissions reset to role defaults.")
+            logger.info(f'Permissions reset to defaults for team member {team_id} by user {request.user.id}')
+
+        elif action == 'change_role':
+            new_role = request.POST.get('role')
+            if new_role in dict(TeamRoles.ROLE_CHOICES):
+                old_role = team_member.team_role
+                team_member.team_role = new_role
+                team_member.save()
+                messages.success(request, f"Role changed from {old_role} to {new_role}.")
+                logger.info(f'Role changed from {old_role} to {new_role} for team member {team_id} by user {request.user.id}')
+
+        return redirect('business:business_team_permissions', business_id, team_id)
+
+    # Get all available permissions and current state
+    role_permissions = set(get_role_permissions(team_member.team_role))
+    effective_permissions = team_member.get_effective_permissions()
+
+    # Build permission display data grouped by category
+    permission_groups = {}
+    for group_name, group_perms in BusinessPermissions.PERMISSION_GROUPS.items():
+        group_data = []
+        for code, label in group_perms:
+            in_role = code in role_permissions
+            is_effective = code in effective_permissions
+
+            # Determine override status
+            custom_perm = team_member.custom_permissions.filter(permission_code=code).first()
+            override_status = None
+            if custom_perm:
+                override_status = 'granted' if custom_perm.is_granted else 'revoked'
+
+            group_data.append({
+                'code': code,
+                'label': label,
+                'in_role_default': in_role,
+                'is_effective': is_effective,
+                'override_status': override_status,
+            })
+        permission_groups[group_name] = group_data
+
+    context = {
+        'business': business,
+        'team_member': team_member,
+        'permission_groups': permission_groups,
+        'role_choices': TeamRoles.ROLE_CHOICES,
+        'current_role': team_member.team_role,
+        'effective_count': len(effective_permissions),
+    }
+    return render(request, 'business/parts/business_team_permissions.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@business_permission_required(BusinessPermissions.TEAM_MANAGE)
+def business_team_remove(request, business_id, team_id):
+    """
+    Remove a team member from the business.
+
+    Requires TEAM_MANAGE permission.
+    Permanently deletes the team member and their custom permissions.
+    """
+    business = request.current_business
+
+    if business.business_id != business_id:
+        messages.error(request, "Access denied.")
+        return redirect('business:business_dashboard')
+
+    team_member = get_object_or_404(
+        business_models.BusinessTeamProfile,
+        id=team_id,
+        business_id=business_id
+    )
+
+    if request.method == 'POST':
+        team_name = team_member.team_name or team_member.user.username
+        team_member.delete()
+        logger.info(f'Team member {team_id} removed from business {business_id} by user {request.user.id}')
+        messages.success(request, f"Team member '{team_name}' has been removed.")
+        return redirect('business:business_teams', business_id)
+
+    context = {
+        'business': business,
+        'team_member': team_member,
+    }
+    return render(request, 'business/parts/business_team_remove_confirm.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@business_permission_required(BusinessPermissions.TEAM_MANAGE)
+def business_team_status_change(request, business_id, team_id):
+    """
+    Change team member status (activate/suspend/deactivate).
+
+    Requires TEAM_MANAGE permission.
+    Handles AJAX requests for status changes.
+
+    Returns proper JSON responses with appropriate HTTP status codes:
+    - 200: Success
+    - 400: Validation error (invalid status, missing status)
+    - 403: Access denied
+    - 404: Team member not found
+    - 405: Invalid request method
+    - 500: Server error
+    """
+    try:
+        business = request.current_business
+
+        if business.business_id != business_id:
+            return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
+
+        if request.method != 'POST':
+            return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
+
+        # Handle invalid team_id gracefully with JSON response instead of 404 HTML page
+        try:
+            team_member = business_models.BusinessTeamProfile.objects.get(
+                id=team_id,
+                business_id=business_id
+            )
+        except business_models.BusinessTeamProfile.DoesNotExist:
+            logger.warning(f'Team member {team_id} not found for business {business_id}')
+            return JsonResponse({'success': False, 'error': 'Team member not found'}, status=404)
+        except (ValueError, TypeError):
+            return JsonResponse({'success': False, 'error': 'Invalid team ID format'}, status=400)
+
+        new_status = request.POST.get('status')
+
+        if not new_status:
+            return JsonResponse({'success': False, 'error': 'Status is required'}, status=400)
+
+        valid_statuses = dict(business_models.BusinessTeamProfile.STATUS_CHOICES)
+
+        if new_status not in valid_statuses:
+            return JsonResponse({'success': False, 'error': 'Invalid status'}, status=400)
+
+        old_status = team_member.team_status
+        team_member.team_status = new_status
+        team_member.save()
+
+        logger.info(f'Team member {team_id} status changed from {old_status} to {new_status} by user {request.user.id}')
+
+        return JsonResponse({
+            'success': True,
+            'message': f"Status changed to {valid_statuses[new_status]}",
+            'new_status': new_status,
+            'new_status_label': valid_statuses[new_status],
+        })
+
+    except Exception as e:
+        logger.error(f'Error changing team member status: {e}')
+        return JsonResponse({'success': False, 'error': 'Server error'}, status=500)
 
 
 # Workflow Guide -----------------------------------------------------
