@@ -130,18 +130,19 @@
     position: relative;
 }
 
-/* Auto-expand submenu for active parent */
-.dashboard-sidebar .nav-item.active .multi-level,
-.dashboard-sidebar .nav-item.active .submenu,
-.dashboard-sidebar .nav-item.active .collapse {
-    display: block !important;
+/* Auto-expand submenu for active parent - controlled by JS now */
+/* Removed !important to allow JS to control collapse state properly */
+.dashboard-sidebar .nav-item.active .multi-level.show,
+.dashboard-sidebar .nav-item.active .submenu.show,
+.dashboard-sidebar .nav-item.active .collapse.show {
+    display: block;
 }
 
-/* Rotate caret when parent is active or expanded */
-.dashboard-sidebar .nav-item.active .fa-caret-down,
-.dashboard-sidebar .nav-item.active .fa-chevron-down,
+/* Rotate caret when explicitly expanded (via aria-expanded or JS) */
 .dashboard-sidebar .nav-link[aria-expanded="true"] .fa-caret-down,
-.dashboard-sidebar .nav-link[aria-expanded="true"] .fa-chevron-down {
+.dashboard-sidebar .nav-link[aria-expanded="true"] .fa-chevron-down,
+.dashboard-sidebar div.nav-link[aria-expanded="true"] .fa-caret-down,
+.dashboard-sidebar div.nav-link[aria-expanded="true"] .fa-chevron-down {
     transform: rotate(180deg);
 }
 

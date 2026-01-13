@@ -55,6 +55,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.db.models import Q
 from datetime import datetime, timedelta, timezone
 from django.forms import inlineformset_factory
 import pandas as pd
@@ -671,30 +672,70 @@ def add_order_product(request, order_id):
         logger.info(f"User {request.user.id} adding products to order {order_id}")
 
         # Get existing items for this order
-        existing_items = orders_models.OrderItem.objects.filter(order=order)
+        existing_items = orders_models.OrderItem.objects.filter(order=order).select_related('product')
 
         if request.method == 'POST':
             logger.info(f"Processing product addition for order {order_id}")
-            form = orders_forms.AddOrderProductsForm(request.POST)
 
-            # Set the order for the form
-            if form.is_valid():
-                order_item = form.save(commit=False)
-                order_item.order = order
-                order_item.save()
-                logger.info(f"Product added successfully to order {order_id}")
-                messages.success(request, "Product added to order successfully")
+            # Handle multiple products from the form
+            products_added = 0
+            errors = []
+
+            # Get all product entries from POST data
+            product_ids = request.POST.getlist('product_id[]')
+            quantities = request.POST.getlist('quantity[]')
+            unit_prices = request.POST.getlist('unit_price[]')
+            notes_list = request.POST.getlist('notes[]')
+
+            for i, product_id in enumerate(product_ids):
+                if not product_id:  # Skip empty product selections
+                    continue
+
+                try:
+                    from product import models as product_models
+                    product = product_models.Product.objects.get(id=product_id, business=business)
+
+                    quantity = int(quantities[i]) if i < len(quantities) and quantities[i] else 1
+                    unit_price = float(unit_prices[i]) if i < len(unit_prices) and unit_prices[i] else float(product.item_price)
+                    notes = notes_list[i] if i < len(notes_list) else ''
+
+                    # Create the order item
+                    order_item = orders_models.OrderItem(
+                        order=order,
+                        product=product,
+                        quantity=quantity,
+                        unit_price=unit_price,
+                        notes=notes
+                    )
+                    order_item.save()
+                    products_added += 1
+
+                except product_models.Product.DoesNotExist:
+                    errors.append(f"Product #{i+1} not found")
+                except (ValueError, IndexError) as e:
+                    errors.append(f"Invalid data for product #{i+1}: {str(e)}")
+
+            if products_added > 0:
+                logger.info(f"{products_added} product(s) added successfully to order {order_id}")
+                messages.success(request, f"{products_added} product(s) added to order successfully")
                 return redirect('orders:orders_all_list')
+            elif errors:
+                for error in errors:
+                    messages.error(request, error)
             else:
-                logger.warning(f"Invalid product form for order {order_id}: {form.errors}")
-        else:
-            form = orders_forms.AddOrderProductsForm(initial={'order': order})
+                messages.warning(request, "No products were selected")
+
+        # Get all products for this business (for Select2 AJAX search)
+        from product import models as product_models
+
+        # Check if fulfillment/inventory is enabled
+        inventory_enabled = business.fulfillment_service_enabled
 
         data = {
             'order': order,
-            'form': form,
             'business': business,
-            'existing_items': existing_items
+            'existing_items': existing_items,
+            'inventory_enabled': inventory_enabled,
         }
         return render(request, 'orders/order_product_add.html', data)
 
@@ -706,6 +747,64 @@ def add_order_product(request, order_id):
         logger.error(f"Business not found for user {request.user.id}")
         messages.error(request, "Business not found")
         return redirect('business:business_dashboard')
+
+
+@login_required(login_url='account_login')
+def product_search_api(request):
+    """
+    AJAX endpoint for product search with Select2.
+    Returns products matching search query with price and inventory info.
+    Requires minimum 3 characters to trigger search.
+    """
+    try:
+        business = business_models.Business.objects.get(user_id=request.user.id)
+        search_term = request.GET.get('q', '').strip()
+
+        # Require minimum 3 characters
+        if len(search_term) < 3:
+            return JsonResponse({'results': [], 'pagination': {'more': False}})
+
+        from product import models as product_models
+
+        # Search products by name, SKU, or brand
+        products = product_models.Product.objects.filter(
+            business=business
+        ).filter(
+            Q(item_name__icontains=search_term) |
+            Q(brand_name__icontains=search_term) |
+            Q(item_sku__icontains=search_term)
+        ).select_related('unit')[:20]  # Limit to 20 results
+
+        results = []
+        for product in products:
+            # Get inventory status if fulfillment is enabled
+            inventory_qty = None
+            if business.fulfillment_service_enabled:
+                inventory = product_models.ProductInventory.objects.filter(
+                    item_sku=product
+                ).first()
+                inventory_qty = inventory.item_quantity if inventory else 0
+
+            result = {
+                'id': product.id,
+                'text': f"{product.brand_name} {product.item_name}",
+                'sku': product.item_sku,
+                'price': float(product.item_price),
+                'unit': product.unit.short_code if product.unit else '',
+                'inventory': inventory_qty,
+            }
+            results.append(result)
+
+        return JsonResponse({
+            'results': results,
+            'pagination': {'more': False}
+        })
+
+    except business_models.Business.DoesNotExist:
+        return JsonResponse({'results': [], 'error': 'Business not found'}, status=404)
+    except Exception as e:
+        logger.error(f"Product search error: {str(e)}")
+        return JsonResponse({'results': [], 'error': str(e)}, status=500)
 
 
 

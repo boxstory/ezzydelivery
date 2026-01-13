@@ -32,11 +32,12 @@ urlpatterns = [
     path('bulk_entry/', orders_views.bulk_order_entry, name='bulk_order_entry'),
 
     # Products add to order list
-    path('add_order_product/<int:order_id>/', 
+    path('add_order_product/<int:order_id>/',
          orders_views.add_order_product, name='add_order_product'),
-    path('update_order_product/<int:order_id>/', 
+    path('update_order_product/<int:order_id>/',
          orders_views.update_order_product, name='update_order_product'),
-    path('order/<int:order_id>/products/', orders_views.order_product_list, name='order_product_list'), 
+    path('order/<int:order_id>/products/', orders_views.order_product_list, name='order_product_list'),
+    path('api/product-search/', orders_views.product_search_api, name='product_search_api'), 
 
 
     # operation links

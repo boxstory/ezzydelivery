@@ -171,12 +171,29 @@
 
 <script>
   $(document).ready(function () {
-    // Get the active menu item and open its submenu
-    const activeMenuItem = $(".nav-item.active");
-    activeMenuItem.find(".multi-level").addClass("show");
-    activeMenuItem
-      .find('[data-bs-toggle="collapse"]')
-      .attr("aria-expanded", "true");
+    // First, close ALL submenus and reset their states
+    $(".dashboard-sidebar .multi-level, .dashboard-sidebar .submenu").removeClass("show");
+    $(".dashboard-sidebar [data-bs-toggle='collapse']").attr("aria-expanded", "false");
+    $(".dashboard-sidebar [data-bs-toggle='collapse'] .fa-caret-down").css("transform", "rotate(0deg)");
+
+    // Now open ONLY the submenu that contains an active sublink
+    // Check if any submenu contains an active nav-link (sublink)
+    $(".dashboard-sidebar .multi-level, .dashboard-sidebar .submenu").each(function() {
+      const submenu = $(this);
+      const hasActiveSublink = submenu.find(".nav-link.active, .nav-item.active").length > 0;
+
+      if (hasActiveSublink) {
+        // Open this submenu
+        submenu.addClass("show");
+
+        // Update the parent toggle
+        const toggleBtn = $('[data-bs-target="#' + submenu.attr('id') + '"]');
+        if (toggleBtn.length) {
+          toggleBtn.attr("aria-expanded", "true");
+          toggleBtn.find(".fa-caret-down").css("transform", "rotate(180deg)");
+        }
+      }
+    });
   });
 </script>
 

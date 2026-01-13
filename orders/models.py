@@ -18,6 +18,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 import barcode
 from barcode.writer import ImageWriter
+import qrcode
 from io import BytesIO
 from django.core.files import File
 
@@ -237,11 +238,20 @@ class OrderBarcode(models.Model):
         return str(self.order_number)
     
     def save(self, *args, **kwargs):
-        EAN = barcode.get_barcode_class('code128')
-        ean = EAN(self.order_number, writer=ImageWriter())
+        # Generate QR code instead of barcode
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=2,
+        )
+        qr.add_data(self.order_number)
+        qr.make(fit=True)
+        qr_image = qr.make_image(fill_color="black", back_color="white")
         buffer = BytesIO()
-        ean.write(buffer)
-        self.barcode.save(f"{self.order_number}.png", File(buffer), save=False)
+        qr_image.save(buffer, format='PNG')
+        buffer.seek(0)
+        self.barcode.save(f"{self.order_number}_qr.png", File(buffer), save=False)
         return super().save(*args, **kwargs)
 
 
