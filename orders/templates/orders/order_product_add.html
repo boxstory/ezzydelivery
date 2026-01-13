@@ -1,104 +1,1067 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
 {% block content %}
-<div class="p-3 col-12  " id="orders_add_product_container_main">
-  <div class="container align-content-center w-100">
-    <div class="row">
-      <div class="col-md-12 pb-3">
-        <div class="col p-2">
-          <h2 class="m-0 text-center" id="orders_add_product_header_title">Add Ordered Products list</h2>
-        </div>
-        <div class="col d-flex justify-content-between rounded-2 bg-light" id="orders_add_product_nav_actions">
-
-          <a class="btn pe-3 text-dark" href="{% url 'orders:orders_all_list' %}">
-            <div class="btn btn-dark my-2" id="orders_add_product_btn_orders_list">Orders List</div>
-          </a>
-          <a class="btn pe-3 text-dark d-none d-md-block" href="{% url 'orders:orders_all_list' %}">
-            <div class="btn btn-dark my-2" id="orders_add_product_btn_edit_order">Edit Order</div>
-          </a>
-
-        </div>
+<div class="order-product-add-page" id="orders_add_product_container_main">
+  <!-- Page Header -->
+  <div class="order-product-header">
+    <div class="order-product-header-content">
+      <div class="order-product-title-section">
+        <h1 class="order-product-title">
+          <i class="fas fa-boxes me-2"></i>Add Products to Order
+        </h1>
+        <p class="order-product-subtitle">Add one or more products to order #{{ order.client_order_code }}</p>
       </div>
-    </div>
-
-    <div class=" pb-2 bg-light p-3 pt-0" id="collapse-{{ order.id }}" data-card-id="orders_add_product_card_order_info">
-      <div class="pb-2">
-        <div class="d-flex justify-content-between">
-          <div>Name</div>
-          <div>Mobile</div>
-        </div>
-        <hr class="p-0 m-0" />
-        <div class="d-flex justify-content-between p-0">
-          <p>{{ order.customer_name }}</p>
-          <p>{{ order.customer_phone }}</p>
-        </div>
-      </div>
-      <div class=" ">
-        <div class="d-flex justify-content-between">
-          <div>order number</div>
-          <div>Date</div>
-        </div>
-        <hr class="p-0 m-0 align-content-center" />
-        <div class="d-flex justify-content-between pt-2">
-          <div>{{ order.client_order_code }}</div>
-          <div>
-            {{ order.order_date }}
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="row mt-3">
-      <div class="col-md-12">
-        {{ error }}
-        <form method="POST" id="orders_add_product_form_main">
-          {% if form.non_field_errors %}
-          <!-- extra css -->
-          {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
-
-          {% endif %}
-          {% csrf_token %}
-          {{ form | crispy }}
-
-          {% if order.order_status == 'publish' %}
-          <div class="my-3 text-center">
-            <button class="btn btn-success w-50 " id="orders_add_product_btn_published">
-
-              <P class="m-0"> Already Published</P>
-            </button>
-          </div>
-          {% else %}
-
-
-
-          <div class=" my-3 text-center">
-            <button class="btn btn-dark w-50 align-content-center" href="{% url 'orders:orders_all_list'  %}" id="orders_add_product_btn_confirm">Confirm
-              Products
-            </button>
-
-          </div>{% endif %}
-
-
-
-        </form>
+      <div class="order-product-quick-actions">
+        <a href="{% url 'orders:order_update' order.id %}" class="quick-action-btn">
+          <i class="fas fa-edit"></i>
+          <span>Edit Order</span>
+        </a>
+        <a href="{% url 'orders:orders_all_list' %}" class="quick-action-btn">
+          <i class="fas fa-arrow-left"></i>
+          <span>Back to Orders</span>
+        </a>
       </div>
     </div>
   </div>
+
+  <!-- Order Summary Card -->
+  <div class="order-summary-card">
+    <div class="order-summary-header">
+      <i class="fas fa-file-invoice"></i>
+      <h3>Order Details</h3>
+    </div>
+    <div class="order-summary-body">
+      <div class="order-summary-grid">
+        <div class="summary-item">
+          <span class="summary-label">Customer</span>
+          <span class="summary-value">{{ order.customer_name }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Phone</span>
+          <span class="summary-value">{{ order.customer_phone }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Order ID</span>
+          <span class="summary-value">{{ order.client_order_code }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Date</span>
+          <span class="summary-value">{{ order.order_date }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Status</span>
+          <span class="summary-value">
+            <span class="badge bg-{{ order.order_status|default:'secondary' }}">{{ order.get_order_status_display }}</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Existing Products (if any) -->
+  {% if existing_items %}
+  <div class="existing-products-card">
+    <div class="existing-products-header">
+      <i class="fas fa-shopping-cart"></i>
+      <h3>Current Products ({{ existing_items.count }})</h3>
+    </div>
+    <div class="existing-products-body">
+      <table class="existing-products-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>SKU</th>
+            <th>Qty</th>
+            <th>Unit Price</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in existing_items %}
+          <tr>
+            <td>{{ item.product.brand_name }} {{ item.product.item_name }}</td>
+            <td><code>{{ item.product.item_sku }}</code></td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.unit_price }} QAR</td>
+            <td><strong>{{ item.total_price }} QAR</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Add Products Form -->
+  <div class="add-products-card">
+    <div class="add-products-header">
+      <i class="fas fa-plus-circle"></i>
+      <h3>Add New Products</h3>
+      <span class="product-count-badge" id="product_count_badge">2 products</span>
+    </div>
+
+    <form method="POST" id="add_products_form" class="add-products-form">
+      {% csrf_token %}
+
+      <div class="products-container" id="products_container">
+        <!-- Product Row 1 -->
+        <div class="product-row" data-row-index="0">
+          <div class="product-row-header">
+            <span class="product-row-number">Product #1</span>
+            <button type="button" class="btn-remove-product" title="Remove this product" disabled>
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="product-row-fields">
+            <div class="field-group field-product">
+              <label class="form-label">
+                <i class="fas fa-box me-1"></i>Product <span class="text-danger">*</span>
+              </label>
+              <select name="product_id[]" class="product-select" required>
+                <option value="">Type 3+ characters to search...</option>
+              </select>
+              <div class="product-info-display" style="display: none;">
+                <span class="sku-badge"></span>
+                {% if inventory_enabled %}
+                <span class="inventory-badge"></span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="field-group field-quantity">
+              <label class="form-label">
+                <i class="fas fa-hashtag me-1"></i>Qty
+              </label>
+              <input type="number" name="quantity[]" class="form-control quantity-input" value="1" min="1" required>
+            </div>
+            <div class="field-group field-price">
+              <label class="form-label">
+                <i class="fas fa-tag me-1"></i>Unit Price (QAR)
+              </label>
+              <input type="number" name="unit_price[]" class="form-control price-input" step="0.01" min="0" placeholder="Auto-filled">
+            </div>
+            <div class="field-group field-total">
+              <label class="form-label">
+                <i class="fas fa-calculator me-1"></i>Total
+              </label>
+              <div class="total-display">0.00 QAR</div>
+            </div>
+            <div class="field-group field-notes">
+              <label class="form-label">
+                <i class="fas fa-sticky-note me-1"></i>Notes
+              </label>
+              <input type="text" name="notes[]" class="form-control notes-input" placeholder="Optional notes">
+            </div>
+          </div>
+        </div>
+
+        <!-- Product Row 2 -->
+        <div class="product-row" data-row-index="1">
+          <div class="product-row-header">
+            <span class="product-row-number">Product #2</span>
+            <button type="button" class="btn-remove-product" title="Remove this product">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="product-row-fields">
+            <div class="field-group field-product">
+              <label class="form-label">
+                <i class="fas fa-box me-1"></i>Product
+              </label>
+              <select name="product_id[]" class="product-select">
+                <option value="">Type 3+ characters to search...</option>
+              </select>
+              <div class="product-info-display" style="display: none;">
+                <span class="sku-badge"></span>
+                {% if inventory_enabled %}
+                <span class="inventory-badge"></span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="field-group field-quantity">
+              <label class="form-label">
+                <i class="fas fa-hashtag me-1"></i>Qty
+              </label>
+              <input type="number" name="quantity[]" class="form-control quantity-input" value="1" min="1">
+            </div>
+            <div class="field-group field-price">
+              <label class="form-label">
+                <i class="fas fa-tag me-1"></i>Unit Price (QAR)
+              </label>
+              <input type="number" name="unit_price[]" class="form-control price-input" step="0.01" min="0" placeholder="Auto-filled">
+            </div>
+            <div class="field-group field-total">
+              <label class="form-label">
+                <i class="fas fa-calculator me-1"></i>Total
+              </label>
+              <div class="total-display">0.00 QAR</div>
+            </div>
+            <div class="field-group field-notes">
+              <label class="form-label">
+                <i class="fas fa-sticky-note me-1"></i>Notes
+              </label>
+              <input type="text" name="notes[]" class="form-control notes-input" placeholder="Optional notes">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add More Button -->
+      <div class="add-product-btn-container">
+        <button type="button" class="btn-add-product" id="btn_add_product">
+          <i class="fas fa-plus me-2"></i>Add Another Product
+        </button>
+      </div>
+
+      <!-- Order Total -->
+      <div class="order-total-section">
+        <div class="order-total-row">
+          <span class="order-total-label">Order Total:</span>
+          <span class="order-total-value" id="order_total">0.00 QAR</span>
+        </div>
+      </div>
+
+      <!-- Submit Buttons -->
+      {% if order.order_status == 'publish' %}
+      <div class="form-submit-section">
+        <div class="alert alert-success">
+          <i class="fas fa-check-circle me-2"></i>
+          This order has already been published
+        </div>
+      </div>
+      {% else %}
+      <div class="form-submit-section">
+        <a href="{% url 'orders:orders_all_list' %}" class="btn btn-outline-secondary btn-lg">
+          <i class="fas fa-times me-2"></i>Cancel
+        </a>
+        <button type="submit" class="btn btn-primary btn-lg" id="btn_submit_products">
+          <i class="fas fa-save me-2"></i>Save Products
+        </button>
+      </div>
+      {% endif %}
+    </form>
+  </div>
 </div>
 {% endblock content %}
-{% block extra_js %}
-<script>
 
-  // Initialize select2 in pickuplocation search field
-  if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
-    $("#id_product01_name").select2();
-    $("#id_product02_name").select2();
-    $("#id_product03_name").select2();
-    $("#id_product04_name").select2();
-    $("#id_product05_name").select2();
-    $("#id_product06_name").select2();
-    $("#id_product07_name").select2();
+{% block extra_css %}
+<style>
+/* =============================================
+   ORDER PRODUCT ADD PAGE STYLES
+   ============================================= */
+
+.order-product-add-page {
+  padding: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Page Header */
+.order-product-header {
+  margin-bottom: 1.5rem;
+}
+
+.order-product-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.order-product-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--brand-grey-900, #212529);
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.order-product-title i {
+  color: var(--brand-primary, #ffd33b);
+}
+
+.order-product-subtitle {
+  color: var(--brand-grey-600, #6c757d);
+  margin: 0.25rem 0 0;
+  font-size: 0.9375rem;
+}
+
+.order-product-quick-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--brand-white, #fff);
+  border: 1px solid var(--brand-grey-300, #dee2e6);
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--brand-grey-700, #495057);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.quick-action-btn:hover {
+  background: var(--brand-grey-100, #f8f9fa);
+  border-color: var(--brand-primary, #ffd33b);
+  color: var(--brand-grey-900, #212529);
+  transform: translateY(-1px);
+}
+
+.quick-action-btn i {
+  color: var(--brand-primary, #ffd33b);
+}
+
+/* Order Summary Card */
+.order-summary-card,
+.existing-products-card,
+.add-products-card {
+  background: var(--brand-white, #fff);
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+
+.order-summary-header,
+.existing-products-header,
+.add-products-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, var(--brand-grey-50, #f8f9fa) 0%, var(--brand-grey-100, #f1f3f4) 100%);
+  border-bottom: 1px solid var(--brand-grey-200, #e9ecef);
+}
+
+.order-summary-header i,
+.existing-products-header i,
+.add-products-header i {
+  font-size: 1.25rem;
+  color: var(--brand-primary, #ffd33b);
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-white, #fff);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.order-summary-header h3,
+.existing-products-header h3,
+.add-products-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--brand-grey-800, #343a40);
+  margin: 0;
+  flex: 1;
+}
+
+.product-count-badge {
+  background: var(--brand-primary, #ffd33b);
+  color: var(--brand-grey-900, #212529);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+}
+
+.order-summary-body,
+.existing-products-body {
+  padding: 1.25rem 1.5rem;
+}
+
+.order-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.summary-label {
+  font-size: 0.75rem;
+  color: var(--brand-grey-500, #6c757d);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-value {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--brand-grey-800, #343a40);
+}
+
+/* Existing Products Table */
+.existing-products-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.existing-products-table th,
+.existing-products-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--brand-grey-200, #e9ecef);
+}
+
+.existing-products-table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand-grey-600, #6c757d);
+  text-transform: uppercase;
+  background: var(--brand-grey-50, #f8f9fa);
+}
+
+.existing-products-table td {
+  font-size: 0.875rem;
+}
+
+.existing-products-table code {
+  background: var(--brand-grey-100, #f8f9fa);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+}
+
+/* Product Row */
+.products-container {
+  padding: 1.5rem;
+}
+
+.product-row {
+  background: var(--brand-grey-50, #f8f9fa);
+  border: 1px solid var(--brand-grey-200, #e9ecef);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  transition: all 0.2s ease;
+}
+
+.product-row:hover {
+  border-color: var(--brand-primary, #ffd33b);
+}
+
+.product-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.product-row-number {
+  font-weight: 600;
+  color: var(--brand-grey-700, #495057);
+  font-size: 0.875rem;
+}
+
+.btn-remove-product {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: var(--brand-grey-200, #e9ecef);
+  color: var(--brand-grey-600, #6c757d);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-remove-product:hover:not(:disabled) {
+  background: #dc3545;
+  color: white;
+}
+
+.btn-remove-product:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.product-row-fields {
+  display: grid;
+  grid-template-columns: 2fr 80px 120px 100px 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.field-group .form-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--brand-grey-600, #6c757d);
+  margin-bottom: 0.375rem;
+}
+
+.field-group .form-label i {
+  font-size: 0.6875rem;
+}
+
+.field-group .form-control {
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--brand-grey-300, #dee2e6);
+  border-radius: 0.5rem;
+}
+
+.field-group .form-control:focus {
+  border-color: var(--brand-primary, #ffd33b);
+  box-shadow: 0 0 0 3px rgba(255, 211, 59, 0.15);
+}
+
+/* Product Info Display */
+.product-info-display {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.375rem;
+  flex-wrap: wrap;
+}
+
+.sku-badge {
+  font-size: 0.6875rem;
+  background: var(--brand-grey-200, #e9ecef);
+  color: var(--brand-grey-700, #495057);
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  font-family: monospace;
+}
+
+.inventory-badge {
+  font-size: 0.6875rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.inventory-badge.in-stock {
+  background: #d4edda;
+  color: #155724;
+}
+
+.inventory-badge.low-stock {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.inventory-badge.out-of-stock {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* Total Display */
+.total-display {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--brand-grey-800, #343a40);
+  padding: 0.5rem 0.75rem;
+  background: var(--brand-white, #fff);
+  border: 1px solid var(--brand-grey-300, #dee2e6);
+  border-radius: 0.5rem;
+  text-align: center;
+}
+
+/* Add Product Button */
+.add-product-btn-container {
+  padding: 0 1.5rem 1.5rem;
+}
+
+.btn-add-product {
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: 2px dashed var(--brand-grey-300, #dee2e6);
+  border-radius: 0.75rem;
+  color: var(--brand-grey-600, #6c757d);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-add-product:hover {
+  background: var(--brand-grey-50, #f8f9fa);
+  border-color: var(--brand-primary, #ffd33b);
+  color: var(--brand-grey-800, #343a40);
+}
+
+/* Order Total */
+.order-total-section {
+  background: linear-gradient(135deg, var(--brand-grey-800, #343a40) 0%, var(--brand-grey-900, #212529) 100%);
+  padding: 1.25rem 1.5rem;
+  margin: 0 1.5rem 1.5rem;
+  border-radius: 0.75rem;
+}
+
+.order-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.order-total-label {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--brand-grey-300, #dee2e6);
+}
+
+.order-total-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--brand-primary, #ffd33b);
+}
+
+/* Submit Section */
+.form-submit-section {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--brand-grey-50, #f8f9fa);
+  border-top: 1px solid var(--brand-grey-200, #e9ecef);
+}
+
+.form-submit-section .btn {
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+}
+
+.form-submit-section .btn-primary {
+  background: linear-gradient(135deg, var(--brand-primary, #ffd33b) 0%, var(--brand-primary-dark, #e6be35) 100%);
+  border: none;
+  color: var(--brand-grey-900, #212529);
+}
+
+.form-submit-section .btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 211, 59, 0.4);
+}
+
+/* Select2 Custom Styling */
+.select2-container {
+  width: 100% !important;
+}
+
+.select2-container--default .select2-selection--single {
+  height: auto;
+  min-height: 38px;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--brand-grey-300, #dee2e6);
+  border-radius: 0.5rem;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+  line-height: 1.5;
+  padding-left: 0;
+  color: var(--brand-grey-800, #343a40);
+}
+
+.select2-container--default .select2-selection--single .select2-selection__placeholder {
+  color: var(--brand-grey-500, #6c757d);
+}
+
+.select2-container--default.select2-container--focus .select2-selection--single {
+  border-color: var(--brand-primary, #ffd33b);
+  box-shadow: 0 0 0 3px rgba(255, 211, 59, 0.15);
+}
+
+.select2-dropdown {
+  border: 1px solid var(--brand-grey-300, #dee2e6);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.select2-results__option {
+  padding: 0.625rem 0.75rem;
+}
+
+.select2-results__option--highlighted {
+  background: var(--brand-primary, #ffd33b) !important;
+  color: var(--brand-grey-900, #212529) !important;
+}
+
+/* Custom Select2 Result Template */
+.product-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.product-option-name {
+  font-weight: 500;
+}
+
+.product-option-meta {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--brand-grey-600, #6c757d);
+}
+
+.product-option-sku {
+  font-family: monospace;
+  background: var(--brand-grey-200, #e9ecef);
+  padding: 0 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.product-option-price {
+  color: var(--brand-primary-dark, #e6be35);
+  font-weight: 600;
+}
+
+.product-option-inventory {
+  color: #28a745;
+}
+
+.product-option-inventory.low {
+  color: #ffc107;
+}
+
+.product-option-inventory.out {
+  color: #dc3545;
+}
+
+/* Responsive Design */
+@media (max-width: 992px) {
+  .product-row-fields {
+    grid-template-columns: 1fr 1fr;
   }
 
+  .field-product {
+    grid-column: 1 / -1;
+  }
+
+  .field-notes {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .order-product-add-page {
+    padding: 1rem;
+  }
+
+  .order-product-header-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .order-product-title {
+    font-size: 1.5rem;
+  }
+
+  .order-product-quick-actions {
+    justify-content: center;
+  }
+
+  .product-row-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .field-product,
+  .field-quantity,
+  .field-price,
+  .field-total,
+  .field-notes {
+    grid-column: auto;
+  }
+
+  .form-submit-section {
+    flex-direction: column-reverse;
+  }
+
+  .form-submit-section .btn {
+    width: 100%;
+  }
+
+  .order-total-section {
+    margin: 0 1rem 1rem;
+  }
+
+  .order-total-value {
+    font-size: 1.25rem;
+  }
+}
+</style>
+{% endblock extra_css %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+  const inventoryEnabled = {{ inventory_enabled|yesno:"true,false" }};
+  let productRowCount = 2;
+
+  // Initialize Select2 for product dropdowns
+  function initializeSelect2(selectElement) {
+    $(selectElement).select2({
+      placeholder: 'Type 3+ characters to search...',
+      minimumInputLength: 3,
+      allowClear: true,
+      ajax: {
+        url: '{% url "orders:product_search_api" %}',
+        dataType: 'json',
+        delay: 300,
+        data: function(params) {
+          return {
+            q: params.term
+          };
+        },
+        processResults: function(data) {
+          return {
+            results: data.results.map(function(item) {
+              return {
+                id: item.id,
+                text: item.text,
+                sku: item.sku,
+                price: item.price,
+                unit: item.unit,
+                inventory: item.inventory
+              };
+            })
+          };
+        },
+        cache: true
+      },
+      templateResult: formatProductOption,
+      templateSelection: formatProductSelection
+    });
+
+    // Handle product selection - auto-populate price
+    $(selectElement).on('select2:select', function(e) {
+      const data = e.params.data;
+      const row = $(this).closest('.product-row');
+
+      // Auto-fill price from product
+      row.find('.price-input').val(data.price);
+
+      // Show product info (SKU, inventory)
+      const infoDisplay = row.find('.product-info-display');
+      infoDisplay.show();
+      infoDisplay.find('.sku-badge').text('SKU: ' + data.sku);
+
+      if (inventoryEnabled && data.inventory !== null) {
+        const inventoryBadge = infoDisplay.find('.inventory-badge');
+        if (data.inventory > 10) {
+          inventoryBadge.removeClass('low-stock out-of-stock').addClass('in-stock');
+          inventoryBadge.text('Stock: ' + data.inventory);
+        } else if (data.inventory > 0) {
+          inventoryBadge.removeClass('in-stock out-of-stock').addClass('low-stock');
+          inventoryBadge.text('Low Stock: ' + data.inventory);
+        } else {
+          inventoryBadge.removeClass('in-stock low-stock').addClass('out-of-stock');
+          inventoryBadge.text('Out of Stock');
+        }
+      }
+
+      // Calculate total
+      calculateRowTotal(row);
+    });
+
+    // Handle clearing selection
+    $(selectElement).on('select2:clear', function() {
+      const row = $(this).closest('.product-row');
+      row.find('.price-input').val('');
+      row.find('.product-info-display').hide();
+      calculateRowTotal(row);
+    });
+  }
+
+  // Format product option in dropdown
+  function formatProductOption(product) {
+    if (!product.id) return product.text;
+
+    let inventoryClass = '';
+    let inventoryText = '';
+
+    if (inventoryEnabled && product.inventory !== null) {
+      if (product.inventory > 10) {
+        inventoryClass = '';
+        inventoryText = 'In Stock: ' + product.inventory;
+      } else if (product.inventory > 0) {
+        inventoryClass = 'low';
+        inventoryText = 'Low Stock: ' + product.inventory;
+      } else {
+        inventoryClass = 'out';
+        inventoryText = 'Out of Stock';
+      }
+    }
+
+    const $option = $(`
+      <div class="product-option">
+        <span class="product-option-name">${product.text}</span>
+        <div class="product-option-meta">
+          <span class="product-option-sku">${product.sku}</span>
+          <span class="product-option-price">${product.price} QAR</span>
+          ${inventoryEnabled && product.inventory !== null ?
+            `<span class="product-option-inventory ${inventoryClass}">${inventoryText}</span>` : ''}
+        </div>
+      </div>
+    `);
+
+    return $option;
+  }
+
+  // Format selected product
+  function formatProductSelection(product) {
+    return product.text || 'Type 3+ characters to search...';
+  }
+
+  // Calculate row total
+  function calculateRowTotal(row) {
+    const quantity = parseFloat(row.find('.quantity-input').val()) || 0;
+    const price = parseFloat(row.find('.price-input').val()) || 0;
+    const total = (quantity * price).toFixed(2);
+    row.find('.total-display').text(total + ' QAR');
+    calculateOrderTotal();
+  }
+
+  // Calculate order total
+  function calculateOrderTotal() {
+    let orderTotal = 0;
+    $('.product-row').each(function() {
+      const quantity = parseFloat($(this).find('.quantity-input').val()) || 0;
+      const price = parseFloat($(this).find('.price-input').val()) || 0;
+      orderTotal += quantity * price;
+    });
+    $('#order_total').text(orderTotal.toFixed(2) + ' QAR');
+  }
+
+  // Update product count badge
+  function updateProductCountBadge() {
+    const count = $('.product-row').length;
+    $('#product_count_badge').text(count + ' product' + (count !== 1 ? 's' : ''));
+  }
+
+  // Update row numbers
+  function updateRowNumbers() {
+    $('.product-row').each(function(index) {
+      $(this).find('.product-row-number').text('Product #' + (index + 1));
+      $(this).attr('data-row-index', index);
+    });
+    updateRemoveButtons();
+    updateProductCountBadge();
+  }
+
+  // Update remove buttons (disable if only 1 row)
+  function updateRemoveButtons() {
+    const rowCount = $('.product-row').length;
+    if (rowCount <= 1) {
+      $('.btn-remove-product').prop('disabled', true);
+    } else {
+      $('.btn-remove-product').prop('disabled', false);
+    }
+  }
+
+  // Add new product row
+  $('#btn_add_product').on('click', function() {
+    productRowCount++;
+    const newRowIndex = $('.product-row').length;
+
+    const newRow = $(`
+      <div class="product-row" data-row-index="${newRowIndex}">
+        <div class="product-row-header">
+          <span class="product-row-number">Product #${newRowIndex + 1}</span>
+          <button type="button" class="btn-remove-product" title="Remove this product">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="product-row-fields">
+          <div class="field-group field-product">
+            <label class="form-label">
+              <i class="fas fa-box me-1"></i>Product
+            </label>
+            <select name="product_id[]" class="product-select">
+              <option value="">Type 3+ characters to search...</option>
+            </select>
+            <div class="product-info-display" style="display: none;">
+              <span class="sku-badge"></span>
+              ${inventoryEnabled ? '<span class="inventory-badge"></span>' : ''}
+            </div>
+          </div>
+          <div class="field-group field-quantity">
+            <label class="form-label">
+              <i class="fas fa-hashtag me-1"></i>Qty
+            </label>
+            <input type="number" name="quantity[]" class="form-control quantity-input" value="1" min="1">
+          </div>
+          <div class="field-group field-price">
+            <label class="form-label">
+              <i class="fas fa-tag me-1"></i>Unit Price (QAR)
+            </label>
+            <input type="number" name="unit_price[]" class="form-control price-input" step="0.01" min="0" placeholder="Auto-filled">
+          </div>
+          <div class="field-group field-total">
+            <label class="form-label">
+              <i class="fas fa-calculator me-1"></i>Total
+            </label>
+            <div class="total-display">0.00 QAR</div>
+          </div>
+          <div class="field-group field-notes">
+            <label class="form-label">
+              <i class="fas fa-sticky-note me-1"></i>Notes
+            </label>
+            <input type="text" name="notes[]" class="form-control notes-input" placeholder="Optional notes">
+          </div>
+        </div>
+      </div>
+    `);
+
+    $('#products_container').append(newRow);
+
+    // Initialize Select2 on new select
+    initializeSelect2(newRow.find('.product-select'));
+
+    // Update row numbers and buttons
+    updateRowNumbers();
+
+    // Scroll to new row
+    newRow[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Focus on the new product select
+    setTimeout(function() {
+      newRow.find('.product-select').select2('open');
+    }, 300);
+  });
+
+  // Remove product row
+  $(document).on('click', '.btn-remove-product', function() {
+    if ($('.product-row').length <= 1) return;
+
+    $(this).closest('.product-row').remove();
+    updateRowNumbers();
+    calculateOrderTotal();
+  });
+
+  // Recalculate on quantity/price change
+  $(document).on('input', '.quantity-input, .price-input', function() {
+    const row = $(this).closest('.product-row');
+    calculateRowTotal(row);
+  });
+
+  // Initialize all existing Select2 elements
+  $('.product-select').each(function() {
+    initializeSelect2(this);
+  });
+
+  // Initial setup
+  updateRemoveButtons();
+  updateProductCountBadge();
+});
 </script>
 {% endblock extra_js %}
