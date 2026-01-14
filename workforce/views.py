@@ -583,8 +583,6 @@ def add_order(request):
                     'customer_address_en': customer_address_en,
                     'name_was_translated': customer_name_original != customer_name_en,
                     'address_was_translated': customer_address_original != customer_address_en,
-                    'customer_email': request.POST.get('customer_email', '').strip(),
-                    'invoice_number': request.POST.get('invoice_number', '').strip(),
                     'dl_landmark': request.POST.get('dl_landmark', '').strip(),
                     'location_link': request.POST.get('location_link', '').strip(),
                     'product_name': request.POST.get('product_name', '').strip(),
@@ -662,11 +660,13 @@ def add_order(request):
                 return JsonResponse({'success': False, 'error': error_msg}, status=400)
             messages.error(request, error_msg)
 
+    from datetime import date
     context = {
         'businesses': businesses,
         'selected_business': selected_business,
         'selected_business_id': selected_business_id,
         'pickup_locations': pickup_locations,
+        'today': date.today().isoformat(),
     }
     return render(request, 'workforce/orders_add.html', context)
 

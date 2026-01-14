@@ -73,16 +73,8 @@
                         <input type="tel" class="form-input" id="customer_whatsapp" name="customer_whatsapp" placeholder="+974 XXXX XXXX">
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="form-label" for="customer_email">Customer Email</label>
-                        <input type="email" class="form-input" id="customer_email" name="customer_email" placeholder="email@example.com">
-                    </div>
-                    <div class="col-md-6 mb-3">
                         <label class="form-label" for="client_order_code">Client Order Code</label>
                         <input type="text" class="form-input" id="client_order_code" name="client_order_code" placeholder="Leave blank for auto-generate">
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label" for="invoice_number">Invoice Number</label>
-                        <input type="text" class="form-input" id="invoice_number" name="invoice_number" placeholder="INV-XXXX">
                     </div>
                 </div>
 
@@ -142,10 +134,12 @@
                     <div class="col-md-4 mb-3">
                         <label class="form-label" for="pickup_location">Pickup Location</label>
                         <select class="form-input" id="pickup_location" name="pickup_location">
-                            <option value="">-- Default Location --</option>
                             {% for location in pickup_locations %}
-                                <option value="{{ location.id }}">{{ location.location_name }}</option>
+                                <option value="{{ location.id }}" {% if 'ezzy' in location.location_name|lower or 'fulfilment' in location.location_name|lower or 'fulfillment' in location.location_name|lower %}selected{% endif %}>{{ location.location_name }}</option>
                             {% endfor %}
+                            {% if not pickup_locations %}
+                                <option value="">-- No Locations Available --</option>
+                            {% endif %}
                         </select>
                     </div>
                     <div class="col-md-6 mb-3">
@@ -154,7 +148,7 @@
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label" for="order_date">Order Date</label>
-                        <input type="date" class="form-input" id="order_date" name="order_date">
+                        <input type="date" class="form-input" id="order_date" name="order_date" value="{{ today }}">
                     </div>
                 </div>
 
