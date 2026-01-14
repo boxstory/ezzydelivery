@@ -282,17 +282,17 @@ This file tracks UI/CSS issues, alignment problems, and bugs discovered during p
 ### Additional Inline Styles Found
 
 #### Fleet Templates
-- [ ] workforce/templates/workforce/fleet_transactions.html - Lines 52-92: 11 inline styles
+- [x] workforce/templates/workforce/fleet_transactions.html - Lines 52-92: 11 inline styles - Fixed: Using CSS classes (stats-grid, stat-card, btn-action)
 - [x] workforce/templates/workforce/fleet_cod_in_hand.html - Lines 57-61: button styles - Fixed: Extracted to `.fleet-report-actions`, `.btn-print-report`, `.btn-export-report` classes
 - [x] workforce/templates/workforce/fleet_drivers_earnings.html - Lines 57-61: button styles - Fixed: Extracted to `.fleet-report-actions`, `.btn-print-report`, `.btn-export-report` classes
 
 #### DMS Templates
-- [ ] workforce/templates/workforce/dms_orders_list.html - Lines 27-35: flex layout inline
-- [ ] workforce/templates/workforce/dms_publish_order.html - Lines 68-74: button styles
+- [x] workforce/templates/workforce/dms_orders_list.html - Lines 27-35: flex layout inline - Fixed: Using CSS classes (filter-row, filter-search-group, filter-toggle-group)
+- [x] workforce/templates/workforce/dms_publish_order.html - Lines 68-74: button styles - Fixed: Using CSS classes (btn-action, btn-action-outline, btn-action-primary); JS inline styles extracted to `.visible-counter` and `.last-refresh`
 
 #### Other Templates
 - [x] business/templates/business/parts/business_settings_api_test_result.html - Line 4: display:none - Fixed: Using Bootstrap `.d-none` class
-- [ ] business/templates/business/parts/business_team_permissions.html - Lines 141-143: table widths
+- [x] business/templates/business/parts/business_team_permissions.html - Lines 141-143: table widths - Fixed: Using `.col-width-sm` and `.col-width-md` classes
 - [x] orders/templates/orders/verification_error.html - Line 28: font-size inline - Fixed: Created `.contact-message` class
 - [x] orders/templates/orders/parts/order_product_list.html - Lines 19, 32: color inline - Fixed: Using `.text-brand-primary` class
 
@@ -336,4 +336,4 @@ _Items moved here when fixed. Format: `[x] Description - Fixed by [agent/user]`_
 
 Last Updated: 2026-01-14
 Status: Comprehensive scan complete. Major CSS and code quality fixes completed.
-Total Issues Found: 250+ | Fixed: 85+ | In Progress: 2+ | Pending: 163+
+Total Issues Found: 250+ | Fixed: 90+ | In Progress: 0 | Pending: 160+
