@@ -62,7 +62,7 @@ This file tracks UI/CSS issues, alignment problems, and bugs discovered during p
 
 #### workforce/templates/workforce/wf_orders_by_seller.html
 - [x] Line 33: `style="visibility: hidden;"` - Fixed: Using Bootstrap `.invisible` class
-- [ ] Lines 84-85: Icon container styles - Extract to component class
+- [x] Lines 84-85: Icon container styles - Fixed: Using `.driver-icon.driver-icon-sm` classes
 
 #### workforce/templates/workforce/vehicle_document_detail.html
 - [x] Lines 18-174: 30+ inline styles - Fixed: Extracted to workforce.css (page-title, document-back-section, section-container, info-grid, info-row, etc.)
@@ -291,10 +291,10 @@ This file tracks UI/CSS issues, alignment problems, and bugs discovered during p
 - [ ] workforce/templates/workforce/dms_publish_order.html - Lines 68-74: button styles
 
 #### Other Templates
-- [ ] business/templates/business/parts/business_settings_api_test_result.html - Line 4: display:none
+- [x] business/templates/business/parts/business_settings_api_test_result.html - Line 4: display:none - Fixed: Using Bootstrap `.d-none` class
 - [ ] business/templates/business/parts/business_team_permissions.html - Lines 141-143: table widths
-- [ ] orders/templates/orders/verification_error.html - Line 28: font-size inline
-- [ ] orders/templates/orders/parts/order_product_list.html - Lines 19, 32: color inline
+- [x] orders/templates/orders/verification_error.html - Line 28: font-size inline - Fixed: Created `.contact-message` class
+- [x] orders/templates/orders/parts/order_product_list.html - Lines 19, 32: color inline - Fixed: Using `.text-brand-primary` class
 
 ---
 
@@ -336,4 +336,4 @@ _Items moved here when fixed. Format: `[x] Description - Fixed by [agent/user]`_
 
 Last Updated: 2026-01-14
 Status: Comprehensive scan complete. Major CSS and code quality fixes completed.
-Total Issues Found: 250+ | Fixed: 80+ | In Progress: 2+ | Pending: 168+
+Total Issues Found: 250+ | Fixed: 85+ | In Progress: 2+ | Pending: 163+
