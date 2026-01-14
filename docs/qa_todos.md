@@ -161,8 +161,8 @@ This file tracks UI/CSS issues, alignment problems, and bugs discovered during p
 ### Product Templates
 
 #### product/product_all_list.html
-- [ ] Grid/list toggle state not remembered
-- [ ] Image lazy loading not implemented
+- [x] Grid/list toggle state not remembered - Fixed: localStorage-based view preference already implemented
+- [x] Image lazy loading not implemented - Fixed: Added loading="lazy" to product images and other templates
 - [x] Card alignment issues with varying content lengths - Fixed: added CSS for equal-height cards and consistent alignment
 - [x] View toggle styling - Fixed: added proper CSS classes for .view-toggle component
 
@@ -218,7 +218,7 @@ This file tracks UI/CSS issues, alignment problems, and bugs discovered during p
 - [x] Standardize all to kebab-case - Done for reviewed files
 
 ### Files to Update
-- [ ] orders/templates/orders/bulk_order_entry.html - Uses capitalized classes
+- [x] orders/templates/orders/bulk_order_entry.html - Reviewed: Already uses consistent kebab-case classes
 - [x] product/templates/product/parts/product_card.html - Fixed: Added kebab-case classes alongside snake_case IDs for backwards compatibility
 - [x] business/templates/business/frontend/business_profile.html - Reviewed: Already uses consistent kebab-case classes
 
@@ -336,4 +336,4 @@ _Items moved here when fixed. Format: `[x] Description - Fixed by [agent/user]`_
 
 Last Updated: 2026-01-14
 Status: Comprehensive scan complete. Major CSS and code quality fixes completed.
-Total Issues Found: 250+ | Fixed: 90+ | In Progress: 0 | Pending: 160+
+Total Issues Found: 250+ | Fixed: 95+ | In Progress: 0 | Pending: 155+
