@@ -98,8 +98,11 @@ This file tracks UI/CSS issues, alignment problems, and bugs discovered during p
 - [x] Line 2171: `float: right;` - Converted to flexbox
 
 #### business/static/volte1/css/volte.css (26+ instances)
-- [ ] Lines 459-859: Multiple `float: left;` - Audit and convert to modern layout
-- [ ] Lines 9174, 9178: Float with !important - Critical refactor needed
+- [x] Lines 459-859: Multiple `float: left;` - **NO ACTION NEEDED**: Chartist.js library aspect ratio trick
+- [x] Lines 9174, 9178: Float with !important - **NO ACTION NEEDED**: Bootstrap 5 .float-start/.float-end utilities
+- [x] Lines 1299, 3960, 7070, 8609: `float: left;` - **NO ACTION NEEDED**: Bootstrap 5 core CSS (legend, form-check, breadcrumb, carousel)
+- [x] Line 26847: `float: left;` - **NO ACTION NEEDED**: SimpleBar scrollbar library
+- **Note**: volte.css is a bundled vendor CSS containing Bootstrap 5, Chartist.js, and SimpleBar. These floats are legitimate library code and should not be modified.
 
 ---
 

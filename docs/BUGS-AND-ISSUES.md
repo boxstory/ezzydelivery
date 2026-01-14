@@ -6,7 +6,7 @@
 |----|-------------|---------|--------|----------|
 | B001 | Excessive !important usage (130+ instances) | workforce.css, base-forms.css, core.css | partial | high |
 | B002 | Inline styles in templates (100+ instances) | Multiple templates | in-progress | high |
-| B003 | Float-based layouts in volte.css (26+ instances) | business/static/volte1/css/volte.css | open | medium |
+| B003 | Float-based layouts in volte.css (26+ instances) | business/static/volte1/css/volte.css | wontfix | low |
 | B004 | Hardcoded pixel values (97 instances) | business.css, orders.css, product.css, volte.css | open | medium |
 | B005 | Missing media queries for responsive design | mobile-app.css, base-forms.css | open | medium |
 | B006 | Color contrast issues (.text-muted, warning badges) | Multiple templates | open | low |
@@ -56,6 +56,7 @@
 | F029 | Inline onclick handlers in user_verification_list.html | Replaced with data-action + event delegation | 2026-01-14 |
 | F030 | Inline onclick handlers in orders_list_view.html | Replaced with data-filter, data-order-id + event delegation | 2026-01-14 |
 | F031 | Inline onclick handlers in dl_list_incompleted.html | Replaced 15+ handlers with data attributes + event delegation | 2026-01-14 |
+| F032 | Float layouts in volte.css (B003) | WONTFIX: Vendor CSS (Bootstrap 5, Chartist.js, SimpleBar) - not custom code | 2026-01-14 |
 
 ## Priority Order
 
