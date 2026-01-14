@@ -1,0 +1,270 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Add Order - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3">
+    <!-- Page Title -->
+    <h1 class="page-title">
+        <i class="fa-solid fa-plus me-2"></i>Add Order for Client
+    </h1>
+
+    <!-- Seller Selection Card -->
+    <div class="filter-section mb-4">
+        <form method="get" id="workforce_orders_add_form_seller">
+            <div class="row align-items-end">
+                <div class="col-md-8">
+                    <label for="businessSelect" class="filter-label">
+                        <i class="fa-solid fa-store me-2"></i>Select Seller
+                    </label>
+                    <select id="businessSelect" name="business" class="filter-input" onchange="this.form.submit()">
+                        <option value="">-- Select a Seller --</option>
+                        {% for business in businesses %}
+                            <option value="{{ business.business_id }}" {% if selected_business_id == business.business_id|stringformat:"s" %}selected{% endif %}>
+                                {{ business.business_name }} ({{ business.business_code }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    {% if selected_business %}
+                        <span class="badge badge-success">
+                            <i class="fa-solid fa-check me-1"></i>
+                            {{ selected_business.business_name }}
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if selected_business %}
+    <!-- Order Form -->
+    <div class="card-modern">
+        <div class="card-header-modern">
+            <h5 class="mb-0">
+                <i class="fa-solid fa-file-lines me-2"></i>
+                Order Details for {{ selected_business.business_name }}
+            </h5>
+        </div>
+        <div class="card-body p-4">
+            <form method="post" id="workforce_orders_add_form_order">
+                {% csrf_token %}
+                <input type="hidden" name="business" value="{{ selected_business.business_id }}">
+
+                <!-- Customer Information -->
+                <h6 class="section-heading">Customer Information</h6>
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="customer_name">Customer Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-input" id="customer_name" name="customer_name" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="customer_phone">Phone Number <span class="text-danger">*</span></label>
+                        <input type="tel" class="form-input" id="customer_phone" name="customer_phone" required placeholder="+974 XXXX XXXX">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="customer_whatsapp">WhatsApp Number</label>
+                        <input type="tel" class="form-input" id="customer_whatsapp" name="customer_whatsapp" placeholder="+974 XXXX XXXX">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="customer_email">Customer Email</label>
+                        <input type="email" class="form-input" id="customer_email" name="customer_email" placeholder="email@example.com">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="client_order_code">Client Order Code</label>
+                        <input type="text" class="form-input" id="client_order_code" name="client_order_code" placeholder="Leave blank for auto-generate">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="invoice_number">Invoice Number</label>
+                        <input type="text" class="form-input" id="invoice_number" name="invoice_number" placeholder="INV-XXXX">
+                    </div>
+                </div>
+
+                <!-- Delivery Address -->
+                <h6 class="section-heading">Delivery Address</h6>
+                <div class="row mb-4">
+                    <div class="col-md-8 mb-3">
+                        <label class="form-label" for="customer_address">Full Address <span class="text-danger">*</span></label>
+                        <textarea class="form-input" id="customer_address" name="customer_address" rows="2" required></textarea>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="dl_landmark">City / Landmark</label>
+                        <input type="text" class="form-input" id="dl_landmark" name="dl_landmark" placeholder="e.g., Al Wakrah, near Mall">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="dl_zone">Zone Number</label>
+                        <input type="number" class="form-input" id="dl_zone" name="dl_zone" min="0" placeholder="e.g., 45">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="dl_street">Street Number</label>
+                        <input type="number" class="form-input" id="dl_street" name="dl_street" min="0" placeholder="e.g., 123">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="dl_building">Building Number</label>
+                        <input type="number" class="form-input" id="dl_building" name="dl_building" min="0" placeholder="e.g., 56">
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label class="form-label" for="location_link">Google Maps Link</label>
+                        <input type="url" class="form-input" id="location_link" name="location_link" placeholder="https://maps.google.com/...">
+                    </div>
+                </div>
+
+                <!-- Product Details -->
+                <h6 class="section-heading">Product Details</h6>
+                <div class="row mb-4">
+                    <div class="col-md-8 mb-3">
+                        <label class="form-label" for="product_name">Product Name / Description</label>
+                        <input type="text" class="form-input" id="product_name" name="product_name" placeholder="e.g., iPhone 15 Pro Max 256GB">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="quantity">Quantity</label>
+                        <input type="number" class="form-input" id="quantity" name="quantity" min="1" value="1">
+                    </div>
+                </div>
+
+                <!-- Order Details -->
+                <h6 class="section-heading">Order & Delivery Details</h6>
+                <div class="row mb-4">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="cod_amount">COD Amount (QAR)</label>
+                        <input type="number" class="form-input" id="cod_amount" name="cod_amount" min="0" value="0">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="dl_amount">Delivery Fee (QAR)</label>
+                        <input type="number" class="form-input" id="dl_amount" name="dl_amount" min="0" value="0">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="pickup_location">Pickup Location</label>
+                        <select class="form-input" id="pickup_location" name="pickup_location">
+                            <option value="">-- Default Location --</option>
+                            {% for location in pickup_locations %}
+                                <option value="{{ location.id }}">{{ location.location_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="deadline_date">Delivery Date/Time Preference</label>
+                        <input type="text" class="form-input" id="deadline_date" name="deadline_date" placeholder="e.g., Tomorrow, ASAP, Jan 15 evening">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="order_date">Order Date</label>
+                        <input type="date" class="form-input" id="order_date" name="order_date">
+                    </div>
+                </div>
+
+                <!-- Notes Section -->
+                <h6 class="section-heading">Notes</h6>
+                <div class="row mb-4">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="order_notes">Customer Notes</label>
+                        <textarea class="form-input" id="order_notes" name="order_notes" rows="2" placeholder="Notes from customer..."></textarea>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="seller_notes">Seller Notes</label>
+                        <textarea class="form-input" id="seller_notes" name="seller_notes" rows="2" placeholder="Notes from seller..."></textarea>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="internal_notes">Internal Notes</label>
+                        <textarea class="form-input" id="internal_notes" name="internal_notes" rows="2" placeholder="Staff only notes..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-plus me-2"></i>Create Order
+                    </button>
+                    <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <!-- No Seller Selected -->
+    <div class="empty-state">
+        <i class="fa-solid fa-store"></i>
+        <h3>Select a Seller</h3>
+        <p>Please select a seller from the dropdown above to create an order.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Convert Arabic/Persian numerals to English
+    function convertArabicNumerals(text) {
+        if (!text) return '';
+        const arabicNumerals = '٠١٢٣٤٥٦٧٨٩';
+        const persianNumerals = '۰۱۲۳۴۵۶۷۸۹';
+        const englishNumerals = '0123456789';
+
+        let result = String(text);
+        for (let i = 0; i < 10; i++) {
+            result = result.split(arabicNumerals[i]).join(englishNumerals[i]);
+            result = result.split(persianNumerals[i]).join(englishNumerals[i]);
+        }
+        return result;
+    }
+
+    // Format phone number for WhatsApp (Qatar formatting)
+    function formatWhatsAppNumber(phone) {
+        if (!phone) return '';
+
+        // Convert Arabic numerals first
+        phone = convertArabicNumerals(String(phone));
+
+        // Remove +, spaces, dashes, parentheses and any non-digit
+        let digitsOnly = phone.replace(/\D/g, '');
+
+        if (!digitsOnly) return '';
+
+        // 8-digit Qatar mobile (starts with 3, 5, 6, 7) - add 974
+        if (digitsOnly.length === 8 && '3567'.includes(digitsOnly[0])) {
+            return '974' + digitsOnly;
+        }
+
+        // 8-digit Qatar landline (starts with 4) - no country code needed
+        if (digitsOnly.length === 8 && digitsOnly[0] === '4') {
+            return digitsOnly;
+        }
+
+        // Already has country code or other format - return as is
+        return digitsOnly;
+    }
+
+    // Get form elements
+    var phoneField = document.getElementById('customer_phone');
+    var whatsappField = document.getElementById('customer_whatsapp');
+
+    // Auto-fill and format WhatsApp when phone loses focus
+    if (phoneField) {
+        phoneField.addEventListener('blur', function() {
+            if (whatsappField && !whatsappField.value.trim() && this.value.trim()) {
+                var formatted = formatWhatsAppNumber(this.value);
+                whatsappField.value = formatted;
+                console.log('Phone:', this.value, '-> WhatsApp:', formatted);
+            }
+        });
+    }
+
+    // Also format WhatsApp field on blur if user enters it manually
+    if (whatsappField) {
+        whatsappField.addEventListener('blur', function() {
+            if (this.value.trim()) {
+                this.value = formatWhatsAppNumber(this.value);
+            }
+        });
+    }
+});
+</script>
+{% endblock extra_js %}

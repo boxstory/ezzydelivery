@@ -1,0 +1,1412 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Bulk Import Orders - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
+<style>
+.wizard-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-lg);
+    position: relative;
+}
+.wizard-steps::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 50px;
+    right: 50px;
+    height: 2px;
+    background: var(--border-color);
+    z-index: 0;
+}
+.wizard-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+}
+.wizard-step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+    transition: all 0.3s ease;
+}
+.wizard-step.active .wizard-step-number {
+    background: var(--brand-primary);
+    border-color: var(--brand-primary);
+    color: white;
+}
+.wizard-step.completed .wizard-step-number {
+    background: var(--success-color);
+    border-color: var(--success-color);
+    color: white;
+}
+.wizard-step-label {
+    font-size: var(--font-sm);
+    color: var(--text-muted);
+}
+.wizard-step.active .wizard-step-label,
+.wizard-step.completed .wizard-step-label {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+.step-content {
+    display: none;
+}
+.step-content.active {
+    display: block;
+}
+.mapping-group-header {
+    background: var(--bg-secondary);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin: var(--spacing-md) 0 var(--spacing-xs) 0;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--brand-primary);
+}
+.mapping-group-header h6 {
+    margin: 0;
+    color: var(--brand-primary);
+    font-size: var(--font-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.mapping-container {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: var(--spacing-sm);
+}
+.mapping-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+    background: white;
+}
+.mapping-row:hover {
+    background: var(--bg-hover);
+}
+.mapping-row:last-child {
+    border-bottom: none;
+}
+.mapping-source {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+.mapping-source select {
+    font-size: var(--font-sm);
+}
+.mapping-arrow {
+    color: var(--text-muted);
+    font-size: var(--font-sm);
+}
+.mapping-target {
+    flex: 1;
+    font-size: var(--font-sm);
+}
+.mapping-target .required {
+    color: var(--danger-color);
+}
+.preview-table-container {
+    max-height: 500px;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+.preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-sm);
+}
+.preview-table th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-secondary);
+    padding: var(--spacing-sm) var(--spacing-md);
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+    white-space: nowrap;
+}
+.preview-table td {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+.preview-table td[contenteditable="true"] {
+    background: white;
+    cursor: text;
+}
+.preview-table td[contenteditable="true"]:focus {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: -2px;
+    background: var(--brand-primary-light, #f0f7ff);
+}
+.preview-table tr:hover td {
+    background: var(--bg-hover);
+}
+.preview-table .row-number {
+    color: var(--text-muted);
+    font-weight: 500;
+    min-width: 40px;
+}
+.preview-stats {
+    display: flex;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+.preview-stat {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+.preview-stat-value {
+    font-weight: 600;
+    font-size: var(--font-lg);
+}
+.error-cell {
+    background: var(--danger-bg, #fff5f5) !important;
+    border: 1px solid var(--danger-color) !important;
+}
+.file-drop-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-xl);
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+.file-drop-zone:hover,
+.file-drop-zone.dragover {
+    border-color: var(--brand-primary);
+    background: var(--brand-primary-light, #f0f7ff);
+}
+.file-drop-zone i {
+    font-size: 48px;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-md);
+}
+.file-info {
+    display: none;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    margin-top: var(--spacing-md);
+}
+.file-info.show {
+    display: flex;
+}
+.file-info-icon {
+    font-size: 32px;
+}
+.file-info-icon.csv {
+    color: var(--success-color);
+}
+.file-info-icon.excel {
+    color: #217346;
+}
+
+/* Progress Modal Styles */
+.progress-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+.progress-modal.show {
+    display: flex;
+}
+.progress-modal-content {
+    background: white;
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 700px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.progress-modal-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.progress-modal-header h5 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+.progress-modal-body {
+    padding: var(--spacing-lg);
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.progress-bar-container {
+    margin-bottom: var(--spacing-lg);
+}
+.progress-bar-outer {
+    height: 24px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+}
+.progress-bar-inner {
+    height: 100%;
+    background: linear-gradient(90deg, var(--brand-primary), var(--success-color));
+    border-radius: 12px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+.progress-bar-inner::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+.progress-text {
+    display: flex;
+    justify-content: space-between;
+    margin-top: var(--spacing-sm);
+    font-size: var(--font-sm);
+}
+.progress-stats {
+    display: flex;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+.progress-stat-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+}
+.progress-stat-item.success {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success-color);
+}
+.progress-stat-item.error {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger-color);
+}
+.log-container {
+    flex: 1;
+    min-height: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+    background: #1e1e1e;
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+.log-entry {
+    padding: 4px 0;
+    border-bottom: 1px solid #333;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+}
+.log-entry:last-child {
+    border-bottom: none;
+}
+.log-entry.success {
+    color: #4caf50;
+}
+.log-entry.error {
+    color: #f44336;
+}
+.log-entry.info {
+    color: #64b5f6;
+}
+.log-entry .log-time {
+    color: #888;
+    min-width: 80px;
+}
+.log-entry .log-icon {
+    min-width: 20px;
+}
+
+/* Failed Rows Table */
+.failed-rows-section {
+    margin-top: var(--spacing-lg);
+}
+.failed-table-container {
+    max-height: 400px;
+    overflow: auto;
+    border: 1px solid var(--danger-color);
+    border-radius: var(--radius-md);
+}
+.failed-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-sm);
+}
+.failed-table th {
+    position: sticky;
+    top: 0;
+    background: #fff5f5;
+    padding: var(--spacing-sm) var(--spacing-md);
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--danger-color);
+    white-space: nowrap;
+}
+.failed-table td {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+.failed-table td[contenteditable="true"] {
+    background: white;
+    cursor: text;
+}
+.failed-table td[contenteditable="true"]:focus {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: -2px;
+}
+.failed-table .error-message {
+    color: var(--danger-color);
+    font-weight: 500;
+    max-width: 200px;
+}
+.failed-table tr:hover td {
+    background: #fff5f5;
+}
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3">
+    <!-- Page Title -->
+    <h1 class="page-title">
+        <i class="fa-solid fa-file-import me-2"></i>Bulk Import Orders
+    </h1>
+
+    <!-- Wizard Steps -->
+    <div class="wizard-steps">
+        <div class="wizard-step active" data-step="1">
+            <div class="wizard-step-number">1</div>
+            <div class="wizard-step-label">Upload File</div>
+        </div>
+        <div class="wizard-step" data-step="2">
+            <div class="wizard-step-number">2</div>
+            <div class="wizard-step-label">Map Columns</div>
+        </div>
+        <div class="wizard-step" data-step="3">
+            <div class="wizard-step-number">3</div>
+            <div class="wizard-step-label">Preview & Edit</div>
+        </div>
+        <div class="wizard-step" data-step="4">
+            <div class="wizard-step-number">4</div>
+            <div class="wizard-step-label">Complete</div>
+        </div>
+    </div>
+
+    <!-- Step 1: Upload File -->
+    <div class="step-content active" id="step1">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card-modern">
+                    <div class="card-header-modern">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-upload me-2"></i>Upload File
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <!-- Seller Selection -->
+                        <div class="mb-4">
+                            <label for="businessSelect" class="form-label">
+                                <i class="fa-solid fa-store me-2"></i>Select Seller <span class="text-danger">*</span>
+                            </label>
+                            <select id="businessSelect" name="business" class="form-input" required>
+                                <option value="">-- Select a Seller --</option>
+                                {% for business in businesses %}
+                                    <option value="{{ business.business_id }}">
+                                        {{ business.business_name }} ({{ business.business_code }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- File Upload Zone -->
+                        <div class="file-drop-zone" id="fileDropZone">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                            <p class="mb-2"><strong>Drop your file here</strong></p>
+                            <p class="text-muted mb-3">or click to browse</p>
+                            <input type="file" id="importFile" accept=".csv,.xlsx,.xls" hidden>
+                            <span class="badge bg-secondary me-1">CSV</span>
+                            <span class="badge bg-success me-1">XLSX</span>
+                            <span class="badge bg-success">XLS</span>
+                        </div>
+
+                        <!-- File Info -->
+                        <div class="file-info" id="fileInfo">
+                            <i class="fa-solid fa-file file-info-icon" id="fileIcon"></i>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold" id="fileName"></div>
+                                <div class="text-muted small" id="fileSize"></div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearFile()">
+                                <i class="fa-solid fa-times"></i>
+                            </button>
+                        </div>
+
+                        <div class="form-actions mt-4">
+                            <button type="button" class="btn btn-primary" id="btnNext1" disabled onclick="goToStep(2)">
+                                <i class="fa-solid fa-arrow-right me-2"></i>Next: Map Columns
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Format Guide -->
+            <div class="col-lg-4">
+                <div class="card-modern">
+                    <div class="card-header-modern">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-info-circle me-2"></i>File Format Guide
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <h6 class="mb-3">Required Columns:</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <code>customer_name</code> <span class="text-danger">*</span>
+                            </li>
+                            <li class="mb-2">
+                                <code>customer_phone</code> <span class="text-danger">*</span>
+                            </li>
+                            <li class="mb-2">
+                                <code>customer_address</code> <span class="text-danger">*</span>
+                            </li>
+                        </ul>
+
+                        <h6 class="mb-3 mt-4">Optional Columns:</h6>
+                        <ul class="list-unstyled small">
+                            <li class="mb-1"><code>client_order_code</code></li>
+                            <li class="mb-1"><code>customer_whatsapp</code></li>
+                            <li class="mb-1"><code>dl_zone</code>, <code>dl_street</code>, <code>dl_building</code></li>
+                            <li class="mb-1"><code>cod_amount</code>, <code>dl_amount</code></li>
+                            <li class="mb-1"><code>order_notes</code></li>
+                        </ul>
+
+                        <hr>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="#" class="btn btn-outline-primary btn-sm" onclick="downloadSampleCSV()">
+                                <i class="fa-solid fa-download me-1"></i>Sample CSV
+                            </a>
+                            <a href="#" class="btn btn-outline-success btn-sm" onclick="downloadSampleExcel()">
+                                <i class="fa-solid fa-download me-1"></i>Sample Excel
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: Map Columns -->
+    <div class="step-content" id="step2">
+        <div class="card-modern">
+            <div class="card-header-modern d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fa-solid fa-arrows-left-right me-2"></i>Map Columns
+                </h5>
+                <div>
+                    <span class="badge bg-info me-2" id="fileColumnsCount">0 columns in file</span>
+                    <span class="badge bg-success" id="mappedColumnsCount">0 mapped</span>
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <div class="alert alert-info mb-3">
+                    <i class="fa-solid fa-info-circle me-2"></i>
+                    Match your file columns to the order fields. We've auto-detected some mappings. Only <strong>Customer Name, Phone 1, and Address</strong> are required.
+                </div>
+
+                <div id="mappingContainer" class="mapping-container">
+                    <!-- Mapping rows will be generated by JavaScript -->
+                </div>
+
+                <div class="form-actions mt-4">
+                    <button type="button" class="btn btn-outline-secondary" onclick="goToStep(1)">
+                        <i class="fa-solid fa-arrow-left me-2"></i>Back
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="goToStep(3)">
+                        <i class="fa-solid fa-arrow-right me-2"></i>Next: Preview Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 3: Preview & Edit -->
+    <div class="step-content" id="step3">
+        <div class="card-modern">
+            <div class="card-header-modern d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fa-solid fa-table me-2"></i>Preview & Edit Data
+                </h5>
+                <div class="preview-stats">
+                    <div class="preview-stat">
+                        <span class="text-muted">Total Rows:</span>
+                        <span class="preview-stat-value" id="totalRows">0</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <div class="alert alert-info mb-4">
+                    <i class="fa-solid fa-info-circle me-2"></i>
+                    Click on any cell to edit. Changes will be saved when you import.
+                </div>
+
+                <div class="preview-table-container">
+                    <table class="preview-table" id="previewTable">
+                        <thead>
+                            <tr id="previewTableHead"></tr>
+                        </thead>
+                        <tbody id="previewTableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="form-actions mt-4">
+                    <button type="button" class="btn btn-outline-secondary" onclick="goToStep(2)">
+                        <i class="fa-solid fa-arrow-left me-2"></i>Back
+                    </button>
+                    <button type="button" class="btn btn-success" id="btnImport" onclick="startImport()">
+                        <i class="fa-solid fa-play me-2"></i>Start Import
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 4: Complete -->
+    <div class="step-content" id="step4">
+        <div class="card-modern">
+            <div class="card-body p-4">
+                <div id="importSuccess" class="text-center mb-4" style="display: none;">
+                    <i class="fa-solid fa-check-circle text-success" style="font-size: 64px;"></i>
+                    <h3 class="mt-4">Import Complete!</h3>
+                    <p class="text-muted" id="successMessage"></p>
+                </div>
+
+                <!-- Failed Rows Section -->
+                <div id="failedRowsSection" class="failed-rows-section" style="display: none;">
+                    <div class="alert alert-warning">
+                        <h5 class="alert-heading">
+                            <i class="fa-solid fa-exclamation-triangle me-2"></i>
+                            Some orders failed to import
+                        </h5>
+                        <p class="mb-0">You can edit the failed rows below and retry importing them.</p>
+                    </div>
+
+                    <div class="failed-table-container">
+                        <table class="failed-table" id="failedTable">
+                            <thead>
+                                <tr id="failedTableHead"></tr>
+                            </thead>
+                            <tbody id="failedTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="form-actions mt-4">
+                        <button type="button" class="btn btn-warning" onclick="retryFailedRows()">
+                            <i class="fa-solid fa-redo me-2"></i>Retry Failed Orders
+                        </button>
+                    </div>
+                </div>
+
+                <div class="text-center mt-4">
+                    <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-primary">
+                        <i class="fa-solid fa-list me-2"></i>View All Orders
+                    </a>
+                    <button type="button" class="btn btn-outline-secondary" onclick="resetWizard()">
+                        <i class="fa-solid fa-redo me-2"></i>Import More
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Modal -->
+<div class="progress-modal" id="progressModal">
+    <div class="progress-modal-content">
+        <div class="progress-modal-header">
+            <h5>
+                <i class="fa-solid fa-cog fa-spin me-2"></i>
+                <span id="progressTitle">Importing Orders...</span>
+            </h5>
+            <span id="progressPercentage" class="badge bg-primary">0%</span>
+        </div>
+        <div class="progress-modal-body">
+            <!-- Progress Bar -->
+            <div class="progress-bar-container">
+                <div class="progress-bar-outer">
+                    <div class="progress-bar-inner" id="progressBar" style="width: 0%"></div>
+                </div>
+                <div class="progress-text">
+                    <span id="progressCurrent">0</span> of <span id="progressTotal">0</span> orders
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="progress-stats">
+                <div class="progress-stat-item success">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <span>Success: <strong id="statSuccess">0</strong></span>
+                </div>
+                <div class="progress-stat-item error">
+                    <i class="fa-solid fa-times-circle"></i>
+                    <span>Failed: <strong id="statFailed">0</strong></span>
+                </div>
+            </div>
+
+            <!-- Log Container -->
+            <div class="log-container" id="logContainer">
+                <div class="log-entry info">
+                    <span class="log-time">[--:--:--]</span>
+                    <span class="log-icon"><i class="fa-solid fa-info-circle"></i></span>
+                    <span>Waiting to start...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script>
+// Global state
+let uploadedData = {
+    columns: [],
+    rows: [],
+    mappings: {},
+    mappedRows: [],
+    failedRows: []
+};
+
+const targetFields = [
+    // Core Order Fields
+    { name: 'client_order_code', label: 'Order ID', required: false, group: 'Order Info' },
+    { name: 'order_date', label: 'Order Date', required: false, group: 'Order Info' },
+    // Customer Info
+    { name: 'customer_name', label: 'Customer Name', required: true, group: 'Customer' },
+    { name: 'customer_phone', label: 'Phone 1', required: true, group: 'Customer' },
+    { name: 'customer_whatsapp', label: 'Phone 2 / WhatsApp', required: false, group: 'Customer' },
+    { name: 'customer_email', label: 'Email', required: false, group: 'Customer' },
+    // Address Fields
+    { name: 'customer_address', label: 'Customer Address', required: true, group: 'Address' },
+    { name: 'dl_landmark', label: 'City / Landmark', required: false, group: 'Address' },
+    { name: 'dl_building', label: 'Villa / Building No', required: false, group: 'Address' },
+    { name: 'dl_street', label: 'Street No', required: false, group: 'Address' },
+    { name: 'dl_zone', label: 'Zone No', required: false, group: 'Address' },
+    { name: 'location_link', label: 'Location Link', required: false, group: 'Address' },
+    { name: 'dl_latitude', label: 'Latitude', required: false, group: 'Address' },
+    { name: 'dl_longitude', label: 'Longitude', required: false, group: 'Address' },
+    // Delivery Preferences
+    { name: 'deadline_date', label: 'Preferred Day & Time', required: false, group: 'Delivery' },
+    // Product Info
+    { name: 'product_name', label: 'Product Name', required: false, group: 'Product' },
+    { name: 'product_url', label: 'Product URL', required: false, group: 'Product' },
+    { name: 'quantity', label: 'Quantity', required: false, group: 'Product' },
+    // Payment
+    { name: 'cod_amount', label: 'Price / COD Amount', required: false, group: 'Payment' },
+    { name: 'dl_amount', label: 'Delivery Fee', required: false, group: 'Payment' },
+    // Notes
+    { name: 'order_notes', label: 'Customer Notes', required: false, group: 'Notes' },
+    { name: 'seller_notes', label: 'Seller Notes', required: false, group: 'Notes' },
+    { name: 'internal_notes', label: 'Internal Notes', required: false, group: 'Notes' },
+    // Additional Products
+    { name: 'product_1', label: 'Product 1', required: false, group: 'Additional Products' },
+    { name: 'count_1', label: 'Count 1', required: false, group: 'Additional Products' },
+    { name: 'product_2', label: 'Product 2', required: false, group: 'Additional Products' },
+    { name: 'count_2', label: 'Count 2', required: false, group: 'Additional Products' },
+    { name: 'product_3', label: 'Product 3', required: false, group: 'Additional Products' },
+    { name: 'count_3', label: 'Count 3', required: false, group: 'Additional Products' },
+    { name: 'product_4', label: 'Product 4', required: false, group: 'Additional Products' },
+    { name: 'count_4', label: 'Count 4', required: false, group: 'Additional Products' },
+    { name: 'product_5', label: 'Product 5', required: false, group: 'Additional Products' },
+    { name: 'count_5', label: 'Count 5', required: false, group: 'Additional Products' },
+    // Status Fields
+    { name: 'stock_status', label: 'Stock Status', required: false, group: 'Status' },
+    { name: 'invoice_number', label: 'Invoice No', required: false, group: 'Status' }
+];
+
+// File handling
+const fileDropZone = document.getElementById('fileDropZone');
+const fileInput = document.getElementById('importFile');
+const businessSelect = document.getElementById('businessSelect');
+
+fileDropZone.addEventListener('click', () => fileInput.click());
+fileDropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    fileDropZone.classList.add('dragover');
+});
+fileDropZone.addEventListener('dragleave', () => {
+    fileDropZone.classList.remove('dragover');
+});
+fileDropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    fileDropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        handleFileSelect();
+    }
+});
+fileInput.addEventListener('change', handleFileSelect);
+businessSelect.addEventListener('change', checkStep1Ready);
+
+function handleFileSelect() {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const fileIcon = document.getElementById('fileIcon');
+
+    fileName.textContent = file.name;
+    fileSize.textContent = formatFileSize(file.size);
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'csv') {
+        fileIcon.className = 'fa-solid fa-file-csv file-info-icon csv';
+    } else {
+        fileIcon.className = 'fa-solid fa-file-excel file-info-icon excel';
+    }
+
+    fileInfo.classList.add('show');
+    checkStep1Ready();
+}
+
+function clearFile() {
+    fileInput.value = '';
+    document.getElementById('fileInfo').classList.remove('show');
+    checkStep1Ready();
+}
+
+function checkStep1Ready() {
+    const hasFile = fileInput.files.length > 0;
+    const hasBusiness = businessSelect.value !== '';
+    document.getElementById('btnNext1').disabled = !(hasFile && hasBusiness);
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Wizard navigation
+function goToStep(step) {
+    if (step === 2 && uploadedData.columns.length === 0) {
+        uploadFile();
+        return;
+    }
+    if (step === 3) {
+        applyMappings();
+    }
+
+    // Update wizard steps
+    document.querySelectorAll('.wizard-step').forEach((el, index) => {
+        el.classList.remove('active', 'completed');
+        if (index + 1 < step) {
+            el.classList.add('completed');
+        } else if (index + 1 === step) {
+            el.classList.add('active');
+        }
+    });
+
+    // Update content
+    document.querySelectorAll('.step-content').forEach(el => el.classList.remove('active'));
+    document.getElementById('step' + step).classList.add('active');
+}
+
+function uploadFile() {
+    const formData = new FormData();
+    formData.append('import_file', fileInput.files[0]);
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    showProgressModal('Parsing file...');
+    addLog('info', 'Uploading and parsing file...');
+
+    fetch('{% url "workforce:wf_orders_bulk_preview" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideProgressModal();
+        if (data.error) {
+            alert('Error: ' + data.error);
+            return;
+        }
+
+        uploadedData.columns = data.columns;
+        uploadedData.rows = data.rows;
+        uploadedData.mappings = data.suggested_mappings || {};
+
+        buildMappingUI();
+        goToStep(2);
+    })
+    .catch(error => {
+        hideProgressModal();
+        alert('Error uploading file: ' + error.message);
+    });
+}
+
+function buildMappingUI() {
+    const container = document.getElementById('mappingContainer');
+    container.innerHTML = '';
+
+    // Update column counts
+    document.getElementById('fileColumnsCount').textContent = uploadedData.columns.length + ' columns in file';
+
+    // Group fields by their group property
+    const groups = {};
+    targetFields.forEach(field => {
+        const groupName = field.group || 'Other';
+        if (!groups[groupName]) {
+            groups[groupName] = [];
+        }
+        groups[groupName].push(field);
+    });
+
+    // Create UI for each group
+    Object.keys(groups).forEach(groupName => {
+        // Group header
+        const groupHeader = document.createElement('div');
+        groupHeader.className = 'mapping-group-header';
+        groupHeader.innerHTML = `<h6 class="mb-2 mt-3"><i class="fa-solid fa-folder me-2"></i>${groupName}</h6>`;
+        container.appendChild(groupHeader);
+
+        // Fields in this group
+        groups[groupName].forEach(field => {
+            const row = document.createElement('div');
+            row.className = 'mapping-row';
+
+            const sourceSelect = document.createElement('select');
+            sourceSelect.className = 'form-input form-input-sm';
+            sourceSelect.id = 'map_' + field.name;
+
+            let options = '<option value="">-- Skip --</option>';
+            uploadedData.columns.forEach(col => {
+                const selected = uploadedData.mappings[field.name] === col ? 'selected' : '';
+                options += `<option value="${col}" ${selected}>${col}</option>`;
+            });
+            sourceSelect.innerHTML = options;
+
+            row.innerHTML = `
+                <div class="mapping-source">
+                    ${sourceSelect.outerHTML}
+                </div>
+                <div class="mapping-arrow">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+                <div class="mapping-target">
+                    <strong>${field.label}</strong>
+                    ${field.required ? '<span class="required">*</span>' : ''}
+                </div>
+            `;
+
+            container.appendChild(row);
+        });
+    });
+
+    // Add change listeners to update mapped count
+    container.querySelectorAll('select').forEach(select => {
+        select.addEventListener('change', updateMappedCount);
+    });
+
+    // Initial count update
+    updateMappedCount();
+}
+
+function updateMappedCount() {
+    let count = 0;
+    targetFields.forEach(field => {
+        const select = document.getElementById('map_' + field.name);
+        if (select && select.value) {
+            count++;
+        }
+    });
+    document.getElementById('mappedColumnsCount').textContent = count + ' mapped';
+}
+
+function applyMappings() {
+    // Get current mappings
+    const mappings = {};
+    targetFields.forEach(field => {
+        const select = document.getElementById('map_' + field.name);
+        if (select && select.value) {
+            mappings[field.name] = select.value;
+        }
+    });
+
+    // Transform rows based on mappings
+    const transformedRows = uploadedData.rows.map(row => {
+        const newRow = {};
+        targetFields.forEach(field => {
+            const sourceCol = mappings[field.name];
+            newRow[field.name] = sourceCol ? (row[sourceCol] || '') : '';
+        });
+        return newRow;
+    });
+
+    uploadedData.mappedRows = transformedRows;
+    buildPreviewTable();
+}
+
+function buildPreviewTable() {
+    const thead = document.getElementById('previewTableHead');
+    const tbody = document.getElementById('previewTableBody');
+
+    // Build header
+    let headerHtml = '<th class="row-number">#</th>';
+    targetFields.forEach(field => {
+        headerHtml += `<th>${field.label}${field.required ? ' <span class="text-danger">*</span>' : ''}</th>`;
+    });
+    thead.innerHTML = headerHtml;
+
+    // Build body
+    let bodyHtml = '';
+    uploadedData.mappedRows.forEach((row, index) => {
+        bodyHtml += `<tr data-row="${index}">`;
+        bodyHtml += `<td class="row-number">${index + 1}</td>`;
+        targetFields.forEach(field => {
+            const value = row[field.name] || '';
+            const errorClass = field.required && !value ? 'error-cell' : '';
+            bodyHtml += `<td contenteditable="true" data-field="${field.name}" class="${errorClass}">${escapeHtml(value)}</td>`;
+        });
+        bodyHtml += '</tr>';
+    });
+    tbody.innerHTML = bodyHtml;
+
+    // Update stats
+    document.getElementById('totalRows').textContent = uploadedData.mappedRows.length;
+
+    // Add edit listeners
+    addEditListeners(tbody);
+}
+
+function addEditListeners(container) {
+    container.querySelectorAll('td[contenteditable="true"]').forEach(cell => {
+        cell.addEventListener('blur', function() {
+            const row = parseInt(this.parentElement.dataset.row);
+            const field = this.dataset.field;
+
+            // Update the correct data source
+            if (this.closest('#failedTableBody')) {
+                uploadedData.failedRows[row].row[field] = this.textContent.trim();
+            } else {
+                uploadedData.mappedRows[row][field] = this.textContent.trim();
+            }
+
+            // Update error styling
+            const fieldDef = targetFields.find(f => f.name === field);
+            if (fieldDef && fieldDef.required) {
+                if (!this.textContent.trim()) {
+                    this.classList.add('error-cell');
+                } else {
+                    this.classList.remove('error-cell');
+                }
+            }
+        });
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Import functions
+async function startImport() {
+    const businessId = businessSelect.value;
+    if (!businessId) {
+        alert('Please select a seller');
+        return;
+    }
+
+    uploadedData.failedRows = [];
+
+    // Show progress modal
+    showProgressModal('Importing Orders...');
+    resetProgress(uploadedData.mappedRows.length);
+    clearLogs();
+    addLog('info', `Starting import of ${uploadedData.mappedRows.length} orders...`);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    // Process rows one by one
+    for (let i = 0; i < uploadedData.mappedRows.length; i++) {
+        const row = uploadedData.mappedRows[i];
+
+        try {
+            const response = await fetch('{% url "workforce:wf_orders_bulk_save" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    business_id: businessId,
+                    row: row,
+                    row_index: i
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                successCount++;
+                addLog('success', `Row ${i + 1}: Order ${data.order_code} created for ${data.customer_name}`);
+            } else {
+                failCount++;
+                uploadedData.failedRows.push({
+                    originalIndex: i,
+                    row: { ...row },
+                    error: data.error
+                });
+                addLog('error', `Row ${i + 1}: ${data.error}`);
+            }
+        } catch (error) {
+            failCount++;
+            uploadedData.failedRows.push({
+                originalIndex: i,
+                row: { ...row },
+                error: error.message
+            });
+            addLog('error', `Row ${i + 1}: ${error.message}`);
+        }
+
+        // Update progress
+        updateProgress(i + 1, uploadedData.mappedRows.length, successCount, failCount);
+
+        // Small delay to prevent overwhelming the server
+        await sleep(50);
+    }
+
+    // Complete
+    addLog('info', `Import complete! ${successCount} success, ${failCount} failed.`);
+
+    setTimeout(() => {
+        hideProgressModal();
+        showResults(successCount, failCount);
+        goToStep(4);
+    }, 1000);
+}
+
+async function retryFailedRows() {
+    const businessId = businessSelect.value;
+    if (!businessId) {
+        alert('Please select a seller');
+        return;
+    }
+
+    if (uploadedData.failedRows.length === 0) {
+        alert('No failed rows to retry');
+        return;
+    }
+
+    const rowsToRetry = [...uploadedData.failedRows];
+    uploadedData.failedRows = [];
+
+    // Show progress modal
+    showProgressModal('Retrying Failed Orders...');
+    resetProgress(rowsToRetry.length);
+    clearLogs();
+    addLog('info', `Retrying ${rowsToRetry.length} failed orders...`);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    // Process rows one by one
+    for (let i = 0; i < rowsToRetry.length; i++) {
+        const item = rowsToRetry[i];
+        const row = item.row;
+
+        try {
+            const response = await fetch('{% url "workforce:wf_orders_bulk_save" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    business_id: businessId,
+                    row: row,
+                    row_index: i
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                successCount++;
+                addLog('success', `Row ${i + 1}: Order ${data.order_code} created for ${data.customer_name}`);
+            } else {
+                failCount++;
+                uploadedData.failedRows.push({
+                    originalIndex: i,
+                    row: { ...row },
+                    error: data.error
+                });
+                addLog('error', `Row ${i + 1}: ${data.error}`);
+            }
+        } catch (error) {
+            failCount++;
+            uploadedData.failedRows.push({
+                originalIndex: i,
+                row: { ...row },
+                error: error.message
+            });
+            addLog('error', `Row ${i + 1}: ${error.message}`);
+        }
+
+        // Update progress
+        updateProgress(i + 1, rowsToRetry.length, successCount, failCount);
+
+        // Small delay
+        await sleep(50);
+    }
+
+    // Complete
+    addLog('info', `Retry complete! ${successCount} success, ${failCount} still failed.`);
+
+    setTimeout(() => {
+        hideProgressModal();
+        showResults(successCount, failCount);
+    }, 1000);
+}
+
+function showResults(successCount, failCount) {
+    // Show success message
+    document.getElementById('importSuccess').style.display = 'block';
+    document.getElementById('successMessage').textContent =
+        `Successfully imported ${successCount} order(s).` +
+        (failCount > 0 ? ` ${failCount} order(s) failed.` : '');
+
+    // Show failed rows if any
+    if (uploadedData.failedRows.length > 0) {
+        buildFailedTable();
+        document.getElementById('failedRowsSection').style.display = 'block';
+    } else {
+        document.getElementById('failedRowsSection').style.display = 'none';
+    }
+}
+
+function buildFailedTable() {
+    const thead = document.getElementById('failedTableHead');
+    const tbody = document.getElementById('failedTableBody');
+
+    // Build header
+    let headerHtml = '<th class="row-number">#</th>';
+    headerHtml += '<th class="error-message">Error</th>';
+    targetFields.forEach(field => {
+        headerHtml += `<th>${field.label}${field.required ? ' <span class="text-danger">*</span>' : ''}</th>`;
+    });
+    thead.innerHTML = headerHtml;
+
+    // Build body
+    let bodyHtml = '';
+    uploadedData.failedRows.forEach((item, index) => {
+        const row = item.row;
+        bodyHtml += `<tr data-row="${index}">`;
+        bodyHtml += `<td class="row-number">${index + 1}</td>`;
+        bodyHtml += `<td class="error-message" title="${escapeHtml(item.error)}">
+            <i class="fa-solid fa-exclamation-circle me-1"></i>${escapeHtml(item.error.substring(0, 30))}${item.error.length > 30 ? '...' : ''}
+        </td>`;
+        targetFields.forEach(field => {
+            const value = row[field.name] || '';
+            const errorClass = field.required && !value ? 'error-cell' : '';
+            bodyHtml += `<td contenteditable="true" data-field="${field.name}" class="${errorClass}">${escapeHtml(value)}</td>`;
+        });
+        bodyHtml += '</tr>';
+    });
+    tbody.innerHTML = bodyHtml;
+
+    // Add edit listeners
+    addEditListeners(tbody);
+}
+
+// Progress Modal functions
+function showProgressModal(title) {
+    document.getElementById('progressTitle').textContent = title || 'Processing...';
+    document.getElementById('progressModal').classList.add('show');
+}
+
+function hideProgressModal() {
+    document.getElementById('progressModal').classList.remove('show');
+}
+
+function resetProgress(total) {
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('progressPercentage').textContent = '0%';
+    document.getElementById('progressCurrent').textContent = '0';
+    document.getElementById('progressTotal').textContent = total;
+    document.getElementById('statSuccess').textContent = '0';
+    document.getElementById('statFailed').textContent = '0';
+}
+
+function updateProgress(current, total, success, failed) {
+    const percentage = Math.round((current / total) * 100);
+    document.getElementById('progressBar').style.width = percentage + '%';
+    document.getElementById('progressPercentage').textContent = percentage + '%';
+    document.getElementById('progressCurrent').textContent = current;
+    document.getElementById('statSuccess').textContent = success;
+    document.getElementById('statFailed').textContent = failed;
+}
+
+function clearLogs() {
+    document.getElementById('logContainer').innerHTML = '';
+}
+
+function addLog(type, message) {
+    const container = document.getElementById('logContainer');
+    const time = new Date().toLocaleTimeString();
+
+    let icon = 'fa-info-circle';
+    if (type === 'success') icon = 'fa-check-circle';
+    else if (type === 'error') icon = 'fa-times-circle';
+
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    entry.innerHTML = `
+        <span class="log-time">[${time}]</span>
+        <span class="log-icon"><i class="fa-solid ${icon}"></i></span>
+        <span>${escapeHtml(message)}</span>
+    `;
+
+    container.appendChild(entry);
+    container.scrollTop = container.scrollHeight;
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function resetWizard() {
+    uploadedData = { columns: [], rows: [], mappings: {}, mappedRows: [], failedRows: [] };
+    fileInput.value = '';
+    document.getElementById('fileInfo').classList.remove('show');
+    document.getElementById('importSuccess').style.display = 'none';
+    document.getElementById('failedRowsSection').style.display = 'none';
+    checkStep1Ready();
+    goToStep(1);
+}
+
+// Sample file downloads
+function getSampleData() {
+    return [
+        {
+            client_order_code: 'ORD-001',
+            customer_name: 'John Doe',
+            customer_phone: '+97412345678',
+            customer_whatsapp: '+97412345678',
+            customer_address: 'Zone 45 Street 123 Building 5',
+            dl_zone: 45,
+            dl_street: 123,
+            dl_building: 5,
+            cod_amount: 150,
+            dl_amount: 15,
+            order_notes: 'Handle with care'
+        },
+        {
+            client_order_code: 'ORD-002',
+            customer_name: 'Jane Smith',
+            customer_phone: '+97487654321',
+            customer_whatsapp: '+97487654321',
+            customer_address: 'Zone 61 Street 8 Building 12',
+            dl_zone: 61,
+            dl_street: 8,
+            dl_building: 12,
+            cod_amount: 0,
+            dl_amount: 20,
+            order_notes: 'Leave at door'
+        },
+        {
+            client_order_code: '',
+            customer_name: 'Ahmed Ali',
+            customer_phone: '+97455555555',
+            customer_whatsapp: '',
+            customer_address: 'Zone 33 Street 44',
+            dl_zone: 33,
+            dl_street: 44,
+            dl_building: 0,
+            cod_amount: 250,
+            dl_amount: 0,
+            order_notes: ''
+        }
+    ];
+}
+
+function downloadSampleCSV() {
+    var csvContent = "client_order_code,customer_name,customer_phone,customer_whatsapp,customer_address,dl_zone,dl_street,dl_building,cod_amount,dl_amount,order_notes\n";
+    csvContent += "ORD-001,John Doe,+97412345678,+97412345678,Zone 45 Street 123 Building 5,45,123,5,150,15,Handle with care\n";
+    csvContent += "ORD-002,Jane Smith,+97487654321,+97487654321,Zone 61 Street 8 Building 12,61,8,12,0,20,Leave at door\n";
+    csvContent += ",Ahmed Ali,+97455555555,,Zone 33 Street 44,33,44,0,250,0,\n";
+
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var link = document.createElement("a");
+    var url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "sample_orders.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function downloadSampleExcel() {
+    var data = getSampleData();
+    var worksheet = XLSX.utils.json_to_sheet(data);
+    var workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
+    XLSX.writeFile(workbook, "sample_orders.xlsx");
+}
+</script>
+{% endblock extra_js %}

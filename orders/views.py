@@ -92,6 +92,14 @@ from django.core.paginator import (
 
 logger = logging.getLogger('orders')
 
+# Import shared utilities from core
+from core.utils import (
+    contains_arabic,
+    translate_to_english,
+    convert_arabic_numerals,
+    format_whatsapp_number,
+)
+
 
 # =============================================================================
 # ORDER LIST VIEWS
@@ -1507,3 +1515,435 @@ def verify_location(request, token):
         return render(request, 'orders/verification_error.html', {
             'error': 'Invalid or expired verification link'
         })
+
+
+# =============================================================================
+# BULK IMPORT VIEWS (SHARED - Staff & Client Dashboard)
+# =============================================================================
+
+@login_required
+def bulk_import_orders(request):
+    """
+    Bulk import page with 4-step wizard.
+    - Staff users: Can select any business from dropdown
+    - Client users: Business is auto-selected based on logged-in user
+    """
+    is_staff_user = request.user.is_staff
+    business = None
+    businesses = None
+    pickup_locations = []
+
+    if is_staff_user:
+        # Staff can select any business
+        businesses = business_models.Business.objects.filter(
+            business_status='active'
+        ).order_by('business_name')
+    else:
+        # Client - get their business
+        try:
+            user_business = request.user.user_business.first()
+            if user_business:
+                business = business_models.Business.objects.get(user_id=user_business.user_id)
+                pickup_locations = business_models.PickupLocation.objects.filter(
+                    business_id=business.business_id
+                ).all()
+        except business_models.Business.DoesNotExist:
+            pass
+
+        if not business:
+            from django.contrib import messages
+            messages.error(request, 'No business associated with your account')
+            return redirect('business:business_dashboard')
+
+    # Target fields for column mapping - grouped by category
+    target_fields = [
+        # Order Info
+        {'name': 'client_order_code', 'label': 'Order ID', 'required': False, 'group': 'Order Info'},
+        {'name': 'order_date', 'label': 'Order Date', 'required': False, 'group': 'Order Info'},
+        {'name': 'invoice_number', 'label': 'Invoice No', 'required': False, 'group': 'Order Info'},
+
+        # Customer
+        {'name': 'customer_name', 'label': 'Customer Name', 'required': True, 'group': 'Customer'},
+        {'name': 'customer_phone', 'label': 'Phone 1', 'required': True, 'group': 'Customer'},
+        {'name': 'customer_whatsapp', 'label': 'Phone 2 / WhatsApp', 'required': False, 'group': 'Customer'},
+        {'name': 'customer_email', 'label': 'Email', 'required': False, 'group': 'Customer'},
+
+        # Address
+        {'name': 'customer_address', 'label': 'Customer Address', 'required': True, 'group': 'Address'},
+        {'name': 'dl_landmark', 'label': 'City / Landmark', 'required': False, 'group': 'Address'},
+        {'name': 'dl_building', 'label': 'Villa / Building No', 'required': False, 'group': 'Address'},
+        {'name': 'dl_street', 'label': 'Street No', 'required': False, 'group': 'Address'},
+        {'name': 'dl_zone', 'label': 'Zone No', 'required': False, 'group': 'Address'},
+        {'name': 'location_link', 'label': 'Location Link', 'required': False, 'group': 'Address'},
+        {'name': 'dl_latitude', 'label': 'Latitude', 'required': False, 'group': 'Address'},
+        {'name': 'dl_longitude', 'label': 'Longitude', 'required': False, 'group': 'Address'},
+
+        # Delivery
+        {'name': 'deadline_date', 'label': 'Day & Time Preference', 'required': False, 'group': 'Delivery'},
+
+        # Product
+        {'name': 'product_url', 'label': 'Product URL', 'required': False, 'group': 'Product'},
+        {'name': 'product_name', 'label': 'Product Name', 'required': False, 'group': 'Product'},
+        {'name': 'quantity', 'label': 'Qty', 'required': False, 'group': 'Product'},
+        {'name': 'cod_amount', 'label': 'Price / COD Amount', 'required': False, 'group': 'Product'},
+        {'name': 'product_1', 'label': 'Product:1', 'required': False, 'group': 'Product'},
+        {'name': 'count_1', 'label': 'Count:1', 'required': False, 'group': 'Product'},
+        {'name': 'product_2', 'label': 'Product:2', 'required': False, 'group': 'Product'},
+        {'name': 'count_2', 'label': 'Count:2', 'required': False, 'group': 'Product'},
+        {'name': 'product_3', 'label': 'Product:3', 'required': False, 'group': 'Product'},
+        {'name': 'count_3', 'label': 'Count:3', 'required': False, 'group': 'Product'},
+        {'name': 'product_4', 'label': 'Product:4', 'required': False, 'group': 'Product'},
+        {'name': 'count_4', 'label': 'Count:4', 'required': False, 'group': 'Product'},
+        {'name': 'product_5', 'label': 'Product:5', 'required': False, 'group': 'Product'},
+        {'name': 'count_5', 'label': 'Count:5', 'required': False, 'group': 'Product'},
+        {'name': 'stock_status', 'label': 'Stock Status', 'required': False, 'group': 'Product'},
+
+        # Delivery Status
+        {'name': 'dl_number', 'label': 'DL No', 'required': False, 'group': 'Status'},
+        {'name': 'delivery_status', 'label': 'Delivery Status', 'required': False, 'group': 'Status'},
+        {'name': 'delivered_date', 'label': 'Date of Delivered', 'required': False, 'group': 'Status'},
+
+        # Notes
+        {'name': 'order_notes', 'label': 'Customer Notes', 'required': False, 'group': 'Notes'},
+        {'name': 'internal_notes', 'label': 'Notes By Ezzy', 'required': False, 'group': 'Notes'},
+        {'name': 'seller_notes', 'label': 'Notes By Seller', 'required': False, 'group': 'Notes'},
+    ]
+
+    context = {
+        'is_staff_user': is_staff_user,
+        'business': business,
+        'businesses': businesses,
+        'pickup_locations': pickup_locations,
+        'target_fields': target_fields,
+    }
+
+    # Use appropriate template based on user type
+    if is_staff_user:
+        template = 'workforce/orders_bulk_import.html'
+    else:
+        template = 'orders/bulk_import.html'
+
+    return render(request, template, context)
+
+
+@login_required
+@require_POST
+def bulk_import_preview(request):
+    """
+    AJAX endpoint to parse uploaded file and return columns with auto-mapping.
+    """
+    import csv
+    import io
+
+    if 'file' not in request.FILES:
+        return JsonResponse({'error': 'No file provided'}, status=400)
+
+    uploaded_file = request.FILES['file']
+    file_name = uploaded_file.name.lower()
+
+    try:
+        # Parse based on file type
+        if file_name.endswith('.csv'):
+            content = uploaded_file.read().decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(content))
+            rows = list(reader)
+            columns = reader.fieldnames or []
+        elif file_name.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(uploaded_file, engine='openpyxl' if file_name.endswith('.xlsx') else 'xlrd')
+            df = df.fillna('')
+            columns = df.columns.tolist()
+            rows = df.to_dict('records')
+        else:
+            return JsonResponse({'error': 'Unsupported file format. Use CSV, XLSX, or XLS.'}, status=400)
+
+        if not columns:
+            return JsonResponse({'error': 'No columns found in file'}, status=400)
+
+        # Auto-mapping logic
+        auto_mapping = {}
+        mapping_patterns = {
+            'client_order_code': ['order id', 'order no', 'orderid', 'order number', 'no'],
+            'order_date': ['date', 'order date', 'created'],
+            'customer_name': ['customer name', 'name', 'customer', 'full name', 'client name'],
+            'customer_phone': ['phone', 'phone 1', 'mobile', 'contact', 'phone1', 'tel'],
+            'customer_whatsapp': ['phone 2', 'whatsapp', 'phone2', 'watsapp', 'alternate phone'],
+            'customer_email': ['email', 'e-mail', 'customer email'],
+            'customer_address': ['address', 'customer address', 'delivery address', 'full address'],
+            'dl_landmark': ['city', 'landmark', 'customer city', 'land mark', 'city landmark', 'customer city land mark'],
+            'dl_building': ['building', 'villa', 'building no', 'villa no', 'bldg'],
+            'dl_street': ['street', 'street no', 'street number'],
+            'dl_zone': ['zone', 'zone no', 'zone number'],
+            'location_link': ['location', 'loclink', 'google map', 'map link', 'loc link'],
+            'dl_latitude': ['latitude', 'lat'],
+            'dl_longitude': ['longitude', 'lng', 'long'],
+            'deadline_date': ['day', 'time', 'day time', 'preferred', 'deadline', 'delivery date', 'day time if them have demand'],
+            'product_url': ['product url', 'url', 'product link'],
+            'product_name': ['product name', 'product', 'item', 'item name'],
+            'quantity': ['qty', 'quantity', 'count'],
+            'cod_amount': ['price', 'cod', 'amount', 'cod amount', 'total'],
+            'product_1': ['product 1', 'product:1'],
+            'count_1': ['count 1', 'count:1', 'qty 1'],
+            'product_2': ['product 2', 'product:2'],
+            'count_2': ['count 2', 'count:2', 'qty 2'],
+            'product_3': ['product 3', 'product:3'],
+            'count_3': ['count 3', 'count:3', 'qty 3'],
+            'product_4': ['product 4', 'product:4'],
+            'count_4': ['count 4', 'count:4', 'qty 4'],
+            'product_5': ['product 5', 'product:5'],
+            'count_5': ['count 5', 'count:5', 'qty 5'],
+            'stock_status': ['stock', 'stock status', 'availability'],
+            'invoice_number': ['invoice', 'invoice no', 'inv'],
+            'dl_number': ['dl no', 'delivery no', 'dl number'],
+            'delivery_status': ['delivery status', 'status'],
+            'delivered_date': ['delivered', 'date of delivered', 'delivery date'],
+            'order_notes': ['note', 'notes', 'customer notes', 'remarks'],
+            'internal_notes': ['notes by ezzy', 'ezzy notes', 'internal notes'],
+            'seller_notes': ['notes by seller', 'seller notes', 'vendor notes'],
+        }
+
+        for col in columns:
+            col_lower = col.lower()
+            for char in ['\n', '/', '-', '_', '&', '(', ')', ':', ',', '.']:
+                col_lower = col_lower.replace(char, ' ')
+            col_normalized = ' '.join(col_lower.split())
+
+            for field, patterns in mapping_patterns.items():
+                if any(pattern in col_normalized or col_normalized in pattern for pattern in patterns):
+                    if field not in auto_mapping.values():
+                        auto_mapping[col] = field
+                        break
+
+        return JsonResponse({
+            'columns': columns,
+            'rows': rows[:100],  # Limit preview rows
+            'total_rows': len(rows),
+            'auto_mapping': auto_mapping
+        })
+
+    except Exception as e:
+        logger.error(f'Error parsing bulk import file: {e}')
+        return JsonResponse({'error': f'Error parsing file: {str(e)}'}, status=400)
+
+
+@login_required
+@require_POST
+def bulk_import_save(request):
+    """
+    AJAX endpoint to save a single order row from bulk import.
+    - Staff users: business_id from request body
+    - Client users: business from logged-in user
+    """
+    import uuid
+
+    try:
+        data = json.loads(request.body)
+        row = data.get('row')
+        row_index = data.get('row_index', 0)
+        business_id = data.get('business_id')
+
+        # Determine business based on user type
+        if request.user.is_staff and business_id:
+            # Staff user with business_id provided
+            try:
+                business = business_models.Business.objects.get(business_id=business_id)
+            except business_models.Business.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Invalid business selected'}, status=400)
+        else:
+            # Client user - get their business
+            try:
+                user_business = request.user.user_business.first()
+                if not user_business:
+                    return JsonResponse({'success': False, 'error': 'No business associated with your account'}, status=400)
+                business = business_models.Business.objects.get(user_id=user_business.user_id)
+            except business_models.Business.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Business not found'}, status=400)
+
+        if not row:
+            return JsonResponse({'success': False, 'error': 'No data provided'}, status=400)
+
+        try:
+            client_order_code = str(row.get('client_order_code', '')).strip()
+            if not client_order_code:
+                client_order_code = f"ORD-{uuid.uuid4().hex[:8].upper()}"
+
+            # Check for duplicate
+            if orders_models.Order.objects.filter(client_order_code=client_order_code).exists():
+                return JsonResponse({
+                    'success': False,
+                    'row_index': row_index,
+                    'error': f"Duplicate order code '{client_order_code}'"
+                })
+
+            # Validate required fields
+            customer_name = str(row.get('customer_name', '')).strip()
+            customer_phone = str(row.get('customer_phone', '')).strip()
+            customer_address = str(row.get('customer_address', '')).strip()
+
+            if not customer_name:
+                return JsonResponse({
+                    'success': False,
+                    'row_index': row_index,
+                    'error': 'Customer name is required'
+                })
+            if not customer_phone:
+                return JsonResponse({
+                    'success': False,
+                    'row_index': row_index,
+                    'error': 'Customer phone is required'
+                })
+            if not customer_address:
+                return JsonResponse({
+                    'success': False,
+                    'row_index': row_index,
+                    'error': 'Customer address is required'
+                })
+
+            # Convert Arabic numerals in phone numbers
+            customer_phone = convert_arabic_numerals(customer_phone)
+
+            # Format WhatsApp number
+            raw_whatsapp = str(row.get('customer_whatsapp', '')).strip()
+            if raw_whatsapp:
+                customer_whatsapp = format_whatsapp_number(raw_whatsapp)
+            else:
+                customer_whatsapp = format_whatsapp_number(customer_phone)
+
+            # Translate Arabic text
+            customer_name_original = customer_name
+            customer_address_original = customer_address
+            customer_name_en = translate_to_english(customer_name)
+            customer_address_en = translate_to_english(customer_address)
+
+            if contains_arabic(customer_name):
+                customer_name = customer_name_en
+            if contains_arabic(customer_address):
+                customer_address = customer_address_en
+
+            # Parse numeric fields safely
+            def safe_int(val):
+                try:
+                    return int(float(val)) if val else 0
+                except (ValueError, TypeError):
+                    return 0
+
+            def safe_decimal(val):
+                try:
+                    from decimal import Decimal
+                    return Decimal(str(val)) if val else None
+                except (ValueError, TypeError):
+                    return None
+
+            # Build notes
+            notes_parts = []
+            if row.get('order_notes'):
+                notes_parts.append(f"Customer: {row.get('order_notes')}")
+            if row.get('seller_notes'):
+                notes_parts.append(f"Seller: {row.get('seller_notes')}")
+            combined_notes = ' | '.join(notes_parts) if notes_parts else ''
+
+            # Store original data
+            original_data = {
+                'import_data': row,
+                'extra_fields': {
+                    'customer_name_original': customer_name_original,
+                    'customer_address_original': customer_address_original,
+                    'customer_name_en': customer_name_en,
+                    'customer_address_en': customer_address_en,
+                    'name_was_translated': customer_name_original != customer_name_en,
+                    'address_was_translated': customer_address_original != customer_address_en,
+                    'customer_email': str(row.get('customer_email', '')),
+                    'dl_landmark': str(row.get('dl_landmark', '')),
+                    'location_link': str(row.get('location_link', '')),
+                    'dl_latitude': str(row.get('dl_latitude', '')),
+                    'dl_longitude': str(row.get('dl_longitude', '')),
+                    'product_name': str(row.get('product_name', '')),
+                    'product_url': str(row.get('product_url', '')),
+                    'quantity': str(row.get('quantity', '')),
+                    'stock_status': str(row.get('stock_status', '')),
+                    'invoice_number': str(row.get('invoice_number', '')),
+                    'seller_notes': str(row.get('seller_notes', '')),
+                    'internal_notes': str(row.get('internal_notes', '')),
+                }
+            }
+
+            # Create Order
+            order = orders_models.Order(
+                business=business,
+                client_order_code=client_order_code,
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                customer_whatsapp=customer_whatsapp,
+                customer_address=customer_address,
+                dl_zone=safe_int(row.get('dl_zone')),
+                dl_street=safe_int(row.get('dl_street')),
+                dl_building=safe_int(row.get('dl_building')),
+                cod_amount=safe_int(row.get('cod_amount')),
+                dl_amount=safe_int(row.get('dl_amount')),
+                order_notes=combined_notes[:100] if combined_notes else str(row.get('order_notes', ''))[:100],
+                deadline_date=str(row.get('deadline_date', '')),
+                order_status='to_review',
+                verification_status='pending',
+                original_order_data=original_data,
+            )
+            order.save()
+
+            # Create OrderItems
+            items_created = 0
+            product_name = str(row.get('product_name', '')).strip()
+            if product_name:
+                orders_models.OrderItem.objects.create(
+                    order=order,
+                    quantity=safe_int(row.get('quantity')) or 1,
+                    unit_price=safe_decimal(row.get('cod_amount')),
+                    notes=f"{product_name} | URL: {row.get('product_url', '')}" if row.get('product_url') else product_name
+                )
+                items_created += 1
+
+            for i in range(1, 6):
+                prod_name = str(row.get(f'product_{i}', '')).strip()
+                prod_count = safe_int(row.get(f'count_{i}')) or 1
+                if prod_name:
+                    orders_models.OrderItem.objects.create(
+                        order=order,
+                        quantity=prod_count,
+                        notes=prod_name
+                    )
+                    items_created += 1
+
+            # Create AddressVerification if lat/long provided
+            lat = safe_decimal(row.get('dl_latitude'))
+            lng = safe_decimal(row.get('dl_longitude'))
+            if lat and lng:
+                orders_models.AddressVerification.objects.create(
+                    order=order,
+                    original_address=customer_address,
+                    latitude=lat,
+                    longitude=lng,
+                    zone_number=safe_int(row.get('dl_zone')) or None,
+                    street_number=safe_int(row.get('dl_street')) or None,
+                    building_number=safe_int(row.get('dl_building')) or None,
+                    notes=f"Landmark: {row.get('dl_landmark', '')} | Link: {row.get('location_link', '')}",
+                    verification_result='pending'
+                )
+
+            return JsonResponse({
+                'success': True,
+                'row_index': row_index,
+                'order_id': order.id,
+                'order_code': client_order_code,
+                'customer_name': customer_name,
+                'items_created': items_created
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'row_index': row_index,
+                'error': str(e)
+            })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON data'}, status=400)
+    except Exception as e:
+        logger.error(f'Error saving bulk import row: {e}')
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

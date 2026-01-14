@@ -96,6 +96,14 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Import shared utilities from core
+from core.utils import (
+    contains_arabic,
+    translate_to_english,
+    convert_arabic_numerals,
+    format_whatsapp_number,
+)
+
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -474,6 +482,231 @@ def orders_pending_verification(request):
 
 
 
+
+
+# Staff Order Creation section  ------------------------------------------------------------------------------------------------------
+
+@login_required(login_url='/accounts/login/')
+def add_order(request):
+    """
+    Staff view to add an order for a client/seller.
+    Seller is selected at the top of the form.
+    """
+    import uuid
+    from django.contrib import messages
+    from core.utils import (
+        contains_arabic, translate_to_english,
+        convert_arabic_numerals, format_whatsapp_number
+    )
+
+    # Get all active businesses for seller dropdown
+    businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).select_related('business_profile').order_by('business_name')
+
+    # Get selected business if provided
+    selected_business_id = request.GET.get('business', '')
+    selected_business = None
+    pickup_locations = []
+
+    if selected_business_id:
+        try:
+            selected_business = business_models.Business.objects.get(business_id=selected_business_id)
+            pickup_locations = business_models.PickupLocation.objects.filter(
+                business=selected_business
+            )
+        except business_models.Business.DoesNotExist:
+            pass
+
+    if request.method == 'POST':
+        try:
+            # Get form data
+            business_id = request.POST.get('business')
+            business = business_models.Business.objects.get(business_id=business_id)
+
+            # Generate client order code if not provided
+            client_order_code = request.POST.get('client_order_code', '').strip()
+            if not client_order_code:
+                client_order_code = f"WF-{uuid.uuid4().hex[:8].upper()}"
+
+            # Get and process customer data
+            customer_name = request.POST.get('customer_name', '').strip()
+            customer_address = request.POST.get('customer_address', '').strip()
+            customer_phone = request.POST.get('customer_phone', '').strip()
+
+            # Store originals before translation
+            customer_name_original = customer_name
+            customer_address_original = customer_address
+
+            # Translate Arabic text to English
+            customer_name_en = translate_to_english(customer_name)
+            customer_address_en = translate_to_english(customer_address)
+
+            if contains_arabic(customer_name):
+                customer_name = customer_name_en
+            if contains_arabic(customer_address):
+                customer_address = customer_address_en
+
+            # Convert Arabic numerals and format phone numbers
+            customer_phone = convert_arabic_numerals(customer_phone)
+            raw_whatsapp = request.POST.get('customer_whatsapp', '').strip()
+            if raw_whatsapp:
+                customer_whatsapp = format_whatsapp_number(raw_whatsapp)
+            else:
+                customer_whatsapp = format_whatsapp_number(customer_phone)
+
+            # Helper to safely parse integers
+            def safe_int(val):
+                try:
+                    return int(float(val)) if val else 0
+                except (ValueError, TypeError):
+                    return 0
+
+            # Build combined notes
+            notes_parts = []
+            order_notes = request.POST.get('order_notes', '').strip()
+            seller_notes = request.POST.get('seller_notes', '').strip()
+            if order_notes:
+                notes_parts.append(f"Customer: {order_notes}")
+            if seller_notes:
+                notes_parts.append(f"Seller: {seller_notes}")
+            combined_notes = ' | '.join(notes_parts) if notes_parts else order_notes
+
+            # Prepare original_order_data with extra fields
+            original_data = {
+                'source': 'staff_dashboard',
+                'created_by': request.user.username,
+                'extra_fields': {
+                    'customer_name_original': customer_name_original,
+                    'customer_address_original': customer_address_original,
+                    'customer_name_en': customer_name_en,
+                    'customer_address_en': customer_address_en,
+                    'name_was_translated': customer_name_original != customer_name_en,
+                    'address_was_translated': customer_address_original != customer_address_en,
+                    'customer_email': request.POST.get('customer_email', '').strip(),
+                    'invoice_number': request.POST.get('invoice_number', '').strip(),
+                    'dl_landmark': request.POST.get('dl_landmark', '').strip(),
+                    'location_link': request.POST.get('location_link', '').strip(),
+                    'product_name': request.POST.get('product_name', '').strip(),
+                    'quantity': request.POST.get('quantity', '1'),
+                    'seller_notes': seller_notes,
+                    'internal_notes': request.POST.get('internal_notes', '').strip(),
+                }
+            }
+
+            # Create order
+            order = orders_models.Order(
+                business=business,
+                client_order_code=client_order_code,
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                customer_whatsapp=customer_whatsapp,
+                customer_address=customer_address,
+                dl_zone=safe_int(request.POST.get('dl_zone')),
+                dl_street=safe_int(request.POST.get('dl_street')),
+                dl_building=safe_int(request.POST.get('dl_building')),
+                cod_amount=safe_int(request.POST.get('cod_amount')),
+                dl_amount=safe_int(request.POST.get('dl_amount')),
+                order_notes=combined_notes[:100] if combined_notes else '',
+                deadline_date=request.POST.get('deadline_date', '').strip(),
+                order_status='to_review',
+                verification_status='pending',
+                original_order_data=original_data,
+            )
+
+            # Set pickup location if provided
+            pickup_location_id = request.POST.get('pickup_location')
+            if pickup_location_id:
+                try:
+                    order.pickup_location = business_models.PickupLocation.objects.get(
+                        id=pickup_location_id, business=business
+                    )
+                except business_models.PickupLocation.DoesNotExist:
+                    pass
+
+            order.save()
+
+            # Create OrderItem if product name is provided
+            product_name = request.POST.get('product_name', '').strip()
+            if product_name:
+                orders_models.OrderItem.objects.create(
+                    order=order,
+                    quantity=safe_int(request.POST.get('quantity')) or 1,
+                    unit_price=safe_int(request.POST.get('cod_amount')) if request.POST.get('cod_amount') else None,
+                    notes=product_name
+                )
+
+            messages.success(request, f'Order {order.order_number} created successfully.')
+
+            # Return JSON response for AJAX
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Order {order.order_number} created successfully.',
+                    'order_id': order.id,
+                    'order_number': order.order_number
+                })
+
+            return redirect(reverse('workforce:wf_orders_all'))
+
+        except business_models.Business.DoesNotExist:
+            error_msg = 'Please select a valid seller.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg}, status=400)
+            messages.error(request, error_msg)
+
+        except Exception as e:
+            logger.error(f'Error creating order: {e}')
+            error_msg = f'Error creating order: {str(e)}'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg}, status=400)
+            messages.error(request, error_msg)
+
+    context = {
+        'businesses': businesses,
+        'selected_business': selected_business,
+        'selected_business_id': selected_business_id,
+        'pickup_locations': pickup_locations,
+    }
+    return render(request, 'workforce/orders_add.html', context)
+
+
+# Bulk import views removed - now using shared views from orders app
+# See orders/views.py: bulk_import_orders, bulk_import_preview, bulk_import_save
+
+
+@login_required(login_url='/accounts/login/')
+def orders_api_guide(request):
+    """
+    Display API documentation for order creation.
+    """
+    # Get all active businesses for the example
+    businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).order_by('business_name')[:5]
+
+    context = {
+        'businesses': businesses,
+    }
+    return render(request, 'workforce/orders_api_guide.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def get_pickup_locations(request, business_id):
+    """AJAX endpoint to get pickup locations for a business"""
+    try:
+        business = business_models.Business.objects.get(business_id=business_id)
+        locations = business_models.PickupLocation.objects.filter(business=business)
+
+        location_list = [{
+            'id': loc.id,
+            'name': loc.location_name,
+            'address': loc.location_address or '',
+        } for loc in locations]
+
+        return JsonResponse({'success': True, 'locations': location_list})
+    except business_models.Business.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
 
 
 # Delivery Tasks section  ------------------------------------------------------------------------------------------------------
@@ -2167,9 +2400,13 @@ def seller_detail(request, business_id):
     ).count()
 
     # Get recent orders for activity timeline (last 10)
+    # Use .only() to avoid missing columns (delivered_at, fulfilled_at not migrated)
     recent_orders = orders_models.Order.objects.filter(
         business=business
-    ).select_related('business').order_by('-created_at')[:10]
+    ).only(
+        'id', 'order_number', 'client_order_code', 'order_status',
+        'cod_amount', 'customer_name', 'customer_phone', 'created_at'
+    ).order_by('-created_at')[:10]
 
     # Get delivery task statistics
     delivery_stats = delivery_models.DeliveryTask.objects.filter(
@@ -2221,6 +2458,30 @@ def seller_detail(request, business_id):
                 'error': str(e)
             }, status=400)
 
+    # Build documents list from business profile fields (if available)
+    documents = []
+    # Add QID document if available
+    if business.business_qid:
+        documents.append({
+            'document_type': 'QID',
+            'document_no': business.business_qid,
+            'document_file': None,
+            'document_expiry_date': None,
+        })
+    # Add business logo as document if available (check for actual file, not default)
+    if hasattr(business, 'business_logo') and business.business_logo:
+        try:
+            # Check if file actually exists and has content (not just default placeholder)
+            has_real_file = business.business_logo.name and business.business_logo.size > 0
+        except Exception:
+            has_real_file = False
+        documents.append({
+            'document_type': 'Business Logo',
+            'document_no': 'Logo Image',
+            'document_file': business.business_logo if has_real_file else None,
+            'document_expiry_date': None,
+        })
+
     context = {
         'page_title': f'Seller: {business.business_name}',
         'business': business,
@@ -2236,9 +2497,306 @@ def seller_detail(request, business_id):
         'last_7_days_orders': last_7_days_orders,
         'recent_orders': recent_orders,
         'avg_orders_per_month': avg_orders_per_month,
+        'documents': documents,
+        'now': timezone.now(),
     }
 
     return render(request, 'workforce/seller_detail.html', context)
+
+
+# =============================================================================
+# DRIVER MANAGEMENT VIEWS
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+def drivers_list(request):
+    """
+    View to display all drivers with search and filtering
+    """
+    drivers = fleet_models.Driver.objects.select_related(
+        'user', 'profile'
+    ).prefetch_related(
+        'driver_vehicle', 'driver_document'
+    ).order_by('-driver_id')
+
+    # Apply search filter
+    search = request.GET.get('search', '').strip()
+    if search:
+        from django.db.models import Q
+        drivers = drivers.filter(
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search) |
+            Q(driver_code__icontains=search) |
+            Q(driver_phone__icontains=search)
+        )
+
+    # Apply status filter
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        drivers = drivers.filter(driver_status=status_filter)
+
+    # Pagination
+    page_obj = paginate_queryset(request, drivers, items_per_page=20)
+
+    # Get counts for stats
+    total_count = fleet_models.Driver.objects.count()
+    active_count = fleet_models.Driver.objects.filter(driver_status='Approved').count()
+    pending_count = fleet_models.Driver.objects.filter(driver_status__in=['Pending on Review', 'Processing']).count()
+    inactive_count = fleet_models.Driver.objects.filter(driver_status__in=['Rejected', 'Blocked']).count()
+
+    context = {
+        'page_title': 'All Drivers',
+        'page_obj': page_obj,
+        'search': search,
+        'status_filter': status_filter,
+        'total_count': total_count,
+        'active_count': active_count,
+        'pending_count': pending_count,
+        'inactive_count': inactive_count,
+    }
+
+    return render(request, 'workforce/drivers_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def drivers_pending(request):
+    """
+    View to display drivers pending approval
+    """
+    drivers = fleet_models.Driver.objects.select_related(
+        'user', 'profile'
+    ).prefetch_related(
+        'driver_vehicle', 'driver_document'
+    ).filter(
+        driver_status__in=['Pending on Review', 'Processing']
+    ).order_by('-driver_id')
+
+    # Apply search filter
+    search = request.GET.get('search', '').strip()
+    if search:
+        from django.db.models import Q
+        drivers = drivers.filter(
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search) |
+            Q(driver_code__icontains=search) |
+            Q(driver_phone__icontains=search)
+        )
+
+    # Pagination
+    page_obj = paginate_queryset(request, drivers, items_per_page=20)
+
+    context = {
+        'page_title': 'Pending Drivers',
+        'page_obj': page_obj,
+        'search': search,
+        'status_type': 'pending',
+    }
+
+    return render(request, 'workforce/drivers_pending.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def drivers_active(request):
+    """
+    View to display active (approved) drivers
+    """
+    drivers = fleet_models.Driver.objects.select_related(
+        'user', 'profile'
+    ).prefetch_related(
+        'driver_vehicle', 'driver_document'
+    ).filter(
+        driver_status='Approved'
+    ).order_by('-driver_id')
+
+    # Apply search filter
+    search = request.GET.get('search', '').strip()
+    if search:
+        from django.db.models import Q
+        drivers = drivers.filter(
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search) |
+            Q(driver_code__icontains=search) |
+            Q(driver_phone__icontains=search)
+        )
+
+    # Pagination
+    page_obj = paginate_queryset(request, drivers, items_per_page=20)
+
+    context = {
+        'page_title': 'Active Drivers',
+        'page_obj': page_obj,
+        'search': search,
+        'status_type': 'active',
+    }
+
+    return render(request, 'workforce/drivers_active.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def drivers_inactive(request):
+    """
+    View to display inactive, rejected, or blocked drivers
+    """
+    drivers = fleet_models.Driver.objects.select_related(
+        'user', 'profile'
+    ).prefetch_related(
+        'driver_vehicle', 'driver_document'
+    ).filter(
+        driver_status__in=['Rejected', 'Blocked']
+    ).order_by('-driver_id')
+
+    # Apply search filter
+    search = request.GET.get('search', '').strip()
+    if search:
+        from django.db.models import Q
+        drivers = drivers.filter(
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search) |
+            Q(driver_code__icontains=search) |
+            Q(driver_phone__icontains=search)
+        )
+
+    # Pagination
+    page_obj = paginate_queryset(request, drivers, items_per_page=20)
+
+    context = {
+        'page_title': 'Inactive Drivers',
+        'page_obj': page_obj,
+        'search': search,
+        'status_type': 'inactive',
+    }
+
+    return render(request, 'workforce/drivers_inactive.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def driver_detail(request, driver_id):
+    """
+    View for viewing comprehensive driver details including
+    documents, vehicles, transactions, and delivery stats.
+    """
+    from django.db.models import Count, Sum, Q
+    from django.utils import timezone
+    from datetime import timedelta
+
+    # Fetch driver with all related data
+    driver = get_object_or_404(
+        fleet_models.Driver.objects.select_related(
+            'user', 'profile'
+        ).prefetch_related(
+            'driver_vehicle',
+            'driver_document',
+        ),
+        driver_id=driver_id
+    )
+
+    # Get vehicles
+    vehicles = driver.driver_vehicle.all()
+
+    # Get documents and check if files actually exist
+    raw_documents = driver.driver_document.all()
+    documents = []
+    for doc in raw_documents:
+        doc_dict = {
+            'document_type': doc.document_type,
+            'document_no': doc.document_no,
+            'document_expiry_date': getattr(doc, 'document_expiry_date', None),
+            'document_file': None,  # Default to None
+        }
+        # Check if file actually exists on disk
+        if doc.document_file and doc.document_file.name:
+            try:
+                if doc.document_file.storage.exists(doc.document_file.name):
+                    doc_dict['document_file'] = doc.document_file
+            except Exception:
+                pass
+        documents.append(doc_dict)
+
+    # Get delivery task statistics
+    delivery_stats = delivery_models.DeliveryTask.objects.filter(
+        driver=driver
+    ).aggregate(
+        total_tasks=Count('id'),
+        completed_tasks=Count('id', filter=Q(dl_task_status='delivered')),
+        in_transit=Count('id', filter=Q(dl_task_status='in_transit')),
+        failed_tasks=Count('id', filter=Q(dl_task_status__in=['failed', 'cancelled'])),
+    )
+
+    # Calculate success rate
+    total_completed = (delivery_stats.get('completed_tasks') or 0) + (delivery_stats.get('failed_tasks') or 0)
+    success_rate = 0
+    if total_completed > 0:
+        success_rate = round((delivery_stats.get('completed_tasks') or 0) / total_completed * 100, 1)
+
+    # Get recent tasks count (last 30 days)
+    thirty_days_ago = timezone.now() - timedelta(days=30)
+    recent_tasks_count = delivery_models.DeliveryTask.objects.filter(
+        driver=driver,
+        created_at__gte=thirty_days_ago
+    ).count()
+
+    # Get last 7 days tasks for trend
+    seven_days_ago = timezone.now() - timedelta(days=7)
+    last_7_days_tasks = delivery_models.DeliveryTask.objects.filter(
+        driver=driver,
+        created_at__gte=seven_days_ago
+    ).count()
+
+    # Get recent tasks for activity timeline (last 10)
+    recent_tasks = delivery_models.DeliveryTask.objects.filter(
+        driver=driver
+    ).select_related('business').order_by('-created_at')[:10]
+
+    # Get COD statistics
+    cod_stats = delivery_models.DeliveryTask.objects.filter(
+        driver=driver,
+        order__cod_status_by_client='include'
+    ).aggregate(
+        total_cod_tasks=Count('id'),
+        total_cod_amount=Sum('order__cod_amount'),
+        collected_cod=Sum('order__cod_amount', filter=Q(dl_task_status='delivered')),
+    )
+
+    # Get recent transactions (last 10)
+    recent_transactions = fleet_models.DriverTransaction.objects.filter(
+        driver=driver
+    ).order_by('-created_at')[:10]
+
+    # Handle POST request for updates
+    if request.method == 'POST':
+        try:
+            driver.driver_phone = request.POST.get('driver_phone', driver.driver_phone)
+            driver.driver_whatsapp = request.POST.get('driver_whatsapp', driver.driver_whatsapp)
+            driver.driver_status = request.POST.get('driver_status', driver.driver_status)
+            driver.driver_bio = request.POST.get('driver_bio', driver.driver_bio)
+            driver.save()
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Driver updated successfully'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=400)
+
+    context = {
+        'page_title': f'Driver: {driver.user.first_name} {driver.user.last_name}',
+        'driver': driver,
+        'vehicles': vehicles,
+        'documents': documents,
+        'delivery_stats': delivery_stats,
+        'success_rate': success_rate,
+        'recent_tasks_count': recent_tasks_count,
+        'last_7_days_tasks': last_7_days_tasks,
+        'recent_tasks': recent_tasks,
+        'cod_stats': cod_stats,
+        'recent_transactions': recent_transactions,
+        'now': timezone.now(),
+    }
+
+    return render(request, 'workforce/driver_detail.html', context)
 
 
 # =============================================================================

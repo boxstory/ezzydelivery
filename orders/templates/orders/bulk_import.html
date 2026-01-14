@@ -1,0 +1,1285 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Bulk Import Orders - Client Dashboard{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'business/css/business.css' %}" />
+<style>
+.wizard-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-lg);
+    position: relative;
+}
+.wizard-steps::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 50px;
+    right: 50px;
+    height: 2px;
+    background: var(--border-color);
+    z-index: 0;
+}
+.wizard-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+}
+.wizard-step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+    transition: all 0.3s ease;
+}
+.wizard-step.active .wizard-step-number {
+    background: var(--brand-primary);
+    border-color: var(--brand-primary);
+    color: white;
+}
+.wizard-step.completed .wizard-step-number {
+    background: var(--success-color);
+    border-color: var(--success-color);
+    color: white;
+}
+.wizard-step-label {
+    font-size: var(--font-sm);
+    color: var(--text-muted);
+}
+.wizard-step.active .wizard-step-label,
+.wizard-step.completed .wizard-step-label {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+.step-content {
+    display: none;
+}
+.step-content.active {
+    display: block;
+}
+.mapping-group-header {
+    background: var(--bg-secondary);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin: var(--spacing-md) 0 var(--spacing-xs) 0;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--brand-primary);
+}
+.mapping-group-header h6 {
+    margin: 0;
+    color: var(--brand-primary);
+    font-size: var(--font-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.mapping-container {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: var(--spacing-sm);
+}
+.mapping-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+    background: white;
+}
+.mapping-row:hover {
+    background: var(--bg-hover);
+}
+.mapping-row:last-child {
+    border-bottom: none;
+}
+.mapping-source {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+.mapping-source select {
+    font-size: var(--font-sm);
+}
+.mapping-arrow {
+    color: var(--text-muted);
+    font-size: var(--font-sm);
+}
+.mapping-target {
+    flex: 1;
+    font-size: var(--font-sm);
+}
+.mapping-target .required {
+    color: var(--danger-color);
+}
+.preview-table-container {
+    max-height: 500px;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+.preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-sm);
+}
+.preview-table th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-secondary);
+    padding: var(--spacing-sm) var(--spacing-md);
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+    white-space: nowrap;
+}
+.preview-table td {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+.preview-table td[contenteditable="true"] {
+    background: white;
+    cursor: text;
+}
+.preview-table td[contenteditable="true"]:focus {
+    background: var(--bg-hover);
+    outline: 2px solid var(--brand-primary);
+}
+.preview-table td[contenteditable="true"]:hover {
+    background: var(--bg-hover);
+}
+.file-drop-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    text-align: center;
+    background: var(--bg-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+.file-drop-zone:hover,
+.file-drop-zone.dragover {
+    border-color: var(--brand-primary);
+    background: rgba(106, 17, 203, 0.05);
+}
+.file-drop-zone i {
+    font-size: 3rem;
+    color: var(--brand-primary);
+    margin-bottom: var(--spacing-md);
+}
+.file-info {
+    display: none;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    margin-top: var(--spacing-md);
+}
+.file-info.visible {
+    display: flex;
+}
+.file-info-icon {
+    font-size: 2rem;
+    color: var(--brand-primary);
+}
+.progress-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+}
+.progress-modal-overlay.active {
+    display: flex;
+}
+.progress-modal {
+    background: white;
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 700px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.progress-modal-header {
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.progress-modal-header h5 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+.progress-modal-body {
+    padding: var(--spacing-lg);
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.progress-bar-container {
+    margin-bottom: var(--spacing-lg);
+}
+.progress-bar-outer {
+    height: 24px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+}
+.progress-bar-inner {
+    height: 100%;
+    background: linear-gradient(90deg, var(--brand-primary), var(--success-color));
+    border-radius: 12px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+.progress-bar-inner::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+.progress-text {
+    display: flex;
+    justify-content: space-between;
+    margin-top: var(--spacing-sm);
+    font-size: var(--font-sm);
+}
+.progress-stats {
+    display: flex;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+.progress-stat-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+}
+.progress-stat-item.success {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success-color);
+}
+.progress-stat-item.error {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger-color);
+}
+.log-container {
+    flex: 1;
+    min-height: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+    background: #1e1e1e;
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+.log-entry {
+    padding: 4px 0;
+    border-bottom: 1px solid #333;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+}
+.log-entry:last-child {
+    border-bottom: none;
+}
+.log-entry.success {
+    color: #4caf50;
+}
+.log-entry.error {
+    color: #f44336;
+}
+.log-entry.info {
+    color: #2196f3;
+}
+.log-entry.warning {
+    color: #ff9800;
+}
+.log-entry-time {
+    color: #888;
+    flex-shrink: 0;
+}
+.log-entry-icon {
+    flex-shrink: 0;
+    width: 20px;
+}
+.failed-table-container {
+    margin-top: var(--spacing-lg);
+    border: 1px solid var(--danger-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+.failed-table-header {
+    background: rgba(220, 53, 69, 0.1);
+    padding: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--danger-color);
+}
+.failed-table-header h6 {
+    margin: 0;
+    color: var(--danger-color);
+}
+.failed-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-sm);
+}
+.failed-table th {
+    background: var(--bg-secondary);
+    padding: var(--spacing-sm);
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+}
+.failed-table td {
+    padding: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+.failed-table td[contenteditable="true"] {
+    background: #fff;
+    cursor: text;
+}
+.failed-table td[contenteditable="true"]:focus {
+    background: var(--bg-hover);
+    outline: 2px solid var(--brand-primary);
+}
+.failed-table .error-message {
+    color: var(--danger-color);
+    font-weight: 500;
+    max-width: 200px;
+}
+.failed-table tr:hover td {
+    background: #fff5f5;
+}
+.business-info-disabled {
+    background: var(--bg-secondary);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    margin-bottom: var(--spacing-md);
+}
+.business-info-disabled .business-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.business-info-disabled .business-code {
+    color: var(--text-muted);
+    font-size: var(--font-sm);
+}
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3">
+    <!-- Page Title -->
+    <h1 class="page-title">
+        <i class="fa-solid fa-file-import me-2"></i>Bulk Import Orders
+    </h1>
+
+    <!-- Wizard Steps -->
+    <div class="wizard-steps">
+        <div class="wizard-step active" data-step="1">
+            <div class="wizard-step-number">1</div>
+            <div class="wizard-step-label">Upload File</div>
+        </div>
+        <div class="wizard-step" data-step="2">
+            <div class="wizard-step-number">2</div>
+            <div class="wizard-step-label">Map Columns</div>
+        </div>
+        <div class="wizard-step" data-step="3">
+            <div class="wizard-step-number">3</div>
+            <div class="wizard-step-label">Preview & Edit</div>
+        </div>
+        <div class="wizard-step" data-step="4">
+            <div class="wizard-step-number">4</div>
+            <div class="wizard-step-label">Complete</div>
+        </div>
+    </div>
+
+    <!-- Step 1: Upload File -->
+    <div class="step-content active" id="step1">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card-modern">
+                    <div class="card-header-modern">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-upload me-2"></i>Upload File
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <!-- Business Selection/Info -->
+                        {% if is_staff_user %}
+                        <!-- Staff: Business Selector -->
+                        <div class="mb-4">
+                            <label for="businessSelect" class="form-label">
+                                <i class="fa-solid fa-store me-2"></i>Select Seller <span class="text-danger">*</span>
+                            </label>
+                            <select id="businessSelect" name="business" class="form-select" required>
+                                <option value="">-- Select a Seller --</option>
+                                {% for biz in businesses %}
+                                    <option value="{{ biz.business_id }}">
+                                        {{ biz.business_name }} ({{ biz.business_code }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% else %}
+                        <!-- Client: Business Info (Disabled - Auto-selected) -->
+                        <div class="business-info-disabled">
+                            <label class="form-label mb-2">
+                                <i class="fa-solid fa-store me-2"></i>Business
+                            </label>
+                            <div class="business-name">{{ business.business_name }}</div>
+                            <div class="business-code">Code: {{ business.business_code }}</div>
+                            <input type="hidden" id="businessId" value="{{ business.business_id }}">
+                        </div>
+                        {% endif %}
+
+                        <!-- File Upload Zone -->
+                        <div class="file-drop-zone" id="fileDropZone">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                            <p class="mb-2"><strong>Drop your file here</strong></p>
+                            <p class="text-muted mb-3">or click to browse</p>
+                            <input type="file" id="importFile" accept=".csv,.xlsx,.xls" hidden>
+                            <span class="badge bg-secondary me-1">CSV</span>
+                            <span class="badge bg-success me-1">XLSX</span>
+                            <span class="badge bg-success">XLS</span>
+                        </div>
+
+                        <!-- File Info -->
+                        <div class="file-info" id="fileInfo">
+                            <i class="fa-solid fa-file file-info-icon" id="fileIcon"></i>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold" id="fileName"></div>
+                                <div class="text-muted small" id="fileSize"></div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearFile()">
+                                <i class="fa-solid fa-times"></i>
+                            </button>
+                        </div>
+
+                        <div class="form-actions mt-4">
+                            <button type="button" class="btn btn-primary" id="btnNext1" disabled onclick="goToStep(2)">
+                                <i class="fa-solid fa-arrow-right me-2"></i>Next: Map Columns
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Format Guide -->
+            <div class="col-lg-4">
+                <div class="card-modern">
+                    <div class="card-header-modern">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-info-circle me-2"></i>File Format Guide
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <h6 class="mb-3">Required Columns:</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <code>customer_name</code> <span class="text-danger">*</span>
+                            </li>
+                            <li class="mb-2">
+                                <code>customer_phone</code> <span class="text-danger">*</span>
+                            </li>
+                            <li class="mb-2">
+                                <code>customer_address</code> <span class="text-danger">*</span>
+                            </li>
+                        </ul>
+
+                        <h6 class="mb-3 mt-4">Optional Columns:</h6>
+                        <ul class="list-unstyled small">
+                            <li class="mb-1"><code>client_order_code</code></li>
+                            <li class="mb-1"><code>customer_whatsapp</code></li>
+                            <li class="mb-1"><code>dl_zone</code>, <code>dl_street</code>, <code>dl_building</code></li>
+                            <li class="mb-1"><code>cod_amount</code>, <code>dl_amount</code></li>
+                            <li class="mb-1"><code>order_notes</code></li>
+                        </ul>
+
+                        <hr>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="#" class="btn btn-outline-primary btn-sm" onclick="downloadSampleCSV()">
+                                <i class="fa-solid fa-download me-1"></i>Sample CSV
+                            </a>
+                            <a href="#" class="btn btn-outline-success btn-sm" onclick="downloadSampleExcel()">
+                                <i class="fa-solid fa-download me-1"></i>Sample Excel
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: Map Columns -->
+    <div class="step-content" id="step2">
+        <div class="card-modern">
+            <div class="card-header-modern d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fa-solid fa-arrows-left-right me-2"></i>Map Columns
+                </h5>
+                <div class="d-flex gap-2 align-items-center">
+                    <span class="badge bg-secondary" id="fileColumnsCount">0 columns in file</span>
+                    <span class="badge bg-success" id="mappedColumnsCount">0 mapped</span>
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-muted mb-4">
+                    Map your file columns to the corresponding order fields. Required fields are marked with <span class="text-danger">*</span>
+                </p>
+
+                <div class="mapping-container" id="mappingContainer">
+                    <!-- Mapping rows will be generated by JavaScript -->
+                </div>
+
+                <div class="form-actions mt-4 d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" onclick="goToStep(1)">
+                        <i class="fa-solid fa-arrow-left me-2"></i>Back
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="applyMappings(); goToStep(3);">
+                        <i class="fa-solid fa-arrow-right me-2"></i>Next: Preview Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 3: Preview & Edit -->
+    <div class="step-content" id="step3">
+        <div class="card-modern">
+            <div class="card-header-modern d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fa-solid fa-table me-2"></i>Preview & Edit Data
+                </h5>
+                <span class="badge bg-primary" id="previewRowCount">0 rows</span>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-muted mb-4">
+                    Review and edit the data before importing. Click on any cell to edit.
+                </p>
+
+                <div class="preview-table-container" id="previewTableContainer">
+                    <table class="preview-table" id="previewTable">
+                        <thead id="previewTableHead"></thead>
+                        <tbody id="previewTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="form-actions mt-4 d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" onclick="goToStep(2)">
+                        <i class="fa-solid fa-arrow-left me-2"></i>Back
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="saveOrders()">
+                        <i class="fa-solid fa-save me-2"></i>Import Orders
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 4: Complete -->
+    <div class="step-content" id="step4">
+        <div class="card-modern">
+            <div class="card-body p-5 text-center">
+                <div id="completeSuccess">
+                    <i class="fa-solid fa-check-circle text-success" style="font-size: 4rem;"></i>
+                    <h3 class="mt-4">Import Complete!</h3>
+                    <p class="text-muted" id="completeSummary">0 orders imported successfully</p>
+                    <div class="mt-4">
+                        <a href="{% url 'orders:orders_all_list' %}" class="btn btn-primary">
+                            <i class="fa-solid fa-list me-2"></i>View All Orders
+                        </a>
+                        <button type="button" class="btn btn-outline-secondary ms-2" onclick="resetWizard()">
+                            <i class="fa-solid fa-redo me-2"></i>Import More
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Modal -->
+<div class="progress-modal-overlay" id="progressModal">
+    <div class="progress-modal">
+        <div class="progress-modal-header">
+            <h5>
+                <i class="fa-solid fa-spinner fa-spin me-2"></i>
+                <span id="progressTitle">Importing Orders...</span>
+            </h5>
+        </div>
+        <div class="progress-modal-body">
+            <div class="progress-bar-container">
+                <div class="progress-bar-outer">
+                    <div class="progress-bar-inner" id="progressBar" style="width: 0%"></div>
+                </div>
+                <div class="progress-text">
+                    <span id="progressCurrent">0</span> / <span id="progressTotal">0</span>
+                </div>
+            </div>
+            <div class="progress-stats">
+                <div class="progress-stat-item success">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <span>Success: <strong id="successCount">0</strong></span>
+                </div>
+                <div class="progress-stat-item error">
+                    <i class="fa-solid fa-times-circle"></i>
+                    <span>Failed: <strong id="errorCount">0</strong></span>
+                </div>
+            </div>
+            <div class="log-container" id="logContainer"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Failed Rows Container (shown after save if there are failures) -->
+<div id="failedRowsSection" style="display: none;">
+    <div class="failed-table-container">
+        <div class="failed-table-header">
+            <h6><i class="fa-solid fa-exclamation-triangle me-2"></i>Failed Orders - Edit and Retry</h6>
+            <button type="button" class="btn btn-warning btn-sm" onclick="retryFailedOrders()">
+                <i class="fa-solid fa-redo me-2"></i>Retry All Failed
+            </button>
+        </div>
+        <div style="max-height: 400px; overflow: auto;">
+            <table class="failed-table" id="failedTable">
+                <thead id="failedTableHead"></thead>
+                <tbody id="failedTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+// Target fields for mapping
+const targetFields = [
+    { name: 'client_order_code', label: 'Order ID', required: false, group: 'Order Info' },
+    { name: 'order_date', label: 'Order Date', required: false, group: 'Order Info' },
+    { name: 'invoice_number', label: 'Invoice No', required: false, group: 'Order Info' },
+    { name: 'customer_name', label: 'Customer Name', required: true, group: 'Customer' },
+    { name: 'customer_phone', label: 'Phone 1', required: true, group: 'Customer' },
+    { name: 'customer_whatsapp', label: 'Phone 2 / WhatsApp', required: false, group: 'Customer' },
+    { name: 'customer_email', label: 'Email', required: false, group: 'Customer' },
+    { name: 'customer_address', label: 'Customer Address', required: true, group: 'Address' },
+    { name: 'dl_landmark', label: 'City / Landmark', required: false, group: 'Address' },
+    { name: 'dl_building', label: 'Villa / Building No', required: false, group: 'Address' },
+    { name: 'dl_street', label: 'Street No', required: false, group: 'Address' },
+    { name: 'dl_zone', label: 'Zone No', required: false, group: 'Address' },
+    { name: 'location_link', label: 'Location Link', required: false, group: 'Address' },
+    { name: 'dl_latitude', label: 'Latitude', required: false, group: 'Address' },
+    { name: 'dl_longitude', label: 'Longitude', required: false, group: 'Address' },
+    { name: 'deadline_date', label: 'Day & Time Preference', required: false, group: 'Delivery' },
+    { name: 'product_url', label: 'Product URL', required: false, group: 'Product' },
+    { name: 'product_name', label: 'Product Name', required: false, group: 'Product' },
+    { name: 'quantity', label: 'Qty', required: false, group: 'Product' },
+    { name: 'cod_amount', label: 'Price / COD Amount', required: false, group: 'Product' },
+    { name: 'product_1', label: 'Product:1', required: false, group: 'Product' },
+    { name: 'count_1', label: 'Count:1', required: false, group: 'Product' },
+    { name: 'product_2', label: 'Product:2', required: false, group: 'Product' },
+    { name: 'count_2', label: 'Count:2', required: false, group: 'Product' },
+    { name: 'product_3', label: 'Product:3', required: false, group: 'Product' },
+    { name: 'count_3', label: 'Count:3', required: false, group: 'Product' },
+    { name: 'product_4', label: 'Product:4', required: false, group: 'Product' },
+    { name: 'count_4', label: 'Count:4', required: false, group: 'Product' },
+    { name: 'product_5', label: 'Product:5', required: false, group: 'Product' },
+    { name: 'count_5', label: 'Count:5', required: false, group: 'Product' },
+    { name: 'stock_status', label: 'Stock Status', required: false, group: 'Product' },
+    { name: 'dl_number', label: 'DL No', required: false, group: 'Status' },
+    { name: 'delivery_status', label: 'Delivery Status', required: false, group: 'Status' },
+    { name: 'delivered_date', label: 'Date of Delivered', required: false, group: 'Status' },
+    { name: 'order_notes', label: 'Customer Notes', required: false, group: 'Notes' },
+    { name: 'internal_notes', label: 'Notes By Ezzy', required: false, group: 'Notes' },
+    { name: 'seller_notes', label: 'Notes By Seller', required: false, group: 'Notes' },
+];
+
+// State
+let uploadedData = {
+    columns: [],
+    rows: [],
+    mappings: {},
+    mappedRows: []
+};
+let failedRows = [];
+let successCount = 0;
+let errorCount = 0;
+
+// Check if staff user (business selector exists)
+const isStaffUser = {{ is_staff_user|yesno:"true,false" }};
+
+// DOM elements
+const fileInput = document.getElementById('importFile');
+const fileDropZone = document.getElementById('fileDropZone');
+const fileInfo = document.getElementById('fileInfo');
+const fileName = document.getElementById('fileName');
+const fileSize = document.getElementById('fileSize');
+const btnNext1 = document.getElementById('btnNext1');
+const businessSelect = document.getElementById('businessSelect');
+const businessIdInput = document.getElementById('businessId');
+
+// Add event listener for business selection (staff only)
+if (businessSelect) {
+    businessSelect.addEventListener('change', checkStep1Ready);
+}
+
+// File drop zone events
+fileDropZone.addEventListener('click', () => fileInput.click());
+fileDropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    fileDropZone.classList.add('dragover');
+});
+fileDropZone.addEventListener('dragleave', () => {
+    fileDropZone.classList.remove('dragover');
+});
+fileDropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    fileDropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        handleFileSelect();
+    }
+});
+
+fileInput.addEventListener('change', handleFileSelect);
+
+function handleFileSelect() {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const validTypes = ['.csv', '.xlsx', '.xls'];
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+
+    if (!validTypes.includes(ext)) {
+        alert('Please upload a CSV, XLSX, or XLS file');
+        fileInput.value = '';
+        return;
+    }
+
+    fileName.textContent = file.name;
+    fileSize.textContent = formatFileSize(file.size);
+    fileInfo.classList.add('visible');
+    fileDropZone.style.display = 'none';
+
+    // Upload and parse file
+    uploadFile();
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function clearFile() {
+    fileInput.value = '';
+    fileInfo.classList.remove('visible');
+    fileDropZone.style.display = 'block';
+    btnNext1.disabled = true;
+    uploadedData = { columns: [], rows: [], mappings: {}, mappedRows: [] };
+}
+
+function checkStep1Ready() {
+    const hasFile = fileInput.files.length > 0;
+    const hasData = uploadedData.columns.length > 0;
+
+    // Staff users must also select a business
+    if (isStaffUser) {
+        const hasBusiness = businessSelect && businessSelect.value !== '';
+        btnNext1.disabled = !hasFile || !hasData || !hasBusiness;
+    } else {
+        btnNext1.disabled = !hasFile || !hasData;
+    }
+}
+
+function getSelectedBusinessId() {
+    if (isStaffUser && businessSelect) {
+        return businessSelect.value;
+    } else if (businessIdInput) {
+        return businessIdInput.value;
+    }
+    return null;
+}
+
+function goToStep(step) {
+    document.querySelectorAll('.wizard-step').forEach((el, index) => {
+        el.classList.remove('active', 'completed');
+        if (index + 1 < step) {
+            el.classList.add('completed');
+        } else if (index + 1 === step) {
+            el.classList.add('active');
+        }
+    });
+    document.querySelectorAll('.step-content').forEach(el => el.classList.remove('active'));
+    document.getElementById('step' + step).classList.add('active');
+}
+
+function uploadFile() {
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    showProgressModal('Parsing file...');
+    addLog('info', 'Uploading and parsing file...');
+
+    fetch('{% url "orders:bulk_import_preview" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideProgressModal();
+        if (data.error) {
+            alert('Error: ' + data.error);
+            clearFile();
+            return;
+        }
+
+        uploadedData.columns = data.columns;
+        uploadedData.rows = data.rows;
+        uploadedData.mappings = data.auto_mapping || {};
+
+        addLog('success', `Found ${data.columns.length} columns and ${data.total_rows} rows`);
+        buildMappingUI();
+        btnNext1.disabled = false;
+    })
+    .catch(error => {
+        hideProgressModal();
+        alert('Error uploading file: ' + error.message);
+        clearFile();
+    });
+}
+
+function buildMappingUI() {
+    const container = document.getElementById('mappingContainer');
+    container.innerHTML = '';
+
+    document.getElementById('fileColumnsCount').textContent = uploadedData.columns.length + ' columns in file';
+
+    const groups = {};
+    targetFields.forEach(field => {
+        const groupName = field.group || 'Other';
+        if (!groups[groupName]) {
+            groups[groupName] = [];
+        }
+        groups[groupName].push(field);
+    });
+
+    Object.keys(groups).forEach(groupName => {
+        const groupHeader = document.createElement('div');
+        groupHeader.className = 'mapping-group-header';
+        groupHeader.innerHTML = `<h6 class="mb-2 mt-3"><i class="fa-solid fa-folder me-2"></i>${groupName}</h6>`;
+        container.appendChild(groupHeader);
+
+        groups[groupName].forEach(field => {
+            const row = document.createElement('div');
+            row.className = 'mapping-row';
+
+            let options = '<option value="">-- Skip --</option>';
+            uploadedData.columns.forEach(col => {
+                const selected = uploadedData.mappings[col] === field.name ? 'selected' : '';
+                options += `<option value="${col}" ${selected}>${col}</option>`;
+            });
+
+            row.innerHTML = `
+                <div class="mapping-source">
+                    <select class="form-select form-select-sm" id="map_${field.name}">
+                        ${options}
+                    </select>
+                </div>
+                <div class="mapping-arrow">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+                <div class="mapping-target">
+                    <strong>${field.label}</strong>
+                    ${field.required ? '<span class="required">*</span>' : ''}
+                </div>
+            `;
+
+            container.appendChild(row);
+        });
+    });
+
+    container.querySelectorAll('select').forEach(select => {
+        select.addEventListener('change', updateMappedCount);
+    });
+
+    updateMappedCount();
+}
+
+function updateMappedCount() {
+    let count = 0;
+    targetFields.forEach(field => {
+        const select = document.getElementById('map_' + field.name);
+        if (select && select.value) {
+            count++;
+        }
+    });
+    document.getElementById('mappedColumnsCount').textContent = count + ' mapped';
+}
+
+function applyMappings() {
+    const mappings = {};
+    targetFields.forEach(field => {
+        const select = document.getElementById('map_' + field.name);
+        if (select && select.value) {
+            mappings[field.name] = select.value;
+        }
+    });
+
+    const transformedRows = uploadedData.rows.map(row => {
+        const newRow = {};
+        targetFields.forEach(field => {
+            const sourceCol = mappings[field.name];
+            newRow[field.name] = sourceCol ? (row[sourceCol] || '') : '';
+        });
+        return newRow;
+    });
+
+    uploadedData.mappedRows = transformedRows;
+    buildPreviewTable();
+}
+
+function buildPreviewTable() {
+    const thead = document.getElementById('previewTableHead');
+    const tbody = document.getElementById('previewTableBody');
+
+    const visibleFields = targetFields.filter(f => {
+        return uploadedData.mappedRows.some(row => row[f.name] && row[f.name].toString().trim() !== '');
+    });
+
+    if (visibleFields.length === 0) {
+        visibleFields.push(...targetFields.filter(f => f.required));
+    }
+
+    let headerHtml = '<tr><th>#</th>';
+    visibleFields.forEach(field => {
+        headerHtml += `<th>${field.label}${field.required ? ' <span class="text-danger">*</span>' : ''}</th>`;
+    });
+    headerHtml += '</tr>';
+    thead.innerHTML = headerHtml;
+
+    let bodyHtml = '';
+    uploadedData.mappedRows.forEach((row, index) => {
+        bodyHtml += `<tr data-row-index="${index}"><td>${index + 1}</td>`;
+        visibleFields.forEach(field => {
+            const value = row[field.name] || '';
+            bodyHtml += `<td contenteditable="true" data-field="${field.name}">${value}</td>`;
+        });
+        bodyHtml += '</tr>';
+    });
+    tbody.innerHTML = bodyHtml;
+
+    document.getElementById('previewRowCount').textContent = uploadedData.mappedRows.length + ' rows';
+
+    tbody.querySelectorAll('td[contenteditable]').forEach(td => {
+        td.addEventListener('blur', function() {
+            const rowIndex = parseInt(this.parentElement.dataset.rowIndex);
+            const field = this.dataset.field;
+            uploadedData.mappedRows[rowIndex][field] = this.textContent;
+        });
+    });
+}
+
+async function saveOrders() {
+    const rows = uploadedData.mappedRows;
+    if (rows.length === 0) {
+        alert('No data to import');
+        return;
+    }
+
+    const businessId = getSelectedBusinessId();
+    if (!businessId) {
+        alert('Please select a business');
+        return;
+    }
+
+    successCount = 0;
+    errorCount = 0;
+    failedRows = [];
+
+    showProgressModal('Importing Orders...');
+    document.getElementById('progressTotal').textContent = rows.length;
+    document.getElementById('logContainer').innerHTML = '';
+
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        document.getElementById('progressCurrent').textContent = i + 1;
+        document.getElementById('progressBar').style.width = ((i + 1) / rows.length * 100) + '%';
+
+        try {
+            const response = await fetch('{% url "orders:bulk_import_save" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    row: row,
+                    row_index: i,
+                    business_id: businessId
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                successCount++;
+                document.getElementById('successCount').textContent = successCount;
+                addLog('success', `Row ${i + 1}: Order ${result.order_code} created for ${result.customer_name}`);
+            } else {
+                errorCount++;
+                document.getElementById('errorCount').textContent = errorCount;
+                addLog('error', `Row ${i + 1}: ${result.error}`);
+                failedRows.push({ ...row, _error: result.error, _originalIndex: i });
+            }
+        } catch (error) {
+            errorCount++;
+            document.getElementById('errorCount').textContent = errorCount;
+            addLog('error', `Row ${i + 1}: Network error - ${error.message}`);
+            failedRows.push({ ...row, _error: error.message, _originalIndex: i });
+        }
+    }
+
+    addLog('info', `Import complete: ${successCount} success, ${errorCount} failed`);
+
+    setTimeout(() => {
+        hideProgressModal();
+
+        if (failedRows.length > 0) {
+            buildFailedTable();
+            document.getElementById('failedRowsSection').style.display = 'block';
+        }
+
+        document.getElementById('completeSummary').textContent =
+            `${successCount} orders imported successfully` +
+            (errorCount > 0 ? `, ${errorCount} failed` : '');
+
+        goToStep(4);
+    }, 1000);
+}
+
+function buildFailedTable() {
+    const thead = document.getElementById('failedTableHead');
+    const tbody = document.getElementById('failedTableBody');
+
+    const editableFields = ['customer_name', 'customer_phone', 'customer_address', 'client_order_code'];
+
+    let headerHtml = '<tr><th>#</th><th>Error</th>';
+    editableFields.forEach(fieldName => {
+        const field = targetFields.find(f => f.name === fieldName);
+        headerHtml += `<th>${field ? field.label : fieldName}</th>`;
+    });
+    headerHtml += '</tr>';
+    thead.innerHTML = headerHtml;
+
+    let bodyHtml = '';
+    failedRows.forEach((row, index) => {
+        bodyHtml += `<tr data-failed-index="${index}">`;
+        bodyHtml += `<td>${row._originalIndex + 1}</td>`;
+        bodyHtml += `<td class="error-message">${row._error}</td>`;
+        editableFields.forEach(fieldName => {
+            const value = row[fieldName] || '';
+            bodyHtml += `<td contenteditable="true" data-field="${fieldName}">${value}</td>`;
+        });
+        bodyHtml += '</tr>';
+    });
+    tbody.innerHTML = bodyHtml;
+
+    tbody.querySelectorAll('td[contenteditable]').forEach(td => {
+        td.addEventListener('blur', function() {
+            const failedIndex = parseInt(this.parentElement.dataset.failedIndex);
+            const field = this.dataset.field;
+            failedRows[failedIndex][field] = this.textContent;
+        });
+    });
+}
+
+async function retryFailedOrders() {
+    if (failedRows.length === 0) {
+        alert('No failed orders to retry');
+        return;
+    }
+
+    const businessId = getSelectedBusinessId();
+    if (!businessId) {
+        alert('Please select a business');
+        return;
+    }
+
+    const rowsToRetry = [...failedRows];
+    failedRows = [];
+
+    showProgressModal('Retrying Failed Orders...');
+    document.getElementById('progressTotal').textContent = rowsToRetry.length;
+    document.getElementById('progressCurrent').textContent = '0';
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('logContainer').innerHTML = '';
+
+    let retrySuccess = 0;
+    let retryFailed = 0;
+
+    for (let i = 0; i < rowsToRetry.length; i++) {
+        const row = rowsToRetry[i];
+        document.getElementById('progressCurrent').textContent = i + 1;
+        document.getElementById('progressBar').style.width = ((i + 1) / rowsToRetry.length * 100) + '%';
+
+        try {
+            const response = await fetch('{% url "orders:bulk_import_save" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    row: row,
+                    row_index: row._originalIndex,
+                    business_id: businessId
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                retrySuccess++;
+                successCount++;
+                document.getElementById('successCount').textContent = successCount;
+                addLog('success', `Retry Row ${row._originalIndex + 1}: Order ${result.order_code} created`);
+            } else {
+                retryFailed++;
+                addLog('error', `Retry Row ${row._originalIndex + 1}: ${result.error}`);
+                failedRows.push({ ...row, _error: result.error });
+            }
+        } catch (error) {
+            retryFailed++;
+            addLog('error', `Retry Row ${row._originalIndex + 1}: Network error`);
+            failedRows.push({ ...row, _error: error.message });
+        }
+    }
+
+    errorCount = failedRows.length;
+    document.getElementById('errorCount').textContent = errorCount;
+
+    addLog('info', `Retry complete: ${retrySuccess} success, ${retryFailed} still failed`);
+
+    setTimeout(() => {
+        hideProgressModal();
+
+        if (failedRows.length > 0) {
+            buildFailedTable();
+        } else {
+            document.getElementById('failedRowsSection').style.display = 'none';
+        }
+
+        document.getElementById('completeSummary').textContent =
+            `${successCount} orders imported successfully` +
+            (errorCount > 0 ? `, ${errorCount} failed` : '');
+    }, 1000);
+}
+
+function showProgressModal(title) {
+    document.getElementById('progressTitle').textContent = title || 'Processing...';
+    document.getElementById('progressModal').classList.add('active');
+}
+
+function hideProgressModal() {
+    document.getElementById('progressModal').classList.remove('active');
+}
+
+function addLog(type, message) {
+    const container = document.getElementById('logContainer');
+    const time = new Date().toLocaleTimeString();
+    let icon = 'fa-info-circle';
+    if (type === 'success') icon = 'fa-check-circle';
+    if (type === 'error') icon = 'fa-times-circle';
+    if (type === 'warning') icon = 'fa-exclamation-triangle';
+
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    entry.innerHTML = `
+        <span class="log-entry-time">[${time}]</span>
+        <span class="log-entry-icon"><i class="fa-solid ${icon}"></i></span>
+        <span>${message}</span>
+    `;
+    container.appendChild(entry);
+    container.scrollTop = container.scrollHeight;
+}
+
+function resetWizard() {
+    clearFile();
+    uploadedData = { columns: [], rows: [], mappings: {}, mappedRows: [] };
+    failedRows = [];
+    successCount = 0;
+    errorCount = 0;
+    document.getElementById('failedRowsSection').style.display = 'none';
+    document.getElementById('successCount').textContent = '0';
+    document.getElementById('errorCount').textContent = '0';
+    goToStep(1);
+}
+
+function downloadSampleCSV() {
+    const headers = ['customer_name', 'customer_phone', 'customer_address', 'dl_zone', 'dl_street', 'dl_building', 'cod_amount', 'order_notes'];
+    const sample = [
+        ['John Doe', '55123456', 'Building 10, Street 5, Zone 45', '45', '5', '10', '150', 'Please call before delivery'],
+        ['Jane Smith', '66789012', 'Villa 25, Street 12, Zone 61', '61', '12', '25', '200', '']
+    ];
+
+    let csv = headers.join(',') + '\n';
+    sample.forEach(row => {
+        csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bulk_import_sample.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function downloadSampleExcel() {
+    alert('For Excel format, please download the CSV and open it in Excel, then save as .xlsx');
+}
+</script>
+{% endblock extra_js %}

@@ -58,5 +58,10 @@ urlpatterns = [
      # Location Verification (Public URL)
      path('verify-location/<str:token>/', orders_views.verify_location, name='verify_location'),
 
+     # Bulk Import (Client Dashboard)
+     path('bulk-import/', orders_views.bulk_import_orders, name='bulk_import_orders'),
+     path('bulk-import/preview/', orders_views.bulk_import_preview, name='bulk_import_preview'),
+     path('bulk-import/save/', orders_views.bulk_import_save, name='bulk_import_save'),
+
 ]
 

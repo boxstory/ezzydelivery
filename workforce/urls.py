@@ -17,7 +17,21 @@ urlpatterns = [
     path('sellers/inactive/', workforce_views.sellers_inactive, name='sellers_inactive'),
     path('sellers/<int:business_id>/', workforce_views.seller_detail, name='seller_detail'),
 
+    # Drivers section urls -------------------------------------------------------------------
+    path('drivers/', workforce_views.drivers_list, name='drivers_list'),
+    path('drivers/pending/', workforce_views.drivers_pending, name='drivers_pending'),
+    path('drivers/active/', workforce_views.drivers_active, name='drivers_active'),
+    path('drivers/inactive/', workforce_views.drivers_inactive, name='drivers_inactive'),
+    path('drivers/<int:driver_id>/', workforce_views.driver_detail, name='driver_detail'),
+
     #Orders sections urls -------------------------------------------------------------------
+    path('orders/add/', workforce_views.add_order, name='wf_orders_add'),
+    # Bulk import uses shared views from orders app
+    path('orders/bulk-import/', orders_views.bulk_import_orders, name='wf_orders_bulk_import'),
+    path('orders/bulk-import/preview/', orders_views.bulk_import_preview, name='wf_orders_bulk_preview'),
+    path('orders/bulk-import/save/', orders_views.bulk_import_save, name='wf_orders_bulk_save'),
+    path('orders/api-guide/', workforce_views.orders_api_guide, name='wf_orders_api_guide'),
+    path('orders/pickup-locations/<int:business_id>/', workforce_views.get_pickup_locations, name='get_pickup_locations'),
     path('orders/all/', workforce_views.all_orders, name='wf_orders_all'),
     path('orders/by-seller/', workforce_views.orders_by_seller, name='wf_orders_by_seller'),
     path('orders/to_publish/', workforce_views.orders_to_publish, name='wf_orders_to_publish'),
