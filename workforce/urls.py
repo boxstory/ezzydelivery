@@ -15,6 +15,7 @@ urlpatterns = [
     path('sellers/pending/', workforce_views.sellers_pending, name='sellers_pending'),
     path('sellers/active/', workforce_views.sellers_active, name='sellers_active'),
     path('sellers/inactive/', workforce_views.sellers_inactive, name='sellers_inactive'),
+    path('sellers/<int:business_id>/', workforce_views.seller_detail, name='seller_detail'),
 
     #Orders sections urls -------------------------------------------------------------------
     path('orders/all/', workforce_views.all_orders, name='wf_orders_all'),

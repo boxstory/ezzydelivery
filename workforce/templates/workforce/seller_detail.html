@@ -1,0 +1,1391 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}{{ business.business_name|default:"Seller Detail" }} - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
+<style>
+/* Clean Seller Detail Page */
+.seller-page {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Back Link */
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--brand-grey-600);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 1.5rem;
+    transition: color 0.2s;
+}
+
+.back-link:hover {
+    color: var(--brand-primary-dark);
+}
+
+/* Seller Header - Clean Design */
+.seller-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.seller-main-info {
+    flex: 1;
+    min-width: 280px;
+}
+
+.seller-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--brand-grey-800);
+    margin: 0 0 0.25rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.seller-name i {
+    color: var(--brand-primary);
+}
+
+.seller-id {
+    font-size: 0.8125rem;
+    color: var(--brand-grey-500);
+    font-family: monospace;
+    margin-bottom: 1rem;
+}
+
+.seller-contact-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+}
+
+.seller-contact-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--brand-grey-600);
+}
+
+.seller-contact-item i {
+    color: var(--brand-grey-400);
+    width: 16px;
+}
+
+.seller-status-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 2rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.status-pill-active { background: #dcfce7; color: #166534; }
+.status-pill-inactive { background: #f3f4f6; color: #6b7280; }
+.status-pill-pending { background: #fef3c7; color: #92400e; }
+.status-pill-suspended { background: #fee2e2; color: #991b1b; }
+.status-pill-verified { background: #dbeafe; color: #1e40af; }
+.status-pill-fulfillment { background: #fef9c3; color: #854d0e; }
+
+/* Stats Row - Clean minimal cards */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-box {
+    padding: 1.25rem;
+    border: 1px solid var(--brand-grey-200);
+    border-radius: 0.5rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.stat-box:hover {
+    border-color: var(--brand-primary);
+    box-shadow: 0 2px 8px rgba(247, 192, 0, 0.1);
+}
+
+.stat-box-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--brand-grey-800);
+    line-height: 1;
+    margin-bottom: 0.25rem;
+}
+
+.stat-box-label {
+    font-size: 0.75rem;
+    color: var(--brand-grey-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat-box-trend {
+    font-size: 0.6875rem;
+    color: #16a34a;
+    margin-top: 0.5rem;
+}
+
+/* Tab Navigation - Underline style */
+.tabs-nav {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--brand-grey-200);
+    margin-bottom: 2rem;
+    overflow-x: auto;
+}
+
+.tab-btn {
+    padding: 0.875rem 1.25rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    color: var(--brand-grey-500);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: var(--brand-grey-700);
+}
+
+.tab-btn.active {
+    color: var(--brand-grey-800);
+    border-bottom-color: var(--brand-primary);
+}
+
+.tab-btn-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.375rem;
+    margin-left: 0.5rem;
+    background: var(--brand-grey-100);
+    border-radius: 1rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--brand-grey-600);
+}
+
+.tab-btn.active .tab-btn-count {
+    background: var(--brand-primary);
+    color: var(--brand-grey-800);
+}
+
+/* Tab Content */
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+/* Section Title */
+.section-heading {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--brand-grey-800);
+    margin: 0 0 1.25rem 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--brand-grey-100);
+}
+
+/* Two Column Layout */
+.two-col {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 2rem;
+}
+
+@media (max-width: 1024px) {
+    .two-col {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Order Stats - Clean */
+.order-summary {
+    margin-bottom: 2rem;
+}
+
+.order-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    border: 1px solid var(--brand-grey-200);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.order-stat-cell {
+    padding: 1rem;
+    text-align: center;
+    border-right: 1px solid var(--brand-grey-200);
+}
+
+.order-stat-cell:last-child {
+    border-right: none;
+}
+
+.order-stat-num {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--brand-grey-800);
+}
+
+.order-stat-num.success { color: #16a34a; }
+.order-stat-num.warning { color: #ca8a04; }
+.order-stat-num.info { color: #0284c7; }
+.order-stat-num.danger { color: #dc2626; }
+.order-stat-num.muted { color: var(--brand-grey-500); }
+
+.order-stat-text {
+    font-size: 0.6875rem;
+    color: var(--brand-grey-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 0.25rem;
+}
+
+@media (max-width: 640px) {
+    .order-stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    .order-stat-cell {
+        border-bottom: 1px solid var(--brand-grey-200);
+    }
+    .order-stat-cell:nth-child(3) {
+        border-right: none;
+    }
+}
+
+/* Progress Bar */
+.progress-track {
+    height: 6px;
+    background: var(--brand-grey-100);
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+    margin-top: 1rem;
+}
+
+.progress-fill {
+    height: 100%;
+}
+
+.progress-fill.success { background: #16a34a; }
+.progress-fill.warning { background: #ca8a04; }
+.progress-fill.info { background: #0284c7; }
+.progress-fill.danger { background: #dc2626; }
+
+/* COD Summary */
+.cod-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.cod-item {
+    text-align: center;
+    padding: 1rem;
+    border: 1px solid var(--brand-grey-200);
+    border-radius: 0.5rem;
+}
+
+.cod-value {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--brand-grey-800);
+}
+
+.cod-value.success { color: #16a34a; }
+.cod-value.warning { color: #ca8a04; }
+
+.cod-label {
+    font-size: 0.6875rem;
+    color: var(--brand-grey-500);
+    text-transform: uppercase;
+    margin-top: 0.25rem;
+}
+
+@media (max-width: 640px) {
+    .cod-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Quick Actions */
+.actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    border: 1px solid var(--brand-grey-200);
+    border-radius: 0.375rem;
+    background: none;
+    color: var(--brand-grey-700);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.action-btn:hover {
+    border-color: var(--brand-primary);
+    color: var(--brand-grey-800);
+}
+
+.action-btn i {
+    color: var(--brand-grey-400);
+}
+
+.action-btn:hover i {
+    color: var(--brand-primary);
+}
+
+/* Activity List - Clean */
+.activity-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--brand-grey-100);
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--brand-grey-300);
+    margin-top: 0.375rem;
+    flex-shrink: 0;
+}
+
+.activity-dot.success { background: #16a34a; }
+.activity-dot.warning { background: #ca8a04; }
+.activity-dot.danger { background: #dc2626; }
+
+.activity-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.activity-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--brand-grey-800);
+    margin-bottom: 0.125rem;
+}
+
+.activity-meta {
+    font-size: 0.75rem;
+    color: var(--brand-grey-500);
+}
+
+/* Contact List */
+.contact-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.contact-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--brand-grey-100);
+}
+
+.contact-row:last-child {
+    border-bottom: none;
+}
+
+.contact-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--brand-grey-400);
+    flex-shrink: 0;
+}
+
+.contact-text {
+    flex: 1;
+}
+
+.contact-label {
+    font-size: 0.6875rem;
+    color: var(--brand-grey-500);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.contact-value {
+    font-size: 0.875rem;
+    color: var(--brand-grey-800);
+}
+
+/* Data Table - Clean */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--brand-grey-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--brand-grey-200);
+}
+
+.data-table td {
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+    color: var(--brand-grey-700);
+    border-bottom: 1px solid var(--brand-grey-100);
+}
+
+.data-table tr:last-child td {
+    border-bottom: none;
+}
+
+.data-table tr:hover td {
+    background: var(--brand-grey-50);
+}
+
+/* Info Grid - Two columns */
+.info-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0;
+}
+
+.info-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--brand-grey-100);
+}
+
+.info-item:nth-child(odd) {
+    padding-right: 1rem;
+}
+
+.info-item:nth-child(even) {
+    padding-left: 1rem;
+    border-left: 1px solid var(--brand-grey-100);
+}
+
+.info-label {
+    font-size: 0.6875rem;
+    color: var(--brand-grey-500);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 0.25rem;
+}
+
+.info-value {
+    font-size: 0.875rem;
+    color: var(--brand-grey-800);
+}
+
+@media (max-width: 640px) {
+    .info-list {
+        grid-template-columns: 1fr;
+    }
+    .info-item:nth-child(odd),
+    .info-item:nth-child(even) {
+        padding: 0.75rem 0;
+        border-left: none;
+    }
+}
+
+/* Card Container */
+.card-section {
+    margin-bottom: 2rem;
+}
+
+/* Badges */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-success { background: #dcfce7; color: #166534; }
+.badge-warning { background: #fef3c7; color: #92400e; }
+.badge-danger { background: #fee2e2; color: #991b1b; }
+.badge-info { background: #dbeafe; color: #1e40af; }
+.badge-default { background: var(--brand-grey-100); color: var(--brand-grey-600); }
+
+/* Location List */
+.location-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.location-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--brand-grey-100);
+}
+
+.location-item:last-child {
+    border-bottom: none;
+}
+
+.location-icon {
+    color: var(--brand-grey-400);
+}
+
+.location-info {
+    flex: 1;
+}
+
+.location-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--brand-grey-800);
+}
+
+.location-address {
+    font-size: 0.75rem;
+    color: var(--brand-grey-500);
+}
+
+/* Form Styles */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.form-group {
+    margin-bottom: 0;
+}
+
+.form-group.full-width {
+    grid-column: span 2;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--brand-grey-600);
+    margin-bottom: 0.375rem;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--brand-grey-200);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    color: var(--brand-grey-800);
+    transition: border-color 0.2s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+}
+
+.form-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--brand-grey-700);
+}
+
+.form-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--brand-grey-100);
+}
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: var(--brand-primary);
+    border: none;
+    border-radius: 0.375rem;
+    color: var(--brand-grey-800);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-primary:hover {
+    background: var(--brand-primary-dark);
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: none;
+    border: 1px solid var(--brand-grey-200);
+    border-radius: 0.375rem;
+    color: var(--brand-grey-600);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    border-color: var(--brand-grey-300);
+    color: var(--brand-grey-800);
+}
+
+@media (max-width: 640px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .form-group.full-width {
+        grid-column: span 1;
+    }
+}
+
+/* Empty State */
+.empty-msg {
+    text-align: center;
+    padding: 2rem;
+    color: var(--brand-grey-500);
+    font-size: 0.875rem;
+}
+
+.empty-msg i {
+    font-size: 2rem;
+    color: var(--brand-grey-300);
+    margin-bottom: 0.75rem;
+    display: block;
+}
+
+/* Toast Message */
+.toast-msg {
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    margin-top: 1rem;
+    display: none;
+}
+
+.toast-msg.show {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.toast-msg.success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.toast-msg.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .seller-header {
+        flex-direction: column;
+    }
+
+    .stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3">
+<div class="seller-page">
+
+<!-- Back Link -->
+<a href="{% url 'workforce:sellers_list' %}" class="back-link">
+    <i class="fa-solid fa-arrow-left"></i>
+    Back to Sellers
+</a>
+
+<!-- Header -->
+<div class="seller-header">
+    <div class="seller-main-info">
+        <h1 class="seller-name">
+            <i class="fa-solid fa-store"></i>
+            {{ business.business_name|default:"Unknown Business" }}
+        </h1>
+        <div class="seller-id">{{ business.business_code|default:"N/A" }} &bull; ID #{{ business.business_id }}</div>
+
+        <div class="seller-contact-row">
+            {% if business.business_phone %}
+            <div class="seller-contact-item">
+                <i class="fa-solid fa-phone"></i>
+                {{ business.business_phone }}
+            </div>
+            {% endif %}
+            {% if business.business_email %}
+            <div class="seller-contact-item">
+                <i class="fa-solid fa-envelope"></i>
+                {{ business.business_email }}
+            </div>
+            {% endif %}
+            {% if business.business_since %}
+            <div class="seller-contact-item">
+                <i class="fa-solid fa-calendar"></i>
+                Since {{ business.business_since|date:"M Y" }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="seller-status-badges">
+        <span class="status-pill status-pill-{% if business.business_status == 'active' %}active{% elif business.business_status == 'pending' %}pending{% elif business.business_status == 'suspended' %}suspended{% else %}inactive{% endif %}">
+            <i class="fa-solid fa-circle" style="font-size: 6px;"></i>
+            {{ business.business_status|title }}
+        </span>
+        {% if business.profile.verification_status == 'verified' %}
+        <span class="status-pill status-pill-verified">
+            <i class="fa-solid fa-check"></i>
+            Verified
+        </span>
+        {% endif %}
+        {% if business.fulfillment_service_enabled %}
+        <span class="status-pill status-pill-fulfillment">
+            <i class="fa-solid fa-warehouse"></i>
+            Fulfillment
+        </span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Stats Row -->
+<div class="stats-row">
+    <div class="stat-box">
+        <div class="stat-box-value">{{ order_stats.total_orders|default:0 }}</div>
+        <div class="stat-box-label">Total Orders</div>
+        {% if last_7_days_orders > 0 %}
+        <div class="stat-box-trend">+{{ last_7_days_orders }} this week</div>
+        {% endif %}
+    </div>
+    <div class="stat-box">
+        <div class="stat-box-value">{{ delivery_success_rate }}%</div>
+        <div class="stat-box-label">Success Rate</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-box-value">{{ recent_orders_count|default:0 }}</div>
+        <div class="stat-box-label">Last 30 Days</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-box-value">{{ cod_stats.total_cod_orders|default:0 }}</div>
+        <div class="stat-box-label">COD Orders</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-box-value">{{ team_members.count|default:0 }}</div>
+        <div class="stat-box-label">Team Members</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-box-value">{{ pickup_locations.count|default:0 }}</div>
+        <div class="stat-box-label">Locations</div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs-nav" role="tablist">
+    <button class="tab-btn active" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="orders">Orders <span class="tab-btn-count">{{ order_stats.total_orders|default:0 }}</span></button>
+    <button class="tab-btn" data-tab="details">Details</button>
+    <button class="tab-btn" data-tab="team">Team <span class="tab-btn-count">{{ team_members.count|default:0 }}</span></button>
+    <button class="tab-btn" data-tab="integrations">Integrations <span class="tab-btn-count">{{ api_settings.count|default:0 }}</span></button>
+    <button class="tab-btn" data-tab="settings">Settings</button>
+</div>
+
+<!-- Tab: Overview -->
+<div id="panel-overview" class="tab-panel active">
+    <div class="two-col">
+        <div>
+            <!-- Order Summary -->
+            <div class="card-section">
+                <h3 class="section-heading">Order Summary</h3>
+                <div class="order-stats-grid">
+                    <div class="order-stat-cell">
+                        <div class="order-stat-num success">{{ order_stats.delivered_orders|default:0 }}</div>
+                        <div class="order-stat-text">Delivered</div>
+                    </div>
+                    <div class="order-stat-cell">
+                        <div class="order-stat-num warning">{{ order_stats.pending_orders|default:0 }}</div>
+                        <div class="order-stat-text">Pending</div>
+                    </div>
+                    <div class="order-stat-cell">
+                        <div class="order-stat-num info">{{ order_stats.processing_orders|default:0 }}</div>
+                        <div class="order-stat-text">Processing</div>
+                    </div>
+                    <div class="order-stat-cell">
+                        <div class="order-stat-num danger">{{ order_stats.cancelled_orders|default:0 }}</div>
+                        <div class="order-stat-text">Cancelled</div>
+                    </div>
+                    <div class="order-stat-cell">
+                        <div class="order-stat-num muted">{{ order_stats.failed_orders|default:0 }}</div>
+                        <div class="order-stat-text">Failed</div>
+                    </div>
+                </div>
+                {% if order_stats.total_orders > 0 %}
+                <div class="progress-track">
+                    {% with d=order_stats.delivered_orders|default:0 p=order_stats.pending_orders|default:0 pr=order_stats.processing_orders|default:0 c=order_stats.cancelled_orders|default:0 t=order_stats.total_orders %}
+                    <div class="progress-fill success" style="width: {% widthratio d t 100 %}%;"></div>
+                    <div class="progress-fill warning" style="width: {% widthratio p t 100 %}%;"></div>
+                    <div class="progress-fill info" style="width: {% widthratio pr t 100 %}%;"></div>
+                    <div class="progress-fill danger" style="width: {% widthratio c t 100 %}%;"></div>
+                    {% endwith %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- COD Summary -->
+            {% if cod_stats.total_cod_orders > 0 %}
+            <div class="card-section">
+                <h3 class="section-heading">COD Summary</h3>
+                <div class="cod-grid">
+                    <div class="cod-item">
+                        <div class="cod-value">{{ cod_stats.total_cod_orders|default:0 }}</div>
+                        <div class="cod-label">Orders</div>
+                    </div>
+                    <div class="cod-item">
+                        <div class="cod-value">{{ cod_stats.total_cod_amount|default:0|floatformat:0 }} QAR</div>
+                        <div class="cod-label">Total</div>
+                    </div>
+                    <div class="cod-item">
+                        <div class="cod-value success">{{ cod_stats.collected_cod|default:0|floatformat:0 }} QAR</div>
+                        <div class="cod-label">Collected</div>
+                    </div>
+                    <div class="cod-item">
+                        <div class="cod-value warning">{{ cod_stats.pending_cod|default:0|floatformat:0 }} QAR</div>
+                        <div class="cod-label">Pending</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Quick Actions -->
+            <div class="card-section">
+                <h3 class="section-heading">Quick Actions</h3>
+                <div class="actions-row">
+                    <a href="{% url 'workforce:wf_orders_by_seller' %}?business={{ business.business_id }}" class="action-btn">
+                        <i class="fa-solid fa-box"></i>
+                        View Orders
+                    </a>
+                    <a href="{% url 'workforce:store_document_detail' business.business_id %}" class="action-btn">
+                        <i class="fa-solid fa-file-alt"></i>
+                        Documents
+                    </a>
+                    <a href="{% url 'workforce:business_license_detail' business.business_id %}" class="action-btn">
+                        <i class="fa-solid fa-certificate"></i>
+                        License
+                    </a>
+                    <button class="action-btn" onclick="document.querySelector('[data-tab=settings]').click();">
+                        <i class="fa-solid fa-edit"></i>
+                        Edit Info
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <!-- Recent Activity -->
+            <div class="card-section">
+                <h3 class="section-heading">Recent Activity</h3>
+                {% if recent_orders %}
+                <ul class="activity-list">
+                    {% for order in recent_orders %}
+                    <li class="activity-item">
+                        <span class="activity-dot {% if order.order_status == 'delivered' %}success{% elif order.order_status == 'pending' %}warning{% elif order.order_status == 'cancelled' or order.order_status == 'failed' %}danger{% endif %}"></span>
+                        <div class="activity-content">
+                            <div class="activity-title">#{{ order.order_number|default:order.client_order_code|truncatechars:20 }}</div>
+                            <div class="activity-meta">{{ order.order_status|title }} &bull; {{ order.created_at|timesince }} ago</div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="empty-msg">
+                    <i class="fa-solid fa-inbox"></i>
+                    No recent orders
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Contact Info -->
+            <div class="card-section">
+                <h3 class="section-heading">Contact</h3>
+                <ul class="contact-list">
+                    <li class="contact-row">
+                        <span class="contact-icon"><i class="fa-solid fa-phone"></i></span>
+                        <div class="contact-text">
+                            <div class="contact-label">Phone</div>
+                            <div class="contact-value">{{ business.business_phone|default:"Not provided" }}</div>
+                        </div>
+                    </li>
+                    <li class="contact-row">
+                        <span class="contact-icon"><i class="fa-solid fa-envelope"></i></span>
+                        <div class="contact-text">
+                            <div class="contact-label">Email</div>
+                            <div class="contact-value">{{ business.business_email|default:"Not provided" }}</div>
+                        </div>
+                    </li>
+                    <li class="contact-row">
+                        <span class="contact-icon"><i class="fa-brands fa-whatsapp"></i></span>
+                        <div class="contact-text">
+                            <div class="contact-label">WhatsApp</div>
+                            <div class="contact-value">{{ business.business_whatsapp|default:"Not provided" }}</div>
+                        </div>
+                    </li>
+                    {% if business_profile.business_address %}
+                    <li class="contact-row">
+                        <span class="contact-icon"><i class="fa-solid fa-location-dot"></i></span>
+                        <div class="contact-text">
+                            <div class="contact-label">Address</div>
+                            <div class="contact-value">{{ business_profile.business_address }}</div>
+                        </div>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab: Orders -->
+<div id="panel-orders" class="tab-panel">
+    <h3 class="section-heading">Recent Orders</h3>
+    {% if recent_orders %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Status</th>
+                <th>COD</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in recent_orders %}
+            <tr>
+                <td><strong>{{ order.order_number|default:order.client_order_code|truncatechars:20 }}</strong></td>
+                <td>
+                    {{ order.customer_name|default:"N/A" }}
+                    {% if order.customer_phone %}<br><small style="color: var(--brand-grey-500);">{{ order.customer_phone }}</small>{% endif %}
+                </td>
+                <td>
+                    <span class="badge {% if order.order_status == 'delivered' %}badge-success{% elif order.order_status == 'pending' %}badge-warning{% elif order.order_status == 'cancelled' or order.order_status == 'failed' %}badge-danger{% else %}badge-default{% endif %}">
+                        {{ order.order_status|title }}
+                    </span>
+                </td>
+                <td>{% if order.cod_amount %}{{ order.cod_amount|floatformat:0 }} QAR{% else %}-{% endif %}</td>
+                <td>{{ order.created_at|date:"d M Y" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div style="margin-top: 1rem;">
+        <a href="{% url 'workforce:wf_orders_by_seller' %}?business={{ business.business_id }}" class="action-btn">
+            <i class="fa-solid fa-external-link"></i>
+            View All Orders
+        </a>
+    </div>
+    {% else %}
+    <div class="empty-msg">
+        <i class="fa-solid fa-box"></i>
+        No orders yet
+    </div>
+    {% endif %}
+</div>
+
+<!-- Tab: Details -->
+<div id="panel-details" class="tab-panel">
+    <div class="two-col">
+        <div>
+            <!-- Business Info -->
+            <div class="card-section">
+                <h3 class="section-heading">Business Information</h3>
+                <div class="info-list">
+                    <div class="info-item">
+                        <div class="info-label">Business Name</div>
+                        <div class="info-value">{{ business.business_name|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Business Code</div>
+                        <div class="info-value">{{ business.business_code|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">QID</div>
+                        <div class="info-value">{{ business.business_qid|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Category</div>
+                        <div class="info-value">{{ business.business_product_category|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Business Since</div>
+                        <div class="info-value">{{ business.business_since|date:"d M Y"|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Created</div>
+                        <div class="info-value">{{ business.created_at|date:"d M Y" }}</div>
+                    </div>
+                </div>
+            </div>
+
+            {% if business.user or business.profile %}
+            <!-- Owner Info -->
+            <div class="card-section">
+                <h3 class="section-heading">Owner Information</h3>
+                <div class="info-list">
+                    {% if business.user %}
+                    <div class="info-item">
+                        <div class="info-label">Name</div>
+                        <div class="info-value">{{ business.user.first_name }} {{ business.user.last_name|default:"" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Username</div>
+                        <div class="info-value">{{ business.user.username|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Email</div>
+                        <div class="info-value">{{ business.user.email|default:"N/A" }}</div>
+                    </div>
+                    {% endif %}
+                    {% if business.profile %}
+                    <div class="info-item">
+                        <div class="info-label">Phone</div>
+                        <div class="info-value">{{ business.profile.phone|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Verification</div>
+                        <div class="info-value">
+                            <span class="badge {% if business.profile.verification_status == 'verified' %}badge-success{% elif business.profile.verification_status == 'pending' %}badge-warning{% else %}badge-danger{% endif %}">
+                                {{ business.profile.verification_status|title }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="info-item"></div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if business_profile %}
+            <!-- Address -->
+            <div class="card-section">
+                <h3 class="section-heading">Business Address</h3>
+                <div class="info-list">
+                    <div class="info-item">
+                        <div class="info-label">Address</div>
+                        <div class="info-value">{{ business_profile.business_address|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">City</div>
+                        <div class="info-value">{{ business_profile.business_city|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">State</div>
+                        <div class="info-value">{{ business_profile.business_state|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Zip Code</div>
+                        <div class="info-value">{{ business_profile.business_zip_code|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Country</div>
+                        <div class="info-value">{{ business_profile.business_country|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item"></div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div>
+            <!-- Pickup Locations -->
+            <div class="card-section">
+                <h3 class="section-heading">Pickup Locations</h3>
+                {% if pickup_locations %}
+                <ul class="location-list">
+                    {% for loc in pickup_locations %}
+                    <li class="location-item">
+                        <span class="location-icon"><i class="fa-solid fa-location-dot"></i></span>
+                        <div class="location-info">
+                            <div class="location-title">{{ loc.pickup_location_title }}</div>
+                            <div class="location-address">Zone {{ loc.pickup_zone_no|default:"N/A" }}, St {{ loc.pickup_street_no|default:"N/A" }}, Bldg {{ loc.pickup_building_no|default:"N/A" }}</div>
+                        </div>
+                        <span class="badge {% if loc.pickup_status == 'active' %}badge-success{% else %}badge-warning{% endif %}">{{ loc.pickup_status|title }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="empty-msg">
+                    <i class="fa-solid fa-map-marker-alt"></i>
+                    No pickup locations
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab: Team -->
+<div id="panel-team" class="tab-panel">
+    <h3 class="section-heading">Team Members</h3>
+    {% if team_members %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Email</th>
+                <th>Phone</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for member in team_members %}
+            <tr>
+                <td>
+                    <strong>{{ member.team_name|default:member.user.username }}</strong>
+                    {% if member.team_code %}<br><small style="color: var(--brand-grey-500);">{{ member.team_code }}</small>{% endif %}
+                </td>
+                <td>
+                    <span class="badge {% if member.team_role == 'manager' %}badge-info{% else %}badge-default{% endif %}">
+                        {{ member.team_role|title }}
+                    </span>
+                </td>
+                <td>
+                    <span class="badge {% if member.team_status == 'active' %}badge-success{% elif member.team_status == 'pending' %}badge-warning{% else %}badge-default{% endif %}">
+                        {{ member.team_status|title }}
+                    </span>
+                </td>
+                <td>{{ member.team_email|default:member.user.email|default:"N/A" }}</td>
+                <td>{{ member.team_phone|default:"N/A" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-msg">
+        <i class="fa-solid fa-users"></i>
+        No team members
+    </div>
+    {% endif %}
+</div>
+
+<!-- Tab: Integrations -->
+<div id="panel-integrations" class="tab-panel">
+    <h3 class="section-heading">API Integrations</h3>
+    {% if api_settings %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Platform</th>
+                <th>API URL</th>
+                <th>Status</th>
+                <th>Default</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for api in api_settings %}
+            <tr>
+                <td><span class="badge badge-default">{{ api.api_type|title }}</span></td>
+                <td><small>{{ api.site_api_url|default:"N/A"|truncatechars:40 }}</small></td>
+                <td>
+                    {% if api.is_verify_api %}
+                    <span class="badge badge-success">Verified</span>
+                    {% else %}
+                    <span class="badge badge-warning">Pending</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if api.is_default %}<i class="fa-solid fa-check" style="color: #16a34a;"></i>{% else %}-{% endif %}
+                </td>
+                <td>{{ api.created_at|date:"d M Y" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-msg">
+        <i class="fa-solid fa-plug"></i>
+        No API integrations
+    </div>
+    {% endif %}
+</div>
+
+<!-- Tab: Settings -->
+<div id="panel-settings" class="tab-panel">
+    <h3 class="section-heading">Update Seller</h3>
+    <form id="updateForm">
+        {% csrf_token %}
+        <div class="form-grid">
+            <div class="form-group">
+                <label class="form-label">Business Name</label>
+                <input type="text" name="business_name" value="{{ business.business_name }}" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Phone</label>
+                <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="form-input">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="form-input">
+            </div>
+            <div class="form-group">
+                <label class="form-label">QID</label>
+                <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="form-input">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Status</label>
+                <select name="business_status" class="form-input">
+                    <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">&nbsp;</label>
+                <label class="form-checkbox">
+                    <input type="checkbox" name="fulfillment_service_enabled" {% if business.fulfillment_service_enabled %}checked{% endif %}>
+                    Enable Fulfillment Service
+                </label>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">
+                <i class="fa-solid fa-save"></i>
+                Save Changes
+            </button>
+            <a href="{% url 'workforce:sellers_list' %}" class="btn-secondary">Cancel</a>
+        </div>
+    </form>
+    <div id="updateMessage" class="toast-msg"></div>
+</div>
+
+</div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+        this.classList.add('active');
+        document.getElementById('panel-' + this.getAttribute('data-tab')).classList.add('active');
+    });
+});
+
+// Form submit
+document.getElementById('updateForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var btn = this.querySelector('button[type="submit"]');
+    var msg = document.getElementById('updateMessage');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+    fetch('{% url "workforce:seller_detail" business.business_id %}', {
+        method: 'POST',
+        body: new FormData(this),
+        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        msg.className = 'toast-msg show ' + (data.success ? 'success' : 'error');
+        msg.innerHTML = '<i class="fa-solid fa-' + (data.success ? 'check-circle' : 'exclamation-circle') + '"></i> ' + (data.message || data.error || 'Done');
+        if (data.success) setTimeout(function() { location.reload(); }, 1500);
+        else { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes'; }
+    })
+    .catch(function() {
+        msg.className = 'toast-msg show error';
+        msg.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Error saving';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes';
+    });
+});
+</script>
+{% endblock extra_js %}

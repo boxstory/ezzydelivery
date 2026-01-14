@@ -2088,6 +2088,159 @@ def sellers_inactive(request):
     return render(request, 'workforce/sellers_inactive.html', context)
 
 
+@login_required(login_url='/accounts/login/')
+def seller_detail(request, business_id):
+    """
+    View for viewing comprehensive seller/business details including
+    teams, API settings, pickup locations, and documents.
+    """
+    from django.db.models import Count, Sum, Q
+    from django.utils import timezone
+    from datetime import timedelta
+
+    # Fetch business with all related data
+    business = get_object_or_404(
+        business_models.Business.objects.select_related(
+            'user', 'profile'
+        ).prefetch_related(
+            'team_members__user',
+            'business_settings_api',
+            'pickup_location',
+        ),
+        business_id=business_id
+    )
+
+    # Get business profile (handle missing OneToOne relation)
+    try:
+        business_profile = business.business_profile
+    except Exception:
+        business_profile = None
+
+    # Get team members
+    team_members = business.team_members.select_related('user', 'profile').all()
+
+    # Get API settings
+    api_settings = business.business_settings_api.all()
+
+    # Get pickup locations
+    pickup_locations = business.pickup_location.all()
+
+    # Get comprehensive order statistics
+    order_stats = orders_models.Order.objects.filter(business=business).aggregate(
+        total_orders=Count('id'),
+        pending_orders=Count('id', filter=Q(order_status='pending')),
+        processing_orders=Count('id', filter=Q(order_status='processing')),
+        delivered_orders=Count('id', filter=Q(order_status='delivered')),
+        cancelled_orders=Count('id', filter=Q(order_status='cancelled')),
+        failed_orders=Count('id', filter=Q(order_status='failed')),
+    )
+
+    # Get COD statistics
+    cod_stats = orders_models.Order.objects.filter(
+        business=business,
+        cod_status_by_client='include'
+    ).aggregate(
+        total_cod_orders=Count('id'),
+        total_cod_amount=Sum('cod_amount'),
+        collected_cod=Sum('cod_amount', filter=Q(order_status='delivered')),
+        pending_cod=Sum('cod_amount', filter=~Q(order_status__in=['delivered', 'cancelled', 'failed'])),
+    )
+
+    # Calculate delivery success rate
+    total_completed = (order_stats.get('delivered_orders') or 0) + (order_stats.get('failed_orders') or 0) + (order_stats.get('cancelled_orders') or 0)
+    delivery_success_rate = 0
+    if total_completed > 0:
+        delivery_success_rate = round((order_stats.get('delivered_orders') or 0) / total_completed * 100, 1)
+
+    # Get recent orders count (last 30 days)
+    thirty_days_ago = timezone.now() - timedelta(days=30)
+    recent_orders_count = orders_models.Order.objects.filter(
+        business=business,
+        created_at__gte=thirty_days_ago
+    ).count()
+
+    # Get last 7 days orders for trend
+    seven_days_ago = timezone.now() - timedelta(days=7)
+    last_7_days_orders = orders_models.Order.objects.filter(
+        business=business,
+        created_at__gte=seven_days_ago
+    ).count()
+
+    # Get recent orders for activity timeline (last 10)
+    recent_orders = orders_models.Order.objects.filter(
+        business=business
+    ).select_related('business').order_by('-created_at')[:10]
+
+    # Get delivery task statistics
+    delivery_stats = delivery_models.DeliveryTask.objects.filter(
+        business=business
+    ).aggregate(
+        total_tasks=Count('id'),
+        in_transit=Count('id', filter=Q(dl_task_status='in_transit')),
+        completed=Count('id', filter=Q(dl_task_status='delivered')),
+    )
+
+    # Calculate average orders per month (if business_since exists)
+    avg_orders_per_month = 0
+    if business.business_since:
+        months_active = max(1, (timezone.now().date() - business.business_since).days / 30)
+        avg_orders_per_month = round((order_stats.get('total_orders') or 0) / months_active, 1)
+
+    # Handle POST for status update
+    if request.method == 'POST':
+        try:
+            business.business_name = request.POST.get('business_name', business.business_name)
+            business.business_phone = request.POST.get('business_phone', business.business_phone)
+            business.business_email = request.POST.get('business_email', business.business_email)
+            business.business_qid = request.POST.get('business_qid', business.business_qid)
+            business.business_status = request.POST.get('business_status', business.business_status)
+
+            # Handle fulfillment service toggle
+            fulfillment_enabled = request.POST.get('fulfillment_service_enabled') == 'on'
+            if fulfillment_enabled and not business.fulfillment_service_enabled:
+                business.fulfillment_service_enabled = True
+                business.fulfillment_activated_at = timezone.now()
+            elif not fulfillment_enabled:
+                business.fulfillment_service_enabled = False
+
+            business.save()
+
+            # Update business profile if exists
+            if business_profile:
+                business_profile.business_address = request.POST.get('business_address', business_profile.business_address)
+                business_profile.business_city = request.POST.get('business_city', business_profile.business_city)
+                business_profile.save()
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Seller updated successfully'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=400)
+
+    context = {
+        'page_title': f'Seller: {business.business_name}',
+        'business': business,
+        'business_profile': business_profile,
+        'team_members': team_members,
+        'api_settings': api_settings,
+        'pickup_locations': pickup_locations,
+        'order_stats': order_stats,
+        'cod_stats': cod_stats,
+        'delivery_stats': delivery_stats,
+        'delivery_success_rate': delivery_success_rate,
+        'recent_orders_count': recent_orders_count,
+        'last_7_days_orders': last_7_days_orders,
+        'recent_orders': recent_orders,
+        'avg_orders_per_month': avg_orders_per_month,
+    }
+
+    return render(request, 'workforce/seller_detail.html', context)
+
+
 # =============================================================================
 # FULFILLMENT SERVICE & PURCHASE ORDERS
 # =============================================================================
