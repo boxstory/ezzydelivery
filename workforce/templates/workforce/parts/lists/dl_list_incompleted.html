@@ -170,13 +170,13 @@
                             </button>
                             <div class="ms-auto d-flex align-items-center gap-2" role="group" aria-label="Quick Filters">
                                 <span class="text-muted small" id="quickFilterLabel">Quick Filters:</span>
-                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('today')" aria-describedby="quickFilterLabel">
+                                <button type="button" class="btn btn-sm btn-outline-info btn-quick-filter" data-filter="today" aria-describedby="quickFilterLabel">
                                     Today
                                 </button>
-                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('pending')" aria-describedby="quickFilterLabel">
+                                <button type="button" class="btn btn-sm btn-outline-info btn-quick-filter" data-filter="pending" aria-describedby="quickFilterLabel">
                                     Pending
                                 </button>
-                                <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('in_transit')" aria-describedby="quickFilterLabel">
+                                <button type="button" class="btn btn-sm btn-outline-info btn-quick-filter" data-filter="in_transit" aria-describedby="quickFilterLabel">
                                     In Transit
                                 </button>
                             </div>
@@ -301,7 +301,7 @@
                             <i class="fa-solid fa-check-circle me-1"></i>Published to DMS
                         </button>
                         {% else %}
-                        <button class="btn btn-primary btn-sm w-100" onclick="publishToDMS({{ dl.id }})">
+                        <button type="button" class="btn btn-primary btn-sm w-100 btn-publish-dms" data-task-id="{{ dl.id }}">
                             <i class="fa-solid fa-cloud-arrow-up me-1"></i>Publish to DMS
                         </button>
                         {% endif %}
@@ -314,7 +314,7 @@
                             <i class="fa-solid fa-check-circle me-1"></i>In Driver App
                         </button>
                         {% else %}
-                        <button class="btn btn-info btn-sm w-100" onclick="publishToDriverApp({{ dl.id }})">
+                        <button type="button" class="btn btn-info btn-sm w-100 btn-publish-driver-app" data-task-id="{{ dl.id }}">
                             <i class="fa-solid fa-mobile-screen me-1"></i>Publish to App
                         </button>
                         {% endif %}
@@ -328,19 +328,19 @@
                                 <i class="fa-solid fa-sync me-1"></i>Update Status
                             </button>
                             <ul class="dropdown-menu" aria-labelledby="statusDropdown{{ dl.id }}">
-                                <li><a class="dropdown-item" href="#" onclick="updateTaskStatus({{ dl.id }}, 'pending')">
+                                <li><a class="dropdown-item btn-update-status" href="#" data-task-id="{{ dl.id }}" data-status="pending">
                                     <i class="fa-solid fa-clock me-2 text-warning"></i>Pending
                                 </a></li>
-                                <li><a class="dropdown-item" href="#" onclick="updateTaskStatus({{ dl.id }}, 'in_transit')">
+                                <li><a class="dropdown-item btn-update-status" href="#" data-task-id="{{ dl.id }}" data-status="in_transit">
                                     <i class="fa-solid fa-truck me-2 text-info"></i>In Transit
                                 </a></li>
-                                <li><a class="dropdown-item" href="#" onclick="updateTaskStatus({{ dl.id }}, 'delivered')">
+                                <li><a class="dropdown-item btn-update-status" href="#" data-task-id="{{ dl.id }}" data-status="delivered">
                                     <i class="fa-solid fa-check-circle me-2 text-success"></i>Delivered
                                 </a></li>
-                                <li><a class="dropdown-item" href="#" onclick="updateTaskStatus({{ dl.id }}, 'rejected')">
+                                <li><a class="dropdown-item btn-update-status" href="#" data-task-id="{{ dl.id }}" data-status="rejected">
                                     <i class="fa-solid fa-times-circle me-2 text-danger"></i>Rejected
                                 </a></li>
-                                <li><a class="dropdown-item" href="#" onclick="updateTaskStatus({{ dl.id }}, 'cancelled')">
+                                <li><a class="dropdown-item btn-update-status" href="#" data-task-id="{{ dl.id }}" data-status="cancelled">
                                     <i class="fa-solid fa-ban me-2 text-danger"></i>Cancelled
                                 </a></li>
                             </ul>
@@ -498,14 +498,27 @@
                 'dateTo': 'To'
             };
 
-            activeFilters.forEach(([key, value]) => {
-                const tag = document.createElement('span');
+            activeFilters.forEach(function(entry) {
+                var key = entry[0];
+                var value = entry[1];
+                var tag = document.createElement('span');
                 tag.className = 'filter-tag';
-                tag.innerHTML = `
-                    <strong>${filterLabels[key]}:</strong> ${value}
-                    <button type="button" class="btn-close btn-close-sm ms-1"
-                            onclick="removeFilter('${key}')" title="Remove filter"></button>
-                `;
+
+                var strong = document.createElement('strong');
+                strong.textContent = filterLabels[key] + ':';
+                tag.appendChild(strong);
+                tag.appendChild(document.createTextNode(' ' + value + ' '));
+
+                var closeBtn = document.createElement('button');
+                closeBtn.type = 'button';
+                closeBtn.className = 'btn-close btn-close-sm ms-1 btn-remove-filter';
+                closeBtn.title = 'Remove filter';
+                closeBtn.dataset.filterKey = key;
+                closeBtn.addEventListener('click', function() {
+                    removeFilter(this.dataset.filterKey);
+                });
+                tag.appendChild(closeBtn);
+
                 tagsContainer.appendChild(tag);
             });
         } else {
@@ -523,14 +536,14 @@
     // Quick filter functions
     function quickFilter(type) {
         // Clear all fields first
-        const dlCode = document.getElementById('dlCode');
-        const cCode = document.getElementById('cCode');
-        const mobile = document.getElementById('mobile');
-        const driverName = document.getElementById('driverName');
-        const cStatus = document.getElementById('cStatus');
-        const dmsStatus = document.getElementById('dmsStatus');
-        const dateFrom = document.getElementById('dateFrom');
-        const dateTo = document.getElementById('dateTo');
+        var dlCode = document.getElementById('dlCode');
+        var cCode = document.getElementById('cCode');
+        var mobile = document.getElementById('mobile');
+        var driverName = document.getElementById('driverName');
+        var cStatus = document.getElementById('cStatus');
+        var dmsStatus = document.getElementById('dmsStatus');
+        var dateFrom = document.getElementById('dateFrom');
+        var dateTo = document.getElementById('dateTo');
 
         if (dlCode) dlCode.value = '';
         if (cCode) cCode.value = '';
@@ -543,7 +556,7 @@
 
         switch(type) {
             case 'today':
-                const today = new Date().toISOString().split('T')[0];
+                var today = new Date().toISOString().split('T')[0];
                 if (dateFrom) dateFrom.value = today;
                 if (dateTo) dateTo.value = today;
                 break;
@@ -557,6 +570,13 @@
 
         htmx.trigger('#filterForm', 'submit');
     }
+
+    // Event delegation for quick filter buttons
+    document.querySelectorAll('.btn-quick-filter[data-filter]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            quickFilter(this.dataset.filter);
+        });
+    });
 
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
@@ -586,15 +606,15 @@
     // Publish to DMS
     function publishToDMS(taskId) {
         if (confirm('Publish this task to the Delivery Management System?')) {
-            fetch(`/workforce/delivery-task/${taskId}/publish-dms/`, {
+            fetch('/workforce/delivery-task/' + taskId + '/publish-dms/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCSRFToken()
                 }
             })
-            .then(response => response.json())
-            .then(data => {
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 if (data.success) {
                     alert('Task published to DMS successfully!');
                     location.reload();
@@ -602,25 +622,32 @@
                     alert('Error: ' + (data.error || 'Failed to publish to DMS'));
                 }
             })
-            .catch(error => {
+            .catch(function(error) {
                 console.error('Error:', error);
                 alert('An error occurred while publishing to DMS');
             });
         }
     }
 
+    // Event delegation for publish to DMS buttons
+    document.querySelectorAll('.btn-publish-dms[data-task-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            publishToDMS(this.dataset.taskId);
+        });
+    });
+
     // Publish to Driver App
     function publishToDriverApp(taskId) {
         if (confirm('Publish this task to the Driver Mobile App?')) {
-            fetch(`/workforce/delivery-task/${taskId}/publish-driver-app/`, {
+            fetch('/workforce/delivery-task/' + taskId + '/publish-driver-app/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCSRFToken()
                 }
             })
-            .then(response => response.json())
-            .then(data => {
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 if (data.success) {
                     alert('Task published to Driver App successfully!');
                     location.reload();
@@ -628,18 +655,24 @@
                     alert('Error: ' + (data.error || 'Failed to publish to Driver App'));
                 }
             })
-            .catch(error => {
+            .catch(function(error) {
                 console.error('Error:', error);
                 alert('An error occurred while publishing to Driver App');
             });
         }
     }
 
+    // Event delegation for publish to driver app buttons
+    document.querySelectorAll('.btn-publish-driver-app[data-task-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            publishToDriverApp(this.dataset.taskId);
+        });
+    });
+
     // Update Task Status
     function updateTaskStatus(taskId, status) {
-        event.preventDefault();
-        if (confirm(`Update task status to "${status.replace('_', ' ')}"?`)) {
-            fetch(`/workforce/delivery-task/${taskId}/update-status/`, {
+        if (confirm('Update task status to "' + status.replace('_', ' ') + '"?')) {
+            fetch('/workforce/delivery-task/' + taskId + '/update-status/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -647,8 +680,8 @@
                 },
                 body: JSON.stringify({ status: status })
             })
-            .then(response => response.json())
-            .then(data => {
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 if (data.success) {
                     alert('Task status updated successfully!');
                     location.reload();
@@ -656,11 +689,19 @@
                     alert('Error: ' + (data.error || 'Failed to update status'));
                 }
             })
-            .catch(error => {
+            .catch(function(error) {
                 console.error('Error:', error);
                 alert('An error occurred while updating status');
             });
         }
     }
+
+    // Event delegation for update status dropdown items
+    document.querySelectorAll('.btn-update-status[data-task-id][data-status]').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            updateTaskStatus(this.dataset.taskId, this.dataset.status);
+        });
+    });
 </script>
 {% endblock extra_js %}

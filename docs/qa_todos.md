@@ -274,7 +274,7 @@ This file tracks UI/CSS issues, alignment problems, and bugs discovered during p
 #### Workforce List Templates
 - [x] workforce/templates/workforce/user_verification_list.html - Lines 156, 159, 162: status update onclick - Fixed: Replaced with data-action + event delegation
 - [x] workforce/templates/workforce/parts/lists/orders_list_view.html - Lines 224+: quickFilter onclick - Fixed: Replaced with data-filter, data-order-id + event delegation
-- [ ] workforce/templates/workforce/parts/lists/dl_list_incompleted.html - Lines 173-343: 15+ onclick handlers
+- [x] workforce/templates/workforce/parts/lists/dl_list_incompleted.html - Lines 173-343: 15+ onclick handlers - Fixed: Replaced with data attributes + event delegation
 
 ### Additional Inline Styles Found
 
