@@ -58,13 +58,13 @@
 
                             <!-- Quick Download Buttons -->
                             <div class="d-flex gap-2 flex-wrap">
-                                <button class="btn btn-outline-primary btn-sm" onclick="quickDownload('{{ report.id }}', 7)">
+                                <button type="button" class="btn btn-outline-primary btn-sm btn-quick-download" data-report-type="{{ report.id }}" data-days="7">
                                     <i class="fa-solid fa-calendar-week me-1"></i>Last 7 Days
                                 </button>
-                                <button class="btn btn-outline-primary btn-sm" onclick="quickDownload('{{ report.id }}', 30)">
+                                <button type="button" class="btn btn-outline-primary btn-sm btn-quick-download" data-report-type="{{ report.id }}" data-days="30">
                                     <i class="fa-solid fa-calendar-days me-1"></i>Last 30 Days
                                 </button>
-                                <button class="btn btn-outline-primary btn-sm" onclick="quickDownload('{{ report.id }}', 90)">
+                                <button type="button" class="btn btn-outline-primary btn-sm btn-quick-download" data-report-type="{{ report.id }}" data-days="90">
                                     <i class="fa-solid fa-calendar me-1"></i>Last 90 Days
                                 </button>
                             </div>
@@ -105,9 +105,9 @@
                                     <td class="text-end fw-bold text-success">{{ settlement.amount|floatformat:2 }} QR</td>
                                     <td>{{ settlement.paid_at|date:"M d, Y" }}</td>
                                     <td class="text-center">
-                                        <a href="#" class="btn btn-sm btn-outline-primary" onclick="downloadSettlement({{ settlement.id }})">
+                                        <button type="button" class="btn btn-sm btn-outline-primary btn-download-settlement" data-settlement-id="{{ settlement.id }}">
                                             <i class="fa-solid fa-download me-1"></i>Download
-                                        </a>
+                                        </button>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -212,69 +212,83 @@
 
 {% block extra_js %}
 <script>
-// Get CSRF token
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
+document.addEventListener('DOMContentLoaded', function() {
+    // Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
             }
         }
+        return cookieValue;
     }
-    return cookieValue;
-}
-const csrftoken = getCookie('csrftoken');
+    const csrftoken = getCookie('csrftoken');
 
-// Quick download function
-function quickDownload(reportType, days) {
-    const today = new Date();
-    const fromDate = new Date(today);
-    fromDate.setDate(fromDate.getDate() - days);
+    // Quick download function
+    function quickDownload(reportType, days) {
+        const today = new Date();
+        const fromDate = new Date(today);
+        fromDate.setDate(fromDate.getDate() - days);
 
-    const dateFrom = fromDate.toISOString().split('T')[0];
-    const dateTo = today.toISOString().split('T')[0];
+        const dateFrom = fromDate.toISOString().split('T')[0];
+        const dateTo = today.toISOString().split('T')[0];
 
-    // Create and submit form
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '{% url "fleet:driver_reports" %}';
+        // Create and submit form
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{% url "fleet:driver_reports" %}';
 
-    const csrfInput = document.createElement('input');
-    csrfInput.type = 'hidden';
-    csrfInput.name = 'csrfmiddlewaretoken';
-    csrfInput.value = csrftoken;
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrftoken;
 
-    const typeInput = document.createElement('input');
-    typeInput.type = 'hidden';
-    typeInput.name = 'report_type';
-    typeInput.value = reportType;
+        const typeInput = document.createElement('input');
+        typeInput.type = 'hidden';
+        typeInput.name = 'report_type';
+        typeInput.value = reportType;
 
-    const fromInput = document.createElement('input');
-    fromInput.type = 'hidden';
-    fromInput.name = 'date_from';
-    fromInput.value = dateFrom;
+        const fromInput = document.createElement('input');
+        fromInput.type = 'hidden';
+        fromInput.name = 'date_from';
+        fromInput.value = dateFrom;
 
-    const toInput = document.createElement('input');
-    toInput.type = 'hidden';
-    toInput.name = 'date_to';
-    toInput.value = dateTo;
+        const toInput = document.createElement('input');
+        toInput.type = 'hidden';
+        toInput.name = 'date_to';
+        toInput.value = dateTo;
 
-    form.appendChild(csrfInput);
-    form.appendChild(typeInput);
-    form.appendChild(fromInput);
-    form.appendChild(toInput);
+        form.appendChild(csrfInput);
+        form.appendChild(typeInput);
+        form.appendChild(fromInput);
+        form.appendChild(toInput);
 
-    document.body.appendChild(form);
-    form.submit();
-}
+        document.body.appendChild(form);
+        form.submit();
+    }
 
-// Download settlement report
-function downloadSettlement(settlementId) {
-    window.location.href = `/fleet/settlement/${settlementId}/download/`;
-}
+    // Event delegation for quick download buttons
+    document.querySelectorAll('.btn-quick-download[data-report-type]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const reportType = this.dataset.reportType;
+            const days = parseInt(this.dataset.days, 10);
+            quickDownload(reportType, days);
+        });
+    });
+
+    // Event delegation for settlement download buttons
+    document.querySelectorAll('.btn-download-settlement[data-settlement-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const settlementId = this.dataset.settlementId;
+            window.location.href = '/fleet/settlement/' + settlementId + '/download/';
+        });
+    });
+});
 </script>
 {% endblock extra_js %}

@@ -256,7 +256,7 @@ This file tracks UI/CSS issues, alignment problems, and bugs discovered during p
 ### Inline onclick Handlers (106 instances)
 
 #### Fleet Templates
-- [ ] fleet/templates/fleet/parts/driver_reports.html - Lines 61, 64, 67, 108: onclick handlers
+- [x] fleet/templates/fleet/parts/driver_reports.html - Lines 61, 64, 67, 108: onclick handlers - Fixed: Replaced with data attributes + event delegation
 - [x] workforce/templates/workforce/fleet_transactions.html - Lines 76, 80, 84, 88: print/export onclick - Fixed: Replaced with data-action attributes + event delegation; extracted inline styles to CSS classes
 
 #### Document List Templates

@@ -47,6 +47,7 @@
 | F020 | Inline styles in document list templates | Extracted to workforce.css (filter-row, btn-view-details, etc.) | 2026-01-14 |
 | F021 | Inline <style> tags in bulk_order_entry.html (200+ lines) | Extracted to orders.css (excel-table styles) | 2026-01-14 |
 | F022 | Inline onclick + styles in fleet_transactions.html | Replaced with data-action + event delegation; CSS classes extracted | 2026-01-14 |
+| F023 | Inline onclick handlers in driver_reports.html | Replaced with data attributes + event delegation | 2026-01-14 |
 
 ## Priority Order
 
