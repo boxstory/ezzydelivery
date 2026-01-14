@@ -854,9 +854,9 @@ def deliver_to_here(request, pickup_id):
         id=pickup_id).first()
     if request.method == 'POST':
         form = orders_forms.UpdateOrderForm(request.POST, )
-        print('form valid checking')
+        logger.debug('Form validation checking in deliver_to_here')
         if form.is_valid():
-            print('form valid')
+            logger.debug('Form is valid in deliver_to_here')
             form.save()
             form.business = business_models.Business.objects.get(
                     business_id=request.user.id)
@@ -1019,18 +1019,18 @@ def update_order_product(request, order_id):
     order_items = orders_models.OrderItem.objects.filter(order=order)
 
     if request.method == 'POST':
-            print("POST form in views")
+            logger.debug(f'POST form received in update_order_product for order {order_id}')
             form = orders_forms.AddOrderProductsForm(request.POST)
 
             if form.is_valid():
-                print("valid form")
+                logger.debug(f'Form valid in update_order_product for order {order_id}')
                 order_item = form.save(commit=False)
                 order_item.order = order
                 order_item.save()
                 return  redirect('orders:orders_all_list')
     else:
         form = orders_forms.AddOrderProductsForm(initial={'order': order})
-        print('else form')
+        logger.debug(f'GET request - displaying form for order {order_id}')
 
     data = {
         'order': order,
@@ -1043,7 +1043,7 @@ def update_order_product(request, order_id):
 def order_product_list(request, order_id):
     """List all products in an order using OrderItem model"""
     order = get_object_or_404(orders_models.Order, id=order_id)
-    print('order' + str(order))
+    logger.debug(f'Fetching product list for order {order}')
     ordered_items = order.order_items.select_related('product').all()  # Using related_name='order_items'
 
     # Format items for display
@@ -1056,8 +1056,8 @@ def order_product_list(request, order_id):
             'total_price': item.total_price or (item.quantity * item.unit_price if item.unit_price else 0)
         })
 
-    print('Ordered items:', ordered_items)
-    print('Listed products:', listed_products)
+    logger.debug(f'Ordered items count: {ordered_items.count()}')
+    logger.debug(f'Listed products count: {len(listed_products)}')
 
     data = {
         'order': order,
@@ -1073,12 +1073,12 @@ def update_order_status(request):
     if request.method == 'POST' and request.is_ajax():
         # Assuming you have a model named "YourModel" with a "status" field
         order_id = request.POST.get('order_id')
-        print('update_order_status - view', order_id)
+        logger.debug(f'update_order_status called for order_id: {order_id}')
         status = request.POST.get('status')
-        print(status)
+        logger.debug(f'New status requested: {status}')
         order = orders_models.Order.objects.get(pk=order_id)
         order.order_status = status
-        print(order.order_status)
+        logger.debug(f'Order status updated to: {order.order_status}')
         order.save()
 
         # Return a JSON response indicating success
@@ -1200,18 +1200,17 @@ def get_order_by_api(request):
         return redirect('orders_all_list')
     # Parse message as json
     GetQuestion_response = "json.loads(GetQuestion_response['Message'])"
-    print(request.POST.get('start_date'))
+    logger.debug(f'Start date from POST: {request.POST.get("start_date")}')
     if request.method == 'POST':
         order_list_start_date = request.POST.get('start_date')
         order_list_end_date = request.POST.get('end_date')
-        print( "posted dates")
+        logger.debug('Using posted date range')
     else:
         order_list_start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
         order_list_end_date = datetime.now().strftime('%Y-%m-%d')
-        print( "default dates")
-    
-    print(order_list_start_date)
-    print(order_list_end_date)
+        logger.debug('Using default date range (last 30 days)')
+
+    logger.debug(f'Date range: {order_list_start_date} to {order_list_end_date}')
 
     if get_orders.status_code == 200:
         order_data = get_orders.json()
@@ -1287,7 +1286,7 @@ def get_orders_by_base_api(request):
             json.dump(shop_creds, f)
 
         shop_url = "%s" % BASE_API_STORE_NAME
-        print('shopify shop_url', shop_url)
+        logger.debug(f'Shopify shop_url: {shop_url}')
 
         order_base_url = 'https://' + shop_url + BASE_API_ORDER_ENDPINT
         product_base_url = 'https://' + shop_url + BASE_API_PRODUCT_ENDPINT
@@ -1296,15 +1295,15 @@ def get_orders_by_base_api(request):
         order_response = requests.get(order_base_url, headers=header_value, params={'status': 'any', 'limit': 10})
         order_count = len(order_response.json().get('orders', []))
 
-        print('order_count', order_count    )
+        logger.debug(f'Shopify order_count: {order_count}')
         product_response = requests.get(product_base_url, headers=header_value )
         product_count = len(product_response.json().get('products', []))
-        print('product_count', product_count)
+        logger.debug(f'Shopify product_count: {product_count}')
 
     elif business_api.api_type == 'woocommerce':
         url="http://example.com",
-        shop_url = 'https://' + BASE_API_STORE_NAME 
-        print('woocommerce shop_url', shop_url)
+        shop_url = 'https://' + BASE_API_STORE_NAME
+        logger.debug(f'WooCommerce shop_url: {shop_url}')
  
         wcapi = WooAPI(
             url= shop_url,
@@ -1318,12 +1317,12 @@ def get_orders_by_base_api(request):
 
         order_response = wcapi.get("orders")
         order_date = order_response.headers.get('Date')
-        print('order_date', order_date)
+        logger.debug(f'WooCommerce order_date: {order_date}')
         order_count = order_response.headers.get('X-WP-Total')
-        print('order_count', order_count)
+        logger.debug(f'WooCommerce order_count: {order_count}')
         product_response = wcapi.get("products", params={"per_page": 20})
         product_count = product_response.headers.get('X-WP-Total')
-        print('product_count', product_count)
+        logger.debug(f'WooCommerce product_count: {product_count}')
  
     else:
         order_response = None
@@ -1332,8 +1331,7 @@ def get_orders_by_base_api(request):
 
     start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
     end_date = datetime.now().strftime('%Y-%m-%d')
-    print('start_date', start_date)
-    print('end_date', end_date)
+    logger.debug(f'API fetch date range: {start_date} to {end_date}')
 
     try:
         if order_response.status_code == 200:
@@ -1351,7 +1349,7 @@ def get_orders_by_base_api(request):
                 order_list = []
 
             for order in order_list:
-                print('order in order_response', order)
+                logger.debug(f'Processing order from API: {order.get("id", "unknown")}')
 
                 # Extract customer info safely
                 try:

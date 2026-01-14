@@ -16,19 +16,19 @@
 
 <!-- Filter and View Toggle Section -->
 <div class="filter-section">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-        <div style="flex: 1; min-width: 250px;">
+    <div class="filter-row">
+        <div class="filter-search-group">
             <label for="searchInput" class="filter-label">
                 <i class="fa-solid fa-search me-2"></i>Search Vehicles
             </label>
             <input type="text" id="searchInput" class="filter-input" placeholder="Search by vehicle number, model, driver name..." value="{{ search_query }}">
         </div>
-        <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
-            <button type="button" onclick="toggleView('card')" id="cardViewBtn" class="view-toggle-btn {% if view_type == 'card' %}active{% endif %}" aria-pressed="{% if view_type == 'card' %}true{% else %}false{% endif %}">
+        <div class="filter-toggle-group">
+            <button type="button" data-view="card" id="cardViewBtn" class="view-toggle-btn {% if view_type == 'card' %}active{% endif %}" aria-pressed="{% if view_type == 'card' %}true{% else %}false{% endif %}">
                 <i class="fa-solid fa-grip" aria-hidden="true"></i>
                 Card
             </button>
-            <button type="button" onclick="toggleView('table')" id="tableViewBtn" class="view-toggle-btn {% if view_type == 'table' %}active{% endif %}" aria-pressed="{% if view_type == 'table' %}true{% else %}false{% endif %}">
+            <button type="button" data-view="table" id="tableViewBtn" class="view-toggle-btn {% if view_type == 'table' %}active{% endif %}" aria-pressed="{% if view_type == 'table' %}true{% else %}false{% endif %}">
                 <i class="fa-solid fa-list" aria-hidden="true"></i>
                 Table
             </button>
@@ -37,7 +37,7 @@
 </div>
 
 <!-- Card View -->
-<div id="cardView" class="driver-grid" style="display: {% if view_type == 'card' %}grid{% else %}none{% endif %};">
+<div id="cardView" class="driver-grid {% if view_type != 'card' %}d-none{% endif %}">
     {% if vehicles %}
         {% for vehicle in vehicles %}
         <div class="driver-card" data-search-text="{{ vehicle.vehicle_no|lower }} {{ vehicle.vehicle_type|lower }} {{ vehicle.vehicle_model|lower }} {{ vehicle.driver.user.first_name|default:''|lower }} {{ vehicle.driver.user.last_name|default:''|lower }}">
@@ -78,8 +78,8 @@
                     <span>{{ vehicle.created_at|date:"d M Y" }}</span>
                 </div>
             </div>
-            <div style="margin-top: 1rem;">
-                <a href="{% url 'workforce:vehicle_document_detail' vehicle.driver.driver_id %}" style="background: var(--brand-primary); color: var(--brand-grey-900); padding: 0.5rem 1rem; border-radius: var(--brand-radius-sm); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600;">
+            <div class="driver-card-actions">
+                <a href="{% url 'workforce:vehicle_document_detail' vehicle.driver.driver_id %}" class="btn-view-details">
                     <i class="fa-solid fa-eye"></i>
                     View Details
                 </a>
@@ -87,7 +87,7 @@
         </div>
         {% endfor %}
     {% else %}
-        <div class="empty-state" style="grid-column: 1 / -1;">
+        <div class="empty-state full-width">
             <i class="fa-solid fa-car"></i>
             <h3>No Vehicles Found</h3>
             <p>{% if search_query %}No vehicles match your search criteria.{% else %}There are no vehicle documents available.{% endif %}</p>
@@ -96,7 +96,7 @@
 </div>
 
 <!-- Table View -->
-<div id="tableView" class="orders-table-container" style="display: {% if view_type == 'table' %}block{% else %}none{% endif %};">
+<div id="tableView" class="orders-table-container {% if view_type != 'table' %}d-none{% endif %}">
     {% if vehicles %}
     <table class="orders-table">
         <thead>
@@ -126,7 +126,7 @@
                 </td>
                 <td>{{ vehicle.created_at|date:"d M Y" }}</td>
                 <td>
-                    <a href="{% url 'workforce:vehicle_document_detail' vehicle.driver.driver_id %}" style="background: var(--brand-primary); color: var(--brand-grey-900); padding: 0.375rem 0.75rem; border-radius: var(--brand-radius-sm); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.875rem;">
+                    <a href="{% url 'workforce:vehicle_document_detail' vehicle.driver.driver_id %}" class="btn-view-small">
                         <i class="fa-solid fa-eye"></i>
                         View
                     </a>
@@ -152,31 +152,39 @@
 
 {% block extra_js %}
 <script>
-    let searchTimeout;
+    document.addEventListener('DOMContentLoaded', function() {
+        let searchTimeout;
+        const searchInput = document.getElementById('searchInput');
 
-    // Search functionality
-    document.getElementById('searchInput').addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        const searchTerm = this.value;
+        // Search functionality
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                const searchTerm = this.value;
 
-        searchTimeout = setTimeout(() => {
-            const url = new URL(window.location);
-            if (searchTerm) {
-                url.searchParams.set('search', searchTerm);
-            } else {
-                url.searchParams.delete('search');
-            }
-            url.searchParams.set('page', '1');
-            window.location.href = url.toString();
-        }, 500);
+                searchTimeout = setTimeout(() => {
+                    const url = new URL(window.location);
+                    if (searchTerm) {
+                        url.searchParams.set('search', searchTerm);
+                    } else {
+                        url.searchParams.delete('search');
+                    }
+                    url.searchParams.set('page', '1');
+                    window.location.href = url.toString();
+                }, 500);
+            });
+        }
+
+        // View toggle functionality using event delegation
+        document.querySelectorAll('.view-toggle-btn[data-view]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const viewType = this.dataset.view;
+                const url = new URL(window.location);
+                url.searchParams.set('view', viewType);
+                url.searchParams.set('page', '1');
+                window.location.href = url.toString();
+            });
+        });
     });
-
-    // View toggle functionality
-    function toggleView(viewType) {
-        const url = new URL(window.location);
-        url.searchParams.set('view', viewType);
-        url.searchParams.set('page', '1');
-        window.location.href = url.toString();
-    }
 </script>
 {% endblock extra_js %}
