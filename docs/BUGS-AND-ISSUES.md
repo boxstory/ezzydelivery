@@ -53,6 +53,8 @@
 | F026 | Inline onclick in dms_orders_list.html | Replaced with data-action + event delegation; CSS extracted | 2026-01-14 |
 | F027 | Inline onclick in dms_drivers_list.html | Replaced with data-action + event delegation; CSS extracted | 2026-01-14 |
 | F028 | Inline onclick + 40+ inline styles in dms_publish_order.html | Replaced with data-action; DMS CSS classes added | 2026-01-14 |
+| F029 | Inline onclick handlers in user_verification_list.html | Replaced with data-action + event delegation | 2026-01-14 |
+| F030 | Inline onclick handlers in orders_list_view.html | Replaced with data-filter, data-order-id + event delegation | 2026-01-14 |
 
 ## Priority Order
 

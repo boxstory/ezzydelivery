@@ -220,16 +220,16 @@
                                 <div class="ms-auto d-flex align-items-center gap-2" role="group" aria-label="Quick Filters">
                                     <span class="text-muted small" id="quickFilterLabel">Quick Filters:</span>
                                     <button type="button"
-                                            class="btn btn-sm btn-outline-info"
-                                            onclick="quickFilter('today')"
+                                            class="btn btn-sm btn-outline-info btn-quick-filter"
+                                            data-filter="today"
                                             aria-describedby="quickFilterLabel">Today</button>
                                     <button type="button"
-                                            class="btn btn-sm btn-outline-info"
-                                            onclick="quickFilter('pending')"
+                                            class="btn btn-sm btn-outline-info btn-quick-filter"
+                                            data-filter="pending"
                                             aria-describedby="quickFilterLabel">Pending</button>
                                     <button type="button"
-                                            class="btn btn-sm btn-outline-info"
-                                            onclick="quickFilter('in_transit')"
+                                            class="btn btn-sm btn-outline-info btn-quick-filter"
+                                            data-filter="in_transit"
                                             aria-describedby="quickFilterLabel">In Transit</button>
                                 </div>
                             </div>
@@ -362,8 +362,8 @@
                                             <i class="fa-solid fa-check-circle me-1"></i>Published
                                         </button>
                                     {% else %}
-                                        <button class="btn btn-primary btn-sm w-100 py-2"
-                                                onclick="publishToDelivery({{ order.id }})">
+                                        <button type="button" class="btn btn-primary btn-sm w-100 py-2 btn-publish-order"
+                                                data-order-id="{{ order.id }}">
                                             <i class="fa-solid fa-rocket me-1"></i>Publish to Delivery
                                         </button>
                                     {% endif %}
@@ -483,7 +483,7 @@
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                                         <i class="fa-solid fa-times me-1"></i>Cancel
                                     </button>
-                                    <button type="button" class="btn btn-primary" onclick="submitStatusUpdate({{ order.id }})">
+                                    <button type="button" class="btn btn-primary btn-submit-status" data-order-id="{{ order.id }}">
                                         <i class="fa-solid fa-check me-1"></i>Update Status
                                     </button>
                                 </div>
@@ -622,13 +622,27 @@
                 'dateTo': 'To'
             };
 
-            activeFilters.forEach(([key, value]) => {
-                const tag = document.createElement('span');
+            activeFilters.forEach(function(entry) {
+                var key = entry[0];
+                var value = entry[1];
+                var tag = document.createElement('span');
                 tag.className = 'filter-tag';
-                tag.innerHTML = `
-                    <strong>${filterLabels[key]}:</strong> ${value}
-                    <button type="button" class="btn-close btn-close-sm ms-1" onclick="removeFilter('${key}')" title="Remove filter"></button>
-                `;
+
+                var strong = document.createElement('strong');
+                strong.textContent = filterLabels[key] + ':';
+                tag.appendChild(strong);
+                tag.appendChild(document.createTextNode(' ' + value + ' '));
+
+                var closeBtn = document.createElement('button');
+                closeBtn.type = 'button';
+                closeBtn.className = 'btn-close btn-close-sm ms-1 btn-remove-filter';
+                closeBtn.title = 'Remove filter';
+                closeBtn.dataset.filterKey = key;
+                closeBtn.addEventListener('click', function() {
+                    removeFilter(this.dataset.filterKey);
+                });
+                tag.appendChild(closeBtn);
+
                 tagsContainer.appendChild(tag);
             });
         } else {
@@ -656,7 +670,7 @@
 
         switch(type) {
             case 'today':
-                const today = new Date().toISOString().split('T')[0];
+                var today = new Date().toISOString().split('T')[0];
                 document.getElementById('dateFrom').value = today;
                 document.getElementById('dateTo').value = today;
                 break;
@@ -670,6 +684,13 @@
 
         htmx.trigger('#filterForm', 'submit');
     }
+
+    // Event delegation for quick filter buttons
+    document.querySelectorAll('.btn-quick-filter[data-filter]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            quickFilter(this.dataset.filter);
+        });
+    });
 
     // Save filter preset
     const saveFilterBtn = document.getElementById('saveFilter');
@@ -736,7 +757,7 @@
     // Publish to Delivery
     function publishToDelivery(orderId) {
         if (confirm('Are you sure you want to publish this order to delivery?')) {
-            fetch(`/workforce/orders/${orderId}/publish/`, {
+            fetch('/workforce/orders/' + orderId + '/publish/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -744,8 +765,8 @@
                 },
                 body: JSON.stringify({ action: 'publish' })
             })
-            .then(response => response.json())
-            .then(data => {
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 if (data.success) {
                     alert('Order published successfully!');
                     location.reload();
@@ -753,24 +774,31 @@
                     alert('Error: ' + (data.error || 'Failed to publish order'));
                 }
             })
-            .catch(error => {
+            .catch(function(error) {
                 console.error('Error:', error);
                 alert('An error occurred while publishing the order');
             });
         }
     }
 
+    // Event delegation for publish order buttons
+    document.querySelectorAll('.btn-publish-order[data-order-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            publishToDelivery(this.dataset.orderId);
+        });
+    });
+
     // Submit Status Update from Modal
     function submitStatusUpdate(orderId) {
-        const statusSelect = document.getElementById(`statusSelect${orderId}`);
-        const status = statusSelect.value;
+        var statusSelect = document.getElementById('statusSelect' + orderId);
+        var status = statusSelect.value;
 
         if (!status) {
             alert('Please select a status');
             return;
         }
 
-        fetch(`/workforce/orders/${orderId}/update-status/`, {
+        fetch('/workforce/orders/' + orderId + '/update-status/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -778,11 +806,11 @@
             },
             body: JSON.stringify({ status: status })
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
             if (data.success) {
                 // Close the modal
-                const modal = bootstrap.Modal.getInstance(document.getElementById(`statusModal${orderId}`));
+                var modal = bootstrap.Modal.getInstance(document.getElementById('statusModal' + orderId));
                 if (modal) modal.hide();
                 alert('Status updated successfully!');
                 location.reload();
@@ -790,11 +818,18 @@
                 alert('Error: ' + (data.error || 'Failed to update status'));
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             console.error('Error:', error);
             alert('An error occurred while updating status');
         });
     }
+
+    // Event delegation for submit status buttons
+    document.querySelectorAll('.btn-submit-status[data-order-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            submitStatusUpdate(this.dataset.orderId);
+        });
+    });
 
     // Add Comment
     function addComment(event, orderId) {

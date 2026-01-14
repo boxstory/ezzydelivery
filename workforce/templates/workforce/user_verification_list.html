@@ -153,13 +153,13 @@
         <!-- Action Buttons -->
         {% if data.profile.verification_status != 'verified' %}
         <div class="action-buttons">
-            <button class="btn-verify" onclick="updateStatus({{ data.profile.id }}, 'verified')">
+            <button type="button" class="btn-verify" data-action="verify" data-profile-id="{{ data.profile.id }}">
                 <i class="fa-solid fa-check me-1"></i>Verify
             </button>
-            <button class="btn-review" onclick="updateStatus({{ data.profile.id }}, 'under_review')">
+            <button type="button" class="btn-review" data-action="under_review" data-profile-id="{{ data.profile.id }}">
                 <i class="fa-solid fa-eye me-1"></i>Mark Under Review
             </button>
-            <button class="btn-reject" onclick="rejectUser({{ data.profile.id }})">
+            <button type="button" class="btn-reject" data-action="reject" data-profile-id="{{ data.profile.id }}">
                 <i class="fa-solid fa-times me-1"></i>Reject
             </button>
         </div>
@@ -178,6 +178,7 @@
 
 {% block extra_js %}
 <script>
+document.addEventListener('DOMContentLoaded', function() {
     // Get CSRF token
     function getCookie(name) {
         let cookieValue = null;
@@ -196,8 +197,8 @@
     const csrftoken = getCookie('csrftoken');
 
     function updateStatus(profileId, status) {
-        if (confirm(`Are you sure you want to ${status} this user?`)) {
-            fetch(`/workforce/verification/${profileId}/update-status/`, {
+        if (confirm('Are you sure you want to ' + status.replace('_', ' ') + ' this user?')) {
+            fetch('/workforce/verification/' + profileId + '/update-status/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -205,16 +206,16 @@
                 },
                 body: JSON.stringify({ status: status })
             })
-            .then(response => response.json())
-            .then(data => {
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 if (data.success) {
-                    alert(`User ${status} successfully!`);
+                    alert('User ' + status.replace('_', ' ') + ' successfully!');
                     location.reload();
                 } else {
                     alert('Error: ' + (data.error || 'Failed to update status'));
                 }
             })
-            .catch(error => {
+            .catch(function(error) {
                 console.error('Error:', error);
                 alert('An error occurred while updating status');
             });
@@ -224,7 +225,7 @@
     function rejectUser(profileId) {
         const reason = prompt('Please provide a reason for rejection:');
         if (reason) {
-            fetch(`/workforce/verification/${profileId}/update-status/`, {
+            fetch('/workforce/verification/' + profileId + '/update-status/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -235,8 +236,8 @@
                     rejection_reason: reason
                 })
             })
-            .then(response => response.json())
-            .then(data => {
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 if (data.success) {
                     alert('User rejected successfully!');
                     location.reload();
@@ -244,22 +245,40 @@
                     alert('Error: ' + (data.error || 'Failed to reject user'));
                 }
             })
-            .catch(error => {
+            .catch(function(error) {
                 console.error('Error:', error);
                 alert('An error occurred while rejecting user');
             });
         }
     }
 
-    // Rotate chevron icon on collapse toggle
-    document.addEventListener('DOMContentLoaded', function() {
-        const filterButton = document.querySelector('[data-bs-target="#filterTabsCollapse"]');
-        const chevronIcon = filterButton.querySelector('.fa-chevron-down');
+    // Event delegation for action buttons
+    document.querySelectorAll('[data-action][data-profile-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const action = this.dataset.action;
+            const profileId = this.dataset.profileId;
 
-        filterButton.addEventListener('click', function() {
-            chevronIcon.style.transition = 'transform 0.3s ease';
-            chevronIcon.style.transform = chevronIcon.style.transform === 'rotate(180deg)' ? 'rotate(0deg)' : 'rotate(180deg)';
+            if (action === 'verify') {
+                updateStatus(profileId, 'verified');
+            } else if (action === 'under_review') {
+                updateStatus(profileId, 'under_review');
+            } else if (action === 'reject') {
+                rejectUser(profileId);
+            }
         });
     });
+
+    // Rotate chevron icon on collapse toggle
+    const filterButton = document.querySelector('[data-bs-target="#filterTabsCollapse"]');
+    if (filterButton) {
+        const chevronIcon = filterButton.querySelector('.fa-chevron-down');
+        if (chevronIcon) {
+            filterButton.addEventListener('click', function() {
+                chevronIcon.style.transition = 'transform 0.3s ease';
+                chevronIcon.style.transform = chevronIcon.style.transform === 'rotate(180deg)' ? 'rotate(0deg)' : 'rotate(180deg)';
+            });
+        }
+    }
+});
 </script>
 {% endblock extra_js %}
