@@ -197,8 +197,8 @@ This file tracks UI/CSS issues, alignment problems, and bugs discovered during p
 - [x] Team member avatars need descriptive alt - Fixed: Added `{{ team_member.team_name|default:team_member.user.username }} avatar` pattern
 
 ### Color Contrast
-- [ ] `.text-muted` on light backgrounds may fail WCAG
-- [ ] Warning badges on yellow background
+- [x] `.text-muted` on light backgrounds may fail WCAG - Fixed: --brand-grey-500 (#6c757d) already WCAG AA compliant at 4.68:1 contrast
+- [x] Warning badges on yellow background - Fixed: Added text-dark class to all bg-warning badges across templates
 
 ### Focus Indicators
 - [x] Custom buttons missing visible focus state - Fixed: Added focus-visible styles in core.css
@@ -336,4 +336,4 @@ _Items moved here when fixed. Format: `[x] Description - Fixed by [agent/user]`_
 
 Last Updated: 2026-01-14
 Status: Comprehensive scan complete. Major CSS and code quality fixes completed.
-Total Issues Found: 250+ | Fixed: 95+ | In Progress: 0 | Pending: 155+
+Total Issues Found: 250+ | Fixed: 100+ | In Progress: 0 | Pending: 150+
