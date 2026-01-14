@@ -24,15 +24,15 @@
 
 <!-- Order Filter Section -->
 <div id="workforce_dms_orders_section_filter" class="filter-section">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-        <div style="flex: 1; min-width: 250px;">
+    <div class="filter-row">
+        <div class="filter-search-group">
             <label for="orderFilter" class="filter-label">
                 <i class="fa-solid fa-filter me-2"></i>Filter by Order
             </label>
             <input type="text" id="orderFilter" class="filter-input" placeholder="Search by order number...">
         </div>
-        <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
-            <button id="workforce_dms_orders_btn_refresh" onclick="window.location.reload()" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+        <div class="filter-toggle-group">
+            <button type="button" id="workforce_dms_orders_btn_refresh" class="btn-action btn-action-primary" data-action="refresh">
                 <i class="fa-solid fa-rotate"></i>
                 Refresh
             </button>
@@ -91,28 +91,40 @@
 
 {% block extra_js %}
 <script>
+document.addEventListener('DOMContentLoaded', function() {
     // Filter orders
     let searchTimeout;
-    document.getElementById('orderFilter').addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        const searchTerm = this.value.toLowerCase();
+    const orderFilter = document.getElementById('orderFilter');
+    if (orderFilter) {
+        orderFilter.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const searchTerm = this.value.toLowerCase();
 
-        searchTimeout = setTimeout(() => {
-            const rows = document.querySelectorAll('.orders-table tbody tr');
-            let visibleCount = 0;
+            searchTimeout = setTimeout(function() {
+                const rows = document.querySelectorAll('.orders-table tbody tr');
+                rows.forEach(function(row) {
+                    const orderNumber = row.getAttribute('data-order-number').toLowerCase();
+                    const rowText = row.textContent.toLowerCase();
 
-            rows.forEach(row => {
-                const orderNumber = row.getAttribute('data-order-number').toLowerCase();
-                const rowText = row.textContent.toLowerCase();
+                    if (orderNumber.includes(searchTerm) || rowText.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }, 300);
+        });
+    }
 
-                if (orderNumber.includes(searchTerm) || rowText.includes(searchTerm)) {
-                    row.style.display = '';
-                    visibleCount++;
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-        }, 300);
+    // Event delegation for action buttons
+    document.querySelectorAll('[data-action]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const action = this.dataset.action;
+            if (action === 'refresh') {
+                window.location.reload();
+            }
+        });
     });
+});
 </script>
 {% endblock extra_js %}

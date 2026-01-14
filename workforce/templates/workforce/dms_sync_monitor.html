@@ -28,7 +28,7 @@
         <i class="fa-solid fa-circle-info"></i>
         <p>Monitoring DMS sync status - Last updated: <span id="lastUpdate"></span></p>
     </div>
-    <button onclick="window.location.reload()" style="background: #2196f3; color: white; border: none; border-radius: var(--brand-radius-sm); padding: 0.625rem 1rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+    <button type="button" class="btn-refresh" data-action="refresh">
         <i class="fa-solid fa-rotate"></i>
         Refresh
     </button>
@@ -119,10 +119,14 @@
 
 {% block extra_js %}
 <script>
+document.addEventListener('DOMContentLoaded', function() {
     // Update last refresh time
     function updateLastRefreshTime() {
         const now = new Date();
-        document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+        const updateEl = document.getElementById('lastUpdate');
+        if (updateEl) {
+            updateEl.textContent = now.toLocaleTimeString();
+        }
     }
 
     // Update on page load
@@ -132,5 +136,13 @@
     setInterval(function() {
         window.location.reload();
     }, 30000);
+
+    // Event delegation for refresh button
+    document.querySelectorAll('[data-action="refresh"]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            window.location.reload();
+        });
+    });
+});
 </script>
 {% endblock extra_js %}

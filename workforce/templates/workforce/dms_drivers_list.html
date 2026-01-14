@@ -24,15 +24,15 @@
 
 <!-- Driver Filter Section -->
 <div class="filter-section">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-        <div style="flex: 1; min-width: 250px;">
+    <div class="filter-row">
+        <div class="filter-search-group">
             <label for="driverFilter" class="filter-label">
                 <i class="fa-solid fa-filter me-2"></i>Filter by Driver
             </label>
             <input type="text" id="driverFilter" class="filter-input" placeholder="Search by driver name or ID...">
         </div>
-        <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
-            <button onclick="window.location.reload()" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.25rem; font-weight: 600; cursor: pointer; transition: var(--brand-transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+        <div class="filter-toggle-group">
+            <button type="button" class="btn-action btn-action-primary" data-action="refresh">
                 <i class="fa-solid fa-rotate"></i>
                 Refresh
             </button>
@@ -94,26 +94,38 @@
 
 {% block extra_js %}
 <script>
+document.addEventListener('DOMContentLoaded', function() {
     // Filter driver cards
     let searchTimeout;
-    document.getElementById('driverFilter').addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        const searchTerm = this.value.toLowerCase();
+    const driverFilter = document.getElementById('driverFilter');
+    if (driverFilter) {
+        driverFilter.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const searchTerm = this.value.toLowerCase();
 
-        searchTimeout = setTimeout(() => {
-            const cards = document.querySelectorAll('.driver-card');
-            let visibleCount = 0;
+            searchTimeout = setTimeout(function() {
+                const cards = document.querySelectorAll('.driver-card');
+                cards.forEach(function(card) {
+                    const driverName = card.getAttribute('data-driver-name').toLowerCase();
+                    if (driverName.includes(searchTerm)) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            }, 300);
+        });
+    }
 
-            cards.forEach(card => {
-                const driverName = card.getAttribute('data-driver-name').toLowerCase();
-                if (driverName.includes(searchTerm)) {
-                    card.style.display = 'block';
-                    visibleCount++;
-                } else {
-                    card.style.display = 'none';
-                }
-            });
-        }, 300);
+    // Event delegation for action buttons
+    document.querySelectorAll('[data-action]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const action = this.dataset.action;
+            if (action === 'refresh') {
+                window.location.reload();
+            }
+        });
     });
+});
 </script>
 {% endblock extra_js %}

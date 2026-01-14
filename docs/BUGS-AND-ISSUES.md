@@ -49,6 +49,10 @@
 | F022 | Inline onclick + styles in fleet_transactions.html | Replaced with data-action + event delegation; CSS classes extracted | 2026-01-14 |
 | F023 | Inline onclick handlers in driver_reports.html | Replaced with data attributes + event delegation | 2026-01-14 |
 | F024 | Inline onclick + styles in business_licenses_list.html | Replaced with data-view + event delegation; CSS classes extracted | 2026-01-14 |
+| F025 | Inline onclick in dms_sync_monitor.html | Replaced with data-action + event delegation | 2026-01-14 |
+| F026 | Inline onclick in dms_orders_list.html | Replaced with data-action + event delegation; CSS extracted | 2026-01-14 |
+| F027 | Inline onclick in dms_drivers_list.html | Replaced with data-action + event delegation; CSS extracted | 2026-01-14 |
+| F028 | Inline onclick + 40+ inline styles in dms_publish_order.html | Replaced with data-action; DMS CSS classes added | 2026-01-14 |
 
 ## Priority Order
 
