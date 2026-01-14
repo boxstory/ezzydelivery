@@ -263,7 +263,7 @@ This file tracks UI/CSS issues, alignment problems, and bugs discovered during p
 - [x] workforce/templates/workforce/driver_documents_list.html - Lines 27, 31: toggleView onclick - Fixed: Replaced with data-view attributes and event delegation
 - [x] workforce/templates/workforce/vehicle_documents_list.html - Lines 27, 31: toggleView onclick - Fixed: Replaced with data-view attributes and event delegation
 - [x] workforce/templates/workforce/store_documents_list.html - Lines 27, 31: toggleView onclick - Fixed: Replaced with data-view attributes and event delegation
-- [ ] workforce/templates/workforce/business_licenses_list.html - Lines 27, 31: toggleView onclick
+- [x] workforce/templates/workforce/business_licenses_list.html - Lines 27, 31: toggleView onclick - Fixed: Replaced with data-view attributes + event delegation; extracted inline styles to CSS classes
 
 #### DMS Templates
 - [ ] workforce/templates/workforce/dms_sync_monitor.html - Line 31: reload onclick
