@@ -257,7 +257,7 @@ This file tracks UI/CSS issues, alignment problems, and bugs discovered during p
 
 #### Fleet Templates
 - [ ] fleet/templates/fleet/parts/driver_reports.html - Lines 61, 64, 67, 108: onclick handlers
-- [ ] workforce/templates/workforce/fleet_transactions.html - Lines 76, 80, 84, 88: print/export onclick
+- [x] workforce/templates/workforce/fleet_transactions.html - Lines 76, 80, 84, 88: print/export onclick - Fixed: Replaced with data-action attributes + event delegation; extracted inline styles to CSS classes
 
 #### Document List Templates
 - [x] workforce/templates/workforce/driver_documents_list.html - Lines 27, 31: toggleView onclick - Fixed: Replaced with data-view attributes and event delegation
@@ -333,4 +333,4 @@ _Items moved here when fixed. Format: `[x] Description - Fixed by [agent/user]`_
 
 Last Updated: 2026-01-14
 Status: Comprehensive scan complete. Major CSS and code quality fixes completed.
-Total Issues Found: 250+ | Fixed: 75+ | In Progress: 3+ | Pending: 170+
+Total Issues Found: 250+ | Fixed: 80+ | In Progress: 2+ | Pending: 168+
