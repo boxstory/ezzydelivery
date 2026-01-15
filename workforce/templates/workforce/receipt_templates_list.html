@@ -1,0 +1,337 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Receipt Templates - Ezzy Delivery{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
+<style>
+.templates-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.template-filters {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.filter-select {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm);
+    font-size: 0.875rem;
+}
+
+.btn-create {
+    padding: 0.625rem 1.25rem;
+    background: var(--brand-primary);
+    color: white;
+    border: none;
+    border-radius: var(--brand-radius-sm);
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.btn-create:hover {
+    background: var(--brand-primary-dark, #1a5a8a);
+    color: white;
+}
+
+.templates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.template-card {
+    background: white;
+    border-radius: var(--brand-radius-md);
+    box-shadow: var(--brand-shadow-sm);
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.template-card:hover {
+    box-shadow: var(--brand-shadow-md);
+    transform: translateY(-2px);
+}
+
+.template-preview {
+    height: 180px;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid var(--brand-grey-200);
+    position: relative;
+    overflow: hidden;
+}
+
+.template-preview-inner {
+    width: 120px;
+    background: white;
+    border: 1px solid var(--brand-grey-300);
+    padding: 1rem;
+    font-size: 6px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.template-preview-inner .logo-placeholder {
+    width: 40px;
+    height: 40px;
+    background: var(--brand-grey-200);
+    border-radius: 50%;
+    margin: 0 auto 0.5rem;
+}
+
+.template-preview-inner .lines {
+    height: 4px;
+    background: var(--brand-grey-200);
+    margin: 4px 0;
+    border-radius: 2px;
+}
+
+.template-preview-inner .lines.short {
+    width: 60%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.default-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #28a745;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--brand-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.template-info {
+    padding: 1.25rem;
+}
+
+.template-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--brand-grey-800);
+}
+
+.template-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.812rem;
+    color: var(--brand-grey-600);
+    margin-bottom: 1rem;
+}
+
+.template-meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.template-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--brand-grey-200);
+}
+
+.btn-template-action {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--brand-grey-300);
+    border-radius: var(--brand-radius-sm);
+    background: white;
+    color: var(--brand-grey-700);
+    font-size: 0.812rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.btn-template-action:hover {
+    background: var(--brand-grey-100);
+    color: var(--brand-grey-800);
+}
+
+.btn-template-action.btn-preview {
+    border-color: var(--brand-primary);
+    color: var(--brand-primary);
+}
+
+.btn-template-action.btn-preview:hover {
+    background: var(--brand-primary);
+    color: white;
+}
+
+.btn-template-action.btn-edit {
+    border-color: #ffc107;
+    color: #856404;
+}
+
+.btn-template-action.btn-edit:hover {
+    background: #ffc107;
+    color: #212529;
+}
+
+.btn-template-action.btn-delete {
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+.btn-template-action.btn-delete:hover {
+    background: #dc3545;
+    color: white;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: var(--brand-radius-md);
+    box-shadow: var(--brand-shadow-sm);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    color: var(--brand-grey-400);
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    color: var(--brand-grey-700);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: var(--brand-grey-500);
+    margin-bottom: 1.5rem;
+}
+
+.type-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background: var(--brand-grey-100);
+    border-radius: var(--brand-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.type-badge.settlement { background: #e3f2fd; color: #1565c0; }
+.type-badge.cod_deposit { background: #e8f5e9; color: #2e7d32; }
+.type-badge.earnings { background: #fff3e0; color: #ef6c00; }
+.type-badge.transaction { background: #f3e5f5; color: #7b1fa2; }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3">
+    <!-- Page Title -->
+    <h1 class="page-title">
+        <i class="fa-solid fa-file-invoice me-2"></i>Receipt Templates
+    </h1>
+
+    <!-- Header with filters and create button -->
+    <div class="templates-header">
+        <div class="template-filters">
+            <select class="filter-select" onchange="filterByType(this.value)">
+                <option value="">All Types</option>
+                {% for type_code, type_label in template_types %}
+                <option value="{{ type_code }}" {% if selected_type == type_code %}selected{% endif %}>{{ type_label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <a href="{% url 'workforce:receipt_template_create' %}" class="btn-create">
+            <i class="fa-solid fa-plus"></i>
+            Create Template
+        </a>
+    </div>
+
+    <!-- Templates Grid -->
+    {% if templates %}
+    <div class="templates-grid">
+        {% for template in templates %}
+        <div class="template-card">
+            <div class="template-preview" style="--preview-color: {{ template.primary_color }}">
+                {% if template.is_default %}
+                <span class="default-badge"><i class="fa-solid fa-star me-1"></i>Default</span>
+                {% endif %}
+                <div class="template-preview-inner">
+                    <div class="logo-placeholder" style="background: {{ template.primary_color }}20;"></div>
+                    <div style="font-weight: bold; font-size: 8px; margin-bottom: 4px;">{{ template.company_name|truncatechars:15 }}</div>
+                    <div class="lines"></div>
+                    <div class="lines short"></div>
+                    <div class="lines"></div>
+                    <div class="lines"></div>
+                    <div class="lines short"></div>
+                </div>
+            </div>
+            <div class="template-info">
+                <div class="template-name">{{ template.name }}</div>
+                <div class="template-meta">
+                    <span class="type-badge {{ template.template_type }}">{{ template.get_template_type_display }}</span>
+                    <span><i class="fa-solid fa-ruler"></i>{{ template.get_paper_size_display }}</span>
+                </div>
+                <div class="template-actions">
+                    <a href="{% url 'workforce:receipt_template_preview' template.template_id %}" class="btn-template-action btn-preview" target="_blank">
+                        <i class="fa-solid fa-eye"></i>Preview
+                    </a>
+                    <a href="{% url 'workforce:receipt_template_edit' template.template_id %}" class="btn-template-action btn-edit">
+                        <i class="fa-solid fa-pen"></i>Edit
+                    </a>
+                    <form action="{% url 'workforce:receipt_template_delete' template.template_id %}" method="post" style="flex: 1;" onsubmit="return confirm('Delete this template?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-template-action btn-delete" style="width: 100%;">
+                            <i class="fa-solid fa-trash"></i>Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-file-invoice"></i>
+        <h3>No Templates Found</h3>
+        <p>Create your first receipt template to get started.</p>
+        <a href="{% url 'workforce:receipt_template_create' %}" class="btn-create">
+            <i class="fa-solid fa-plus"></i>
+            Create Template
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+function filterByType(type) {
+    const url = new URL(window.location.href);
+    if (type) {
+        url.searchParams.set('type', type);
+    } else {
+        url.searchParams.delete('type');
+    }
+    window.location.href = url.toString();
+}
+</script>
+{% endblock extra_js %}

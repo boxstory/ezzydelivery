@@ -414,3 +414,81 @@ class DriverSettlement(models.Model):
     class Meta:
         verbose_name_plural = "Driver Settlements"
         ordering = ['-created_at']
+
+
+class ReceiptTemplate(models.Model):
+    """Customizable receipt templates for settlements and transactions"""
+    TEMPLATE_TYPES = (
+        ('settlement', 'Settlement Receipt'),
+        ('cod_deposit', 'COD Deposit Receipt'),
+        ('earnings', 'Earnings Statement'),
+        ('transaction', 'Transaction Receipt'),
+    )
+
+    PAPER_SIZES = (
+        ('thermal_80', 'Thermal 80mm'),
+        ('thermal_58', 'Thermal 58mm'),
+        ('a4', 'A4 Paper'),
+        ('a5', 'A5 Paper'),
+        ('letter', 'Letter'),
+    )
+
+    template_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=100)
+    template_type = models.CharField(max_length=20, choices=TEMPLATE_TYPES)
+    paper_size = models.CharField(max_length=20, choices=PAPER_SIZES, default='thermal_80')
+    is_default = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+
+    # Customization options stored as JSON
+    # Logo settings
+    logo_url = models.CharField(max_length=500, blank=True, null=True)
+    show_logo = models.BooleanField(default=True)
+
+    # Company info
+    company_name = models.CharField(max_length=200, default='Ezzy Delivery')
+    company_address = models.TextField(blank=True, default='Doha, Qatar')
+    company_phone = models.CharField(max_length=50, blank=True, default='+974-XXXX-XXXX')
+    company_email = models.EmailField(blank=True, null=True)
+
+    # Style settings
+    primary_color = models.CharField(max_length=7, default='#2196F3')
+    font_family = models.CharField(max_length=100, default='Courier New, monospace')
+    font_size = models.IntegerField(default=12)
+
+    # Content settings
+    show_signature_line = models.BooleanField(default=True)
+    show_qr_code = models.BooleanField(default=False)
+    show_barcode = models.BooleanField(default=False)
+    footer_message = models.TextField(default='Thank you for your service!')
+    terms_and_conditions = models.TextField(blank=True, null=True)
+
+    # Custom CSS (for advanced users)
+    custom_css = models.TextField(blank=True, null=True, help_text='Custom CSS to override default styles')
+
+    # Custom HTML template (for advanced customization)
+    custom_template = models.TextField(blank=True, null=True, help_text='Custom HTML template content')
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='receipt_templates_created'
+    )
+
+    def __str__(self):
+        return f"{self.name} ({self.get_template_type_display()})"
+
+    def save(self, *args, **kwargs):
+        # Ensure only one default template per type
+        if self.is_default:
+            ReceiptTemplate.objects.filter(
+                template_type=self.template_type,
+                is_default=True
+            ).exclude(template_id=self.template_id).update(is_default=False)
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name_plural = "Receipt Templates"
+        ordering = ['template_type', '-is_default', 'name']

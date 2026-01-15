@@ -371,6 +371,18 @@
                 Transactions
               </a>
             </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_receipt_templates" class="nav-link btn submenu-link"
+                 href="{% url 'workforce:receipt_templates_list' %}"
+                 hx-get="{% url 'workforce:receipt_templates_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-file-invoice me-2"></i>
+                Receipt Templates
+              </a>
+            </li>
           </ul>
         </div>
       </li>
@@ -783,18 +795,41 @@
 
       <hr class="sidebar-divider" />
 
-      <!-- Quick Links -->
-      <li id="workforce_sidebar_menu_reports" class="nav-item">
-        <a id="workforce_sidebar_link_reports" class="nav-link btn nav-link-single"
-           href="{% url 'workforce:staff_reports' %}"
-           hx-get="{% url 'workforce:staff_reports' %}"
-           hx-target="#main-content"
-           hx-select="#main-content"
-           hx-swap="outerHTML"
-           hx-push-url="true">
+      <!-- Reports Section -->
+      <li id="workforce_sidebar_menu_reports" class="nav-item {% if request.resolver_match.url_name == 'staff_reports' or request.resolver_match.url_name == 'fleet_task_sheet' or request.resolver_match.url_name == 'fleet_task_sheets_list' %}active{% endif %}">
+        <a id="workforce_sidebar_link_reports" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-reports" href="#">
           <i class="fa-solid fa-chart-bar me-2"></i>
-          <span>Report</span>
+          <span>Reports</span>
+          <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
         </a>
+        <div class="collapse submenu" id="submenu-reports">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_staff_reports" class="nav-link btn submenu-link"
+                 href="{% url 'workforce:staff_reports' %}"
+                 hx-get="{% url 'workforce:staff_reports' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-chart-line me-2"></i>
+                Dashboard
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_task_sheets" class="nav-link btn submenu-link"
+                 href="{% url 'workforce:fleet_task_sheets_list' %}"
+                 hx-get="{% url 'workforce:fleet_task_sheets_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-file-pdf me-2"></i>
+                Fleet Task Sheets
+              </a>
+            </li>
+          </ul>
+        </div>
       </li>
       <li id="workforce_sidebar_menu_contacts" class="nav-item">
         <a id="workforce_sidebar_link_contacts" class="nav-link btn nav-link-single"

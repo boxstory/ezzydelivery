@@ -41,7 +41,7 @@ logger = logging.getLogger('business.permissions')
 # UTILITY FUNCTIONS
 # =============================================================================
 
-def get_user_business_access(user):
+def get_user_business_access(user, request=None):
     """
     Get the business and access type for a user.
 
@@ -50,6 +50,7 @@ def get_user_business_access(user):
 
     Args:
         user: Django User object
+        request: Optional request object for caching
 
     Returns:
         tuple: (business, access_type, team_profile)
@@ -60,10 +61,27 @@ def get_user_business_access(user):
     if not user.is_authenticated:
         return None, None, None
 
+    # Check if result is cached on request
+    if request and hasattr(request, '_cached_business_access'):
+        return request._cached_business_access
+
+    # Check if business was cached by core.context_processors.user_business
+    # This avoids duplicate queries when both context processors run
+    if request and hasattr(request, '_cached_user_business'):
+        cached_business = request._cached_user_business
+        if cached_business and cached_business.user_id == user.id:
+            # User is the owner of this business
+            result = (cached_business, 'owner', None)
+            request._cached_business_access = result
+            return result
+
     # Check if user is a business owner
     owner_business = Business.objects.filter(user=user).first()
     if owner_business:
-        return owner_business, 'owner', None
+        result = (owner_business, 'owner', None)
+        if request:
+            request._cached_business_access = result
+        return result
 
     # Check if user is an active team member
     team_profile = BusinessTeamProfile.objects.select_related('business').filter(
@@ -72,9 +90,15 @@ def get_user_business_access(user):
     ).first()
 
     if team_profile:
-        return team_profile.business, 'team_member', team_profile
+        result = (team_profile.business, 'team_member', team_profile)
+        if request:
+            request._cached_business_access = result
+        return result
 
-    return None, None, None
+    result = (None, None, None)
+    if request:
+        request._cached_business_access = result
+    return result
 
 
 def user_has_business_permission(user, permission_code, business=None):
@@ -143,7 +167,7 @@ def business_permission_required(permission_code, redirect_url=None):
                 messages.error(request, "Please log in to access this page.")
                 return redirect('account_login')
 
-            business, access_type, team_profile = get_user_business_access(request.user)
+            business, access_type, team_profile = get_user_business_access(request.user, request)
 
             if not business:
                 logger.warning(f"User {request.user.id} has no business access")
@@ -192,7 +216,7 @@ def business_permissions_required(permission_codes, require_all=True, redirect_u
                 messages.error(request, "Please log in to access this page.")
                 return redirect('account_login')
 
-            business, access_type, team_profile = get_user_business_access(request.user)
+            business, access_type, team_profile = get_user_business_access(request.user, request)
 
             if not business:
                 messages.error(request, "No business associated with your account.")
@@ -240,7 +264,7 @@ def business_owner_required(redirect_url=None):
                 messages.error(request, "Please log in to access this page.")
                 return redirect('account_login')
 
-            business, access_type, _ = get_user_business_access(request.user)
+            business, access_type, _ = get_user_business_access(request.user, request)
 
             if access_type != 'owner':
                 logger.warning(
@@ -272,7 +296,7 @@ def business_manager_or_owner_required(redirect_url=None):
                 messages.error(request, "Please log in to access this page.")
                 return redirect('account_login')
 
-            business, access_type, team_profile = get_user_business_access(request.user)
+            business, access_type, team_profile = get_user_business_access(request.user, request)
 
             if not business:
                 messages.error(request, "No business associated with your account.")
@@ -316,7 +340,7 @@ def business_access_required(redirect_url=None):
                 messages.error(request, "Please log in to access this page.")
                 return redirect('account_login')
 
-            business, access_type, team_profile = get_user_business_access(request.user)
+            business, access_type, team_profile = get_user_business_access(request.user, request)
 
             if not business:
                 messages.error(request, "No business associated with your account.")
@@ -351,7 +375,7 @@ def api_business_permission_required(permission_code):
                     'error': 'Authentication required'
                 }, status=401)
 
-            business, access_type, team_profile = get_user_business_access(request.user)
+            business, access_type, team_profile = get_user_business_access(request.user, request)
 
             if not business:
                 return JsonResponse({
@@ -420,7 +444,13 @@ def business_permissions_context(request):
     }
 
     if hasattr(request, 'user') and request.user.is_authenticated:
-        business, access_type, team_profile = get_user_business_access(request.user)
+        # Check if business access is already cached on request
+        if hasattr(request, '_cached_business_access'):
+            business, access_type, team_profile = request._cached_business_access
+        else:
+            business, access_type, team_profile = get_user_business_access(request.user, request)
+            # Cache on request for reuse
+            request._cached_business_access = (business, access_type, team_profile)
 
         if business:
             context['user_business'] = business

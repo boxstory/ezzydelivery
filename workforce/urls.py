@@ -94,6 +94,18 @@ urlpatterns = [
     path('fleet/cod-in-hand/', workforce_views.fleet_cod_in_hand, name='fleet_cod_in_hand'),
     path('fleet/drivers-earnings/', workforce_views.fleet_drivers_earnings, name='fleet_drivers_earnings'),
     path('fleet/transactions/', workforce_views.fleet_transactions, name='fleet_transactions'),
+    path('fleet/generate-demo-transactions/', workforce_views.generate_demo_transactions, name='generate_demo_transactions'),
+    path('fleet/bulk-settle-transactions/', workforce_views.bulk_settle_transactions, name='bulk_settle_transactions'),
+
+    # Receipt Templates URLs
+    path('receipt-templates/', workforce_views.receipt_templates_list, name='receipt_templates_list'),
+    path('receipt-templates/create/', workforce_views.receipt_template_create, name='receipt_template_create'),
+    path('receipt-templates/<int:template_id>/edit/', workforce_views.receipt_template_edit, name='receipt_template_edit'),
+    path('receipt-templates/<int:template_id>/preview/', workforce_views.receipt_template_preview, name='receipt_template_preview'),
+    path('receipt-templates/<int:template_id>/delete/', workforce_views.receipt_template_delete, name='receipt_template_delete'),
+    path('settlement/<int:settlement_id>/receipt/', workforce_views.settlement_receipt_print, name='settlement_receipt_print'),
+    path('fleet/task-sheets/', workforce_views.fleet_task_sheets_list, name='fleet_task_sheets_list'),
+    path('fleet/task-sheet/<int:driver_id>/', workforce_views.fleet_task_sheet, name='fleet_task_sheet'),
 
     #Documents sections urls -----------------------------------------------------------------
     path('documents/driver-ids/', workforce_views.driver_documents_list, name='driver_documents_list'),

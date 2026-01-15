@@ -57,6 +57,7 @@ Related:
 
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 import csv
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
@@ -68,6 +69,7 @@ from django.core.paginator import (
     PageNotAnInteger,
 )
 from django.urls import reverse
+from django.db.models import Count
 
 from business import models as business_models
 from core import models as core_models
@@ -76,6 +78,7 @@ from delivery import models as delivery_models
 from fleet import models as fleet_models
 
 from business import forms as business_forms
+from core.context_processors import get_cached_profile, get_cached_business
 
 # Local aliases for commonly used models
 Business = business_models.Business
@@ -134,9 +137,9 @@ def wf_dashboard(request):
     from django.db.models import Sum, Count, Q
     from datetime import timedelta
 
-    try:
-        profile = core_models.Profile.objects.get(user_id=request.user.id)
-    except core_models.Profile.DoesNotExist:
+    # Use cached profile to avoid duplicate queries
+    profile = get_cached_profile(request)
+    if not profile:
         logger.warning(f"User {request.user.id} has no profile. Redirecting to profile creation.")
         return redirect('core:profile_view')
 
@@ -157,7 +160,7 @@ def wf_dashboard(request):
 
     # Follow up count - tasks that need attention
     follow_up_count = DeliveryTask.objects.filter(
-        Q(dl_status='failed') | Q(dl_status='rescheduled') | Q(dl_status='customer_unavailable')
+        Q(dl_task_status='failed') | Q(dl_task_status='rescheduled') | Q(dl_task_status='customer_unavailable')
     ).count()
 
     # User Verification pending
@@ -168,8 +171,8 @@ def wf_dashboard(request):
     # Driver and Seller counts
     active_drivers = Driver.objects.filter(driver_status='Approved').count()
     pending_drivers = Driver.objects.filter(driver_status='Pending on Review').count()
-    active_sellers = Business.objects.filter(is_active=True).count()
-    pending_sellers = Business.objects.filter(is_active=False, is_verified=False).count()
+    active_sellers = Business.objects.filter(business_status='Approved').count()
+    pending_sellers = Business.objects.filter(business_status='Pending on Review').count()
 
     # COD in hand (sum of driver wallet balances)
     cod_in_hand = Driver.objects.aggregate(
@@ -179,12 +182,19 @@ def wf_dashboard(request):
     # Recent orders (last 10 updated)
     orders = Order.objects.select_related('business').order_by('-updated_at')[:10]
 
-    # Orders trend data for the last 7 days
+    # Orders trend data for the last 7 days - single query with aggregation
+    week_ago = today - timedelta(days=6)
+    order_counts_by_date = dict(
+        Order.objects.filter(order_date__gte=week_ago, order_date__lte=today)
+        .values('order_date')
+        .annotate(count=Count('id'))
+        .values_list('order_date', 'count')
+    )
     orders_trend = []
     max_orders = 1  # Prevent division by zero
     for i in range(6, -1, -1):
         date = today - timedelta(days=i)
-        count = Order.objects.filter(order_date=date).count()
+        count = order_counts_by_date.get(date, 0)
         if count > max_orders:
             max_orders = count
         orders_trend.append({
@@ -1891,15 +1901,133 @@ def dms_publish_order(request):
 @login_required(login_url='/accounts/login/')
 def fleet_cod_in_hand(request):
     """View for COD in hand with drivers"""
-    drivers = fleet_models.Driver.objects.filter(
-        driver_status='Approved'
-    ).select_related('user').order_by('user__first_name')
+    from django.db.models import Sum, Value, DecimalField
+    from django.db.models.functions import Coalesce
+    from datetime import timedelta
+    from delivery import models as delivery_models
+
+    # Date preset filter
+    date_preset = request.GET.get('date_preset', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    today = timezone.now().date()
+
+    # Calculate dates based on preset
+    if date_preset == 'today':
+        date_from = today.isoformat()
+        date_to = today.isoformat()
+    elif date_preset == 'yesterday':
+        yesterday = today - timedelta(days=1)
+        date_from = yesterday.isoformat()
+        date_to = yesterday.isoformat()
+    elif date_preset == '3days':
+        date_from = (today - timedelta(days=3)).isoformat()
+        date_to = today.isoformat()
+    elif date_preset == '1week':
+        date_from = (today - timedelta(days=7)).isoformat()
+        date_to = today.isoformat()
+    elif date_preset == '1month':
+        date_from = (today - timedelta(days=30)).isoformat()
+        date_to = today.isoformat()
+    # For 'custom', use the date_from and date_to from request
+
+    # Build the COD collected subquery based on date filters
+    cod_task_filter = {
+        'cod_collected': True,
+        'driver__isnull': False,
+    }
+    if date_from:
+        cod_task_filter['cod_collected_at__date__gte'] = date_from
+    if date_to:
+        cod_task_filter['cod_collected_at__date__lte'] = date_to
+
+    # If date filter is applied, calculate COD collected in that period per driver
+    if date_from or date_to:
+        # Get drivers with COD collected in the date range
+        from django.db.models import OuterRef, Subquery
+
+        # Subquery for COD collected in date range
+        cod_subquery = delivery_models.DeliveryTask.objects.filter(
+            driver=OuterRef('pk'),
+            **cod_task_filter
+        ).values('driver').annotate(
+            total=Sum('cod_collected_amount')
+        ).values('total')
+
+        drivers = fleet_models.Driver.objects.filter(
+            driver_status='Approved'
+        ).select_related('user').annotate(
+            period_cod=Coalesce(
+                Subquery(cod_subquery),
+                Value(0),
+                output_field=DecimalField()
+            )
+        )
+    else:
+        # No date filter - show current cod_in_hand
+        drivers = fleet_models.Driver.objects.filter(
+            driver_status='Approved'
+        ).select_related('user').annotate(
+            period_cod=models.F('cod_in_hand')
+        )
+
+    # COD filter (yes/no/custom)
+    cod_filter = request.GET.get('cod_filter', '')
+    min_amount = request.GET.get('min_amount', '')
+    max_amount = request.GET.get('max_amount', '')
+
+    if cod_filter == 'yes':
+        drivers = drivers.filter(period_cod__gt=0)
+    elif cod_filter == 'no':
+        drivers = drivers.filter(period_cod=0)
+    elif cod_filter == 'custom':
+        if min_amount:
+            drivers = drivers.filter(period_cod__gte=min_amount)
+        if max_amount:
+            drivers = drivers.filter(period_cod__lte=max_amount)
+
+    # Sorting
+    sort_by = request.GET.get('sort', 'name_asc')
+    sort_options = {
+        'name_asc': 'user__first_name',
+        'name_desc': '-user__first_name',
+        'amount_asc': 'period_cod',
+        'amount_desc': '-period_cod',
+        'date_asc': 'last_settlement_date',
+        'date_desc': '-last_settlement_date',
+    }
+    drivers = drivers.order_by(sort_options.get(sort_by, 'user__first_name'))
+
+    # Calculate totals
+    total_cod = drivers.aggregate(total=Sum('period_cod'))['total'] or 0
+    pending_settlements = drivers.filter(period_cod__gt=0).count()
+
+    # View mode (grid or list) - default to list
+    view_mode = request.GET.get('view', 'list')
+
+    # Build filter params for pagination
+    filter_params = request.GET.copy()
+    if 'page' in filter_params:
+        del filter_params['page']
 
     drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=20)
 
     context = {
         'drivers': drivers_with_pagination,
         'page_title': 'COD In Hand',
+        'total_cod': total_cod,
+        'pending_settlements': pending_settlements,
+        'filter_params': filter_params.urlencode(),
+        'date_preset': date_preset,
+        'date_from': date_from or '',
+        'date_to': date_to or '',
+        'cod_filter': cod_filter,
+        'min_amount': min_amount or '',
+        'max_amount': max_amount or '',
+        'sort_by': sort_by,
+        'view_mode': view_mode,
+        'is_filtered_by_date': bool(date_from or date_to),
     }
     return render(request, 'workforce/fleet_cod_in_hand.html', context)
 
@@ -1922,13 +2050,637 @@ def fleet_drivers_earnings(request):
 
 @login_required(login_url='/accounts/login/')
 def fleet_transactions(request):
-    """View for fleet transactions"""
-    # This would connect to a transactions model when implemented
+    """View for fleet transactions with filtering and sorting"""
+    from django.db.models import Sum
+    from decimal import Decimal
+
+    # Get all approved drivers for filter dropdown
+    all_drivers = fleet_models.Driver.objects.filter(
+        driver_status='Approved'
+    ).select_related('user').order_by('user__first_name')
+
+    # Get selected driver
+    driver_id = request.GET.get('driver_id')
+    selected_driver = None
+    transactions = fleet_models.DriverTransaction.objects.none()
+
+    if driver_id:
+        try:
+            selected_driver = fleet_models.Driver.objects.select_related('user').get(driver_id=driver_id)
+            transactions = fleet_models.DriverTransaction.objects.filter(
+                driver=selected_driver
+            ).select_related('delivery_task', 'settlement')
+        except fleet_models.Driver.DoesNotExist:
+            selected_driver = None
+
+    # Apply filters
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    # Default to cod_collection if no type filter specified
+    txn_type = request.GET.get('type', 'cod_collection') if 'type' not in request.GET else request.GET.get('type')
+    status = request.GET.get('status')
+    min_amount = request.GET.get('min_amount')
+    max_amount = request.GET.get('max_amount')
+
+    if selected_driver:
+        if date_from:
+            transactions = transactions.filter(created_at__date__gte=date_from)
+        if date_to:
+            transactions = transactions.filter(created_at__date__lte=date_to)
+        if txn_type:
+            transactions = transactions.filter(transaction_type=txn_type)
+        if status == 'settled':
+            transactions = transactions.filter(settlement__isnull=False)
+        elif status == 'pending':
+            transactions = transactions.filter(settlement__isnull=True)
+        if min_amount:
+            transactions = transactions.filter(amount__gte=min_amount)
+        if max_amount:
+            transactions = transactions.filter(amount__lte=max_amount)
+
+    # Sorting
+    sort_by = request.GET.get('sort', 'date_desc')
+    sort_options = {
+        'date_asc': 'created_at',
+        'date_desc': '-created_at',
+        'amount_asc': 'amount',
+        'amount_desc': '-amount',
+        'type_asc': 'transaction_type',
+        'type_desc': '-transaction_type',
+    }
+    if selected_driver:
+        transactions = transactions.order_by(sort_options.get(sort_by, '-created_at'))
+
+    # Transaction type choices for filter dropdown
+    transaction_types = fleet_models.DriverTransaction.TRANSACTION_TYPES
+
+    # Calculate totals (on unfiltered queryset for selected driver)
+    total_cod = Decimal('0.00')
+    total_earnings = Decimal('0.00')
+    cod_unsettled = Decimal('0.00')
+    earnings_unsettled = Decimal('0.00')
+
+    if selected_driver:
+        # Get all transactions for totals (not filtered)
+        all_txns = fleet_models.DriverTransaction.objects.filter(driver=selected_driver)
+
+        # Fetch all COD deposit reference numbers in one query to avoid N+1
+        deposited_refs = set(
+            all_txns.filter(transaction_type='cod_deposit').values_list('reference_number', flat=True)
+        )
+
+        for txn in all_txns:
+            if txn.transaction_type == 'cod_collection':
+                total_cod += abs(txn.amount)
+                # COD not yet deposited - check against pre-fetched set
+                if txn.reference_number not in deposited_refs:
+                    cod_unsettled += abs(txn.amount)
+            elif txn.transaction_type == 'earning':
+                total_earnings += txn.amount
+                # Earnings not yet settled
+                if not txn.settlement_id:
+                    earnings_unsettled += txn.amount
+
+    # Build filter params for pagination
+    filter_params = request.GET.copy()
+    if 'page' in filter_params:
+        del filter_params['page']
+
+    transactions_paginated = paginate_queryset(request, transactions, items_per_page=20)
+
     context = {
         'page_title': 'Fleet Transactions',
-        'transactions': [],  # Placeholder for transactions queryset
+        'transactions': transactions_paginated,
+        'all_drivers': all_drivers,
+        'selected_driver': selected_driver,
+        'total_cod': total_cod,
+        'total_earnings': total_earnings,
+        'cod_unsettled': cod_unsettled,
+        'earnings_unsettled': earnings_unsettled,
+        'filter_params': filter_params.urlencode(),
+        # Filter values for form
+        'date_from': date_from or '',
+        'date_to': date_to or '',
+        'txn_type': txn_type or '',
+        'status': status or '',
+        'min_amount': min_amount or '',
+        'max_amount': max_amount or '',
+        'sort_by': sort_by,
+        'transaction_types': transaction_types,
     }
     return render(request, 'workforce/fleet_transactions.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def generate_demo_transactions(request):
+    """Generate demo transactions for a driver"""
+    from django.contrib import messages
+    from decimal import Decimal
+    from datetime import timedelta
+    import random
+
+    if request.method != 'POST':
+        return redirect('workforce:fleet_transactions')
+
+    driver_id = request.POST.get('driver_id')
+    if not driver_id:
+        messages.error(request, 'Driver ID is required')
+        return redirect('workforce:fleet_transactions')
+
+    try:
+        driver = fleet_models.Driver.objects.get(driver_id=driver_id)
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver not found')
+        return redirect('workforce:fleet_transactions')
+
+    # Check if driver already has transactions
+    existing_count = fleet_models.DriverTransaction.objects.filter(driver=driver).count()
+    if existing_count > 0:
+        messages.warning(request, f'Driver already has {existing_count} transactions. Demo data not generated.')
+        return redirect(f"{reverse('workforce:fleet_transactions')}?driver_id={driver_id}")
+
+    now = timezone.now()
+    cod_in_hand = Decimal('0.00')
+    pending_earnings = Decimal('0.00')
+    wallet_balance = driver.wallet_balance or Decimal('5000.00')
+
+    transactions_to_create = []
+
+    # Generate 10-15 COD collection transactions over past 7 days
+    for i in range(random.randint(10, 15)):
+        days_ago = random.randint(0, 7)
+        hours_ago = random.randint(0, 23)
+        txn_date = now - timedelta(days=days_ago, hours=hours_ago)
+
+        cod_amount = Decimal(random.randint(50, 500))
+        earning_amount = Decimal(random.randint(15, 50))
+        cod_in_hand += cod_amount
+        pending_earnings += earning_amount
+
+        # COD Collection transaction
+        transactions_to_create.append(fleet_models.DriverTransaction(
+            driver=driver,
+            transaction_type='cod_collection',
+            amount=cod_amount,
+            description=f'COD collected for delivery #{random.randint(1000, 9999)}',
+            reference_number=f'COD-{random.randint(10000, 99999)}',
+            wallet_balance_after=wallet_balance,
+            cod_in_hand_after=cod_in_hand,
+            pending_earnings_after=pending_earnings,
+            created_by=request.user,
+            created_at=txn_date,
+        ))
+
+        # Earning transaction
+        transactions_to_create.append(fleet_models.DriverTransaction(
+            driver=driver,
+            transaction_type='earning',
+            amount=earning_amount,
+            description=f'Delivery earning for task #{random.randint(1000, 9999)}',
+            reference_number=f'EARN-{random.randint(10000, 99999)}',
+            wallet_balance_after=wallet_balance,
+            cod_in_hand_after=cod_in_hand,
+            pending_earnings_after=pending_earnings,
+            created_by=request.user,
+            created_at=txn_date + timedelta(minutes=5),
+        ))
+
+    # Generate 2-3 COD deposit (cash settled) transactions
+    for i in range(random.randint(2, 3)):
+        days_ago = random.randint(1, 5)
+        txn_date = now - timedelta(days=days_ago, hours=random.randint(10, 18))
+
+        deposit_amount = Decimal(random.randint(200, 800))
+        cod_in_hand = max(Decimal('0.00'), cod_in_hand - deposit_amount)
+
+        transactions_to_create.append(fleet_models.DriverTransaction(
+            driver=driver,
+            transaction_type='cod_deposit',
+            amount=-deposit_amount,  # Negative because money leaving driver
+            description=f'COD deposited to admin - Cash settlement',
+            reference_number=f'DEP-{random.randint(10000, 99999)}',
+            wallet_balance_after=wallet_balance,
+            cod_in_hand_after=cod_in_hand,
+            pending_earnings_after=pending_earnings,
+            created_by=request.user,
+            created_at=txn_date,
+        ))
+
+    # Generate 1 earnings settlement transaction
+    if pending_earnings > Decimal('100.00'):
+        settlement_amount = pending_earnings * Decimal('0.6')  # Settle 60%
+        pending_earnings -= settlement_amount
+
+        transactions_to_create.append(fleet_models.DriverTransaction(
+            driver=driver,
+            transaction_type='settlement',
+            amount=-settlement_amount,  # Negative because paid out
+            description='Weekly earnings settlement - Bank transfer',
+            reference_number=f'SETTLE-{random.randint(10000, 99999)}',
+            wallet_balance_after=wallet_balance,
+            cod_in_hand_after=cod_in_hand,
+            pending_earnings_after=pending_earnings,
+            created_by=request.user,
+            created_at=now - timedelta(days=3),
+        ))
+
+    # Add a bonus transaction
+    bonus_amount = Decimal(random.randint(50, 150))
+    pending_earnings += bonus_amount
+    transactions_to_create.append(fleet_models.DriverTransaction(
+        driver=driver,
+        transaction_type='bonus',
+        amount=bonus_amount,
+        description='Weekly performance bonus',
+        reference_number=f'BONUS-{random.randint(10000, 99999)}',
+        wallet_balance_after=wallet_balance,
+        cod_in_hand_after=cod_in_hand,
+        pending_earnings_after=pending_earnings,
+        created_by=request.user,
+        created_at=now - timedelta(days=1),
+    ))
+
+    # Bulk create all transactions
+    fleet_models.DriverTransaction.objects.bulk_create(transactions_to_create)
+
+    # Update driver's current balances
+    driver.cod_in_hand = cod_in_hand
+    driver.pending_earnings = pending_earnings
+    driver.save(update_fields=['cod_in_hand', 'pending_earnings'])
+
+    messages.success(request, f'Successfully generated {len(transactions_to_create)} demo transactions for {driver.user.first_name} {driver.user.last_name}')
+    return redirect(f"{reverse('workforce:fleet_transactions')}?driver_id={driver_id}")
+
+
+@login_required(login_url='/accounts/login/')
+def bulk_settle_transactions(request):
+    """Bulk settle selected transactions for a driver"""
+    from django.contrib import messages
+    from decimal import Decimal
+    import json
+
+    if request.method != 'POST':
+        return redirect('workforce:fleet_transactions')
+
+    driver_id = request.POST.get('driver_id')
+    transaction_ids_json = request.POST.get('transaction_ids', '[]')
+
+    try:
+        transaction_ids = json.loads(transaction_ids_json)
+    except json.JSONDecodeError:
+        messages.error(request, 'Invalid transaction data')
+        return redirect('workforce:fleet_transactions')
+
+    if not driver_id or not transaction_ids:
+        messages.error(request, 'Driver ID and transactions are required')
+        return redirect('workforce:fleet_transactions')
+
+    try:
+        driver = fleet_models.Driver.objects.get(driver_id=driver_id)
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver not found')
+        return redirect('workforce:fleet_transactions')
+
+    # Get transactions that can be settled (pending earnings and COD collections)
+    transactions = fleet_models.DriverTransaction.objects.filter(
+        transaction_id__in=transaction_ids,
+        driver=driver,
+        settlement__isnull=True  # Not already settled
+    ).exclude(
+        transaction_type__in=['settlement', 'cod_deposit']  # These are already finalized
+    )
+
+    if not transactions.exists():
+        messages.warning(request, 'No eligible transactions found for settlement')
+        return redirect(f"{reverse('workforce:fleet_transactions')}?driver_id={driver_id}")
+
+    # Calculate total settlement amount
+    total_amount = sum(txn.amount for txn in transactions)
+
+    # Create a settlement record
+    settlement_code = f"STL-{timezone.now().strftime('%Y%m%d%H%M%S')}-{driver_id}"
+
+    settlement = fleet_models.DriverSettlement.objects.create(
+        driver=driver,
+        settlement_code=settlement_code,
+        period_start=transactions.order_by('created_at').first().created_at.date(),
+        period_end=timezone.now().date(),
+        total_deliveries=transactions.filter(transaction_type='earning').count(),
+        gross_earnings=total_amount,
+        net_amount=total_amount,
+        created_by=request.user,
+        status='paid',
+        paid_at=timezone.now(),
+    )
+
+    # Link transactions to settlement
+    transactions.update(settlement=settlement)
+
+    # Update driver balances
+    earnings_settled = sum(
+        txn.amount for txn in transactions if txn.transaction_type == 'earning'
+    )
+    cod_settled = sum(
+        abs(txn.amount) for txn in transactions if txn.transaction_type == 'cod_collection'
+    )
+
+    if earnings_settled > 0:
+        driver.pending_earnings = max(Decimal('0.00'), (driver.pending_earnings or Decimal('0.00')) - earnings_settled)
+    if cod_settled > 0:
+        driver.cod_in_hand = max(Decimal('0.00'), (driver.cod_in_hand or Decimal('0.00')) - cod_settled)
+
+    driver.last_settlement_date = timezone.now()
+    driver.save(update_fields=['pending_earnings', 'cod_in_hand', 'last_settlement_date'])
+
+    messages.success(
+        request,
+        f'Successfully settled {transactions.count()} transactions for QAR {total_amount:.2f}. '
+        f'Settlement code: {settlement_code}'
+    )
+    return redirect(f"{reverse('workforce:fleet_transactions')}?driver_id={driver_id}")
+
+
+# ==========================================
+# RECEIPT TEMPLATES SECTION
+# ==========================================
+
+@login_required(login_url='/accounts/login/')
+def receipt_templates_list(request):
+    """List all receipt templates"""
+    templates = fleet_models.ReceiptTemplate.objects.all()
+
+    # Filter by type if specified
+    template_type = request.GET.get('type')
+    if template_type:
+        templates = templates.filter(template_type=template_type)
+
+    context = {
+        'page_title': 'Receipt Templates',
+        'templates': templates,
+        'template_types': fleet_models.ReceiptTemplate.TEMPLATE_TYPES,
+        'selected_type': template_type,
+    }
+    return render(request, 'workforce/receipt_templates_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def receipt_template_create(request):
+    """Create a new receipt template"""
+    from django.contrib import messages
+
+    if request.method == 'POST':
+        template = fleet_models.ReceiptTemplate(
+            name=request.POST.get('name'),
+            template_type=request.POST.get('template_type'),
+            paper_size=request.POST.get('paper_size', 'thermal_80'),
+            is_default=request.POST.get('is_default') == 'on',
+            show_logo=request.POST.get('show_logo') == 'on',
+            logo_url=request.POST.get('logo_url', ''),
+            company_name=request.POST.get('company_name', 'Ezzy Delivery'),
+            company_address=request.POST.get('company_address', ''),
+            company_phone=request.POST.get('company_phone', ''),
+            company_email=request.POST.get('company_email') or None,
+            primary_color=request.POST.get('primary_color', '#2196F3'),
+            font_family=request.POST.get('font_family', 'Courier New, monospace'),
+            font_size=int(request.POST.get('font_size', 12)),
+            show_signature_line=request.POST.get('show_signature_line') == 'on',
+            show_qr_code=request.POST.get('show_qr_code') == 'on',
+            footer_message=request.POST.get('footer_message', ''),
+            custom_css=request.POST.get('custom_css', ''),
+            created_by=request.user,
+        )
+        template.save()
+        messages.success(request, f'Template "{template.name}" created successfully.')
+        return redirect('workforce:receipt_templates_list')
+
+    context = {
+        'page_title': 'Create Receipt Template',
+        'template_types': fleet_models.ReceiptTemplate.TEMPLATE_TYPES,
+        'paper_sizes': fleet_models.ReceiptTemplate.PAPER_SIZES,
+    }
+    return render(request, 'workforce/receipt_template_edit.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def receipt_template_edit(request, template_id):
+    """Edit an existing receipt template"""
+    from django.contrib import messages
+    from django.shortcuts import get_object_or_404
+
+    template = get_object_or_404(fleet_models.ReceiptTemplate, template_id=template_id)
+
+    if request.method == 'POST':
+        template.name = request.POST.get('name')
+        template.template_type = request.POST.get('template_type')
+        template.paper_size = request.POST.get('paper_size', 'thermal_80')
+        template.is_default = request.POST.get('is_default') == 'on'
+        template.show_logo = request.POST.get('show_logo') == 'on'
+        template.logo_url = request.POST.get('logo_url', '')
+        template.company_name = request.POST.get('company_name', 'Ezzy Delivery')
+        template.company_address = request.POST.get('company_address', '')
+        template.company_phone = request.POST.get('company_phone', '')
+        template.company_email = request.POST.get('company_email') or None
+        template.primary_color = request.POST.get('primary_color', '#2196F3')
+        template.font_family = request.POST.get('font_family', 'Courier New, monospace')
+        template.font_size = int(request.POST.get('font_size', 12))
+        template.show_signature_line = request.POST.get('show_signature_line') == 'on'
+        template.show_qr_code = request.POST.get('show_qr_code') == 'on'
+        template.footer_message = request.POST.get('footer_message', '')
+        template.custom_css = request.POST.get('custom_css', '')
+        template.save()
+        messages.success(request, f'Template "{template.name}" updated successfully.')
+        return redirect('workforce:receipt_templates_list')
+
+    context = {
+        'page_title': f'Edit Template: {template.name}',
+        'template': template,
+        'template_types': fleet_models.ReceiptTemplate.TEMPLATE_TYPES,
+        'paper_sizes': fleet_models.ReceiptTemplate.PAPER_SIZES,
+    }
+    return render(request, 'workforce/receipt_template_edit.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def receipt_template_preview(request, template_id):
+    """Preview a receipt template with sample data"""
+    from django.shortcuts import get_object_or_404
+    from decimal import Decimal
+
+    template = get_object_or_404(fleet_models.ReceiptTemplate, template_id=template_id)
+
+    # Create sample data for preview
+    sample_settlement = {
+        'settlement_code': 'STL-PREVIEW-001',
+        'created_at': timezone.now(),
+        'period_start': timezone.now().date() - timezone.timedelta(days=7),
+        'period_end': timezone.now().date(),
+        'net_amount': Decimal('1250.00'),
+        'gross_earnings': Decimal('1300.00'),
+        'deductions': Decimal('50.00'),
+        'bonuses': Decimal('0.00'),
+        'status': 'paid',
+        'paid_at': timezone.now(),
+    }
+
+    sample_driver = {
+        'driver_id': 45,
+        'user': {'first_name': 'Ahmed', 'last_name': 'Khan'},
+        'driver_phone': '+974-5555-1234',
+    }
+
+    sample_transactions = [
+        {'description': 'COD collected for order #1234', 'created_at': timezone.now() - timezone.timedelta(days=1), 'amount': Decimal('350.00')},
+        {'description': 'COD collected for order #1235', 'created_at': timezone.now() - timezone.timedelta(days=2), 'amount': Decimal('275.00')},
+        {'description': 'COD collected for order #1236', 'created_at': timezone.now() - timezone.timedelta(days=3), 'amount': Decimal('425.00')},
+        {'description': 'COD collected for order #1237', 'created_at': timezone.now() - timezone.timedelta(days=4), 'amount': Decimal('200.00')},
+    ]
+
+    context = {
+        'template': template,
+        'settlement': sample_settlement,
+        'driver': sample_driver,
+        'transactions': sample_transactions,
+        'is_preview': True,
+    }
+    return render(request, 'workforce/receipt_template_preview.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def receipt_template_delete(request, template_id):
+    """Delete a receipt template"""
+    from django.shortcuts import get_object_or_404
+    from django.contrib import messages
+
+    template = get_object_or_404(fleet_models.ReceiptTemplate, template_id=template_id)
+
+    if request.method == 'POST':
+        name = template.name
+        template.delete()
+        messages.success(request, f'Template "{name}" deleted successfully.')
+        return redirect('workforce:receipt_templates_list')
+
+    return redirect('workforce:receipt_templates_list')
+
+
+@login_required(login_url='/accounts/login/')
+def settlement_receipt_print(request, settlement_id):
+    """Print a settlement receipt using the default or specified template"""
+    from django.shortcuts import get_object_or_404
+
+    settlement = get_object_or_404(fleet_models.DriverSettlement, settlement_id=settlement_id)
+    transactions = fleet_models.DriverTransaction.objects.filter(settlement=settlement)
+
+    # Get template (use specified or default)
+    template_id = request.GET.get('template_id')
+    if template_id:
+        template = fleet_models.ReceiptTemplate.objects.filter(template_id=template_id).first()
+    else:
+        template = fleet_models.ReceiptTemplate.objects.filter(
+            template_type='settlement',
+            is_default=True
+        ).first()
+
+    context = {
+        'settlement': settlement,
+        'transactions': transactions,
+        'template': template,
+        'is_preview': False,
+    }
+    return render(request, 'workforce/settlement_receipt.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def fleet_task_sheet(request, driver_id):
+    """Generate printable A4 task sheet for a driver's daily deliveries"""
+    from django.shortcuts import get_object_or_404
+    from django.db.models import Sum
+    from datetime import datetime
+    from decimal import Decimal
+
+    driver = get_object_or_404(fleet_models.Driver.objects.select_related('user'), driver_id=driver_id)
+
+    # Get date from query param or use today
+    date_str = request.GET.get('date')
+    if date_str:
+        try:
+            selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = timezone.now().date()
+    else:
+        selected_date = timezone.now().date()
+
+    # Get delivery tasks for this driver on the selected date
+    tasks = delivery_models.DeliveryTask.objects.filter(
+        driver=driver,
+        dl_task_date=selected_date
+    ).select_related('order').prefetch_related('order__order_items').order_by('dl_task_date')
+
+    # Calculate total COD amount
+    total_cod = Decimal('0.00')
+    for task in tasks:
+        if task.order and task.order.payment_type == 'cod':
+            total_cod += task.order.cod_amount or task.order.order_total or Decimal('0.00')
+
+    # Get unique delivery areas
+    areas = set()
+    for task in tasks:
+        if task.order and task.order.delivery_area:
+            areas.add(task.order.delivery_area)
+    delivery_area = ', '.join(areas) if areas else 'Multiple'
+
+    # Sheet number (can be customized based on shift or slot)
+    sheet_number = request.GET.get('sheet', '01')
+    slot_number = request.GET.get('slot', '01')
+
+    context = {
+        'driver': driver,
+        'tasks': tasks,
+        'date': selected_date,
+        'total_cod': total_cod,
+        'delivery_area': delivery_area,
+        'sheet_number': sheet_number,
+        'slot_number': slot_number,
+    }
+    return render(request, 'workforce/fleet_task_sheet.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def fleet_task_sheets_list(request):
+    """List view to select driver and date for task sheet printing"""
+    from django.db.models import Count, Q
+    from datetime import datetime
+
+    # Get all approved drivers with task counts for today
+    today = timezone.now().date()
+    selected_date = request.GET.get('date')
+    if selected_date:
+        try:
+            selected_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = today
+    else:
+        selected_date = today
+
+    drivers = fleet_models.Driver.objects.filter(
+        driver_status='Approved'
+    ).select_related('user').annotate(
+        task_count=Count(
+            'deliverytask',
+            filter=Q(deliverytask__dl_task_date=selected_date)
+        )
+    ).order_by('user__first_name')
+
+    # Get drivers with tasks for quick filter
+    drivers_with_tasks = drivers.filter(task_count__gt=0)
+
+    context = {
+        'page_title': 'Fleet Task Sheets',
+        'drivers': drivers,
+        'drivers_with_tasks': drivers_with_tasks,
+        'selected_date': selected_date,
+        'today': today,
+    }
+    return render(request, 'workforce/fleet_task_sheets_list.html', context)
 
 
 # Inventory Section Functions

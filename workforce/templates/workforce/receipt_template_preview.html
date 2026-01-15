@@ -1,0 +1,368 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt Preview - {{ template.name }}</title>
+    <style>
+        :root {
+            --primary-color: {{ template.primary_color|default:'#2196F3' }};
+            --font-family: {{ template.font_family|default:'Courier New, monospace' }};
+            --font-size: {{ template.font_size|default:12 }}px;
+            {% if template.paper_size == 'thermal_80' %}
+            --receipt-width: 80mm;
+            {% elif template.paper_size == 'thermal_58' %}
+            --receipt-width: 58mm;
+            {% elif template.paper_size == 'a4' %}
+            --receipt-width: 210mm;
+            {% elif template.paper_size == 'a5' %}
+            --receipt-width: 148mm;
+            {% else %}
+            --receipt-width: 80mm;
+            {% endif %}
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-family);
+            font-size: var(--font-size);
+            line-height: 1.4;
+            color: #333;
+            background: #f5f5f5;
+        }
+
+        .action-bar {
+            background: white;
+            padding: 1rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .action-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn-back {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-print {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-edit {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .receipt-container {
+            max-width: var(--receipt-width);
+            margin: 0 auto 2rem;
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+
+        .receipt-header {
+            text-align: center;
+            padding-bottom: 15px;
+            border-bottom: 2px dashed #ddd;
+            margin-bottom: 15px;
+        }
+
+        .receipt-logo {
+            max-width: 100px;
+            height: auto;
+            margin-bottom: 10px;
+        }
+
+        .company-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+
+        .company-info {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .receipt-title {
+            text-align: center;
+            padding: 10px;
+            margin: 15px 0;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            font-weight: bold;
+            font-size: 1.2em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .info-section {
+            margin-bottom: 15px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px dotted #ddd;
+        }
+
+        .info-label {
+            color: #666;
+        }
+
+        .info-value {
+            font-weight: bold;
+        }
+
+        .driver-box {
+            background: #f0f7ff;
+            border: 1px solid var(--primary-color);
+            border-radius: 5px;
+            padding: 10px;
+            margin: 15px 0;
+        }
+
+        .driver-box h4 {
+            color: var(--primary-color);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        .items-table th {
+            text-align: left;
+            padding: 8px 5px;
+            border-bottom: 2px solid #333;
+            font-size: 0.9em;
+        }
+
+        .items-table th:last-child {
+            text-align: right;
+        }
+
+        .items-table td {
+            padding: 8px 5px;
+            border-bottom: 1px dotted #ddd;
+        }
+
+        .items-table td:last-child {
+            text-align: right;
+            font-weight: bold;
+        }
+
+        .total-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px solid #333;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
+        .total-amount {
+            color: var(--primary-color);
+        }
+
+        .signature-section {
+            margin-top: 30px;
+            padding-top: 15px;
+        }
+
+        .signature-line {
+            border-bottom: 1px solid #333;
+            height: 40px;
+            margin-bottom: 5px;
+        }
+
+        .signature-label {
+            text-align: center;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .receipt-footer {
+            text-align: center;
+            padding-top: 15px;
+            border-top: 2px dashed #ddd;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        .preview-badge {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: #ff9800;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            font-weight: bold;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        /* Custom CSS from template */
+        {{ template.custom_css|safe }}
+
+        @media print {
+            .action-bar, .preview-badge {
+                display: none !important;
+            }
+            body {
+                background: white;
+            }
+            .receipt-container {
+                box-shadow: none;
+                margin: 0;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="action-bar">
+        <a href="{% url 'workforce:receipt_templates_list' %}" class="action-btn btn-back">
+            <i class="fa-solid fa-arrow-left"></i> Back to Templates
+        </a>
+        <button class="action-btn btn-print" onclick="window.print()">
+            <i class="fa-solid fa-print"></i> Print Preview
+        </button>
+        <a href="{% url 'workforce:receipt_template_edit' template.template_id %}" class="action-btn btn-edit">
+            <i class="fa-solid fa-pen"></i> Edit Template
+        </a>
+    </div>
+
+    {% if is_preview %}
+    <div class="preview-badge">
+        <i class="fa-solid fa-eye"></i> PREVIEW MODE
+    </div>
+    {% endif %}
+
+    <div class="receipt-container">
+        <!-- Header -->
+        <div class="receipt-header">
+            {% if template.show_logo %}
+            {% if template.logo_url %}
+            <img src="{{ template.logo_url }}" alt="{{ template.company_name }}" class="receipt-logo">
+            {% else %}
+            <img src="{% static 'webpages/img/ezzy-logo-512-512.png' %}" alt="{{ template.company_name }}" class="receipt-logo">
+            {% endif %}
+            {% endif %}
+            <div class="company-name">{{ template.company_name }}</div>
+            <div class="company-info">
+                {{ template.company_address|linebreaksbr }}<br>
+                {% if template.company_phone %}Tel: {{ template.company_phone }}{% endif %}
+                {% if template.company_email %}<br>{{ template.company_email }}{% endif %}
+            </div>
+        </div>
+
+        <!-- Title -->
+        <div class="receipt-title">{{ template.get_template_type_display }}</div>
+
+        <!-- Receipt Info -->
+        <div class="info-section">
+            <div class="info-row">
+                <span class="info-label">Receipt No:</span>
+                <span class="info-value">{{ settlement.settlement_code }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Date:</span>
+                <span class="info-value">{{ settlement.created_at|date:"d M Y" }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Time:</span>
+                <span class="info-value">{{ settlement.created_at|date:"h:i A" }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Period:</span>
+                <span class="info-value">{{ settlement.period_start|date:"d/m" }} - {{ settlement.period_end|date:"d/m/Y" }}</span>
+            </div>
+        </div>
+
+        <!-- Driver Info -->
+        <div class="driver-box">
+            <h4>Driver Information</h4>
+            <div><strong>{{ driver.user.first_name }} {{ driver.user.last_name }}</strong></div>
+            <div>ID: {{ driver.driver_id }} | Phone: {{ driver.driver_phone }}</div>
+        </div>
+
+        <!-- Transactions -->
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Date</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for txn in transactions %}
+                <tr>
+                    <td>{{ txn.description|truncatechars:30 }}</td>
+                    <td>{{ txn.created_at|date:"d/m" }}</td>
+                    <td>QAR {{ txn.amount }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Total -->
+        <div class="total-section">
+            <div class="total-row">
+                <span>TOTAL</span>
+                <span class="total-amount">QAR {{ settlement.net_amount }}</span>
+            </div>
+        </div>
+
+        <!-- Signature -->
+        {% if template.show_signature_line %}
+        <div class="signature-section">
+            <div class="signature-line"></div>
+            <div class="signature-label">Driver's Signature</div>
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="receipt-footer">
+            {{ template.footer_message|linebreaksbr }}
+            <div style="margin-top: 10px; font-size: 0.8em;">
+                Printed: {% now "d M Y, h:i A" %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
