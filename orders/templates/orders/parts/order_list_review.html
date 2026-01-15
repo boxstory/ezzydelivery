@@ -1,45 +1,113 @@
-<div class="container p-0 m-0" id="orders_list_review_container_main">
-    <div class="row table-responsive">
-
-        {% if not orders %}
-        <p id="orders_list_review_message_no_orders"> No orders</p>
-        {%else%}
-
-        <table class="table table-striped table-hover " id="orders_list_review_table_orders">
-            <tr>
-                <th>ID</th>
-                <th>Date</th>
-                <th>Ref No</th>
-
-                <th>Status</th>
-                <th>DMS Status</th>
-                <th>COD</th>
-
-
-
-            </tr>
-            {% for order in orders %}
-            <tr data-order-id="{{ order.id }}" class="data-order-row">
-                <td>{{ order.id }}</td>
-                <td>{{ order.order_date }}</td>
-                <td>{{ order.client_order_code }}</td>
-                <td>
-                    <select class="status-dropdown form-select form-select-md " id="floatingSelectGrid">
-                        <option value="{{ order.order_status }} ">{{ order.order_status }}</option>
-                        <option value="ready_to_pickup">Ready to pickup</option>
-                        <option value="cancelled">Cancelled</option>
-                    </select>
-
-
-                </td>
-                <td>{{ order.dl_task.id }}</td>
-                <td>{{ order.task_created }}</td>
-
-
-            </tr>
-
-            {% endfor %}
-        </table>
-        {% endif %}
+<div class="container-fluid p-0 m-0" id="orders_list_review_container_main">
+    {% if not orders %}
+    <p id="orders_list_review_message_no_orders" class="text-muted text-center py-3">No orders</p>
+    {% else %}
+    <div class="orc-list">
+        {% for order in orders %}
+        <div class="orc-row" data-order-id="{{ order.id }}">
+            <div class="orc-id">
+                <a href="{% url 'workforce:order_detail' order.id %}"
+                   hx-get="{% url 'workforce:order_detail' order.id %}"
+                   hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">{{ order.order_number|default:order.client_order_code|truncatechars:16 }}</a>
+                <span class="orc-seller">{{ order.business.business_name|truncatechars:12 }}</span>
+            </div>
+            <div class="orc-customer">
+                <span class="orc-name">{{ order.customer_name|truncatechars:16 }}</span>
+                <span class="orc-phone">{{ order.customer_phone }}</span>
+            </div>
+            <div class="orc-address" title="{{ order.customer_address }}">
+                {% if order.dl_zone or order.dl_street or order.dl_building %}
+                <span class="orc-zone">Z{{ order.dl_zone|default:"-" }}/S{{ order.dl_street|default:"-" }}/B{{ order.dl_building|default:"-" }}</span>
+                {% endif %}
+                <span class="orc-addr-text">{{ order.customer_address|truncatechars:25 }}</span>
+            </div>
+            <div class="orc-amount">{{ order.cod_amount|default:"0" }} <small>QAR</small></div>
+            <div class="orc-date">{{ order.order_date|date:"d/m" }}</div>
+            <div class="orc-status">
+                {% if order.order_status == 'to_review' %}<span class="st st-warn">Review</span>
+                {% elif order.order_status == 'to_publish' %}<span class="st st-info">Publish</span>
+                {% elif order.order_status == 'published' %}<span class="st st-ok">Done</span>
+                {% elif order.order_status == 'cancelled' %}<span class="st st-err">Cancel</span>
+                {% else %}<span class="st">{{ order.order_status|truncatechars:8 }}</span>{% endif %}
+                {% if order.verification_status == 'verified' %}<span class="st st-ok-o">V</span>{% endif %}
+            </div>
+            <div class="orc-actions">
+                <a href="{% url 'workforce:order_detail' order.id %}" class="orc-btn" title="View"
+                   hx-get="{% url 'workforce:order_detail' order.id %}"
+                   hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <i class="fa-solid fa-eye"></i>
+                </a>
+                <a href="{% url 'workforce:order_detail' order.id %}#edit" class="orc-btn orc-btn-edit" title="Edit">
+                    <i class="fa-solid fa-pen"></i>
+                </a>
+                {% if order.verification_status == 'pending' %}
+                <button type="button" class="orc-btn orc-btn-ok" title="Verify"
+                        hx-post="{% url 'workforce:verify_order' order.id %}"
+                        hx-target="closest .orc-row" hx-swap="outerHTML" hx-confirm="Verify?">
+                    <i class="fa-solid fa-check"></i>
+                </button>
+                {% endif %}
+                {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
+                <button type="button" class="orc-btn orc-btn-info" title="Publish"
+                        hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}"
+                        hx-target="closest .orc-row" hx-swap="outerHTML" hx-confirm="Publish?">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+                {% endif %}
+                {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
+                <button type="button" class="orc-btn orc-btn-err" title="Cancel"
+                        hx-post="{% url 'workforce:cancel_order' order.id %}"
+                        hx-target="closest .orc-row" hx-swap="outerHTML" hx-confirm="Cancel order?">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+                {% endif %}
+                <a href="https://wa.me/{{ order.customer_phone }}" target="_blank" class="orc-btn orc-btn-wa" title="WhatsApp">
+                    <i class="fa-brands fa-whatsapp"></i>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
     </div>
+    {% endif %}
 </div>
+
+<style>
+.orc-list{display:flex;flex-direction:column;gap:2px}
+.orc-row{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fff;border:1px solid #e5e7eb;border-radius:4px;font-size:12px;line-height:1.2}
+.orc-row:hover{background:#f8fafc;border-color:#cbd5e1}
+.orc-id{min-width:100px}
+.orc-id a{color:#2563eb;text-decoration:none;font-weight:600;font-size:11px}
+.orc-id a:hover{text-decoration:underline}
+.orc-seller{display:block;color:#64748b;font-size:10px}
+.orc-customer{min-width:120px}
+.orc-name{display:block;font-weight:500;font-size:11px}
+.orc-phone{color:#64748b;font-size:10px}
+.orc-address{flex:1;min-width:100px;max-width:180px}
+.orc-zone{display:block;font-weight:500;font-size:10px;color:#dc2626}
+.orc-addr-text{color:#64748b;font-size:10px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orc-amount{min-width:60px;text-align:right;font-weight:600;color:#16a34a;font-size:12px}
+.orc-amount small{font-weight:400;color:#64748b;font-size:9px}
+.orc-date{min-width:36px;color:#64748b;font-size:10px;text-align:center}
+.orc-status{display:flex;gap:3px;min-width:60px;flex-wrap:wrap}
+.st{padding:1px 4px;border-radius:3px;font-size:9px;font-weight:500;background:#e5e7eb;color:#475569;white-space:nowrap}
+.st-warn{background:#fef3c7;color:#92400e}
+.st-info{background:#dbeafe;color:#1e40af}
+.st-ok{background:#dcfce7;color:#166534}
+.st-err{background:#fee2e2;color:#991b1b}
+.st-ok-o{background:transparent;border:1px solid #16a34a;color:#16a34a}
+.orc-actions{display:flex;gap:2px;margin-left:auto;flex-shrink:0;flex-wrap:wrap}
+.orc-btn{width:20px;height:20px;padding:0;border:1px solid #d1d5db;border-radius:3px;background:#fff;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:9px;text-decoration:none}
+.orc-btn:hover{background:#f1f5f9;color:#1e293b}
+.orc-btn-ok{border-color:#86efac;color:#16a34a}
+.orc-btn-ok:hover{background:#dcfce7}
+.orc-btn-info{border-color:#93c5fd;color:#2563eb}
+.orc-btn-info:hover{background:#dbeafe}
+.orc-btn-err{border-color:#fca5a5;color:#dc2626}
+.orc-btn-err:hover{background:#fee2e2}
+.orc-btn-wa{border-color:#86efac;color:#16a34a}
+.orc-btn-wa:hover{background:#dcfce7}
+.orc-btn-edit{border-color:#fcd34d;color:#d97706}
+.orc-btn-edit:hover{background:#fef3c7}
+@media(max-width:992px){.orc-address{display:none}}
+@media(max-width:768px){.orc-row{gap:6px;padding:5px 8px}.orc-status{min-width:50px}}
+</style>

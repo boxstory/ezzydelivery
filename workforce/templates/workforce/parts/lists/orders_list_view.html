@@ -3,12 +3,49 @@
 {% load static %}
 <!-- extra css -->
 {% block extra_css %}
-    <link href="{% static 'orders/css/orders.css' %}"
-          rel="stylesheet"
-          type="text/css" />
-    <link href="{% static 'workforce/css/workforce.css' %}"
-          rel="stylesheet"
-          type="text/css" />
+    <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+    <link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
+    <style>
+    .orc-list{display:flex;flex-direction:column;gap:2px}
+    .orc-row{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fff;border:1px solid #e5e7eb;border-radius:4px;font-size:12px;line-height:1.2}
+    .orc-row:hover{background:#f8fafc;border-color:#cbd5e1}
+    .orc-id{min-width:100px}
+    .orc-id a{color:#2563eb;text-decoration:none;font-weight:600;font-size:11px}
+    .orc-id a:hover{text-decoration:underline}
+    .orc-seller{display:block;color:#64748b;font-size:10px}
+    .orc-customer{min-width:120px}
+    .orc-name{display:block;font-weight:500;font-size:11px}
+    .orc-phone{color:#64748b;font-size:10px}
+    .orc-address{flex:1;min-width:100px;max-width:180px}
+    .orc-zone{display:block;font-weight:500;font-size:10px;color:#dc2626}
+    .orc-addr-text{color:#64748b;font-size:10px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .orc-amount{min-width:60px;text-align:right;font-weight:600;color:#16a34a;font-size:12px}
+    .orc-amount small{font-weight:400;color:#64748b;font-size:9px}
+    .orc-date{min-width:36px;color:#64748b;font-size:10px;text-align:center}
+    .orc-status{display:flex;gap:3px;min-width:60px;flex-wrap:wrap}
+    .st{padding:1px 4px;border-radius:3px;font-size:9px;font-weight:500;background:#e5e7eb;color:#475569;white-space:nowrap}
+    .st-warn{background:#fef3c7;color:#92400e}
+    .st-info{background:#dbeafe;color:#1e40af}
+    .st-ok{background:#dcfce7;color:#166534}
+    .st-err{background:#fee2e2;color:#991b1b}
+    .st-ok-o{background:transparent;border:1px solid #16a34a;color:#16a34a}
+    .st-dms{background:#f3e8ff;color:#7c3aed}
+    .orc-actions{display:flex;gap:2px;margin-left:auto;flex-shrink:0;flex-wrap:wrap}
+    .orc-btn{width:20px;height:20px;padding:0;border:1px solid #d1d5db;border-radius:3px;background:#fff;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:9px;text-decoration:none}
+    .orc-btn:hover{background:#f1f5f9;color:#1e293b}
+    .orc-btn-ok{border-color:#86efac;color:#16a34a}
+    .orc-btn-ok:hover{background:#dcfce7}
+    .orc-btn-info{border-color:#93c5fd;color:#2563eb}
+    .orc-btn-info:hover{background:#dbeafe}
+    .orc-btn-err{border-color:#fca5a5;color:#dc2626}
+    .orc-btn-err:hover{background:#fee2e2}
+    .orc-btn-wa{border-color:#86efac;color:#16a34a}
+    .orc-btn-wa:hover{background:#dcfce7}
+    .orc-btn-edit{border-color:#fcd34d;color:#d97706}
+    .orc-btn-edit:hover{background:#fef3c7}
+    @media(max-width:992px){.orc-address{display:none}}
+    @media(max-width:768px){.orc-row{gap:6px;padding:5px 8px}.orc-status{min-width:50px}}
+    </style>
 {% endblock extra_css %}
 {% block content %}
     <div class=" col-12 p-3">
@@ -211,6 +248,10 @@
                                 <button type="button" class="btn btn-outline-secondary px-4" id="clearFilter">
                                     <i class="fa fa-times me-2"></i>Clear All
                                 </button>
+                                <a href="{% url 'workforce:export_orders_csv' %}?{{ request.GET.urlencode }}"
+                                   class="btn btn-outline-success px-4">
+                                    <i class="fa fa-file-csv me-2"></i>Export CSV
+                                </a>
                                 <button type="button"
                                         class="btn btn-outline-primary px-4"
                                         id="saveFilter"
@@ -247,249 +288,75 @@
         </div>
         <!-- Orders List -->
         {% if orders %}
-            <div class="orders-list">
+            <div class="orc-list">
                 {% for order in orders %}
-                    <div class="order-card">
-                        <!-- Order Header -->
-                        <div class="order-header">
-                            <div>
-                                <div class="order-id">
-                                    <i class="fa-solid fa-hashtag me-1"></i>{{ order.business.business_code }}-{{ order.client_order_code }}-{{ order.id }}
-                                    <span class="ms-2 text-muted">| <i class="fa-solid fa-store me-1"></i>{{ order.business.business_name|default:"N/A" }}</span>
-                                </div>
-                                <small class="text-muted">
-                                    <i class="fa-solid fa-truck me-1"></i>
-                                    {% with task=order.delivery_task.first %}
-                                        {% if task %}
-                                            {{ task.dl_task_number|default:"No DL Code" }}
-                                        {% else %}
-                                            No DL Code
-                                        {% endif %}
-                                    {% endwith %}
-                                </small>
-                            </div>
-                            <div class="d-flex flex-wrap gap-2 align-items-center">
-                                <span class="status-badge p-2 status-{{ order.order_status }}">{{ order.get_order_status_display }}</span>
-                                {% with task=order.delivery_task.first %}
-                                    {% if task and task.dl_task_status_dms %}
-                                        <span class="status-badge status-{{ task.dl_task_status_dms }}">
-                                            DMS: {{ task.get_dl_task_status_dms_display }}
-                                        </span>
-                                    {% endif %}
-                                {% endwith %}
-                                <!-- Main Action Section -->
-                                <div class="">
-                                    {% if order.task_created %}
-                                        <button class="btn btn-success" disabled>
-                                            <i class="fa-solid fa-check-circle me-2"></i>Task Created
-                                        </button>
-                                    {% else %}
-                                        <a class="btn btn-primary"
-                                           hx-confirm="Are you sure you wish to Submit?"
-                                           href="{% url 'workforce:submit_to_task' order.id %}">
-                                            <i class="fa-solid fa-paper-plane me-2"></i>Submit Task
-                                        </a>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Order Details Grid -->
-                        <div class="order-details">
-                            <div class="detail-item">
-                                <div class="detail-label">Customer Name</div>
-                                <div class="detail-value">
-                                    <i class="fa-solid fa-user me-1 text-muted"></i>{{ order.customer_name }}
-                                </div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-label">Mobile</div>
-                                <div class="detail-value">
-                                    <i class="fa-solid fa-phone me-1 text-muted"></i>{{ order.customer_phone }}
-                                </div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-label">COD Amount</div>
-                                <div class="detail-value">
-                                    <i class="fa-solid fa-money-bill me-1 text-success"></i>{{ order.cod|default:"N/A" }} QAR
-                                </div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-label">Client Code</div>
-                                <div class="detail-value">
-                                    <i class="fa-solid fa-code me-1 text-muted"></i>{{ order.client_order_code }}
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Location Section -->
-                        <div class="location-section d-flex justify-content-between">
-                            <div class="location-item">
-                                <i class="fa-solid fa-location-dot location-icon text-success"></i>
-                                <div class="location-text">
-                                    <strong class="d-block mb-1">Pickup Location</strong>
-                                    {{ order.pickup_location }}
-                                </div>
-                            </div>
-                            <div class="location-item">
-                                <i class="fa-solid fa-location-dot location-icon text-danger"></i>
-                                <div class="location-text">
-                                    <strong class="d-block mb-1">Delivery Address</strong>
-                                    Zone: {{ order.dl_zone }}, Street: {{ order.dl_street }}, Building: {{ order.dl_building }}
-                                    <br>
-                                    {{ order.customer_address }}
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Quick Actions -->
-                        <div class="quick-actions">
-                            <div class="row g-2">
-                                <div class="col-md-6 col-lg-3">
-                                    <a href="https://wa.me/{{ order.customer_phone }}?text=Hello {{ order.customer_name }}, this is regarding your order {{ order.client_order_code }}"
-                                       target="_blank"
-                                       class="btn btn-success btn-sm w-100  py-2">
-                                        <i class="fa-brands fa-whatsapp me-1"></i>WhatsApp Location
-                                    </a>
-                                </div>
-                                <div class="col-md-6 col-lg-3">
-                                    <a href="https://wa.me/{{ order.customer_phone }}?text=Hi {{ order.customer_name }}, please confirm your delivery address for order {{ order.client_order_code }}: {{ order.customer_address }}"
-                                       target="_blank"
-                                       class="btn btn-outline-success btn-sm w-100 py-2">
-                                        <i class="fa-brands fa-whatsapp me-1"></i>Reconfirm
-                                    </a>
-                                </div>
-                                <div class="col-md-6 col-lg-3">
-                                    {% if order.order_status == 'publish' %}
-                                        <button class="btn btn-success btn-sm w-100 py-2" disabled>
-                                            <i class="fa-solid fa-check-circle me-1"></i>Published
-                                        </button>
-                                    {% else %}
-                                        <button type="button" class="btn btn-primary btn-sm w-100 py-2 btn-publish-order"
-                                                data-order-id="{{ order.id }}">
-                                            <i class="fa-solid fa-rocket me-1"></i>Publish to Delivery
-                                        </button>
-                                    {% endif %}
-                                </div>
-                                <div class="col-md-6 col-lg-3">
-                                    {% with task=order.delivery_task.first %}
-                                    {% if task %}
-                                    <a href="{% url 'workforce:delivery_task_detail' task.id %}"
-                                       class="btn btn-outline-info btn-sm w-100 py-2">
-                                        <i class="fa-solid fa-truck-fast me-1"></i>View Task
-                                        {% if task.dl_task_status_dms %}
-                                        <span class="badge bg-{% if task.dl_task_status_dms == '2' %}success{% elif task.dl_task_status_dms == '1' or task.dl_task_status_dms == '4' %}warning{% elif task.dl_task_status_dms == '3' or task.dl_task_status_dms == '8' or task.dl_task_status_dms == '9' %}danger{% else %}secondary{% endif %} ms-1">
-                                            {{ task.get_dl_task_status_dms_display }}
-                                        </span>
-                                        {% endif %}
-                                    </a>
-                                    {% else %}
-                                    <button class="btn btn-outline-secondary btn-sm w-100 py-2" disabled>
-                                        <i class="fa-solid fa-truck me-1"></i>No Task
-                                    </button>
-                                    {% endif %}
-                                    {% endwith %}
-                                </div>
-                                <div class="col-md-6 col-lg-3">
-                                    <button class="btn btn-outline-secondary btn-sm w-100 py-2"
-                                            type="button"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#statusModal{{ order.id }}">
-                                        <i class="fa-solid fa-flag me-1"></i>Update Status
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Comments Section -->
-                        <div class="comments-preview">
-                            <button class="btn btn-outline-dark btn-sm position-relative"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#comments{{ order.id }}">
-                                <i class="fa-solid fa-comments me-1"></i>Comments
-                                <span class="badge bg-secondary ms-1">{{ order.order_comments.count }}</span>
-                            </button>
-                            <div class="collapse mt-2" id="comments{{ order.id }}">
-                                <div class="card card-body bg-light">
-                                    <!-- Comments Container -->
-                                    <div id="comments-list-{{ order.id }}"
-                                         class="comments-list"
-                                         style="max-height: 200px; overflow-y: auto;">
-                                        {% if order.order_comments.all %}
-                                            {% for comment in order.order_comments.all %}
-                                                <div class="comment-item mb-2 p-2 bg-white rounded border-start border-primary border-3">
-                                                    <div class="d-flex justify-content-between align-items-center">
-                                                        <small class="text-primary fw-bold">
-                                                            <i class="fa-solid fa-user-circle me-1"></i>{{ comment.name }}
-                                                        </small>
-                                                        <small class="text-muted">{{ comment.created_at|timesince }} ago</small>
-                                                    </div>
-                                                    <p class="mb-0 small mt-1">{{ comment.body }}</p>
-                                                </div>
-                                            {% endfor %}
-                                        {% else %}
-                                            <div class="text-center py-3">
-                                                <i class="fa-regular fa-comment-dots fa-2x text-muted mb-2"></i>
-                                                <p class="text-muted small mb-0">No comments yet</p>
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <!-- Add Comment Form -->
-                                    <div class="mt-2 pt-2 border-top">
-                                        <form hx-post="{% url 'orders:add_order_comment' order.id %}"
-                                              hx-target="#comments-list-{{ order.id }}"
-                                              hx-swap="innerHTML"
-                                              hx-on::after-request="this.reset()">
-                                            {% csrf_token %}
-                                            <div class="input-group input-group-sm">
-                                                <input type="text"
-                                                       class="form-control"
-                                                       name="comment"
-                                                       placeholder="Add a comment..."
-                                                       required>
-                                                <button class="btn btn-primary" type="submit">
-                                                    <i class="fa-solid fa-paper-plane"></i>
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                <div class="orc-row" data-order-id="{{ order.id }}">
+                    <div class="orc-id">
+                        <a href="{% url 'workforce:order_detail' order.id %}"
+                           hx-get="{% url 'workforce:order_detail' order.id %}"
+                           hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">{{ order.order_number|default:order.client_order_code|truncatechars:16 }}</a>
+                        <span class="orc-seller">{{ order.business.business_name|truncatechars:12 }}</span>
                     </div>
-                    <!-- Status Update Modal -->
-                    <div class="modal fade" id="statusModal{{ order.id }}" tabindex="-1" aria-labelledby="statusModalLabel{{ order.id }}" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title" id="statusModalLabel{{ order.id }}">
-                                        <i class="fa-solid fa-flag me-2"></i>Update Order Status
-                                    </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <p class="text-muted mb-3">
-                                        Order: <strong>#{{ order.business.business_code }}-{{ order.client_order_code }}-{{ order.id }}</strong>
-                                    </p>
-                                    <div class="mb-3">
-                                        <label for="statusSelect{{ order.id }}" class="form-label fw-bold">Select Status</label>
-                                        <select class="form-select" id="statusSelect{{ order.id }}">
-                                            <option value="">-- Select Status --</option>
-                                            <option value="not_connected">Not Connected</option>
-                                            <option value="no_respond">No Response</option>
-                                            <option value="customer_cancelled">Customer Cancelled</option>
-                                            <option value="rescheduled">Rescheduled</option>
-                                            <option value="address_issue">Address Issue</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                        <i class="fa-solid fa-times me-1"></i>Cancel
-                                    </button>
-                                    <button type="button" class="btn btn-primary btn-submit-status" data-order-id="{{ order.id }}">
-                                        <i class="fa-solid fa-check me-1"></i>Update Status
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="orc-customer">
+                        <span class="orc-name">{{ order.customer_name|truncatechars:16 }}</span>
+                        <span class="orc-phone">{{ order.customer_phone }}</span>
                     </div>
+                    <div class="orc-address" title="{{ order.customer_address }}">
+                        {% if order.dl_zone or order.dl_street or order.dl_building %}
+                        <span class="orc-zone">Z{{ order.dl_zone|default:"-" }}/S{{ order.dl_street|default:"-" }}/B{{ order.dl_building|default:"-" }}</span>
+                        {% endif %}
+                        <span class="orc-addr-text">{{ order.customer_address|truncatechars:25 }}</span>
+                    </div>
+                    <div class="orc-amount">{{ order.cod_amount|default:"0" }} <small>QAR</small></div>
+                    <div class="orc-date">{{ order.order_date|date:"d/m" }}</div>
+                    <div class="orc-status">
+                        {% if order.order_status == 'to_review' %}<span class="st st-warn">Review</span>
+                        {% elif order.order_status == 'to_publish' %}<span class="st st-info">Publish</span>
+                        {% elif order.order_status == 'published' %}<span class="st st-ok">Done</span>
+                        {% elif order.order_status == 'cancelled' %}<span class="st st-err">Cancel</span>
+                        {% else %}<span class="st">{{ order.order_status|truncatechars:8 }}</span>{% endif %}
+                        {% if order.verification_status == 'verified' %}<span class="st st-ok-o">V</span>{% endif %}
+                        {% with task=order.delivery_task.first %}
+                            {% if task and task.dl_task_status_dms %}
+                            <span class="st st-dms">{{ task.get_dl_task_status_dms_display|truncatechars:8 }}</span>
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                    <div class="orc-actions">
+                        <a href="{% url 'workforce:order_detail' order.id %}" class="orc-btn" title="View"
+                           hx-get="{% url 'workforce:order_detail' order.id %}"
+                           hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                            <i class="fa-solid fa-eye"></i>
+                        </a>
+                        <a href="{% url 'workforce:order_detail' order.id %}#edit" class="orc-btn orc-btn-edit" title="Edit">
+                            <i class="fa-solid fa-pen"></i>
+                        </a>
+                        {% if order.verification_status == 'pending' %}
+                        <button type="button" class="orc-btn orc-btn-ok" title="Verify"
+                                hx-post="{% url 'workforce:verify_order' order.id %}"
+                                hx-target="closest .orc-row" hx-swap="outerHTML" hx-confirm="Verify?">
+                            <i class="fa-solid fa-check"></i>
+                        </button>
+                        {% endif %}
+                        {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
+                        <button type="button" class="orc-btn orc-btn-info" title="Publish"
+                                hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}"
+                                hx-target="closest .orc-row" hx-swap="outerHTML" hx-confirm="Publish?">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                        {% endif %}
+                        {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
+                        <button type="button" class="orc-btn orc-btn-err" title="Cancel"
+                                hx-post="{% url 'workforce:cancel_order' order.id %}"
+                                hx-target="closest .orc-row" hx-swap="outerHTML" hx-confirm="Cancel order?">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                        {% endif %}
+                        <a href="https://wa.me/{{ order.customer_phone }}" target="_blank" class="orc-btn orc-btn-wa" title="WhatsApp">
+                            <i class="fa-brands fa-whatsapp"></i>
+                        </a>
+                    </div>
+                </div>
                 {% endfor %}
             </div>
             <!-- Pagination -->

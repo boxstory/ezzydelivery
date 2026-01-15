@@ -57,6 +57,7 @@ Related:
 
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+import csv
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 import json
@@ -129,21 +130,90 @@ def paginate_queryset(request, queryset, items_per_page=10):
 
 @login_required(login_url='/accounts/login/')
 def wf_dashboard(request):
+    from django.utils import timezone
+    from django.db.models import Sum, Count, Q
+    from datetime import timedelta
+
     try:
         profile = core_models.Profile.objects.get(user_id=request.user.id)
     except core_models.Profile.DoesNotExist:
         logger.warning(f"User {request.user.id} has no profile. Redirecting to profile creation.")
-        # Redirect to profile view or create a profile
         return redirect('core:profile_view')
 
-    # Count pending user verifications
+    today = timezone.now().date()
+
+    # Order Statistics
+    total_orders = Order.objects.count()
+    orders_today = Order.objects.filter(order_date=today).count()
+    not_published = Order.objects.filter(task_created=False).exclude(
+        order_status__in=['cancelled', 'delivered', 'fulfilled']
+    ).count()
+    published_orders = Order.objects.filter(task_created=True).count()
+
+    # Location reconfirmation needed (orders with verification issues)
+    loc_reconfirm = Order.objects.filter(
+        Q(verification_status='pending') | Q(verification_status='needs_review')
+    ).count()
+
+    # Follow up count - tasks that need attention
+    follow_up_count = DeliveryTask.objects.filter(
+        Q(dl_status='failed') | Q(dl_status='rescheduled') | Q(dl_status='customer_unavailable')
+    ).count()
+
+    # User Verification pending
     pending_verifications = core_models.Profile.objects.filter(
         verification_status='pending'
     ).count()
 
+    # Driver and Seller counts
+    active_drivers = Driver.objects.filter(driver_status='Approved').count()
+    pending_drivers = Driver.objects.filter(driver_status='Pending on Review').count()
+    active_sellers = Business.objects.filter(is_active=True).count()
+    pending_sellers = Business.objects.filter(is_active=False, is_verified=False).count()
+
+    # COD in hand (sum of driver wallet balances)
+    cod_in_hand = Driver.objects.aggregate(
+        total=Sum('wallet_balance')
+    )['total'] or 0
+
+    # Recent orders (last 10 updated)
+    orders = Order.objects.select_related('business').order_by('-updated_at')[:10]
+
+    # Orders trend data for the last 7 days
+    orders_trend = []
+    max_orders = 1  # Prevent division by zero
+    for i in range(6, -1, -1):
+        date = today - timedelta(days=i)
+        count = Order.objects.filter(order_date=date).count()
+        if count > max_orders:
+            max_orders = count
+        orders_trend.append({
+            'date': date.strftime('%a'),
+            'count': count
+        })
+
     data = {
         'profile': profile,
+        'today': today,
+        # Order stats
+        'total_orders': total_orders,
+        'orders_today': orders_today,
+        'not_published': not_published,
+        'published_orders': published_orders,
+        'loc_reconfirm': loc_reconfirm,
+        'follow_up_count': follow_up_count,
+        # Verification
         'pending_verifications': pending_verifications,
+        # Driver/Seller stats
+        'active_drivers': active_drivers,
+        'pending_drivers': pending_drivers,
+        'active_sellers': active_sellers,
+        'pending_sellers': pending_sellers,
+        'cod_in_hand': cod_in_hand,
+        # Recent data
+        'orders': orders,
+        'orders_trend': orders_trend,
+        'max_orders': max_orders,
     }
     return render(request, 'workforce/wf_base_dashboard.html', data)
 
@@ -215,6 +285,152 @@ def all_orders(request):
         }
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
+
+
+@login_required(login_url='/accounts/login/')
+def export_orders_csv(request):
+    """
+    Export orders to CSV file with applied filters
+    """
+    from django.utils import timezone
+
+    # Start with all orders
+    orders = orders_models.Order.objects.select_related(
+        'business'
+    ).prefetch_related('delivery_task')
+
+    # Apply same filters as all_orders view
+    dl_code = request.GET.get('dlCode', '').strip()
+    c_code = request.GET.get('cCode', '').strip()
+    mobile = request.GET.get('mobile', '').strip()
+    c_status = request.GET.get('cStatus', '').strip()
+    dms_status = request.GET.get('dmsStatus', '').strip()
+    business_id = request.GET.get('business', '').strip()
+    date_from = request.GET.get('dateFrom', '').strip()
+    date_to = request.GET.get('dateTo', '').strip()
+
+    if business_id:
+        orders = orders.filter(business_id=business_id)
+    if dl_code:
+        orders = orders.filter(delivery_task__dl_task_number__icontains=dl_code)
+    if c_code:
+        orders = orders.filter(client_order_code__icontains=c_code)
+    if mobile:
+        orders = orders.filter(customer_phone__icontains=mobile)
+    if c_status:
+        orders = orders.filter(order_status=c_status)
+    if dms_status:
+        orders = orders.filter(delivery_task__dl_task_status_dms=dms_status)
+    if date_from:
+        orders = orders.filter(order_date__gte=date_from)
+    if date_to:
+        orders = orders.filter(order_date__lte=date_to)
+
+    orders = orders.order_by('-created_at')
+
+    # Create the HttpResponse object with CSV content type
+    response = HttpResponse(content_type='text/csv')
+    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+    response['Content-Disposition'] = f'attachment; filename="orders_export_{timestamp}.csv"'
+
+    writer = csv.writer(response)
+    # Write header row
+    writer.writerow([
+        'Order Number',
+        'Client Order Code',
+        'Business',
+        'Customer Name',
+        'Customer Phone',
+        'Customer Address',
+        'Order Status',
+        'Task Status',
+        'COD Amount',
+        'Order Date',
+        'Created At',
+    ])
+
+    # Write data rows
+    for order in orders[:5000]:  # Limit to 5000 rows for performance
+        writer.writerow([
+            order.order_number,
+            order.client_order_code,
+            order.business.business_name if order.business else '',
+            order.customer_name,
+            order.customer_phone,
+            order.customer_address,
+            order.order_status,
+            order.task_status,
+            order.cod_amount,
+            order.order_date,
+            order.created_at.strftime('%Y-%m-%d %H:%M:%S') if order.created_at else '',
+        ])
+
+    return response
+
+
+@login_required(login_url='/accounts/login/')
+def export_drivers_csv(request):
+    """
+    Export drivers to CSV file
+    """
+    from django.utils import timezone
+
+    drivers = fleet_models.Driver.objects.select_related(
+        'user'
+    ).prefetch_related('driver_vehicle')
+
+    # Apply filters
+    search = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', '')
+
+    if search:
+        from django.db.models import Q
+        drivers = drivers.filter(
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search) |
+            Q(driver_code__icontains=search) |
+            Q(driver_phone__icontains=search)
+        )
+    if status_filter:
+        drivers = drivers.filter(driver_status=status_filter)
+
+    drivers = drivers.order_by('-driver_id')
+
+    response = HttpResponse(content_type='text/csv')
+    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+    response['Content-Disposition'] = f'attachment; filename="drivers_export_{timestamp}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'Driver ID',
+        'Driver Code',
+        'Name',
+        'Phone',
+        'WhatsApp',
+        'Email',
+        'Status',
+        'Rating',
+        'Wallet Balance',
+        'COD In Hand',
+        'Date Joined',
+    ])
+
+    for driver in drivers[:2000]:
+        writer.writerow([
+            driver.driver_id,
+            driver.driver_code,
+            f"{driver.user.first_name} {driver.user.last_name}",
+            driver.driver_phone,
+            driver.driver_whatsapp,
+            driver.user.email,
+            driver.driver_status,
+            driver.driver_rating,
+            driver.wallet_balance,
+            getattr(driver, 'cod_in_hand', 0),
+            driver.user.date_joined.strftime('%Y-%m-%d') if driver.user.date_joined else '',
+        ])
+
+    return response
 
 
 @login_required(login_url='/accounts/login/')
@@ -419,19 +635,19 @@ def verify_order(request, order_id):
     from django.utils import timezone
     from orders.models import OrderVerificationLog
     from orders.signals import _create_delivery_task_from_order
-    
+
     order = get_object_or_404(orders_models.Order, id=order_id)
-    
+
     if request.method == 'POST':
         verification_notes = request.POST.get('verification_notes', '')
-        
+
         # Update order verification status
         order.verification_status = 'verified'
         order.verified_by = request.user
         order.verified_at = timezone.now()
         order.verification_notes = verification_notes
         order.save()
-        
+
         # Log verification
         OrderVerificationLog.objects.create(
             order=order,
@@ -440,18 +656,22 @@ def verify_order(request, order_id):
             notes=verification_notes,
             new_status='verified'
         )
-        
+
         # Create delivery task (will be triggered by signal)
         delivery_task = _create_delivery_task_from_order(order)
-        
+
+        # Return updated row HTML for HTMX
+        if request.headers.get('HX-Request'):
+            return render(request, 'orders/parts/order_row.html', {'order': order})
+
         from django.contrib import messages
         if delivery_task:
             messages.success(request, f'Order verified and delivery task created: {delivery_task.dl_task_number}')
         else:
             messages.success(request, 'Order verified successfully')
-        
+
         return redirect(reverse('workforce:wf_orders_all'))
-    
+
     # GET request - show verification form
     context = {
         'order': order,
@@ -1001,6 +1221,83 @@ def workflow_guide(request):
     return render(request, 'workforce/workflow_guide.html', context)
 
 
+# Order Detail View ------------------------------------------------------------------------------------------------------
+
+@login_required(login_url='/accounts/login/')
+def order_detail(request, order_id):
+    """Display order detail page"""
+    order = get_object_or_404(
+        orders_models.Order.objects.select_related('business', 'pickup_location', 'verified_by'),
+        id=order_id
+    )
+
+    # Get related data
+    order_items = orders_models.OrderItem.objects.filter(order=order)
+    order_comments = orders_models.OrderComments.objects.filter(order=order).order_by('-created_at')
+    verification_logs = orders_models.OrderVerificationLog.objects.filter(order=order).order_by('-created_at')
+
+    # Get delivery task if exists
+    delivery_task = None
+    try:
+        delivery_task = delivery_models.DeliveryTask.objects.get(order=order)
+    except delivery_models.DeliveryTask.DoesNotExist:
+        pass
+
+    context = {
+        'order': order,
+        'order_items': order_items,
+        'order_comments': order_comments,
+        'verification_logs': verification_logs,
+        'delivery_task': delivery_task,
+    }
+
+    return render(request, 'workforce/order_detail.html', context)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+def cancel_order(request, order_id):
+    """Cancel an order"""
+    try:
+        order = get_object_or_404(orders_models.Order, id=order_id)
+
+        if order.order_status == 'published':
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot cancel a published order'
+            }, status=400)
+
+        # Update order status
+        old_status = order.order_status
+        order.order_status = 'cancelled'
+        order.save()
+
+        # Log the cancellation
+        orders_models.OrderVerificationLog.objects.create(
+            order=order,
+            verified_by=request.user,
+            action='order_cancelled',
+            old_status=old_status,
+            new_status='cancelled',
+            notes=f'Order cancelled by {request.user.username}'
+        )
+
+        # Return updated row HTML for HTMX
+        if request.headers.get('HX-Request'):
+            return render(request, 'orders/parts/order_row.html', {'order': order})
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Order cancelled successfully',
+            'order_id': order.id
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
 # AJAX Endpoints for Orders List ------------------------------------------------------------------------------------------------------
 
 @require_http_methods(["POST"])
@@ -1010,10 +1307,24 @@ def publish_order_to_delivery(request, order_id):
     try:
         order = get_object_or_404(orders_models.Order, id=order_id)
 
-        # Update order status to publish
-        order.order_status = 'publish'
+        # Update order status to published
+        order.order_status = 'published'
         order.task_status = 'dl_task_listed'
         order.save()
+
+        # Log the publish action
+        orders_models.OrderVerificationLog.objects.create(
+            order=order,
+            verified_by=request.user,
+            action='order_published',
+            old_status='to_publish',
+            new_status='published',
+            notes=f'Order published to delivery by {request.user.username}'
+        )
+
+        # Return updated row HTML for HTMX
+        if request.headers.get('HX-Request'):
+            return render(request, 'orders/parts/order_row.html', {'order': order})
 
         return JsonResponse({
             'success': True,
@@ -2426,11 +2737,33 @@ def seller_detail(request, business_id):
     # Handle POST for status update
     if request.method == 'POST':
         try:
+            # Basic Information
+            business.business_code = request.POST.get('business_code', business.business_code) or None
             business.business_name = request.POST.get('business_name', business.business_name)
-            business.business_phone = request.POST.get('business_phone', business.business_phone)
-            business.business_email = request.POST.get('business_email', business.business_email)
-            business.business_qid = request.POST.get('business_qid', business.business_qid)
+            business.business_qid = request.POST.get('business_qid', business.business_qid) or None
+            business.business_product_category = request.POST.get('business_product_category', business.business_product_category) or None
+            business.business_bio = request.POST.get('business_bio', business.business_bio) or None
             business.business_status = request.POST.get('business_status', business.business_status)
+
+            # Handle business_since date
+            business_since_str = request.POST.get('business_since', '')
+            if business_since_str:
+                from datetime import datetime
+                try:
+                    business.business_since = datetime.strptime(business_since_str, '%Y-%m-%d').date()
+                except ValueError:
+                    pass  # Keep existing value if parsing fails
+            else:
+                business.business_since = None
+
+            # Contact Information
+            business.business_phone = request.POST.get('business_phone', business.business_phone) or None
+            business.business_whatsapp = request.POST.get('business_whatsapp', business.business_whatsapp) or None
+            business.business_email = request.POST.get('business_email', business.business_email) or None
+
+            # Social Media
+            business.business_instagram = request.POST.get('business_instagram', business.business_instagram) or None
+            business.business_facebook_page = request.POST.get('business_facebook_page', business.business_facebook_page) or None
 
             # Handle fulfillment service toggle
             fulfillment_enabled = request.POST.get('fulfillment_service_enabled') == 'on'
@@ -2442,11 +2775,17 @@ def seller_detail(request, business_id):
 
             business.save()
 
-            # Update business profile if exists
-            if business_profile:
-                business_profile.business_address = request.POST.get('business_address', business_profile.business_address)
-                business_profile.business_city = request.POST.get('business_city', business_profile.business_city)
-                business_profile.save()
+            # Update business profile if exists, create if not
+            if not business_profile:
+                business_profile = business_models.BusinessProfile.objects.create(business=business)
+
+            business_profile.business_address = request.POST.get('business_address', business_profile.business_address) or None
+            business_profile.business_city = request.POST.get('business_city', business_profile.business_city) or None
+            business_profile.business_state = request.POST.get('business_state', business_profile.business_state) or None
+            business_profile.business_zip_code = request.POST.get('business_zip_code', business_profile.business_zip_code) or None
+            business_profile.business_country = request.POST.get('business_country', business_profile.business_country) or 'Qatar'
+            business_profile.business_website = request.POST.get('business_website', business_profile.business_website) or None
+            business_profile.save()
 
             return JsonResponse({
                 'success': True,

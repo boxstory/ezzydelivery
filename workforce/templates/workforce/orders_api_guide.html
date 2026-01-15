@@ -1,0 +1,284 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}API Integration - Staff Dashboard{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3">
+    <!-- Page Title -->
+    <h1 class="page-title">
+        <i class="fa-solid fa-code me-2"></i>API Integration Guide
+    </h1>
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- API Endpoint -->
+            <div class="card-modern mb-4">
+                <div class="card-header-modern">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-link me-2"></i>
+                        Create Order API Endpoint
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-4">
+                        <span class="badge badge-success me-2">POST</span>
+                        <code class="bg-light p-2 rounded">/api/v1/orders/create/</code>
+                    </div>
+
+                    <h6 class="mt-4 mb-3">Headers</h6>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Header</th>
+                                <th>Value</th>
+                                <th>Required</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>Content-Type</code></td>
+                                <td>application/json</td>
+                                <td><span class="badge badge-danger">Yes</span></td>
+                            </tr>
+                            <tr>
+                                <td><code>Authorization</code></td>
+                                <td>Token {your_api_token}</td>
+                                <td><span class="badge badge-danger">Yes</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h6 class="mt-4 mb-3">Request Body</h6>
+                    <pre class="bg-dark text-light p-3 rounded"><code>{
+    "business_id": 123,
+    "client_order_code": "ORD-001",
+    "customer_name": "John Doe",
+    "customer_phone": "+97412345678",
+    "customer_whatsapp": "+97412345678",
+    "customer_address": "Zone 45, Street 123, Building 5",
+    "dl_zone": 45,
+    "dl_street": 123,
+    "dl_building": 5,
+    "cod_amount": 150,
+    "dl_amount": 15,
+    "order_notes": "Handle with care"
+}</code></pre>
+
+                    <h6 class="mt-4 mb-3">Response (Success - 201)</h6>
+                    <pre class="bg-dark text-light p-3 rounded"><code>{
+    "success": true,
+    "message": "Order created successfully",
+    "data": {
+        "order_id": 456,
+        "order_number": "BIZCODE-ORD-001-60114-AA001",
+        "status": "to_review"
+    }
+}</code></pre>
+
+                    <h6 class="mt-4 mb-3">Response (Error - 400)</h6>
+                    <pre class="bg-dark text-light p-3 rounded"><code>{
+    "success": false,
+    "error": "customer_name is required"
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- Bulk API -->
+            <div class="card-modern mb-4">
+                <div class="card-header-modern">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-layer-group me-2"></i>
+                        Bulk Create Orders API
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-4">
+                        <span class="badge badge-success me-2">POST</span>
+                        <code class="bg-light p-2 rounded">/api/v1/orders/bulk-create/</code>
+                    </div>
+
+                    <h6 class="mt-4 mb-3">Request Body</h6>
+                    <pre class="bg-dark text-light p-3 rounded"><code>{
+    "business_id": 123,
+    "orders": [
+        {
+            "client_order_code": "ORD-001",
+            "customer_name": "John Doe",
+            "customer_phone": "+97412345678",
+            "customer_address": "Zone 45, Street 123",
+            "cod_amount": 150
+        },
+        {
+            "client_order_code": "ORD-002",
+            "customer_name": "Jane Smith",
+            "customer_phone": "+97487654321",
+            "customer_address": "Zone 61, Street 8",
+            "cod_amount": 0
+        }
+    ]
+}</code></pre>
+
+                    <h6 class="mt-4 mb-3">Response (Success - 201)</h6>
+                    <pre class="bg-dark text-light p-3 rounded"><code>{
+    "success": true,
+    "message": "2 orders created successfully",
+    "data": {
+        "created": 2,
+        "failed": 0,
+        "orders": [
+            {"order_number": "BIZCODE-ORD-001-60114-AA001"},
+            {"order_number": "BIZCODE-ORD-002-60114-AA002"}
+        ]
+    }
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- Webhook -->
+            <div class="card-modern">
+                <div class="card-header-modern">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-bell me-2"></i>
+                        Webhook Notifications
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <p>Configure webhook URL in your business settings to receive order status updates.</p>
+
+                    <h6 class="mt-4 mb-3">Webhook Payload</h6>
+                    <pre class="bg-dark text-light p-3 rounded"><code>{
+    "event": "order.status_updated",
+    "timestamp": "2026-01-14T10:30:00Z",
+    "data": {
+        "order_id": 456,
+        "order_number": "BIZCODE-ORD-001-60114-AA001",
+        "old_status": "to_review",
+        "new_status": "published",
+        "delivery_task_id": 789
+    }
+}</code></pre>
+
+                    <h6 class="mt-4 mb-3">Event Types</h6>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><code>order.created</code> - New order created</li>
+                        <li class="mb-2"><code>order.status_updated</code> - Order status changed</li>
+                        <li class="mb-2"><code>order.delivered</code> - Order delivered</li>
+                        <li class="mb-2"><code>order.failed</code> - Delivery failed</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Field Reference -->
+            <div class="card-modern mb-4">
+                <div class="card-header-modern">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-list-check me-2"></i>
+                        Field Reference
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <h6 class="mb-3">Required Fields</h6>
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <code>business_id</code>
+                            <small class="text-muted d-block">Seller's business ID</small>
+                        </li>
+                        <li class="mb-2">
+                            <code>customer_name</code>
+                            <small class="text-muted d-block">Customer full name</small>
+                        </li>
+                        <li class="mb-2">
+                            <code>customer_phone</code>
+                            <small class="text-muted d-block">Phone number</small>
+                        </li>
+                        <li class="mb-2">
+                            <code>customer_address</code>
+                            <small class="text-muted d-block">Delivery address</small>
+                        </li>
+                    </ul>
+
+                    <h6 class="mb-3 mt-4">Optional Fields</h6>
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <code>client_order_code</code>
+                            <small class="text-muted d-block">Your reference (auto-generated if empty)</small>
+                        </li>
+                        <li class="mb-2">
+                            <code>customer_whatsapp</code>
+                            <small class="text-muted d-block">WhatsApp number</small>
+                        </li>
+                        <li class="mb-2">
+                            <code>dl_zone</code>
+                            <small class="text-muted d-block">Zone number (integer)</small>
+                        </li>
+                        <li class="mb-2">
+                            <code>dl_street</code>
+                            <small class="text-muted d-block">Street number (integer)</small>
+                        </li>
+                        <li class="mb-2">
+                            <code>dl_building</code>
+                            <small class="text-muted d-block">Building number (integer)</small>
+                        </li>
+                        <li class="mb-2">
+                            <code>cod_amount</code>
+                            <small class="text-muted d-block">COD in QAR (default: 0)</small>
+                        </li>
+                        <li class="mb-2">
+                            <code>dl_amount</code>
+                            <small class="text-muted d-block">Delivery fee in QAR</small>
+                        </li>
+                        <li class="mb-2">
+                            <code>order_notes</code>
+                            <small class="text-muted d-block">Special instructions</small>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Business IDs -->
+            <div class="card-modern">
+                <div class="card-header-modern">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-store me-2"></i>
+                        Active Business IDs
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Business</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for business in businesses %}
+                            <tr>
+                                <td><code>{{ business.business_id }}</code></td>
+                                <td>{{ business.business_name }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="2" class="text-muted">No active businesses</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <small class="text-muted mt-2 d-block">
+                        <a href="{% url 'workforce:sellers_list' %}">View all sellers</a>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

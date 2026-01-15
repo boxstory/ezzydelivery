@@ -1,0 +1,638 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}{{ driver.user.first_name }} {{ driver.user.last_name }} - Driver Detail{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3">
+<div class="driver-page">
+
+<!-- Back Link -->
+<a href="{% url 'workforce:drivers_list' %}" class="back-link">
+    <i class="fa-solid fa-arrow-left"></i>
+    Back to Drivers
+</a>
+
+<!-- Header -->
+<div class="driver-header">
+    <div class="driver-main-info">
+        <h1 class="driver-name">
+            <i class="fa-solid fa-motorcycle"></i>
+            {{ driver.user.first_name }} {{ driver.user.last_name }}
+        </h1>
+        <div class="driver-id">{{ driver.driver_code|default:"N/A" }} &bull; ID #{{ driver.driver_id }}</div>
+
+        <div class="driver-contact-row">
+            {% if driver.driver_phone %}
+            <div class="driver-contact-item">
+                <i class="fa-solid fa-phone"></i>
+                {{ driver.driver_phone }}
+            </div>
+            {% endif %}
+            {% if driver.driver_whatsapp %}
+            <div class="driver-contact-item">
+                <i class="fa-brands fa-whatsapp"></i>
+                {{ driver.driver_whatsapp }}
+            </div>
+            {% endif %}
+            {% if driver.user.email %}
+            <div class="driver-contact-item">
+                <i class="fa-solid fa-envelope"></i>
+                {{ driver.user.email }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="driver-status-badges">
+        <span class="status-pill status-pill-{% if driver.driver_status == 'Approved' %}approved{% elif driver.driver_status == 'Pending on Review' or driver.driver_status == 'Processing' %}pending{% else %}rejected{% endif %}">
+            <i class="fa-solid fa-circle status-pill-icon"></i>
+            {{ driver.driver_status }}
+        </span>
+        {% if driver.driver_rating > 0 %}
+        <span class="status-pill status-pill-rating">
+            <i class="fa-solid fa-star"></i>
+            {{ driver.driver_rating }} ({{ driver.driver_rating_count }})
+        </span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Stats Row -->
+<div class="stats-row">
+    <div class="stat-box">
+        <div class="stat-box-value">{{ delivery_stats.total_tasks|default:0 }}</div>
+        <div class="stat-box-label">Total Deliveries</div>
+        {% if last_7_days_tasks > 0 %}
+        <div class="stat-box-trend">+{{ last_7_days_tasks }} this week</div>
+        {% endif %}
+    </div>
+    <div class="stat-box">
+        <div class="stat-box-value">{{ success_rate }}%</div>
+        <div class="stat-box-label">Success Rate</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-box-value">{{ recent_tasks_count|default:0 }}</div>
+        <div class="stat-box-label">Last 30 Days</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-box-value">{{ cod_stats.total_cod_tasks|default:0 }}</div>
+        <div class="stat-box-label">COD Deliveries</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-box-value">{{ driver.wallet_balance|floatformat:0 }}</div>
+        <div class="stat-box-label">Wallet (QAR)</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-box-value">{{ driver.cod_in_hand|floatformat:0|default:0 }}</div>
+        <div class="stat-box-label">COD In Hand</div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs-nav" role="tablist" aria-label="Driver information tabs">
+    <button class="tab-btn active" data-tab="overview" role="tab" id="tab-overview" aria-controls="panel-overview" aria-selected="true">Overview</button>
+    <button class="tab-btn" data-tab="deliveries" role="tab" id="tab-deliveries" aria-controls="panel-deliveries" aria-selected="false">Deliveries <span class="tab-btn-count">{{ delivery_stats.total_tasks|default:0 }}</span></button>
+    <button class="tab-btn" data-tab="details" role="tab" id="tab-details" aria-controls="panel-details" aria-selected="false">Details</button>
+    <button class="tab-btn" data-tab="vehicles" role="tab" id="tab-vehicles" aria-controls="panel-vehicles" aria-selected="false">Vehicles <span class="tab-btn-count">{{ vehicles.count|default:0 }}</span></button>
+    <button class="tab-btn" data-tab="documents" role="tab" id="tab-documents" aria-controls="panel-documents" aria-selected="false">Documents <span class="tab-btn-count">{{ documents|length }}</span></button>
+    <button class="tab-btn" data-tab="settings" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false">Settings</button>
+</div>
+
+<!-- Tab: Overview -->
+<div id="panel-overview" class="tab-panel active" role="tabpanel" aria-labelledby="tab-overview">
+    <div class="two-col">
+        <div>
+            <!-- Delivery Summary -->
+            <div class="card-section">
+                <h3 class="section-heading">Delivery Summary</h3>
+                <div class="delivery-stats-grid">
+                    <div class="delivery-stat-cell">
+                        <div class="delivery-stat-num success">{{ delivery_stats.completed_tasks|default:0 }}</div>
+                        <div class="delivery-stat-text">Completed</div>
+                    </div>
+                    <div class="delivery-stat-cell">
+                        <div class="delivery-stat-num info">{{ delivery_stats.in_transit|default:0 }}</div>
+                        <div class="delivery-stat-text">In Transit</div>
+                    </div>
+                    <div class="delivery-stat-cell">
+                        <div class="delivery-stat-num danger">{{ delivery_stats.failed_tasks|default:0 }}</div>
+                        <div class="delivery-stat-text">Failed</div>
+                    </div>
+                    <div class="delivery-stat-cell">
+                        <div class="delivery-stat-num">{{ delivery_stats.total_tasks|default:0 }}</div>
+                        <div class="delivery-stat-text">Total</div>
+                    </div>
+                </div>
+                {% if delivery_stats.total_tasks > 0 %}
+                <div class="progress-track">
+                    {% with c=delivery_stats.completed_tasks|default:0 i=delivery_stats.in_transit|default:0 f=delivery_stats.failed_tasks|default:0 t=delivery_stats.total_tasks %}
+                    <div class="progress-fill success" style="width: {% widthratio c t 100 %}%;"></div>
+                    <div class="progress-fill warning" style="width: {% widthratio i t 100 %}%;"></div>
+                    <div class="progress-fill danger" style="width: {% widthratio f t 100 %}%;"></div>
+                    {% endwith %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- COD Summary -->
+            {% if cod_stats.total_cod_tasks > 0 %}
+            <div class="card-section">
+                <h3 class="section-heading">COD Summary</h3>
+                <div class="cod-grid">
+                    <div class="cod-item">
+                        <div class="cod-value">{{ cod_stats.total_cod_tasks|default:0 }}</div>
+                        <div class="cod-label">COD Deliveries</div>
+                    </div>
+                    <div class="cod-item">
+                        <div class="cod-value">{{ cod_stats.total_cod_amount|default:0|floatformat:0 }} QAR</div>
+                        <div class="cod-label">Total Amount</div>
+                    </div>
+                    <div class="cod-item">
+                        <div class="cod-value success">{{ cod_stats.collected_cod|default:0|floatformat:0 }} QAR</div>
+                        <div class="cod-label">Collected</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Quick Actions -->
+            <div class="card-section">
+                <h3 class="section-heading">Quick Actions</h3>
+                <div class="actions-row">
+                    <a href="{% url 'workforce:dl_list_all' %}?driver={{ driver.driver_id }}" class="action-btn">
+                        <i class="fa-solid fa-truck"></i>
+                        View Deliveries
+                    </a>
+                    <a href="{% url 'workforce:driver_document_detail' driver.driver_id %}" class="action-btn">
+                        <i class="fa-solid fa-id-card"></i>
+                        Documents
+                    </a>
+                    <button class="action-btn" onclick="document.querySelector('[data-tab=settings]').click();">
+                        <i class="fa-solid fa-edit"></i>
+                        Edit Info
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <!-- Recent Activity -->
+            <div class="card-section">
+                <h3 class="section-heading">Recent Activity</h3>
+                {% if recent_tasks %}
+                <ul class="activity-list">
+                    {% for task in recent_tasks %}
+                    <li class="activity-item">
+                        <span class="activity-dot {% if task.dl_task_status == 'delivered' %}success{% elif task.dl_task_status == 'in_transit' %}warning{% elif task.dl_task_status == 'failed' or task.dl_task_status == 'cancelled' %}danger{% endif %}"></span>
+                        <div class="activity-content">
+                            <div class="activity-title">#{{ task.dl_task_code|default:task.dl_task_id }}</div>
+                            <div class="activity-meta">{{ task.dl_task_status|title }} &bull; {{ task.created_at|timesince }} ago</div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="empty-msg">
+                    <i class="fa-solid fa-inbox"></i>
+                    No recent deliveries
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Contact Info -->
+            <div class="card-section">
+                <h3 class="section-heading">Contact</h3>
+                <ul class="contact-list">
+                    <li class="contact-row">
+                        <span class="contact-icon"><i class="fa-solid fa-phone"></i></span>
+                        <div class="contact-text">
+                            <div class="contact-label">Phone</div>
+                            <div class="contact-value">{{ driver.driver_phone|default:"Not provided" }}</div>
+                        </div>
+                    </li>
+                    <li class="contact-row">
+                        <span class="contact-icon"><i class="fa-brands fa-whatsapp"></i></span>
+                        <div class="contact-text">
+                            <div class="contact-label">WhatsApp</div>
+                            <div class="contact-value">{{ driver.driver_whatsapp|default:"Not provided" }}</div>
+                        </div>
+                    </li>
+                    <li class="contact-row">
+                        <span class="contact-icon"><i class="fa-solid fa-envelope"></i></span>
+                        <div class="contact-text">
+                            <div class="contact-label">Email</div>
+                            <div class="contact-value">{{ driver.user.email|default:"Not provided" }}</div>
+                        </div>
+                    </li>
+                    <li class="contact-row">
+                        <span class="contact-icon"><i class="fa-solid fa-globe"></i></span>
+                        <div class="contact-text">
+                            <div class="contact-label">Languages</div>
+                            <div class="contact-value">{{ driver.driver_languages|title|default:"Not specified" }}</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab: Deliveries -->
+<div id="panel-deliveries" class="tab-panel" role="tabpanel" aria-labelledby="tab-deliveries">
+    <h3 class="section-heading">Recent Deliveries</h3>
+    {% if recent_tasks %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Task</th>
+                <th>Business</th>
+                <th>Status</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in recent_tasks %}
+            <tr>
+                <td><strong>#{{ task.dl_task_code|default:task.dl_task_id }}</strong></td>
+                <td>{{ task.business.business_name|default:"N/A" }}</td>
+                <td>
+                    <span class="badge {% if task.dl_task_status == 'delivered' %}badge-success{% elif task.dl_task_status == 'in_transit' %}badge-warning{% elif task.dl_task_status == 'failed' or task.dl_task_status == 'cancelled' %}badge-danger{% else %}badge-default{% endif %}">
+                        {{ task.dl_task_status|title }}
+                    </span>
+                </td>
+                <td>{{ task.created_at|date:"d M Y" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div class="mt-3">
+        <a href="{% url 'workforce:dl_list_all' %}?driver={{ driver.driver_id }}" class="action-btn">
+            <i class="fa-solid fa-external-link"></i>
+            View All Deliveries
+        </a>
+    </div>
+    {% else %}
+    <div class="empty-msg">
+        <i class="fa-solid fa-truck"></i>
+        No deliveries yet
+    </div>
+    {% endif %}
+</div>
+
+<!-- Tab: Details -->
+<div id="panel-details" class="tab-panel" role="tabpanel" aria-labelledby="tab-details">
+    <div class="two-col">
+        <div>
+            <!-- Driver Info -->
+            <div class="card-section">
+                <h3 class="section-heading">Driver Information</h3>
+                <div class="info-list">
+                    <div class="info-item">
+                        <div class="info-label">Full Name</div>
+                        <div class="info-value">{{ driver.user.first_name }} {{ driver.user.last_name }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Driver Code</div>
+                        <div class="info-value">{{ driver.driver_code|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">DMS Code</div>
+                        <div class="info-value">{{ driver.driver_code_dms|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">License No</div>
+                        <div class="info-value">{{ driver.driver_license_number|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Languages</div>
+                        <div class="info-value">{{ driver.driver_languages|title|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Status</div>
+                        <div class="info-value">
+                            <span class="badge {% if driver.driver_status == 'Approved' %}badge-success{% elif driver.driver_status == 'Pending on Review' or driver.driver_status == 'Processing' %}badge-warning{% else %}badge-danger{% endif %}">
+                                {{ driver.driver_status }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Info -->
+            <div class="card-section">
+                <h3 class="section-heading">Account Information</h3>
+                <div class="info-list">
+                    <div class="info-item">
+                        <div class="info-label">Username</div>
+                        <div class="info-value">{{ driver.user.username|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Email</div>
+                        <div class="info-value">{{ driver.user.email|default:"N/A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Wallet Balance</div>
+                        <div class="info-value">QAR {{ driver.wallet_balance|floatformat:2 }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">COD In Hand</div>
+                        <div class="info-value">QAR {{ driver.cod_in_hand|floatformat:2|default:"0.00" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Rating</div>
+                        <div class="info-value">
+                            <span class="rating-stars">
+                                <i class="fa-solid fa-star"></i>
+                            </span>
+                            {{ driver.driver_rating|default:0 }} ({{ driver.driver_rating_count }} reviews)
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Date Joined</div>
+                        <div class="info-value">{{ driver.user.date_joined|date:"d M Y" }}</div>
+                    </div>
+                </div>
+            </div>
+
+            {% if driver.driver_bio %}
+            <!-- Bio -->
+            <div class="card-section">
+                <h3 class="section-heading">Bio</h3>
+                <p class="bio-text">{{ driver.driver_bio }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <div>
+            <!-- Recent Transactions -->
+            <div class="card-section">
+                <h3 class="section-heading">Recent Transactions</h3>
+                {% if recent_transactions %}
+                <ul class="activity-list">
+                    {% for txn in recent_transactions %}
+                    <li class="activity-item">
+                        <span class="activity-dot {% if txn.amount > 0 %}success{% else %}danger{% endif %}"></span>
+                        <div class="activity-content">
+                            <div class="activity-title">{{ txn.transaction_type|title }}</div>
+                            <div class="activity-meta">
+                                <span class="{% if txn.amount > 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {% if txn.amount > 0 %}+{% endif %}{{ txn.amount|floatformat:2 }} QAR
+                                </span>
+                                &bull; {{ txn.created_at|timesince }} ago
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="empty-msg">
+                    <i class="fa-solid fa-receipt"></i>
+                    No transactions yet
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab: Vehicles -->
+<div id="panel-vehicles" class="tab-panel" role="tabpanel" aria-labelledby="tab-vehicles">
+    <h3 class="section-heading">Vehicles</h3>
+    {% if vehicles %}
+    {% for vehicle in vehicles %}
+    <div class="vehicle-card">
+        <div class="vehicle-header">
+            <div class="vehicle-type">
+                <i class="fa-solid {% if vehicle.vehicle_type == '2wheeler' %}fa-motorcycle{% elif vehicle.vehicle_type == '4wheeler' %}fa-car{% else %}fa-truck{% endif %}"></i>
+                {{ vehicle.vehicle_type|title }}
+            </div>
+            <span class="badge {% if vehicle.vehicle_status == 'active' %}badge-success{% else %}badge-default{% endif %}">
+                {{ vehicle.vehicle_status|title }}
+            </span>
+        </div>
+        <div class="vehicle-details">
+            <div class="vehicle-detail-item">Number: <span>{{ vehicle.vehicle_no|default:"N/A" }}</span></div>
+            <div class="vehicle-detail-item">Model: <span>{{ vehicle.vehicle_model|default:"N/A" }}</span></div>
+            <div class="vehicle-detail-item">Color: <span>{{ vehicle.vehicle_color|default:"N/A" }}</span></div>
+            <div class="vehicle-detail-item">Added: <span>{{ vehicle.created_at|date:"d M Y" }}</span></div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-msg">
+        <i class="fa-solid fa-car"></i>
+        No vehicles registered
+    </div>
+    {% endif %}
+</div>
+
+<!-- Tab: Documents -->
+<div id="panel-documents" class="tab-panel" role="tabpanel" aria-labelledby="tab-documents">
+    <h3 class="section-heading">Documents</h3>
+    {% if documents %}
+    {% for doc in documents %}
+    <div class="document-card">
+        <div class="document-icon">
+            <i class="fa-solid fa-id-card"></i>
+        </div>
+        <div class="document-info">
+            <div class="document-type">{{ doc.document_type|default:"Document" }}</div>
+            <div class="document-number">{{ doc.document_no }}</div>
+            {% if doc.document_expiry_date %}
+            <div class="document-expiry">
+                Expires: {{ doc.document_expiry_date|date:"d M Y" }}
+                {% if doc.document_expiry_date < now %}
+                <span class="badge badge-danger ms-2">Expired</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% if doc.document_file and doc.document_file.name %}
+        <button type="button" class="action-btn doc-view-btn btn-doc-available"
+                data-doc-url="{{ doc.document_file.url }}"
+                data-doc-title="{{ doc.document_type|default:'Document' }} - {{ doc.document_no }}">
+            <i class="fa-solid fa-eye"></i>
+            View
+        </button>
+        {% else %}
+        <span class="action-btn btn-doc-unavailable">
+            <i class="fa-solid fa-eye-slash"></i>
+            No File
+        </span>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-msg">
+        <i class="fa-solid fa-folder-open"></i>
+        No documents uploaded
+    </div>
+    {% endif %}
+</div>
+
+<!-- Document Modal -->
+<div id="docModal" class="doc-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="docModalTitle">
+    <div class="doc-modal">
+        <div class="doc-modal-header">
+            <h4 class="doc-modal-title" id="docModalTitle">Document</h4>
+            <button type="button" class="doc-modal-close" id="docModalClose" aria-label="Close document viewer">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="doc-modal-body">
+            <img id="docModalImage" src="" alt="Document">
+        </div>
+        <div class="doc-modal-footer">
+            <a href="#" id="docModalDownload" class="btn-secondary" target="_blank">
+                <i class="fa-solid fa-download"></i>
+                Open in New Tab
+            </a>
+            <button type="button" class="btn-primary" id="docModalCloseBtn">
+                <i class="fa-solid fa-xmark"></i>
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Tab: Settings -->
+<div id="panel-settings" class="tab-panel" role="tabpanel" aria-labelledby="tab-settings">
+    <h3 class="section-heading">Update Driver</h3>
+    <form id="workforce_driver_detail_form_update">
+        {% csrf_token %}
+        <div class="form-grid">
+            <div class="form-group">
+                <label class="form-label">Phone</label>
+                <input type="text" name="driver_phone" value="{{ driver.driver_phone|default:'' }}" class="form-input">
+            </div>
+            <div class="form-group">
+                <label class="form-label">WhatsApp</label>
+                <input type="text" name="driver_whatsapp" value="{{ driver.driver_whatsapp|default:'' }}" class="form-input">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Status</label>
+                <select name="driver_status" class="form-input">
+                    <option value="Pending on Review" {% if driver.driver_status == 'Pending on Review' %}selected{% endif %}>Pending on Review</option>
+                    <option value="Processing" {% if driver.driver_status == 'Processing' %}selected{% endif %}>Processing</option>
+                    <option value="Approved" {% if driver.driver_status == 'Approved' %}selected{% endif %}>Approved</option>
+                    <option value="Rejected" {% if driver.driver_status == 'Rejected' %}selected{% endif %}>Rejected</option>
+                    <option value="Blocked" {% if driver.driver_status == 'Blocked' %}selected{% endif %}>Blocked</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Bio</label>
+                <input type="text" name="driver_bio" value="{{ driver.driver_bio|default:'' }}" class="form-input">
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">
+                <i class="fa-solid fa-save"></i>
+                Save Changes
+            </button>
+            <a href="{% url 'workforce:drivers_list' %}" class="btn-secondary">Cancel</a>
+        </div>
+    </form>
+    <div id="updateMessage" class="toast-msg"></div>
+</div>
+
+</div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+// Tab switching with accessibility support
+document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.tab-btn').forEach(function(b) {
+            b.classList.remove('active');
+            b.setAttribute('aria-selected', 'false');
+        });
+        document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+        this.classList.add('active');
+        this.setAttribute('aria-selected', 'true');
+        document.getElementById('panel-' + this.getAttribute('data-tab')).classList.add('active');
+    });
+});
+
+// Document Modal
+var docModal = document.getElementById('docModal');
+var docModalTitle = document.getElementById('docModalTitle');
+var docModalImage = document.getElementById('docModalImage');
+var docModalDownload = document.getElementById('docModalDownload');
+
+function openDocModal(url, title) {
+    docModalTitle.textContent = title;
+    docModalImage.src = url;
+    docModalDownload.href = url;
+    docModal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDocModal() {
+    docModal.classList.remove('show');
+    document.body.style.overflow = '';
+    docModalImage.src = '';
+}
+
+// View button click handlers
+document.querySelectorAll('.doc-view-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var url = this.getAttribute('data-doc-url');
+        var title = this.getAttribute('data-doc-title');
+        openDocModal(url, title);
+    });
+});
+
+// Close button handlers
+document.getElementById('docModalClose').addEventListener('click', closeDocModal);
+document.getElementById('docModalCloseBtn').addEventListener('click', closeDocModal);
+
+// Close on overlay click
+docModal.addEventListener('click', function(e) {
+    if (e.target === docModal) {
+        closeDocModal();
+    }
+});
+
+// Close on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && docModal.classList.contains('show')) {
+        closeDocModal();
+    }
+});
+
+// Form submit
+document.getElementById('workforce_driver_detail_form_update').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var btn = this.querySelector('button[type="submit"]');
+    var msg = document.getElementById('updateMessage');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+    fetch('{% url "workforce:driver_detail" driver.driver_id %}', {
+        method: 'POST',
+        body: new FormData(this),
+        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        msg.className = 'toast-msg show ' + (data.success ? 'success' : 'error');
+        msg.innerHTML = '<i class="fa-solid fa-' + (data.success ? 'check-circle' : 'exclamation-circle') + '"></i> ' + (data.message || data.error || 'Done');
+        if (data.success) setTimeout(function() { location.reload(); }, 1500);
+        else { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes'; }
+    })
+    .catch(function() {
+        msg.className = 'toast-msg show error';
+        msg.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Error saving';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes';
+    });
+});
+</script>
+{% endblock extra_js %}

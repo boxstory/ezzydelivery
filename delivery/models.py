@@ -94,7 +94,7 @@ class DlAddressUpdate(models.Model):
         delivery.views.dl_address_link - Customer address update page
     """
     full_name = models.CharField(max_length=100)
-    mobile_no = models.CharField(max_length=11)
+    mobile_no = models.CharField(max_length=20)
     area_name = models.CharField(max_length=100, blank=True, null=True)
     dl_zone = models.PositiveIntegerField(blank=True, null=True)
     dl_building = models.PositiveIntegerField(blank=True, null=True)

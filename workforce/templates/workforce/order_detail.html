@@ -1,0 +1,344 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Order {{ order.order_number }} - Workforce{% endblock %}
+
+{% block content %}
+<div id="main-content" class="flex-fill p-3">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-1">
+                <i class="fa-solid fa-file-invoice me-2"></i>
+                Order Details
+            </h4>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item">
+                        <a href="{% url 'workforce:wf_dashboard' %}"
+                           hx-get="{% url 'workforce:wf_dashboard' %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">Dashboard</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a href="{% url 'workforce:wf_orders_all' %}"
+                           hx-get="{% url 'workforce:wf_orders_all' %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">Orders</a>
+                    </li>
+                    <li class="breadcrumb-item active">{{ order.order_number|truncatechars:20 }}</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="btn-group">
+            {% if order.verification_status == 'pending' %}
+            <button type="button"
+                    class="btn btn-success"
+                    hx-post="{% url 'workforce:verify_order' order.id %}"
+                    hx-confirm="Verify this order?">
+                <i class="fa-solid fa-check me-1"></i> Verify
+            </button>
+            {% endif %}
+            {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
+            <button type="button"
+                    class="btn btn-info"
+                    hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}"
+                    hx-confirm="Publish this order?">
+                <i class="fa-solid fa-paper-plane me-1"></i> Publish
+            </button>
+            {% endif %}
+            {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
+            <button type="button"
+                    class="btn btn-danger"
+                    hx-post="{% url 'workforce:cancel_order' order.id %}"
+                    hx-confirm="Cancel this order?">
+                <i class="fa-solid fa-times me-1"></i> Cancel
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Order Info -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-info-circle me-2"></i>
+                        Order Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Order Number</label>
+                            <p class="fw-bold mb-0">{{ order.order_number }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Client Order Code</label>
+                            <p class="fw-bold mb-0">{{ order.client_order_code }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Order Status</label>
+                            <p class="mb-0">
+                                {% if order.order_status == 'to_review' %}
+                                <span class="badge bg-warning text-dark fs-6">To Review</span>
+                                {% elif order.order_status == 'to_publish' %}
+                                <span class="badge bg-info fs-6">To Publish</span>
+                                {% elif order.order_status == 'published' %}
+                                <span class="badge bg-success fs-6">Published</span>
+                                {% elif order.order_status == 'cancelled' %}
+                                <span class="badge bg-danger fs-6">Cancelled</span>
+                                {% else %}
+                                <span class="badge bg-secondary fs-6">{{ order.order_status }}</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Verification Status</label>
+                            <p class="mb-0">
+                                {% if order.verification_status == 'pending' %}
+                                <span class="badge bg-warning text-dark fs-6">Pending</span>
+                                {% elif order.verification_status == 'verified' %}
+                                <span class="badge bg-success fs-6">Verified</span>
+                                {% elif order.verification_status == 'rejected' %}
+                                <span class="badge bg-danger fs-6">Rejected</span>
+                                {% else %}
+                                <span class="badge bg-secondary fs-6">{{ order.verification_status }}</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Order Date</label>
+                            <p class="mb-0">{{ order.order_date|date:"d M Y" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Created At</label>
+                            <p class="mb-0">{{ order.created_at|date:"d M Y H:i" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customer Info -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-user me-2"></i>
+                        Customer Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Customer Name</label>
+                            <p class="fw-bold mb-0">{{ order.customer_name }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Phone</label>
+                            <p class="mb-0">
+                                <a href="tel:{{ order.customer_phone }}" class="text-decoration-none">
+                                    <i class="fa-solid fa-phone me-1"></i>{{ order.customer_phone }}
+                                </a>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">WhatsApp</label>
+                            <p class="mb-0">
+                                {% if order.customer_whatsapp %}
+                                <a href="https://wa.me/{{ order.customer_whatsapp }}" target="_blank" class="text-decoration-none text-success">
+                                    <i class="fa-brands fa-whatsapp me-1"></i>{{ order.customer_whatsapp }}
+                                </a>
+                                {% else %}
+                                <span class="text-muted">Not provided</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-muted small">Address</label>
+                            <p class="mb-0">{{ order.customer_address }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Zone</label>
+                            <p class="mb-0">{{ order.dl_zone|default:"-" }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Street</label>
+                            <p class="mb-0">{{ order.dl_street|default:"-" }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Building</label>
+                            <p class="mb-0">{{ order.dl_building|default:"-" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Items -->
+            {% if order_items %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-box me-2"></i>
+                        Order Items
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Product</th>
+                                <th>Quantity</th>
+                                <th>Unit Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in order_items %}
+                            <tr>
+                                <td>{{ item.product|default:item.notes|truncatechars:50 }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>{{ item.unit_price }} QAR</td>
+                                <td>{{ item.total_price }} QAR</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Activity Log -->
+            {% if verification_logs %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-clock-rotate-left me-2"></i>
+                        Activity Log
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        {% for log in verification_logs %}
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>{{ log.action }}</strong>
+                                    {% if log.notes %}
+                                    <p class="text-muted small mb-0">{{ log.notes }}</p>
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">{{ log.created_at|date:"d M Y H:i" }}</small>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Payment Info -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-money-bill me-2"></i>
+                        Payment
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>COD Amount:</span>
+                        <strong>{{ order.cod_amount }} QAR</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Delivery Fee:</span>
+                        <strong>{{ order.dl_amount }} QAR</strong>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <span class="fw-bold">Total:</span>
+                        <strong class="text-success fs-5">{{ order.cod_amount|add:order.dl_amount }} QAR</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Business Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-store me-2"></i>
+                        Seller
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="fw-bold mb-1">{{ order.business.business_name }}</p>
+                    <p class="text-muted small mb-0">ID: {{ order.business.business_id }}</p>
+                    {% if order.pickup_location %}
+                    <hr>
+                    <p class="small mb-1"><strong>Pickup Location:</strong></p>
+                    <p class="text-muted small mb-0">{{ order.pickup_location.location_name }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Delivery Task -->
+            {% if delivery_task %}
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-truck me-2"></i>
+                        Delivery Task
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">
+                        <strong>Task #:</strong> {{ delivery_task.dl_task_number }}
+                    </p>
+                    <p class="mb-2">
+                        <strong>Status:</strong>
+                        <span class="badge bg-info">{{ delivery_task.dl_task_status }}</span>
+                    </p>
+                    {% if delivery_task.driver %}
+                    <p class="mb-0">
+                        <strong>Driver:</strong> {{ delivery_task.driver.profile.first_name }}
+                    </p>
+                    {% endif %}
+                    <hr>
+                    <a href="{% url 'workforce:delivery_task_detail' delivery_task.id %}"
+                       class="btn btn-outline-primary btn-sm w-100"
+                       hx-get="{% url 'workforce:delivery_task_detail' delivery_task.id %}"
+                       hx-target="#main-content"
+                       hx-select="#main-content"
+                       hx-swap="outerHTML"
+                       hx-push-url="true">
+                        View Task Details
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Notes -->
+            {% if order.order_notes %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-sticky-note me-2"></i>
+                        Notes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ order.order_notes }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

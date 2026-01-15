@@ -4,12 +4,20 @@
 {% block title %}{{ business.business_name|default:"Seller Detail" }} - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
 <style>
 /* Clean Seller Detail Page */
 .seller-page {
     max-width: 1400px;
     margin: 0 auto;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+.seller-page *:not(i):not([class*="fa-"]) {
+    font-family: inherit;
 }
 
 /* Back Link */
@@ -519,8 +527,12 @@
 }
 
 .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
     padding: 0.75rem 0;
     border-bottom: 1px solid var(--brand-grey-100);
+    gap: 1rem;
 }
 
 .info-item:nth-child(odd) {
@@ -533,26 +545,39 @@
 }
 
 .info-label {
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     color: var(--brand-grey-500);
     text-transform: uppercase;
     letter-spacing: 0.3px;
-    margin-bottom: 0.25rem;
+    flex-shrink: 0;
+    min-width: 100px;
 }
 
-.info-value {
-    font-size: 0.875rem;
-    color: var(--brand-grey-800);
+.info-item .info-value {
+    font-size: 0.9375rem !important;
+    font-weight: 500 !important;
+    color: var(--brand-grey-800) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    letter-spacing: -0.01em !important;
+    text-align: right;
 }
 
 @media (max-width: 640px) {
     .info-list {
         grid-template-columns: 1fr;
     }
+    .info-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
     .info-item:nth-child(odd),
     .info-item:nth-child(even) {
         padding: 0.75rem 0;
         border-left: none;
+    }
+    .info-item .info-value {
+        text-align: left;
     }
 }
 
@@ -769,6 +794,171 @@
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* Document Card */
+.document-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid var(--brand-grey-200);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.document-card:last-child {
+    margin-bottom: 0;
+}
+
+.document-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--brand-grey-100);
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--brand-grey-500);
+    font-size: 1.25rem;
+}
+
+.document-info {
+    flex: 1;
+}
+
+.document-type {
+    font-weight: 600;
+    color: var(--brand-grey-800);
+    margin-bottom: 0.25rem;
+}
+
+.document-number {
+    font-size: 0.8125rem;
+    color: var(--brand-grey-600);
+}
+
+.document-expiry {
+    font-size: 0.75rem;
+    color: var(--brand-grey-500);
+}
+
+/* Document Button States */
+.btn-doc-available {
+    background: #dcfce7 !important;
+    border-color: #16a34a !important;
+    color: #166534 !important;
+}
+
+.btn-doc-available:hover {
+    background: #bbf7d0 !important;
+    border-color: #15803d !important;
+}
+
+.btn-doc-available i {
+    color: #16a34a !important;
+}
+
+.btn-doc-unavailable {
+    background: #fee2e2 !important;
+    border-color: #dc2626 !important;
+    color: #991b1b !important;
+    cursor: not-allowed;
+}
+
+.btn-doc-unavailable i {
+    color: #dc2626 !important;
+}
+
+/* Document Modal */
+.doc-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 2rem;
+}
+
+.doc-modal-overlay.show {
+    display: flex;
+}
+
+.doc-modal {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    background: #fff;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+}
+
+.doc-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--brand-grey-200);
+    background: var(--brand-grey-50);
+}
+
+.doc-modal-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-grey-800);
+    margin: 0;
+}
+
+.doc-modal-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: none;
+    color: var(--brand-grey-500);
+    font-size: 1.25rem;
+    cursor: pointer;
+    border-radius: 0.25rem;
+    transition: all 0.2s;
+}
+
+.doc-modal-close:hover {
+    background: var(--brand-grey-100);
+    color: var(--brand-grey-800);
+}
+
+.doc-modal-body {
+    padding: 1rem;
+    max-height: calc(90vh - 60px);
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand-grey-100);
+}
+
+.doc-modal-body img {
+    max-width: 100%;
+    max-height: calc(90vh - 100px);
+    object-fit: contain;
+    border-radius: 0.25rem;
+}
+
+.doc-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--brand-grey-200);
+    background: var(--brand-grey-50);
+}
 </style>
 {% endblock extra_css %}
 
@@ -869,9 +1059,10 @@
     <button class="tab-btn active" data-tab="overview">Overview</button>
     <button class="tab-btn" data-tab="orders">Orders <span class="tab-btn-count">{{ order_stats.total_orders|default:0 }}</span></button>
     <button class="tab-btn" data-tab="details">Details</button>
+    <button class="tab-btn" data-tab="documents">Documents <span class="tab-btn-count">{{ documents|length }}</span></button>
     <button class="tab-btn" data-tab="team">Team <span class="tab-btn-count">{{ team_members.count|default:0 }}</span></button>
     <button class="tab-btn" data-tab="integrations">Integrations <span class="tab-btn-count">{{ api_settings.count|default:0 }}</span></button>
-    <button class="tab-btn" data-tab="settings">Settings</button>
+    <button class="tab-btn" data-tab="edit">Edit</button>
 </div>
 
 <!-- Tab: Overview -->
@@ -956,7 +1147,7 @@
                         <i class="fa-solid fa-certificate"></i>
                         License
                     </a>
-                    <button class="action-btn" onclick="document.querySelector('[data-tab=settings]').click();">
+                    <button class="action-btn" onclick="document.querySelector('[data-tab=edit]').click();">
                         <i class="fa-solid fa-edit"></i>
                         Edit Info
                     </button>
@@ -1207,6 +1398,75 @@
     </div>
 </div>
 
+<!-- Tab: Documents -->
+<div id="panel-documents" class="tab-panel">
+    <h3 class="section-heading">Business Documents</h3>
+    {% if documents %}
+    {% for doc in documents %}
+    <div class="document-card">
+        <div class="document-icon">
+            <i class="fa-solid fa-{% if doc.document_type == 'license' %}certificate{% elif doc.document_type == 'id' %}id-card{% else %}file-alt{% endif %}"></i>
+        </div>
+        <div class="document-info">
+            <div class="document-type">{{ doc.document_type|default:"Document"|title }}</div>
+            <div class="document-number">{{ doc.document_no|default:"N/A" }}</div>
+            {% if doc.document_expiry_date %}
+            <div class="document-expiry">
+                Expires: {{ doc.document_expiry_date|date:"d M Y" }}
+                {% if doc.document_expiry_date < now %}
+                <span class="badge badge-danger" style="margin-left: 0.5rem;">Expired</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% if doc.document_file and doc.document_file.name %}
+        <button type="button" class="action-btn doc-view-btn btn-doc-available"
+                data-doc-url="{{ doc.document_file.url }}"
+                data-doc-title="{{ doc.document_type|default:'Document'|title }} - {{ doc.document_no }}">
+            <i class="fa-solid fa-eye"></i>
+            View
+        </button>
+        {% else %}
+        <span class="action-btn btn-doc-unavailable">
+            <i class="fa-solid fa-eye-slash"></i>
+            No File
+        </span>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-msg">
+        <i class="fa-solid fa-folder-open"></i>
+        No documents uploaded
+    </div>
+    {% endif %}
+</div>
+
+<!-- Document Modal -->
+<div id="docModal" class="doc-modal-overlay">
+    <div class="doc-modal">
+        <div class="doc-modal-header">
+            <h4 class="doc-modal-title" id="docModalTitle">Document</h4>
+            <button type="button" class="doc-modal-close" id="docModalClose">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="doc-modal-body">
+            <img id="docModalImage" src="" alt="Document">
+        </div>
+        <div class="doc-modal-footer">
+            <a href="#" id="docModalDownload" class="btn-secondary" target="_blank">
+                <i class="fa-solid fa-download"></i>
+                Open in New Tab
+            </a>
+            <button type="button" class="btn-primary" id="docModalCloseBtn">
+                <i class="fa-solid fa-xmark"></i>
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Tab: Team -->
 <div id="panel-team" class="tab-panel">
     <h3 class="section-heading">Team Members</h3>
@@ -1294,27 +1554,37 @@
     {% endif %}
 </div>
 
-<!-- Tab: Settings -->
-<div id="panel-settings" class="tab-panel">
+<!-- Tab: Edit -->
+<div id="panel-edit" class="tab-panel">
     <h3 class="section-heading">Update Seller</h3>
     <form id="updateForm">
         {% csrf_token %}
+
+        <!-- Basic Information Section -->
+        <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-700); margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--brand-grey-100);">
+            <i class="fa-solid fa-store" style="margin-right: 0.5rem; color: var(--brand-primary);"></i>
+            Basic Information
+        </h4>
         <div class="form-grid">
             <div class="form-group">
-                <label class="form-label">Business Name</label>
+                <label class="form-label">Business Code</label>
+                <input type="text" name="business_code" value="{{ business.business_code|default:'' }}" class="form-input" placeholder="e.g., SHOP001">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Business Name *</label>
                 <input type="text" name="business_name" value="{{ business.business_name }}" class="form-input" required>
             </div>
             <div class="form-group">
-                <label class="form-label">Phone</label>
-                <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="form-input">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Email</label>
-                <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="form-input">
-            </div>
-            <div class="form-group">
                 <label class="form-label">QID</label>
-                <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="form-input">
+                <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="form-input" maxlength="11" placeholder="11 digits">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Product Category</label>
+                <input type="text" name="business_product_category" value="{{ business.business_product_category|default:'' }}" class="form-input" placeholder="e.g., Electronics, Fashion">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Business Since</label>
+                <input type="date" name="business_since" value="{{ business.business_since|date:'Y-m-d' }}" class="form-input">
             </div>
             <div class="form-group">
                 <label class="form-label">Status</label>
@@ -1325,14 +1595,94 @@
                     <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
                 </select>
             </div>
+            <div class="form-group full-width">
+                <label class="form-label">Business Bio</label>
+                <input type="text" name="business_bio" value="{{ business.business_bio|default:'' }}" class="form-input" maxlength="225" placeholder="Short description of the business">
+            </div>
+        </div>
+
+        <!-- Contact Information Section -->
+        <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-700); margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--brand-grey-100);">
+            <i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--brand-primary);"></i>
+            Contact Information
+        </h4>
+        <div class="form-grid">
             <div class="form-group">
-                <label class="form-label">&nbsp;</label>
+                <label class="form-label">Phone</label>
+                <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="form-input" placeholder="e.g., +974 1234 5678">
+            </div>
+            <div class="form-group">
+                <label class="form-label">WhatsApp</label>
+                <input type="text" name="business_whatsapp" value="{{ business.business_whatsapp|default:'' }}" class="form-input" placeholder="e.g., +974 1234 5678">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="form-input" placeholder="business@example.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Website</label>
+                <input type="url" name="business_website" value="{{ business_profile.business_website|default:'' }}" class="form-input" placeholder="https://example.com">
+            </div>
+        </div>
+
+        <!-- Social Media Section -->
+        <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-700); margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--brand-grey-100);">
+            <i class="fa-solid fa-share-nodes" style="margin-right: 0.5rem; color: var(--brand-primary);"></i>
+            Social Media
+        </h4>
+        <div class="form-grid">
+            <div class="form-group">
+                <label class="form-label"><i class="fa-brands fa-instagram" style="margin-right: 0.375rem;"></i>Instagram</label>
+                <input type="text" name="business_instagram" value="{{ business.business_instagram|default:'' }}" class="form-input" placeholder="@username or URL">
+            </div>
+            <div class="form-group">
+                <label class="form-label"><i class="fa-brands fa-facebook" style="margin-right: 0.375rem;"></i>Facebook</label>
+                <input type="text" name="business_facebook_page" value="{{ business.business_facebook_page|default:'' }}" class="form-input" placeholder="Page name or URL">
+            </div>
+        </div>
+
+        <!-- Address Section -->
+        <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-700); margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--brand-grey-100);">
+            <i class="fa-solid fa-location-dot" style="margin-right: 0.5rem; color: var(--brand-primary);"></i>
+            Business Address
+        </h4>
+        <div class="form-grid">
+            <div class="form-group full-width">
+                <label class="form-label">Street Address</label>
+                <input type="text" name="business_address" value="{{ business_profile.business_address|default:'' }}" class="form-input" placeholder="Street address">
+            </div>
+            <div class="form-group">
+                <label class="form-label">City</label>
+                <input type="text" name="business_city" value="{{ business_profile.business_city|default:'' }}" class="form-input" placeholder="e.g., Doha">
+            </div>
+            <div class="form-group">
+                <label class="form-label">State/Area</label>
+                <input type="text" name="business_state" value="{{ business_profile.business_state|default:'' }}" class="form-input" placeholder="e.g., Al Wakrah">
+            </div>
+            <div class="form-group">
+                <label class="form-label">ZIP Code</label>
+                <input type="text" name="business_zip_code" value="{{ business_profile.business_zip_code|default:'' }}" class="form-input" maxlength="10">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Country</label>
+                <input type="text" name="business_country" value="{{ business_profile.business_country|default:'Qatar' }}" class="form-input">
+            </div>
+        </div>
+
+        <!-- Settings Section -->
+        <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-700); margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--brand-grey-100);">
+            <i class="fa-solid fa-gear" style="margin-right: 0.5rem; color: var(--brand-primary);"></i>
+            Service Settings
+        </h4>
+        <div class="form-grid">
+            <div class="form-group">
                 <label class="form-checkbox">
                     <input type="checkbox" name="fulfillment_service_enabled" {% if business.fulfillment_service_enabled %}checked{% endif %}>
-                    Enable Fulfillment Service
+                    Enable Fulfillment Service (WMS Integration)
                 </label>
             </div>
         </div>
+
         <div class="form-actions">
             <button type="submit" class="btn-primary">
                 <i class="fa-solid fa-save"></i>
@@ -1358,6 +1708,53 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
         this.classList.add('active');
         document.getElementById('panel-' + this.getAttribute('data-tab')).classList.add('active');
     });
+});
+
+// Document Modal
+var docModal = document.getElementById('docModal');
+var docModalTitle = document.getElementById('docModalTitle');
+var docModalImage = document.getElementById('docModalImage');
+var docModalDownload = document.getElementById('docModalDownload');
+
+function openDocModal(url, title) {
+    docModalTitle.textContent = title;
+    docModalImage.src = url;
+    docModalDownload.href = url;
+    docModal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDocModal() {
+    docModal.classList.remove('show');
+    document.body.style.overflow = '';
+    docModalImage.src = '';
+}
+
+// View button click handlers
+document.querySelectorAll('.doc-view-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var url = this.getAttribute('data-doc-url');
+        var title = this.getAttribute('data-doc-title');
+        openDocModal(url, title);
+    });
+});
+
+// Close button handlers
+document.getElementById('docModalClose').addEventListener('click', closeDocModal);
+document.getElementById('docModalCloseBtn').addEventListener('click', closeDocModal);
+
+// Close on overlay click
+docModal.addEventListener('click', function(e) {
+    if (e.target === docModal) {
+        closeDocModal();
+    }
+});
+
+// Close on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && docModal.classList.contains('show')) {
+        closeDocModal();
+    }
 });
 
 // Form submit

@@ -5,6 +5,9 @@
 
 {% block extra_css %}
 <link type="text/css" rel="stylesheet" href="{% static 'business/css/business.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
 <style>
 .wizard-steps {
     display: flex;
@@ -241,31 +244,33 @@
 }
 .progress-bar-outer {
     height: 24px;
-    background: var(--bg-secondary);
+    background: var(--bg-secondary, #e9ecef);
     border-radius: 12px;
     overflow: hidden;
     position: relative;
 }
 .progress-bar-inner {
     height: 100%;
-    background: linear-gradient(90deg, var(--brand-primary), var(--success-color));
+    min-width: 0;
+    background: linear-gradient(90deg, var(--brand-primary, #6a11cb), var(--success-color, #28a745));
     border-radius: 12px;
-    transition: width 0.3s ease;
+    transition: width 0.4s ease-out;
     position: relative;
+    overflow: hidden;
 }
 .progress-bar-inner::after {
     content: '';
     position: absolute;
     top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-    animation: shimmer 1.5s infinite;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: shimmer 1.5s infinite linear;
 }
 @keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+    0% { left: -100%; }
+    100% { left: 100%; }
 }
 .progress-text {
     display: flex;
@@ -380,10 +385,100 @@
 .failed-table .error-message {
     color: var(--danger-color);
     font-weight: 500;
-    max-width: 200px;
+    min-width: 200px;
+    max-width: 300px;
+}
+.failed-table .error-message-content {
+    max-height: 60px;
+    overflow-y: auto;
+    padding: var(--spacing-xs);
+    background: #fff5f5;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.4;
+    word-break: break-word;
+}
+.failed-table .error-message-content:hover {
+    background: #ffe0e0;
 }
 .failed-table tr:hover td {
     background: #fff5f5;
+}
+
+/* Error Detail Modal */
+.error-detail-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+.error-detail-modal.show {
+    display: flex;
+}
+.error-detail-content {
+    background: white;
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.error-detail-header {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fff5f5;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.error-detail-header h5 {
+    margin: 0;
+    color: var(--danger-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+.error-detail-body {
+    padding: var(--spacing-lg);
+    flex: 1;
+    overflow-y: auto;
+}
+.error-detail-body .error-text {
+    background: #f8f9fa;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--danger-color);
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.error-detail-body .row-info {
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    font-size: var(--font-sm);
+}
+.error-detail-footer {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
 }
 .business-info-disabled {
     background: var(--bg-secondary);
@@ -401,9 +496,7 @@
     font-size: var(--font-sm);
 }
 </style>
-{% endblock extra_css %}
 
-{% block content %}
 <div class="col-12 p-3">
     <!-- Page Title -->
     <h1 class="page-title">
@@ -529,7 +622,6 @@
                             <li class="mb-1"><code>customer_whatsapp</code></li>
                             <li class="mb-1"><code>dl_zone</code>, <code>dl_street</code>, <code>dl_building</code></li>
                             <li class="mb-1"><code>cod_amount</code>, <code>dl_amount</code></li>
-                            <li class="mb-1"><code>order_notes</code></li>
                         </ul>
 
                         <hr>
@@ -563,6 +655,13 @@
                 <p class="text-muted mb-4">
                     Map your file columns to the corresponding order fields. Required fields are marked with <span class="text-danger">*</span>
                 </p>
+
+                <!-- Mapping Header -->
+                <div class="mapping-row mapping-header-row" style="background: var(--bg-secondary); font-weight: 600; border-bottom: 2px solid var(--border-color);">
+                    <div class="mapping-source">Source (Your File)</div>
+                    <div class="mapping-arrow"></div>
+                    <div class="mapping-target">Ezzy-DMS</div>
+                </div>
 
                 <div class="mapping-container" id="mappingContainer">
                     <!-- Mapping rows will be generated by JavaScript -->
@@ -672,7 +771,7 @@
 <div id="failedRowsSection" style="display: none;">
     <div class="failed-table-container">
         <div class="failed-table-header">
-            <h6><i class="fa-solid fa-exclamation-triangle me-2"></i>Failed Orders - Edit and Retry</h6>
+            <h6><i class="fa-solid fa-exclamation-triangle me-2"></i>Failed Orders - Edit and Retry <span class="text-muted small">(click error to see full details)</span></h6>
             <button type="button" class="btn btn-warning btn-sm" onclick="retryFailedOrders()">
                 <i class="fa-solid fa-redo me-2"></i>Retry All Failed
             </button>
@@ -685,6 +784,35 @@
         </div>
     </div>
 </div>
+
+<!-- Error Detail Modal -->
+<div class="error-detail-modal" id="errorDetailModal">
+    <div class="error-detail-content">
+        <div class="error-detail-header">
+            <h5>
+                <i class="fa-solid fa-exclamation-circle"></i>
+                <span>Error Details</span>
+            </h5>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="closeErrorModal()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="error-detail-body">
+            <div class="row-info">
+                <strong>Row:</strong> <span id="errorRowNumber">-</span> |
+                <strong>Customer:</strong> <span id="errorCustomerName">-</span>
+            </div>
+            <label class="form-label text-muted mb-2">Error Message:</label>
+            <div class="error-text" id="errorFullText"></div>
+        </div>
+        <div class="error-detail-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeErrorModal()">Close</button>
+            <button type="button" class="btn btn-outline-primary" onclick="copyErrorText()">
+                <i class="fa-solid fa-copy me-1"></i>Copy Error
+            </button>
+        </div>
+    </div>
+</div>
 {% endblock content %}
 
 {% block extra_js %}
@@ -693,7 +821,6 @@
 const targetFields = [
     { name: 'client_order_code', label: 'Order ID', required: false, group: 'Order Info' },
     { name: 'order_date', label: 'Order Date', required: false, group: 'Order Info' },
-    { name: 'invoice_number', label: 'Invoice No', required: false, group: 'Order Info' },
     { name: 'customer_name', label: 'Customer Name', required: true, group: 'Customer' },
     { name: 'customer_phone', label: 'Phone 1', required: true, group: 'Customer' },
     { name: 'customer_whatsapp', label: 'Phone 2 / WhatsApp', required: false, group: 'Customer' },
@@ -721,11 +848,6 @@ const targetFields = [
     { name: 'count_4', label: 'Count:4', required: false, group: 'Product' },
     { name: 'product_5', label: 'Product:5', required: false, group: 'Product' },
     { name: 'count_5', label: 'Count:5', required: false, group: 'Product' },
-    { name: 'stock_status', label: 'Stock Status', required: false, group: 'Product' },
-    { name: 'dl_number', label: 'DL No', required: false, group: 'Status' },
-    { name: 'delivery_status', label: 'Delivery Status', required: false, group: 'Status' },
-    { name: 'delivered_date', label: 'Date of Delivered', required: false, group: 'Status' },
-    { name: 'order_notes', label: 'Customer Notes', required: false, group: 'Notes' },
     { name: 'internal_notes', label: 'Notes By Ezzy', required: false, group: 'Notes' },
     { name: 'seller_notes', label: 'Notes By Seller', required: false, group: 'Notes' },
 ];
@@ -877,9 +999,18 @@ function uploadFile() {
 
         uploadedData.columns = data.columns;
         uploadedData.rows = data.rows;
-        uploadedData.mappings = data.auto_mapping || {};
+        // Server returns auto_mapping with column -> field mapping
+        // We need to reverse it to field -> column for our UI
+        const autoMapping = data.auto_mapping || {};
+        console.log('Server auto_mapping:', autoMapping);
+        uploadedData.mappings = {};
+        for (const [col, field] of Object.entries(autoMapping)) {
+            uploadedData.mappings[field] = col;
+        }
+        console.log('Reversed mappings (field -> col):', uploadedData.mappings);
 
         addLog('success', `Found ${data.columns.length} columns and ${data.total_rows} rows`);
+        addLog('info', `Auto-mapped ${Object.keys(autoMapping).length} columns`);
         buildMappingUI();
         btnNext1.disabled = false;
     })
@@ -916,8 +1047,13 @@ function buildMappingUI() {
             row.className = 'mapping-row';
 
             let options = '<option value="">-- Skip --</option>';
+            const mappedCol = uploadedData.mappings[field.name];
             uploadedData.columns.forEach(col => {
-                const selected = uploadedData.mappings[col] === field.name ? 'selected' : '';
+                // Compare with trimming to handle whitespace
+                const selected = (mappedCol && mappedCol.trim() === col.trim()) ? 'selected' : '';
+                if (selected) {
+                    console.log(`Mapping: ${field.name} -> ${col} (SELECTED)`);
+                }
                 options += `<option value="${col}" ${selected}>${col}</option>`;
             });
 
@@ -1039,13 +1175,11 @@ async function saveOrders() {
     failedRows = [];
 
     showProgressModal('Importing Orders...');
-    document.getElementById('progressTotal').textContent = rows.length;
-    document.getElementById('logContainer').innerHTML = '';
+    await resetProgressBar(rows.length);
 
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        document.getElementById('progressCurrent').textContent = i + 1;
-        document.getElementById('progressBar').style.width = ((i + 1) / rows.length * 100) + '%';
+        updateProgressBar(i + 1, rows.length);
 
         try {
             const response = await fetch('{% url "orders:bulk_import_save" %}', {
@@ -1115,12 +1249,18 @@ function buildFailedTable() {
 
     let bodyHtml = '';
     failedRows.forEach((row, index) => {
+        const customerName = row.customer_name || 'Unknown';
+        const errorText = row._error || 'Unknown error';
         bodyHtml += `<tr data-failed-index="${index}">`;
         bodyHtml += `<td>${row._originalIndex + 1}</td>`;
-        bodyHtml += `<td class="error-message">${row._error}</td>`;
+        bodyHtml += `<td class="error-message">
+            <div class="error-message-content" onclick="showErrorModal(${row._originalIndex + 1}, '${escapeHtml(customerName)}', \`${escapeHtml(errorText).replace(/`/g, '\\`')}\`)">
+                <i class="fa-solid fa-exclamation-circle me-1"></i>${escapeHtml(errorText)}
+            </div>
+        </td>`;
         editableFields.forEach(fieldName => {
             const value = row[fieldName] || '';
-            bodyHtml += `<td contenteditable="true" data-field="${fieldName}">${value}</td>`;
+            bodyHtml += `<td contenteditable="true" data-field="${fieldName}">${escapeHtml(value)}</td>`;
         });
         bodyHtml += '</tr>';
     });
@@ -1134,6 +1274,58 @@ function buildFailedTable() {
         });
     });
 }
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Error Detail Modal Functions
+function showErrorModal(rowNumber, customerName, errorText) {
+    document.getElementById('errorRowNumber').textContent = rowNumber;
+    document.getElementById('errorCustomerName').textContent = customerName;
+    document.getElementById('errorFullText').textContent = errorText;
+    document.getElementById('errorDetailModal').classList.add('show');
+}
+
+function closeErrorModal() {
+    document.getElementById('errorDetailModal').classList.remove('show');
+}
+
+function copyErrorText() {
+    const errorText = document.getElementById('errorFullText').textContent;
+    navigator.clipboard.writeText(errorText).then(() => {
+        const btn = event.target.closest('button');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Copied!';
+        btn.classList.remove('btn-outline-primary');
+        btn.classList.add('btn-success');
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-primary');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+        alert('Failed to copy error text');
+    });
+}
+
+// Close modal on outside click
+document.getElementById('errorDetailModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeErrorModal();
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeErrorModal();
+    }
+});
 
 async function retryFailedOrders() {
     if (failedRows.length === 0) {
@@ -1151,18 +1343,14 @@ async function retryFailedOrders() {
     failedRows = [];
 
     showProgressModal('Retrying Failed Orders...');
-    document.getElementById('progressTotal').textContent = rowsToRetry.length;
-    document.getElementById('progressCurrent').textContent = '0';
-    document.getElementById('progressBar').style.width = '0%';
-    document.getElementById('logContainer').innerHTML = '';
+    await resetProgressBar(rowsToRetry.length);
 
     let retrySuccess = 0;
     let retryFailed = 0;
 
     for (let i = 0; i < rowsToRetry.length; i++) {
         const row = rowsToRetry[i];
-        document.getElementById('progressCurrent').textContent = i + 1;
-        document.getElementById('progressBar').style.width = ((i + 1) / rowsToRetry.length * 100) + '%';
+        updateProgressBar(i + 1, rowsToRetry.length);
 
         try {
             const response = await fetch('{% url "orders:bulk_import_save" %}', {
@@ -1226,6 +1414,40 @@ function hideProgressModal() {
     document.getElementById('progressModal').classList.remove('active');
 }
 
+async function resetProgressBar(total) {
+    const progressBar = document.getElementById('progressBar');
+    // Disable transition temporarily for instant reset
+    progressBar.style.transition = 'none';
+    progressBar.style.width = '0%';
+
+    document.getElementById('progressCurrent').textContent = '0';
+    document.getElementById('progressTotal').textContent = total;
+    document.getElementById('successCount').textContent = '0';
+    document.getElementById('errorCount').textContent = '0';
+    document.getElementById('logContainer').innerHTML = '';
+
+    // Force browser to apply the 0% width before re-enabling transition
+    progressBar.offsetHeight; // Trigger reflow
+
+    // Re-enable transition after a frame
+    await new Promise(resolve => requestAnimationFrame(() => {
+        progressBar.style.transition = 'width 0.4s ease-out';
+        requestAnimationFrame(resolve);
+    }));
+}
+
+function updateProgressBar(current, total) {
+    const percentage = Math.round((current / total) * 100);
+    const progressBar = document.getElementById('progressBar');
+
+    // Use requestAnimationFrame for smoother updates
+    requestAnimationFrame(() => {
+        progressBar.style.width = percentage + '%';
+    });
+
+    document.getElementById('progressCurrent').textContent = current;
+}
+
 function addLog(type, message) {
     const container = document.getElementById('logContainer');
     const time = new Date().toLocaleTimeString();
@@ -1258,10 +1480,10 @@ function resetWizard() {
 }
 
 function downloadSampleCSV() {
-    const headers = ['customer_name', 'customer_phone', 'customer_address', 'dl_zone', 'dl_street', 'dl_building', 'cod_amount', 'order_notes'];
+    const headers = ['customer_name', 'customer_phone', 'customer_address', 'dl_zone', 'dl_street', 'dl_building', 'cod_amount'];
     const sample = [
-        ['John Doe', '55123456', 'Building 10, Street 5, Zone 45', '45', '5', '10', '150', 'Please call before delivery'],
-        ['Jane Smith', '66789012', 'Villa 25, Street 12, Zone 61', '61', '12', '25', '200', '']
+        ['John Doe', '55123456', 'Building 10, Street 5, Zone 45', '45', '5', '10', '150'],
+        ['Jane Smith', '66789012', 'Villa 25, Street 12, Zone 61', '61', '12', '25', '200']
     ];
 
     let csv = headers.join(',') + '\n';

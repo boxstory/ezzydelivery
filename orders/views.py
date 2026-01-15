@@ -60,6 +60,7 @@ from datetime import datetime, timedelta, timezone
 from django.forms import inlineformset_factory
 import pandas as pd
 from django.contrib import messages
+import re
 import requests
 from woocommerce import API as WooAPI
 from decouple import config
@@ -1560,7 +1561,6 @@ def bulk_import_orders(request):
         # Order Info
         {'name': 'client_order_code', 'label': 'Order ID', 'required': False, 'group': 'Order Info'},
         {'name': 'order_date', 'label': 'Order Date', 'required': False, 'group': 'Order Info'},
-        {'name': 'invoice_number', 'label': 'Invoice No', 'required': False, 'group': 'Order Info'},
 
         # Customer
         {'name': 'customer_name', 'label': 'Customer Name', 'required': True, 'group': 'Customer'},
@@ -1596,15 +1596,8 @@ def bulk_import_orders(request):
         {'name': 'count_4', 'label': 'Count:4', 'required': False, 'group': 'Product'},
         {'name': 'product_5', 'label': 'Product:5', 'required': False, 'group': 'Product'},
         {'name': 'count_5', 'label': 'Count:5', 'required': False, 'group': 'Product'},
-        {'name': 'stock_status', 'label': 'Stock Status', 'required': False, 'group': 'Product'},
-
-        # Delivery Status
-        {'name': 'dl_number', 'label': 'DL No', 'required': False, 'group': 'Status'},
-        {'name': 'delivery_status', 'label': 'Delivery Status', 'required': False, 'group': 'Status'},
-        {'name': 'delivered_date', 'label': 'Date of Delivered', 'required': False, 'group': 'Status'},
 
         # Notes
-        {'name': 'order_notes', 'label': 'Customer Notes', 'required': False, 'group': 'Notes'},
         {'name': 'internal_notes', 'label': 'Notes By Ezzy', 'required': False, 'group': 'Notes'},
         {'name': 'seller_notes', 'label': 'Notes By Seller', 'required': False, 'group': 'Notes'},
     ]
@@ -1659,59 +1652,199 @@ def bulk_import_preview(request):
         if not columns:
             return JsonResponse({'error': 'No columns found in file'}, status=400)
 
-        # Auto-mapping logic
+        # Fuzzy matching with multiple strategies
+        from difflib import SequenceMatcher
+
+        def similarity_ratio(str1, str2):
+            """Calculate similarity ratio between two strings."""
+            return SequenceMatcher(None, str1.lower(), str2.lower()).ratio()
+
+        def word_overlap_score(str1, str2):
+            """Calculate word overlap score between two strings."""
+            words1 = set(str1.lower().split())
+            words2 = set(str2.lower().split())
+            if not words1 or not words2:
+                return 0
+            intersection = words1 & words2
+            union = words1 | words2
+            return len(intersection) / len(union) if union else 0
+
+        def get_best_match(col_name, patterns, threshold=0.6):
+            """Find the best matching pattern for a column name using multiple strategies."""
+            best_score = 0
+            best_field = None
+
+            # First pass: Look for exact matches only (highest priority)
+            for field, pattern_list in patterns.items():
+                for pattern in pattern_list:
+                    if pattern == col_name:
+                        return field, 1.0
+
+            # Second pass: Look for full word matches (e.g., "product 1" matches pattern "product 1")
+            for field, pattern_list in patterns.items():
+                for pattern in pattern_list:
+                    # Check if all words in pattern exist in col_name
+                    pattern_words = pattern.split()
+                    col_words = col_name.split()
+                    if len(pattern_words) > 1 and pattern_words == col_words[:len(pattern_words)]:
+                        return field, 0.99
+
+            # Third pass: Fuzzy matching with scoring
+            for field, pattern_list in patterns.items():
+                for pattern in pattern_list:
+                    # Skip single-word generic patterns for multi-word columns
+                    # (prevents 'product' from matching 'product 1')
+                    col_words = col_name.split()
+                    if len(col_words) > 1 and ' ' not in pattern and pattern in col_name:
+                        continue
+
+                    # Strategy: Sequence similarity
+                    seq_ratio = similarity_ratio(col_name, pattern)
+
+                    # Strategy: Word overlap
+                    word_score = word_overlap_score(col_name, pattern)
+
+                    # Combined score (weighted average)
+                    combined_score = (seq_ratio * 0.6) + (word_score * 0.4)
+
+                    # Also check if key words match
+                    pattern_words = set(pattern.lower().split())
+                    if pattern_words and pattern_words.issubset(set(col_words)):
+                        combined_score = max(combined_score, 0.9)
+
+                    if combined_score >= threshold and combined_score > best_score:
+                        best_score = combined_score
+                        best_field = field
+
+            return best_field, best_score
+
+        # Auto-mapping logic with expanded patterns
         auto_mapping = {}
-        mapping_patterns = {
-            'client_order_code': ['order id', 'order no', 'orderid', 'order number', 'no'],
-            'order_date': ['date', 'order date', 'created'],
-            'customer_name': ['customer name', 'name', 'customer', 'full name', 'client name'],
-            'customer_phone': ['phone', 'phone 1', 'mobile', 'contact', 'phone1', 'tel'],
-            'customer_whatsapp': ['phone 2', 'whatsapp', 'phone2', 'watsapp', 'alternate phone'],
-            'customer_email': ['email', 'e-mail', 'customer email'],
-            'customer_address': ['address', 'customer address', 'delivery address', 'full address'],
-            'dl_landmark': ['city', 'landmark', 'customer city', 'land mark', 'city landmark', 'customer city land mark'],
-            'dl_building': ['building', 'villa', 'building no', 'villa no', 'bldg'],
-            'dl_street': ['street', 'street no', 'street number'],
-            'dl_zone': ['zone', 'zone no', 'zone number'],
-            'location_link': ['location', 'loclink', 'google map', 'map link', 'loc link'],
-            'dl_latitude': ['latitude', 'lat'],
-            'dl_longitude': ['longitude', 'lng', 'long'],
-            'deadline_date': ['day', 'time', 'day time', 'preferred', 'deadline', 'delivery date', 'day time if them have demand'],
-            'product_url': ['product url', 'url', 'product link'],
-            'product_name': ['product name', 'product', 'item', 'item name'],
-            'quantity': ['qty', 'quantity', 'count'],
-            'cod_amount': ['price', 'cod', 'amount', 'cod amount', 'total'],
-            'product_1': ['product 1', 'product:1'],
-            'count_1': ['count 1', 'count:1', 'qty 1'],
-            'product_2': ['product 2', 'product:2'],
-            'count_2': ['count 2', 'count:2', 'qty 2'],
-            'product_3': ['product 3', 'product:3'],
-            'count_3': ['count 3', 'count:3', 'qty 3'],
-            'product_4': ['product 4', 'product:4'],
-            'count_4': ['count 4', 'count:4', 'qty 4'],
-            'product_5': ['product 5', 'product:5'],
-            'count_5': ['count 5', 'count:5', 'qty 5'],
-            'stock_status': ['stock', 'stock status', 'availability'],
-            'invoice_number': ['invoice', 'invoice no', 'inv'],
-            'dl_number': ['dl no', 'delivery no', 'dl number'],
-            'delivery_status': ['delivery status', 'status'],
-            'delivered_date': ['delivered', 'date of delivered', 'delivery date'],
-            'order_notes': ['note', 'notes', 'customer notes', 'remarks'],
-            'internal_notes': ['notes by ezzy', 'ezzy notes', 'internal notes'],
-            'seller_notes': ['notes by seller', 'seller notes', 'vendor notes'],
+
+        # Target field labels (for direct matching with column names)
+        field_labels = {
+            'client_order_code': 'Order ID',
+            'order_date': 'Order Date',
+            'customer_name': 'Customer Name',
+            'customer_phone': 'Phone 1',
+            'customer_whatsapp': 'Phone 2 / WhatsApp',
+            'customer_email': 'Email',
+            'customer_address': 'Customer Address',
+            'dl_landmark': 'City / Landmark',
+            'dl_building': 'Villa / Building No',
+            'dl_street': 'Street No',
+            'dl_zone': 'Zone No',
+            'location_link': 'Location Link',
+            'dl_latitude': 'Latitude',
+            'dl_longitude': 'Longitude',
+            'deadline_date': 'Day & Time Preference',
+            'product_url': 'Product URL',
+            'product_name': 'Product Name',
+            'quantity': 'Qty',
+            'cod_amount': 'Price / COD Amount',
+            'product_1': 'Product 1',
+            'count_1': 'Count 1',
+            'product_2': 'Product 2',
+            'count_2': 'Count 2',
+            'product_3': 'Product 3',
+            'count_3': 'Count 3',
+            'product_4': 'Product 4',
+            'count_4': 'Count 4',
+            'product_5': 'Product 5',
+            'count_5': 'Count 5',
+            'internal_notes': 'Notes By Ezzy',
+            'seller_notes': 'Notes By Seller',
         }
 
+        mapping_patterns = {
+            'client_order_code': ['order id', 'order no', 'orderid', 'order number', 'no', 'id', 'order', 'orderno', 'order code', 'client order'],
+            'order_date': ['date', 'order date', 'created', 'created at', 'orderdate', 'creation date'],
+            'customer_name': ['customer name', 'name', 'customer', 'full name', 'client name', 'buyer name', 'recipient', 'receiver name', 'customername', 'cust name'],
+            'customer_phone': ['phone', 'phone 1', 'mobile', 'contact', 'phone1', 'tel', 'telephone', 'mob', 'mobile no', 'phone number', 'contact no', 'phonenumber', 'mobileno'],
+            'customer_whatsapp': ['phone 2', 'whatsapp', 'phone2', 'watsapp', 'alternate phone', 'alt phone', 'secondary phone', 'whats app', 'wa number'],
+            'customer_email': ['email', 'e-mail', 'customer email', 'mail', 'email address'],
+            'customer_address': ['address', 'customer address', 'delivery address', 'full address', 'shipping address', 'addr', 'location', 'customeraddress', 'del address', 'destination'],
+            'dl_landmark': ['city', 'landmark', 'customer city', 'land mark', 'city landmark', 'customer city land mark', 'area', 'locality', 'near', 'nearby'],
+            'dl_building': ['building', 'villa', 'building no', 'villa no', 'bldg', 'building number', 'house', 'flat', 'apartment', 'apt', 'unit'],
+            'dl_street': ['street', 'street no', 'street number', 'st no', 'streetno', 'road'],
+            'dl_zone': ['zone', 'zone no', 'zone number', 'zoneno', 'area code', 'pin', 'pincode', 'postal'],
+            'location_link': ['location', 'loclink', 'google map', 'map link', 'loc link', 'gps', 'map', 'location link', 'google link', 'maps'],
+            'dl_latitude': ['latitude', 'lat', 'geo lat'],
+            'dl_longitude': ['longitude', 'lng', 'long', 'geo long'],
+            'deadline_date': ['day', 'time', 'day time', 'preferred', 'deadline', 'delivery date', 'day time if them have demand', 'expected', 'eta', 'delivery time', 'preferred time', 'slot'],
+            'product_url': ['product url', 'url', 'product link', 'item url', 'link'],
+            'product_name': ['product name', 'product', 'item', 'item name', 'description', 'product description', 'productname', 'itemname', 'goods', 'items'],
+            'quantity': ['qty', 'quantity', 'count', 'units', 'pcs', 'pieces', 'no of items'],
+            'cod_amount': ['price', 'cod', 'amount', 'cod amount', 'total', 'value', 'order value', 'payment', 'cash', 'collect', 'collection'],
+            'product_1': ['product 1', 'product:1', 'item 1', 'product1', 'product  1', 'additional products', 'additional product'],
+            'count_1': ['count 1', 'count:1', 'qty 1', 'quantity 1', 'count1', 'qty1'],
+            'product_2': ['product 2', 'product:2', 'item 2', 'product2', 'product  2'],
+            'count_2': ['count 2', 'count:2', 'qty 2', 'quantity 2', 'count2', 'qty2'],
+            'product_3': ['product 3', 'product:3', 'item 3', 'product3', 'product  3'],
+            'count_3': ['count 3', 'count:3', 'qty 3', 'quantity 3', 'count3', 'qty3'],
+            'product_4': ['product 4', 'product:4', 'item 4', 'product4', 'product  4'],
+            'count_4': ['count 4', 'count:4', 'qty 4', 'quantity 4', 'count4', 'qty4'],
+            'product_5': ['product 5', 'product:5', 'item 5', 'product5', 'product  5'],
+            'count_5': ['count 5', 'count:5', 'qty 5', 'quantity 5', 'count5', 'qty5'],
+            'internal_notes': ['notes by ezzy', 'ezzy notes', 'internal notes', 'staff notes', 'admin notes'],
+            'seller_notes': ['notes by seller', 'seller notes', 'vendor notes', 'merchant notes', 'note', 'notes', 'remarks', 'comment', 'comments', 'instruction', 'instructions', 'special instructions'],
+        }
+
+        # Add field labels to patterns (for direct label matching)
+        for field, label in field_labels.items():
+            if field in mapping_patterns:
+                mapping_patterns[field].append(label.lower())
+
+        # Columns to skip/ignore from auto-mapping (not relevant for order import)
+        ignore_columns = [
+            'status', 'stock status', 'stock_status', 'stockstatus',
+            'invoice', 'invoice no', 'invoice number', 'invoice_number', 'invoiceno',
+            'payment status', 'payment_status', 'paymentstatus',
+            'order status', 'order_status', 'orderstatus',
+            'tracking', 'tracking no', 'tracking number',
+            'fulfillment', 'fulfillment status',
+            'customer notes', 'order notes', 'order_notes',
+        ]
+
         for col in columns:
-            col_lower = col.lower()
-            for char in ['\n', '/', '-', '_', '&', '(', ')', ':', ',', '.']:
+            col_lower = col.lower().strip()
+            for char in ['\n', '/', '-', '_', '&', '(', ')', ':', ',', '.', '#', '\t', '\r']:
                 col_lower = col_lower.replace(char, ' ')
             col_normalized = ' '.join(col_lower.split())
+            logger.info(f'Processing column: "{col}" -> normalized: "{col_normalized}"')
 
-            for field, patterns in mapping_patterns.items():
-                if any(pattern in col_normalized or col_normalized in pattern for pattern in patterns):
-                    if field not in auto_mapping.values():
-                        auto_mapping[col] = field
-                        break
+            # Skip ignored columns
+            if col_normalized in ignore_columns:
+                logger.info(f'Skipping ignored column: "{col}"')
+                continue
+
+            # Special handling for numbered product/count columns (product 1, count 1, etc.)
+            product_match = re.match(r'^(product|item)\s*(\d+)$', col_normalized)
+            count_match = re.match(r'^(count|qty|quantity)\s*(\d+)$', col_normalized)
+
+            if product_match:
+                num = product_match.group(2)
+                field_name = f'product_{num}'
+                if field_name in mapping_patterns and field_name not in auto_mapping.values():
+                    auto_mapping[col] = field_name
+                    logger.info(f'Direct mapped "{col}" -> "{field_name}"')
+                    continue
+
+            if count_match:
+                num = count_match.group(2)
+                field_name = f'count_{num}'
+                if field_name in mapping_patterns and field_name not in auto_mapping.values():
+                    auto_mapping[col] = field_name
+                    logger.info(f'Direct mapped "{col}" -> "{field_name}"')
+                    continue
+
+            # Try to find best match with 60% threshold (more lenient)
+            best_field, match_score = get_best_match(col_normalized, mapping_patterns, threshold=0.6)
+            if best_field and best_field not in auto_mapping.values():
+                auto_mapping[col] = best_field
+                logger.info(f'Auto-mapped column "{col}" -> field "{best_field}" (score: {match_score:.2f})')
+
+        logger.info(f'Total auto-mappings: {len(auto_mapping)} - {auto_mapping}')
 
         return JsonResponse({
             'columns': columns,
@@ -1826,6 +1959,15 @@ def bulk_import_save(request):
                 except (ValueError, TypeError):
                     return 0
 
+            def safe_int_or_none(val):
+                """Return None for empty values instead of 0 - for optional fields."""
+                try:
+                    if val is None or val == '' or (isinstance(val, str) and not val.strip()):
+                        return None
+                    return int(float(val))
+                except (ValueError, TypeError):
+                    return None
+
             def safe_decimal(val):
                 try:
                     from decimal import Decimal
@@ -1874,9 +2016,9 @@ def bulk_import_save(request):
                 customer_phone=customer_phone,
                 customer_whatsapp=customer_whatsapp,
                 customer_address=customer_address,
-                dl_zone=safe_int(row.get('dl_zone')),
-                dl_street=safe_int(row.get('dl_street')),
-                dl_building=safe_int(row.get('dl_building')),
+                dl_zone=safe_int_or_none(row.get('dl_zone')),
+                dl_street=safe_int_or_none(row.get('dl_street')),
+                dl_building=safe_int_or_none(row.get('dl_building')),
                 cod_amount=safe_int(row.get('cod_amount')),
                 dl_amount=safe_int(row.get('dl_amount')),
                 order_notes=combined_notes[:100] if combined_notes else str(row.get('order_notes', ''))[:100],

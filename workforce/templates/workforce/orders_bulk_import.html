@@ -5,6 +5,9 @@
 
 {% block extra_css %}
 <link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
 <style>
 .wizard-steps {
     display: flex;
@@ -270,31 +273,33 @@
 }
 .progress-bar-outer {
     height: 24px;
-    background: var(--bg-secondary);
+    background: var(--bg-secondary, #e9ecef);
     border-radius: 12px;
     overflow: hidden;
     position: relative;
 }
 .progress-bar-inner {
     height: 100%;
-    background: linear-gradient(90deg, var(--brand-primary), var(--success-color));
+    min-width: 0;
+    background: linear-gradient(90deg, var(--brand-primary, #6a11cb), var(--success-color, #28a745));
     border-radius: 12px;
-    transition: width 0.3s ease;
+    transition: width 0.4s ease-out;
     position: relative;
+    overflow: hidden;
 }
 .progress-bar-inner::after {
     content: '';
     position: absolute;
     top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-    animation: shimmer 1.5s infinite;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: shimmer 1.5s infinite linear;
 }
 @keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+    0% { left: -100%; }
+    100% { left: 100%; }
 }
 .progress-text {
     display: flex;
@@ -401,15 +406,103 @@
 .failed-table .error-message {
     color: var(--danger-color);
     font-weight: 500;
-    max-width: 200px;
+    min-width: 200px;
+    max-width: 300px;
+}
+.failed-table .error-message-content {
+    max-height: 60px;
+    overflow-y: auto;
+    padding: var(--spacing-xs);
+    background: #fff5f5;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.4;
+    word-break: break-word;
+}
+.failed-table .error-message-content:hover {
+    background: #ffe0e0;
 }
 .failed-table tr:hover td {
     background: #fff5f5;
 }
-</style>
-{% endblock extra_css %}
 
-{% block content %}
+/* Error Detail Modal */
+.error-detail-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+.error-detail-modal.show {
+    display: flex;
+}
+.error-detail-content {
+    background: white;
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.error-detail-header {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fff5f5;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.error-detail-header h5 {
+    margin: 0;
+    color: var(--danger-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+.error-detail-body {
+    padding: var(--spacing-lg);
+    flex: 1;
+    overflow-y: auto;
+}
+.error-detail-body .error-text {
+    background: #f8f9fa;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--danger-color);
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.error-detail-body .row-info {
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    font-size: var(--font-sm);
+}
+.error-detail-footer {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+}
+</style>
+
 <div class="col-12 p-3">
     <!-- Page Title -->
     <h1 class="page-title">
@@ -522,7 +615,6 @@
                             <li class="mb-1"><code>customer_whatsapp</code></li>
                             <li class="mb-1"><code>dl_zone</code>, <code>dl_street</code>, <code>dl_building</code></li>
                             <li class="mb-1"><code>cod_amount</code>, <code>dl_amount</code></li>
-                            <li class="mb-1"><code>order_notes</code></li>
                         </ul>
 
                         <hr>
@@ -556,6 +648,13 @@
                 <div class="alert alert-info mb-3">
                     <i class="fa-solid fa-info-circle me-2"></i>
                     Match your file columns to the order fields. We've auto-detected some mappings. Only <strong>Customer Name, Phone 1, and Address</strong> are required.
+                </div>
+
+                <!-- Mapping Header -->
+                <div class="mapping-row mapping-header-row" style="background: var(--bg-secondary); font-weight: 600; border-bottom: 2px solid var(--border-color);">
+                    <div class="mapping-source">Source (Your File)</div>
+                    <div class="mapping-arrow"></div>
+                    <div class="mapping-target">Ezzy-DMS</div>
                 </div>
 
                 <div id="mappingContainer" class="mapping-container">
@@ -710,6 +809,35 @@
         </div>
     </div>
 </div>
+
+<!-- Error Detail Modal -->
+<div class="error-detail-modal" id="errorDetailModal">
+    <div class="error-detail-content">
+        <div class="error-detail-header">
+            <h5>
+                <i class="fa-solid fa-exclamation-circle"></i>
+                <span>Error Details</span>
+            </h5>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="closeErrorModal()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="error-detail-body">
+            <div class="row-info">
+                <strong>Row:</strong> <span id="errorRowNumber">-</span> |
+                <strong>Customer:</strong> <span id="errorCustomerName">-</span>
+            </div>
+            <label class="form-label text-muted mb-2">Error Message:</label>
+            <div class="error-text" id="errorFullText"></div>
+        </div>
+        <div class="error-detail-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeErrorModal()">Close</button>
+            <button type="button" class="btn btn-outline-primary" onclick="copyErrorText()">
+                <i class="fa-solid fa-copy me-1"></i>Copy Error
+            </button>
+        </div>
+    </div>
+</div>
 {% endblock content %}
 
 {% block extra_js %}
@@ -752,7 +880,6 @@ const targetFields = [
     { name: 'cod_amount', label: 'Price / COD Amount', required: false, group: 'Payment' },
     { name: 'dl_amount', label: 'Delivery Fee', required: false, group: 'Payment' },
     // Notes
-    { name: 'order_notes', label: 'Customer Notes', required: false, group: 'Notes' },
     { name: 'seller_notes', label: 'Seller Notes', required: false, group: 'Notes' },
     { name: 'internal_notes', label: 'Internal Notes', required: false, group: 'Notes' },
     // Additional Products
@@ -765,10 +892,7 @@ const targetFields = [
     { name: 'product_4', label: 'Product 4', required: false, group: 'Additional Products' },
     { name: 'count_4', label: 'Count 4', required: false, group: 'Additional Products' },
     { name: 'product_5', label: 'Product 5', required: false, group: 'Additional Products' },
-    { name: 'count_5', label: 'Count 5', required: false, group: 'Additional Products' },
-    // Status Fields
-    { name: 'stock_status', label: 'Stock Status', required: false, group: 'Status' },
-    { name: 'invoice_number', label: 'Invoice No', required: false, group: 'Status' }
+    { name: 'count_5', label: 'Count 5', required: false, group: 'Additional Products' }
 ];
 
 // File handling
@@ -865,7 +989,7 @@ function goToStep(step) {
 
 function uploadFile() {
     const formData = new FormData();
-    formData.append('import_file', fileInput.files[0]);
+    formData.append('file', fileInput.files[0]);
     formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
 
     showProgressModal('Parsing file...');
@@ -885,8 +1009,18 @@ function uploadFile() {
 
         uploadedData.columns = data.columns;
         uploadedData.rows = data.rows;
-        uploadedData.mappings = data.suggested_mappings || {};
+        // Server returns auto_mapping with column -> field mapping
+        // We need to reverse it to field -> column for our UI
+        const autoMapping = data.auto_mapping || {};
+        console.log('Server auto_mapping:', autoMapping);
+        uploadedData.mappings = {};
+        for (const [col, field] of Object.entries(autoMapping)) {
+            uploadedData.mappings[field] = col;
+        }
+        console.log('Reversed mappings (field -> col):', uploadedData.mappings);
+        console.log('Columns from file:', uploadedData.columns);
 
+        addLog('info', `Auto-mapped ${Object.keys(autoMapping).length} columns`);
         buildMappingUI();
         goToStep(2);
     })
@@ -931,8 +1065,13 @@ function buildMappingUI() {
             sourceSelect.id = 'map_' + field.name;
 
             let options = '<option value="">-- Skip --</option>';
+            const mappedCol = uploadedData.mappings[field.name];
             uploadedData.columns.forEach(col => {
-                const selected = uploadedData.mappings[field.name] === col ? 'selected' : '';
+                // Compare with trimming to handle whitespace
+                const selected = (mappedCol && mappedCol.trim() === col.trim()) ? 'selected' : '';
+                if (selected) {
+                    console.log(`Mapping: ${field.name} -> ${col} (SELECTED)`);
+                }
                 options += `<option value="${col}" ${selected}>${col}</option>`;
             });
             sourceSelect.innerHTML = options;
@@ -1074,7 +1213,7 @@ async function startImport() {
 
     // Show progress modal
     showProgressModal('Importing Orders...');
-    resetProgress(uploadedData.mappedRows.length);
+    await resetProgress(uploadedData.mappedRows.length);
     clearLogs();
     addLog('info', `Starting import of ${uploadedData.mappedRows.length} orders...`);
 
@@ -1157,7 +1296,7 @@ async function retryFailedRows() {
 
     // Show progress modal
     showProgressModal('Retrying Failed Orders...');
-    resetProgress(rowsToRetry.length);
+    await resetProgress(rowsToRetry.length);
     clearLogs();
     addLog('info', `Retrying ${rowsToRetry.length} failed orders...`);
 
@@ -1245,7 +1384,7 @@ function buildFailedTable() {
 
     // Build header
     let headerHtml = '<th class="row-number">#</th>';
-    headerHtml += '<th class="error-message">Error</th>';
+    headerHtml += '<th class="error-message">Error <span class="text-muted small">(click to expand)</span></th>';
     targetFields.forEach(field => {
         headerHtml += `<th>${field.label}${field.required ? ' <span class="text-danger">*</span>' : ''}</th>`;
     });
@@ -1255,10 +1394,13 @@ function buildFailedTable() {
     let bodyHtml = '';
     uploadedData.failedRows.forEach((item, index) => {
         const row = item.row;
+        const customerName = row.customer_name || 'Unknown';
         bodyHtml += `<tr data-row="${index}">`;
         bodyHtml += `<td class="row-number">${index + 1}</td>`;
-        bodyHtml += `<td class="error-message" title="${escapeHtml(item.error)}">
-            <i class="fa-solid fa-exclamation-circle me-1"></i>${escapeHtml(item.error.substring(0, 30))}${item.error.length > 30 ? '...' : ''}
+        bodyHtml += `<td class="error-message">
+            <div class="error-message-content" onclick="showErrorModal(${index}, '${escapeHtml(customerName)}', \`${escapeHtml(item.error).replace(/`/g, '\\`')}\`)">
+                <i class="fa-solid fa-exclamation-circle me-1"></i>${escapeHtml(item.error)}
+            </div>
         </td>`;
         targetFields.forEach(field => {
             const value = row[field.name] || '';
@@ -1283,18 +1425,37 @@ function hideProgressModal() {
     document.getElementById('progressModal').classList.remove('show');
 }
 
-function resetProgress(total) {
-    document.getElementById('progressBar').style.width = '0%';
+async function resetProgress(total) {
+    const progressBar = document.getElementById('progressBar');
+    // Disable transition temporarily for instant reset
+    progressBar.style.transition = 'none';
+    progressBar.style.width = '0%';
+
     document.getElementById('progressPercentage').textContent = '0%';
     document.getElementById('progressCurrent').textContent = '0';
     document.getElementById('progressTotal').textContent = total;
     document.getElementById('statSuccess').textContent = '0';
     document.getElementById('statFailed').textContent = '0';
+
+    // Force browser to apply the 0% width before re-enabling transition
+    progressBar.offsetHeight; // Trigger reflow
+
+    // Re-enable transition after a frame
+    await new Promise(resolve => requestAnimationFrame(() => {
+        progressBar.style.transition = 'width 0.4s ease-out';
+        requestAnimationFrame(resolve);
+    }));
 }
 
 function updateProgress(current, total, success, failed) {
     const percentage = Math.round((current / total) * 100);
-    document.getElementById('progressBar').style.width = percentage + '%';
+    const progressBar = document.getElementById('progressBar');
+
+    // Use requestAnimationFrame for smoother updates
+    requestAnimationFrame(() => {
+        progressBar.style.width = percentage + '%';
+    });
+
     document.getElementById('progressPercentage').textContent = percentage + '%';
     document.getElementById('progressCurrent').textContent = current;
     document.getElementById('statSuccess').textContent = success;
@@ -1352,8 +1513,7 @@ function getSampleData() {
             dl_street: 123,
             dl_building: 5,
             cod_amount: 150,
-            dl_amount: 15,
-            order_notes: 'Handle with care'
+            dl_amount: 15
         },
         {
             client_order_code: 'ORD-002',
@@ -1365,8 +1525,7 @@ function getSampleData() {
             dl_street: 8,
             dl_building: 12,
             cod_amount: 0,
-            dl_amount: 20,
-            order_notes: 'Leave at door'
+            dl_amount: 20
         },
         {
             client_order_code: '',
@@ -1378,17 +1537,16 @@ function getSampleData() {
             dl_street: 44,
             dl_building: 0,
             cod_amount: 250,
-            dl_amount: 0,
-            order_notes: ''
+            dl_amount: 0
         }
     ];
 }
 
 function downloadSampleCSV() {
-    var csvContent = "client_order_code,customer_name,customer_phone,customer_whatsapp,customer_address,dl_zone,dl_street,dl_building,cod_amount,dl_amount,order_notes\n";
-    csvContent += "ORD-001,John Doe,+97412345678,+97412345678,Zone 45 Street 123 Building 5,45,123,5,150,15,Handle with care\n";
-    csvContent += "ORD-002,Jane Smith,+97487654321,+97487654321,Zone 61 Street 8 Building 12,61,8,12,0,20,Leave at door\n";
-    csvContent += ",Ahmed Ali,+97455555555,,Zone 33 Street 44,33,44,0,250,0,\n";
+    var csvContent = "client_order_code,customer_name,customer_phone,customer_whatsapp,customer_address,dl_zone,dl_street,dl_building,cod_amount,dl_amount\n";
+    csvContent += "ORD-001,John Doe,+97412345678,+97412345678,Zone 45 Street 123 Building 5,45,123,5,150,15\n";
+    csvContent += "ORD-002,Jane Smith,+97487654321,+97487654321,Zone 61 Street 8 Building 12,61,8,12,0,20\n";
+    csvContent += ",Ahmed Ali,+97455555555,,Zone 33 Street 44,33,44,0,250,0\n";
 
     var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     var link = document.createElement("a");
@@ -1408,5 +1566,51 @@ function downloadSampleExcel() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
     XLSX.writeFile(workbook, "sample_orders.xlsx");
 }
+
+// Error Detail Modal Functions
+function showErrorModal(rowIndex, customerName, errorText) {
+    document.getElementById('errorRowNumber').textContent = rowIndex + 1;
+    document.getElementById('errorCustomerName').textContent = customerName;
+    document.getElementById('errorFullText').textContent = errorText;
+    document.getElementById('errorDetailModal').classList.add('show');
+}
+
+function closeErrorModal() {
+    document.getElementById('errorDetailModal').classList.remove('show');
+}
+
+function copyErrorText() {
+    const errorText = document.getElementById('errorFullText').textContent;
+    navigator.clipboard.writeText(errorText).then(() => {
+        // Show feedback
+        const btn = event.target.closest('button');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Copied!';
+        btn.classList.remove('btn-outline-primary');
+        btn.classList.add('btn-success');
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-primary');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+        alert('Failed to copy error text');
+    });
+}
+
+// Close modal on outside click
+document.getElementById('errorDetailModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeErrorModal();
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeErrorModal();
+    }
+});
 </script>
 {% endblock extra_js %}

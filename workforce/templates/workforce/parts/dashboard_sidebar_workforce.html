@@ -21,7 +21,7 @@
       
 
       <!-- Orders Section -->
-      <li id="workforce_sidebar_menu_orders" class="nav-item {% if request.resolver_match.url_name == 'wf_orders_all' or request.resolver_match.url_name == 'wf_orders_to_publish' or request.resolver_match.url_name == 'wf_orders_published' or request.resolver_match.url_name == 'wf_orders_by_seller' or request.resolver_match.url_name == 'wf_orders_dms_updated' or request.resolver_match.url_name == 'wf_orders_reported' %}active{% endif %}">
+      <li id="workforce_sidebar_menu_orders" class="nav-item {% if request.resolver_match.url_name == 'wf_orders_all' or request.resolver_match.url_name == 'wf_orders_to_publish' or request.resolver_match.url_name == 'wf_orders_published' or request.resolver_match.url_name == 'wf_orders_by_seller' or request.resolver_match.url_name == 'wf_orders_dms_updated' or request.resolver_match.url_name == 'wf_orders_reported' or request.resolver_match.url_name == 'wf_orders_add' or request.resolver_match.url_name == 'wf_orders_bulk_import' %}active{% endif %}">
         <a id="workforce_sidebar_link_orders" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-orders" href="#">
           <i class="fa-solid fa-box me-2"></i>
           <span>Orders</span>
@@ -29,6 +29,42 @@
         </a>
         <div class="collapse submenu" id="submenu-orders">
           <ul class="nav flex-column">
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wf_orders_add" class="nav-link btn submenu-link submenu-link-highlight"
+                 href="{% url 'workforce:wf_orders_add' %}"
+                 hx-get="{% url 'workforce:wf_orders_add' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-plus me-2"></i>
+                Add Order
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wf_orders_bulk" class="nav-link btn submenu-link"
+                 href="{% url 'workforce:wf_orders_bulk_import' %}"
+                 hx-get="{% url 'workforce:wf_orders_bulk_import' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-file-import me-2"></i>
+                Bulk Import
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wf_orders_api" class="nav-link btn submenu-link"
+                 href="{% url 'workforce:wf_orders_api_guide' %}"
+                 hx-get="{% url 'workforce:wf_orders_api_guide' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-code me-2"></i>
+                API Integration
+              </a>
+            </li>
             <li class="nav-item">
               <a id="workforce_sidebar_link_wf_orders_all" class="nav-link btn submenu-link"
                  href="{% url 'workforce:wf_orders_all' %}"
@@ -339,67 +375,6 @@
         </div>
       </li>
 
-      <!-- Documents Section -->
-      <li id="workforce_sidebar_menu_documents" class="nav-item {% if request.resolver_match.url_name == 'driver_documents_list' or request.resolver_match.url_name == 'vehicle_documents_list' or request.resolver_match.url_name == 'store_documents_list' or request.resolver_match.url_name == 'business_licenses_list' %}active{% endif %}">
-        <a id="workforce_sidebar_link_documents" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-documents" href="#">
-          <i class="fa-solid fa-id-card me-2"></i>
-          <span>Documents</span>
-          <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
-        </a>
-        <div class="collapse submenu" id="submenu-documents">
-          <ul class="nav flex-column">
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_documents_driver" class="nav-link btn submenu-link"
-                 href="{% url 'workforce:driver_documents_list' %}"
-                 hx-get="{% url 'workforce:driver_documents_list' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-id-card me-2"></i>
-                Driver IDs
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_documents_vehicle" class="nav-link btn submenu-link"
-                 href="{% url 'workforce:vehicle_documents_list' %}"
-                 hx-get="{% url 'workforce:vehicle_documents_list' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-car me-2"></i>
-                Vehicles
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_documents_store" class="nav-link btn submenu-link"
-                 href="{% url 'workforce:store_documents_list' %}"
-                 hx-get="{% url 'workforce:store_documents_list' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-store me-2"></i>
-                Store Documents
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_documents_business" class="nav-link btn submenu-link"
-                 href="{% url 'workforce:business_licenses_list' %}"
-                 hx-get="{% url 'workforce:business_licenses_list' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-certificate me-2"></i>
-                Business Licenses
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
       <!-- Inventory Section -->
       <li id="workforce_sidebar_menu_inventory" class="nav-item {% if request.resolver_match.url_name == 'driver_documents' or request.resolver_match.url_name == 'vehicle_own' %}active{% endif %}">
         <a id="workforce_sidebar_link_inventory" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-inventory" href="#">
@@ -685,7 +660,7 @@
         </a>
       </li>
       <!-- Sellers Section -->
-      <li id="workforce_sidebar_menu_sellers" class="nav-item {% if request.resolver_match.url_name == 'sellers_list' or request.resolver_match.url_name == 'sellers_pending' or request.resolver_match.url_name == 'sellers_active' or request.resolver_match.url_name == 'sellers_inactive' %}active{% endif %}">
+      <li id="workforce_sidebar_menu_sellers" class="nav-item {% if request.resolver_match.url_name == 'sellers_list' or request.resolver_match.url_name == 'sellers_pending' or request.resolver_match.url_name == 'sellers_active' or request.resolver_match.url_name == 'sellers_inactive' or request.resolver_match.url_name == 'seller_detail' %}active{% endif %}">
         <a id="workforce_sidebar_link_sellers" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-sellers" href="#">
           <i class="fa-solid fa-store me-2"></i>
           <span>Sellers</span>
@@ -745,6 +720,67 @@
         </div>
       </li>
 
+      <!-- Drivers Section -->
+      <li id="workforce_sidebar_menu_drivers" class="nav-item {% if request.resolver_match.url_name == 'drivers_list' or request.resolver_match.url_name == 'drivers_pending' or request.resolver_match.url_name == 'drivers_active' or request.resolver_match.url_name == 'drivers_inactive' or request.resolver_match.url_name == 'driver_detail' %}active{% endif %}">
+        <a id="workforce_sidebar_link_drivers" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-drivers" href="#">
+          <i class="fa-solid fa-motorcycle me-2"></i>
+          <span>Drivers</span>
+          <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
+        </a>
+        <div class="collapse submenu" id="submenu-drivers">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_all_drivers" class="nav-link btn submenu-link"
+                 href="{% url 'workforce:drivers_list' %}"
+                 hx-get="{% url 'workforce:drivers_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-list me-2"></i>
+                All Drivers
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_drivers_pending" class="nav-link btn submenu-link"
+                 href="{% url 'workforce:drivers_pending' %}"
+                 hx-get="{% url 'workforce:drivers_pending' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-clock me-2"></i>
+                Pending Approval
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_drivers_active" class="nav-link btn submenu-link"
+                 href="{% url 'workforce:drivers_active' %}"
+                 hx-get="{% url 'workforce:drivers_active' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-circle-check me-2"></i>
+                Active Drivers
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_drivers_inactive" class="nav-link btn submenu-link"
+                 href="{% url 'workforce:drivers_inactive' %}"
+                 hx-get="{% url 'workforce:drivers_inactive' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-circle-xmark me-2"></i>
+                Inactive Drivers
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
       <hr class="sidebar-divider" />
 
       <!-- Quick Links -->
@@ -782,6 +818,18 @@
           <span>Profile</span>
         </a>
       </li>
+
+      {% if user.is_superuser %}
+      <li id="workforce_sidebar_menu_admin" class="nav-item">
+        <a id="workforce_sidebar_link_admin" class="nav-link btn nav-link-single"
+           href="{% url 'admin:index' %}"
+           target="_blank">
+          <i class="fa-solid fa-screwdriver-wrench me-2"></i>
+          <span>Django Admin</span>
+          <i class="fa-solid fa-external-link-alt ms-auto small"></i>
+        </a>
+      </li>
+      {% endif %}
     </ul>
   </div>
 </div>

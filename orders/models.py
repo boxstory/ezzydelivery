@@ -131,9 +131,9 @@ class Order(models.Model):
     customer_address = models.CharField(max_length=100, blank=True)
     deadline_date = models.CharField(max_length=100, blank=True)
     order_date = models.DateField(auto_now_add=True)
-    dl_zone = models.PositiveIntegerField(blank=True)
-    dl_building = models.PositiveIntegerField(blank=True)
-    dl_street = models.PositiveIntegerField(blank=True)
+    dl_zone = models.PositiveIntegerField(blank=True, null=True, default=None)
+    dl_building = models.PositiveIntegerField(blank=True, null=True, default=None)
+    dl_street = models.PositiveIntegerField(blank=True, null=True, default=None)
 
     # Delivery completion tracking
     delivered_at = models.DateTimeField(blank=True, null=True, help_text="When the order was delivered")

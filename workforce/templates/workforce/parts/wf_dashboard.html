@@ -167,6 +167,136 @@
                 <span><i class="fa-solid fa-arrow-right me-1"></i>View pending verifications</span>
             </div>
         </a>
+
+        <!-- Active Drivers -->
+        <a id="workforce_dashboard_card_active_drivers"
+           href="{% url 'workforce:drivers_active' %}"
+           class="stat-card stat-card-success text-decoration-none"
+           hx-get="{% url 'workforce:drivers_active' %}"
+           hx-target="#main-content"
+           hx-select="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true"
+           role="button"
+           aria-label="View active drivers">
+            <div class="stat-card-header">
+                <div>
+                    <p class="stat-card-title">Active Drivers</p>
+                    <h2 class="stat-card-value">{{ active_drivers|default:0 }}</h2>
+                </div>
+                <div class="stat-card-icon" aria-hidden="true">
+                    <i class="fa-solid fa-motorcycle"></i>
+                </div>
+            </div>
+            <div class="stat-card-meta">
+                <span><i class="fa-solid fa-arrow-right me-1"></i>View active drivers</span>
+            </div>
+        </a>
+
+        <!-- Pending Drivers -->
+        <a id="workforce_dashboard_card_pending_drivers"
+           href="{% url 'workforce:drivers_pending' %}"
+           class="stat-card stat-card-warning text-decoration-none"
+           hx-get="{% url 'workforce:drivers_pending' %}"
+           hx-target="#main-content"
+           hx-select="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true"
+           role="button"
+           aria-label="View pending driver applications">
+            <div class="stat-card-header">
+                <div>
+                    <p class="stat-card-title">Pending Drivers</p>
+                    <h2 class="stat-card-value">{{ pending_drivers|default:0 }}</h2>
+                </div>
+                <div class="stat-card-icon" aria-hidden="true">
+                    <i class="fa-solid fa-user-clock"></i>
+                </div>
+            </div>
+            <div class="stat-card-meta">
+                <span><i class="fa-solid fa-arrow-right me-1"></i>Review applications</span>
+            </div>
+        </a>
+
+        <!-- Active Sellers -->
+        <a id="workforce_dashboard_card_active_sellers"
+           href="{% url 'workforce:sellers_active' %}"
+           class="stat-card stat-card-info text-decoration-none"
+           hx-get="{% url 'workforce:sellers_active' %}"
+           hx-target="#main-content"
+           hx-select="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true"
+           role="button"
+           aria-label="View active sellers">
+            <div class="stat-card-header">
+                <div>
+                    <p class="stat-card-title">Active Sellers</p>
+                    <h2 class="stat-card-value">{{ active_sellers|default:0 }}</h2>
+                </div>
+                <div class="stat-card-icon" aria-hidden="true">
+                    <i class="fa-solid fa-store"></i>
+                </div>
+            </div>
+            <div class="stat-card-meta">
+                <span><i class="fa-solid fa-arrow-right me-1"></i>View active sellers</span>
+            </div>
+        </a>
+
+        <!-- COD In Hand -->
+        <a id="workforce_dashboard_card_cod_in_hand"
+           href="{% url 'workforce:fleet_cod_in_hand' %}"
+           class="stat-card stat-card-primary text-decoration-none"
+           hx-get="{% url 'workforce:fleet_cod_in_hand' %}"
+           hx-target="#main-content"
+           hx-select="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true"
+           role="button"
+           aria-label="View COD in hand">
+            <div class="stat-card-header">
+                <div>
+                    <p class="stat-card-title">COD In Hand</p>
+                    <h2 class="stat-card-value">{{ cod_in_hand|default:0 }} QAR</h2>
+                </div>
+                <div class="stat-card-icon" aria-hidden="true">
+                    <i class="fa-solid fa-sack-dollar"></i>
+                </div>
+            </div>
+            <div class="stat-card-meta">
+                <span><i class="fa-solid fa-arrow-right me-1"></i>View fleet balance</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- Orders Trend Chart -->
+    <div id="workforce_dashboard_section_chart" class="recent-orders-section mb-4">
+        <div class="section-header">
+            <h4 class="section-title">
+                <i class="fa-solid fa-chart-line me-2" aria-hidden="true"></i>
+                Orders Trend (Last 7 Days)
+            </h4>
+        </div>
+        <div class="section-content">
+            <div id="workforce_dashboard_orders_chart" class="orders-trend-chart">
+                <div class="chart-bars d-flex align-items-end justify-content-between" style="height: 150px; gap: 0.5rem;">
+                    {% for day in orders_trend %}
+                    <div class="chart-bar-wrapper text-center flex-fill">
+                        <div class="chart-bar bg-primary"
+                             style="height: {% widthratio day.count max_orders 100 %}%; min-height: 10px; border-radius: var(--brand-radius-sm) var(--brand-radius-sm) 0 0;"
+                             title="{{ day.count }} orders">
+                        </div>
+                        <small class="chart-label d-block mt-1 text-muted">{{ day.date }}</small>
+                        <small class="chart-value d-block fw-bold">{{ day.count }}</small>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-4 w-100">
+                        <p class="mb-0">No data available</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Quick Actions Section -->

@@ -46,8 +46,8 @@ def generate_sequence_code(number):
 
 def generate_order_number(business, client_order_code):
     """
-    Generate order number in format: {business_code}-{client_order_code}-{YMMDD}-{sequence}
-    Example: BIZCODE-CLIENTREF-60113-AA001
+    Generate order number in format: {business_code}-{YMMDD}-{sequence}
+    Example: BIZCODE-60113-AA001
 
     - YMMDD: Year(last digit) + Month(2 digits) + Day(2 digits)
     - Sequence: AA001-AA999, AB001-AB999, ... never resets, continues globally per business
@@ -64,9 +64,9 @@ def generate_order_number(business, client_order_code):
     # Generate sequence: AA001, AA002, ... AA999, AB001, etc.
     sequence = generate_sequence_code(total_orders + 1)
 
-    # Build order number
-    business_code = business.business_code or 'EZY'
-    order_number = f"{business_code}-{client_order_code}-{date_part}-{sequence}"
+    # Build order number - use business_code, fallback to business_id or 'EZY'
+    business_code = business.business_code if business.business_code else f"BIZ{business.business_id}"
+    order_number = f"{business_code}-{date_part}-{sequence}"
 
     return order_number
 
@@ -93,9 +93,12 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
     logger.debug('order_post_save_receiver')
     if created:
         logger.debug(f'New order created: {instance}')
-        if instance.order_number == "" :
-            instance.order_number = str(instance.business.business_code) + '-' + str(instance.client_order_code) + '-' + str(instance.id)
-            logger.debug(f'Generated order_number: {instance.order_number}')
+        if not instance.order_number or instance.order_number == "":
+            # Fallback order number generation
+            business_code = instance.business.business_code if instance.business.business_code else f"BIZ{instance.business.business_id}"
+            instance.order_number = f"{business_code}-{instance.id}"
+            instance.save(update_fields=['order_number'])
+            logger.debug(f'Generated fallback order_number: {instance.order_number}')
         
         # Save original order data as proof
         if not instance.original_order_data:

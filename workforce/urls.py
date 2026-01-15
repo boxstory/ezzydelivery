@@ -23,6 +23,7 @@ urlpatterns = [
     path('drivers/active/', workforce_views.drivers_active, name='drivers_active'),
     path('drivers/inactive/', workforce_views.drivers_inactive, name='drivers_inactive'),
     path('drivers/<int:driver_id>/', workforce_views.driver_detail, name='driver_detail'),
+    path('drivers/export/', workforce_views.export_drivers_csv, name='export_drivers_csv'),
 
     #Orders sections urls -------------------------------------------------------------------
     path('orders/add/', workforce_views.add_order, name='wf_orders_add'),
@@ -33,6 +34,7 @@ urlpatterns = [
     path('orders/api-guide/', workforce_views.orders_api_guide, name='wf_orders_api_guide'),
     path('orders/pickup-locations/<int:business_id>/', workforce_views.get_pickup_locations, name='get_pickup_locations'),
     path('orders/all/', workforce_views.all_orders, name='wf_orders_all'),
+    path('orders/export/', workforce_views.export_orders_csv, name='export_orders_csv'),
     path('orders/by-seller/', workforce_views.orders_by_seller, name='wf_orders_by_seller'),
     path('orders/to_publish/', workforce_views.orders_to_publish, name='wf_orders_to_publish'),
     path('orders/published/', workforce_views.orders_published, name='wf_orders_published'),
@@ -40,6 +42,10 @@ urlpatterns = [
     path('orders/<int:order_id>/verify-address/', workforce_views.verify_order_address, name='verify_order_address'),
     path('orders/<int:order_id>/verify/', workforce_views.verify_order, name='verify_order'),
     path('orders/submit_to_task/<int:order_id>/', workforce_views.submit_to_task, name='submit_to_task'),
+
+    # Order detail and actions
+    path('orders/<int:order_id>/', workforce_views.order_detail, name='order_detail'),
+    path('orders/<int:order_id>/cancel/', workforce_views.cancel_order, name='cancel_order'),
 
     # AJAX endpoints for orders
     path('orders/<int:order_id>/publish/', workforce_views.publish_order_to_delivery, name='publish_order_to_delivery'),
