@@ -3,6 +3,10 @@
 
 {% block title %}Add Storage Location{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row mb-4">
@@ -95,4 +99,84 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const warehouseSelect = document.getElementById('warehouse');
+    const parentSelect = document.getElementById('parent');
+    const locationTypeSelect = document.getElementById('location_type');
+
+    // Function to load parent locations based on warehouse
+    function loadParentLocations(warehouseId) {
+        if (!warehouseId) {
+            parentSelect.innerHTML = '<option value="">None (Top Level)</option>';
+            parentSelect.disabled = true;
+            return;
+        }
+
+        // Show loading state
+        parentSelect.disabled = true;
+        parentSelect.innerHTML = '<option value="">Loading...</option>';
+
+        // Fetch locations for the selected warehouse
+        fetch(`/workforce/warehouse/api/warehouses/${warehouseId}/storage-locations/`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch locations');
+                }
+                return response.json();
+            })
+            .then(locations => {
+                // Clear and rebuild options
+                parentSelect.innerHTML = '<option value="">None (Top Level)</option>';
+
+                if (locations.length > 0) {
+                    locations.forEach(location => {
+                        const option = document.createElement('option');
+                        option.value = location.id;
+                        option.textContent = `${location.code} - ${location.name}`;
+                        parentSelect.appendChild(option);
+                    });
+                    parentSelect.disabled = false;
+                } else {
+                    parentSelect.innerHTML = '<option value="">None (Top Level) - No existing locations</option>';
+                    parentSelect.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading parent locations:', error);
+                parentSelect.innerHTML = '<option value="">None (Top Level) - Error loading locations</option>';
+                parentSelect.disabled = false;
+            });
+    }
+
+    // Pre-select warehouse from URL parameter if present
+    const urlParams = new URLSearchParams(window.location.search);
+    const warehouseParam = urlParams.get('warehouse');
+    if (warehouseParam) {
+        warehouseSelect.value = warehouseParam;
+        loadParentLocations(warehouseParam);
+    }
+
+    // Listen for warehouse selection changes
+    warehouseSelect.addEventListener('change', function() {
+        const selectedWarehouseId = this.value;
+        loadParentLocations(selectedWarehouseId);
+    });
+
+    // Auto-generate location name from code (optional helper)
+    const codeInput = document.getElementById('code');
+    const nameInput = document.getElementById('name');
+
+    codeInput.addEventListener('blur', function() {
+        if (!nameInput.value && this.value) {
+            // Suggest a name based on code
+            const selectedType = locationTypeSelect.options[locationTypeSelect.selectedIndex]?.text || 'Location';
+            nameInput.value = `${selectedType} ${this.value}`;
+        }
+    });
+});
+</script>
 {% endblock %}
