@@ -503,109 +503,104 @@
               </a>
             </li>
 
-            <!-- Inventory Section (Collapsible) -->
-            <li class="nav-item">
-              <button class="nav-link btn w-100 text-start d-flex align-items-center"
-                      type="button"
-                      data-bs-toggle="collapse"
-                      data-bs-target="#inventorySubmenu"
-                      aria-expanded="false"
-                      aria-controls="inventorySubmenu">
-                <i class="fa-solid fa-boxes-stacked me-2"></i>
-                <span class="flex-grow-1">Inventory</span>
-                <i class="fa-solid fa-chevron-down ms-auto"></i>
-              </button>
-            </li>
-            <div class="collapse" id="inventorySubmenu">
-              <ul class="list-unstyled ps-0">
-                <li class="nav-item">
-                  <a id="workforce_sidebar_link_wh_inventory" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'inventory_list' or request.resolver_match.url_name == 'stock_card' %}active{% endif %}"
-                     href="{% url 'warehouse:inventory_list' %}"
-                     hx-get="{% url 'warehouse:inventory_list' %}"
-                     hx-target="#main-content"
-                     hx-select="#main-content"
-                     hx-swap="outerHTML"
-                     hx-push-url="true">
-                    <i class="fa-solid fa-list me-2"></i>
-                    View Inventory
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a id="workforce_sidebar_link_wh_transactions" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'transaction_list' %}active{% endif %}"
-                     href="{% url 'warehouse:transaction_list' %}"
-                     hx-get="{% url 'warehouse:transaction_list' %}"
-                     hx-target="#main-content"
-                     hx-select="#main-content"
-                     hx-swap="outerHTML"
-                     hx-push-url="true">
-                    <i class="fa-solid fa-arrow-right-arrow-left me-2"></i>
-                    Transactions
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a id="workforce_sidebar_link_wh_alerts" class="nav-link btn submenu-link d-flex align-items-center {% if request.resolver_match.url_name == 'low_stock_alerts' %}active{% endif %}"
-                     href="{% url 'warehouse:low_stock_alerts' %}"
-                     hx-get="{% url 'warehouse:low_stock_alerts' %}"
-                     hx-target="#main-content"
-                     hx-select="#main-content"
-                     hx-swap="outerHTML"
-                     hx-push-url="true">
-                    <i class="fa-solid fa-triangle-exclamation me-2"></i>
-                    <span class="flex-grow-1">Low Stock Alerts</span>
-                    {% if low_stock_count %}<span class="badge bg-danger ms-auto" data-badge="low_stock">{{ low_stock_count }}</span>{% endif %}
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a id="workforce_sidebar_link_storage_locations" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'location_list' or request.resolver_match.url_name == 'location_add' %}active{% endif %}"
-                     href="{% url 'warehouse:location_list' %}"
-                     hx-get="{% url 'warehouse:location_list' %}"
-                     hx-target="#main-content"
-                     hx-select="#main-content"
-                     hx-swap="outerHTML"
-                     hx-push-url="true">
-                    <i class="fa-solid fa-shelves me-2"></i>
-                    Storage Locations
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a id="workforce_sidebar_link_wh_receive" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'receive_stock' or request.resolver_match.url_name == 'confirm_receive' %}active{% endif %}"
-                     href="{% url 'warehouse:receive_stock' %}"
-                     hx-get="{% url 'warehouse:receive_stock' %}"
-                     hx-target="#main-content"
-                     hx-select="#main-content"
-                     hx-swap="outerHTML"
-                     hx-push-url="true">
-                    <i class="fa-solid fa-truck-loading me-2"></i>
-                    Receive Stock
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a id="workforce_sidebar_link_wh_pick_lists" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'pick_list_list' or request.resolver_match.url_name == 'create_pick_list' or request.resolver_match.url_name == 'pick_list_detail' %}active{% endif %}"
-                     href="{% url 'warehouse:pick_list_list' %}"
-                     hx-get="{% url 'warehouse:pick_list_list' %}"
-                     hx-target="#main-content"
-                     hx-select="#main-content"
-                     hx-swap="outerHTML"
-                     hx-push-url="true">
-                    <i class="fa-solid fa-clipboard-list me-2"></i>
-                    Pick Lists
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a id="workforce_sidebar_link_wh_cycle_counts" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'cycle_count_list' or request.resolver_match.url_name == 'create_cycle_count' or request.resolver_match.url_name == 'cycle_count_detail' %}active{% endif %}"
-                     href="{% url 'warehouse:cycle_count_list' %}"
-                     hx-get="{% url 'warehouse:cycle_count_list' %}"
-                     hx-target="#main-content"
-                     hx-select="#main-content"
-                     hx-swap="outerHTML"
-                     hx-push-url="true">
-                    <i class="fa-solid fa-rotate me-2"></i>
-                    Cycle Counts
-                  </a>
-                </li>
-              </ul>
-            </div>
+          </ul>
+        </div>
+      </li>
 
+      <!-- Inventory Management Section -->
+      <li id="workforce_sidebar_menu_inventory" class="nav-item">
+        <a id="workforce_sidebar_link_inventory" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-inventory" href="#">
+          <i class="fa-solid fa-boxes-stacked me-2"></i>
+          <span>Inventory</span>
+          <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
+        </a>
+        <div class="collapse submenu {% if request.resolver_match.url_name in 'inventory_list,stock_card,transaction_list,low_stock_alerts,location_list,location_add,receive_stock,confirm_receive,pick_list_list,create_pick_list,pick_list_detail,cycle_count_list,create_cycle_count,cycle_count_detail' %}show{% endif %}" id="submenu-inventory">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_inventory" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'inventory_list' or request.resolver_match.url_name == 'stock_card' %}active{% endif %}"
+                 href="{% url 'warehouse:inventory_list' %}"
+                 hx-get="{% url 'warehouse:inventory_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-list me-2"></i>
+                View Inventory
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_transactions" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'transaction_list' %}active{% endif %}"
+                 href="{% url 'warehouse:transaction_list' %}"
+                 hx-get="{% url 'warehouse:transaction_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-arrow-right-arrow-left me-2"></i>
+                Transactions
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_alerts" class="nav-link btn submenu-link d-flex align-items-center {% if request.resolver_match.url_name == 'low_stock_alerts' %}active{% endif %}"
+                 href="{% url 'warehouse:low_stock_alerts' %}"
+                 hx-get="{% url 'warehouse:low_stock_alerts' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                <span class="flex-grow-1">Low Stock Alerts</span>
+                {% if low_stock_count %}<span class="badge bg-danger ms-auto" data-badge="low_stock">{{ low_stock_count }}</span>{% endif %}
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_storage_locations" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'location_list' or request.resolver_match.url_name == 'location_add' %}active{% endif %}"
+                 href="{% url 'warehouse:location_list' %}"
+                 hx-get="{% url 'warehouse:location_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-shelves me-2"></i>
+                Storage Locations
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_receive" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'receive_stock' or request.resolver_match.url_name == 'confirm_receive' %}active{% endif %}"
+                 href="{% url 'warehouse:receive_stock' %}"
+                 hx-get="{% url 'warehouse:receive_stock' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-truck-loading me-2"></i>
+                Receive Stock
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_pick_lists" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'pick_list_list' or request.resolver_match.url_name == 'create_pick_list' or request.resolver_match.url_name == 'pick_list_detail' %}active{% endif %}"
+                 href="{% url 'warehouse:pick_list_list' %}"
+                 hx-get="{% url 'warehouse:pick_list_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-clipboard-list me-2"></i>
+                Pick Lists
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wh_cycle_counts" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'cycle_count_list' or request.resolver_match.url_name == 'create_cycle_count' or request.resolver_match.url_name == 'cycle_count_detail' %}active{% endif %}"
+                 href="{% url 'warehouse:cycle_count_list' %}"
+                 hx-get="{% url 'warehouse:cycle_count_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-rotate me-2"></i>
+                Cycle Counts
+              </a>
+            </li>
           </ul>
         </div>
       </li>
