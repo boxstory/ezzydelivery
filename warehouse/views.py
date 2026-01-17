@@ -857,6 +857,249 @@ def warehouse_detail(request, pk):
 
 @login_required(login_url='account_login')
 @user_passes_test(is_superuser_only)
+def warehouse_capacity_configure(request, pk):
+    """Configure warehouse internal capacity - Superuser only"""
+    warehouse = get_object_or_404(warehouse_models.Warehouse, pk=pk)
+
+    if request.method == 'POST':
+        try:
+            total_zones = int(request.POST.get('total_zones', 0))
+            racks_per_zone = int(request.POST.get('racks_per_zone', 0))
+            shelves_per_rack = int(request.POST.get('shelves_per_rack', 0))
+            bins_per_shelf = int(request.POST.get('bins_per_shelf', 0))
+
+            zone_naming_pattern = request.POST.get('zone_naming_pattern', 'A,B,C,D')
+            rack_naming_pattern = request.POST.get('rack_naming_pattern', 'numeric')
+            shelf_naming_pattern = request.POST.get('shelf_naming_pattern', 'numeric')
+            bin_naming_pattern = request.POST.get('bin_naming_pattern', 'numeric')
+
+            # Validate inputs
+            if total_zones < 1:
+                messages.error(request, "Total zones must be at least 1")
+                return redirect('warehouse:warehouse_capacity_configure', pk=pk)
+            if racks_per_zone < 1:
+                messages.error(request, "Racks per zone must be at least 1")
+                return redirect('warehouse:warehouse_capacity_configure', pk=pk)
+            if shelves_per_rack < 1:
+                messages.error(request, "Shelves per rack must be at least 1")
+                return redirect('warehouse:warehouse_capacity_configure', pk=pk)
+            if bins_per_shelf < 1:
+                messages.error(request, "Bins per shelf must be at least 1")
+                return redirect('warehouse:warehouse_capacity_configure', pk=pk)
+
+            # Update warehouse configuration
+            warehouse.total_zones = total_zones
+            warehouse.racks_per_zone = racks_per_zone
+            warehouse.shelves_per_rack = shelves_per_rack
+            warehouse.bins_per_shelf = bins_per_shelf
+            warehouse.zone_naming_pattern = zone_naming_pattern
+            warehouse.rack_naming_pattern = rack_naming_pattern
+            warehouse.shelf_naming_pattern = shelf_naming_pattern
+            warehouse.bin_naming_pattern = bin_naming_pattern
+            warehouse.is_capacity_configured = True
+            warehouse.capacity_configured_at = timezone.now()
+            warehouse.capacity_configured_by = request.user
+            warehouse.save()
+
+            messages.success(
+                request,
+                f"Capacity configured successfully! Total capacity: {warehouse.total_capacity:,} bins"
+            )
+            return redirect('warehouse:warehouse_capacity_preview', pk=pk)
+
+        except ValueError as e:
+            logger.exception(f"Error configuring warehouse capacity: {str(e)}")
+            messages.error(request, f"Invalid input: {str(e)}")
+        except Exception as e:
+            logger.exception(f"Error configuring warehouse capacity: {str(e)}")
+            messages.error(request, f"Error configuring capacity: {str(e)}")
+
+    context = {
+        'warehouse': warehouse,
+        'is_staff': True,
+    }
+    return render(request, 'warehouse/warehouse_capacity_configure.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
+def warehouse_capacity_preview(request, pk):
+    """Preview warehouse capacity configuration and generate locations"""
+    warehouse = get_object_or_404(warehouse_models.Warehouse, pk=pk)
+
+    if not warehouse.is_capacity_configured:
+        messages.warning(request, "Please configure warehouse capacity first")
+        return redirect('warehouse:warehouse_capacity_configure', pk=pk)
+
+    # Generate preview of location structure
+    zone_names = warehouse.get_zone_names()
+    preview_structure = []
+
+    for zone_idx, zone_name in enumerate(zone_names, 1):
+        zone_data = {
+            'name': zone_name,
+            'racks': []
+        }
+
+        # Show only first 3 racks as preview
+        for rack_idx in range(1, min(4, warehouse.racks_per_zone + 1)):
+            rack_name = warehouse.generate_location_name('rack', rack_idx)
+            rack_data = {
+                'name': rack_name,
+                'shelves': []
+            }
+
+            # Show only first 3 shelves as preview
+            for shelf_idx in range(1, min(4, warehouse.shelves_per_rack + 1)):
+                shelf_name = warehouse.generate_location_name('shelf', shelf_idx)
+                shelf_data = {
+                    'name': shelf_name,
+                    'bins': []
+                }
+
+                # Show only first 3 bins as preview
+                for bin_idx in range(1, min(4, warehouse.bins_per_shelf + 1)):
+                    bin_name = warehouse.generate_location_name('bin', bin_idx)
+                    shelf_data['bins'].append(bin_name)
+
+                if warehouse.bins_per_shelf > 3:
+                    shelf_data['bins'].append(f"... {warehouse.bins_per_shelf - 3} more")
+
+                rack_data['shelves'].append(shelf_data)
+
+            if warehouse.shelves_per_rack > 3:
+                rack_data['shelves'].append({'name': f"... {warehouse.shelves_per_rack - 3} more", 'bins': []})
+
+            zone_data['racks'].append(rack_data)
+
+        if warehouse.racks_per_zone > 3:
+            zone_data['racks'].append({'name': f"... {warehouse.racks_per_zone - 3} more", 'shelves': []})
+
+        preview_structure.append(zone_data)
+
+    # Check if locations already generated
+    existing_count = warehouse_models.StorageLocation.objects.filter(warehouse=warehouse).count()
+
+    context = {
+        'warehouse': warehouse,
+        'preview_structure': preview_structure,
+        'existing_count': existing_count,
+        'is_staff': True,
+    }
+    return render(request, 'warehouse/warehouse_capacity_preview.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
+def warehouse_generate_locations(request, pk):
+    """Generate storage locations based on capacity configuration"""
+    if request.method != 'POST':
+        return redirect('warehouse:warehouse_capacity_preview', pk=pk)
+
+    warehouse = get_object_or_404(warehouse_models.Warehouse, pk=pk)
+
+    if not warehouse.is_capacity_configured:
+        messages.error(request, "Warehouse capacity not configured")
+        return redirect('warehouse:warehouse_capacity_configure', pk=pk)
+
+    try:
+        # Delete existing locations if requested
+        if request.POST.get('delete_existing') == 'yes':
+            existing_count = warehouse_models.StorageLocation.objects.filter(warehouse=warehouse).count()
+            warehouse_models.StorageLocation.objects.filter(warehouse=warehouse).delete()
+            logger.info(f"Deleted {existing_count} existing locations for warehouse {warehouse.code}")
+
+        zone_names = warehouse.get_zone_names()
+        locations_created = 0
+
+        for zone_idx, zone_name in enumerate(zone_names, 1):
+            # Create zone
+            zone, created = warehouse_models.StorageLocation.objects.get_or_create(
+                warehouse=warehouse,
+                code=zone_name,
+                defaults={
+                    'name': f"Zone {zone_name}",
+                    'location_type': 'zone',
+                    'is_pickable': False,
+                    'is_active': True,
+                }
+            )
+            if created:
+                locations_created += 1
+
+            for rack_idx in range(1, warehouse.racks_per_zone + 1):
+                rack_name = warehouse.generate_location_name('rack', rack_idx)
+                rack_code = f"{zone_name}-{rack_name}"
+
+                # Create rack
+                rack, created = warehouse_models.StorageLocation.objects.get_or_create(
+                    warehouse=warehouse,
+                    code=rack_code,
+                    defaults={
+                        'name': f"Rack {rack_name}",
+                        'location_type': 'rack',
+                        'parent': zone,
+                        'is_pickable': False,
+                        'is_active': True,
+                    }
+                )
+                if created:
+                    locations_created += 1
+
+                for shelf_idx in range(1, warehouse.shelves_per_rack + 1):
+                    shelf_name = warehouse.generate_location_name('shelf', shelf_idx)
+                    shelf_code = f"{rack_code}-{shelf_name}"
+
+                    # Create shelf
+                    shelf, created = warehouse_models.StorageLocation.objects.get_or_create(
+                        warehouse=warehouse,
+                        code=shelf_code,
+                        defaults={
+                            'name': f"Shelf {shelf_name}",
+                            'location_type': 'shelf',
+                            'parent': rack,
+                            'is_pickable': False,
+                            'is_active': True,
+                        }
+                    )
+                    if created:
+                        locations_created += 1
+
+                    for bin_idx in range(1, warehouse.bins_per_shelf + 1):
+                        bin_name = warehouse.generate_location_name('bin', bin_idx)
+                        bin_code = f"{shelf_code}-{bin_name}"
+
+                        # Create bin (pickable location)
+                        bin_loc, created = warehouse_models.StorageLocation.objects.get_or_create(
+                            warehouse=warehouse,
+                            code=bin_code,
+                            defaults={
+                                'name': f"Bin {bin_name}",
+                                'location_type': 'bin',
+                                'parent': shelf,
+                                'is_pickable': True,
+                                'is_active': True,
+                            }
+                        )
+                        if created:
+                            locations_created += 1
+
+        messages.success(
+            request,
+            f"Successfully generated {locations_created:,} storage locations for warehouse {warehouse.code}"
+        )
+        logger.info(f"Generated {locations_created} storage locations for warehouse {warehouse.code}")
+
+        return redirect('warehouse:location_list')
+
+    except Exception as e:
+        logger.exception(f"Error generating storage locations: {str(e)}")
+        messages.error(request, f"Error generating locations: {str(e)}")
+        return redirect('warehouse:warehouse_capacity_preview', pk=pk)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
 def location_list(request):
     """List all storage locations - Superuser only"""
     business, is_staff = get_business_filter(request)
@@ -882,6 +1125,9 @@ def location_list(request):
     if warehouse_id:
         locations = locations.filter(warehouse_id=warehouse_id)
 
+    # Get view mode from query parameter
+    view_mode = request.GET.get('view', 'table')
+
     paginator = Paginator(locations, 50)
     page = request.GET.get('page', 1)
     items = paginator.get_page(page)
@@ -890,6 +1136,7 @@ def location_list(request):
         'locations': items,
         'warehouses': warehouses,
         'selected_warehouse': warehouse_id,
+        'view_mode': view_mode,
         'is_staff': is_staff,
     }
     return render(request, 'warehouse/location_list.html', context)
@@ -1132,7 +1379,8 @@ def api_storage_locations(request, warehouse_id):
                 'id': loc.id,
                 'name': loc.name,
                 'code': loc.code or '',
-                'is_default': loc.is_default,
+                'location_type': loc.get_location_type_display(),
+                'is_pickable': loc.is_pickable,
             }
             for loc in locations
         ]

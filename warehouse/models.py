@@ -104,46 +104,357 @@ ALERT_STATUS_CHOICES = [
 
 
 # =============================================================================
-# WAREHOUSE MODEL
-# Represents a physical warehouse or storage facility.
-# Can optionally link to an existing PickupLocation.
-# Auto-generates warehouse code if not provided: WH-{business_code}-{uuid}
+# WAREHOUSE MODEL (FULFILLMENT CENTER)
+# Independent entity managed by staff only - NOT owned by sellers
+# Represents a physical fulfillment center with multiple locations
+# Auto-generates warehouse code if not provided: WH-FC-{uuid}
 # =============================================================================
 
 
 class Warehouse(models.Model):
-    business = models.ForeignKey(
-        business_models.Business,
-        on_delete=models.CASCADE,
-        related_name='warehouses',
-        db_index=True
+    """
+    Fulfillment Center - Independent warehouse entity managed by staff.
+
+    This is a warehouse-first architecture where:
+    - Warehouses are NOT owned by sellers
+    - Staff creates and manages all warehouses
+    - Multiple sellers can be linked to one warehouse
+    - One seller can be linked to multiple warehouses
+    """
+    name = models.CharField(max_length=200, help_text="Fulfillment center name")
+    code = models.CharField(max_length=50, unique=True, db_index=True, help_text="Unique warehouse code")
+    description = models.TextField(blank=True, help_text="Warehouse description and details")
+
+    # Address and contact info
+    address = models.TextField(blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100, blank=True)
+    postal_code = models.CharField(max_length=20, blank=True)
+    country = models.CharField(max_length=100, default='Bahrain')
+
+    # GPS coordinates for distance-based auto-selection
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
+    # Contact information
+    phone = models.CharField(max_length=20, blank=True)
+    email = models.EmailField(blank=True)
+
+    # Capacity Configuration - Internal warehouse structure
+    total_zones = models.IntegerField(
+        default=0,
+        help_text="Total number of zones in this warehouse"
     )
-    name = models.CharField(max_length=200)
-    code = models.CharField(max_length=50, unique=True, db_index=True)
-    pickup_location = models.ForeignKey(
-        business_models.PickupLocation,
+    racks_per_zone = models.IntegerField(
+        default=0,
+        help_text="Number of racks in each zone"
+    )
+    shelves_per_rack = models.IntegerField(
+        default=0,
+        help_text="Number of shelves in each rack"
+    )
+    bins_per_shelf = models.IntegerField(
+        default=0,
+        help_text="Number of bins in each shelf"
+    )
+
+    # Naming configuration (stores JSON for custom naming patterns)
+    zone_naming_pattern = models.CharField(
+        max_length=50,
+        default='A,B,C,D',
+        help_text="Zone naming pattern (e.g., 'A,B,C' or '1,2,3' or 'NORTH,SOUTH')"
+    )
+    rack_naming_pattern = models.CharField(
+        max_length=20,
+        default='numeric',
+        choices=[('numeric', 'Numeric (01, 02, 03...)'), ('alpha', 'Alpha (A, B, C...)')],
+        help_text="How to name racks within zones"
+    )
+    shelf_naming_pattern = models.CharField(
+        max_length=20,
+        default='numeric',
+        choices=[('numeric', 'Numeric (01, 02, 03...)'), ('alpha', 'Alpha (A, B, C...)')],
+        help_text="How to name shelves within racks"
+    )
+    bin_naming_pattern = models.CharField(
+        max_length=20,
+        default='numeric',
+        choices=[('numeric', 'Numeric (01, 02, 03...)'), ('alpha', 'Alpha (A, B, C...)')],
+        help_text="How to name bins within shelves"
+    )
+
+    # Capacity tracking
+    is_capacity_configured = models.BooleanField(
+        default=False,
+        help_text="Has the warehouse capacity been configured?"
+    )
+    capacity_configured_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When was capacity configuration completed?"
+    )
+    capacity_configured_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='warehouses'
+        related_name='configured_warehouse_capacity',
+        help_text="Who configured the warehouse capacity"
     )
-    address = models.TextField(blank=True)
-    is_active = models.BooleanField(default=True)
+
+    # Status and management
+    is_active = models.BooleanField(default=True, help_text="Is this warehouse operational?")
+    is_default = models.BooleanField(default=False, help_text="Is this the default fulfillment center?")
+
+    # Staff management
+    manager = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='managed_warehouses',
+        help_text="Staff member managing this warehouse"
+    )
+
+    # Timestamps
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_warehouses',
+        help_text="Staff who created this warehouse"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Warehouse'
-        verbose_name_plural = 'Warehouses'
-        ordering = ['name']
+        verbose_name = 'Fulfillment Center'
+        verbose_name_plural = 'Fulfillment Centers'
+        ordering = ['-is_default', 'name']
+        indexes = [
+            models.Index(fields=['is_active', 'name'], name='wh_fc_active_name_idx'),
+            models.Index(fields=['code'], name='wh_fc_code_idx'),
+        ]
 
     def __str__(self):
         return f"{self.code} - {self.name}"
 
     def save(self, *args, **kwargs):
         if not self.code:
-            # Auto-generate code if not provided
-            self.code = f"WH-{self.business.business_code}-{uuid.uuid4().hex[:6].upper()}"
+            # Auto-generate code if not provided: WH-FC-{unique_id}
+            self.code = f"WH-FC-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
+
+    @property
+    def total_capacity(self):
+        """Calculate total storage locations (bins) based on configuration"""
+        if not self.is_capacity_configured:
+            return 0
+        return (self.total_zones * self.racks_per_zone *
+                self.shelves_per_rack * self.bins_per_shelf)
+
+    @property
+    def total_racks(self):
+        """Total number of racks across all zones"""
+        return self.total_zones * self.racks_per_zone if self.total_zones else 0
+
+    @property
+    def total_shelves(self):
+        """Total number of shelves across all zones"""
+        return (self.total_zones * self.racks_per_zone *
+                self.shelves_per_rack) if self.total_zones else 0
+
+    def get_zone_names(self):
+        """Get list of zone names based on naming pattern"""
+        if not self.zone_naming_pattern:
+            return []
+        zones = [z.strip() for z in self.zone_naming_pattern.split(',')]
+        return zones[:self.total_zones] if self.total_zones else zones
+
+    def generate_location_name(self, location_type, index):
+        """Generate a name for a location based on the naming pattern"""
+        if location_type == 'rack':
+            pattern = self.rack_naming_pattern
+        elif location_type == 'shelf':
+            pattern = self.shelf_naming_pattern
+        elif location_type == 'bin':
+            pattern = self.bin_naming_pattern
+        else:
+            return str(index)
+
+        if pattern == 'numeric':
+            return f"{index:02d}"
+        elif pattern == 'alpha':
+            # Convert index to letter (1=A, 2=B, etc.)
+            if index <= 26:
+                return chr(64 + index)  # 65 is 'A'
+            else:
+                # For > 26, use AA, AB, AC, etc.
+                first = chr(64 + ((index - 1) // 26))
+                second = chr(65 + ((index - 1) % 26))
+                return f"{first}{second}"
+        return str(index)
+
+
+# =============================================================================
+# WAREHOUSE LOCATION MODEL
+# Multiple physical locations within a fulfillment center
+# Each location can serve different delivery zones
+# =============================================================================
+
+
+class WarehouseLocation(models.Model):
+    """
+    Physical location within a fulfillment center.
+
+    A warehouse can have multiple pickup/dispatch locations.
+    Staff selects the appropriate location during delivery task assignment
+    based on customer location and stock availability.
+    """
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.CASCADE,
+        related_name='pickup_locations',
+        db_index=True,
+        help_text="Parent fulfillment center"
+    )
+    name = models.CharField(max_length=200, help_text="Location name (e.g., 'North Gate', 'Main Entrance')")
+    code = models.CharField(max_length=50, db_index=True, help_text="Location code within warehouse")
+
+    # Address details
+    address = models.TextField(blank=True, help_text="Specific address or directions")
+    zone_number = models.IntegerField(null=True, blank=True, help_text="Delivery zone number")
+
+    # GPS coordinates for location-based selection
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
+    # Status
+    is_active = models.BooleanField(default=True, help_text="Is this location operational?")
+    is_default = models.BooleanField(default=False, help_text="Is this the default location for the warehouse?")
+
+    # Operating information
+    operating_hours = models.TextField(blank=True, help_text="Operating hours for pickup")
+    notes = models.TextField(blank=True, help_text="Special instructions for drivers")
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Warehouse Location'
+        verbose_name_plural = 'Warehouse Locations'
+        unique_together = ['warehouse', 'code']
+        ordering = ['warehouse', '-is_default', 'name']
+        indexes = [
+            models.Index(fields=['warehouse', 'is_active'], name='wh_loc_wh_active_idx'),
+            models.Index(fields=['zone_number'], name='wh_loc_zone_num_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.warehouse.code}/{self.name}"
+
+    @property
+    def full_code(self):
+        """Returns warehouse code + location code"""
+        return f"{self.warehouse.code}-{self.code}"
+
+
+# =============================================================================
+# SELLER WAREHOUSE LINK MODEL
+# Many-to-many relationship between sellers and warehouses
+# Allows flexible warehouse assignment and default settings
+# =============================================================================
+
+
+class SellerWarehouseLink(models.Model):
+    """
+    Links sellers (businesses) to fulfillment centers.
+
+    This creates a many-to-many relationship where:
+    - One seller can connect to multiple warehouses
+    - One warehouse can serve multiple sellers
+    - Each seller has a default warehouse and location
+    - Link can be created/removed by staff at any time
+    """
+    business = models.ForeignKey(
+        business_models.Business,
+        on_delete=models.CASCADE,
+        related_name='warehouse_links',
+        db_index=True,
+        help_text="Seller/business using this warehouse"
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.CASCADE,
+        related_name='seller_links',
+        db_index=True,
+        help_text="Fulfillment center serving this seller"
+    )
+    default_location = models.ForeignKey(
+        WarehouseLocation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='default_for_sellers',
+        help_text="Default pickup location for this seller at this warehouse"
+    )
+
+    # Priority and settings
+    is_default = models.BooleanField(
+        default=False,
+        help_text="Is this the default warehouse for this seller?"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Is this link active?"
+    )
+    priority = models.IntegerField(
+        default=0,
+        help_text="Selection priority (higher = preferred). Used for auto-selection."
+    )
+
+    # Timestamps and management
+    linked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_warehouse_links',
+        help_text="Staff who created this link"
+    )
+    linked_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # Notes
+    notes = models.TextField(blank=True, help_text="Special notes about this warehouse-seller relationship")
+
+    class Meta:
+        verbose_name = 'Seller Warehouse Link'
+        verbose_name_plural = 'Seller Warehouse Links'
+        unique_together = ['business', 'warehouse']
+        ordering = ['business', '-is_default', '-priority', 'warehouse']
+        indexes = [
+            models.Index(fields=['business', 'is_active'], name='wh_link_biz_active_idx'),
+            models.Index(fields=['warehouse', 'is_active'], name='wh_link_wh_active_idx'),
+            models.Index(fields=['business', 'is_default'], name='wh_link_biz_default_idx'),
+        ]
+
+    def __str__(self):
+        default_tag = " [DEFAULT]" if self.is_default else ""
+        return f"{self.business.business_name} → {self.warehouse.name}{default_tag}"
+
+    def save(self, *args, **kwargs):
+        # Ensure default_location belongs to the selected warehouse
+        if self.default_location and self.default_location.warehouse != self.warehouse:
+            raise ValueError(f"Default location must belong to warehouse {self.warehouse.code}")
+
+        # If this is being set as default, unset other defaults for this business
+        if self.is_default:
+            SellerWarehouseLink.objects.filter(
+                business=self.business,
+                is_default=True
+            ).exclude(pk=self.pk).update(is_default=False)
+
         super().save(*args, **kwargs)
 
 
@@ -155,11 +466,13 @@ class StorageLocation(models.Model):
     """
     Hierarchical storage locations within a warehouse.
     Supports zones, aisles, racks, shelves, and bins.
+    NOTE: This is for internal warehouse storage (racks, bins, etc.)
+    NOT for pickup/dispatch locations - see WarehouseLocation for that.
     """
     warehouse = models.ForeignKey(
         Warehouse,
         on_delete=models.CASCADE,
-        related_name='locations',
+        related_name='storage_locations',
         db_index=True
     )
     parent = models.ForeignKey(

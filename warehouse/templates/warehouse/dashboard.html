@@ -1,316 +1,350 @@
 {% extends 'wf_dashboard_base.html' %}
 {% load static %}
 
-{% block title %}Warehouse Dashboard{% endblock %}
+{% block title %}Warehouse Logistics{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse-logistics.css' %}" type="text/css" />
+{% endblock %}
 
 {% block content %}
-<div id="warehouse_dashboard_section_main" class="container-fluid py-4">
-    <!-- Page Header with Breadcrumb -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-2">
-                    <li class="breadcrumb-item"><a href="{% url 'workforce:wf_dashboard' %}" class="text-decoration-none">Workforce</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Warehouse</li>
-                </ol>
-            </nav>
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 id="warehouse_dashboard_header_title" class="h3 mb-1 fw-bold">
-                        <i class="fas fa-warehouse text-primary me-2"></i>Warehouse Dashboard
-                    </h1>
-                    <p class="text-muted mb-0">Manage inventory, stock levels, and warehouse operations</p>
-                </div>
-                <div class="d-none d-md-block">
-                    <a href="{% url 'warehouse:receive_stock' %}" class="btn btn-primary">
-                        <i class="fas fa-truck-loading me-1"></i> Receive Stock
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Summary Cards -->
-    <div id="warehouse_dashboard_section_summary" class="row mb-4 g-3">
-        <div class="col-xl-3 col-md-6">
-            <div id="warehouse_dashboard_card_total_stock" class="card border-0 shadow-sm h-100 card-hover">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="text-muted text-uppercase small fw-semibold mb-1">Total Stock</p>
-                            <h2 class="mb-0 fw-bold">{{ total_on_hand|default:0 }}</h2>
-                            <small class="text-success"><i class="fas fa-arrow-up me-1"></i>Units in stock</small>
-                        </div>
-                        <div class="bg-primary bg-opacity-10 rounded-3 p-3">
-                            <i class="fas fa-boxes fa-2x text-primary"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6">
-            <div id="warehouse_dashboard_card_reserved" class="card border-0 shadow-sm h-100 card-hover">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="text-muted text-uppercase small fw-semibold mb-1">Reserved</p>
-                            <h2 class="mb-0 fw-bold">{{ total_reserved|default:0 }}</h2>
-                            <small class="text-warning"><i class="fas fa-lock me-1"></i>Allocated to orders</small>
-                        </div>
-                        <div class="bg-warning bg-opacity-10 rounded-3 p-3">
-                            <i class="fas fa-lock fa-2x text-warning"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6">
-            <div id="warehouse_dashboard_card_alerts" class="card border-0 shadow-sm h-100 card-hover {% if low_stock_count > 0 %}border-start border-danger border-4{% endif %}">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="text-muted text-uppercase small fw-semibold mb-1">Low Stock Alerts</p>
-                            <h2 class="mb-0 fw-bold {% if low_stock_count > 0 %}text-danger{% endif %}">{{ low_stock_count }}</h2>
-                            <small class="{% if low_stock_count > 0 %}text-danger{% else %}text-success{% endif %}">
-                                {% if low_stock_count > 0 %}<i class="fas fa-exclamation-circle me-1"></i>Need attention{% else %}<i class="fas fa-check-circle me-1"></i>All good{% endif %}
-                            </small>
-                        </div>
-                        <div class="bg-danger bg-opacity-10 rounded-3 p-3">
-                            <i class="fas fa-exclamation-triangle fa-2x text-danger"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6">
-            <div id="warehouse_dashboard_card_picks" class="card border-0 shadow-sm h-100 card-hover">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="text-muted text-uppercase small fw-semibold mb-1">Pending Picks</p>
-                            <h2 class="mb-0 fw-bold">{{ pending_picks }}</h2>
-                            <small class="text-info"><i class="fas fa-clipboard-list me-1"></i>Awaiting picking</small>
-                        </div>
-                        <div class="bg-info bg-opacity-10 rounded-3 p-3">
-                            <i class="fas fa-clipboard-list fa-2x text-info"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div id="warehouse_dashboard_card_actions" class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-0 py-3">
-                    <h5 class="mb-0 fw-semibold"><i class="fas fa-bolt text-warning me-2"></i>Quick Actions</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-lg-3 col-md-6">
-                            <a id="warehouse_dashboard_btn_receive" href="{% url 'warehouse:receive_stock' %}"
-                               class="btn btn-outline-primary w-100 py-4 d-flex flex-column align-items-center gap-2 rounded-3 action-btn"
-                               hx-get="{% url 'warehouse:receive_stock' %}"
-                               hx-target="#main-content"
-                               hx-select="#main-content"
-                               hx-swap="outerHTML"
-                               hx-push-url="true">
-                                <i class="fas fa-truck-loading fa-2x"></i>
-                                <span class="fw-semibold">Receive Stock</span>
-                            </a>
-                        </div>
-                        <div class="col-lg-3 col-md-6">
-                            <a id="warehouse_dashboard_btn_inventory" href="{% url 'warehouse:inventory_list' %}"
-                               class="btn btn-outline-success w-100 py-4 d-flex flex-column align-items-center gap-2 rounded-3 action-btn"
-                               hx-get="{% url 'warehouse:inventory_list' %}"
-                               hx-target="#main-content"
-                               hx-select="#main-content"
-                               hx-swap="outerHTML"
-                               hx-push-url="true">
-                                <i class="fas fa-warehouse fa-2x"></i>
-                                <span class="fw-semibold">View Inventory</span>
-                            </a>
-                        </div>
-                        <div class="col-lg-3 col-md-6">
-                            <a id="warehouse_dashboard_btn_picks" href="{% url 'warehouse:pick_list_list' %}"
-                               class="btn btn-outline-info w-100 py-4 d-flex flex-column align-items-center gap-2 rounded-3 action-btn"
-                               hx-get="{% url 'warehouse:pick_list_list' %}"
-                               hx-target="#main-content"
-                               hx-select="#main-content"
-                               hx-swap="outerHTML"
-                               hx-push-url="true">
-                                <i class="fas fa-tasks fa-2x"></i>
-                                <span class="fw-semibold">Pick Lists</span>
-                            </a>
-                        </div>
-                        <div class="col-lg-3 col-md-6">
-                            <a id="warehouse_dashboard_btn_alerts" href="{% url 'warehouse:low_stock_alerts' %}"
-                               class="btn btn-outline-danger w-100 py-4 d-flex flex-column align-items-center gap-2 rounded-3 action-btn position-relative"
-                               hx-get="{% url 'warehouse:low_stock_alerts' %}"
-                               hx-target="#main-content"
-                               hx-select="#main-content"
-                               hx-swap="outerHTML"
-                               hx-push-url="true">
-                                <i class="fas fa-bell fa-2x"></i>
-                                <span class="fw-semibold">Alerts</span>
-                                {% if low_stock_count > 0 %}
-                                <span class="position-absolute top-0 end-0 translate-middle badge rounded-pill bg-danger">
-                                    {{ low_stock_count }}
-                                </span>
-                                {% endif %}
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Transactions and Warehouses -->
-    <div class="row g-4">
-        <div class="col-lg-8">
-            <div id="warehouse_dashboard_card_transactions" class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-semibold"><i class="fas fa-history text-secondary me-2"></i>Recent Transactions</h5>
-                    <a id="warehouse_dashboard_btn_view_all" href="{% url 'warehouse:transaction_list' %}"
-                       class="btn btn-sm btn-outline-primary"
-                       hx-get="{% url 'warehouse:transaction_list' %}"
-                       hx-target="#main-content"
-                       hx-select="#main-content"
-                       hx-swap="outerHTML"
-                       hx-push-url="true">
-                        View All <i class="fas fa-arrow-right ms-1"></i>
-                    </a>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table id="warehouse_dashboard_table_transactions" class="table table-hover align-middle mb-0">
-                            <thead id="warehouse_dashboard_thead_transactions" class="bg-light">
-                                <tr>
-                                    <th class="ps-3">Transaction #</th>
-                                    <th>Product</th>
-                                    <th>Type</th>
-                                    <th class="text-center">Qty</th>
-                                    <th>Date</th>
-                                </tr>
-                            </thead>
-                            <tbody id="warehouse_dashboard_tbody_transactions">
-                                {% for txn in recent_transactions %}
-                                <tr>
-                                    <td class="ps-3"><code class="bg-light px-2 py-1 rounded">{{ txn.transaction_number|truncatechars:12 }}</code></td>
-                                    <td>
-                                        <span class="fw-medium">{{ txn.product.item_name|truncatechars:25 }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge rounded-pill {% if 'receive' in txn.transaction_type %}bg-success{% elif 'ship' in txn.transaction_type %}bg-primary{% elif 'adjust' in txn.transaction_type %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                                            {{ txn.get_transaction_type_display }}
-                                        </span>
-                                    </td>
-                                    <td class="text-center">
-                                        {% if txn.quantity > 0 %}
-                                            <span class="badge bg-success-subtle text-success fw-semibold">+{{ txn.quantity }}</span>
-                                        {% else %}
-                                            <span class="badge bg-danger-subtle text-danger fw-semibold">{{ txn.quantity }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td><small class="text-muted">{{ txn.created_at|date:"M d, H:i" }}</small></td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted py-5">
-                                        <i class="fas fa-inbox fa-3x mb-3 d-block opacity-50"></i>
-                                        <p class="mb-0">No transactions yet</p>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+<div class="warehouse-logistics-container">
+    <!-- Left Panel - Section View -->
+    <div>
+        <!-- Header -->
+        <div class="warehouse-header">
+            <h1 class="warehouse-title">Warehouse Logistics</h1>
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search product..." id="searchInput">
             </div>
         </div>
 
-        <!-- Warehouses -->
-        <div class="col-lg-4">
-            <div id="warehouse_dashboard_card_warehouses" class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-semibold"><i class="fas fa-building text-secondary me-2"></i>Warehouses</h5>
-                    <a id="warehouse_dashboard_btn_add_warehouse" href="{% url 'warehouse:warehouse_add' %}"
-                       class="btn btn-sm btn-primary rounded-circle"
-                       title="Add Warehouse"
-                       hx-get="{% url 'warehouse:warehouse_add' %}"
-                       hx-target="#main-content"
-                       hx-select="#main-content"
-                       hx-swap="outerHTML"
-                       hx-push-url="true">
-                        <i class="fas fa-plus"></i>
-                    </a>
+        <!-- Section Card -->
+        <div class="section-card">
+            <div class="section-header">
+                <h2 class="section-title">Section <span id="currentSectionName">{{ selected_section.code|default:"001" }}</span></h2>
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div class="section-date">
+                        <i class="far fa-calendar"></i>
+                        <span id="currentDate">{{ current_date|date:"d.m.Y" }}</span>
+                    </div>
+                    <a href="{% url 'warehouse:location_list' %}" class="show-all-btn">Show all</a>
                 </div>
-                <div id="warehouse_dashboard_list_warehouses" class="card-body">
-                    {% for wh in warehouses %}
-                    <div class="d-flex justify-content-between align-items-center mb-3 pb-3 {% if not forloop.last %}border-bottom{% endif %}">
-                        <div class="d-flex align-items-center">
-                            <div class="bg-primary bg-opacity-10 rounded-3 p-2 me-3">
-                                <i class="fas fa-warehouse text-primary"></i>
+            </div>
+
+            <!-- Storage Grid -->
+            <div class="storage-grid" id="storageGrid">
+                {% for i in "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" %}
+                <div class="storage-cell {% cycle 'loaded' 'loaded' 'loaded' 'loaded' 'loaded' 'loaded' 'free' 'free' 'free' 'free' 'free' 'free' %}" data-position="{{ forloop.counter }}">
+                    {% if forloop.counter == 35 %}
+                    <div class="storage-tooltip">
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Row 3</span>
+                            <span class="tooltip-value">#132236</span>
+                        </div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">H60 x W60 x 20 KG</span>
+                        </div>
+                        <div class="tooltip-delivered">
+                            Delivered 06.15PM
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Legend -->
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-box free"></div>
+                    <span>Free place</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-box loaded"></div>
+                    <span>Loaded place</span>
+                </div>
+            </div>
+
+            <!-- Section List -->
+            <div class="section-list">
+                <div class="section-list-header">
+                    <h3 class="section-list-title">List of sections</h3>
+                    <select class="sort-dropdown" id="sortBy">
+                        <option>Sort by</option>
+                        <option value="usage">Usage %</option>
+                        <option value="name">Section Name</option>
+                        <option value="date">Date</option>
+                    </select>
+                </div>
+
+                <!-- Section Items -->
+                {% for location in storage_locations %}
+                <div class="section-item" onclick="loadSection('{{ location.code }}', {{ location.id }})">
+                    <div class="section-name">Section {{ location.code }}</div>
+                    <div class="section-meta">
+                        <div class="section-date-small">
+                            <i class="far fa-calendar"></i>
+                            <span>{{ location.created_at|date:"d/m/Y" }}</span>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <span class="section-usage">Used</span>
+                            <div class="usage-bar">
+                                <div class="usage-fill {% if location.usage_percent < 40 %}low{% elif location.usage_percent < 70 %}medium{% else %}high{% endif %}"
+                                     style="width: {{ location.usage_percent }}%"></div>
                             </div>
-                            <div>
-                                <h6 class="mb-0 fw-semibold">{{ wh.name }}</h6>
-                                <small class="text-muted"><code>{{ wh.code }}</code></small>
-                            </div>
+                            <span class="section-usage" style="margin-left: 8px;">{{ location.usage_percent|default:"0" }}%</span>
                         </div>
-                        <a href="{% url 'warehouse:warehouse_detail' wh.pk %}"
-                           class="btn btn-sm btn-outline-secondary rounded-pill"
-                           hx-get="{% url 'warehouse:warehouse_detail' wh.pk %}"
-                           hx-target="#main-content"
-                           hx-select="#main-content"
-                           hx-swap="outerHTML"
-                           hx-push-url="true">
-                            View
-                        </a>
                     </div>
-                    {% empty %}
-                    <div class="text-center text-muted py-4">
-                        <i class="fas fa-warehouse fa-3x mb-3 opacity-50"></i>
-                        <p class="mb-3">No warehouses yet</p>
-                        <a href="{% url 'warehouse:warehouse_add' %}"
-                           class="btn btn-primary"
-                           hx-get="{% url 'warehouse:warehouse_add' %}"
-                           hx-target="#main-content"
-                           hx-select="#main-content"
-                           hx-swap="outerHTML"
-                           hx-push-url="true">
-                            <i class="fas fa-plus me-1"></i>Create Warehouse
-                        </a>
-                    </div>
-                    {% endfor %}
                 </div>
+                {% empty %}
+                <div class="section-item">
+                    <div class="section-name">Section 001</div>
+                    <div class="section-meta">
+                        <div class="section-date-small">
+                            <i class="far fa-calendar"></i>
+                            <span>28/09/2020</span>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <span class="section-usage">Used</span>
+                            <div class="usage-bar">
+                                <div class="usage-fill low" style="width: 20%"></div>
+                            </div>
+                            <span class="section-usage" style="margin-left: 8px;">20%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="section-item">
+                    <div class="section-name">Section 002</div>
+                    <div class="section-meta">
+                        <div class="section-date-small">
+                            <i class="far fa-calendar"></i>
+                            <span>28/09/2020</span>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <span class="section-usage">Used</span>
+                            <div class="usage-bar">
+                                <div class="usage-fill low" style="width: 28%"></div>
+                            </div>
+                            <span class="section-usage" style="margin-left: 8px;">28%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="section-item">
+                    <div class="section-name">Section 003</div>
+                    <div class="section-meta">
+                        <div class="section-date-small">
+                            <i class="far fa-calendar"></i>
+                            <span>28/09/2020</span>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <span class="section-usage">Used</span>
+                            <div class="usage-bar">
+                                <div class="usage-fill high" style="width: 80%"></div>
+                            </div>
+                            <span class="section-usage" style="margin-left: 8px;">80%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="section-item">
+                    <div class="section-name">Section 004</div>
+                    <div class="section-meta">
+                        <div class="section-date-small">
+                            <i class="far fa-calendar"></i>
+                            <span>28/02/2020</span>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <span class="section-usage">Used</span>
+                            <div class="usage-bar">
+                                <div class="usage-fill medium" style="width: 50%"></div>
+                            </div>
+                            <span class="section-usage" style="margin-left: 8px;">50%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="section-item">
+                    <div class="section-name">Section 005</div>
+                    <div class="section-meta">
+                        <div class="section-date-small">
+                            <i class="far fa-calendar"></i>
+                            <span>28/02/2020</span>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <span class="section-usage">Used</span>
+                            <div class="usage-bar">
+                                <div class="usage-fill medium" style="width: 58%"></div>
+                            </div>
+                            <span class="section-usage" style="margin-left: 8px;">58%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="section-item">
+                    <div class="section-name">Section 006</div>
+                    <div class="section-meta">
+                        <div class="section-date-small">
+                            <i class="far fa-calendar"></i>
+                            <span>28/03/2020</span>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <span class="section-usage">Used</span>
+                            <div class="usage-bar">
+                                <div class="usage-fill low" style="width: 36%"></div>
+                            </div>
+                            <span class="section-usage" style="margin-left: 8px;">36%</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="right-panel">
+        <!-- Usage Circle -->
+        <div class="usage-circle-card">
+            <button class="close-btn" onclick="this.parentElement.style.display='none'">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="usage-title">Section 5 usage</div>
+
+            <div class="circle-container">
+                <div class="progress-circle">
+                    <svg width="180" height="180">
+                        <circle class="progress-bg" cx="90" cy="90" r="80"></circle>
+                        <circle class="progress-bar" cx="90" cy="90" r="80"
+                                stroke-dasharray="502.65"
+                                stroke-dashoffset="210.11"></circle>
+                    </svg>
+                    <div class="circle-text">
+                        <div class="circle-percentage">58%</div>
+                        <div class="circle-label">Location used</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="usage-stats">
+                <div class="stat-item">
+                    <div class="stat-label">Loaded</div>
+                    <div class="stat-value">19 Shelves</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Empty</div>
+                    <div class="stat-value">64 Shelves</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Box List -->
+        <div class="box-list">
+            <div class="tabs">
+                <div class="tab active">Received</div>
+                <div class="tab">Sent</div>
+                <div class="tab">Expected</div>
+            </div>
+
+            <div class="box-items">
+                {% for txn in recent_transactions|slice:":10" %}
+                <div class="box-item">
+                    <div class="box-icon">
+                        <i class="fas fa-box"></i>
+                    </div>
+                    <div class="box-info">
+                        <div class="box-id">Box {{ txn.transaction_number|truncatechars:8 }}</div>
+                        <div class="box-time">Delivered {{ txn.created_at|date:"H:i" }}PM</div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="box-item">
+                    <div class="box-icon">
+                        <i class="fas fa-box"></i>
+                    </div>
+                    <div class="box-info">
+                        <div class="box-id">Box 132236</div>
+                        <div class="box-time">Delivered 06:15PM</div>
+                    </div>
+                </div>
+                <div class="box-item">
+                    <div class="box-icon">
+                        <i class="fas fa-box"></i>
+                    </div>
+                    <div class="box-info">
+                        <div class="box-id">Box 232645</div>
+                        <div class="box-time">Delivered 06:15PM</div>
+                    </div>
+                </div>
+                <div class="box-item">
+                    <div class="box-icon">
+                        <i class="fas fa-box"></i>
+                    </div>
+                    <div class="box-info">
+                        <div class="box-id">Box 323624</div>
+                        <div class="box-time">Delivered 06:15PM</div>
+                    </div>
+                </div>
+                <div class="box-item">
+                    <div class="box-icon">
+                        <i class="fas fa-box"></i>
+                    </div>
+                    <div class="box-info">
+                        <div class="box-id">Box 323624</div>
+                        <div class="box-time">Delivered 06:15PM</div>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
         </div>
     </div>
 </div>
 
-<style>
-.card-hover {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Search functionality
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            console.log('Searching for:', searchTerm);
+            // Add search logic here
+        });
+    }
+
+    // Sort functionality
+    const sortBy = document.getElementById('sortBy');
+    if (sortBy) {
+        sortBy.addEventListener('change', function(e) {
+            const sortValue = e.target.value;
+            console.log('Sorting by:', sortValue);
+            // Add sort logic here
+        });
+    }
+
+    // Tab switching
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            tabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            // Load different data based on tab
+        });
+    });
+
+    // Highlight clicked cell
+    const cells = document.querySelectorAll('.storage-cell.loaded');
+    cells.forEach(cell => {
+        cell.addEventListener('click', function() {
+            cells.forEach(c => c.classList.remove('highlight'));
+            this.classList.add('highlight');
+        });
+    });
+});
+
+function loadSection(code, id) {
+    document.getElementById('currentSectionName').textContent = code;
+    // Load section data via AJAX
+    console.log('Loading section:', code, id);
 }
-.card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 .5rem 1rem rgba(0,0,0,.1) !important;
-}
-.action-btn {
-    transition: all 0.2s ease;
-}
-.action-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 .25rem .5rem rgba(0,0,0,.1);
-}
-.bg-success-subtle {
-    background-color: rgba(25, 135, 84, 0.1);
-}
-.bg-danger-subtle {
-    background-color: rgba(220, 53, 69, 0.1);
-}
-</style>
+</script>
 {% endblock %}
