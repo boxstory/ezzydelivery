@@ -959,6 +959,125 @@ def location_add(request):
     return render(request, 'warehouse/location_add.html', context)
 
 
+@login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
+def location_edit(request, pk):
+    """Edit an existing storage location - Superuser only"""
+    location = get_object_or_404(warehouse_models.StorageLocation, pk=pk)
+    business, is_staff = get_business_filter(request)
+
+    # For non-staff users, verify warehouse access
+    if not is_staff:
+        if not warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business,
+            warehouse=location.warehouse,
+            is_active=True
+        ).exists():
+            messages.error(request, "You don't have access to this warehouse")
+            return redirect('warehouse:location_list')
+
+    if request.method == 'POST':
+        try:
+            # Extract form data
+            name = request.POST.get('name')
+            location_type = request.POST.get('location_type')
+            parent_id = request.POST.get('parent')
+            is_pickable = request.POST.get('is_pickable') == 'on'
+            is_active = request.POST.get('is_active') == 'on'
+
+            # Validate parent belongs to same warehouse
+            if parent_id:
+                parent = warehouse_models.StorageLocation.objects.get(id=parent_id)
+                if parent.warehouse != location.warehouse:
+                    raise ValueError("Parent location must be in the same warehouse")
+                location.parent = parent
+            else:
+                location.parent = None
+
+            # Update fields (code and warehouse are not editable)
+            location.name = name
+            location.location_type = location_type
+            location.is_pickable = is_pickable
+            location.is_active = is_active
+            location.save()
+
+            # Log and message
+            logger.info(f"Storage location {location.code} updated by {request.user.username}")
+            messages.success(request, f"Storage location '{location.code}' updated successfully")
+
+            return redirect('warehouse:location_list')
+
+        except Exception as e:
+            logger.error(f"Error updating storage location: {str(e)}")
+            messages.error(request, f"Error updating location: {str(e)}")
+
+    # GET request - prepare context
+    if is_staff:
+        warehouses = warehouse_models.Warehouse.objects.all().order_by('name')
+    else:
+        warehouse_links = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).select_related('warehouse')
+        warehouses = [link.warehouse for link in warehouse_links]
+
+    # Get parent location options for the same warehouse
+    parent_locations = warehouse_models.StorageLocation.objects.filter(
+        warehouse=location.warehouse
+    ).exclude(id=location.id).order_by('code')
+
+    location_types = warehouse_models.LOCATION_TYPE_CHOICES
+
+    context = {
+        'location': location,
+        'warehouses': warehouses,
+        'parent_locations': parent_locations,
+        'location_types': location_types,
+        'is_staff': is_staff,
+    }
+
+    return render(request, 'warehouse/location_edit.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
+def location_delete(request, pk):
+    """Delete a storage location - Superuser only"""
+    location = get_object_or_404(warehouse_models.StorageLocation, pk=pk)
+    business, is_staff = get_business_filter(request)
+
+    # For non-staff users, verify warehouse access
+    if not is_staff:
+        if not warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business,
+            warehouse=location.warehouse,
+            is_active=True
+        ).exists():
+            messages.error(request, "You don't have access to this warehouse")
+            return redirect('warehouse:location_list')
+
+    if request.method == 'POST':
+        # Store display info before deletion
+        location_code = location.code
+        location_name = location.name
+        warehouse_name = location.warehouse.name
+
+        # Delete the location (CASCADE will handle related records)
+        location.delete()
+
+        # Log and message
+        logger.info(f"Storage location {location_code} ({warehouse_name}) deleted by {request.user.username}")
+        messages.success(request, f"Storage location '{location_code}' deleted successfully")
+
+        return redirect('warehouse:location_list')
+
+    # GET request - show confirmation
+    context = {
+        'location': location,
+    }
+
+    return render(request, 'warehouse/location_delete.html', context)
+
+
 # =============================================================================
 # API ENDPOINTS
 # =============================================================================
