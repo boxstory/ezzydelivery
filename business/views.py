@@ -193,6 +193,22 @@ def business_dashboard(request):
             Q(order_status='customer_confirmation_pending')
         ).select_related('pickup_location').order_by('-id')[:5]
 
+        # Team statistics
+        team_members = business_models.BusinessTeamProfile.objects.filter(
+            business_id=business.business_id
+        ).select_related('user')
+
+        total_team_members = team_members.count()
+        active_team_members = team_members.filter(team_status='active').count()
+        pending_team_members = team_members.filter(team_status='pending').count()
+
+        # Recent team members (latest 3)
+        recent_team_members = team_members.order_by('-created_at')[:3]
+
+        # Check if user has multiple businesses (for business switcher)
+        user_businesses = get_all_user_businesses(request.user)
+        show_business_switcher = len(user_businesses) > 1
+
         context = {
             'profile': profile,
             'business': business,
@@ -210,6 +226,14 @@ def business_dashboard(request):
             'todays_pending_orders': todays_pending_orders,
             'todays_delivered_orders': todays_delivered_orders,
             'followup_orders': followup_orders,
+            # Team stats
+            'total_team_members': total_team_members,
+            'active_team_members': active_team_members,
+            'pending_team_members': pending_team_members,
+            'recent_team_members': recent_team_members,
+            # Business switcher
+            'show_business_switcher': show_business_switcher,
+            'user_businesses': user_businesses,
         }
         return render(request, 'business/business_dashboard.html', context)
     except business_models.Business.DoesNotExist:
@@ -920,6 +944,7 @@ from business.decorators import (
     business_manager_or_owner_required,
     business_owner_required,
     get_user_business_access,
+    get_all_user_businesses,
     user_has_business_permission,
 )
 from business.permissions import BusinessPermissions, TeamRoles, get_role_permissions
@@ -1377,5 +1402,98 @@ def workflow_guide(request):
     }
 
     return render(request, 'business/workflow_guide.html', context)
+
+
+# =============================================================================
+# BUSINESS SELECTOR VIEWS
+# =============================================================================
+
+@login_required(login_url='account_login')
+def business_selector(request):
+    """
+    Show business selector when user has access to multiple businesses.
+
+    Allows users to choose which business they want to work with.
+    Selected business is stored in session.
+    """
+    # Get all businesses user has access to
+    user_businesses = get_all_user_businesses(request.user)
+
+    if not user_businesses:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    # If only one business, auto-select it and redirect
+    if len(user_businesses) == 1:
+        business_info = user_businesses[0]
+        request.session['selected_business_id'] = business_info['business'].business_id
+        messages.success(request, f"Welcome to {business_info['business'].business_name}")
+        return redirect('business:business_dashboard')
+
+    # Prefetch business logos to avoid N+1 queries
+    business_ids = [b['business'].business_id for b in user_businesses]
+    logos = business_models.BusinessLogo.objects.filter(
+        business_id__in=business_ids
+    ).select_related('business')
+
+    # Create a logo lookup dict
+    logo_dict = {logo.business_id: logo for logo in logos}
+
+    # Attach logos to businesses
+    for business_info in user_businesses:
+        business_info['logo'] = logo_dict.get(business_info['business'].business_id)
+
+    # Get current selection if any
+    selected_business_id = request.session.get('selected_business_id')
+
+    context = {
+        'user_businesses': user_businesses,
+        'selected_business_id': selected_business_id,
+        'total_count': len(user_businesses),
+    }
+
+    return render(request, 'business/business_selector.html', context)
+
+
+@login_required(login_url='account_login')
+def business_switch(request, business_id):
+    """
+    Switch to a different business.
+
+    Verifies user has access to the business and stores selection in session.
+    """
+    # Verify user has access to this business
+    user_businesses = get_all_user_businesses(request.user)
+
+    # Check if business_id is in user's accessible businesses
+    has_access = any(
+        b['business'].business_id == business_id
+        for b in user_businesses
+    )
+
+    if not has_access:
+        messages.error(request, "You don't have access to this business")
+        return redirect('business:business_selector')
+
+    # Store selection in session
+    request.session['selected_business_id'] = business_id
+
+    # Get business name for message
+    business = next(
+        (b['business'] for b in user_businesses if b['business'].business_id == business_id),
+        None
+    )
+
+    if business:
+        messages.success(request, f"Switched to {business.business_name}")
+
+    # Clear cached business access to force reload
+    if hasattr(request, '_cached_business_access'):
+        delattr(request, '_cached_business_access')
+    if hasattr(request, '_cached_user_business'):
+        delattr(request, '_cached_user_business')
+
+    # Redirect to dashboard
+    return redirect('business:business_dashboard')
 
 

@@ -224,7 +224,8 @@
 
       <hr />
 
-      <!-- SETTINGS SECTION -->
+      <!-- SETTINGS SECTION - Only visible to business owner -->
+      {% if is_business_owner %}
       <li class="nav-item {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}active{% endif %}">
         <div class="nav-link d-flex justify-content-start align-items-center {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}active{% endif %}"
              data-bs-toggle="collapse"
@@ -280,8 +281,63 @@
           </ul>
         </div>
       </li>
+      {% endif %}
 
       <hr />
+
+      <!-- BUSINESS SWITCHER - Only show if user has multiple businesses -->
+      {% if show_business_switcher %}
+      <li class="nav-item">
+        <div class="nav-link d-flex justify-content-start align-items-center business-switcher-sidebar collapsed"
+             data-bs-toggle="collapse"
+             data-bs-target="#submenu-business-switcher"
+             data-title="Switch Business"
+             aria-expanded="false">
+          <i class="fa-solid fa-building me-2"></i>
+          <span class="flex-fill text-start">Switch Business</span>
+          <i class="fa-solid fa-caret-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse rounded-3"
+             role="list"
+             id="submenu-business-switcher"
+             data-bs-parent="#client_sidebar_nav_main">
+          <ul class="flex-column nav text-black">
+            {% for business_info in user_businesses %}
+            <li class="nav-item">
+              <a class="nav-link d-flex align-items-center {% if business_info.business.business_id == user_business.business_id %}active{% endif %}"
+                 href="{% url 'business:business_switch' business_info.business.business_id %}">
+                <div class="me-2">
+                  {% if business_info.access_type == 'owner' %}
+                  <i class="fa-solid fa-crown text-warning"></i>
+                  {% else %}
+                  <i class="fa-solid fa-user-tie text-info"></i>
+                  {% endif %}
+                </div>
+                <div class="flex-fill">
+                  <div class="small fw-bold">{{ business_info.business.business_name|truncatechars:15 }}</div>
+                  <small class="text-muted" style="font-size: 0.7rem;">
+                    {% if business_info.access_type == 'owner' %}Owner{% else %}{{ business_info.team_profile.get_team_role_display }}{% endif %}
+                  </small>
+                </div>
+                {% if business_info.business.business_id == user_business.business_id %}
+                <i class="fa-solid fa-check text-success ms-1"></i>
+                {% endif %}
+              </a>
+            </li>
+            {% endfor %}
+            <li class="nav-item">
+              <a class="nav-link d-flex align-items-center"
+                 href="{% url 'business:business_selector' %}">
+                <i class="fa-solid fa-th-large me-2"></i>
+                <span>View All</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <hr />
+      {% endif %}
 
       <!-- HELP CENTER -->
       <li class="nav-item {% if current_url == 'help_center' %}active{% endif %}">

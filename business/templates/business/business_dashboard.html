@@ -3,45 +3,7 @@
 {% load crispy_forms_tags %}
 
 {% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'business/css/business.css' %}" />
-<style>
-.db-stats {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 6px;
-  padding: 8px;
-}
-.db-stat {
-  background: #fff;
-  border-radius: 6px;
-  padding: 10px;
-  border: 1px solid #e5e7eb;
-  text-align: center;
-}
-.db-stat-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  margin-bottom: 6px;
-}
-.db-stat-icon.primary { background: #fef3c7; color: #d97706; }
-.db-stat-icon.success { background: #dcfce7; color: #16a34a; }
-.db-stat-icon.info { background: #dbeafe; color: #2563eb; }
-.db-stat-icon.warning { background: #fef3c7; color: #ca8a04; }
-.db-stat-icon.danger { background: #fee2e2; color: #dc2626; }
-.db-stat-value { font-size: 1.1rem; font-weight: 700; color: #1f2937; margin: 0; }
-.db-stat-label { font-size: 0.7rem; color: #6b7280; margin: 2px 0 0 0; }
-@media (max-width: 992px) {
-  .db-stats { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 576px) {
-  .db-stats { grid-template-columns: repeat(2, 1fr); }
-}
-</style>
+<!-- Dashboard styles now in business.css for HTMX compatibility -->
 {% endblock extra_css %}
 
 {% block title %}BUSINESS DASHBOARD{% endblock title %}
@@ -163,6 +125,78 @@
           <li class="list-group-item py-2 text-muted text-center small">No failed orders</li>
           {% endfor %}
         </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team Members Section -->
+  <div class="row g-3 px-2 mt-3">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+          <span><i class="fa-solid fa-users text-primary me-2"></i>Team Members</span>
+          <div>
+            <span class="badge bg-success me-1">{{ active_team_members }} Active</span>
+            {% if pending_team_members > 0 %}
+            <span class="badge bg-warning text-dark me-1">{{ pending_team_members }} Pending</span>
+            {% endif %}
+            <a href="{% url 'business:business_teams' business.business_id %}" class="btn btn-sm btn-outline-primary ms-2">
+              View All ({{ total_team_members }})
+            </a>
+          </div>
+        </div>
+        <div class="card-body p-2">
+          {% if recent_team_members %}
+          <div class="team-members-grid">
+            {% for member in recent_team_members %}
+            <div class="team-member-card">
+              <div class="d-flex align-items-center">
+                <div class="team-member-avatar me-3">
+                  {% if member.team_logo %}
+                  <img src="{{ member.team_logo.url }}" alt="{{ member.team_name|default:member.user.username }}" class="rounded-circle" style="width: 48px; height: 48px; object-fit: cover;">
+                  {% else %}
+                  <div class="avatar-placeholder">
+                    <i class="fa-solid fa-user"></i>
+                  </div>
+                  {% endif %}
+                </div>
+                <div class="flex-fill">
+                  <div class="fw-bold">{{ member.team_name|default:member.user.username }}</div>
+                  <small class="text-muted">
+                    {% if member.team_role == 'manager' %}
+                    <span class="badge bg-primary">Manager</span>
+                    {% elif member.team_role == 'staff' %}
+                    <span class="badge bg-info text-dark">Staff</span>
+                    {% elif member.team_role == 'viewer' %}
+                    <span class="badge bg-secondary">Viewer</span>
+                    {% endif %}
+                  </small>
+                </div>
+                <div class="text-end">
+                  {% if member.team_status == 'active' %}
+                  <span class="badge bg-success">Active</span>
+                  {% elif member.team_status == 'pending' %}
+                  <span class="badge bg-warning text-dark">Pending</span>
+                  {% elif member.team_status == 'suspended' %}
+                  <span class="badge bg-danger">Suspended</span>
+                  {% else %}
+                  <span class="badge bg-secondary">{{ member.team_status }}</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-center py-4 text-muted">
+            <i class="fa-solid fa-users fa-3x mb-2 opacity-50"></i>
+            <p class="mb-2">No team members yet</p>
+            <a href="{% url 'business:business_teams_add' business.business_id %}" class="btn btn-sm btn-primary">
+              <i class="fa-solid fa-user-plus me-1"></i>Add Team Member
+            </a>
+          </div>
+          {% endif %}
+        </div>
       </div>
     </div>
   </div>

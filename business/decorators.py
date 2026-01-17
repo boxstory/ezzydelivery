@@ -41,16 +41,65 @@ logger = logging.getLogger('business.permissions')
 # UTILITY FUNCTIONS
 # =============================================================================
 
+def get_all_user_businesses(user):
+    """
+    Get all businesses a user has access to (owned + team member).
+
+    Args:
+        user: Django User object
+
+    Returns:
+        list: List of dicts with business info:
+            [
+                {
+                    'business': Business object,
+                    'access_type': 'owner' or 'team_member',
+                    'team_profile': BusinessTeamProfile or None
+                },
+                ...
+            ]
+    """
+    if not user.is_authenticated:
+        return []
+
+    businesses = []
+
+    # Get owned businesses
+    owned_businesses = Business.objects.filter(user=user)
+    for business in owned_businesses:
+        businesses.append({
+            'business': business,
+            'access_type': 'owner',
+            'team_profile': None
+        })
+
+    # Get team member businesses
+    team_profiles = BusinessTeamProfile.objects.select_related('business').filter(
+        user=user,
+        team_status='active'
+    )
+    for team_profile in team_profiles:
+        businesses.append({
+            'business': team_profile.business,
+            'access_type': 'team_member',
+            'team_profile': team_profile
+        })
+
+    return businesses
+
+
 def get_user_business_access(user, request=None):
     """
     Get the business and access type for a user.
 
-    Checks if the user is a business owner first, then checks if they
-    are an active team member. This determines their access level.
+    Checks session for selected business first, then:
+    - If user has multiple businesses: returns None (redirect to selector)
+    - If user has one business: returns that business
+    - Checks if the user is a business owner first, then team member
 
     Args:
         user: Django User object
-        request: Optional request object for caching
+        request: Optional request object for caching and session
 
     Returns:
         tuple: (business, access_type, team_profile)
@@ -65,6 +114,39 @@ def get_user_business_access(user, request=None):
     if request and hasattr(request, '_cached_business_access'):
         return request._cached_business_access
 
+    # Check if user has selected a specific business in session
+    selected_business_id = None
+    if request and hasattr(request, 'session'):
+        selected_business_id = request.session.get('selected_business_id')
+
+    # If a business is selected in session, use that
+    if selected_business_id:
+        # Try to get owned business
+        owner_business = Business.objects.filter(
+            user=user,
+            business_id=selected_business_id
+        ).first()
+
+        if owner_business:
+            result = (owner_business, 'owner', None)
+            if request:
+                request._cached_business_access = result
+            return result
+
+        # Try to get team member business
+        team_profile = BusinessTeamProfile.objects.select_related('business').filter(
+            user=user,
+            business_id=selected_business_id,
+            team_status='active'
+        ).first()
+
+        if team_profile:
+            result = (team_profile.business, 'team_member', team_profile)
+            if request:
+                request._cached_business_access = result
+            return result
+
+    # No selection in session - use legacy behavior (first business)
     # Check if business was cached by core.context_processors.user_business
     # This avoids duplicate queries when both context processors run
     if request and hasattr(request, '_cached_user_business'):

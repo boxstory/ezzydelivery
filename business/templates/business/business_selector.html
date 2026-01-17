@@ -1,0 +1,153 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Select Business{% endblock title %}
+
+{% block content %}
+<div class="container-fluid" style="max-width: 1200px;">
+  <div class="row justify-content-center mt-5">
+    <div class="col-12 col-lg-10">
+      <!-- Header -->
+      <div class="text-center mb-4">
+        <i class="fa-solid fa-building fa-3x text-primary mb-3"></i>
+        <h2 class="fw-bold">Select Your Business</h2>
+        <p class="text-muted">You have access to {{ total_count }} business{{ total_count|pluralize:"es" }}. Choose one to continue.</p>
+      </div>
+
+      <!-- Business Cards Grid -->
+      <div class="row g-4">
+        {% for business_info in user_businesses %}
+        <div class="col-md-6 col-lg-4">
+          <div class="card business-selector-card {% if business_info.business.business_id == selected_business_id %}selected{% endif %}">
+            <div class="card-body p-4">
+              <!-- Business Logo -->
+              <div class="text-center mb-3">
+                {% if business_info.logo and business_info.logo.business_logo %}
+                <img src="{{ business_info.logo.business_logo.url }}" alt="{{ business_info.business.business_name }}" class="business-logo-selector">
+                {% else %}
+                <div class="business-logo-placeholder">
+                  <i class="fa-solid fa-store"></i>
+                </div>
+                {% endif %}
+              </div>
+
+              <!-- Business Info -->
+              <h5 class="card-title text-center fw-bold mb-2">{{ business_info.business.business_name }}</h5>
+
+              <!-- Access Type Badge -->
+              <div class="text-center mb-3">
+                {% if business_info.access_type == 'owner' %}
+                <span class="badge bg-primary">
+                  <i class="fa-solid fa-crown me-1"></i>Owner
+                </span>
+                {% else %}
+                <span class="badge bg-info text-dark">
+                  <i class="fa-solid fa-user-tie me-1"></i>Team Member
+                  {% if business_info.team_profile %}
+                  ({{ business_info.team_profile.get_team_role_display }})
+                  {% endif %}
+                </span>
+                {% endif %}
+              </div>
+
+              <!-- Business Details -->
+              <div class="business-details">
+                {% if business_info.business.business_code %}
+                <div class="detail-item">
+                  <i class="fa-solid fa-hashtag text-muted me-2"></i>
+                  <small class="text-muted">{{ business_info.business.business_code }}</small>
+                </div>
+                {% endif %}
+                {% if business_info.business.business_product_category %}
+                <div class="detail-item">
+                  <i class="fa-solid fa-tag text-muted me-2"></i>
+                  <small class="text-muted">{{ business_info.business.business_product_category }}</small>
+                </div>
+                {% endif %}
+                {% if business_info.business.business_status %}
+                <div class="detail-item">
+                  <i class="fa-solid fa-circle-info text-muted me-2"></i>
+                  <small class="text-muted">Status: {{ business_info.business.get_business_status_display }}</small>
+                </div>
+                {% endif %}
+              </div>
+
+              <!-- Select Button -->
+              <a href="{% url 'business:business_switch' business_info.business.business_id %}" class="btn btn-primary w-100 mt-3">
+                {% if business_info.business.business_id == selected_business_id %}
+                <i class="fa-solid fa-check me-2"></i>Current Business
+                {% else %}
+                <i class="fa-solid fa-arrow-right me-2"></i>Select Business
+                {% endif %}
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Help Text -->
+      <div class="text-center mt-5">
+        <p class="text-muted">
+          <i class="fa-solid fa-circle-info me-2"></i>
+          You can switch between businesses anytime from the sidebar.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.business-selector-card {
+  transition: all 0.3s ease;
+  border: 2px solid #e9ecef;
+  height: 100%;
+}
+
+.business-selector-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+  border-color: #0d6efd;
+}
+
+.business-selector-card.selected {
+  border-color: #0d6efd;
+  background: linear-gradient(to bottom, #f8f9ff 0%, #ffffff 100%);
+}
+
+.business-logo-selector {
+  width: 100px;
+  height: 100px;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.business-logo-placeholder {
+  width: 100px;
+  height: 100px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 40px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.business-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+}
+</style>
+{% endblock content %}

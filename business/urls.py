@@ -82,5 +82,8 @@ urlpatterns = [
     # workflow guide
     path('workflow-guide/', business_views.workflow_guide, name='workflow_guide'),
 
+    # business selector (for users with multiple businesses)
+    path('selector/', business_views.business_selector, name='business_selector'),
+    path('switch/<int:business_id>/', business_views.business_switch, name='business_switch'),
 
 ]
