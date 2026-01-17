@@ -1,0 +1,324 @@
+{% extends 'business_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Inventory Transactions{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}" type="text/css" />
+<link rel="stylesheet" href="{% static 'product/css/inventory.css' %}" type="text/css" />
+<style>
+.transaction-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 30px;
+}
+
+.transaction-row {
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 12px;
+    border-left: 4px solid #e2e8f0;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.transaction-row:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateX(4px);
+}
+
+.transaction-row.receive {
+    border-left-color: #10b981;
+}
+
+.transaction-row.issue {
+    border-left-color: #ef4444;
+}
+
+.transaction-row.adjust {
+    border-left-color: #f59e0b;
+}
+
+.transaction-row.transfer {
+    border-left-color: #667eea;
+}
+
+.transaction-row.reserve {
+    border-left-color: #8b5cf6;
+}
+
+.transaction-type-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.transaction-type-badge.receive {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.transaction-type-badge.issue {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.transaction-type-badge.adjust {
+    background: #fed7aa;
+    color: #92400e;
+}
+
+.transaction-type-badge.transfer {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+.transaction-type-badge.reserve {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="main-content" class="container-fluid py-4">
+    <!-- Transaction Header -->
+    <div class="transaction-header">
+        <h1>Inventory Transactions</h1>
+        <p class="mb-0 opacity-90">Track all inventory movements and adjustments</p>
+    </div>
+
+    <!-- Filters -->
+    <div class="inventory-filters">
+        <form method="GET"
+              hx-get="{% url 'product:transaction_list' %}"
+              hx-target="#main-content"
+              hx-swap="outerHTML"
+              hx-push-url="true"
+              hx-trigger="change, submit"
+              class="d-flex align-items-center gap-3 flex-wrap">
+
+            <!-- Transaction Type Filter -->
+            <select name="type" class="warehouse-selector">
+                <option value="">All Transaction Types</option>
+                {% for value, label in transaction_types %}
+                <option value="{{ value }}" {% if selected_type == value %}selected{% endif %}>
+                    {{ label }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <!-- Warehouse Filter -->
+            <select name="warehouse" class="warehouse-selector">
+                <option value="">All Warehouses</option>
+                {% for warehouse in warehouses %}
+                <option value="{{ warehouse.id }}" {% if selected_warehouse == warehouse.id|stringformat:"s" %}selected{% endif %}>
+                    {{ warehouse.name }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <!-- Filter Button -->
+            <button type="submit" class="filter-button">
+                <i class="fas fa-filter me-2"></i>Apply Filters
+            </button>
+
+            <!-- Clear Filters -->
+            {% if selected_type or selected_warehouse %}
+            <a href="{% url 'product:transaction_list' %}"
+               class="btn btn-outline-secondary"
+               hx-get="{% url 'product:transaction_list' %}"
+               hx-target="#main-content"
+               hx-swap="outerHTML"
+               hx-push-url="true">
+                <i class="fas fa-times me-2"></i>Clear
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Transactions List -->
+    {% if transactions %}
+    <div class="row">
+        <div class="col-12">
+            {% for txn in transactions %}
+            <div class="transaction-row {{ txn.transaction_type }}"
+                 hx-get="{% url 'product:stock_card' txn.product.id %}"
+                 hx-target="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <div class="row align-items-center">
+                    <!-- Transaction Type & Time -->
+                    <div class="col-md-2">
+                        <span class="transaction-type-badge {{ txn.transaction_type }}">
+                            {{ txn.get_transaction_type_display|default:txn.transaction_type }}
+                        </span>
+                        <div class="small text-muted mt-1">
+                            {{ txn.created_at|date:"M d, Y" }}
+                            <br>
+                            {{ txn.created_at|time:"H:i" }}
+                        </div>
+                    </div>
+
+                    <!-- Product Info -->
+                    <div class="col-md-3">
+                        <div class="fw-bold text-dark">{{ txn.product.item_name }}</div>
+                        <div class="small text-muted">
+                            SKU{{ txn.product.product_id }}
+                            {% if txn.product.brand_name %}
+                            · {{ txn.product.brand_name }}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Warehouse & Location -->
+                    <div class="col-md-2">
+                        <div class="small">
+                            <i class="fas fa-warehouse me-1"></i>
+                            {{ txn.warehouse.code }}
+                        </div>
+                        {% if txn.location %}
+                        <div class="small text-muted">
+                            <i class="fas fa-map-marker-alt me-1"></i>
+                            {{ txn.location.code }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Quantity Change -->
+                    <div class="col-md-2 text-center">
+                        <div class="fw-bold {% if txn.quantity > 0 %}text-success{% else %}text-danger{% endif %}"
+                             style="font-size: 1.2rem;">
+                            {% if txn.quantity > 0 %}+{% endif %}{{ txn.quantity }}
+                        </div>
+                        <div class="small text-muted">units</div>
+                    </div>
+
+                    <!-- Before/After -->
+                    <div class="col-md-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="text-center flex-fill">
+                                <div class="small text-muted">Before</div>
+                                <div class="fw-semibold">{{ txn.quantity_before|default:0 }}</div>
+                            </div>
+                            <i class="fas fa-arrow-right text-muted"></i>
+                            <div class="text-center flex-fill">
+                                <div class="small text-muted">After</div>
+                                <div class="fw-semibold">{{ txn.quantity_after|default:0 }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User -->
+                    <div class="col-md-1">
+                        {% if txn.created_by %}
+                        <div class="small text-muted">
+                            <i class="fas fa-user me-1"></i>
+                            {{ txn.created_by.username }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Notes (if any) -->
+                {% if txn.notes %}
+                <div class="row mt-2">
+                    <div class="col-12">
+                        <div class="small">
+                            <i class="fas fa-comment text-muted me-1"></i>
+                            <span class="text-muted">{{ txn.notes }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if transactions.paginator.num_pages > 1 %}
+    <div class="pagination-wrapper">
+        {% if transactions.has_previous %}
+        <a href="?page={{ transactions.previous_page_number }}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}"
+           class="pagination-btn"
+           hx-get="?page={{ transactions.previous_page_number }}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}"
+           hx-target="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+        {% else %}
+        <button class="pagination-btn" disabled>
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        {% endif %}
+
+        <span class="page-info">
+            Page {{ transactions.number }} of {{ transactions.paginator.num_pages }}
+        </span>
+
+        {% if transactions.has_next %}
+        <a href="?page={{ transactions.next_page_number }}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}"
+           class="pagination-btn"
+           hx-get="?page={{ transactions.next_page_number }}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}"
+           hx-target="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true">
+            <i class="fas fa-chevron-right"></i>
+        </a>
+        {% else %}
+        <button class="pagination-btn" disabled>
+            <i class="fas fa-chevron-right"></i>
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="empty-state">
+        <div class="empty-state-icon">
+            <i class="fas fa-exchange-alt"></i>
+        </div>
+        <h3>No transactions found</h3>
+        <p>
+            {% if selected_type or selected_warehouse %}
+            Try adjusting your filters to see more results.
+            {% else %}
+            Transaction history will appear here as you receive, issue, and move inventory.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+
+    <!-- Back Button -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="{% url 'product:inventory_list' %}"
+               class="btn btn-outline-secondary"
+               hx-get="{% url 'product:inventory_list' %}"
+               hx-target="#main-content"
+               hx-swap="outerHTML"
+               hx-push-url="true">
+                <i class="fas fa-arrow-left me-2"></i>Back to Inventory
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-submit form on filter changes
+document.querySelectorAll('.warehouse-selector').forEach(elem => {
+    elem.addEventListener('change', function() {
+        this.closest('form').dispatchEvent(new Event('submit'));
+    });
+});
+</script>
+{% endblock %}

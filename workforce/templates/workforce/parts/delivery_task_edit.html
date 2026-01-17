@@ -1,0 +1,137 @@
+{% extends "wf_dashboard_base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3" role="main">
+    <!-- Header -->
+    <header class="orders-header mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-2">
+                        <li class="breadcrumb-item"><a href="{% url 'workforce:dl_list_all' %}">All Tasks</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workforce:delivery_task_detail' task.id %}">Task #{{ task.dl_task_number }}</a></li>
+                        <li class="breadcrumb-item active">Edit</li>
+                    </ol>
+                </nav>
+                <h1 class="h2 mb-0">
+                    <i class="fa-solid fa-edit me-2"></i>Edit Task #{{ task.dl_task_number }}
+                </h1>
+            </div>
+            <div>
+                <a href="{% url 'workforce:delivery_task_detail' task.id %}" class="btn btn-outline-secondary">
+                    <i class="fa-solid fa-arrow-left me-2"></i>Back to Task
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Edit Form -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-cog me-2"></i>Task Settings</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Driver Assignment</label>
+                                <select name="driver" class="form-select">
+                                    <option value="">-- Select Driver --</option>
+                                    {% for driver in drivers %}
+                                    <option value="{{ driver.id }}" {% if task.driver_id == driver.id %}selected{% endif %}>
+                                        {{ driver.driver_first_name }} {{ driver.driver_last_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Assign or change the driver for this task</small>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Client Status</label>
+                                <select name="status" class="form-select">
+                                    <option value="">-- Select Status --</option>
+                                    <option value="for_review" {% if task.dl_task_status_client == 'for_review' %}selected{% endif %}>For Review</option>
+                                    <option value="0" {% if task.dl_task_status_client == '0' %}selected{% endif %}>Assigned to Driver</option>
+                                    <option value="1" {% if task.dl_task_status_client == '1' %}selected{% endif %}>In Transit</option>
+                                    <option value="2" {% if task.dl_task_status_client == '2' %}selected{% endif %}>Delivered</option>
+                                    <option value="3" {% if task.dl_task_status_client == '3' %}selected{% endif %}>Rejected</option>
+                                    <option value="9" {% if task.dl_task_status_client == '9' %}selected{% endif %}>Cancelled</option>
+                                </select>
+                                <small class="text-muted">Update the current status</small>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label fw-bold">Notes</label>
+                                <textarea name="notes" class="form-control" rows="4" placeholder="Add any notes about this task...">{{ task.notes|default:"" }}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa-solid fa-save me-2"></i>Save Changes
+                            </button>
+                            <a href="{% url 'workforce:delivery_task_detail' task.id %}" class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Task Info Summary -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-info-circle me-2"></i>Task Info</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-5">Task Number</dt>
+                        <dd class="col-7">#{{ task.dl_task_number }}</dd>
+
+                        <dt class="col-5">Date</dt>
+                        <dd class="col-7">{{ task.dl_task_date|date:"d M Y" }}</dd>
+
+                        <dt class="col-5">Customer</dt>
+                        <dd class="col-7">{{ task.order.customer_name|default:"N/A" }}</dd>
+
+                        <dt class="col-5">Phone</dt>
+                        <dd class="col-7">{{ task.order.customer_phone|default:"N/A" }}</dd>
+
+                        <dt class="col-5">Business</dt>
+                        <dd class="col-7">{{ task.business.business_name|default:"N/A" }}</dd>
+
+                        {% if task.order.cod_amount %}
+                        <dt class="col-5">COD Amount</dt>
+                        <dd class="col-7 fw-bold text-success">AED {{ task.order.cod_amount }}</dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Delivery Address -->
+            {% if task.order.customer_address %}
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-location-dot me-2"></i>Delivery Address</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ task.order.customer_address }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock content %}

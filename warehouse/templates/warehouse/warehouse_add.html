@@ -3,6 +3,10 @@
 
 {% block title %}Add Warehouse{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row mb-4">
@@ -13,8 +17,8 @@
                     <li class="breadcrumb-item active">Add New</li>
                 </ol>
             </nav>
-            <h1 class="h3 mb-0">Add Warehouse</h1>
-            <p class="text-muted">Create a new warehouse location</p>
+            <h1 class="h3 mb-0">Add Fulfillment Center</h1>
+            <p class="text-muted">Create a new fulfillment center (warehouse)</p>
         </div>
     </div>
 
@@ -22,46 +26,145 @@
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white">
-                    <h5 class="mb-0">Warehouse Details</h5>
+                    <h5 class="mb-0">Fulfillment Center Details</h5>
                 </div>
                 <div class="card-body">
                     <form method="POST">
                         {% csrf_token %}
 
-                        {% if is_staff %}
-                        <div class="mb-3">
-                            <label for="business" class="form-label">Business <span class="text-danger">*</span></label>
-                            <select class="form-select" id="business" name="business" required>
-                                <option value="">Select a business...</option>
-                                {% for biz in businesses %}
-                                <option value="{{ biz.pk }}">{{ biz.business_name }}</option>
-                                {% endfor %}
-                            </select>
-                            <small class="text-muted">Select the business this warehouse belongs to</small>
-                        </div>
-                        {% endif %}
+                        <!-- Basic Information -->
+                        <h6 class="text-primary mb-3">Basic Information</h6>
 
                         <div class="mb-3">
                             <label for="name" class="form-label">Warehouse Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="name" name="name" required placeholder="e.g., Main Warehouse">
+                            <input type="text" class="form-control" id="name" name="name" required
+                                   placeholder="e.g., Central Fulfillment Center">
+                            <small class="text-muted">Name of the fulfillment center</small>
                         </div>
 
                         <div class="mb-3">
                             <label for="code" class="form-label">Warehouse Code</label>
-                            <input type="text" class="form-control" id="code" name="code" placeholder="e.g., WH-001 (auto-generated if empty)">
-                            <small class="text-muted">Leave empty to auto-generate</small>
+                            <input type="text" class="form-control" id="code" name="code"
+                                   placeholder="Auto-generated (e.g., WH-FC-XXXXXXXX)">
+                            <small class="text-muted">Leave empty to auto-generate code</small>
                         </div>
 
                         <div class="mb-3">
-                            <label for="address" class="form-label">Address</label>
-                            <textarea class="form-control" id="address" name="address" rows="3" placeholder="Full warehouse address"></textarea>
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="2"
+                                      placeholder="Brief description of this fulfillment center"></textarea>
                         </div>
+
+                        <hr class="my-4">
+
+                        <!-- Location Details -->
+                        <h6 class="text-primary mb-3">Location Details</h6>
+
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Address</label>
+                            <textarea class="form-control" id="address" name="address" rows="2"
+                                      placeholder="Full street address"></textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="city" class="form-label">City</label>
+                                <input type="text" class="form-control" id="city" name="city"
+                                       placeholder="e.g., Manama">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="state" class="form-label">State/Governorate</label>
+                                <input type="text" class="form-control" id="state" name="state"
+                                       placeholder="e.g., Capital Governorate">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="postal_code" class="form-label">Postal Code</label>
+                                <input type="text" class="form-control" id="postal_code" name="postal_code"
+                                       placeholder="e.g., 317">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="country" class="form-label">Country</label>
+                                <input type="text" class="form-control" id="country" name="country"
+                                       placeholder="e.g., Bahrain" value="Bahrain">
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Contact Information -->
+                        <h6 class="text-primary mb-3">Contact Information</h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="phone" class="form-label">Phone</label>
+                                <input type="tel" class="form-control" id="phone" name="phone"
+                                       placeholder="e.g., +973 1234 5678">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email" name="email"
+                                       placeholder="e.g., warehouse@company.com">
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- GPS Coordinates (Optional) -->
+                        <h6 class="text-primary mb-3">GPS Coordinates <small class="text-muted">(Optional)</small></h6>
+                        <p class="small text-muted mb-3">
+                            <i class="fas fa-info-circle me-1"></i>
+                            GPS coordinates enable distance-based auto-selection. Get coordinates from Google Maps.
+                        </p>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="latitude" class="form-label">Latitude</label>
+                                <input type="number" step="0.000001" class="form-control" id="latitude" name="latitude"
+                                       placeholder="e.g., 26.2285">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="longitude" class="form-label">Longitude</label>
+                                <input type="number" step="0.000001" class="form-control" id="longitude" name="longitude"
+                                       placeholder="e.g., 50.5860">
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Settings -->
+                        <h6 class="text-primary mb-3">Settings</h6>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="is_active" name="is_active" checked>
+                            <label class="form-check-label" for="is_active">
+                                <strong>Active</strong>
+                            </label>
+                            <small class="d-block text-muted">Warehouse is operational and can be used</small>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="is_default" name="is_default">
+                            <label class="form-check-label" for="is_default">
+                                <strong>System Default</strong>
+                            </label>
+                            <small class="d-block text-muted">Use as system-wide default fulfillment center</small>
+                        </div>
+
+                        <hr class="my-4">
 
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-plus me-1"></i>Create Warehouse
+                                <i class="fas fa-plus me-1"></i>Create Fulfillment Center
                             </button>
-                            <a href="{% url 'warehouse:warehouse_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                            <a href="{% url 'warehouse:warehouse_list' %}" class="btn btn-outline-secondary"
+                               hx-get="{% url 'warehouse:warehouse_list' %}"
+                               hx-target="body"
+                               hx-push-url="true">
+                                Cancel
+                            </a>
                         </div>
                     </form>
                 </div>

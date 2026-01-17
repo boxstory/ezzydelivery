@@ -1,20 +1,23 @@
 {% comment %}
 Pagination Component
 Usage:
-{% include "includes/components/_pagination.html" with page_obj=orders filter_params="&status=pending" %}
+{% include "includes/components/_pagination.html" with page_obj=orders filter_params="status=pending&type=cod" %}
 
 Parameters:
 - page_obj: Django paginator page object (required)
-- filter_params: URL query string to preserve filters (optional)
+- filter_params: URL query string to preserve filters (optional, without leading &)
 - htmx_target: HTMX target element (default: #main-content)
 - show_per_page: Show per-page selector (default: true)
 - show_goto: Show go-to-page input (default: true)
-- per_page: Current items per page (optional)
+- per_page: Current items per page (optional, defaults to 10)
 - variant: 'default', 'compact', or 'minimal' (optional)
 {% endcomment %}
 
 {% load static %}
 <link href="{% static 'webpages/css/pagination.css' %}" rel="stylesheet" type="text/css" />
+
+{% comment %}Determine current per_page value - use passed variable or default to 10{% endcomment %}
+{% with current_per_page=per_page|default:"10" %}
 
 {% if page_obj.has_other_pages or page_obj.paginator.count > 0 %}
 <nav aria-label="Page navigation" class="pagination-wrapper {{ variant|default:'' }}">
@@ -24,10 +27,10 @@ Parameters:
         <li class="page-item prev {% if not page_obj.has_previous %}disabled{% endif %}">
             {% if page_obj.has_previous %}
             <a class="page-link"
-               href="?page={{ page_obj.previous_page_number }}{{ filter_params }}"
+               href="?page={{ page_obj.previous_page_number }}&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}"
                aria-label="Previous page"
                {% if htmx_target %}
-               hx-get="?page={{ page_obj.previous_page_number }}{{ filter_params }}"
+               hx-get="?page={{ page_obj.previous_page_number }}&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}"
                hx-target="{{ htmx_target|default:'#main-content' }}"
                hx-select="{{ htmx_target|default:'#main-content' }}"
                hx-swap="outerHTML"
@@ -51,10 +54,10 @@ Parameters:
             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
             <li class="page-item {% if num < page_obj.number|add:'-1' or num > page_obj.number|add:'1' %}hide-mobile{% endif %}">
                 <a class="page-link"
-                   href="?page={{ num }}{{ filter_params }}"
+                   href="?page={{ num }}&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}"
                    aria-label="Page {{ num }}"
                    {% if htmx_target %}
-                   hx-get="?page={{ num }}{{ filter_params }}"
+                   hx-get="?page={{ num }}&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}"
                    hx-target="{{ htmx_target|default:'#main-content' }}"
                    hx-select="{{ htmx_target|default:'#main-content' }}"
                    hx-swap="outerHTML"
@@ -74,10 +77,10 @@ Parameters:
         <li class="page-item next {% if not page_obj.has_next %}disabled{% endif %}">
             {% if page_obj.has_next %}
             <a class="page-link"
-               href="?page={{ page_obj.next_page_number }}{{ filter_params }}"
+               href="?page={{ page_obj.next_page_number }}&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}"
                aria-label="Next page"
                {% if htmx_target %}
-               hx-get="?page={{ page_obj.next_page_number }}{{ filter_params }}"
+               hx-get="?page={{ page_obj.next_page_number }}&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}"
                hx-target="{{ htmx_target|default:'#main-content' }}"
                hx-select="{{ htmx_target|default:'#main-content' }}"
                hx-swap="outerHTML"
@@ -97,11 +100,21 @@ Parameters:
     <!-- Per Page Selector -->
     <div class="pagination-per-page">
         <select id="pagination-per-page-select"
-                onchange="window.location.href='?page=1&per_page=' + this.value + '{{ filter_params|default:"" }}'">
-            <option value="10" {% if per_page == 10 or not per_page %}selected{% endif %}>10 / page</option>
-            <option value="25" {% if per_page == 25 %}selected{% endif %}>25 / page</option>
-            <option value="50" {% if per_page == 50 %}selected{% endif %}>50 / page</option>
-            <option value="100" {% if per_page == 100 %}selected{% endif %}>100 / page</option>
+                {% if htmx_target %}
+                hx-get=""
+                hx-target="{{ htmx_target|default:'#main-content' }}"
+                hx-select="{{ htmx_target|default:'#main-content' }}"
+                hx-swap="outerHTML"
+                hx-push-url="true"
+                hx-vals='{"page": "1"}'
+                onchange="this.setAttribute('hx-get', '?page=1&per_page=' + this.value + '{% if filter_params %}&{{ filter_params }}{% endif %}'); htmx.trigger(this, 'htmx:trigger');"
+                {% else %}
+                onchange="window.location.href='?page=1&per_page=' + this.value + '{% if filter_params %}&{{ filter_params }}{% endif %}';"
+                {% endif %}>
+            <option value="10" {% if current_per_page == "10" %}selected{% endif %}>10 / page</option>
+            <option value="25" {% if current_per_page == "25" %}selected{% endif %}>25 / page</option>
+            <option value="50" {% if current_per_page == "50" %}selected{% endif %}>50 / page</option>
+            <option value="100" {% if current_per_page == "100" %}selected{% endif %}>100 / page</option>
         </select>
     </div>
     {% endif %}
@@ -115,7 +128,17 @@ Parameters:
                min="1"
                max="{{ page_obj.paginator.num_pages }}"
                value="{{ page_obj.number }}"
-               onkeypress="if(event.key==='Enter'){var p=Math.min(Math.max(1,this.value),{{ page_obj.paginator.num_pages }});window.location.href='?page='+p+'{{ filter_params|default:"" }}';}"
+               {% if htmx_target %}
+               hx-get=""
+               hx-target="{{ htmx_target|default:'#main-content' }}"
+               hx-select="{{ htmx_target|default:'#main-content' }}"
+               hx-swap="outerHTML"
+               hx-push-url="true"
+               hx-trigger="keyup[key=='Enter']"
+               onkeyup="if(event.key==='Enter'){var p=Math.min(Math.max(1,this.value),{{ page_obj.paginator.num_pages }});this.setAttribute('hx-get','?page='+p+'&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}');}"
+               {% else %}
+               onkeypress="if(event.key==='Enter'){var p=Math.min(Math.max(1,this.value),{{ page_obj.paginator.num_pages }});window.location.href='?page='+p+'&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}';}"
+               {% endif %}
                aria-label="Go to page number">
         <label>Page</label>
     </div>
@@ -131,3 +154,5 @@ Parameters:
 
 </nav>
 {% endif %}
+
+{% endwith %}

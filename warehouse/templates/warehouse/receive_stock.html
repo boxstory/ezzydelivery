@@ -3,6 +3,155 @@
 
 {% block title %}Receive Stock{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+<style>
+.product-row {
+    transition: all 0.3s ease;
+}
+.product-row:hover {
+    background-color: #f8f9fa;
+}
+.remove-product-btn {
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+.remove-product-btn:hover {
+    opacity: 1;
+}
+.add-product-btn {
+    border: 2px dashed #0d6efd;
+    background: #f8f9ff;
+    transition: all 0.2s;
+}
+.add-product-btn:hover {
+    background: #e7f1ff;
+    border-color: #0a58ca;
+}
+.table-wrapper {
+    max-height: 500px;
+    overflow-y: auto;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let rowCounter = 1;
+
+    // Add new product row
+    document.getElementById('add-product-row').addEventListener('click', function() {
+        const tbody = document.getElementById('products-tbody');
+        const newRow = createProductRow(rowCounter++);
+        tbody.appendChild(newRow);
+        updateRowNumbers();
+    });
+
+    // Remove product row
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-row-btn') || e.target.closest('.remove-row-btn')) {
+            const btn = e.target.classList.contains('remove-row-btn') ? e.target : e.target.closest('.remove-row-btn');
+            const row = btn.closest('tr');
+            row.remove();
+            updateRowNumbers();
+        }
+    });
+
+    // Load storage locations when warehouse changes
+    const warehouseSelect = document.getElementById('warehouse');
+    const locationSelect = document.getElementById('location');
+
+    warehouseSelect.addEventListener('change', function() {
+        const warehouseId = this.value;
+
+        if (!warehouseId) {
+            locationSelect.innerHTML = '<option value="">Default Location</option>';
+            locationSelect.disabled = true;
+            return;
+        }
+
+        locationSelect.innerHTML = '<option value="">Loading...</option>';
+        locationSelect.disabled = true;
+
+        // Fetch storage locations for selected warehouse
+        fetch(`/workforce/warehouse/api/warehouses/${warehouseId}/storage-locations/`)
+            .then(response => response.json())
+            .then(data => {
+                locationSelect.innerHTML = '<option value="">Default Location</option>';
+
+                if (data.length > 0) {
+                    data.forEach(location => {
+                        const option = document.createElement('option');
+                        option.value = location.id;
+                        option.textContent = location.name;
+                        if (location.is_default) {
+                            option.textContent += ' (Default)';
+                        }
+                        locationSelect.appendChild(option);
+                    });
+                }
+
+                locationSelect.disabled = false;
+            })
+            .catch(error => {
+                console.error('Error loading locations:', error);
+                locationSelect.innerHTML = '<option value="">Error loading locations</option>';
+                locationSelect.disabled = true;
+            });
+    });
+
+    function createProductRow(index) {
+        const tr = document.createElement('tr');
+        tr.className = 'product-row';
+        tr.innerHTML = `
+            <td class="text-center align-middle">
+                <span class="row-number badge bg-secondary">${index}</span>
+            </td>
+            <td>
+                <select name="products[]" class="form-select" required>
+                    <option value="">Select Product</option>
+                    {% for p in products %}
+                    <option value="{{ p.id }}">{{ p.item_name }} {% if p.item_sku %}({{ p.item_sku }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <input type="number" name="quantities[]" class="form-control" min="1" required placeholder="0">
+            </td>
+            <td class="text-center align-middle">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-row-btn remove-product-btn">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        return tr;
+    }
+
+    function updateRowNumbers() {
+        const rows = document.querySelectorAll('#products-tbody tr');
+        rows.forEach((row, index) => {
+            const badge = row.querySelector('.row-number');
+            if (badge) {
+                badge.textContent = index + 1;
+            }
+        });
+
+        // Show/hide remove buttons based on row count
+        const removeButtons = document.querySelectorAll('.remove-row-btn');
+        if (rows.length === 1) {
+            removeButtons.forEach(btn => btn.style.display = 'none');
+        } else {
+            removeButtons.forEach(btn => btn.style.display = 'inline-block');
+        }
+    }
+
+    // Initialize row numbers on load
+    updateRowNumbers();
+});
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <!-- Page Header with Breadcrumb -->
@@ -28,16 +177,17 @@
 
     <div class="row">
         <!-- Main Form -->
-        <div class="col-lg-8">
+        <div class="col-lg-9">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3 border-0">
                     <h5 class="mb-0 fw-semibold"><i class="fas fa-file-invoice text-secondary me-2"></i>Stock Receipt Form</h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST">
+                    <form method="POST" id="receive-stock-form">
                         {% csrf_token %}
 
-                        <div class="row g-3">
+                        <!-- Warehouse and Location Selection -->
+                        <div class="row g-3 mb-4">
                             <div class="col-md-6">
                                 <label for="warehouse" class="form-label fw-medium">
                                     <i class="fas fa-warehouse text-muted me-1"></i>Warehouse <span class="text-danger">*</span>
@@ -57,26 +207,7 @@
                                 <select name="location" id="location" class="form-select form-select-lg">
                                     <option value="">Default Location</option>
                                 </select>
-                                <div class="form-text"><i class="fas fa-info-circle me-1"></i>Locations will load based on selected warehouse</div>
-                            </div>
-
-                            <div class="col-12">
-                                <label for="product" class="form-label fw-medium">
-                                    <i class="fas fa-cube text-muted me-1"></i>Product <span class="text-danger">*</span>
-                                </label>
-                                <select name="product" id="product" class="form-select form-select-lg" required>
-                                    <option value="">Select Product</option>
-                                    {% for p in products %}
-                                    <option value="{{ p.id }}">{{ p.item_name }} {% if p.item_sku %}({{ p.item_sku }}){% endif %}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-
-                            <div class="col-md-6">
-                                <label for="quantity" class="form-label fw-medium">
-                                    <i class="fas fa-hashtag text-muted me-1"></i>Quantity <span class="text-danger">*</span>
-                                </label>
-                                <input type="number" class="form-control form-control-lg" id="quantity" name="quantity" min="1" required placeholder="Enter quantity">
+                                <div class="form-text"><i class="fas fa-info-circle me-1"></i>Applies to all products below</div>
                             </div>
 
                             <div class="col-md-6">
@@ -86,11 +217,65 @@
                                 <input type="text" class="form-control form-control-lg" id="reference" name="reference" placeholder="e.g., PO-12345">
                             </div>
 
-                            <div class="col-12">
+                            <div class="col-md-6">
                                 <label for="notes" class="form-label fw-medium">
                                     <i class="fas fa-sticky-note text-muted me-1"></i>Notes
                                 </label>
-                                <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Supplier info, condition notes, etc."></textarea>
+                                <input type="text" class="form-control form-control-lg" id="notes" name="notes" placeholder="Supplier info, condition notes, etc.">
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Products Table -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <label class="form-label fw-medium mb-0">
+                                    <i class="fas fa-boxes text-muted me-1"></i>Products to Receive <span class="text-danger">*</span>
+                                </label>
+                                <button type="button" id="add-product-row" class="btn btn-sm btn-outline-primary add-product-btn">
+                                    <i class="fas fa-plus me-1"></i>Add Product Row
+                                </button>
+                            </div>
+
+                            <div class="table-responsive table-wrapper">
+                                <table class="table table-bordered table-hover align-middle mb-0">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th width="50" class="text-center">#</th>
+                                            <th>Product</th>
+                                            <th width="150">Quantity</th>
+                                            <th width="80" class="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="products-tbody">
+                                        <!-- Initial Row -->
+                                        <tr class="product-row">
+                                            <td class="text-center align-middle">
+                                                <span class="row-number badge bg-secondary">1</span>
+                                            </td>
+                                            <td>
+                                                <select name="products[]" class="form-select" required>
+                                                    <option value="">Select Product</option>
+                                                    {% for p in products %}
+                                                    <option value="{{ p.id }}">{{ p.item_name }} {% if p.item_sku %}({{ p.item_sku }}){% endif %}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input type="number" name="quantities[]" class="form-control" min="1" required placeholder="0">
+                                            </td>
+                                            <td class="text-center align-middle">
+                                                <button type="button" class="btn btn-sm btn-outline-danger remove-row-btn remove-product-btn">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="form-text mt-2">
+                                <i class="fas fa-info-circle me-1"></i>Click "Add Product Row" to receive multiple products at once
                             </div>
                         </div>
 
@@ -98,7 +283,7 @@
 
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary btn-lg px-4">
-                                <i class="fas fa-check me-2"></i>Receive Stock
+                                <i class="fas fa-check me-2"></i>Receive All Products
                             </button>
                             <a href="{% url 'warehouse:inventory_list' %}" class="btn btn-outline-secondary btn-lg"
                                hx-get="{% url 'warehouse:inventory_list' %}"
@@ -115,28 +300,28 @@
         </div>
 
         <!-- Quick Tips Sidebar -->
-        <div class="col-lg-4">
+        <div class="col-lg-3">
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-info bg-opacity-10 border-0 py-3">
                     <h6 class="mb-0 fw-semibold text-info"><i class="fas fa-lightbulb me-2"></i>Quick Tips</h6>
                 </div>
                 <div class="card-body">
-                    <ul class="list-unstyled mb-0">
+                    <ul class="list-unstyled mb-0 small">
                         <li class="mb-3 d-flex align-items-start">
                             <span class="badge bg-primary rounded-circle me-2">1</span>
-                            <span>Select the warehouse first to load available locations</span>
+                            <span>Select warehouse and location (applies to all products)</span>
                         </li>
                         <li class="mb-3 d-flex align-items-start">
                             <span class="badge bg-primary rounded-circle me-2">2</span>
-                            <span>Choose the product you're receiving</span>
+                            <span>Add product rows using the "+ Add Product Row" button</span>
                         </li>
                         <li class="mb-3 d-flex align-items-start">
                             <span class="badge bg-primary rounded-circle me-2">3</span>
-                            <span>Enter the exact quantity received</span>
+                            <span>Select products and enter quantities</span>
                         </li>
                         <li class="d-flex align-items-start">
-                            <span class="badge bg-secondary rounded-circle me-2"><i class="fas fa-info fa-xs"></i></span>
-                            <span>Add PO number and notes for tracking</span>
+                            <span class="badge bg-success rounded-circle me-2">✓</span>
+                            <span>Submit once to receive all products</span>
                         </li>
                     </ul>
                 </div>
@@ -144,9 +329,9 @@
 
             <div class="card border-0 shadow-sm bg-light">
                 <div class="card-body text-center py-4">
-                    <i class="fas fa-boxes fa-3x text-muted mb-3"></i>
-                    <h6 class="fw-semibold">Need to receive multiple products?</h6>
-                    <p class="text-muted small mb-0">Submit this form multiple times for each product, or use bulk import for large shipments.</p>
+                    <i class="fas fa-boxes fa-3x text-primary mb-3"></i>
+                    <h6 class="fw-semibold">Multiple Products</h6>
+                    <p class="text-muted small mb-0">You can now receive multiple products in a single submission!</p>
                 </div>
             </div>
         </div>

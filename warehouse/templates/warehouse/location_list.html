@@ -3,32 +3,387 @@
 
 {% block title %}Storage Locations{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+<style>
+.view-toggle {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.view-toggle .btn {
+    border-radius: 8px;
+}
+
+/* Visual Warehouse Diagram */
+.warehouse-diagram {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 20px;
+}
+
+.diagram-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.diagram-guide {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.guide-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+}
+
+.location-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.location-card {
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.location-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-color: #667eea;
+}
+
+.location-card.zone {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: #667eea;
+}
+
+.location-card.aisle {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border-color: #f093fb;
+}
+
+.location-card.rack {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    border-color: #4facfe;
+}
+
+.location-card.bin {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    color: white;
+    border-color: #43e97b;
+}
+
+.location-card.shelf {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    color: white;
+    border-color: #fa709a;
+}
+
+.location-code {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.location-name {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin-bottom: 10px;
+}
+
+.location-type {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.location-status {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #4caf50;
+}
+
+.location-status.inactive {
+    background: #9e9e9e;
+}
+
+.location-hierarchy {
+    margin-top: 30px;
+}
+
+.hierarchy-level {
+    margin-bottom: 30px;
+}
+
+.hierarchy-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.legend-color {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+}
+
+/* Table row colors based on location type */
+.table tbody tr.location-row-zone {
+    background: linear-gradient(90deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+    border-left: 4px solid #667eea;
+    font-weight: 600;
+}
+
+.table tbody tr.location-row-aisle {
+    background: linear-gradient(90deg, rgba(240, 147, 251, 0.12) 0%, rgba(245, 87, 108, 0.12) 100%);
+    border-left: 3px solid #f093fb;
+    border-top: 1px dashed rgba(240, 147, 251, 0.3);
+}
+
+.table tbody tr.location-row-rack {
+    background: linear-gradient(90deg, rgba(79, 172, 254, 0.10) 0%, rgba(0, 242, 254, 0.10) 100%);
+    border-left: 2px solid #4facfe;
+    border-top: 1px dashed rgba(79, 172, 254, 0.3);
+}
+
+.table tbody tr.location-row-shelf {
+    background: linear-gradient(90deg, rgba(250, 112, 154, 0.08) 0%, rgba(254, 225, 64, 0.08) 100%);
+    border-left: 2px solid #fa709a;
+    border-top: 1px dashed rgba(250, 112, 154, 0.3);
+}
+
+.table tbody tr.location-row-bin {
+    background: linear-gradient(90deg, rgba(67, 233, 123, 0.08) 0%, rgba(56, 249, 215, 0.08) 100%);
+    border-left: 2px solid #43e97b;
+    border-top: 1px dashed rgba(67, 233, 123, 0.3);
+}
+
+.table tbody tr.location-row-zone:hover,
+.table tbody tr.location-row-aisle:hover,
+.table tbody tr.location-row-rack:hover,
+.table tbody tr.location-row-bin:hover,
+.table tbody tr.location-row-shelf:hover {
+    filter: brightness(0.95);
+}
+
+/* Tree connector lines for hierarchy visualization */
+.hierarchy-connector {
+    position: relative;
+    padding-left: 8px;
+}
+
+.hierarchy-connector::before {
+    content: "";
+    position: absolute;
+    left: -10px;
+    top: 50%;
+    width: 15px;
+    height: 1px;
+    background-color: #ccc;
+}
+
+.hierarchy-connector::after {
+    content: "";
+    position: absolute;
+    left: -10px;
+    top: 0;
+    bottom: 50%;
+    width: 1px;
+    background-color: #ccc;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row mb-4">
         <div class="col-12">
-            <h1 class="h3 mb-0">Storage Locations</h1>
+            <h1 class="h3 mb-0"><i class="fas fa-map-marked-alt me-2"></i>Storage Locations</h1>
             <p class="text-muted">Manage storage locations across warehouses</p>
         </div>
     </div>
 
-    <!-- Filter -->
+    <!-- Filter & View Toggle -->
     <div class="row mb-4">
-        <div class="col-12">
-            <form method="GET" class="d-flex gap-2">
-                <select name="warehouse" class="form-select" style="max-width: 250px;">
+        <div class="col-md-6">
+            <form method="GET" class="d-flex gap-2" id="filter-form">
+                <select name="warehouse" class="form-select" style="max-width: 250px;" onchange="this.form.submit()">
                     <option value="">All Warehouses</option>
                     {% for wh in warehouses %}
                     <option value="{{ wh.id }}" {% if selected_warehouse == wh.id|stringformat:'s' %}selected{% endif %}>{{ wh.name }}</option>
                     {% endfor %}
                 </select>
-                <button type="submit" class="btn btn-primary">Filter</button>
+                <input type="hidden" name="view" id="view-input" value="{{ view_mode|default:'table' }}">
             </form>
+        </div>
+        <div class="col-md-6 text-end">
+            <div class="btn-group view-toggle" role="group">
+                <button type="button" class="btn btn-outline-primary {% if view_mode == 'visual' %}active{% endif %}" onclick="switchView('visual')">
+                    <i class="fas fa-th me-1"></i>Visual View
+                </button>
+                <button type="button" class="btn btn-outline-primary {% if view_mode != 'visual' %}active{% endif %}" onclick="switchView('table')">
+                    <i class="fas fa-list me-1"></i>Table View
+                </button>
+            </div>
+            <a href="{% url 'warehouse:location_add' %}" class="btn btn-primary ms-2">
+                <i class="fas fa-plus me-1"></i>Add Location
+            </a>
+        </div>
+    </div>
+
+    <!-- Visual Warehouse Diagram View -->
+    <div id="visual-view" style="display: none;">
+        <div class="warehouse-diagram">
+            <div class="diagram-guide">
+                <h5 class="mb-3"><i class="fas fa-info-circle me-2 text-info"></i>Warehouse Rack Labeling Guide</h5>
+                <img src="{% static 'warehouse/img/What-is-warehouse-rack-labelling-writing.jpg' %}"
+                     alt="Warehouse Rack Labeling"
+                     class="guide-image"
+                     onerror="this.style.display='none'">
+                <p class="small text-muted mb-0">
+                    <strong>Location Hierarchy:</strong> Zone → Aisle → Rack → Shelf → Bin
+                </p>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+                    <span>Zone</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
+                    <span>Aisle</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
+                    <span>Rack</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
+                    <span>Bin</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);"></div>
+                    <span>Shelf</span>
+                </div>
+            </div>
+
+            <div class="location-hierarchy">
+                {% regroup locations by get_location_type_display as locations_by_type %}
+                {% for type_group in locations_by_type %}
+                <div class="hierarchy-level">
+                    <div class="hierarchy-title">
+                        <i class="fas fa-layer-group text-primary"></i>
+                        {{ type_group.grouper }} Locations ({{ type_group.list|length }})
+                    </div>
+                    <div class="location-grid">
+                        {% for loc in type_group.list %}
+                        <div class="location-card {{ loc.location_type }}" onclick="editLocation({{ loc.id }})">
+                            <div class="location-status {% if not loc.is_active %}inactive{% endif %}"></div>
+                            <div class="location-code">{{ loc.code }}</div>
+                            <div class="location-name">{{ loc.name }}</div>
+                            <div class="location-type">{{ loc.warehouse.name }}</div>
+                            {% if loc.parent %}
+                            <div class="small mt-2" style="opacity: 0.8;">
+                                <i class="fas fa-arrow-up me-1"></i>{{ loc.parent.code }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-map-marker-alt fa-3x mb-3 d-block opacity-50"></i>
+                    <p class="mb-2 fw-medium">No storage locations found</p>
+                    <a href="{% url 'warehouse:location_add' %}" class="btn btn-primary mt-2">
+                        <i class="fas fa-plus me-1"></i>Add First Location
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 
     <!-- Locations Table -->
-    <div class="row">
+    <div id="table-view" class="row">
+        <div class="col-12 mb-4">
+            <!-- Warehouse Rack Labeling Guide -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="mb-3"><i class="fas fa-info-circle me-2 text-info"></i>Warehouse Rack Labeling Guide</h6>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <img src="{% static 'warehouse/img/What-is-warehouse-rack-labelling-writing.jpg' %}"
+                                 alt="Warehouse Rack Labeling"
+                                 class="img-fluid rounded shadow-sm"
+                                 style="max-height: 300px; object-fit: contain;"
+                                 onerror="this.parentElement.style.display='none'">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-center">
+                            <div>
+                                <p class="mb-3"><strong>Location Hierarchy:</strong></p>
+                                <ul class="list-unstyled small">
+                                    <li class="mb-2"><span class="badge" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">Zone</span> → Top level area</li>
+                                    <li class="mb-2"><span class="badge" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">Aisle</span> → Pathway within zone</li>
+                                    <li class="mb-2"><span class="badge" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">Rack</span> → Storage structure</li>
+                                    <li class="mb-2"><span class="badge" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">Shelf</span> → Horizontal level</li>
+                                    <li><span class="badge" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">Bin</span> → Storage container</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="col-12">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -42,22 +397,111 @@
                         <table class="table table-hover mb-0">
                             <thead class="bg-light">
                                 <tr>
+                                    <th>Type</th>
+                                    <th>Hierarchy</th>
                                     <th>Code</th>
                                     <th>Name</th>
                                     <th>Warehouse</th>
-                                    <th>Type</th>
                                     <th>Parent</th>
                                     <th>Status</th>
+                                    <th class="text-end">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for loc in locations %}
-                                <tr>
-                                    <td><code>{{ loc.code }}</code></td>
-                                    <td>{{ loc.name }}</td>
+                                <tr class="location-row-{{ loc.location_type }}">
+                                    <td>
+                                        <span class="badge" style="background: {% if loc.location_type == 'zone' %}linear-gradient(135deg, #667eea 0%, #764ba2 100%){% elif loc.location_type == 'aisle' %}linear-gradient(135deg, #f093fb 0%, #f5576c 100%){% elif loc.location_type == 'rack' %}linear-gradient(135deg, #4facfe 0%, #00f2fe 100%){% elif loc.location_type == 'bin' %}linear-gradient(135deg, #43e97b 0%, #38f9d7 100%){% elif loc.location_type == 'shelf' %}linear-gradient(135deg, #fa709a 0%, #fee140 100%){% endif %};">
+                                            {{ loc.get_location_type_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center small">
+                                            {% if loc.location_type == 'zone' %}
+                                            <span class="text-muted">1</span>
+                                            <i class="fas fa-circle mx-1" style="font-size: 4px; color: #667eea;"></i>
+                                            <span class="fw-bold" style="color: #667eea;">Zone</span>
+                                            {% elif loc.location_type == 'aisle' %}
+                                            <span class="text-muted">1</span>
+                                            <i class="fas fa-chevron-right mx-1" style="font-size: 8px; color: #ccc;"></i>
+                                            <span class="text-muted">2</span>
+                                            <i class="fas fa-circle mx-1" style="font-size: 4px; color: #f093fb;"></i>
+                                            <span class="fw-bold" style="color: #f093fb;">Aisle</span>
+                                            {% elif loc.location_type == 'rack' %}
+                                            <span class="text-muted">1</span>
+                                            <i class="fas fa-chevron-right mx-1" style="font-size: 8px; color: #ccc;"></i>
+                                            <span class="text-muted">2</span>
+                                            <i class="fas fa-chevron-right mx-1" style="font-size: 8px; color: #ccc;"></i>
+                                            <span class="text-muted">3</span>
+                                            <i class="fas fa-circle mx-1" style="font-size: 4px; color: #4facfe;"></i>
+                                            <span class="fw-bold" style="color: #4facfe;">Rack</span>
+                                            {% elif loc.location_type == 'shelf' %}
+                                            <span class="text-muted">1</span>
+                                            <i class="fas fa-chevron-right mx-1" style="font-size: 8px; color: #ccc;"></i>
+                                            <span class="text-muted">2</span>
+                                            <i class="fas fa-chevron-right mx-1" style="font-size: 8px; color: #ccc;"></i>
+                                            <span class="text-muted">3</span>
+                                            <i class="fas fa-chevron-right mx-1" style="font-size: 8px; color: #ccc;"></i>
+                                            <span class="text-muted">4</span>
+                                            <i class="fas fa-circle mx-1" style="font-size: 4px; color: #fa709a;"></i>
+                                            <span class="fw-bold" style="color: #fa709a;">Shelf</span>
+                                            {% elif loc.location_type == 'bin' %}
+                                            <span class="text-muted">1</span>
+                                            <i class="fas fa-chevron-right mx-1" style="font-size: 8px; color: #ccc;"></i>
+                                            <span class="text-muted">2</span>
+                                            <i class="fas fa-chevron-right mx-1" style="font-size: 8px; color: #ccc;"></i>
+                                            <span class="text-muted">3</span>
+                                            <i class="fas fa-chevron-right mx-1" style="font-size: 8px; color: #ccc;"></i>
+                                            <span class="text-muted">4</span>
+                                            <i class="fas fa-chevron-right mx-1" style="font-size: 8px; color: #ccc;"></i>
+                                            <span class="text-muted">5</span>
+                                            <i class="fas fa-circle mx-1" style="font-size: 4px; color: #43e97b;"></i>
+                                            <span class="fw-bold" style="color: #43e97b;">Bin</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if loc.location_type == 'aisle' %}
+                                            <span style="display: inline-block; width: 20px; position: relative;">
+                                                <span style="position: absolute; left: 5px; top: 50%; width: 12px; height: 1px; background: #ccc;"></span>
+                                                <span style="position: absolute; left: 5px; top: 0; bottom: 50%; width: 1px; background: #ccc;"></span>
+                                            </span>
+                                            <i class="fas fa-level-down-alt text-muted me-1" style="font-size: 10px; transform: rotate(90deg);"></i>
+                                            {% elif loc.location_type == 'rack' %}
+                                            <span style="display: inline-block; width: 40px; position: relative;">
+                                                <span style="position: absolute; left: 25px; top: 50%; width: 12px; height: 1px; background: #ccc;"></span>
+                                                <span style="position: absolute; left: 25px; top: 0; bottom: 50%; width: 1px; background: #ccc;"></span>
+                                            </span>
+                                            <i class="fas fa-level-down-alt text-muted me-1" style="font-size: 10px; transform: rotate(90deg);"></i>
+                                            {% elif loc.location_type == 'shelf' %}
+                                            <span style="display: inline-block; width: 60px; position: relative;">
+                                                <span style="position: absolute; left: 45px; top: 50%; width: 12px; height: 1px; background: #ccc;"></span>
+                                                <span style="position: absolute; left: 45px; top: 0; bottom: 50%; width: 1px; background: #ccc;"></span>
+                                            </span>
+                                            <i class="fas fa-level-down-alt text-muted me-1" style="font-size: 10px; transform: rotate(90deg);"></i>
+                                            {% elif loc.location_type == 'bin' %}
+                                            <span style="display: inline-block; width: 80px; position: relative;">
+                                                <span style="position: absolute; left: 65px; top: 50%; width: 12px; height: 1px; background: #ccc;"></span>
+                                                <span style="position: absolute; left: 65px; top: 0; bottom: 50%; width: 1px; background: #ccc;"></span>
+                                            </span>
+                                            <i class="fas fa-level-down-alt text-muted me-1" style="font-size: 10px; transform: rotate(90deg);"></i>
+                                            {% endif %}
+                                            <code class="fw-bold">{{ loc.code }}</code>
+                                        </div>
+                                    </td>
+                                    <td><strong>{{ loc.name }}</strong></td>
                                     <td>{{ loc.warehouse.name }}</td>
-                                    <td>{{ loc.get_location_type_display }}</td>
-                                    <td>{{ loc.parent.code|default:"-" }}</td>
+                                    <td>
+                                        {% if loc.parent %}
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-level-up-alt text-muted me-2" style="transform: rotate(90deg);"></i>
+                                            <code>{{ loc.parent.code }}</code>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if loc.is_active %}
                                         <span class="badge bg-success">Active</span>
@@ -65,10 +509,24 @@
                                         <span class="badge bg-secondary">Inactive</span>
                                         {% endif %}
                                     </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'warehouse:location_edit' loc.id %}"
+                                               class="btn btn-outline-primary btn-sm btn-action"
+                                               title="Edit Location">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'warehouse:location_delete' loc.id %}"
+                                               class="btn btn-outline-danger btn-sm btn-action"
+                                               title="Delete Location">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-5">
+                                    <td colspan="8" class="text-center text-muted py-5">
                                         <i class="fas fa-map-marker-alt fa-3x mb-3 d-block"></i>
                                         No storage locations found
                                     </td>
@@ -84,5 +542,127 @@
             </div>
         </div>
     </div>
+
+    <!-- Quick Tips & Workflow Help -->
+    <div class="row mt-4">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-info bg-opacity-10 border-0 py-3">
+                    <h6 class="mb-0 fw-semibold text-info">
+                        <i class="fas fa-lightbulb me-2"></i>Quick Tips
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0 small">
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Visual View:</strong> Click "Visual View" to see warehouse locations as interactive cards organized by type</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Color Coding:</strong> Each location type has a unique color (Zone=Purple, Aisle=Pink, Rack=Blue, Bin=Green, Shelf=Orange)</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Location Hierarchy:</strong> Follow the standard: Zone → Aisle → Rack → Shelf → Bin</span>
+                        </li>
+                        <li class="d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Rack Labeling:</strong> Use the guide image to understand standard warehouse rack labeling conventions</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary bg-opacity-10 border-0 py-3">
+                    <h6 class="mb-0 fw-semibold text-primary">
+                        <i class="fas fa-route me-2"></i>Location Setup Workflow
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">1</span>
+                            <div>
+                                <strong class="d-block">Create Zones</strong>
+                                <small class="text-muted">Start by creating major zones in your warehouse (e.g., Z-A, Z-B)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">2</span>
+                            <div>
+                                <strong class="d-block">Add Aisles</strong>
+                                <small class="text-muted">Within each zone, create aisles (e.g., Z-A-01, Z-A-02)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">3</span>
+                            <div>
+                                <strong class="d-block">Define Racks & Bins</strong>
+                                <small class="text-muted">Create racks within aisles, then add bins/shelves for precise inventory placement</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">4</span>
+                            <div>
+                                <strong class="d-block">Assign Inventory</strong>
+                                <small class="text-muted">Use these locations when receiving stock for accurate tracking</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+// View switching
+function switchView(view) {
+    const visualView = document.getElementById('visual-view');
+    const tableView = document.getElementById('table-view');
+    const viewInput = document.getElementById('view-input');
+    const buttons = document.querySelectorAll('.view-toggle .btn');
+
+    if (view === 'visual') {
+        if (visualView) visualView.style.display = 'block';
+        if (tableView) tableView.style.display = 'none';
+        if (viewInput) viewInput.value = 'visual';
+        buttons[0].classList.add('active');
+        buttons[1].classList.remove('active');
+    } else {
+        if (visualView) visualView.style.display = 'none';
+        if (tableView) tableView.style.display = 'block';
+        if (viewInput) viewInput.value = 'table';
+        buttons[0].classList.remove('active');
+        buttons[1].classList.add('active');
+    }
+
+    // Update URL without reload
+    const url = new URL(window.location);
+    url.searchParams.set('view', view);
+    window.history.pushState({}, '', url);
+}
+
+// Edit location
+function editLocation(locationId) {
+    window.location.href = `/workforce/warehouse/locations/${locationId}/edit/`;
+}
+
+// Initialize view on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewMode = urlParams.get('view') || 'table';
+    switchView(viewMode);
+});
+</script>
 {% endblock %}

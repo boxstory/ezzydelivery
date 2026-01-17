@@ -1,17 +1,14 @@
+{% load custom_filters %}
 <style>
     #product_card_image_bg_{{ product.id }} {
-        background-image: url('{{ product.product_image.url }}');
+        background-image: url('{{ product.product_image|safe_image_url }}');
     }
 </style>
 <div class="card col-12 col-lg-6 product-card-single" id="product_card_single">
     <div class="m-2 product-card-wrapper" id="product_card_wrapper">
         <div class="img-avatar product-card-brand-logo-wrapper" id="product_card_brand_logo_wrapper">
             <div>
-                {% if product.brand_logo %}
-                <img src="{{ product.brand_logo.url }}" loading="lazy" alt="{{ product.brand_name|default:'Brand logo' }}" class="product-card-brand-logo-img" id="product_card_brand_logo_img">
-                {% else %}
-                <img src="/media/business/product_images/brand_logo_default.jpg" loading="lazy" alt="Default brand logo" class="product-card-brand-logo-default" id="product_card_brand_logo_default">
-                {% endif %}
+                <img src="{{ product.brand_logo|safe_brand_logo_url }}" loading="lazy" alt="{{ product.brand_name|default:'Brand logo' }}" class="product-card-brand-logo-img" id="product_card_brand_logo_img" onerror="this.src='/media/business/product_images/brand_logo_default.jpg';">
             </div>
         </div>
         <div class="card-text product-card-content" id="product_card_content">

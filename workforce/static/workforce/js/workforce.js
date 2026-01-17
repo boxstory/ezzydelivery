@@ -617,9 +617,12 @@
                 }
                 if (toggle) {
                     toggle.setAttribute('aria-expanded', 'true');
-                    const parentNavItem = toggle.closest('.nav-item');
-                    if (parentNavItem) {
-                        parentNavItem.classList.add('active');
+                    // Only add active class to parent nav-item if this collapse contains the active page
+                    if (collapseId === activeCollapseId) {
+                        const parentNavItem = toggle.closest('.nav-item');
+                        if (parentNavItem) {
+                            parentNavItem.classList.add('active');
+                        }
                     }
                 }
             }

@@ -3,6 +3,10 @@
 
 {% block title %}Cycle Counts{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row mb-4">
@@ -89,6 +93,87 @@
 
                 <!-- Pagination -->
                 {% include "includes/components/_pagination.html" with page_obj=cycle_counts filter_params=filter_params %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Tips & Workflow Help -->
+    <div class="row mt-4">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-info bg-opacity-10 border-0 py-3">
+                    <h6 class="mb-0 fw-semibold text-info">
+                        <i class="fas fa-lightbulb me-2"></i>Quick Tips
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0 small">
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Cycle Counting:</strong> Regular physical counts to verify system accuracy without full inventory</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Discrepancies:</strong> System creates adjustment transactions automatically when physical count differs</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Assignment:</strong> Assign counts to staff members for accountability and tracking</span>
+                        </li>
+                        <li class="d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Schedule:</strong> Plan regular counts (daily/weekly) to maintain inventory accuracy</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary bg-opacity-10 border-0 py-3">
+                    <h6 class="mb-0 fw-semibold text-primary">
+                        <i class="fas fa-route me-2"></i>Cycle Count Workflow
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">1</span>
+                            <div>
+                                <strong class="d-block">Create Cycle Count</strong>
+                                <small class="text-muted">Select products/locations to count, assign to staff</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">2</span>
+                            <div>
+                                <strong class="d-block">Physical Count</strong>
+                                <small class="text-muted">Staff counts actual items, records findings</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">3</span>
+                            <div>
+                                <strong class="d-block">Review Discrepancies</strong>
+                                <small class="text-muted">Compare physical count with system quantity</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-success rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-check fa-xs"></i></span>
+                            <div>
+                                <strong class="d-block">Complete & Adjust</strong>
+                                <small class="text-muted">System updates stock levels, creates adjustment transactions</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

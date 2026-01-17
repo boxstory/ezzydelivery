@@ -1,0 +1,294 @@
+{% extends 'business_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Stock Card - {{ product.item_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}" type="text/css" />
+<link rel="stylesheet" href="{% static 'product/css/inventory.css' %}" type="text/css" />
+<style>
+.stock-card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 30px;
+}
+
+.product-detail-image {
+    width: 150px;
+    height: 150px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+}
+
+.warehouse-stock-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 20px;
+}
+
+.transaction-card {
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 12px;
+    border-left: 4px solid #e2e8f0;
+}
+
+.transaction-card.receive {
+    border-left-color: #10b981;
+}
+
+.transaction-card.adjust {
+    border-left-color: #f59e0b;
+}
+
+.transaction-card.transfer {
+    border-left-color: #667eea;
+}
+
+.transaction-card.reserve {
+    border-left-color: #8b5cf6;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="main-content" class="container-fluid py-4">
+    <!-- Breadcrumb -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a href="{% url 'product:inventory_list' %}"
+                           hx-get="{% url 'product:inventory_list' %}"
+                           hx-target="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">
+                            Inventory
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item active">{{ product.item_name }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Product Header -->
+    <div class="stock-card-header">
+        <div class="d-flex align-items-start gap-4">
+            {% if product.item_image %}
+            <img src="{{ product.item_image.url }}"
+                 alt="{{ product.item_name }}"
+                 class="product-detail-image">
+            {% else %}
+            <div class="product-image-placeholder" style="width: 150px; height: 150px; font-size: 3rem;">
+                {{ product.item_name|first|upper }}
+            </div>
+            {% endif %}
+
+            <div class="flex-fill">
+                <div class="mb-2">
+                    <span class="badge bg-light text-dark">SKU{{ product.product_id }}</span>
+                </div>
+                <h1 class="mb-2">{{ product.item_name }}</h1>
+                {% if product.brand_name %}
+                <p class="mb-3 opacity-90">{{ product.brand_name }}</p>
+                {% endif %}
+
+                <div class="d-flex gap-4">
+                    <div>
+                        <div class="small opacity-75">Category</div>
+                        <div class="fw-bold">{{ product.product_category.name|default:"Uncategorized" }}</div>
+                    </div>
+                    <div>
+                        <div class="small opacity-75">Unit Price</div>
+                        <div class="fw-bold">QAR {{ product.item_price|default:0 }}</div>
+                    </div>
+                    {% if product.barcode %}
+                    <div>
+                        <div class="small opacity-75">Barcode</div>
+                        <div class="fw-bold">{{ product.barcode }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <a href="{% url 'product:product_single_update' product.id %}"
+               class="btn btn-light"
+               hx-get="{% url 'product:product_single_update' product.id %}"
+               hx-target="#main-content"
+               hx-swap="outerHTML"
+               hx-push-url="true">
+                <i class="fas fa-edit me-2"></i>Edit Product
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Stock Levels by Warehouse -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-warehouse text-primary me-2"></i>Stock by Warehouse
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if stock_levels %}
+                    {% for stock in stock_levels %}
+                    <div class="warehouse-stock-card">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h6 class="mb-1">{{ stock.warehouse.name }}</h6>
+                                <small class="text-muted">{{ stock.warehouse.code }}</small>
+                            </div>
+                            {% if stock.quantity_on_hand > stock.reorder_point %}
+                            <span class="stock-badge in-stock">In Stock</span>
+                            {% elif stock.quantity_on_hand > 0 %}
+                            <span class="stock-badge low-stock">Low Stock</span>
+                            {% else %}
+                            <span class="stock-badge out-of-stock">Out of Stock</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="row">
+                            <div class="col-6 col-md-3 mb-3">
+                                <div class="metric">
+                                    <div class="metric-label">On Hand</div>
+                                    <div class="metric-value">{{ stock.quantity_on_hand|default:0 }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3 mb-3">
+                                <div class="metric">
+                                    <div class="metric-label">Reserved</div>
+                                    <div class="metric-value">{{ stock.quantity_reserved|default:0 }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3 mb-3">
+                                <div class="metric">
+                                    <div class="metric-label">Available</div>
+                                    <div class="metric-value text-success">
+                                        {{ stock.quantity_on_hand|default:0|add:stock.quantity_reserved|default:0|multiply:-1 }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3 mb-3">
+                                <div class="metric">
+                                    <div class="metric-label">Reorder Point</div>
+                                    <div class="metric-value">{{ stock.reorder_point|default:0 }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if stock.location %}
+                        <div class="small text-muted">
+                            <i class="fas fa-map-marker-alt me-1"></i>
+                            Location: {{ stock.location.code }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-box-open fa-3x mb-3 opacity-25"></i>
+                        <p>No stock records found for this product</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Transactions -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exchange-alt text-primary me-2"></i>Recent Transactions
+                    </h5>
+                </div>
+                <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                    {% if transactions %}
+                    {% for txn in transactions %}
+                    <div class="transaction-card {{ txn.transaction_type }}">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <span class="badge bg-{{ txn.transaction_type|default:'secondary' }} text-uppercase">
+                                    {{ txn.get_transaction_type_display|default:txn.transaction_type }}
+                                </span>
+                                <div class="small text-muted mt-1">
+                                    {{ txn.created_at|date:"M d, Y H:i" }}
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold {% if txn.quantity > 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {% if txn.quantity > 0 %}+{% endif %}{{ txn.quantity }}
+                                </div>
+                                <div class="small text-muted">units</div>
+                            </div>
+                        </div>
+
+                        <div class="small">
+                            <div class="mb-1">
+                                <i class="fas fa-warehouse me-1"></i>
+                                {{ txn.warehouse.code }}
+                                {% if txn.location %}
+                                <span class="text-muted">→ {{ txn.location.code }}</span>
+                                {% endif %}
+                            </div>
+                            {% if txn.notes %}
+                            <div class="text-muted">
+                                <i class="fas fa-comment me-1"></i>{{ txn.notes }}
+                            </div>
+                            {% endif %}
+                            {% if txn.created_by %}
+                            <div class="text-muted">
+                                <i class="fas fa-user me-1"></i>{{ txn.created_by.get_full_name|default:txn.created_by.username }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-history fa-3x mb-3 opacity-25"></i>
+                        <p>No transaction history available</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="d-flex gap-2 justify-content-center">
+                <a href="{% url 'product:inventory_list' %}"
+                   class="btn btn-outline-secondary"
+                   hx-get="{% url 'product:inventory_list' %}"
+                   hx-target="#main-content"
+                   hx-swap="outerHTML"
+                   hx-push-url="true">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Inventory
+                </a>
+                <a href="{% url 'warehouse:receive_stock' %}?product={{ product.id }}"
+                   class="btn btn-success"
+                   hx-get="{% url 'warehouse:receive_stock' %}?product={{ product.id }}"
+                   hx-target="#main-content"
+                   hx-swap="outerHTML"
+                   hx-push-url="true">
+                    <i class="fas fa-plus me-2"></i>Receive Stock
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% load custom_filters %}
+{% endblock %}

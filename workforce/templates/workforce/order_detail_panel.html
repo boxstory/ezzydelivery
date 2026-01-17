@@ -1,0 +1,247 @@
+<!-- Order Detail Panel Content - No extends, just content -->
+<div class="order-detail-panel-scroll">
+    <!-- Order Info Card -->
+    <div class="card mb-3">
+        <div class="card-header bg-primary text-white">
+            <h6 class="mb-0">
+                <i class="fa-solid fa-info-circle me-2"></i>
+                Order Information
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-6">
+                    <small class="text-muted d-block">Order Number</small>
+                    <strong>{{ order.order_number }}</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">Client Code</small>
+                    <strong>{{ order.client_order_code }}</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">Status</small>
+                    {% if order.order_status == 'to_review' %}
+                    <span class="badge bg-warning text-dark">To Review</span>
+                    {% elif order.order_status == 'to_publish' %}
+                    <span class="badge bg-info">To Publish</span>
+                    {% elif order.order_status == 'published' %}
+                    <span class="badge bg-success">Published</span>
+                    {% elif order.order_status == 'cancelled' %}
+                    <span class="badge bg-danger">Cancelled</span>
+                    {% else %}
+                    <span class="badge bg-secondary">{{ order.order_status }}</span>
+                    {% endif %}
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">Verification</small>
+                    {% if order.verification_status == 'pending' %}
+                    <span class="badge bg-warning text-dark">Pending</span>
+                    {% elif order.verification_status == 'verified' %}
+                    <span class="badge bg-success">Verified</span>
+                    {% else %}
+                    <span class="badge bg-secondary">{{ order.verification_status }}</span>
+                    {% endif %}
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">Business</small>
+                    <strong>{{ order.business.business_name }}</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">Date</small>
+                    {{ order.order_date|date:"d M Y" }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customer Info Card -->
+    <div class="card mb-3">
+        <div class="card-header bg-info text-white">
+            <h6 class="mb-0">
+                <i class="fa-solid fa-user me-2"></i>
+                Customer Information
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-12">
+                    <small class="text-muted d-block">Name</small>
+                    <strong>{{ order.customer_name }}</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">Phone</small>
+                    <a href="tel:{{ order.customer_phone }}" class="text-decoration-none">
+                        <i class="fa-solid fa-phone me-1"></i>{{ order.customer_phone }}
+                    </a>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">WhatsApp</small>
+                    {% if order.customer_whatsapp %}
+                    <a href="https://wa.me/{{ order.customer_whatsapp }}" target="_blank" class="text-decoration-none text-success">
+                        <i class="fa-brands fa-whatsapp me-1"></i>{{ order.customer_whatsapp }}
+                    </a>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                </div>
+                <div class="col-12">
+                    <small class="text-muted d-block">Address</small>
+                    {{ order.customer_address }}
+                </div>
+                <div class="col-4">
+                    <small class="text-muted d-block">Zone</small>
+                    {{ order.dl_zone|default:"-" }}
+                </div>
+                <div class="col-4">
+                    <small class="text-muted d-block">Street</small>
+                    {{ order.dl_street|default:"-" }}
+                </div>
+                <div class="col-4">
+                    <small class="text-muted d-block">Building</small>
+                    {{ order.dl_building|default:"-" }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Items -->
+    {% if order_items %}
+    <div class="card mb-3">
+        <div class="card-header">
+            <h6 class="mb-0">
+                <i class="fa-solid fa-box me-2"></i>
+                Order Items
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Product</th>
+                        <th>Quantity</th>
+                        <th>Unit Price</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order_items %}
+                    <tr>
+                        <td>{{ item.product|default:item.notes|truncatechars:30 }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>{{ item.unit_price|default:"0.00" }} QAR</td>
+                        <td>{{ item.total_price|default:"0.00" }} QAR</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Payment Info -->
+    <div class="card mb-3">
+        <div class="card-header bg-success text-white">
+            <h6 class="mb-0">
+                <i class="fa-solid fa-money-bill-wave me-2"></i>
+                Payment Information
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-6">
+                    <small class="text-muted d-block">COD Amount</small>
+                    <strong class="text-success">{{ order.cod_amount|default:"0" }} QAR</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">Delivery Fee</small>
+                    {{ order.dl_amount|default:"0" }} QAR
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delivery Task Info -->
+    {% if delivery_task %}
+    <div class="card mb-3">
+        <div class="card-header bg-warning">
+            <h6 class="mb-0">
+                <i class="fa-solid fa-truck me-2"></i>
+                Delivery Task
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-6">
+                    <small class="text-muted d-block">Task Number</small>
+                    <strong>{{ delivery_task.dl_task_number }}</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">DMS Status</small>
+                    <span class="badge bg-secondary">{{ delivery_task.get_dl_task_status_dms_display }}</span>
+                </div>
+                {% if delivery_task.driver %}
+                <div class="col-12">
+                    <small class="text-muted d-block">Driver</small>
+                    {{ delivery_task.driver.first_name }} {{ delivery_task.driver.last_name }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Action Buttons -->
+    <div class="d-grid gap-2 mt-4">
+        {% if order.verification_status == 'pending' %}
+        <button type="button"
+                class="btn btn-success"
+                hx-post="/workforce/orders/{{ order.id }}/verify/"
+                hx-confirm="Verify this order?"
+                hx-target="closest .order-detail-panel-scroll"
+                hx-swap="outerHTML">
+            <i class="fa-solid fa-check me-1"></i> Verify Order
+        </button>
+        {% endif %}
+
+        {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
+        <button type="button"
+                class="btn btn-info"
+                hx-post="/workforce/orders/{{ order.id }}/publish/"
+                hx-confirm="Publish this order?"
+                hx-target="closest .order-detail-panel-scroll"
+                hx-swap="outerHTML">
+            <i class="fa-solid fa-paper-plane me-1"></i> Publish to Delivery
+        </button>
+        {% endif %}
+
+        <a href="/workforce/orders/{{ order.id }}/" class="btn btn-outline-primary" target="_blank">
+            <i class="fa-solid fa-external-link me-1"></i> Open Full Page
+        </a>
+
+        {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
+        <button type="button"
+                class="btn btn-outline-danger"
+                hx-post="/workforce/orders/{{ order.id }}/cancel/"
+                hx-confirm="Cancel this order?"
+                hx-target="closest .order-detail-panel-scroll"
+                hx-swap="outerHTML">
+            <i class="fa-solid fa-times me-1"></i> Cancel Order
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- Order Notes -->
+    {% if order.order_notes %}
+    <div class="card mt-3">
+        <div class="card-header">
+            <h6 class="mb-0">
+                <i class="fa-solid fa-note-sticky me-2"></i>
+                Notes
+            </h6>
+        </div>
+        <div class="card-body">
+            <p class="mb-0 small">{{ order.order_notes }}</p>
+        </div>
+    </div>
+    {% endif %}
+</div>

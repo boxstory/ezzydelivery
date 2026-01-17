@@ -1,0 +1,422 @@
+{% comment %}
+Tasks View Toggle Scripts
+Usage: {% include "workforce/parts/components/_tasks_view_scripts.html" %}
+
+Include this in your extra_js block after including the view toggle and card/table views.
+This provides the JavaScript for switching between list, grid, and table views.
+{% endcomment %}
+
+<script>
+// Tasks View Toggle
+function setTasksView(view) {
+    const cardsContainer = document.getElementById('tasksContainer');
+    const tableContainer = document.getElementById('tasksTableContainer');
+    const listBtn = document.getElementById('listViewBtn');
+    const gridBtn = document.getElementById('gridViewBtn');
+    const tableBtn = document.getElementById('tableViewBtn');
+
+    if (!cardsContainer || !tableContainer) return;
+
+    // Reset all buttons
+    listBtn.classList.remove('active');
+    gridBtn.classList.remove('active');
+    tableBtn.classList.remove('active');
+
+    if (view === 'list') {
+        cardsContainer.style.display = '';
+        tableContainer.style.display = 'none';
+        cardsContainer.classList.remove('grid-view');
+        cardsContainer.classList.add('list-view');
+        listBtn.classList.add('active');
+    } else if (view === 'grid') {
+        cardsContainer.style.display = '';
+        tableContainer.style.display = 'none';
+        cardsContainer.classList.remove('list-view');
+        cardsContainer.classList.add('grid-view');
+        gridBtn.classList.add('active');
+    } else {
+        // Default: table view
+        cardsContainer.style.display = 'none';
+        tableContainer.style.display = 'block';
+        tableBtn.classList.add('active');
+    }
+
+    // Save preference to localStorage
+    localStorage.setItem('tasksViewPreference', view);
+}
+
+// Initialize view on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const savedView = localStorage.getItem('tasksViewPreference') || 'table';
+    setTasksView(savedView);
+});
+
+// Re-initialize after HTMX swaps
+document.body.addEventListener('htmx:afterSwap', function(event) {
+    if (document.getElementById('tasksContainer')) {
+        const savedView = localStorage.getItem('tasksViewPreference') || 'table';
+        setTasksView(savedView);
+    }
+});
+
+// ============================================
+// BULK SELECTION FUNCTIONS
+// ============================================
+
+// Toggle select all checkboxes
+function toggleSelectAll(checkbox) {
+    const taskCheckboxes = document.querySelectorAll('.task-checkbox');
+    taskCheckboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    updateBulkSelection();
+}
+
+// Update bulk selection count and show/hide bulk actions bar
+function updateBulkSelection() {
+    const taskCheckboxes = document.querySelectorAll('.task-checkbox');
+    const selectedCheckboxes = document.querySelectorAll('.task-checkbox:checked');
+    const bulkActionsBar = document.getElementById('bulkActionsBar');
+    const selectedCount = document.getElementById('selectedCount');
+    const selectAllCheckbox = document.getElementById('selectAllTasks');
+
+    if (selectedCount) {
+        selectedCount.textContent = selectedCheckboxes.length;
+    }
+
+    if (bulkActionsBar) {
+        bulkActionsBar.style.display = selectedCheckboxes.length > 0 ? 'block' : 'none';
+    }
+
+    // Update select all checkbox state
+    if (selectAllCheckbox) {
+        if (selectedCheckboxes.length === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else if (selectedCheckboxes.length === taskCheckboxes.length) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        }
+    }
+}
+
+// Clear all selections
+function clearAllSelections() {
+    const taskCheckboxes = document.querySelectorAll('.task-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAllTasks');
+
+    taskCheckboxes.forEach(cb => {
+        cb.checked = false;
+    });
+
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    }
+
+    updateBulkSelection();
+}
+
+// Get selected task IDs
+function getSelectedTaskIds() {
+    const selectedCheckboxes = document.querySelectorAll('.task-checkbox:checked');
+    return Array.from(selectedCheckboxes).map(cb => cb.value);
+}
+
+// Bulk action handler
+function bulkAction(action) {
+    const selectedIds = getSelectedTaskIds();
+
+    if (selectedIds.length === 0) {
+        showToast('Please select at least one task', 'warning');
+        return;
+    }
+
+    switch(action) {
+        case 'print':
+            bulkPrint(selectedIds);
+            break;
+        case 'publish_dms':
+            bulkPublishDMS(selectedIds);
+            break;
+        case 'publish_app':
+            bulkPublishApp(selectedIds);
+            break;
+        case 'export':
+            bulkExport(selectedIds);
+            break;
+        case 'status_pending':
+        case 'status_in_transit':
+        case 'status_delivered':
+        case 'status_rejected':
+        case 'status_cancelled':
+            const status = action.replace('status_', '');
+            bulkUpdateStatus(selectedIds, status);
+            break;
+        default:
+            console.log('Unknown action:', action);
+    }
+}
+
+// Bulk print selected tasks
+function bulkPrint(taskIds) {
+    const printUrl = '/workforce/tasks/bulk-print/?ids=' + taskIds.join(',');
+    window.open(printUrl, '_blank');
+}
+
+// Bulk publish to DMS
+function bulkPublishDMS(taskIds) {
+    if (confirm('Publish ' + taskIds.length + ' task(s) to DMS?')) {
+        fetch('/workforce/tasks/bulk-publish-dms/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+            },
+            body: JSON.stringify({ task_ids: taskIds })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Tasks published to DMS successfully', 'success');
+                location.reload();
+            } else {
+                showToast(data.message || 'Error publishing tasks', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error publishing tasks', 'error');
+            console.error('Error:', error);
+        });
+    }
+}
+
+// Bulk publish to App
+function bulkPublishApp(taskIds) {
+    if (confirm('Publish ' + taskIds.length + ' task(s) to Driver App?')) {
+        fetch('/workforce/tasks/bulk-publish-app/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+            },
+            body: JSON.stringify({ task_ids: taskIds })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Tasks published to App successfully', 'success');
+                location.reload();
+            } else {
+                showToast(data.message || 'Error publishing tasks', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error publishing tasks', 'error');
+            console.error('Error:', error);
+        });
+    }
+}
+
+// Bulk update status
+function bulkUpdateStatus(taskIds, status) {
+    if (confirm('Update status to "' + status.replace('_', ' ') + '" for ' + taskIds.length + ' task(s)?')) {
+        fetch('/workforce/tasks/bulk-update-status/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+            },
+            body: JSON.stringify({ task_ids: taskIds, status: status })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Status updated successfully', 'success');
+                location.reload();
+            } else {
+                showToast(data.message || 'Error updating status', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error updating status', 'error');
+            console.error('Error:', error);
+        });
+    }
+}
+
+// Bulk export
+function bulkExport(taskIds) {
+    const exportUrl = '/workforce/tasks/bulk-export/?ids=' + taskIds.join(',');
+    window.location.href = exportUrl;
+}
+
+// ============================================
+// TABLE SORTING FUNCTIONS
+// ============================================
+
+let currentSort = { field: null, direction: 'asc' };
+
+function sortTable(field) {
+    // Toggle direction if same field, else reset to asc
+    if (currentSort.field === field) {
+        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSort.field = field;
+        currentSort.direction = 'asc';
+    }
+
+    // Update URL with sort params and reload
+    const url = new URL(window.location.href);
+    url.searchParams.set('sort', field);
+    url.searchParams.set('order', currentSort.direction);
+
+    // Use HTMX if available, else regular navigation
+    if (typeof htmx !== 'undefined') {
+        htmx.ajax('GET', url.toString(), {
+            target: '#main-content',
+            select: '#main-content',
+            swap: 'outerHTML'
+        });
+    } else {
+        window.location.href = url.toString();
+    }
+
+    // Update sort icons
+    updateSortIcons(field, currentSort.direction);
+}
+
+function updateSortIcons(activeField, direction) {
+    // Reset all sort icons
+    document.querySelectorAll('.sortable .sort-icon').forEach(icon => {
+        icon.className = 'fa-solid fa-sort sort-icon';
+    });
+
+    // Update active column icon
+    const activeHeader = document.querySelector(`.sortable[data-sort="${activeField}"] .sort-icon`);
+    if (activeHeader) {
+        activeHeader.className = `fa-solid fa-sort-${direction === 'asc' ? 'up' : 'down'} sort-icon text-primary`;
+    }
+}
+
+// Initialize sort icons based on URL params
+document.addEventListener('DOMContentLoaded', function() {
+    const url = new URL(window.location.href);
+    const sortField = url.searchParams.get('sort');
+    const sortOrder = url.searchParams.get('order') || 'asc';
+
+    if (sortField) {
+        currentSort = { field: sortField, direction: sortOrder };
+        updateSortIcons(sortField, sortOrder);
+    }
+});
+
+// ============================================
+// TASK ACTION FUNCTIONS
+// ============================================
+
+// View task detail
+function viewTaskDetail(taskId) {
+    window.location.href = '/workforce/delivery-task/' + taskId + '/';
+}
+
+// Edit task
+function editTask(taskId) {
+    window.location.href = '/workforce/delivery-task/' + taskId + '/edit/';
+}
+
+// Publish single task to DMS
+function publishToDMS(taskId) {
+    if (confirm('Publish this task to DMS?')) {
+        fetch('/workforce/delivery-task/' + taskId + '/publish-dms/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Task published to DMS successfully', 'success');
+                location.reload();
+            } else {
+                showToast(data.message || 'Error publishing task', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error publishing task', 'error');
+            console.error('Error:', error);
+        });
+    }
+}
+
+// Publish single task to Driver App
+function publishToDriverApp(taskId) {
+    if (confirm('Publish this task to Driver App?')) {
+        fetch('/workforce/delivery-task/' + taskId + '/publish-driver-app/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Task published to App successfully', 'success');
+                location.reload();
+            } else {
+                showToast(data.message || 'Error publishing task', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error publishing task', 'error');
+            console.error('Error:', error);
+        });
+    }
+}
+
+// Set task info for status modal
+function setStatusModalTask(button) {
+    const taskId = button.getAttribute('data-task-id');
+    const taskNumber = button.getAttribute('data-task-number');
+    const modal = document.getElementById('statusModal');
+    if (modal) {
+        modal.querySelector('#modalTaskId')?.setAttribute('value', taskId);
+        modal.querySelector('#modalTaskNumber')?.textContent = taskNumber;
+    }
+}
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
+// Get CSRF cookie
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Show toast notification (uses existing toast system if available)
+function showToast(message, type) {
+    if (typeof window.showToastNotification === 'function') {
+        window.showToastNotification(message, type);
+    } else {
+        alert(message);
+    }
+}
+</script>

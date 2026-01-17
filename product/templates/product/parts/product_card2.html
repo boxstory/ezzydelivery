@@ -1,26 +1,19 @@
+{% load custom_filters %}
 <!-- Modern Product Card Component -->
-<div class="col-lg-4 col-md-6 col-sm-6 mb-4">
+<div class="col-lg-4 col-md-6 col-sm-6 mb-3">
     <div class="modern-product-card">
         <!-- Image Section -->
         <div class="product-image-wrapper">
             <div class="product-image-container">
-                {% if product.product_image %}
-                    <img src="{{ product.product_image.url }}"
-                         loading="lazy"
-                         alt="{{ product.item_name }}"
-                         class="product-main-img">
-                {% else %}
-                    <div class="d-flex align-items-center justify-content-center h-100">
-                        <i class="fas fa-box fa-4x text-muted"></i>
-                    </div>
-                {% endif %}
+                <img src="{{ product.product_image|safe_image_url }}"
+                     loading="lazy"
+                     alt="{{ product.item_name }}"
+                     class="product-main-img">
             </div>
             <!-- Brand Logo Badge -->
-            {% if product.brand_logo %}
             <div class="brand-logo-badge">
-                <img src="{{ product.brand_logo.url }}" loading="lazy" alt="{{ product.brand_name }}">
+                <img src="{{ product.brand_logo|safe_brand_logo_url }}" loading="lazy" alt="{{ product.brand_name }}" onerror="this.parentElement.style.display='none';">
             </div>
-            {% endif %}
             <!-- Category Badge -->
             {% if product.product_category %}
             <div class="stock-badge in-stock">
@@ -33,7 +26,7 @@
         <!-- Card Body -->
         <div class="product-card-body">
             <!-- Brand & Category -->
-            <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="product-brand-name">{{ product.brand_name|default:"No Brand" }}</span>
                 {% if product.color %}
                 <span class="badge" style="background-color: {{ product.color.short_code|default:'#6c757d' }}; color: #fff; font-size: 0.7rem;">
@@ -44,6 +37,15 @@
 
             <!-- Product Title -->
             <h6 class="product-card-title">{{ product.item_name }}</h6>
+
+            <!-- Product ID -->
+            {% if product.product_id %}
+            <div class="mb-1">
+                <span class="badge bg-primary" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+                    <i class="fas fa-fingerprint me-1"></i>{{ product.product_id }}
+                </span>
+            </div>
+            {% endif %}
 
             <!-- Product Description -->
             <p class="product-card-description">
@@ -65,7 +67,7 @@
             </div>
 
             <!-- Product Meta -->
-            <div class="d-flex gap-2 mb-3 flex-wrap">
+            <div class="d-flex gap-2 mb-2 flex-wrap">
                 {% if product.size %}
                 <span class="badge bg-light text-dark border">
                     <i class="fas fa-ruler me-1"></i>{{ product.size }}

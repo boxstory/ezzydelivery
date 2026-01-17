@@ -3,23 +3,39 @@
 
 {% block title %}Inventory Transactions{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
+    <!-- Page Header with Breadcrumb -->
     <div class="row mb-4">
         <div class="col-12">
-            <h1 class="h3 mb-0">Inventory Transactions</h1>
-            <p class="text-muted">View all inventory movements</p>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{% url 'workforce:wf_dashboard' %}" class="text-decoration-none">Workforce</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'warehouse:dashboard' %}" class="text-decoration-none">Warehouse</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Transactions</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-1 fw-bold">
+                <i class="fas fa-exchange-alt text-primary me-2"></i>Inventory Transactions
+            </h1>
+            <p class="text-muted mb-0">Track all inventory movements and changes</p>
         </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Filters Card -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <form method="GET" class="row g-3">
+                <div class="card-body py-3">
+                    <form method="GET" class="row g-3 align-items-end">
                         <div class="col-md-4">
-                            <label for="type" class="form-label">Transaction Type</label>
+                            <label for="type" class="form-label small fw-semibold text-muted">
+                                <i class="fas fa-tag me-1"></i>Transaction Type
+                            </label>
                             <select name="type" id="type" class="form-select">
                                 <option value="">All Types</option>
                                 {% for type_val, type_label in transaction_types %}
@@ -28,7 +44,9 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label for="warehouse" class="form-label">Warehouse</label>
+                            <label for="warehouse" class="form-label small fw-semibold text-muted">
+                                <i class="fas fa-warehouse me-1"></i>Warehouse
+                            </label>
                             <select name="warehouse" id="warehouse" class="form-select">
                                 <option value="">All Warehouses</option>
                                 {% for wh in warehouses %}
@@ -36,8 +54,10 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary">Filter</button>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-filter me-1"></i>Apply Filters
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -48,48 +68,92 @@
     <!-- Transactions Table -->
     <div class="row">
         <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">All Transactions</h5>
+            <div class="card border-0 shadow-sm"> 
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-semibold">
+                        <i class="fas fa-list-ul text-secondary me-2"></i>Transaction History
+                    </h5>
+                    <span class="badge bg-secondary">{{ transactions.paginator.count|default:0 }} transactions</span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light">
                                 <tr>
-                                    <th>Date</th>
+                                    <th class="ps-3">Date & Time</th>
                                     <th>Transaction #</th>
                                     <th>Product</th>
                                     <th>Warehouse</th>
                                     <th>Type</th>
-                                    <th class="text-end">Qty</th>
+                                    <th class="text-center">Quantity</th>
+                                    <th class="text-center">Before</th>
+                                    <th class="text-center">After</th>
                                     <th>Notes</th>
-                                    <th>By</th>
+                                    <th>Created By</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for txn in transactions %}
                                 <tr>
-                                    <td>{{ txn.created_at|date:"d M Y" }}<br><small class="text-muted">{{ txn.created_at|time:"H:i" }}</small></td>
-                                    <td><code>{{ txn.transaction_number|truncatechars:15 }}</code></td>
-                                    <td>{{ txn.product.item_name|truncatechars:25 }}</td>
-                                    <td>{{ txn.warehouse.name }}</td>
+                                    <td class="ps-3">
+                                        <div class="fw-medium">{{ txn.created_at|date:"d M Y" }}</div>
+                                        <small class="text-muted">{{ txn.created_at|time:"H:i" }}</small>
+                                    </td>
+                                    <td><code class="bg-light px-2 py-1 rounded">{{ txn.transaction_number|truncatechars:15 }}</code></td>
+                                    <td>
+                                        <div class="fw-medium">{{ txn.product.item_name|truncatechars:30 }}</div>
+                                        <small class="text-muted">SKU: {{ txn.product.item_sku|default:"-" }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted">{{ txn.warehouse.name }}</span>
+                                        {% if txn.location %}
+                                        <div><small class="badge bg-secondary">{{ txn.location.code }}</small></div>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         <span class="badge {% if 'receive' in txn.transaction_type %}bg-success{% elif 'ship' in txn.transaction_type %}bg-primary{% elif 'adjust' in txn.transaction_type %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
                                             {{ txn.get_transaction_type_display }}
                                         </span>
                                     </td>
-                                    <td class="text-end">
-                                        {% if txn.quantity > 0 %}<span class="text-success fw-bold">+{{ txn.quantity }}</span>{% else %}<span class="text-danger fw-bold">{{ txn.quantity }}</span>{% endif %}
+                                    <td class="text-center">
+                                        {% if txn.quantity > 0 %}
+                                        <span class="text-success fw-bold fs-5">+{{ txn.quantity }}</span>
+                                        {% else %}
+                                        <span class="text-danger fw-bold fs-5">{{ txn.quantity }}</span>
+                                        {% endif %}
                                     </td>
-                                    <td>{{ txn.notes|truncatechars:30|default:"-" }}</td>
-                                    <td>{{ txn.created_by.username|default:"-" }}</td>
+                                    <td class="text-center">
+                                        <span class="text-muted">{{ txn.quantity_before|default:"-" }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="fw-medium">{{ txn.quantity_after|default:"-" }}</span>
+                                    </td>
+                                    <td>
+                                        {% if txn.notes %}
+                                        <span class="text-muted" title="{{ txn.notes }}">{{ txn.notes|truncatechars:40 }}</span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if txn.created_by %}
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-2" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+                                                <i class="fas fa-user text-primary small"></i>
+                                            </div>
+                                            <span>{{ txn.created_by.username }}</span>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-5">
-                                        <i class="fas fa-exchange-alt fa-3x mb-3 d-block"></i>
-                                        No transactions found
+                                    <td colspan="10" class="text-center text-muted py-5">
+                                        <i class="fas fa-exchange-alt fa-3x mb-3 d-block opacity-50"></i>
+                                        <p class="mb-2 fw-medium">No transactions found</p>
+                                        <p class="small text-muted">Transactions will appear here as you receive or move inventory</p>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -98,8 +162,90 @@
                     </div>
                 </div>
 
-                <!-- Pagination -->
-                {% include "includes/components/_pagination.html" with page_obj=transactions filter_params=filter_params %}
+                <div class="card-footer bg-white border-top">
+                    {% include "includes/components/_pagination.html" with page_obj=transactions filter_params=filter_params %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Tips & Workflow Help -->
+    <div class="row mt-4">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-info bg-opacity-10 border-0 py-3">
+                    <h6 class="mb-0 fw-semibold text-info">
+                        <i class="fas fa-lightbulb me-2"></i>Quick Tips
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0 small">
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Transaction Types:</strong> Green badges = Incoming stock (Receive), Blue = Outgoing (Ship), Yellow = Adjustments</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Quantity Changes:</strong> "Before" shows stock before transaction, "After" shows stock after transaction</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Filtering:</strong> Use filters to find specific transaction types or warehouses</span>
+                        </li>
+                        <li class="d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Audit Trail:</strong> All transactions are automatically logged with user, timestamp, and notes for full traceability</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary bg-opacity-10 border-0 py-3">
+                    <h6 class="mb-0 fw-semibold text-primary">
+                        <i class="fas fa-route me-2"></i>Typical Workflow
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">1</span>
+                            <div>
+                                <strong class="d-block">Receive Stock</strong>
+                                <small class="text-muted">New inventory arrives → Creates "Receive" transaction</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">2</span>
+                            <div>
+                                <strong class="d-block">Ship Orders</strong>
+                                <small class="text-muted">Products are picked and shipped → Creates "Ship" transaction</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">3</span>
+                            <div>
+                                <strong class="d-block">Cycle Counts</strong>
+                                <small class="text-muted">Physical counts reveal discrepancies → Creates "Adjustment" transaction</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-success rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-check fa-xs"></i></span>
+                            <div>
+                                <strong class="d-block">Review History</strong>
+                                <small class="text-muted">Check this page anytime to audit inventory movements</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

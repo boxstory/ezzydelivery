@@ -3,6 +3,10 @@
 
 {% block title %}Pick Lists{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row mb-4">
@@ -89,6 +93,87 @@
 
                 <!-- Pagination -->
                 {% include "includes/components/_pagination.html" with page_obj=pick_lists filter_params=filter_params %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Tips & Workflow Help -->
+    <div class="row mt-4">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-info bg-opacity-10 border-0 py-3">
+                    <h6 class="mb-0 fw-semibold text-info">
+                        <i class="fas fa-lightbulb me-2"></i>Quick Tips
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0 small">
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Pick Lists:</strong> Batch multiple orders together for efficient warehouse picking</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Status Tracking:</strong> Follow picks from pending → in progress → completed</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Assignment:</strong> Assign pick lists to specific warehouse staff for accountability</span>
+                        </li>
+                        <li class="d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Priority:</strong> Process high-priority picks first to meet SLAs</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary bg-opacity-10 border-0 py-3">
+                    <h6 class="mb-0 fw-semibold text-primary">
+                        <i class="fas fa-route me-2"></i>Picking Workflow
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">1</span>
+                            <div>
+                                <strong class="d-block">Create Pick List</strong>
+                                <small class="text-muted">Batch orders by warehouse, zone, or priority</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">2</span>
+                            <div>
+                                <strong class="d-block">Assign to Picker</strong>
+                                <small class="text-muted">Assign list to warehouse staff member</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">3</span>
+                            <div>
+                                <strong class="d-block">Pick Products</strong>
+                                <small class="text-muted">Collect items from storage locations, scan barcodes</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-success rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-check fa-xs"></i></span>
+                            <div>
+                                <strong class="d-block">Complete & Pack</strong>
+                                <small class="text-muted">Mark complete → Stock deducted → Ready for shipping</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

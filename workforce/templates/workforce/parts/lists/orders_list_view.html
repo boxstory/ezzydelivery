@@ -1,51 +1,9 @@
 {% extends "wf_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
-<!-- extra css -->
 {% block extra_css %}
-    <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
-    <link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
-    <style>
-    .orc-list{display:flex;flex-direction:column;gap:2px}
-    .orc-row{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fff;border:1px solid #e5e7eb;border-radius:4px;font-size:12px;line-height:1.2}
-    .orc-row:hover{background:#f8fafc;border-color:#cbd5e1}
-    .orc-id{min-width:100px}
-    .orc-id a{color:#2563eb;text-decoration:none;font-weight:600;font-size:11px}
-    .orc-id a:hover{text-decoration:underline}
-    .orc-seller{display:block;color:#64748b;font-size:10px}
-    .orc-customer{min-width:120px}
-    .orc-name{display:block;font-weight:500;font-size:11px}
-    .orc-phone{color:#64748b;font-size:10px}
-    .orc-address{flex:1;min-width:100px;max-width:180px}
-    .orc-zone{display:block;font-weight:500;font-size:10px;color:#dc2626}
-    .orc-addr-text{color:#64748b;font-size:10px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .orc-amount{min-width:60px;text-align:right;font-weight:600;color:#16a34a;font-size:12px}
-    .orc-amount small{font-weight:400;color:#64748b;font-size:9px}
-    .orc-date{min-width:36px;color:#64748b;font-size:10px;text-align:center}
-    .orc-status{display:flex;gap:3px;min-width:60px;flex-wrap:wrap}
-    .st{padding:1px 4px;border-radius:3px;font-size:9px;font-weight:500;background:#e5e7eb;color:#475569;white-space:nowrap}
-    .st-warn{background:#fef3c7;color:#92400e}
-    .st-info{background:#dbeafe;color:#1e40af}
-    .st-ok{background:#dcfce7;color:#166534}
-    .st-err{background:#fee2e2;color:#991b1b}
-    .st-ok-o{background:transparent;border:1px solid #16a34a;color:#16a34a}
-    .st-dms{background:#f3e8ff;color:#7c3aed}
-    .orc-actions{display:flex;gap:2px;margin-left:auto;flex-shrink:0;flex-wrap:wrap}
-    .orc-btn{width:20px;height:20px;padding:0;border:1px solid #d1d5db;border-radius:3px;background:#fff;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:9px;text-decoration:none}
-    .orc-btn:hover{background:#f1f5f9;color:#1e293b}
-    .orc-btn-ok{border-color:#86efac;color:#16a34a}
-    .orc-btn-ok:hover{background:#dcfce7}
-    .orc-btn-info{border-color:#93c5fd;color:#2563eb}
-    .orc-btn-info:hover{background:#dbeafe}
-    .orc-btn-err{border-color:#fca5a5;color:#dc2626}
-    .orc-btn-err:hover{background:#fee2e2}
-    .orc-btn-wa{border-color:#86efac;color:#16a34a}
-    .orc-btn-wa:hover{background:#dcfce7}
-    .orc-btn-edit{border-color:#fcd34d;color:#d97706}
-    .orc-btn-edit:hover{background:#fef3c7}
-    @media(max-width:992px){.orc-address{display:none}}
-    @media(max-width:768px){.orc-row{gap:6px;padding:5px 8px}.orc-status{min-width:50px}}
-    </style>
+<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
     <div class=" col-12 p-3">
@@ -91,6 +49,23 @@
                       hx-push-url="true">
                     <div class="row g-3 mb-3">
                         <div class="col-md-6 col-lg-3">
+                            <label for="cCode" class="form-label small fw-bold text-muted">
+                                <i class="fa-solid fa-code me-1"></i>Business Code
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="fa-solid fa-search text-muted"></i>
+                                </span>
+                                <input type="text"
+                                       class="form-control border-start-0 ps-0"
+                                       name="cCode"
+                                       id="cCode"
+                                       placeholder="Search Business Code..."
+                                       value="{{ filters.cCode }}"
+                                       autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-lg-3">
                             <label for="dlCode" class="form-label small fw-bold text-muted">
                                 <i class="fa-solid fa-hashtag me-1"></i>DL Code
                             </label>
@@ -104,23 +79,6 @@
                                        id="dlCode"
                                        placeholder="Search DL Code..."
                                        value="{{ filters.dlCode }}"
-                                       autocomplete="off">
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-lg-3">
-                            <label for="cCode" class="form-label small fw-bold text-muted">
-                                <i class="fa-solid fa-code me-1"></i>Client Code
-                            </label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light border-end-0">
-                                    <i class="fa-solid fa-search text-muted"></i>
-                                </span>
-                                <input type="text"
-                                       class="form-control border-start-0 ps-0"
-                                       name="cCode"
-                                       id="cCode"
-                                       placeholder="Search Business Code..."
-                                       value="{{ filters.cCode }}"
                                        autocomplete="off">
                             </div>
                         </div>
@@ -316,18 +274,16 @@
                         {% elif order.order_status == 'cancelled' %}<span class="st st-err">Cancel</span>
                         {% else %}<span class="st">{{ order.order_status|truncatechars:8 }}</span>{% endif %}
                         {% if order.verification_status == 'verified' %}<span class="st st-ok-o">V</span>{% endif %}
-                        {% with task=order.delivery_task.first %}
+                        {% with task=order.delivery_task.all.0 %}
                             {% if task and task.dl_task_status_dms %}
                             <span class="st st-dms">{{ task.get_dl_task_status_dms_display|truncatechars:8 }}</span>
                             {% endif %}
                         {% endwith %}
                     </div>
                     <div class="orc-actions">
-                        <a href="{% url 'workforce:order_detail' order.id %}" class="orc-btn" title="View"
-                           hx-get="{% url 'workforce:order_detail' order.id %}"
-                           hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                        <button type="button" class="orc-btn" title="View" onclick="openOrderDetailPanel({{ order.id }})">
                             <i class="fa-solid fa-eye"></i>
-                        </a>
+                        </button>
                         <a href="{% url 'workforce:order_detail' order.id %}#edit" class="orc-btn orc-btn-edit" title="Edit">
                             <i class="fa-solid fa-pen"></i>
                         </a>
@@ -382,6 +338,23 @@
                 {% endif %}
             </div>
         {% endif %}
+    </div>
+
+    <!-- Order Detail Slide Panel -->
+    <div id="orderDetailPanel" class="order-detail-panel">
+        <div class="order-detail-panel-overlay" onclick="closeOrderDetailPanel()"></div>
+        <div class="order-detail-panel-content">
+            <div class="order-detail-panel-header">
+                <h5><i class="fa-solid fa-file-invoice me-2"></i>Order Details</h5>
+                <button type="button" class="btn-close" onclick="closeOrderDetailPanel()" aria-label="Close"></button>
+            </div>
+            <div class="order-detail-panel-body" id="orderDetailContent">
+                <div class="text-center py-5">
+                    <i class="fa-solid fa-spinner fa-spin fa-3x text-muted"></i>
+                    <p class="mt-3 text-muted">Loading order details...</p>
+                </div>
+            </div>
+        </div>
     </div>
 {% endblock content %}
 {% block extra_js %}
@@ -736,6 +709,38 @@
         modalElementList.forEach(function(modalEl) {
             new bootstrap.Modal(modalEl);
         });
+    });
+
+    // Order Detail Panel Functions
+    function openOrderDetailPanel(orderId) {
+        const panel = document.getElementById('orderDetailPanel');
+        const content = document.getElementById('orderDetailContent');
+
+        // Show panel with animation
+        panel.classList.add('active');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+
+        // Load order details via HTMX
+        htmx.ajax('GET', '/workforce/orders/' + orderId + '/', {
+            target: '#orderDetailContent',
+            swap: 'innerHTML'
+        });
+    }
+
+    function closeOrderDetailPanel() {
+        const panel = document.getElementById('orderDetailPanel');
+        panel.classList.remove('active');
+        document.body.style.overflow = ''; // Restore scrolling
+    }
+
+    // Close panel with Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const panel = document.getElementById('orderDetailPanel');
+            if (panel.classList.contains('active')) {
+                closeOrderDetailPanel();
+            }
+        }
     });
     </script>
 {% endblock extra_js %}

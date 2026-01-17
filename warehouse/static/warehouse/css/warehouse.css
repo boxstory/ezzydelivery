@@ -1,0 +1,329 @@
+/* ===============================
+   WAREHOUSE APP STYLES
+   Full Width Layout Fix
+   =============================== */
+
+/* CRITICAL: Fix flexbox layout to use full available width */
+/* The sidebar takes col-md-3 (25%) or col-lg-2 (16.67%), main-content should fill the rest */
+
+/* Fix the flex container that wraps sidebar + main-content */
+main .col-12.d-flex {
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+/* Main content area - use flex-grow to fill remaining space */
+#main-content {
+    flex: 1 !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+}
+
+/* Override Bootstrap col classes that might be limiting width */
+#main-content[class*="col-"] {
+    flex: 1 !important;
+    max-width: none !important;
+}
+
+/* Container fluid should use full width of its parent */
+#main-content .container-fluid {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+/* All cards should fill their containers */
+#main-content .card {
+    display: flex !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    flex-direction: column !important;
+}
+
+/* Rows should span full width without breaking layout */
+#main-content .container-fluid > .row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+}
+
+/* Columns inside rows should take full width and no padding */
+#main-content .container-fluid > .row > .col-12 {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    flex: 0 0 100% !important;
+}
+
+/* Ensure card-body respects full width */
+#main-content .card-body {
+    width: 100% !important;
+}
+
+/* Form rows inside cards can keep their gutter */
+#main-content .card-body .row {
+    margin-left: calc(var(--bs-gutter-x) * -0.5) !important;
+    margin-right: calc(var(--bs-gutter-x) * -0.5) !important;
+}
+
+/* Tables and responsive wrappers */
+#main-content .table-responsive {
+    width: 100% !important;
+    overflow-x: auto;
+}
+
+#main-content table {
+    width: 100%;
+    min-width: 100%;
+}
+
+/* ===============================
+   WAREHOUSE SPECIFIC COMPONENTS
+   =============================== */
+
+/* Summary Stats Cards */
+.warehouse-stats-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.warehouse-stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Inventory Table Enhancements */
+.inventory-table {
+    font-size: 0.9rem;
+}
+
+.inventory-table thead th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+
+.inventory-table tbody tr:hover {
+    background-color: rgba(255, 211, 59, 0.05);
+}
+
+/* Product Image Styling */
+.product-image {
+    border: 1px solid #dee2e6;
+    transition: transform 0.2s ease;
+}
+
+.product-image:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+}
+
+/* Transaction Type Badges */
+.transaction-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.375rem 0.75rem;
+}
+
+/* Low Stock Warning */
+.low-stock-warning {
+    animation: pulse-warning 2s ease-in-out infinite;
+}
+
+@keyframes pulse-warning {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Filter Cards */
+.filter-card {
+    border-radius: 0.5rem;
+}
+
+.filter-card .form-label {
+    margin-bottom: 0.375rem;
+}
+
+/* Breadcrumb Styling */
+.breadcrumb {
+    background-color: transparent;
+    padding: 0;
+    margin-bottom: 0.5rem;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    content: "›";
+    color: #6c757d;
+}
+
+/* Stock Level Indicators */
+.stock-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
+
+.stock-indicator.in-stock {
+    background-color: #28a745;
+}
+
+.stock-indicator.low-stock {
+    background-color: #ffc107;
+}
+
+.stock-indicator.out-of-stock {
+    background-color: #dc3545;
+}
+
+/* Responsive Table Wrapper */
+.table-responsive {
+    border-radius: 0.5rem;
+}
+
+/* User Avatar in Tables */
+.user-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.user-avatar:hover {
+    transform: scale(1.1);
+}
+
+/* Action Buttons */
+.btn-action {
+    transition: all 0.2s ease;
+}
+
+.btn-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+}
+
+/* Empty State Styling */
+.empty-state {
+    padding: 3rem 1rem;
+}
+
+.empty-state i {
+    opacity: 0.5;
+    margin-bottom: 1rem;
+}
+
+/* Pagination Footer */
+.card-footer {
+    background-color: #f8f9fa;
+}
+
+/* Large Screen Layout - Ensure full width usage */
+@media (min-width: 992px) {
+    #main-content {
+        flex: 1 1 auto !important;
+        width: 100% !important;
+    }
+
+    #main-content .container-fluid {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    #main-content .card {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    #main-content .container-fluid > .row {
+        width: 100% !important;
+    }
+
+    #main-content .container-fluid > .row > .col-12 {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+/* Mobile Responsive */
+@media (max-width: 767.98px) {
+    #main-content .container-fluid {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
+    .inventory-table {
+        font-size: 0.8rem;
+    }
+
+    .inventory-table thead th {
+        font-size: 0.7rem;
+    }
+}
+
+/* HTMX Loading States - Prevent Layout Shift */
+/* Hide content during HTMX swap to prevent flash */
+#main-content.htmx-swapping {
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.1s ease-in-out;
+}
+
+/* Smooth transition when content loads */
+#main-content.htmx-settling {
+    opacity: 1;
+    transition: opacity 0.15s ease-in-out;
+}
+
+/* Loading indicator for HTMX requests */
+.htmx-request #main-content {
+    position: relative;
+}
+
+.htmx-request #main-content::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.7);
+    z-index: 999;
+    pointer-events: none;
+}
+
+/* Prevent layout shift during HTMX operations */
+#main-content {
+    min-height: 400px;
+}
+
+/* Smooth height transition for dynamic content */
+#main-content > .container-fluid {
+    transition: height 0.2s ease-in-out;
+}
+
+/* Print Styles */
+@media print {
+    .filter-card,
+    .btn-action,
+    .breadcrumb {
+        display: none !important;
+    }
+
+    #main-content {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}

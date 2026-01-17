@@ -7,7 +7,7 @@
 <!-- extra css -->
 {% load crispy_forms_tags %}
 {% block content %}
-  <section class="container pt-4 col-10" id="product_add_section">
+  <section class="container-fluid pt-4 px-4" id="product_add_section">
     <div class="row">
       <div class="col-md-12 pb-3 d-flex justify-content-between" id="product_add_header">
         <h2 id="product_add_title">Add Product</h2>
@@ -16,9 +16,9 @@
         </a>
       </div>
     </div>
-    <div class=" container" id="product_add_form_container">
-      <div class="col-md-10 container d-flex justify-content-center" id="product_add_form_wrapper">
-        <form method="POST" id="product_add_form_main">
+    <div class="container-fluid" id="product_add_form_container">
+      <div class="col-12 col-xl-10 mx-auto" id="product_add_form_wrapper">
+        <form method="POST" enctype="multipart/form-data" id="product_add_form_main">
           {% csrf_token %}
           {{ form | crispy }}
           <div class="submit my-3 text-center" id="product_add_submit_wrapper">
@@ -32,8 +32,54 @@
 {% block extra_js %}
   <!-- extra js -->
   <script>
-        $("#id_color").select2();
-        $("#id_unit").select2();
-        $("#id_product_category").select2();
+        $(document).ready(function() {
+            // Debug: Check if elements exist
+            console.log('Color field:', $('#id_color').length);
+            console.log('Unit field:', $('#id_unit').length);
+            console.log('Category field:', $('#id_product_category').length);
+
+            // Initialize Select2
+            $("#id_color").select2({
+                placeholder: "Select a color",
+                allowClear: true
+            });
+            $("#id_unit").select2({
+                placeholder: "Select a unit",
+                allowClear: true
+            });
+            $("#id_product_category").select2({
+                placeholder: "Select a category",
+                allowClear: true,
+                width: '100%',
+                dropdownAutoWidth: true
+            });
+
+            // Debug: Check options count
+            console.log('Category options count:', $('#id_product_category option').length);
+        });
   </script>
+  <style>
+    /* Make select2 dropdowns wider and show more options */
+    .select2-container {
+        width: 100% !important;
+    }
+    .select2-dropdown {
+        min-width: 300px;
+    }
+    .select2-results {
+        max-height: 400px !important;
+    }
+    /* Style the form fields */
+    #product_add_form_main .form-control,
+    #product_add_form_main .select2-selection {
+        min-height: 45px;
+        font-size: 1rem;
+    }
+    /* Make form wider on larger screens */
+    @media (min-width: 1200px) {
+        #product_add_form_wrapper {
+            max-width: 900px;
+        }
+    }
+  </style>
 {% endblock extra_js %}

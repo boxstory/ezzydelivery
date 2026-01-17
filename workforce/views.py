@@ -114,11 +114,45 @@ from core.utils import (
 # =============================================================================
 
 
+def get_per_page(request, default=10):
+    """
+    Get the validated per_page value from request.
+    Valid per_page values: 10, 25, 50, 100 (defaults to provided default if invalid)
+    Returns the per_page value as a string for template use.
+    """
+    per_page = request.GET.get('per_page')
+    if per_page:
+        try:
+            per_page = int(per_page)
+            if per_page not in [10, 25, 50, 100]:
+                per_page = default
+        except (ValueError, TypeError):
+            per_page = default
+    else:
+        per_page = default
+    return str(per_page)
+
+
 def paginate_queryset(request, queryset, items_per_page=10):
     """
     A helper function to handle pagination for a given queryset.
+    Reads 'per_page' from request.GET to allow users to change page size.
+    Valid per_page values: 10, 25, 50, 100 (defaults to items_per_page if invalid)
     """
-    paginator = Paginator(queryset, items_per_page)
+    # Read per_page from request, with validation
+    per_page = request.GET.get('per_page')
+    if per_page:
+        try:
+            per_page = int(per_page)
+            # Only allow valid page sizes to prevent abuse
+            if per_page not in [10, 25, 50, 100]:
+                per_page = items_per_page
+        except (ValueError, TypeError):
+            per_page = items_per_page
+    else:
+        per_page = items_per_page
+
+    paginator = Paginator(queryset, per_page)
     page_number = request.GET.get('page', 1)
     try:
         page_obj = paginator.page(page_number)
@@ -235,7 +269,7 @@ def all_orders(request):
 
     # Start with all orders, prefetch related data to avoid N+1 queries
     orders = orders_models.Order.objects.select_related(
-        'business'
+        'business', 'pickup_location'
     ).prefetch_related('order_comments', 'delivery_task')
 
     # Apply filters based on GET parameters
@@ -507,7 +541,7 @@ def orders_to_publish(request):
 @login_required(login_url='/accounts/login/')
 def orders_published(request):
     orders = orders_models.Order.objects.select_related(
-        'business'
+        'business', 'pickup_location'
     ).prefetch_related('order_comments', 'delivery_task').filter(task_created=True).order_by('-created_at')
     orders = paginate_queryset(request, orders)
 
@@ -1261,7 +1295,11 @@ def order_detail(request, order_id):
         'delivery_task': delivery_task,
     }
 
-    return render(request, 'workforce/order_detail.html', context)
+    # Check if this is being loaded in a panel (via HTMX)
+    is_htmx = request.headers.get('HX-Request') == 'true'
+    template = 'workforce/order_detail_panel.html' if is_htmx else 'workforce/order_detail.html'
+
+    return render(request, template, context)
 
 
 @require_http_methods(["POST"])
@@ -1932,26 +1970,24 @@ def fleet_cod_in_hand(request):
         date_to = today.isoformat()
     # For 'custom', use the date_from and date_to from request
 
-    # Build the COD collected subquery based on date filters
-    cod_task_filter = {
-        'cod_collected': True,
-        'driver__isnull': False,
-    }
-    if date_from:
-        cod_task_filter['cod_collected_at__date__gte'] = date_from
-    if date_to:
-        cod_task_filter['cod_collected_at__date__lte'] = date_to
-
     # If date filter is applied, calculate COD collected in that period per driver
     if date_from or date_to:
         # Get drivers with COD collected in the date range
         from django.db.models import OuterRef, Subquery
 
-        # Subquery for COD collected in date range
+        # Build subquery with date filter - use created_at__date for filtering
         cod_subquery = delivery_models.DeliveryTask.objects.filter(
-            driver=OuterRef('pk'),
-            **cod_task_filter
-        ).values('driver').annotate(
+            driver_id=OuterRef('driver_id'),
+            cod_collected=True,
+        )
+
+        # Apply date filters on created_at date
+        if date_from:
+            cod_subquery = cod_subquery.filter(created_at__date__gte=date_from)
+        if date_to:
+            cod_subquery = cod_subquery.filter(created_at__date__lte=date_to)
+
+        cod_subquery = cod_subquery.values('driver').annotate(
             total=Sum('cod_collected_amount')
         ).values('total')
 
@@ -1966,26 +2002,31 @@ def fleet_cod_in_hand(request):
         )
     else:
         # No date filter - show current cod_in_hand
+        from django.db.models import F
         drivers = fleet_models.Driver.objects.filter(
             driver_status='Approved'
         ).select_related('user').annotate(
-            period_cod=models.F('cod_in_hand')
+            period_cod=F('cod_in_hand')
         )
 
-    # COD filter (yes/no/custom)
+    # COD filter (yes/no/custom) - filters on actual cod_in_hand field
     cod_filter = request.GET.get('cod_filter', '')
     min_amount = request.GET.get('min_amount', '')
     max_amount = request.GET.get('max_amount', '')
 
     if cod_filter == 'yes':
-        drivers = drivers.filter(period_cod__gt=0)
+        # Filter drivers who currently have COD in hand
+        drivers = drivers.filter(cod_in_hand__gt=0)
     elif cod_filter == 'no':
-        drivers = drivers.filter(period_cod=0)
+        # Filter drivers with no COD in hand
+        from django.db.models import Q
+        drivers = drivers.filter(Q(cod_in_hand=0) | Q(cod_in_hand__isnull=True))
     elif cod_filter == 'custom':
+        # Filter by custom amount range on cod_in_hand
         if min_amount:
-            drivers = drivers.filter(period_cod__gte=min_amount)
+            drivers = drivers.filter(cod_in_hand__gte=min_amount)
         if max_amount:
-            drivers = drivers.filter(period_cod__lte=max_amount)
+            drivers = drivers.filter(cod_in_hand__lte=max_amount)
 
     # Sorting
     sort_by = request.GET.get('sort', 'name_asc')
@@ -2006,10 +2047,12 @@ def fleet_cod_in_hand(request):
     # View mode (grid or list) - default to list
     view_mode = request.GET.get('view', 'list')
 
-    # Build filter params for pagination
+    # Build filter params for pagination (exclude page and per_page as they're handled separately)
     filter_params = request.GET.copy()
     if 'page' in filter_params:
         del filter_params['page']
+    if 'per_page' in filter_params:
+        del filter_params['per_page']
 
     drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=20)
 
@@ -2019,6 +2062,7 @@ def fleet_cod_in_hand(request):
         'total_cod': total_cod,
         'pending_settlements': pending_settlements,
         'filter_params': filter_params.urlencode(),
+        'per_page': get_per_page(request, default=20),
         'date_preset': date_preset,
         'date_from': date_from or '',
         'date_to': date_to or '',
@@ -2053,6 +2097,7 @@ def fleet_transactions(request):
     """View for fleet transactions with filtering and sorting"""
     from django.db.models import Sum
     from decimal import Decimal
+    from datetime import timedelta
 
     # Get all approved drivers for filter dropdown
     all_drivers = fleet_models.Driver.objects.filter(
@@ -2073,14 +2118,37 @@ def fleet_transactions(request):
         except fleet_models.Driver.DoesNotExist:
             selected_driver = None
 
-    # Apply filters
-    date_from = request.GET.get('date_from')
-    date_to = request.GET.get('date_to')
+    # Date preset filter
+    date_preset = request.GET.get('date_preset', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    today = timezone.now().date()
+
+    # Calculate dates based on preset
+    if date_preset == 'today':
+        date_from = today.isoformat()
+        date_to = today.isoformat()
+    elif date_preset == 'yesterday':
+        yesterday = today - timedelta(days=1)
+        date_from = yesterday.isoformat()
+        date_to = yesterday.isoformat()
+    elif date_preset == '3days':
+        date_from = (today - timedelta(days=3)).isoformat()
+        date_to = today.isoformat()
+    elif date_preset == '1week':
+        date_from = (today - timedelta(days=7)).isoformat()
+        date_to = today.isoformat()
+    elif date_preset == '1month':
+        date_from = (today - timedelta(days=30)).isoformat()
+        date_to = today.isoformat()
+    # For 'custom', use the date_from and date_to from request
+
     # Default to cod_collection if no type filter specified
     txn_type = request.GET.get('type', 'cod_collection') if 'type' not in request.GET else request.GET.get('type')
-    status = request.GET.get('status')
-    min_amount = request.GET.get('min_amount')
-    max_amount = request.GET.get('max_amount')
+    status = request.GET.get('status', '')
+    min_amount = request.GET.get('min_amount', '')
+    max_amount = request.GET.get('max_amount', '')
 
     if selected_driver:
         if date_from:
@@ -2119,6 +2187,7 @@ def fleet_transactions(request):
     total_earnings = Decimal('0.00')
     cod_unsettled = Decimal('0.00')
     earnings_unsettled = Decimal('0.00')
+    deposited_refs = set()
 
     if selected_driver:
         # Get all transactions for totals (not filtered)
@@ -2141,10 +2210,12 @@ def fleet_transactions(request):
                 if not txn.settlement_id:
                     earnings_unsettled += txn.amount
 
-    # Build filter params for pagination
+    # Build filter params for pagination (exclude page and per_page as they're handled separately)
     filter_params = request.GET.copy()
     if 'page' in filter_params:
         del filter_params['page']
+    if 'per_page' in filter_params:
+        del filter_params['per_page']
 
     transactions_paginated = paginate_queryset(request, transactions, items_per_page=20)
 
@@ -2157,8 +2228,11 @@ def fleet_transactions(request):
         'total_earnings': total_earnings,
         'cod_unsettled': cod_unsettled,
         'earnings_unsettled': earnings_unsettled,
+        'deposited_refs': deposited_refs,
         'filter_params': filter_params.urlencode(),
+        'per_page': get_per_page(request, default=20),
         # Filter values for form
+        'date_preset': date_preset,
         'date_from': date_from or '',
         'date_to': date_to or '',
         'txn_type': txn_type or '',
@@ -2869,12 +2943,16 @@ def dms_sync_monitor(request):
     """View for monitoring DMS sync status"""
     try:
         # Get recently synced tasks
-        recently_synced = delivery_models.DeliveryTask.objects.filter(
+        recently_synced = delivery_models.DeliveryTask.objects.select_related(
+            'order', 'driver', 'driver__user'
+        ).filter(
             dl_task_number_dms__isnull=False
         ).order_by('-updated_at')[:50]
 
         # Get failed sync attempts
-        failed_sync = delivery_models.DeliveryTask.objects.filter(
+        failed_sync = delivery_models.DeliveryTask.objects.select_related(
+            'order', 'driver', 'driver__user'
+        ).filter(
             dl_task_number_dms__isnull=True,
             dl_task_status__in=['in_transit', 'pending', 'address_pending']
         ).order_by('-created_at')[:50]
@@ -4022,5 +4100,219 @@ def fulfilled_orders_list(request):
     }
 
     return render(request, 'workforce/fulfilled_orders_list.html', context)
+
+
+# ==========================================
+# DELIVERY TASK BULK ACTIONS
+# ==========================================
+
+@login_required(login_url='/accounts/login/')
+def delivery_task_edit(request, task_id):
+    """Edit delivery task details"""
+    task = get_object_or_404(
+        delivery_models.DeliveryTask.objects.select_related(
+            'order', 'order__business', 'driver', 'business', 'pickup_location'
+        ),
+        id=task_id
+    )
+
+    if request.method == 'POST':
+        # Handle form submission
+        driver_id = request.POST.get('driver')
+        status = request.POST.get('status')
+        notes = request.POST.get('notes', '')
+
+        if driver_id:
+            task.driver_id = driver_id
+        if status:
+            task.dl_task_status_client = status
+        task.notes = notes
+        task.save()
+
+        messages.success(request, f'Task #{task.dl_task_number} updated successfully.')
+        return redirect('workforce:delivery_task_detail', task_id=task_id)
+
+    # Get available drivers for dropdown
+    drivers = fleet_models.Driver.objects.filter(driver_status='active').order_by('driver_first_name')
+
+    context = {
+        'page_title': f'Edit Task #{task.dl_task_number}',
+        'task': task,
+        'drivers': drivers,
+    }
+
+    return render(request, 'workforce/parts/delivery_task_edit.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+def bulk_print_tasks(request):
+    """Generate printable view for selected tasks"""
+    task_ids = request.GET.get('ids', '').split(',')
+    task_ids = [int(id) for id in task_ids if id.isdigit()]
+
+    tasks = delivery_models.DeliveryTask.objects.filter(
+        id__in=task_ids
+    ).select_related('order', 'driver', 'business', 'pickup_location')
+
+    context = {
+        'page_title': 'Print Tasks',
+        'tasks': tasks,
+        'print_mode': True,
+    }
+
+    return render(request, 'workforce/parts/bulk_print_tasks.html', context)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+def bulk_publish_dms(request):
+    """Bulk publish tasks to DMS"""
+    try:
+        data = json.loads(request.body)
+        task_ids = data.get('task_ids', [])
+
+        if not task_ids:
+            return JsonResponse({
+                'success': False,
+                'error': 'No tasks selected'
+            }, status=400)
+
+        # Update all selected tasks
+        updated = delivery_models.DeliveryTask.objects.filter(
+            id__in=task_ids
+        ).update(
+            dl_task_status='publish_to_dms',
+            dl_task_publish=True
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': f'{updated} task(s) published to DMS',
+            'updated_count': updated
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+def bulk_publish_app(request):
+    """Bulk publish tasks to Driver App"""
+    try:
+        data = json.loads(request.body)
+        task_ids = data.get('task_ids', [])
+
+        if not task_ids:
+            return JsonResponse({
+                'success': False,
+                'error': 'No tasks selected'
+            }, status=400)
+
+        # Update all selected tasks to be available in driver app
+        updated = delivery_models.DeliveryTask.objects.filter(
+            id__in=task_ids
+        ).update(dl_task_status_dms='6')  # Unassigned - available for drivers
+
+        return JsonResponse({
+            'success': True,
+            'message': f'{updated} task(s) published to Driver App',
+            'updated_count': updated
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+def bulk_update_status(request):
+    """Bulk update task status"""
+    try:
+        data = json.loads(request.body)
+        task_ids = data.get('task_ids', [])
+        status = data.get('status')
+
+        if not task_ids:
+            return JsonResponse({
+                'success': False,
+                'error': 'No tasks selected'
+            }, status=400)
+
+        if not status:
+            return JsonResponse({
+                'success': False,
+                'error': 'Status is required'
+            }, status=400)
+
+        # Map simple status names to actual values
+        status_mapping = {
+            'pending': 'for_review',
+            'in_transit': '1',
+            'delivered': '2',
+            'rejected': '3',
+            'cancelled': '9',
+        }
+
+        actual_status = status_mapping.get(status, status)
+
+        # Update all selected tasks
+        updated = delivery_models.DeliveryTask.objects.filter(
+            id__in=task_ids
+        ).update(dl_task_status_client=actual_status)
+
+        return JsonResponse({
+            'success': True,
+            'message': f'{updated} task(s) updated to {status}',
+            'updated_count': updated
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@login_required(login_url='/accounts/login/')
+def bulk_export_tasks(request):
+    """Export selected tasks to CSV"""
+    task_ids = request.GET.get('ids', '').split(',')
+    task_ids = [int(id) for id in task_ids if id.isdigit()]
+
+    tasks = delivery_models.DeliveryTask.objects.filter(
+        id__in=task_ids
+    ).select_related('order', 'driver', 'business', 'pickup_location')
+
+    # Create CSV response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="delivery_tasks_export.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'Task Number', 'Date', 'Customer Name', 'Customer Phone',
+        'Delivery Address', 'Driver', 'Client Status', 'DMS Status',
+        'Pickup Location', 'COD Amount', 'Notes'
+    ])
+
+    for task in tasks:
+        writer.writerow([
+            task.dl_task_number,
+            task.dl_task_date,
+            task.order.customer_name if task.order else '',
+            task.order.customer_phone if task.order else '',
+            task.order.customer_address if task.order else '',
+            str(task.driver) if task.driver else '',
+            task.get_dl_task_status_client_display() if hasattr(task, 'get_dl_task_status_client_display') else task.dl_task_status_client,
+            task.get_dl_task_status_dms_display() if hasattr(task, 'get_dl_task_status_dms_display') else task.dl_task_status_dms,
+            task.pickup_location.pickup_location_address if task.pickup_location else '',
+            task.order.cod_amount if task.order else '',
+            task.notes if hasattr(task, 'notes') else '',
+        ])
+
+    return response
 
 

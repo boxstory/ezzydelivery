@@ -6,19 +6,72 @@ from warehouse import models as warehouse_models
 
 @admin.register(warehouse_models.Warehouse)
 class WarehouseAdmin(admin.ModelAdmin):
-    list_display = ('code', 'name', 'business', 'is_active', 'created_at')
-    list_filter = ('is_active', 'business', 'created_at')
-    search_fields = ('code', 'name', 'business__business_name')
+    list_display = ('code', 'name', 'city', 'is_active', 'is_default', 'manager', 'created_at')
+    list_filter = ('is_active', 'is_default', 'city', 'created_at')
+    search_fields = ('code', 'name', 'address', 'city')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
-        ('Warehouse Info', {
-            'fields': ('business', 'name', 'code', 'address')
+        ('Fulfillment Center Info', {
+            'fields': ('name', 'code', 'description', 'is_active', 'is_default')
         }),
-        ('Settings', {
-            'fields': ('pickup_location', 'is_active')
+        ('Location Details', {
+            'fields': ('address', 'city', 'state', 'postal_code', 'country', 'latitude', 'longitude')
+        }),
+        ('Contact Information', {
+            'fields': ('phone', 'email')
+        }),
+        ('Management', {
+            'fields': ('manager', 'created_by')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(warehouse_models.WarehouseLocation)
+class WarehouseLocationAdmin(admin.ModelAdmin):
+    list_display = ('full_code', 'name', 'warehouse', 'zone_number', 'is_active', 'is_default')
+    list_filter = ('warehouse', 'is_active', 'is_default', 'zone_number')
+    search_fields = ('name', 'code', 'warehouse__name', 'warehouse__code', 'address')
+    readonly_fields = ('created_at', 'updated_at', 'full_code')
+    fieldsets = (
+        ('Location Info', {
+            'fields': ('warehouse', 'name', 'code', 'full_code', 'is_active', 'is_default')
+        }),
+        ('Address & Zone', {
+            'fields': ('address', 'zone_number', 'latitude', 'longitude')
+        }),
+        ('Operations', {
+            'fields': ('operating_hours', 'notes')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(warehouse_models.SellerWarehouseLink)
+class SellerWarehouseLinkAdmin(admin.ModelAdmin):
+    list_display = ('business', 'warehouse', 'default_location', 'is_default', 'is_active', 'priority', 'linked_at')
+    list_filter = ('is_default', 'is_active', 'warehouse', 'linked_at')
+    search_fields = ('business__business_name', 'warehouse__name', 'warehouse__code')
+    readonly_fields = ('linked_at', 'updated_at')
+    raw_id_fields = ('business', 'warehouse', 'default_location', 'linked_by')
+    fieldsets = (
+        ('Link Details', {
+            'fields': ('business', 'warehouse', 'default_location', 'is_active')
+        }),
+        ('Priority & Defaults', {
+            'fields': ('is_default', 'priority')
+        }),
+        ('Notes', {
+            'fields': ('notes',)
+        }),
+        ('Management', {
+            'fields': ('linked_by', 'linked_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )

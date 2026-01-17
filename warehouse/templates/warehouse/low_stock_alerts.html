@@ -3,6 +3,10 @@
 
 {% block title %}Low Stock Alerts{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row mb-4">
@@ -95,6 +99,87 @@
 
                 <!-- Pagination -->
                 {% include "includes/components/_pagination.html" with page_obj=alerts filter_params=filter_params %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Tips & Workflow Help -->
+    <div class="row mt-4">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-info bg-opacity-10 border-0 py-3">
+                    <h6 class="mb-0 fw-semibold text-info">
+                        <i class="fas fa-lightbulb me-2"></i>Quick Tips
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0 small">
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Alert Trigger:</strong> Alerts appear when "On Hand" quantity reaches or goes below the reorder point</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Quick Restock:</strong> Click the "+" button to quickly receive stock for that product</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Acknowledge Alerts:</strong> Mark alerts as acknowledged to track which ones you've already addressed</span>
+                        </li>
+                        <li class="d-flex align-items-start">
+                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                            <span><strong>Set Reorder Points:</strong> Configure reorder points on product pages to control when alerts trigger</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary bg-opacity-10 border-0 py-3">
+                    <h6 class="mb-0 fw-semibold text-primary">
+                        <i class="fas fa-route me-2"></i>Alert Response Workflow
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-warning rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">!</span>
+                            <div>
+                                <strong class="d-block">Alert Triggered</strong>
+                                <small class="text-muted">Stock falls below reorder point → Alert appears here</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">1</span>
+                            <div>
+                                <strong class="d-block">Review Alert</strong>
+                                <small class="text-muted">Check current stock level and estimated stockout date</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step mb-3">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">2</span>
+                            <div>
+                                <strong class="d-block">Order Restock</strong>
+                                <small class="text-muted">Contact supplier or transfer from another warehouse</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-success rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-check fa-xs"></i></span>
+                            <div>
+                                <strong class="d-block">Receive & Acknowledge</strong>
+                                <small class="text-muted">Receive stock → Alert auto-clears when above reorder point</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

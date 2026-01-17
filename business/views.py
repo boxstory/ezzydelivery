@@ -62,6 +62,7 @@ import logging
 from django import forms
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from decouple import config
@@ -71,8 +72,11 @@ import requests, json
 import shopify
 from woocommerce import API as WooAPI
 
+from django.db.models import Sum, Q
+
 from business import models as business_models
 from core import models as core_models
+from delivery import models as delivery_models
 from ezzydelivery.settings import BASE_DIR
 from orders import models as orders_models
 from ezzy_api import models as ezzy_api_models
@@ -80,6 +84,7 @@ from ezzy_api import models as ezzy_api_models
 from business import forms as business_forms
 from datetime import datetime
 from core.seo import SEOMetadata
+from core.context_processors import get_cached_profile, get_cached_business
 
 # Local aliases for commonly used models
 Business = business_models.Business
@@ -103,14 +108,12 @@ logger = logging.getLogger('business')
 @login_required(login_url='account_login')
 def business_dashboard(request):
     try:
-        # IDOR FIX: Verify user has associated business
-        user_business = request.user.user_business.first()
-        if not user_business:
+        # IDOR FIX: Verify user has associated business (using cached helper)
+        business = get_cached_business(request)
+        if not business:
             logger.warning(f"User {request.user.id} has no associated business")
             messages.error(request, "No business associated with your account")
             return redirect('core:main_dashboard')
-
-        business = business_models.Business.objects.get(business_id=user_business.business_id)
         logger.info(f"User {request.user.id} accessed dashboard for business {business.business_id}")
 
         profile = core_models.Profile.objects.get(user_id=business.user_id)
@@ -124,12 +127,89 @@ def business_dashboard(request):
             business=business.business_id
         ).select_related('business', 'pickup_location', 'address_verified_by', 'verified_by').order_by('-id')[:10]
 
+        # Calculate real statistics
+        all_orders = orders_models.Order.objects.filter(business=business.business_id)
+
+        # Total orders count
+        total_orders = all_orders.count()
+
+        # Get delivery tasks for this business
+        delivery_tasks = delivery_models.DeliveryTask.objects.filter(business=business.business_id)
+
+        # Delivered orders (status '2' = Delivered)
+        delivered_count = delivery_tasks.filter(dl_task_status_client='2').count()
+
+        # COD calculations
+        cod_amount_total = all_orders.aggregate(total=Sum('cod_amount'))['total'] or 0
+
+        # COD collected (from delivered orders)
+        cod_collected = all_orders.filter(
+            task_status='delivered'
+        ).aggregate(total=Sum('cod_amount'))['total'] or 0
+
+        # Alternative: check delivery task status
+        delivered_order_ids = delivery_tasks.filter(
+            dl_task_status_client='2'
+        ).values_list('order_id', flat=True)
+        cod_collected = all_orders.filter(
+            id__in=delivered_order_ids
+        ).aggregate(total=Sum('cod_amount'))['total'] or 0
+
+        # To be reconfirmed (customer confirmation pending or address needs update)
+        reconfirm_count = all_orders.filter(
+            Q(order_status='customer_confirmation_pending') |
+            Q(verification_status='address_needs_update')
+        ).count()
+
+        # Follow up required (rejected orders or orders needing attention)
+        followup_count = delivery_tasks.filter(
+            Q(dl_task_status_client='rejected') |
+            Q(dl_task_status_client='customer_confiration_pending')
+        ).count()
+
+        # Today's orders
+        from datetime import date
+        today = date.today()
+
+        # Today's pending orders (latest 5)
+        todays_pending_orders = all_orders.filter(
+            order_date=today
+        ).exclude(
+            task_status='delivered'
+        ).exclude(
+            order_status='cancelled'
+        ).select_related('pickup_location').order_by('-id')[:5]
+
+        # Today's delivered orders (latest 5)
+        todays_delivered_orders = all_orders.filter(
+            order_date=today,
+            task_status='delivered'
+        ).select_related('pickup_location').order_by('-id')[:5]
+
+        # Failed/Follow up orders (latest 5) - rejected or need follow up
+        followup_orders = all_orders.filter(
+            Q(task_status='rejected') |
+            Q(task_status='failed') |
+            Q(order_status='customer_confirmation_pending')
+        ).select_related('pickup_location').order_by('-id')[:5]
+
         context = {
             'profile': profile,
             'business': business,
             'business_profile': business_profile,
             'location': location,
             'orders': orders,
+            # Stats
+            'total_orders': total_orders,
+            'delivered_count': delivered_count,
+            'cod_amount_total': cod_amount_total,
+            'cod_collected': cod_collected,
+            'reconfirm_count': reconfirm_count,
+            'followup_count': followup_count,
+            # Today's orders lists
+            'todays_pending_orders': todays_pending_orders,
+            'todays_delivered_orders': todays_delivered_orders,
+            'followup_orders': followup_orders,
         }
         return render(request, 'business/business_dashboard.html', context)
     except business_models.Business.DoesNotExist:
@@ -146,23 +226,23 @@ def business_dashboard(request):
 
 @login_required(login_url='account_login')
 def driver_directory(request):
-    try:
-        # IDOR FIX: Get user's business with proper verification
-        business = business_models.Business.objects.get(user_id=request.user.id)
-        driver_directory = business_models.DriverDirectory.objects.filter(
-            business_id=business.business_id).all()
-
-        logger.info(f"User {request.user.id} accessed driver directory for business {business.business_id}")
-
-        context = {
-            'contacts': driver_directory,
-            'business': business,
-        }
-        return render(request, 'business/parts/driver_directory.html', context)
-    except business_models.Business.DoesNotExist:
+    # IDOR FIX: Get user's business with proper verification (use cached)
+    business = get_cached_business(request)
+    if not business:
         logger.warning(f"Business not found for user {request.user.id}")
         messages.error(request, "Business not found")
         return redirect('business:business_dashboard')
+
+    driver_directory = business_models.DriverDirectory.objects.filter(
+        business_id=business.business_id).all()
+
+    logger.info(f"User {request.user.id} accessed driver directory for business {business.business_id}")
+
+    context = {
+        'contacts': driver_directory,
+        'business': business,
+    }
+    return render(request, 'business/parts/driver_directory.html', context)
 
 
 @login_required(login_url='account_login')
@@ -181,10 +261,9 @@ def driver_directory_add(request):
         return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=405)
 
     try:
-        # IDOR FIX: Verify user has business
-        try:
-            business = business_models.Business.objects.get(user_id=request.user.id)
-        except business_models.Business.DoesNotExist:
+        # IDOR FIX: Verify user has business (use cached)
+        business = get_cached_business(request)
+        if not business:
             logger.warning(f"Business not found for user {request.user.id}")
             return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
 
@@ -222,9 +301,14 @@ def driver_directory_add(request):
 
 @login_required(login_url='account_login')
 def driver_directory_delete(request, id):
+    # IDOR FIX: Verify directory entry belongs to user's business (use cached)
+    business = get_cached_business(request)
+    if not business:
+        logger.warning(f"Business not found for user {request.user.id}")
+        messages.error(request, "Business not found")
+        return redirect('core:main_dashboard')
+
     try:
-        # IDOR FIX: Verify directory entry belongs to user's business
-        business = business_models.Business.objects.get(user_id=request.user.id)
         fleet = business_models.DriverDirectory.objects.get(id=id, business_id=business.business_id)
 
         logger.info(f"User {request.user.id} deleting driver directory entry {id} from business {business.business_id}")
@@ -236,24 +320,18 @@ def driver_directory_delete(request, id):
         logger.warning(f"Driver directory entry {id} not found or unauthorized access by user {request.user.id}")
         messages.error(request, "Driver directory entry not found")
         return redirect('business:driver_directory')
-    except business_models.Business.DoesNotExist:
-        logger.warning(f"Business not found for user {request.user.id}")
-        messages.error(request, "Business not found")
-        return redirect('core:main_dashboard')
 
 
 # pickup location add------------------------------------------------------
 @login_required(login_url='account_login')
 def pickup_location_list(request):
     try:
-        # IDOR FIX: Verify user has associated business
-        user_business = request.user.user_business.first()
-        if not user_business:
+        # IDOR FIX: Verify user has associated business (using cached helper)
+        business = get_cached_business(request)
+        if not business:
             logger.warning(f"User {request.user.id} has no associated business")
             messages.error(request, "No business associated with your account")
             return redirect('core:main_dashboard')
-
-        business = business_models.Business.objects.get(business_id=user_business.business_id)
         pickup_location = business_models.PickupLocation.objects.filter(
             business_id=business.business_id).all()
 
@@ -276,14 +354,13 @@ def pickup_location_list(request):
 @login_required(login_url='account_login')
 def pickup_location_add(request):
     try:
-        # IDOR FIX: Verify user has associated business
-        user_business = request.user.user_business.first()
-        if not user_business:
+        # IDOR FIX: Verify user has associated business (using cached helper)
+        business = get_cached_business(request)
+        if not business:
             logger.warning(f"User {request.user.id} has no associated business")
             messages.error(request, "No business associated with your account")
             return redirect('core:main_dashboard')
 
-        business = business_models.Business.objects.get(business_id=user_business.business_id)
         form = business_forms.PickupLocationsAddForm(request.POST or None)
 
         if request.method == 'POST':
@@ -310,14 +387,13 @@ def pickup_location_add(request):
 @login_required(login_url='account_login')
 def pickup_location_delete(request, pickup_location_id):
     try:
-        # IDOR FIX: Verify pickup location belongs to user's business
-        user_business = request.user.user_business.first()
-        if not user_business:
+        # IDOR FIX: Verify pickup location belongs to user's business (using cached helper)
+        business = get_cached_business(request)
+        if not business:
             logger.warning(f"User {request.user.id} has no associated business")
             messages.error(request, "No business associated with your account")
             return redirect('core:main_dashboard')
 
-        business = business_models.Business.objects.get(business_id=user_business.business_id)
         pickup_location = business_models.PickupLocation.objects.get(
             id=pickup_location_id, business_id=business.business_id
         )
@@ -340,14 +416,13 @@ def pickup_location_delete(request, pickup_location_id):
 @login_required(login_url='account_login')
 def pickup_location_update(request, pickup_location_id):
     try:
-        # IDOR FIX: Verify pickup location belongs to user's business
-        user_business = request.user.user_business.first()
-        if not user_business:
+        # IDOR FIX: Verify pickup location belongs to user's business (using cached helper)
+        business = get_cached_business(request)
+        if not business:
             logger.warning(f"User {request.user.id} has no associated business")
             messages.error(request, "No business associated with your account")
             return redirect('core:main_dashboard')
 
-        business = business_models.Business.objects.get(business_id=user_business.business_id)
         pickup_location = get_object_or_404(
             business_models.PickupLocation, id=pickup_location_id, business_id=business.business_id
         )
@@ -381,42 +456,44 @@ def pickup_location_update(request, pickup_location_id):
 
 @login_required(login_url='/accounts/login/')
 def business_profile(request):
-    try:
-        business = business_models.Business.objects.get(
-            business_id=request.user.user_business.first().business_id)
-        profile = core_models.Profile.objects.filter(user_id=request.user.id)
-        business_profile = business_models.BusinessProfile.objects.get_or_create(business_id = business.business_id )
-        business_profile = business_profile[0]
-        #print('business_profile', business_profile)
-        location = business_models.PickupLocation.objects.filter(
-            business_id=business.business_id).values_list('pickup_location_title', flat=True)[:2]
-        business_logo = business_models.BusinessLogo.objects.select_related('business').get_or_create(business_id = business.business_id )
-        instakey = config("INSTAGRAM_TOKEN_FEEDS_KEY")
-        business_logo = business_logo[0].business_logo.url
-
-
-        context = {
-            'profile': profile,
-            'business': business,
-            'location': location,
-            'business_profile': business_profile,
-            'business_logo_img': business_logo,
-            'instakey': instakey,
-        }
-        return render(request, 'business/frontend/business_profile.html', context)
-    except business_models.Business.DoesNotExist:
-
+    # Use cached business and profile to avoid duplicate queries
+    business = get_cached_business(request)
+    if not business:
         return redirect("/join_us/")
+
+    profile = get_cached_profile(request)
+    # Optimization: Use business already fetched or fetch with select_related if needed
+    business_profile, created = business_models.BusinessProfile.objects.get_or_create(business=business)
+    
+    location = business_models.PickupLocation.objects.filter(
+        business_id=business.business_id).values_list('pickup_location_title', flat=True)[:2]
+    
+    business_logo_obj, created = business_models.BusinessLogo.objects.get_or_create(business=business)
+    instakey = config("INSTAGRAM_TOKEN_FEEDS_KEY", default="")
+    business_logo = business_logo_obj.business_logo.url if business_logo_obj.business_logo else None
+
+    context = {
+        'profile': profile,
+        'business': business,
+        'location': location,
+        'business_profile': business_profile,
+        'business_logo_img': business_logo,
+        'instakey': instakey,
+    }
+    return render(request, 'business/frontend/business_profile.html', context)
 
 @login_required(login_url='/accounts/login/')
 def business_profile_display(request, business_id):
     try:
-        business = business_models.Business.objects.get(
+        business = business_models.Business.objects.select_related('profile', 'business_profile').get(
             business_id=business_id)
         location = business_models.PickupLocation.objects.filter(
             business_id=business.business_id).values_list('pickup_location_title', flat=True)[:2]
-        business_logo = business_models.BusinessLogo.objects.select_related('business').get(business_id=business.business_id)
-        business_logo = business_logo.business_logo.url
+        
+        business_logo_obj = business_models.BusinessLogo.objects.filter(business=business).first()
+        business_logo = business_logo_obj.business_logo.url if business_logo_obj and business_logo_obj.business_logo else None
+        
+        business_profile = business.business_profile if hasattr(business, 'business_profile') else None
 
         # Dynamic SEO for business profile
         business_name = business.business_name or "Business"
@@ -433,6 +510,7 @@ def business_profile_display(request, business_id):
             'business': business,
             'location': location,
             'business_logo_img': business_logo,
+            'business_profile': business_profile,
         }
         return render(request, 'business/frontend/business_profile.html', context)
     except business_models.Business.DoesNotExist:
@@ -441,7 +519,7 @@ def business_profile_display(request, business_id):
 
 @login_required(login_url='/accounts/login/')
 def all_business(request):
-    business = business_models.Business.objects.all()
+    business = business_models.Business.objects.select_related('profile', 'business_profile').prefetch_related('business_logo').all()
 
     # SEO metadata for business directory
     meta = SEOMetadata.get_page_meta(
@@ -463,10 +541,9 @@ def all_business(request):
 
 @login_required(login_url='/accounts/login/')
 def business_profile_update(request, business_id):
-    # Check if user has a profile
-    try:
-        profile = core_models.Profile.objects.get(user_id=request.user.id)
-    except core_models.Profile.DoesNotExist:
+    # Check if user has a profile (use cached)
+    profile = get_cached_profile(request)
+    if not profile:
         messages.warning(request, "Please complete your profile first.")
         return redirect('core:profile_add')
 
@@ -480,14 +557,14 @@ def business_profile_update(request, business_id):
         messages.warning(request, "Please complete your business registration first.")
         return redirect('core:business_register')
 
-    # Verify user owns this business
-    if not request.user.user_business.exists():
+    # Verify user owns this business (use cached)
+    user_business = get_cached_business(request)
+    if not user_business:
         messages.error(request, "No business found for your account.")
         return redirect('core:business_register')
 
-    if request.user.user_business.first().business_id == business_id:
-        business = business_models.Business.objects.get(
-            business_id=request.user.user_business.first().business_id)
+    if user_business.business_id == business_id:
+        business = user_business  # Already have the business object
         form = business_forms.businessRegisterForm(instance=business)
 
         if request.method == 'POST':
@@ -513,10 +590,10 @@ def business_profile_update(request, business_id):
 
 @login_required(login_url='/accounts/login/')
 def business_profile_info_update(request, business_id):
-    if request.user.user_business.first().business_id == business_id:
+    user_business = get_cached_business(request)
+    if user_business and user_business.business_id == business_id:
         logger.debug(f'Business profile update matched for business_id={business_id}, user_id={request.user.id}')
-        business = business_models.Business.objects.get(
-            business_id=request.user.user_business.first().business_id)
+        business = user_business  # Already have the business object
         business_profile = business_models.BusinessProfile.objects.get(business_id=business_id)
 
         logger.debug(f'Updating business profile for business_id={business.business_id}')
@@ -583,8 +660,11 @@ def business_settings(request, business_id):
 #business_settings_api---------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 def business_settings_api_update(request, business_id, api_id):
-    if request.user.id == request.user.user_business.first().user_id:
-        business = business_models.Business.objects.filter(business_id=business_id).first()
+    user_business = get_cached_business(request)
+    if user_business and request.user.id == user_business.user_id:
+        business = user_business if user_business.business_id == business_id else None
+        if not business:
+            return redirect('business:business_settings', business_id=user_business.business_id)
         business_apis = business_models.BusinessApiSettings.objects.filter(id=api_id).first()
         form = business_forms.businessApiSettingsForm(instance=business_apis)
         # Hide the business field and set it to the current business
@@ -623,8 +703,11 @@ def business_settings_api_update(request, business_id, api_id):
 
 @login_required(login_url='/accounts/login/')
 def business_settings_api_add(request, business_id):
-    if request.user.id == request.user.user_business.first().user_id:
-        business = business_models.Business.objects.filter(business_id=business_id).first()
+    user_business = get_cached_business(request)
+    if user_business and request.user.id == user_business.user_id:
+        business = user_business if user_business.business_id == business_id else None
+        if not business:
+            return redirect('business:business_settings', business_id=user_business.business_id)
         form = business_forms.businessApiSettingsForm(initial={'business': business})
         # Hide the business field and set it to the current business
         form.fields['business'].widget = forms.HiddenInput()
@@ -1167,6 +1250,10 @@ def business_team_status_change(request, business_id, team_id):
 @login_required(login_url='account_login')
 def workflow_guide(request):
     """Display comprehensive workflow guide for clients"""
+    
+    # Get user's business for URL generation
+    user_business = get_cached_business(request)
+    business_id = user_business.business_id if user_business else None
 
     workflow_steps = [
         {
@@ -1180,7 +1267,7 @@ def workflow_guide(request):
                 'Add business description and category',
             ],
             'status': 'completed',
-            'url': 'business:business_profile',
+            'target_url': reverse('business:business_profile'),
         },
         {
             'number': 2,
@@ -1194,7 +1281,7 @@ def workflow_guide(request):
                 'Mark location as active',
             ],
             'status': 'in_progress',
-            'url': 'business:pickup_location_list',
+            'target_url': reverse('business:pickup_location_list'),
         },
         {
             'number': 3,
@@ -1208,7 +1295,7 @@ def workflow_guide(request):
                 'Set as default if successful',
             ],
             'status': 'pending',
-            'url': None,  # Requires business_id parameter - accessed via sidebar
+            'target_url': reverse('business:business_settings_api_list', args=[business_id]) if business_id else None,
         },
         {
             'number': 4,
@@ -1224,7 +1311,7 @@ def workflow_guide(request):
                 'Or: Auto-import from connected API',
             ],
             'status': 'pending',
-            'url': None,
+            'target_url': reverse('orders:add_order'),
         },
         {
             'number': 5,
@@ -1238,7 +1325,7 @@ def workflow_guide(request):
                 'Delivery task is automatically created',
             ],
             'status': 'automated',
-            'url': None,
+            'target_url': reverse('orders:orders_all_list'),
         },
         {
             'number': 6,
@@ -1252,7 +1339,7 @@ def workflow_guide(request):
                 'Driver assignment process begins',
             ],
             'status': 'automated',
-            'url': None,
+            'target_url': None,
         },
         {
             'number': 7,
@@ -1266,7 +1353,7 @@ def workflow_guide(request):
                 'View delivery completion proof',
             ],
             'status': 'pending',
-            'url': None,
+            'target_url': reverse('orders:orders_all_list'),
         },
         {
             'number': 8,
@@ -1279,13 +1366,14 @@ def workflow_guide(request):
                 'Team members can view and manage orders',
             ],
             'status': 'pending',
-            'url': None,  # Requires business_id parameter - accessed via sidebar
+            'target_url': reverse('business:business_teams', args=[business_id]) if business_id else None,
         },
     ]
 
     context = {
         'workflow_steps': workflow_steps,
         'page_title': 'Client Workflow Guide',
+        'user_business': user_business,  # Also ensure sidebar has business context
     }
 
     return render(request, 'business/workflow_guide.html', context)

@@ -28,4 +28,12 @@ urlpatterns = [
     # Product Inventory
     path('product_inventory/', product_views.product_inventory, name='product_inventory'),
 
+    # Inventory Management (moved from warehouse app)
+    path('inventory/', product_views.inventory_list, name='inventory_list'),
+    path('inventory/<int:product_id>/', product_views.stock_card, name='stock_card'),
+    path('transactions/', product_views.transaction_list, name='transaction_list'),
+
+    # Test images
+    path('test-images/', product_views.test_images, name='test_images'),
+
 ]

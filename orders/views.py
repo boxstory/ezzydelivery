@@ -66,6 +66,7 @@ from woocommerce import API as WooAPI
 from decouple import config
 
 from core import models as core_models
+from core.context_processors import get_cached_business
 from orders import forms, models as orders_models
 from business import models as business_models
 from orders import forms as orders_forms
@@ -134,9 +135,15 @@ def orders_all_list(request):
 
     default_page = 1
     page = request.GET.get('page', default_page)
-    # Paginate items
-    items_per_page = 10  # Increased from 5 for better UX
-    paginator = Paginator(items, items_per_page)
+    # Read per_page from request, with validation (valid: 10, 25, 50, 100)
+    per_page = request.GET.get('per_page', '10')
+    try:
+        per_page = int(per_page)
+        if per_page not in [10, 25, 50, 100]:
+            per_page = 10
+    except (ValueError, TypeError):
+        per_page = 10
+    paginator = Paginator(items, per_page)
 
     try:
         orders = paginator.page(page)
@@ -152,6 +159,7 @@ def orders_all_list(request):
         'orders': orders,
         'business': business,
         'len': paginator.count,  # Use paginator.count (cached) instead of items.count()
+        'per_page': str(per_page),  # String for template comparison
         # Permission checks for template buttons
         'can_create_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_CREATE),
         'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
@@ -187,9 +195,15 @@ def orders_pending_list(request):
 
     default_page = 1
     page = request.GET.get('page', default_page)
-    # Paginate items
-    items_per_page = 10
-    paginator = Paginator(orders, items_per_page)
+    # Read per_page from request, with validation (valid: 10, 25, 50, 100)
+    per_page = request.GET.get('per_page', '10')
+    try:
+        per_page = int(per_page)
+        if per_page not in [10, 25, 50, 100]:
+            per_page = 10
+    except (ValueError, TypeError):
+        per_page = 10
+    paginator = Paginator(orders, per_page)
 
     try:
         orders = paginator.page(page)
@@ -204,6 +218,7 @@ def orders_pending_list(request):
     context = {
         'orders': orders,
         'business': business,
+        'per_page': str(per_page),  # String for template comparison
     }
     return render(request, 'orders/order_pending_list.html', context)
 
@@ -234,9 +249,15 @@ def orders_successfull_list(request):
 
     default_page = 1
     page = request.GET.get('page', default_page)
-    # Paginate items
-    items_per_page = 10
-    paginator = Paginator(orders, items_per_page)
+    # Read per_page from request, with validation (valid: 10, 25, 50, 100)
+    per_page = request.GET.get('per_page', '10')
+    try:
+        per_page = int(per_page)
+        if per_page not in [10, 25, 50, 100]:
+            per_page = 10
+    except (ValueError, TypeError):
+        per_page = 10
+    paginator = Paginator(orders, per_page)
 
     try:
         orders = paginator.page(page)
@@ -251,6 +272,7 @@ def orders_successfull_list(request):
     context = {
         'orders': orders,
         'business': business,
+        'per_page': str(per_page),  # String for template comparison
     }
     return render(request, 'orders/order_successful_list.html', context)
 
@@ -282,9 +304,15 @@ def orders_unsuccessfull_list(request):
 
     default_page = 1
     page = request.GET.get('page', default_page)
-    # Paginate items
-    items_per_page = 10
-    paginator = Paginator(orders, items_per_page)
+    # Read per_page from request, with validation (valid: 10, 25, 50, 100)
+    per_page = request.GET.get('per_page', '10')
+    try:
+        per_page = int(per_page)
+        if per_page not in [10, 25, 50, 100]:
+            per_page = 10
+    except (ValueError, TypeError):
+        per_page = 10
+    paginator = Paginator(orders, per_page)
 
     try:
         orders = paginator.page(page)
@@ -299,13 +327,17 @@ def orders_unsuccessfull_list(request):
     context = {
         'orders': orders,
         'business': business,
+        'per_page': str(per_page),  # String for template comparison
     }
     return render(request, 'orders/order_unsuccessful_list.html', context)
 
 
 @login_required(login_url='account_login')
 def latest_orders_list(request):
-    business = business_models.Business.objects.get(user_id=request.user.id)
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, 'Business not found.')
+        return redirect('business:business_dashboard')
     logger.debug(f"User {request.user.id} accessing latest orders for business {business.business_id}")
 
     orders = orders_models.Order.objects.filter(
@@ -319,9 +351,15 @@ def latest_orders_list(request):
 
     default_page = 1
     page = request.GET.get('page', default_page)
-    # Paginate items
-    items_per_page = 10
-    paginator = Paginator(orders, items_per_page)
+    # Read per_page from request, with validation (valid: 10, 25, 50, 100)
+    per_page = request.GET.get('per_page', '10')
+    try:
+        per_page = int(per_page)
+        if per_page not in [10, 25, 50, 100]:
+            per_page = 10
+    except (ValueError, TypeError):
+        per_page = 10
+    paginator = Paginator(orders, per_page)
 
     try:
         orders = paginator.page(page)
@@ -336,6 +374,7 @@ def latest_orders_list(request):
     context = {
         'orders': orders,
         'business': business,
+        'per_page': str(per_page),  # String for template comparison
     }
     return render(request, 'orders/order_list_view.html', context)
 
@@ -362,7 +401,7 @@ def order_upload_file(request):
     else:
         form = orders_forms.OrderFileUploadForm()
     
-    business = business_models.Business.objects.get(user_id=request.user.id)
+    business = get_cached_business(request)
     context = {
         'form': form,
         'business': business
@@ -589,9 +628,8 @@ def add_order_bulk(request):
     if request.method != 'POST':
         return redirect('orders:add_order')
 
-    try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
-    except business_models.Business.DoesNotExist:
+    business = get_cached_business(request)
+    if not business:
         messages.error(request, 'Business not found.')
         return redirect('orders:add_order')
 
@@ -675,7 +713,10 @@ def add_order_bulk(request):
 def add_order_product(request, order_id):
     try:
         # IDOR FIX: Verify order belongs to user's business
-        business = business_models.Business.objects.get(user_id=request.user.id)
+        business = get_cached_business(request)
+        if not business:
+            messages.error(request, 'Business not found.')
+            return redirect('orders:orders_all_list')
         order = orders_models.Order.objects.get(id=order_id, business=business)
 
         logger.info(f"User {request.user.id} adding products to order {order_id}")
@@ -696,13 +737,24 @@ def add_order_product(request, order_id):
             unit_prices = request.POST.getlist('unit_price[]')
             notes_list = request.POST.getlist('notes[]')
 
+            # Fetch all products at once to avoid N+1 queries
+            from product import models as product_models
+            valid_product_ids = [pid for pid in product_ids if pid]
+            products_map = {
+                str(p.id): p for p in product_models.Product.objects.filter(
+                    id__in=valid_product_ids, business=business
+                )
+            }
+
             for i, product_id in enumerate(product_ids):
                 if not product_id:  # Skip empty product selections
                     continue
 
                 try:
-                    from product import models as product_models
-                    product = product_models.Product.objects.get(id=product_id, business=business)
+                    product = products_map.get(str(product_id))
+                    if not product:
+                        errors.append(f"Product #{i+1} not found")
+                        continue
 
                     quantity = int(quantities[i]) if i < len(quantities) and quantities[i] else 1
                     unit_price = float(unit_prices[i]) if i < len(unit_prices) and unit_prices[i] else float(product.item_price)
@@ -719,8 +771,6 @@ def add_order_product(request, order_id):
                     order_item.save()
                     products_added += 1
 
-                except product_models.Product.DoesNotExist:
-                    errors.append(f"Product #{i+1} not found")
                 except (ValueError, IndexError) as e:
                     errors.append(f"Invalid data for product #{i+1}: {str(e)}")
 
@@ -765,8 +815,10 @@ def product_search_api(request):
     Returns products matching search query with price and inventory info.
     Requires minimum 3 characters to trigger search.
     """
+    business = get_cached_business(request)
+    if not business:
+        return JsonResponse({'results': [], 'pagination': {'more': False}})
     try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
         search_term = request.GET.get('q', '').strip()
 
         # Require minimum 3 characters
@@ -776,23 +828,30 @@ def product_search_api(request):
         from product import models as product_models
 
         # Search products by name, SKU, or brand
-        products = product_models.Product.objects.filter(
+        products = list(product_models.Product.objects.filter(
             business=business
         ).filter(
             Q(item_name__icontains=search_term) |
             Q(brand_name__icontains=search_term) |
             Q(item_sku__icontains=search_term)
-        ).select_related('unit')[:20]  # Limit to 20 results
+        ).select_related('unit')[:20])  # Limit to 20 results
+
+        # Fetch all inventory at once to avoid N+1 queries
+        inventory_map = {}
+        if business.fulfillment_service_enabled and products:
+            inventory_map = {
+                inv.item_sku_id: inv.item_quantity
+                for inv in product_models.ProductInventory.objects.filter(
+                    item_sku__in=products
+                )
+            }
 
         results = []
         for product in products:
             # Get inventory status if fulfillment is enabled
             inventory_qty = None
             if business.fulfillment_service_enabled:
-                inventory = product_models.ProductInventory.objects.filter(
-                    item_sku=product
-                ).first()
-                inventory_qty = inventory.item_quantity if inventory else 0
+                inventory_qty = inventory_map.get(product.id, 0)
 
             result = {
                 'id': product.id,
@@ -884,7 +943,10 @@ def pick_from_here(request, pickup_id):
     """Add order with a pre-selected pickup location."""
     import json
 
-    business = business_models.Business.objects.get(user_id=request.user.id)
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, 'Business not found.')
+        return redirect('business:business_dashboard')
     pickup_location = business_models.PickupLocation.objects.filter(
         id=pickup_id, business_id=business.business_id).first()
 
@@ -1162,19 +1224,19 @@ def get_order_comments(request, order_id):
 
 @login_required(login_url='account_login')
 def get_order_by_api(request):
-    # IDOR FIX: Get user's business with authorization check
+    # IDOR FIX: Get user's business with authorization check (using cached helper)
     try:
-        user_business = request.user.user_business.first()
+        user_business = get_cached_business(request)
         if not user_business:
             logger.warning(f"User {request.user.id} has no associated business")
             messages.error(request, "No business associated with your account")
-            return redirect('business_dashboard')
+            return redirect('business:business_dashboard')
 
-        business = business_models.Business.objects.get(user_id=user_business.user_id)
+        business = user_business  # Already have the business object
     except business_models.Business.DoesNotExist:
         logger.warning(f"Business not found for user {request.user.id}")
         messages.error(request, "Business not found")
-        return redirect('business_dashboard')
+        return redirect('business:business_dashboard')
 
     api_data = business_models.BusinessApiSettings.objects.filter(
         business_id=business.business_id,
@@ -1206,7 +1268,7 @@ def get_order_by_api(request):
     except requests.exceptions.RequestException as e:
         logger.error(f"Shopify API request failed: {e}")
         messages.error(request, "Failed to connect to Shopify API")
-        return redirect('orders_all_list')
+        return redirect('orders:orders_all_list')
     # Parse message as json
     GetQuestion_response = "json.loads(GetQuestion_response['Message'])"
     logger.debug(f'Start date from POST: {request.POST.get("start_date")}')
@@ -1245,20 +1307,15 @@ def get_order_by_api(request):
 
 @login_required(login_url='account_login')
 def get_orders_by_base_api(request):
-    # IDOR FIX: Get user's business with authorization check
-    try:
-        user_business = request.user.user_business.first()
-        if not user_business:
-            logger.warning(f"User {request.user.id} has no associated business")
-            messages.error(request, "No business associated with your account")
-            return redirect('business_dashboard')
+    # IDOR FIX: Get user's business with authorization check (using cached helper)
+    user_business = get_cached_business(request)
+    if not user_business:
+        logger.warning(f"User {request.user.id} has no associated business")
+        messages.error(request, "No business associated with your account")
+        return redirect('business:business_dashboard')
 
-        business = business_models.Business.objects.get(user_id=user_business.user_id)
-        business_id = business.business_id
-    except business_models.Business.DoesNotExist:
-        logger.warning(f"Business not found for user {request.user.id}")
-        messages.error(request, "Business not found")
-        return redirect('business_dashboard')
+    business = user_business  # Already have the business object
+    business_id = business.business_id
 
     business_api = business_models.BusinessApiSettings.objects.filter(
         business_id=business_id,
@@ -1540,18 +1597,13 @@ def bulk_import_orders(request):
             business_status='active'
         ).order_by('business_name')
     else:
-        # Client - get their business
-        try:
-            user_business = request.user.user_business.first()
-            if user_business:
-                business = business_models.Business.objects.get(user_id=user_business.user_id)
-                pickup_locations = business_models.PickupLocation.objects.filter(
-                    business_id=business.business_id
-                ).all()
-        except business_models.Business.DoesNotExist:
-            pass
-
-        if not business:
+        # Client - get their business (using cached helper)
+        business = get_cached_business(request)
+        if business:
+            pickup_locations = business_models.PickupLocation.objects.filter(
+                business_id=business.business_id
+            ).all()
+        else:
             from django.contrib import messages
             messages.error(request, 'No business associated with your account')
             return redirect('business:business_dashboard')
@@ -1882,14 +1934,10 @@ def bulk_import_save(request):
             except business_models.Business.DoesNotExist:
                 return JsonResponse({'success': False, 'error': 'Invalid business selected'}, status=400)
         else:
-            # Client user - get their business
-            try:
-                user_business = request.user.user_business.first()
-                if not user_business:
-                    return JsonResponse({'success': False, 'error': 'No business associated with your account'}, status=400)
-                business = business_models.Business.objects.get(user_id=user_business.user_id)
-            except business_models.Business.DoesNotExist:
-                return JsonResponse({'success': False, 'error': 'Business not found'}, status=400)
+            # Client user - get their business (using cached helper)
+            business = get_cached_business(request)
+            if not business:
+                return JsonResponse({'success': False, 'error': 'No business associated with your account'}, status=400)
 
         if not row:
             return JsonResponse({'success': False, 'error': 'No data provided'}, status=400)

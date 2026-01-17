@@ -732,16 +732,16 @@ def driver_analytics(request):
 @login_required(login_url='/accounts/login/')
 def driver_profile(request, fleet_id):
     try:
-        driver = fleet_models.Driver.objects.get(driver_id=fleet_id)
-        profile_picture = fleet_models.Driver.objects.get(driver_id=fleet_id)
-
+        # Single query with select_related to avoid duplicate queries
+        driver = fleet_models.Driver.objects.select_related('user').get(driver_id=fleet_id)
     except fleet_models.Driver.DoesNotExist:
         logger.warning(f'driver does not exist for fleet_id={fleet_id}')
-        return redirect('/fleets/')
+        return redirect('/fleet/')
     logger.debug(f'driver_profile for driver_id={driver.driver_id}')
 
-    profile = core_models.Profile.objects.get(user_id=driver.user_id)
-    profile_picture = core_models.ProfilePicture.objects.get(user_id=driver.user_id)
+    profile = core_models.Profile.objects.select_related('user').get(user_id=driver.user_id)
+    # Get or create profile picture to avoid DoesNotExist error
+    profile_picture, _ = core_models.ProfilePicture.objects.get_or_create(user_id=driver.user_id)
     logger.debug(f'profile_picture={profile_picture}')
 
     driver_vehicle = driver.driver_vehicle.all()

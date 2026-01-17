@@ -68,20 +68,21 @@ def get_user_business_access(user, request=None):
     # Check if business was cached by core.context_processors.user_business
     # This avoids duplicate queries when both context processors run
     if request and hasattr(request, '_cached_user_business'):
-        cached_business = request._cached_user_business
-        if cached_business and cached_business.user_id == user.id:
-            # User is the owner of this business
-            result = (cached_business, 'owner', None)
+        owner_business = request._cached_user_business
+        if owner_business:
+            result = (owner_business, 'owner', None)
             request._cached_business_access = result
             return result
-
-    # Check if user is a business owner
-    owner_business = Business.objects.filter(user=user).first()
-    if owner_business:
-        result = (owner_business, 'owner', None)
-        if request:
-            request._cached_business_access = result
-        return result
+        # If owner_business is None, we already know the user is not an owner
+        # so we skip the owner_business query below.
+    else:
+        # Check if user is a business owner (if not already checked/cached)
+        owner_business = Business.objects.filter(user=user).first()
+        if owner_business:
+            result = (owner_business, 'owner', None)
+            if request:
+                request._cached_business_access = result
+            return result
 
     # Check if user is an active team member
     team_profile = BusinessTeamProfile.objects.select_related('business').filter(

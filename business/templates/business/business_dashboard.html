@@ -4,125 +4,167 @@
 
 {% block extra_css %}
 <link type="text/css" rel="stylesheet" href="{% static 'business/css/business.css' %}" />
+<style>
+.db-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  padding: 8px;
+}
+.db-stat {
+  background: #fff;
+  border-radius: 6px;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  text-align: center;
+}
+.db-stat-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.db-stat-icon.primary { background: #fef3c7; color: #d97706; }
+.db-stat-icon.success { background: #dcfce7; color: #16a34a; }
+.db-stat-icon.info { background: #dbeafe; color: #2563eb; }
+.db-stat-icon.warning { background: #fef3c7; color: #ca8a04; }
+.db-stat-icon.danger { background: #fee2e2; color: #dc2626; }
+.db-stat-value { font-size: 1.1rem; font-weight: 700; color: #1f2937; margin: 0; }
+.db-stat-label { font-size: 0.7rem; color: #6b7280; margin: 2px 0 0 0; }
+@media (max-width: 992px) {
+  .db-stats { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 576px) {
+  .db-stats { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
 {% endblock extra_css %}
-<!-- title -->
-{% block title %}
-  BUSINESS DASHBOARD
-{% endblock title %}
-<!-- Main BUSINESS DASHBOARD content area -->
+
+{% block title %}BUSINESS DASHBOARD{% endblock title %}
+
 {% block content %}
-  <div class="flex-fill" id="client_dashboard_container_main">
-    <!-- Dashboard Header -->
-    <div class="dashboard-header d-none d-md-block" id="client_dashboard_header_main">
-      <h1 class="h3 text-center" id="client_dashboard_title_business">{{ business.business_name }} - Dashboard</h1>
+<div class="flex-fill" id="client_dashboard_container_main">
+  <!-- Dashboard Header -->
+  <div class="dashboard-header d-none d-md-block" id="client_dashboard_header_main">
+    <h1 class="h3 text-center" id="client_dashboard_title_business">
+      {{ business.business_name }} - Dashboard
+    </h1>
+  </div>
+
+  <!-- Stats -->
+  <div class="db-stats">
+    <div class="db-stat">
+      <div class="db-stat-icon primary"><i class="fa-solid fa-box"></i></div>
+      <p class="db-stat-value">{{ total_orders|default:0 }}</p>
+      <p class="db-stat-label">Total Orders</p>
     </div>
-
-    <!-- Stats Grid -->
-    <h2 class="visually-hidden">Order Statistics Overview</h2>
-    <div class="stats-grid" id="client_dashboard_section_stats">
-      <!-- Featured Card - Total Orders -->
-      <article class="stat-card stat-card-featured stat-card-primary" id="client_dashboard_card_total_orders">
-        <div class="stat-card-header">
-          <div>
-            <p class="stat-card-title" id="client_dashboard_title_total_orders">Total Orders</p>
-            <p class="stat-card-value h2 mb-0" id="client_dashboard_value_total_orders">5,005</p>
-          </div>
-          <div class="stat-card-icon">
-            <i class="fa-solid fa-chart-line"></i>
-          </div>
-        </div>
-        <div class="stat-card-meta">
-          <div class="stat-card-location">
-            <i class="fa-solid fa-location-dot"></i>
-            <span>Qatar</span>
-          </div>
-          <div class="stat-card-trend positive">
-            <i class="fa-solid fa-arrow-up"></i>
-            <span>18.2%</span>
-            <span class="d-none d-lg-inline">since last month</span>
-          </div>
-        </div>
-      </article>
-
-      <!-- Delivered Orders -->
-      <article class="stat-card stat-card-success" id="client_dashboard_card_delivered">
-        <div class="stat-card-header">
-          <div>
-            <p class="stat-card-title" id="client_dashboard_title_delivered">Delivered</p>
-            <p class="stat-card-value h2 mb-0" id="client_dashboard_value_delivered">10</p>
-          </div>
-          <div class="stat-card-icon">
-            <i class="fa-solid fa-check-circle"></i>
-          </div>
-        </div>
-        <div class="stat-card-meta">
-          <span>Successfully delivered orders</span>
-        </div>
-      </article>
-
-      <!-- COD Amount -->
-      <article class="stat-card stat-card-info" id="client_dashboard_card_cod_amount">
-        <div class="stat-card-header">
-          <div>
-            <p class="stat-card-title" id="client_dashboard_title_cod_amount">COD Amount</p>
-            <p class="stat-card-value h2 mb-0" id="client_dashboard_value_cod_amount">10</p>
-          </div>
-          <div class="stat-card-icon">
-            <i class="fa-solid fa-money-bill-wave"></i>
-          </div>
-        </div>
-        <div class="stat-card-meta">
-          <span>Total cash on delivery</span>
-        </div>
-      </article>
-
-      <!-- COD Collected -->
-      <article class="stat-card stat-card-success" id="client_dashboard_card_cod_collected">
-        <div class="stat-card-header">
-          <div>
-            <p class="stat-card-title" id="client_dashboard_title_cod_collected">COD Collected</p>
-            <p class="stat-card-value h2 mb-0" id="client_dashboard_value_cod_collected">10</p>
-          </div>
-          <div class="stat-card-icon">
-            <i class="fa-solid fa-hand-holding-dollar"></i>
-          </div>
-        </div>
-        <div class="stat-card-meta">
-          <span>Cash collected from deliveries</span>
-        </div>
-      </article>
-
-      <!-- To be Reconfirmed -->
-      <article class="stat-card stat-card-warning" id="client_dashboard_card_reconfirm">
-        <div class="stat-card-header">
-          <div>
-            <p class="stat-card-title" id="client_dashboard_title_reconfirm">To be Reconfirmed</p>
-            <p class="stat-card-value h2 mb-0" id="client_dashboard_value_reconfirm">10</p>
-          </div>
-          <div class="stat-card-icon">
-            <i class="fa-solid fa-clock-rotate-left"></i>
-          </div>
-        </div>
-        <div class="stat-card-meta">
-          <span>Orders awaiting reconfirmation</span>
-        </div>
-      </article>
-
-      <!-- Follow Up Required -->
-      <article class="stat-card stat-card-danger" id="client_dashboard_card_follow_up">
-        <div class="stat-card-header">
-          <div>
-            <p class="stat-card-title" id="client_dashboard_title_follow_up">Follow Up Required</p>
-            <p class="stat-card-value h2 mb-0" id="client_dashboard_value_follow_up">10</p>
-          </div>
-          <div class="stat-card-icon">
-            <i class="fa-solid fa-phone"></i>
-          </div>
-        </div>
-        <div class="stat-card-meta">
-          <span>Orders needing attention</span>
-        </div>
-      </article>
+    <div class="db-stat">
+      <div class="db-stat-icon success"><i class="fa-solid fa-check"></i></div>
+      <p class="db-stat-value">{{ delivered_count|default:0 }}</p>
+      <p class="db-stat-label">Delivered</p>
+    </div>
+    <div class="db-stat">
+      <div class="db-stat-icon info"><i class="fa-solid fa-money-bill"></i></div>
+      <p class="db-stat-value">{{ cod_amount_total|default:0 }}</p>
+      <p class="db-stat-label">COD Amount</p>
+    </div>
+    <div class="db-stat">
+      <div class="db-stat-icon success"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+      <p class="db-stat-value">{{ cod_collected|default:0 }}</p>
+      <p class="db-stat-label">COD Collected</p>
+    </div>
+    <div class="db-stat">
+      <div class="db-stat-icon warning"><i class="fa-solid fa-clock"></i></div>
+      <p class="db-stat-value">{{ reconfirm_count|default:0 }}</p>
+      <p class="db-stat-label">To Reconfirm</p>
+    </div>
+    <div class="db-stat">
+      <div class="db-stat-icon danger"><i class="fa-solid fa-phone"></i></div>
+      <p class="db-stat-value">{{ followup_count|default:0 }}</p>
+      <p class="db-stat-label">Follow Up</p>
     </div>
   </div>
+
+  <!-- Today's Orders Lists -->
+  <div class="row g-3 px-2 mt-2">
+    <!-- Today's Pending Orders -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+          <span><i class="fa-solid fa-clock text-warning me-2"></i>Today's Pending</span>
+          <span class="badge bg-warning text-dark">{{ todays_pending_orders|length }}</span>
+        </div>
+        <ul class="list-group list-group-flush">
+          {% for order in todays_pending_orders %}
+          <li class="list-group-item py-2 d-flex justify-content-between align-items-center">
+            <div>
+              <strong>#{{ order.order_number }}</strong>
+              <small class="text-muted ms-2">{{ order.customer_name|truncatechars:12 }}</small>
+            </div>
+            <div>
+              {% if order.cod_amount %}<span class="badge bg-info">{{ order.cod_amount }}</span>{% endif %}
+            </div>
+          </li>
+          {% empty %}
+          <li class="list-group-item py-2 text-muted text-center small">No pending orders</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Today's Delivered Orders -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+          <span><i class="fa-solid fa-check-circle text-success me-2"></i>Today's Delivered</span>
+          <span class="badge bg-success">{{ todays_delivered_orders|length }}</span>
+        </div>
+        <ul class="list-group list-group-flush">
+          {% for order in todays_delivered_orders %}
+          <li class="list-group-item py-2 d-flex justify-content-between align-items-center">
+            <div>
+              <strong>#{{ order.order_number }}</strong>
+              <small class="text-muted ms-2">{{ order.customer_name|truncatechars:12 }}</small>
+            </div>
+            <div>
+              {% if order.cod_amount %}<span class="badge bg-success">{{ order.cod_amount }}</span>{% endif %}
+            </div>
+          </li>
+          {% empty %}
+          <li class="list-group-item py-2 text-muted text-center small">No deliveries today</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Failed/Follow Up Orders -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+          <span><i class="fa-solid fa-exclamation-triangle text-danger me-2"></i>Failed/Follow Up</span>
+          <span class="badge bg-danger">{{ followup_orders|length }}</span>
+        </div>
+        <ul class="list-group list-group-flush">
+          {% for order in followup_orders %}
+          <li class="list-group-item py-2 d-flex justify-content-between align-items-center">
+            <div>
+              <strong>#{{ order.order_number }}</strong>
+              <small class="text-muted ms-2">{{ order.customer_name|truncatechars:12 }}</small>
+            </div>
+            <div>
+              {% if order.cod_amount %}<span class="badge bg-danger">{{ order.cod_amount }}</span>{% endif %}
+            </div>
+          </li>
+          {% empty %}
+          <li class="list-group-item py-2 text-muted text-center small">No failed orders</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock content %}

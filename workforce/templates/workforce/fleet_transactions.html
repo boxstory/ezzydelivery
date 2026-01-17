@@ -314,16 +314,28 @@
         <input type="hidden" name="sort" value="{{ sort_by }}" id="sortInput">
         <div class="filter-row">
             <div class="filter-group">
-                <label><i class="fa-solid fa-calendar me-1"></i>Date From</label>
-                <input type="date" name="date_from" value="{{ date_from }}">
+                <label><i class="fa-solid fa-calendar me-1"></i>Date Range</label>
+                <select name="date_preset" id="datePresetSelect" class="filter-select" onchange="toggleCustomDate(this.value)">
+                    <option value="">All Time</option>
+                    <option value="today" {% if date_preset == 'today' %}selected{% endif %}>Today</option>
+                    <option value="yesterday" {% if date_preset == 'yesterday' %}selected{% endif %}>Yesterday</option>
+                    <option value="3days" {% if date_preset == '3days' %}selected{% endif %}>Last 3 Days</option>
+                    <option value="1week" {% if date_preset == '1week' %}selected{% endif %}>Last 1 Week</option>
+                    <option value="1month" {% if date_preset == '1month' %}selected{% endif %}>Last 1 Month</option>
+                    <option value="custom" {% if date_preset == 'custom' %}selected{% endif %}>Custom Date</option>
+                </select>
             </div>
-            <div class="filter-group">
-                <label><i class="fa-solid fa-calendar me-1"></i>Date To</label>
-                <input type="date" name="date_to" value="{{ date_to }}">
+            <div class="filter-group custom-date-fields {% if date_preset != 'custom' %}hidden{% endif %}" id="customDateFrom">
+                <label><i class="fa-solid fa-calendar-day me-1"></i>From</label>
+                <input type="date" name="date_from" value="{{ date_from }}" id="dateFromInput">
+            </div>
+            <div class="filter-group custom-date-fields {% if date_preset != 'custom' %}hidden{% endif %}" id="customDateTo">
+                <label><i class="fa-solid fa-calendar-day me-1"></i>To</label>
+                <input type="date" name="date_to" value="{{ date_to }}" id="dateToInput">
             </div>
             <div class="filter-group">
                 <label><i class="fa-solid fa-tag me-1"></i>Type</label>
-                <select name="type">
+                <select name="type" class="filter-select">
                     <option value="">All Types</option>
                     {% for type_code, type_label in transaction_types %}
                     <option value="{{ type_code }}" {% if txn_type == type_code %}selected{% endif %}>{{ type_label }}</option>
@@ -332,19 +344,11 @@
             </div>
             <div class="filter-group">
                 <label><i class="fa-solid fa-circle-check me-1"></i>Status</label>
-                <select name="status">
+                <select name="status" class="filter-select">
                     <option value="">All Status</option>
                     <option value="settled" {% if status == 'settled' %}selected{% endif %}>Settled</option>
                     <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
                 </select>
-            </div>
-            <div class="filter-group">
-                <label><i class="fa-solid fa-coins me-1"></i>Min Amount</label>
-                <input type="number" name="min_amount" value="{{ min_amount }}" placeholder="0.00" step="0.01">
-            </div>
-            <div class="filter-group">
-                <label><i class="fa-solid fa-coins me-1"></i>Max Amount</label>
-                <input type="number" name="max_amount" value="{{ max_amount }}" placeholder="10000.00" step="0.01">
             </div>
             <div class="filter-actions">
                 <button type="submit" class="btn-filter btn-filter-apply">
@@ -434,7 +438,7 @@
                            data-description="{{ txn.description }}"
                            data-date="{{ txn.created_at|date:'d M Y' }}"
                            onchange="updateBulkSelection()"
-                           {% if txn.settlement or txn.transaction_type == 'settlement' or txn.transaction_type == 'cod_deposit' %}disabled{% endif %}>
+                           {% if txn.settlement or txn.transaction_type == 'settlement' or txn.transaction_type == 'cod_deposit' or txn.reference_number in deposited_refs %}disabled{% endif %}>
                 </td>
                 <td>{{ txn.created_at|date:"d M Y, h:i A" }}</td>
                 <td>
@@ -477,6 +481,8 @@
                     <span class="transaction-type cod_deposit">Deposited</span>
                     {% elif txn.transaction_type == 'settlement' %}
                     <span class="transaction-type settlement">Paid</span>
+                    {% elif txn.transaction_type == 'cod_collection' and txn.reference_number in deposited_refs %}
+                    <span class="transaction-type cod_deposit">Deposited</span>
                     {% else %}
                     <span class="transaction-type" style="background: #fff3cd; color: #856404;">Pending</span>
                     {% endif %}
@@ -580,6 +586,23 @@
 function updateSort(value) {
     document.getElementById('sortInput').value = value;
     document.getElementById('filterForm').submit();
+}
+
+// Toggle custom date fields based on dropdown selection
+function toggleCustomDate(value) {
+    const customDateFrom = document.getElementById('customDateFrom');
+    const customDateTo = document.getElementById('customDateTo');
+    if (value === 'custom') {
+        customDateFrom.style.display = '';
+        customDateFrom.classList.remove('hidden');
+        customDateTo.style.display = '';
+        customDateTo.classList.remove('hidden');
+    } else {
+        customDateFrom.style.display = 'none';
+        customDateFrom.classList.add('hidden');
+        customDateTo.style.display = 'none';
+        customDateTo.classList.add('hidden');
+    }
 }
 
 // Toggle select all checkboxes

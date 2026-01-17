@@ -1,0 +1,338 @@
+{% extends 'wf_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Confirm Delete Link{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+<style>
+.delete-header {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.delete-header i {
+    font-size: 4rem;
+    margin-bottom: 15px;
+    opacity: 0.9;
+}
+
+.delete-header h2 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.warning-card {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 25px;
+}
+
+.warning-card h5 {
+    color: #856404;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.warning-card ul {
+    color: #856404;
+    margin-bottom: 0;
+}
+
+.info-card {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.link-display {
+    background: #f8f9fa;
+    border-left: 4px solid #e74c3c;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.link-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.link-arrow {
+    color: #e74c3c;
+}
+
+.badge-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.detail-item {
+    padding: 10px;
+    background: white;
+    border-radius: 6px;
+}
+
+.detail-label {
+    font-size: 0.85rem;
+    color: #7f8c8d;
+    margin-bottom: 5px;
+}
+
+.detail-value {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.btn-delete {
+    background: #e74c3c;
+    border-color: #e74c3c;
+    color: white;
+    padding: 12px 30px;
+    font-weight: 600;
+}
+
+.btn-delete:hover {
+    background: #c0392b;
+    border-color: #c0392b;
+    color: white;
+}
+
+.btn-cancel {
+    padding: 12px 30px;
+}
+
+.impact-list {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 15px;
+}
+
+.impact-list li {
+    margin-bottom: 8px;
+}
+
+.impact-list li:last-child {
+    margin-bottom: 0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Back Button -->
+    <div class="mb-3">
+        <a href="{% url 'warehouse:seller_warehouse_link_detail' link.pk %}" class="btn btn-outline-secondary btn-sm"
+           hx-get="{% url 'warehouse:seller_warehouse_link_detail' link.pk %}"
+           hx-target="body"
+           hx-push-url="true">
+            <i class="fa-solid fa-arrow-left me-2"></i>Back to Link Details
+        </a>
+    </div>
+
+    <!-- Delete Header -->
+    <div class="delete-header">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <h2>Confirm Link Deletion</h2>
+        <p class="mb-0">This action cannot be undone</p>
+    </div>
+
+    <!-- Warning -->
+    <div class="warning-card">
+        <h5><i class="fa-solid fa-exclamation-triangle"></i> Warning</h5>
+        <p class="mb-2">You are about to permanently delete this seller-warehouse link:</p>
+        <ul>
+            <li>This action is <strong>irreversible</strong></li>
+            <li>The seller will lose access to this warehouse</li>
+            <li>Future orders may not be able to use this warehouse</li>
+            <li>Historical data will remain unchanged</li>
+        </ul>
+    </div>
+
+    <!-- Link Information -->
+    <div class="info-card">
+        <h5><i class="fa-solid fa-info-circle"></i> Link to Delete</h5>
+
+        <div class="link-display">
+            <div class="link-title">
+                <span>{{ link.business.business_name }}</span>
+                <i class="fa-solid fa-arrow-right link-arrow"></i>
+                <span>{{ link.warehouse.name }}</span>
+            </div>
+
+            <div class="badge-group">
+                {% if link.is_default %}
+                <span class="badge bg-warning text-dark">DEFAULT WAREHOUSE</span>
+                {% endif %}
+                {% if link.is_active %}
+                <span class="badge bg-success">Active</span>
+                {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+                {% endif %}
+            </div>
+
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <div class="detail-label">Default Location</div>
+                    <div class="detail-value">{{ link.default_location.name|default:"Not set" }}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Priority</div>
+                    <div class="detail-value">{{ link.priority }}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Linked Date</div>
+                    <div class="detail-value">{{ link.linked_at|date:"M d, Y" }}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Linked By</div>
+                    <div class="detail-value">{{ link.linked_by.get_full_name|default:link.linked_by.username }}</div>
+                </div>
+            </div>
+
+            {% if link.notes %}
+            <div class="mt-3 pt-3" style="border-top: 1px solid #dee2e6;">
+                <div class="detail-label"><i class="fa-solid fa-note-sticky me-1"></i> Notes:</div>
+                <div class="detail-value" style="white-space: pre-wrap; font-weight: normal;">{{ link.notes }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Impact Assessment -->
+    <div class="info-card">
+        <h5><i class="fa-solid fa-chart-line"></i> Impact Assessment</h5>
+
+        <div class="impact-list">
+            <strong>What will happen after deletion:</strong>
+            <ul class="mt-2">
+                <li>
+                    <i class="fa-solid fa-check-circle text-success me-2"></i>
+                    <strong>Seller:</strong> {{ link.business.business_name }} will no longer have access to {{ link.warehouse.name }}
+                </li>
+                {% if link.is_default %}
+                <li>
+                    <i class="fa-solid fa-exclamation-circle text-warning me-2"></i>
+                    <strong>Default Status:</strong> This is the seller's default warehouse. Make sure to set another warehouse as default.
+                </li>
+                {% endif %}
+                <li>
+                    <i class="fa-solid fa-info-circle text-info me-2"></i>
+                    <strong>Existing Orders:</strong> Historical orders will not be affected
+                </li>
+                <li>
+                    <i class="fa-solid fa-info-circle text-info me-2"></i>
+                    <strong>Warehouse:</strong> {{ link.warehouse.name }} will remain active for other sellers
+                </li>
+            </ul>
+        </div>
+
+        {% if link.is_default %}
+        <div class="alert alert-warning mt-3 mb-0">
+            <i class="fa-solid fa-lightbulb me-2"></i>
+            <strong>Recommendation:</strong> Since this is the default warehouse, consider setting another warehouse as default before deleting this link.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Confirmation Form -->
+    <form method="post" action="">
+        {% csrf_token %}
+
+        <div class="info-card">
+            <h5><i class="fa-solid fa-shield-halved"></i> Final Confirmation</h5>
+
+            <div class="alert alert-danger mb-3">
+                <i class="fa-solid fa-exclamation-triangle me-2"></i>
+                <strong>Are you absolutely sure?</strong> This action cannot be undone.
+            </div>
+
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="confirm-delete" required>
+                <label class="form-check-label" for="confirm-delete">
+                    <strong>I understand that this action is permanent and cannot be reversed</strong>
+                </label>
+            </div>
+
+            <div class="action-buttons">
+                <button type="submit" class="btn btn-delete btn-lg" id="delete-button" disabled>
+                    <i class="fa-solid fa-trash me-2"></i>
+                    Yes, Delete This Link
+                </button>
+                <a href="{% url 'warehouse:seller_warehouse_link_detail' link.pk %}" class="btn btn-secondary btn-lg btn-cancel"
+                   hx-get="{% url 'warehouse:seller_warehouse_link_detail' link.pk %}"
+                   hx-target="body"
+                   hx-push-url="true">
+                    <i class="fa-solid fa-times me-2"></i>
+                    Cancel - Keep Link
+                </a>
+            </div>
+        </div>
+    </form>
+
+    <!-- Alternative Actions -->
+    <div class="info-card">
+        <h5><i class="fa-solid fa-lightbulb"></i> Alternative Actions</h5>
+
+        <p>Instead of deleting, you might want to:</p>
+        <ul>
+            <li>
+                <strong>Deactivate the link:</strong>
+                <a href="{% url 'warehouse:seller_warehouse_link_edit' link.pk %}"
+                   hx-get="{% url 'warehouse:seller_warehouse_link_edit' link.pk %}"
+                   hx-target="body"
+                   hx-push-url="true">Edit the link</a>
+                and uncheck "Link is Active" to temporarily disable it
+            </li>
+            <li>
+                <strong>Change priority:</strong>
+                Lower the priority to reduce its usage without removing it completely
+            </li>
+            <li>
+                <strong>Update default location:</strong>
+                Change the default pickup location if that's the issue
+            </li>
+        </ul>
+    </div>
+</div>
+
+<script>
+// Enable delete button only when checkbox is checked
+document.getElementById('confirm-delete').addEventListener('change', function() {
+    document.getElementById('delete-button').disabled = !this.checked;
+});
+</script>
+{% endblock %}

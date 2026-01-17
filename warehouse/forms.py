@@ -43,16 +43,167 @@ CycleCountItem = warehouse_models.CycleCountItem
 
 
 class WarehouseForm(forms.ModelForm):
+    """
+    Form for creating/editing fulfillment centers.
+    Staff-only form - warehouses are NOT owned by sellers.
+    """
     class Meta:
         model = warehouse_models.Warehouse
-        fields = ['name', 'code', 'address', 'pickup_location', 'is_active']
+        fields = [
+            'name', 'code', 'description', 'address', 'city', 'state',
+            'postal_code', 'country', 'latitude', 'longitude',
+            'phone', 'email', 'is_active', 'is_default', 'manager'
+        ]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Auto-generated if empty'}),
-            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'pickup_location': forms.Select(attrs={'class': 'form-select'}),
+            'name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Enter fulfillment center name'
+            }),
+            'code': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Auto-generated if empty (WH-FC-XXXXXXXX)'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Warehouse description and operational details'
+            }),
+            'address': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Full warehouse address'
+            }),
+            'city': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'City'}),
+            'state': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'State/Region'}),
+            'postal_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Postal Code'}),
+            'country': forms.TextInput(attrs={'class': 'form-control'}),
+            'latitude': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.000001',
+                'placeholder': 'Latitude (for auto-selection)'
+            }),
+            'longitude': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.000001',
+                'placeholder': 'Longitude (for auto-selection)'
+            }),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Contact phone'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Contact email'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_default': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'manager': forms.Select(attrs={'class': 'form-select'}),
         }
+        help_texts = {
+            'code': 'Leave empty to auto-generate unique code',
+            'is_default': 'Set as default fulfillment center for auto-selection',
+            'latitude': 'GPS coordinates used for distance-based warehouse selection',
+            'longitude': 'GPS coordinates used for distance-based warehouse selection',
+        }
+
+
+class WarehouseLocationForm(forms.ModelForm):
+    """
+    Form for creating/editing warehouse pickup/dispatch locations.
+    Each warehouse can have multiple physical locations.
+    """
+    class Meta:
+        model = warehouse_models.WarehouseLocation
+        fields = [
+            'warehouse', 'name', 'code', 'address', 'zone_number',
+            'latitude', 'longitude', 'is_active', 'is_default',
+            'operating_hours', 'notes'
+        ]
+        widgets = {
+            'warehouse': forms.Select(attrs={'class': 'form-select'}),
+            'name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g., North Gate, Main Entrance, Loading Dock A'
+            }),
+            'code': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g., NG, ME, LDA'
+            }),
+            'address': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Specific location address or directions'
+            }),
+            'zone_number': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Primary delivery zone served by this location'
+            }),
+            'latitude': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.000001',
+                'placeholder': 'GPS latitude'
+            }),
+            'longitude': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.000001',
+                'placeholder': 'GPS longitude'
+            }),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_default': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'operating_hours': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'e.g., Mon-Fri 8AM-5PM, Sat 9AM-2PM'
+            }),
+            'notes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Special instructions for drivers'
+            }),
+        }
+        help_texts = {
+            'is_default': 'Set as default location for this warehouse',
+            'zone_number': 'Links this location to a delivery zone for automatic selection',
+        }
+
+
+class SellerWarehouseLinkForm(forms.ModelForm):
+    """
+    Form for linking sellers to fulfillment centers.
+    Staff-only form - controls which warehouses serve which sellers.
+    """
+    class Meta:
+        model = warehouse_models.SellerWarehouseLink
+        fields = [
+            'business', 'warehouse', 'default_location',
+            'is_default', 'is_active', 'priority', 'notes'
+        ]
+        widgets = {
+            'business': forms.Select(attrs={'class': 'form-select'}),
+            'warehouse': forms.Select(attrs={'class': 'form-select'}),
+            'default_location': forms.Select(attrs={'class': 'form-select'}),
+            'is_default': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'priority': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': 0,
+                'placeholder': 'Higher priority = preferred for auto-selection'
+            }),
+            'notes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Special notes about this warehouse-seller relationship'
+            }),
+        }
+        help_texts = {
+            'is_default': 'Set as default warehouse for this seller',
+            'priority': 'Higher values are preferred during automatic warehouse selection',
+            'default_location': 'Default pickup location at this warehouse for this seller',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filter locations based on selected warehouse
+        if 'instance' in kwargs and kwargs['instance'].pk:
+            warehouse = kwargs['instance'].warehouse
+            self.fields['default_location'].queryset = warehouse_models.WarehouseLocation.objects.filter(
+                warehouse=warehouse,
+                is_active=True
+            )
 
 
 # =============================================================================
@@ -131,8 +282,15 @@ class ReceiveStockForm(forms.Form):
 
     def __init__(self, business, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business,
+            is_active=True
+        ).values_list('warehouse_id', flat=True)
+
         self.fields['warehouse'].queryset = warehouse_models.Warehouse.objects.filter(
-            business=business, is_active=True
+            id__in=linked_warehouse_ids,
+            is_active=True
         )
 
 

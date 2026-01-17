@@ -1,4 +1,5 @@
 {% load static %}
+{% load custom_filters %}
 <link rel="stylesheet" href="{% static 'orders/css/orders.css' %}">
 
 {% if not orders %}
@@ -51,7 +52,7 @@
       </div>
       <div class="summary-item">
         <i class="fa-solid fa-location-dot"></i>
-        <span>Zone {{ order.dl_zone }}</span>
+        <span>{% get_zone_display order %}</span>
       </div>
       {% if order.cod_amount %}
       <div class="summary-item">
@@ -105,7 +106,7 @@
                 <div class="location-text">
                   <div class="location-name">Drop-off</div>
                   <div class="location-address">
-                    Zone {{ order.dl_zone }}, Street {{ order.dl_street }}, Building {{ order.dl_building }}<br>
+                    {% get_zone_display order %}{% if order.dl_street %}, Street {{ order.dl_street }}{% endif %}{% if order.dl_building %}, Building {{ order.dl_building }}{% endif %}<br>
                     {{ order.customer_address }}
                   </div>
                 </div>
@@ -247,4 +248,4 @@ function loadProducts(orderId, event) {
   });
 }
 </script>
-{% include "includes/components/_pagination.html" with page_obj=orders %}
+{% include "includes/components/_pagination.html" with page_obj=orders per_page=per_page %}

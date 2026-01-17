@@ -1,0 +1,137 @@
+{% comment %}
+Tasks Table View Component
+Usage: {% include "workforce/parts/components/_tasks_table_view.html" with tasks=dl_tasks %}
+
+Required context:
+- tasks: Paginated queryset of delivery tasks (DeliveryTask objects)
+
+Each task should have:
+- dl_task_number, dl_task_date, dl_task_status_client, dl_task_status_dms
+- order (with customer_name, customer_phone)
+- driver, dl_task_publish
+{% endcomment %}
+
+<div class="tasks-table-wrapper" id="tasksTableContainer">
+    <!-- Bulk Actions Bar -->
+    <div class="bulk-actions-bar" id="bulkActionsBar" style="display: none;">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 p-2 bg-primary text-white rounded-top">
+            <div class="d-flex align-items-center gap-2">
+                <span class="selected-count fw-bold"><span id="selectedCount">0</span> selected</span>
+                <button type="button" class="btn btn-sm btn-light" onclick="clearAllSelections()">
+                    <i class="fa-solid fa-times me-1"></i>Clear
+                </button>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-sm btn-light" onclick="bulkAction('print')" title="Print Selected">
+                    <i class="fa-solid fa-print me-1"></i>Print
+                </button>
+                <button type="button" class="btn btn-sm btn-light" onclick="bulkAction('publish_dms')" title="Publish to DMS">
+                    <i class="fa-solid fa-cloud-arrow-up me-1"></i>Publish DMS
+                </button>
+                <button type="button" class="btn btn-sm btn-light" onclick="bulkAction('publish_app')" title="Publish to App">
+                    <i class="fa-solid fa-mobile-screen me-1"></i>To App
+                </button>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fa-solid fa-sync me-1"></i>Change Status
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="bulkAction('status_pending')">Pending</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="bulkAction('status_in_transit')">In Transit</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="bulkAction('status_delivered')">Delivered</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="bulkAction('status_rejected')">Rejected</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="bulkAction('status_cancelled')">Cancelled</a></li>
+                    </ul>
+                </div>
+                <button type="button" class="btn btn-sm btn-warning" onclick="bulkAction('export')" title="Export Selected">
+                    <i class="fa-solid fa-download me-1"></i>Export
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-hover tasks-table mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="th-checkbox">
+                        <input type="checkbox" class="form-check-input" id="selectAllTasks" onchange="toggleSelectAll(this)">
+                    </th>
+                    <th class="sortable" data-sort="task_number" onclick="sortTable('task_number')">
+                        Task # <i class="fa-solid fa-sort sort-icon"></i>
+                    </th>
+                    <th class="sortable" data-sort="date" onclick="sortTable('date')">
+                        Date <i class="fa-solid fa-sort sort-icon"></i>
+                    </th>
+                    <th class="sortable" data-sort="customer" onclick="sortTable('customer')">
+                        Customer <i class="fa-solid fa-sort sort-icon"></i>
+                    </th>
+                    <th>Mobile</th>
+                    <th class="sortable" data-sort="driver" onclick="sortTable('driver')">
+                        Driver <i class="fa-solid fa-sort sort-icon"></i>
+                    </th>
+                    <th class="sortable" data-sort="status" onclick="sortTable('status')">
+                        Status <i class="fa-solid fa-sort sort-icon"></i>
+                    </th>
+                    <th class="sortable" data-sort="dms_status" onclick="sortTable('dms_status')">
+                        DMS <i class="fa-solid fa-sort sort-icon"></i>
+                    </th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dl in tasks %}
+                <tr data-task-id="{{ dl.id }}">
+                    <td class="td-checkbox">
+                        <input type="checkbox" class="form-check-input task-checkbox" value="{{ dl.id }}" onchange="updateBulkSelection()">
+                    </td>
+                    <td class="fw-semibold">{{ dl.dl_task_number }}</td>
+                    <td>{{ dl.dl_task_date|date:"d M"|default:"N/A" }}</td>
+                    <td>{{ dl.order.customer_name|default:"N/A"|truncatechars:20 }}</td>
+                    <td>{{ dl.order.customer_phone|default:"N/A" }}</td>
+                    <td>{{ dl.driver|default:"-"|truncatechars:15 }}</td>
+                    <td>
+                        {% if dl.dl_task_status_client %}
+                        <span class="status-badge status-{{ dl.dl_task_status_client }}">
+                            {{ dl.get_dl_task_status_client_display }}
+                        </span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if dl.dl_task_status_dms %}
+                        <span class="status-badge status-{{ dl.dl_task_status_dms }}">
+                            {{ dl.get_dl_task_status_dms_display }}
+                        </span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-info btn-sm" onclick="viewTaskDetail({{ dl.id }})" title="View Details">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                            <button class="btn btn-outline-warning btn-sm" onclick="editTask({{ dl.id }})" title="Edit">
+                                <i class="fa-solid fa-edit"></i>
+                            </button>
+                            <a href="https://wa.me/{{ dl.order.customer_phone }}" target="_blank" class="btn btn-outline-success btn-sm" title="WhatsApp">
+                                <i class="fa-brands fa-whatsapp"></i>
+                            </a>
+                            <button class="btn btn-outline-primary btn-sm" onclick="publishToDMS({{ dl.id }})" title="Publish DMS" {% if dl.dl_task_publish %}disabled{% endif %}>
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#statusModal" data-task-id="{{ dl.id }}" data-task-number="{{ dl.dl_task_number }}" onclick="setStatusModalTask(this)" title="Update Status">
+                                <i class="fa-solid fa-sync"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center py-4 text-muted">
+                        <i class="fa-solid fa-inbox me-2"></i>No tasks to display
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

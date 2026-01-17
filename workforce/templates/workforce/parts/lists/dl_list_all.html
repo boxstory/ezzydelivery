@@ -15,9 +15,13 @@
                 <h1 class="h2 mb-0"><i class="fa-solid fa-tasks me-2" aria-hidden="true"></i>All Delivery Tasks</h1>
                 <p class="mb-0 opacity-75">Manage and track all delivery tasks</p>
             </div>
-            <div class="text-end" aria-label="Task count summary">
-                <div class="fs-3 fw-bold" aria-live="polite">{{ dl_tasks.paginator.count|default:"0" }}</div>
-                <small>Total Tasks</small>
+            <div class="d-flex align-items-center gap-3">
+                <!-- View Toggle -->
+                {% include "workforce/parts/components/_tasks_view_toggle.html" %}
+                <div class="text-end" aria-label="Task count summary">
+                    <div class="fs-3 fw-bold" aria-live="polite">{{ dl_tasks.paginator.count|default:"0" }}</div>
+                    <small>Total Tasks</small>
+                </div>
             </div>
         </div>
     </header>
@@ -181,202 +185,13 @@
         </div>
     </div>
 
-    <!-- Tasks List -->
+    <!-- Tasks Views -->
     {% if dl_tasks %}
-    <div class="tasks-list">
-        {% for dl in dl_tasks %}
-        <div class="task-card">
-            <!-- Task Header -->
-            <div class="task-header">
-                <div>
-                    <div class="task-id">
-                        <i class="fa-solid fa-hashtag me-1"></i>{{ dl.dl_task_number }}
-                    </div>
-                    <small class="text-muted">
-                        <i class="fa-solid fa-calendar me-1"></i>{{ dl.dl_task_date|default:"N/A" }}
-                    </small>
-                </div>
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                    {% if dl.dl_task_status_client %}
-                    <span class="status-badge status-{{ dl.dl_task_status_client }}">
-                        {{ dl.get_dl_task_status_client_display }}
-                    </span>
-                    {% endif %}
-                    {% if dl.dl_task_status_dms %}
-                    <span class="status-badge status-{{ dl.dl_task_status_dms }}">
-                        DMS: {{ dl.get_dl_task_status_dms_display }}
-                    </span>
-                    {% endif %}
-                </div>
-            </div>
+    <!-- Card Views (List/Grid) -->
+    {% include "workforce/parts/components/_tasks_card_view.html" with tasks=dl_tasks %}
 
-            <!-- Task Details Grid -->
-            <div class="task-details">
-                <div class="detail-item">
-                    <div class="detail-label">Customer Name</div>
-                    <div class="detail-value">
-                        <i class="fa-solid fa-user me-1 text-muted"></i>{{ dl.order.customer_name|default:"N/A" }}
-                    </div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Mobile</div>
-                    <div class="detail-value">
-                        <i class="fa-solid fa-phone me-1 text-muted"></i>{{ dl.order.customer_phone|default:"N/A" }}
-                    </div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Order Status</div>
-                    <div class="detail-value">
-                        <i class="fa-solid fa-info-circle me-1 text-muted"></i>{{ dl.order_status|default:"N/A" }}
-                    </div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">DMS Task Number</div>
-                    <div class="detail-value">
-                        <i class="fa-solid fa-code me-1 text-muted"></i>{{ dl.dl_task_number_dms|default:"N/A" }}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Location Section -->
-            <div class="location-section d-flex justify-content-between">
-                <div class="location-item">
-                    <i class="fa-solid fa-location-dot location-icon text-success"></i>
-                    <div class="location-text">
-                        <strong class="d-block mb-1">Pickup Location</strong>
-                        {{ dl.pickup_location|default:"N/A" }}
-                    </div>
-                </div>
-                {% if dl.order.customer_address %}
-                <div class="location-item">
-                    <i class="fa-solid fa-location-dot location-icon text-danger"></i>
-                    <div class="location-text">
-                        <strong class="d-block mb-1">Delivery Address</strong>
-                        {{ dl.order.customer_address }}
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Driver Info -->
-            {% if dl.driver %}
-            <div class="driver-info">
-                <div>
-                    <i class="fa-solid fa-user-tie me-2 text-primary"></i>
-                    <strong>Driver:</strong> {{ dl.driver }}
-                </div>
-                <span class="badge bg-primary">Assigned</span>
-            </div>
-            {% endif %}
-
-            <!-- Comments Section -->
-            <div class="comments-preview mt-3">
-                <button class="btn btn-outline-dark btn-sm position-relative"
-                        data-bs-toggle="collapse"
-                        data-bs-target="#comments{{ dl.order.id }}">
-                    <i class="fa-solid fa-comments me-1"></i>Comments
-                    <span class="badge bg-secondary ms-1">{{ dl.order.order_comments.count }}</span>
-                </button>
-                <div class="collapse mt-2" id="comments{{ dl.order.id }}">
-                    <div class="card card-body bg-light">
-                        <!-- Comments Container -->
-                        <div id="comments-list-{{ dl.order.id }}"
-                             class="comments-list"
-                             style="max-height: 200px; overflow-y: auto;">
-                            {% if dl.order.order_comments.all %}
-                                {% for comment in dl.order.order_comments.all %}
-                                    <div class="comment-item mb-2 p-2 bg-white rounded border-start border-primary border-3">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <small class="text-primary fw-bold">
-                                                <i class="fa-solid fa-user-circle me-1"></i>{{ comment.name }}
-                                            </small>
-                                            <small class="text-muted">{{ comment.created_at|timesince }} ago</small>
-                                        </div>
-                                        <p class="mb-0 small mt-1">{{ comment.body }}</p>
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                <div class="text-center py-3">
-                                    <i class="fa-regular fa-comment-dots fa-2x text-muted mb-2"></i>
-                                    <p class="text-muted small mb-0">No comments yet</p>
-                                </div>
-                            {% endif %}
-                        </div>
-                        <!-- Add Comment Form -->
-                        <div class="mt-2 pt-2 border-top">
-                            <form hx-post="{% url 'orders:add_order_comment' dl.order.id %}"
-                                  hx-target="#comments-list-{{ dl.order.id }}"
-                                  hx-swap="innerHTML"
-                                  hx-on::after-request="this.reset()">
-                                {% csrf_token %}
-                                <div class="input-group input-group-sm">
-                                    <input type="text"
-                                           class="form-control"
-                                           name="comment"
-                                           placeholder="Add a comment..."
-                                           required>
-                                    <button class="btn btn-primary" type="submit">
-                                        <i class="fa-solid fa-paper-plane"></i>
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="quick-actions">
-                <div class="row g-2">
-                    <!-- Contact Customer -->
-                    <div class="col-md-6 col-lg-3">
-                        <a href="https://wa.me/{{ dl.order.customer_phone }}?text=Hello {{ dl.order.customer_name }}, this is regarding delivery task {{ dl.dl_task_number }}"
-                           target="_blank" class="btn btn-success btn-sm w-100">
-                            <i class="fa-brands fa-whatsapp me-1"></i>Contact Customer
-                        </a>
-                    </div>
-
-                    <!-- Publish to DMS -->
-                    <div class="col-md-6 col-lg-3">
-                        {% if dl.dl_task_publish %}
-                        <button class="btn btn-success btn-sm w-100" disabled>
-                            <i class="fa-solid fa-check-circle me-1"></i>Published to DMS
-                        </button>
-                        {% else %}
-                        <button class="btn btn-primary btn-sm w-100" onclick="publishToDMS({{ dl.id }})">
-                            <i class="fa-solid fa-cloud-arrow-up me-1"></i>Publish to DMS
-                        </button>
-                        {% endif %}
-                    </div>
-
-                    <!-- Publish to Driver App -->
-                    <div class="col-md-6 col-lg-3">
-                        {% if dl.dl_task_status_dms == '6' or dl.dl_task_status_dms == '0' or dl.dl_task_status_dms == '7' %}
-                        <button class="btn btn-success btn-sm w-100" disabled>
-                            <i class="fa-solid fa-check-circle me-1"></i>In Driver App
-                        </button>
-                        {% else %}
-                        <button class="btn btn-info btn-sm w-100" onclick="publishToDriverApp({{ dl.id }})">
-                            <i class="fa-solid fa-mobile-screen me-1"></i>Publish to App
-                        </button>
-                        {% endif %}
-                    </div>
-
-                    <!-- Update Status -->
-                    <div class="col-md-6 col-lg-3">
-                        <button class="btn btn-outline-secondary btn-sm w-100" type="button"
-                                data-bs-toggle="modal" data-bs-target="#statusModal"
-                                data-task-id="{{ dl.id }}" data-task-number="{{ dl.dl_task_number }}"
-                                onclick="setStatusModalTask(this)">
-                            <i class="fa-solid fa-sync me-1"></i>Update Status
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-        {% endfor %}
-    </div>
+    <!-- Table View -->
+    {% include "workforce/parts/components/_tasks_table_view.html" with tasks=dl_tasks %}
 
     <!-- Pagination -->
     {% include "includes/components/_pagination.html" with page_obj=dl_tasks filter_params=filter_params %}
@@ -404,42 +219,11 @@
 </div>
 
 <!-- Status Update Modal -->
-<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="statusModalLabel">
-                    <i class="fa-solid fa-sync me-2"></i>Update Task Status
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="mb-3">Task: <strong id="statusModalTaskNumber"></strong></p>
-                <input type="hidden" id="statusModalTaskId">
-                <div class="mb-3">
-                    <label for="statusSelect" class="form-label">Select New Status</label>
-                    <select class="form-select" id="statusSelect">
-                        <option value="">-- Select Status --</option>
-                        <option value="pending">Pending</option>
-                        <option value="in_transit">In Transit</option>
-                        <option value="delivered">Delivered</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="cancelled">Cancelled</option>
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitStatusUpdate()">
-                    <i class="fa-solid fa-check me-1"></i>Update Status
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+{% include "workforce/parts/components/_tasks_status_modal.html" %}
 {% endblock content %}
 
 {% block extra_js %}
 <script src="{% static 'orders/js/orders_main.js' %}"></script>
 <script src="{% static 'workforce/js/workforce.js' %}"></script>
+{% include "workforce/parts/components/_tasks_view_scripts.html" %}
 {% endblock extra_js %}

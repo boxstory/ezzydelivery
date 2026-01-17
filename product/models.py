@@ -108,6 +108,15 @@ class UnitVariant(models.Model):
 
 
 class Product(models.Model):
+    product_id = models.CharField(
+        max_length=6,
+        unique=True,
+        editable=False,
+        db_index=True,
+        null=True,
+        blank=True,
+        help_text="6-digit unique product identifier (last 2 digits from business code)"
+    )  # Unique, non-editable product ID for inventory tracking
     brand_name = models.CharField(max_length=100)
     item_name = models.CharField(max_length=100)
     item_sku = models.CharField(max_length=100, db_index=True)  # INDEX: Frequently searched/filtered
@@ -121,9 +130,9 @@ class Product(models.Model):
     item_discription = models.CharField(max_length=100, null=True, blank=True)
 
     brand_logo = models.ImageField(
-        upload_to='product_images/brand_logo', null=True, blank=True, default="business/product_images/brand_logo_default.jpg")
+        upload_to='product_images/brand_logo', null=True, blank=True)
     product_image = models.ImageField(
-        upload_to='product_images/product_images', null=True, blank=True, default="business/product_images/product_image_default.jpg")
+        upload_to='product_images/product_images', null=True, blank=True)
     business = models.ForeignKey(
         business_models.Business, on_delete=models.SET_NULL, null=True, related_name='product', db_index=True)  # INDEX: Filtered in every product query
     product_category = models.ForeignKey(
@@ -133,6 +142,63 @@ class Product(models.Model):
 
     def __str__(self):
         return self.brand_name + " " + self.item_name
+
+    def save(self, *args, **kwargs):
+        """
+        Override save to auto-generate unique 6-digit product_id.
+        Format: {4-digit-counter}{2-digit-business-code}
+        Example: 000101, 000212, 123456
+
+        - First 4 digits: Sequential counter (0001-9999)
+        - Last 2 digits: Last 2 digits from business_id
+        """
+        if not self.product_id:
+            from django.db.models import Max
+
+            # Get last 2 digits from business_id
+            if self.business and self.business.business_id:
+                # Extract only digits from business_id and take last 2
+                business_digits = ''.join(filter(str.isdigit, str(self.business.business_id)))
+                business_suffix = business_digits[-2:].zfill(2) if business_digits else "00"
+            else:
+                business_suffix = "00"
+
+            # Find the highest product_id with this business suffix
+            suffix_pattern = f"_____{business_suffix}"  # 5 chars + suffix
+            last_product = Product.objects.filter(
+                product_id__endswith=business_suffix
+            ).order_by('-product_id').first()
+
+            if last_product and len(last_product.product_id) == 6:
+                # Extract the 4-digit counter from existing product_id
+                try:
+                    last_counter = int(last_product.product_id[:4])
+                    counter = last_counter + 1
+                    # If counter exceeds 9999, wrap to 0001
+                    if counter > 9999:
+                        counter = 1
+                except (ValueError, IndexError):
+                    counter = 1
+            else:
+                counter = 1
+
+            # Generate 6-digit product_id: {counter:04d}{business_suffix}
+            self.product_id = f"{counter:04d}{business_suffix}"
+
+            # Ensure uniqueness (in case of race condition)
+            max_attempts = 9999
+            attempts = 0
+            while Product.objects.filter(product_id=self.product_id).exists() and attempts < max_attempts:
+                counter += 1
+                if counter > 9999:
+                    counter = 1
+                self.product_id = f"{counter:04d}{business_suffix}"
+                attempts += 1
+
+            if attempts >= max_attempts:
+                raise ValueError(f"Unable to generate unique product_id for business suffix {business_suffix}")
+
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name_plural = "Products items"

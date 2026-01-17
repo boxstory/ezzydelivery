@@ -21,7 +21,7 @@
             <span style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase;">Total COD</span>
             <i class="fa-solid fa-money-bills" style="font-size: 1.5rem; color: #28a745; opacity: 0.3;"></i>
         </div>
-        <div style="font-size: 2rem; font-weight: 800; color: #28a745;">₹{{ total_cod|default:"0.00" }}</div>
+        <div style="font-size: 2rem; font-weight: 800; color: #28a745;">QAR {{ total_cod|default:"0.00" }}</div>
         <div style="font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;">Across all drivers</div>
     </div>
 
@@ -44,33 +44,120 @@
     </div>
 </div>
 
-<!-- Fleet Filter Section -->
-<div class="filter-section">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-        <div style="flex: 1; min-width: 250px;">
-            <label for="fleetFilter" class="filter-label">
-                <i class="fa-solid fa-filter me-2"></i>Filter by Fleet Driver
-            </label>
-            <input type="text" id="fleetFilter" class="filter-input" placeholder="Search by driver name or ID...">
+<!-- Filter Panel -->
+<div class="filter-panel">
+    <form method="get" id="filterForm">
+        <div class="filter-row">
+            <!-- Date Filter Dropdown -->
+            <div class="filter-group">
+                <label><i class="fa-solid fa-calendar me-1"></i>Date Range</label>
+                <select name="date_preset" id="datePresetSelect" class="filter-select" onchange="toggleCustomDate(this.value)">
+                    <option value="">All Time</option>
+                    <option value="today" {% if date_preset == 'today' %}selected{% endif %}>Today</option>
+                    <option value="yesterday" {% if date_preset == 'yesterday' %}selected{% endif %}>Yesterday</option>
+                    <option value="3days" {% if date_preset == '3days' %}selected{% endif %}>Last 3 Days</option>
+                    <option value="1week" {% if date_preset == '1week' %}selected{% endif %}>Last 1 Week</option>
+                    <option value="1month" {% if date_preset == '1month' %}selected{% endif %}>Last 1 Month</option>
+                    <option value="custom" {% if date_preset == 'custom' %}selected{% endif %}>Custom Date</option>
+                </select>
+            </div>
+
+            <!-- Custom Date Fields (shown only when Custom is selected) -->
+            <div class="filter-group custom-date-fields" id="customDateFields" style="{% if date_preset != 'custom' %}display: none;{% endif %}">
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <div>
+                        <label><i class="fa-solid fa-calendar-day me-1"></i>From</label>
+                        <input type="date" name="date_from" value="{{ date_from }}" id="dateFromInput">
+                    </div>
+                    <div>
+                        <label><i class="fa-solid fa-calendar-day me-1"></i>To</label>
+                        <input type="date" name="date_to" value="{{ date_to }}" id="dateToInput">
+                    </div>
+                </div>
+            </div>
+
+            <!-- COD Filter Dropdown -->
+            <div class="filter-group">
+                <label><i class="fa-solid fa-coins me-1"></i>COD In Hand</label>
+                <select name="cod_filter" id="codFilterSelect" class="filter-select" onchange="toggleCustomAmount(this.value)">
+                    <option value="">All</option>
+                    <option value="yes" {% if cod_filter == 'yes' %}selected{% endif %}>Yes</option>
+                    <option value="no" {% if cod_filter == 'no' %}selected{% endif %}>No</option>
+                    <option value="custom" {% if cod_filter == 'custom' %}selected{% endif %}>Custom Amount</option>
+                </select>
+            </div>
+
+            <!-- Custom Amount Fields (shown only when Custom COD is selected) -->
+            <div class="filter-group custom-amount-fields" id="customAmountFields" style="{% if cod_filter != 'custom' %}display: none;{% endif %}">
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <div>
+                        <label>Min</label>
+                        <input type="number" name="min_amount" value="{{ min_amount }}" placeholder="0.00" step="0.01" style="width: 100px;">
+                    </div>
+                    <div>
+                        <label>Max</label>
+                        <input type="number" name="max_amount" value="{{ max_amount }}" placeholder="10000" step="0.01" style="width: 100px;">
+                    </div>
+                </div>
+            </div>
+
+            <input type="hidden" name="sort" value="{{ sort_by }}" id="sortInput">
+            <input type="hidden" name="view" value="{{ view_mode }}" id="viewInput">
+            <div class="filter-actions">
+                <button type="submit" class="btn-filter btn-filter-apply">
+                    <i class="fa-solid fa-filter me-1"></i>Apply
+                </button>
+                <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="btn-filter btn-filter-clear">
+                    <i class="fa-solid fa-times me-1"></i>Clear
+                </a>
+            </div>
         </div>
-        <div class="fleet-report-actions">
-            <button onclick="window.print()" class="btn-print-report">
-                <i class="fa-solid fa-print"></i>
-                Print
+    </form>
+</div>
+
+<!-- Toolbar with Sort and View Toggle -->
+<div class="toolbar">
+    <div class="toolbar-left">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <label for="sortSelect" style="font-size: 0.875rem; color: var(--brand-grey-600);">Sort by:</label>
+            <select id="sortSelect" class="sort-select" onchange="updateSort(this.value)">
+                <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name (A-Z)</option>
+                <option value="name_desc" {% if sort_by == 'name_desc' %}selected{% endif %}>Name (Z-A)</option>
+                <option value="amount_desc" {% if sort_by == 'amount_desc' %}selected{% endif %}>Amount (High-Low)</option>
+                <option value="amount_asc" {% if sort_by == 'amount_asc' %}selected{% endif %}>Amount (Low-High)</option>
+                <option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>Last Settled (Recent)</option>
+                <option value="date_asc" {% if sort_by == 'date_asc' %}selected{% endif %}>Last Settled (Oldest)</option>
+            </select>
+        </div>
+        <span style="font-size: 0.875rem; color: var(--brand-grey-500);">
+            {{ drivers.paginator.count }} driver{{ drivers.paginator.count|pluralize }}
+        </span>
+    </div>
+    <div class="toolbar-right">
+        <div class="view-toggle">
+            <button type="button" class="view-toggle-btn {% if view_mode == 'grid' %}active{% endif %}" onclick="setView('grid')" title="Grid View">
+                <i class="fa-solid fa-grid-2"></i>
             </button>
-            <button onclick="exportToCSV()" class="btn-export-report">
-                <i class="fa-solid fa-file-export"></i>
-                Export CSV
+            <button type="button" class="view-toggle-btn {% if view_mode == 'list' %}active{% endif %}" onclick="setView('list')" title="List View">
+                <i class="fa-solid fa-list"></i>
             </button>
         </div>
+        <button onclick="window.print()" class="btn-print-report">
+            <i class="fa-solid fa-print"></i>
+            Print
+        </button>
+        <button onclick="exportToCSV()" class="btn-export-report">
+            <i class="fa-solid fa-file-export"></i>
+            Export
+        </button>
     </div>
 </div>
 
-<!-- Fleet Cards Grid -->
 {% if drivers %}
-<div class="fleet-grid">
+<!-- Grid View -->
+<div class="fleet-grid {% if view_mode == 'grid' %}active{% endif %}" id="gridView">
     {% for driver in drivers %}
-    <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.id }}" class="fleet-card" data-driver-name="{{ driver.user.first_name }} {{ driver.user.last_name }}">
+    <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.driver_id }}" class="fleet-card" data-driver-name="{{ driver.user.first_name }} {{ driver.user.last_name }}">
         <div class="fleet-card-header">
             <div class="fleet-avatar">
                 {{ driver.user.first_name|first|upper }}{{ driver.user.last_name|first|upper }}
@@ -82,16 +169,76 @@
         </div>
         <div class="fleet-details">
             <div class="detail-row">
-                <span class="detail-label">COD Amount</span>
-                <span class="detail-value amount">₹{{ driver.cod_amount|default:"0.00" }}</span>
+                <span class="detail-label">{% if is_filtered_by_date %}COD Collected{% else %}COD In Hand{% endif %}</span>
+                <span class="detail-value amount {% if driver.period_cod > 0 %}amount-positive{% else %}amount-zero{% endif %}">QAR {{ driver.period_cod|default:"0.00" }}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Last Settled</span>
-                <span class="detail-value date">{{ driver.last_settled_date|date:"d M Y"|default:"Never" }}</span>
+                <span class="detail-value date">{{ driver.last_settlement_date|date:"d M Y"|default:"Never" }}</span>
             </div>
         </div>
     </a>
     {% endfor %}
+</div>
+
+<!-- List View -->
+<div class="fleet-list {% if view_mode == 'list' %}active{% endif %}" id="listView">
+    <table class="list-table">
+        <thead>
+            <tr>
+                <th class="sortable" onclick="updateSort('{% if sort_by == 'name_asc' %}name_desc{% else %}name_asc{% endif %}')">
+                    Driver
+                    {% if sort_by == 'name_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
+                    {% elif sort_by == 'name_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
+                    {% else %}<i class="fa-solid fa-sort ms-1" style="opacity: 0.3;"></i>{% endif %}
+                </th>
+                <th>Driver ID</th>
+                <th>Phone</th>
+                <th class="sortable" onclick="updateSort('{% if sort_by == 'amount_asc' %}amount_desc{% else %}amount_asc{% endif %}')">
+                    {% if is_filtered_by_date %}COD Collected{% else %}COD In Hand{% endif %}
+                    {% if sort_by == 'amount_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
+                    {% elif sort_by == 'amount_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
+                    {% else %}<i class="fa-solid fa-sort ms-1" style="opacity: 0.3;"></i>{% endif %}
+                </th>
+                <th>Wallet Balance</th>
+                <th class="sortable" onclick="updateSort('{% if sort_by == 'date_asc' %}date_desc{% else %}date_asc{% endif %}')">
+                    Last Settlement
+                    {% if sort_by == 'date_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
+                    {% elif sort_by == 'date_desc' %}<i class="fa-solid fa-sort-down ms-1"></i>
+                    {% else %}<i class="fa-solid fa-sort ms-1" style="opacity: 0.3;"></i>{% endif %}
+                </th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for driver in drivers %}
+            <tr>
+                <td>
+                    <div class="driver-cell">
+                        <div class="list-avatar">
+                            {{ driver.user.first_name|first|upper }}{{ driver.user.last_name|first|upper }}
+                        </div>
+                        <div>
+                            <strong>{{ driver.user.first_name }} {{ driver.user.last_name }}</strong>
+                        </div>
+                    </div>
+                </td>
+                <td>{{ driver.driver_id }}</td>
+                <td>{{ driver.driver_phone }}</td>
+                <td class="{% if driver.period_cod > 0 %}amount-positive{% else %}amount-zero{% endif %}">
+                    QAR {{ driver.period_cod|default:"0.00" }}
+                </td>
+                <td>QAR {{ driver.wallet_balance|default:"0.00" }}</td>
+                <td>{{ driver.last_settlement_date|date:"d M Y"|default:"Never" }}</td>
+                <td>
+                    <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.driver_id }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fa-solid fa-eye"></i> View
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
 <!-- Pagination -->
@@ -102,7 +249,8 @@
 <div class="empty-state">
     <i class="fa-solid fa-sack-dollar"></i>
     <h3>No Fleet Drivers Found</h3>
-    <p>There are no drivers with COD records at the moment.</p>
+    <p>There are no drivers matching your filters.</p>
+    <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="btn btn-primary mt-3">Clear Filters</a>
 </div>
 {% endif %}
 </div>
@@ -110,65 +258,116 @@
 
 {% block extra_js %}
 <script>
-    // Debounced search functionality
-    let searchTimeout;
-    document.getElementById('fleetFilter').addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        const searchTerm = this.value.toLowerCase();
+    // Update sort and submit form
+    function updateSort(value) {
+        document.getElementById('sortInput').value = value;
+        document.getElementById('filterForm').submit();
+    }
 
-        searchTimeout = setTimeout(() => {
-            const cards = document.querySelectorAll('.fleet-card');
-            let visibleCount = 0;
+    // Set view mode and submit form
+    function setView(mode) {
+        document.getElementById('viewInput').value = mode;
+        document.getElementById('filterForm').submit();
+    }
 
-            cards.forEach(card => {
-                const driverName = card.getAttribute('data-driver-name').toLowerCase();
-                if (driverName.includes(searchTerm)) {
-                    card.style.display = 'block';
-                    visibleCount++;
+    // Toggle custom date fields based on dropdown selection
+    function toggleCustomDate(value) {
+        const customDateFields = document.getElementById('customDateFields');
+        if (value === 'custom') {
+            customDateFields.style.display = 'block';
+        } else {
+            customDateFields.style.display = 'none';
+        }
+    }
+
+    // Toggle custom amount fields based on dropdown selection
+    function toggleCustomAmount(value) {
+        const customAmountFields = document.getElementById('customAmountFields');
+        if (value === 'custom') {
+            customAmountFields.style.display = 'block';
+        } else {
+            customAmountFields.style.display = 'none';
+        }
+    }
+
+    // Client-side search filter (for quick filtering within current page)
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.id = 'quickSearch';
+        searchInput.placeholder = 'Quick search on this page...';
+        searchInput.className = 'filter-input';
+        searchInput.style.maxWidth = '250px';
+
+        // Add quick search to toolbar
+        const toolbarLeft = document.querySelector('.toolbar-left');
+        if (toolbarLeft) {
+            const searchWrapper = document.createElement('div');
+            searchWrapper.style.display = 'flex';
+            searchWrapper.style.alignItems = 'center';
+            searchWrapper.style.gap = '0.5rem';
+            searchWrapper.innerHTML = '<i class="fa-solid fa-search" style="color: var(--brand-grey-400);"></i>';
+            searchWrapper.appendChild(searchInput);
+            toolbarLeft.insertBefore(searchWrapper, toolbarLeft.firstChild);
+        }
+
+        // Quick search functionality
+        let searchTimeout;
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const searchTerm = this.value.toLowerCase();
+
+            searchTimeout = setTimeout(() => {
+                const viewMode = '{{ view_mode }}';
+
+                if (viewMode === 'grid') {
+                    const cards = document.querySelectorAll('.fleet-card');
+                    cards.forEach(card => {
+                        const driverName = card.getAttribute('data-driver-name').toLowerCase();
+                        card.style.display = driverName.includes(searchTerm) ? 'block' : 'none';
+                    });
                 } else {
-                    card.style.display = 'none';
+                    const rows = document.querySelectorAll('.list-table tbody tr');
+                    rows.forEach(row => {
+                        const text = row.textContent.toLowerCase();
+                        row.style.display = text.includes(searchTerm) ? '' : 'none';
+                    });
                 }
-            });
-
-            // Show message if no results
-            const existingMessage = document.querySelector('.no-results-message');
-            if (existingMessage) existingMessage.remove();
-
-            if (visibleCount === 0 && searchTerm !== '') {
-                const grid = document.querySelector('.fleet-grid');
-                const message = document.createElement('div');
-                message.className = 'no-results-message';
-                message.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--brand-grey-500);';
-                // Use DOM methods for XSS-safe content insertion
-                const icon = document.createElement('i');
-                icon.className = 'fa-solid fa-search';
-                icon.style.cssText = 'font-size: 2rem; margin-bottom: 1rem; display: block;';
-                icon.setAttribute('aria-hidden', 'true');
-                const paragraph = document.createElement('p');
-                paragraph.textContent = 'No drivers found matching "' + searchTerm + '"';
-                message.appendChild(icon);
-                message.appendChild(paragraph);
-                grid.appendChild(message);
-            }
-        }, 300);
+            }, 300);
+        });
     });
 
     // Export to CSV functionality
     function exportToCSV() {
         const csvData = [];
-        csvData.push(['Driver Name', 'Driver ID', 'COD Amount', 'Last Settled Date']);
+        csvData.push(['Driver Name', 'Driver ID', 'Phone', 'COD In Hand', 'Wallet Balance', 'Last Settlement Date']);
 
-        const cards = document.querySelectorAll('.fleet-card:not([style*="display: none"])');
-        cards.forEach(card => {
-            const name = card.getAttribute('data-driver-name');
-            const idText = card.querySelector('.fleet-info p').textContent.replace('ID: ', '');
-            const codAmount = card.querySelector('.detail-value.amount').textContent.replace('₹', '').trim();
-            const lastSettled = card.querySelector('.detail-value.date').textContent.trim();
+        const viewMode = '{{ view_mode }}';
 
-            csvData.push([name, idText, codAmount, lastSettled]);
-        });
+        if (viewMode === 'list') {
+            const rows = document.querySelectorAll('.list-table tbody tr:not([style*="display: none"])');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const name = cells[0].textContent.trim();
+                const id = cells[1].textContent.trim();
+                const phone = cells[2].textContent.trim();
+                const cod = cells[3].textContent.replace('QAR', '').trim();
+                const wallet = cells[4].textContent.replace('QAR', '').trim();
+                const lastSettled = cells[5].textContent.trim();
+                csvData.push([name, id, phone, cod, wallet, lastSettled]);
+            });
+        } else {
+            const cards = document.querySelectorAll('.fleet-card:not([style*="display: none"])');
+            cards.forEach(card => {
+                const name = card.getAttribute('data-driver-name');
+                const idText = card.querySelector('.fleet-info p').textContent.replace('ID: ', '');
+                const codAmount = card.querySelector('.detail-value.amount').textContent.replace('QAR', '').trim();
+                const lastSettled = card.querySelector('.detail-value.date').textContent.trim();
+                csvData.push([name, idText, '', codAmount, '', lastSettled]);
+            });
+        }
 
-        const csvContent = csvData.map(row => row.join(',')).join('\n');
+        const csvContent = csvData.map(row => row.map(cell => '"' + cell + '"').join(',')).join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -178,24 +377,8 @@
         window.URL.revokeObjectURL(url);
     }
 
-    // Print styles
-    window.addEventListener('beforeprint', function() {
-        document.querySelectorAll('.fleet-card').forEach(card => {
-            if (card.style.display === 'none') {
-                card.classList.add('hide-on-print');
-            }
-        });
-    });
-
-    // Add keyboard shortcuts
+    // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
-        // Ctrl+F or Cmd+F to focus search
-        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-            e.preventDefault();
-            document.getElementById('fleetFilter').focus();
-        }
-        // Ctrl+P or Cmd+P for print (browser default)
-        // Ctrl+E or Cmd+E for export
         if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
             e.preventDefault();
             exportToCSV();

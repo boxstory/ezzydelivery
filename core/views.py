@@ -60,6 +60,7 @@ from business import forms as business_forms
 from business import models as business_models
 from core import forms as core_forms
 from core import models as core_models
+from core.context_processors import get_cached_profile, get_cached_business
 from fleet import forms as fleet_forms
 from fleet import models as fleet_models
 
@@ -147,10 +148,9 @@ def verification_required(role=None):
             if not request.user.is_authenticated:
                 return redirect('/accounts/login/')
 
-            # Check if profile exists
-            try:
-                profile = core_models.Profile.objects.get(user_id=request.user.id)
-            except core_models.Profile.DoesNotExist:
+            # Check if profile exists (use cached profile)
+            profile = get_cached_profile(request)
+            if not profile:
                 messages.error(request, "Please create your profile first.")
                 return redirect('core:profile_add')
 
@@ -201,7 +201,9 @@ def verification_required(role=None):
 def join_business(request):
     """Handle business registration process"""
     try:
-        profile = core_models.Profile.objects.get(user_id=request.user.id)
+        profile = get_cached_profile(request)
+        if not profile:
+            raise core_models.Profile.DoesNotExist()
 
         # Check if role already selected
         if profile.is_driver or profile.is_business:
@@ -249,7 +251,9 @@ def join_business(request):
 def join_driver(request):
     """Handle driver registration process"""
     try:
-        profile = core_models.Profile.objects.get(user_id=request.user.id)
+        profile = get_cached_profile(request)
+        if not profile:
+            raise core_models.Profile.DoesNotExist()
 
         # Check if role already selected
         if profile.is_driver or profile.is_business:
@@ -364,9 +368,8 @@ def update_driver(request):
 @login_required(login_url='/accounts/login/')
 def business_profile_update(request):
     """Update business profile information"""
-    try:
-        business_profile = business_models.Business.objects.get(user_id=request.user.id)
-    except business_models.Business.DoesNotExist:
+    business_profile = get_cached_business(request)
+    if not business_profile:
         logger.error(f"Business profile not found for user {request.user.id}")
         messages.error(request, "Business profile not found. Please register as business first.")
         return redirect('core:join_business')
@@ -394,8 +397,8 @@ def business_profile_update(request):
 @login_required(login_url='/accounts/login/')
 def join_us(request):
     """Handle role selection (driver or business)"""
-    if core_models.Profile.objects.filter(user_id=request.user.id).exists():
-        profile = get_object_or_404(core_models.Profile, user_id=request.user.id)
+    profile = get_cached_profile(request)
+    if profile:
         joinusform = core_forms.JoinUsForm(request.POST or None, instance=profile)
         driverjoinform = fleet_forms.DriverJoinForm()
         businessjoinform = business_forms.businessRegisterForm()
@@ -468,8 +471,8 @@ def main_dashboard(request):
     if request.user.is_staff:
         return redirect('workforce:wf_dashboard')
 
-    if core_models.Profile.objects.filter(user_id=request.user.id).exists():
-        profile = core_models.Profile.objects.get(user_id=request.user.id)
+    profile = get_cached_profile(request)
+    if profile:
 
         # Check if profile is completed (only for non-staff users)
         if not profile.is_profile_completed:
@@ -537,12 +540,17 @@ def profile_view(request):
 @login_required(login_url='/accounts/login/')
 def profile(request, pk):
     """Display user profile"""
-    profile = get_object_or_404(core_models.Profile, user_id=request.user.id)
+    # Optimized query with select_related and prefetch_related
+    profile = get_object_or_404(
+        core_models.Profile.objects.select_related('user').prefetch_related('profile_picture'), 
+        user_id=request.user.id
+    )
 
-    try:
-        profile_picture = core_models.ProfilePicture.objects.get(user=request.user.id)
-    except core_models.ProfilePicture.DoesNotExist:
-        # Create default profile picture
+    # Get profile picture from prefetch cache if possible
+    profile_picture = profile.profile_picture.first()
+    
+    if not profile_picture:
+        # Create default profile picture if somehow missing
         profile_picture = core_models.ProfilePicture(
             user=request.user,
             profile=profile,
@@ -816,9 +824,8 @@ def profile_complete_update(request):
 @login_required(login_url='/accounts/login/')
 def business_register(request):
     """Business registration with completion tracking"""
-    try:
-        profile = core_models.Profile.objects.get(user_id=request.user.id)
-    except core_models.Profile.DoesNotExist:
+    profile = get_cached_profile(request)
+    if not profile:
         messages.error(request, "Please complete your profile first!")
         return redirect('core:profile_complete_update')
 
@@ -837,14 +844,9 @@ def business_register(request):
         messages.error(request, "Please select business role in your profile first!")
         return redirect('core:profile_complete_update')
 
-    # Check if business already exists
-    try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
-        # Business exists, update it
-        is_update = True
-    except business_models.Business.DoesNotExist:
-        business = None
-        is_update = False
+    # Check if business already exists (use cached version)
+    business = get_cached_business(request)
+    is_update = business is not None
 
     if request.method == 'POST':
         form = business_forms.businessRegisterForm(request.POST, instance=business)
@@ -913,9 +915,8 @@ def business_register(request):
 @login_required(login_url='/accounts/login/')
 def driver_register(request):
     """Driver registration with completion tracking"""
-    try:
-        profile = core_models.Profile.objects.get(user_id=request.user.id)
-    except core_models.Profile.DoesNotExist:
+    profile = get_cached_profile(request)
+    if not profile:
         messages.error(request, "Please complete your profile first!")
         return redirect('core:profile_complete_update')
 
@@ -1020,14 +1021,14 @@ def make_staff(request):
         messages.error(request, "Only superusers can access this.")
         return redirect('core:main_dashboard')
 
-    try:
-        profile = core_models.Profile.objects.get(user_id=request.user.id)
+    profile = get_cached_profile(request)
+    if profile:
         profile.is_staff = True
         profile.is_profile_completed = True
         profile.save()
         messages.success(request, f"Profile updated! is_staff={profile.is_staff}")
         logger.info(f"User {request.user.id} set as staff")
         return redirect('workforce:wf_dashboard')
-    except core_models.Profile.DoesNotExist:
+    else:
         messages.error(request, "Profile not found!")
         return redirect('core:profile_add')

@@ -1,0 +1,148 @@
+{% comment %}
+Tasks Card View Component (List/Grid)
+Usage: {% include "workforce/parts/components/_tasks_card_view.html" with tasks=dl_tasks %}
+
+Required context:
+- tasks: Paginated queryset of delivery tasks (DeliveryTask objects)
+
+Each task should have:
+- dl_task_number, dl_task_date, dl_task_status_client, dl_task_status_dms
+- order (with customer_name, customer_phone, customer_address)
+- driver, pickup_location, dl_task_publish
+{% endcomment %}
+
+<div class="tasks-list" id="tasksContainer" style="display: none;">
+    {% for dl in tasks %}
+    <div class="task-card">
+        <!-- Task Header -->
+        <div class="task-header">
+            <div>
+                <div class="task-id">
+                    <i class="fa-solid fa-hashtag me-1"></i>{{ dl.dl_task_number }}
+                </div>
+                <small class="text-muted">
+                    <i class="fa-solid fa-calendar me-1"></i>{{ dl.dl_task_date|default:"N/A" }}
+                </small>
+            </div>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                {% if dl.dl_task_status_client %}
+                <span class="status-badge status-{{ dl.dl_task_status_client }}">
+                    {{ dl.get_dl_task_status_client_display }}
+                </span>
+                {% endif %}
+                {% if dl.dl_task_status_dms %}
+                <span class="status-badge status-{{ dl.dl_task_status_dms }}">
+                    DMS: {{ dl.get_dl_task_status_dms_display }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Task Details Grid -->
+        <div class="task-details">
+            <div class="detail-item">
+                <div class="detail-label">Customer Name</div>
+                <div class="detail-value">
+                    <i class="fa-solid fa-user me-1 text-muted"></i>{{ dl.order.customer_name|default:"N/A" }}
+                </div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Mobile</div>
+                <div class="detail-value">
+                    <i class="fa-solid fa-phone me-1 text-muted"></i>{{ dl.order.customer_phone|default:"N/A" }}
+                </div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Order Status</div>
+                <div class="detail-value">
+                    <i class="fa-solid fa-info-circle me-1 text-muted"></i>{{ dl.order_status|default:"N/A" }}
+                </div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">DMS Task Number</div>
+                <div class="detail-value">
+                    <i class="fa-solid fa-code me-1 text-muted"></i>{{ dl.dl_task_number_dms|default:"N/A" }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Location Section -->
+        <div class="location-section d-flex justify-content-between">
+            <div class="location-item">
+                <i class="fa-solid fa-location-dot location-icon text-success"></i>
+                <div class="location-text">
+                    <strong class="d-block mb-1">Pickup</strong>
+                    {{ dl.pickup_location|default:"N/A" }}
+                </div>
+            </div>
+            {% if dl.order.customer_address %}
+            <div class="location-item">
+                <i class="fa-solid fa-location-dot location-icon text-danger"></i>
+                <div class="location-text">
+                    <strong class="d-block mb-1">Delivery</strong>
+                    {{ dl.order.customer_address }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Driver Info -->
+        {% if dl.driver %}
+        <div class="driver-info">
+            <div>
+                <i class="fa-solid fa-user-tie me-2 text-primary"></i>
+                <strong>Driver:</strong> {{ dl.driver }}
+            </div>
+            <span class="badge bg-primary">Assigned</span>
+        </div>
+        {% endif %}
+
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <div class="row g-2">
+                <div class="col-md-6 col-lg-3">
+                    <a href="https://wa.me/{{ dl.order.customer_phone }}?text=Hello {{ dl.order.customer_name }}, this is regarding delivery task {{ dl.dl_task_number }}"
+                       target="_blank" class="btn btn-success btn-sm w-100">
+                        <i class="fa-brands fa-whatsapp me-1"></i>WhatsApp
+                    </a>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    {% if dl.dl_task_publish %}
+                    <button class="btn btn-success btn-sm w-100" disabled>
+                        <i class="fa-solid fa-check-circle me-1"></i>Published
+                    </button>
+                    {% else %}
+                    <button class="btn btn-primary btn-sm w-100" onclick="publishToDMS({{ dl.id }})">
+                        <i class="fa-solid fa-cloud-arrow-up me-1"></i>Publish DMS
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    {% if dl.dl_task_status_dms == '6' or dl.dl_task_status_dms == '0' or dl.dl_task_status_dms == '7' %}
+                    <button class="btn btn-success btn-sm w-100" disabled>
+                        <i class="fa-solid fa-check-circle me-1"></i>In App
+                    </button>
+                    {% else %}
+                    <button class="btn btn-info btn-sm w-100" onclick="publishToDriverApp({{ dl.id }})">
+                        <i class="fa-solid fa-mobile-screen me-1"></i>To App
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <button class="btn btn-outline-secondary btn-sm w-100" type="button"
+                            data-bs-toggle="modal" data-bs-target="#statusModal"
+                            data-task-id="{{ dl.id }}" data-task-number="{{ dl.dl_task_number }}"
+                            onclick="setStatusModalTask(this)">
+                        <i class="fa-solid fa-sync me-1"></i>Status
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-center py-4 text-muted">
+        <i class="fa-solid fa-inbox fa-2x mb-2"></i>
+        <p class="mb-0">No tasks to display</p>
+    </div>
+    {% endfor %}
+</div>

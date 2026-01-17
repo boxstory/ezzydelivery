@@ -62,12 +62,20 @@ urlpatterns = [
 
     # Delivery task detail view
     path('delivery-task/<int:task_id>/', workforce_views.delivery_task_detail, name='delivery_task_detail'),
+    path('delivery-task/<int:task_id>/edit/', workforce_views.delivery_task_edit, name='delivery_task_edit'),
 
     # AJAX endpoints for delivery tasks
     path('delivery-task/<int:task_id>/publish-dms/', workforce_views.publish_task_to_dms, name='publish_task_to_dms'),
     path('delivery-task/<int:task_id>/publish-driver-app/', workforce_views.publish_task_to_driver_app, name='publish_task_to_driver_app'),
     path('delivery-task/<int:task_id>/assign-driver/', workforce_views.assign_driver_to_task, name='assign_driver_to_task'),
     path('delivery-task/<int:task_id>/update-status/', workforce_views.update_task_status, name='update_task_status'),
+
+    # Bulk action endpoints for delivery tasks
+    path('tasks/bulk-print/', workforce_views.bulk_print_tasks, name='bulk_print_tasks'),
+    path('tasks/bulk-publish-dms/', workforce_views.bulk_publish_dms, name='bulk_publish_dms'),
+    path('tasks/bulk-publish-app/', workforce_views.bulk_publish_app, name='bulk_publish_app'),
+    path('tasks/bulk-update-status/', workforce_views.bulk_update_status, name='bulk_update_status'),
+    path('tasks/bulk-export/', workforce_views.bulk_export_tasks, name='bulk_export_tasks'),
 
     # User Verification URLs
     path('verification/users/', workforce_views.user_verification_list, name='user_verification_list'),

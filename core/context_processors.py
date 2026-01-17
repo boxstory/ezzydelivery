@@ -1,9 +1,86 @@
 """
 Context processors for EzzyDelivery
 Makes data available to all templates
+
+Also provides utility functions for views to get cached user data:
+    - get_cached_profile(request) -> Profile or None
+    - get_cached_business(request) -> Business or None
 """
 from core.seo import SEOMetadata
 import json
+
+
+# =============================================================================
+# UTILITY FUNCTIONS FOR VIEWS
+# =============================================================================
+
+def get_cached_profile(request):
+    """
+    Get cached user profile for use in views.
+    Uses the same cache as user_profile context processor.
+
+    Usage in views:
+        from core.context_processors import get_cached_profile
+        profile = get_cached_profile(request)
+
+    Returns:
+        Profile object or None
+    """
+    if not request.user.is_authenticated:
+        return None
+
+    # Check if already cached
+    if hasattr(request, '_cached_profile'):
+        return request._cached_profile
+
+    from core.models import Profile
+    try:
+        profile = Profile.objects.select_related('user').get(user_id=request.user.id)
+        request._cached_profile = profile
+        return profile
+    except Profile.DoesNotExist:
+        request._cached_profile = None
+        return None
+
+
+def get_cached_business(request):
+    """
+    Get cached user business for use in views.
+    Uses the same cache as user_business context processor.
+
+    Usage in views:
+        from core.context_processors import get_cached_business
+        business = get_cached_business(request)
+
+    Returns:
+        Business object or None
+    """
+    if not request.user.is_authenticated:
+        return None
+
+    # Check if already cached
+    if hasattr(request, '_cached_user_business'):
+        return request._cached_user_business
+
+    # Check if cached via business_permissions_context
+    if hasattr(request, '_cached_business_access'):
+        business, _, _ = request._cached_business_access
+        request._cached_user_business = business
+        return business
+
+    from business.models import Business
+    try:
+        business = Business.objects.filter(user_id=request.user.id).first()
+        request._cached_user_business = business
+        return business
+    except Exception:
+        request._cached_user_business = None
+        return None
+
+
+# =============================================================================
+# CONTEXT PROCESSORS
+# =============================================================================
 
 
 def seo_defaults(request):
@@ -78,20 +155,10 @@ def user_profile(request):
     Add user profile to template context to avoid duplicate queries.
     Templates should use {{ user_profile }} instead of {{ user.profile }}.
     Caches the profile on the request object for reuse by views.
-    """
-    if request.user.is_authenticated:
-        # Check if profile is already cached on request
-        if hasattr(request, '_cached_profile'):
-            return {'user_profile': request._cached_profile}
 
-        from core.models import Profile
-        try:
-            profile = Profile.objects.select_related('user').get(user_id=request.user.id)
-            request._cached_profile = profile
-            return {'user_profile': profile}
-        except Profile.DoesNotExist:
-            request._cached_profile = None
-    return {'user_profile': None}
+    Views can also use: from core.context_processors import get_cached_profile
+    """
+    return {'user_profile': get_cached_profile(request)}
 
 
 def user_business(request):
@@ -99,17 +166,7 @@ def user_business(request):
     Add user's business to template context to avoid duplicate queries.
     Templates should use {{ user_business }} instead of {{ request.user.user_business.first }}.
     Caches the business on the request object for reuse.
-    """
-    if request.user.is_authenticated:
-        # Check if business is already cached on request
-        if hasattr(request, '_cached_user_business'):
-            return {'user_business': request._cached_user_business}
 
-        from business.models import Business
-        try:
-            business = Business.objects.filter(user_id=request.user.id).first()
-            request._cached_user_business = business
-            return {'user_business': business}
-        except Exception:
-            request._cached_user_business = None
-    return {'user_business': None}
+    Views can also use: from core.context_processors import get_cached_business
+    """
+    return {'user_business': get_cached_business(request)}

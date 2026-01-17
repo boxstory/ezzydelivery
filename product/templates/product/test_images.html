@@ -1,0 +1,67 @@
+{% load static %}
+{% load custom_filters %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-card { border: 1px solid #ccc; padding: 20px; margin: 20px 0; }
+        img { max-width: 300px; border: 2px solid #green; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Product Image Test Page</h1>
+
+    <div class="test-card">
+        <h2>Test 1: Direct Default Image URL</h2>
+        <img src="/media/business/product_images/product_image_default.jpg" alt="Default Image">
+        <p>URL: /media/business/product_images/product_image_default.jpg</p>
+    </div>
+
+    <div class="test-card">
+        <h2>Test 2: First 5 Products with Filter</h2>
+        {% for product in products|slice:":5" %}
+            <div style="margin: 10px 0; padding: 10px; background: #f5f5f5;">
+                <h3>{{ product.item_name }}</h3>
+                <p><strong>Image Field Value:</strong> {{ product.product_image }}</p>
+                <p><strong>Filter Result:</strong> {{ product.product_image|safe_image_url }}</p>
+                <img src="{{ product.product_image|safe_image_url }}"
+                     alt="{{ product.item_name }}"
+                     style="display: block; margin: 10px 0;">
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="test-card">
+        <h2>Test 3: Without Filter (Direct .url)</h2>
+        {% for product in products|slice:":3" %}
+            <div style="margin: 10px 0; padding: 10px; background: #ffe;">
+                <h3>{{ product.item_name }}</h3>
+                {% if product.product_image %}
+                    <p><strong>Direct URL:</strong> {{ product.product_image.url }}</p>
+                    <img src="{{ product.product_image.url }}"
+                         alt="{{ product.item_name }}"
+                         style="display: block; margin: 10px 0;">
+                {% else %}
+                    <p class="error">No image</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        // Log image load events
+        document.querySelectorAll('img').forEach(img => {
+            img.addEventListener('load', () => {
+                console.log('✓ Image loaded:', img.src);
+            });
+            img.addEventListener('error', () => {
+                console.error('✗ Image failed:', img.src);
+            });
+        });
+    </script>
+</body>
+</html>

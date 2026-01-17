@@ -24,6 +24,25 @@ from business import models as business_models
 from ezzy_api import models as ezzy_api_models
 from ezzy_api import serializers as ezzy_api_serializers
 from shipday import Shipday
+from core.context_processors import get_cached_business
+
+
+def get_api_user_business(request):
+    """
+    Helper to get business for API request user.
+    Uses cached version when available, falls back to DB query for DRF requests.
+    """
+    # Try cached version first (works for regular Django requests)
+    business = get_cached_business(request)
+    if business is not None:
+        return business
+    # For DRF requests that might not have the cache attribute, query directly
+    if hasattr(request, 'user') and request.user.is_authenticated:
+        try:
+            return business_models.Business.objects.get(user_id=request.user.id)
+        except business_models.Business.DoesNotExist:
+            return None
+    return None
 
 # Local aliases for commonly used models
 Order = orders_models.Order
@@ -2370,8 +2389,14 @@ def push_task_to_dms_api(request, task_id):
 @permission_classes([IsAuthenticated])
 def business_dashboard_stats(request):
     """Get dashboard statistics for business"""
+    business = get_api_user_business(request)
+    if not business:
+        logger.warning(f"Business not found for user {request.user.id}")
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
     try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
         logger.info(f"Fetching dashboard stats for business {business.business_id}")
 
         # Get date range from query params (default to last 30 days)
@@ -2434,11 +2459,11 @@ def business_dashboard_stats(request):
             }
         }, status=status.HTTP_200_OK)
 
-    except business_models.Business.DoesNotExist:
-        logger.warning(f"Business not found for user {request.user.id}")
+    except Exception as e:
+        logger.error(f"Error fetching dashboard stats: {e}")
         return Response(
-            {'error': 'Business not found'},
-            status=status.HTTP_404_NOT_FOUND
+            {'error': 'Error fetching dashboard statistics'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
@@ -2458,9 +2483,14 @@ def business_orders_api(request):
     GET: List all orders for business
     POST: Create new order
     """
+    business = get_api_user_business(request)
+    if not business:
+        logger.warning(f"Business not found for user {request.user.id}")
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
     try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
-
         if request.method == 'GET':
             logger.info(f"Fetching orders for business {business.business_id}")
 
@@ -2576,8 +2606,14 @@ def business_order_detail_api(request, order_id):
     PUT: Update order
     DELETE: Delete order
     """
+    business = get_api_user_business(request)
+    if not business:
+        logger.warning(f"Business not found for user {request.user.id}")
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
     try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
         order = orders_models.Order.objects.select_related(
             'client', 'pickup_location', 'business'
         ).get(id=order_id, business=business)
@@ -2670,9 +2706,14 @@ def business_clients_api(request):
     GET: List all clients for business
     POST: Create new client
     """
+    business = get_api_user_business(request)
+    if not business:
+        logger.warning(f"Business not found for user {request.user.id}")
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
     try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
-
         if request.method == 'GET':
             logger.info(f"Fetching clients for business {business.business_id}")
 
@@ -2759,8 +2800,14 @@ def api_tester_view(request):
 @permission_classes([IsAuthenticated])
 def business_tasks_api(request):
     """Get all delivery tasks for business"""
+    business = get_api_user_business(request)
+    if not business:
+        logger.warning(f"Business not found for user {request.user.id}")
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
     try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
         logger.info(f"Fetching tasks for business {business.business_id}")
 
         # Filters
@@ -2825,8 +2872,14 @@ def api_tester_view(request):
 @permission_classes([IsAuthenticated])
 def business_pickup_locations_api(request):
     """Get all pickup locations for business"""
+    business = get_api_user_business(request)
+    if not business:
+        logger.warning(f"Business not found for user {request.user.id}")
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
     try:
-        business = business_models.Business.objects.get(user_id=request.user.id)
         logger.info(f"Fetching pickup locations for business {business.business_id}")
 
         locations = business_models.PickupLocation.objects.filter(

@@ -229,6 +229,8 @@ TEMPLATES = [
                 'core.context_processors.user_business',
                 # Business team permissions context
                 'business.decorators.business_permissions_context',
+                # Workforce dashboard sidebar counts
+                'workforce.context_processors.workforce_sidebar_counts',
             ],
         },
     },
@@ -568,7 +570,7 @@ LOGGING = {
         # Query log (SQL queries and duplicates)
         'file_queries': {
             'level': 'DEBUG',
-            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOGS_DIR / 'queries.log',
             'maxBytes': 10 * 1024 * 1024,  # 10 MB
             'backupCount': 3,
