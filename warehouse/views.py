@@ -1,6 +1,6 @@
 import logging
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Sum, F, Q
@@ -10,6 +10,16 @@ from django.utils import timezone
 from warehouse import models as warehouse_models
 from business import models as business_models
 from product import models as product_models
+from core.context_processors import get_cached_business
+
+# Import seller-warehouse link views
+from warehouse.views_seller_links import (
+    seller_warehouse_links,
+    seller_warehouse_link_detail,
+    seller_warehouse_link_add,
+    seller_warehouse_link_edit,
+    seller_warehouse_link_delete
+)
 
 # Local aliases for commonly used models
 Warehouse = warehouse_models.Warehouse
@@ -26,16 +36,18 @@ logger = logging.getLogger('warehouse')
 
 
 def get_user_business(request):
-    """Helper to get business for current user"""
-    try:
-        return business_models.Business.objects.get(user_id=request.user.id)
-    except business_models.Business.DoesNotExist:
-        return None
+    """Helper to get business for current user - uses cached version"""
+    return get_cached_business(request)
 
 
 def is_staff_user(request):
     """Check if user is a staff member (can access all warehouses)"""
     return request.user.is_staff or request.user.is_superuser
+
+
+def is_superuser_only(user):
+    """Check if user is a superuser (required for warehouse setup/config)"""
+    return user.is_superuser
 
 
 def get_business_filter(request):
@@ -59,7 +71,7 @@ def dashboard(request):
     """Warehouse dashboard with summary stats"""
     business, is_staff = get_business_filter(request)
 
-    # Staff users see all warehouses, regular users see only their business
+    # Staff users see all warehouses, regular users see only linked warehouses
     if is_staff:
         warehouses = warehouse_models.Warehouse.objects.filter(is_active=True)
         stock_filter = {}
@@ -71,14 +83,18 @@ def dashboard(request):
         if not business:
             messages.error(request, "No business associated with your account")
             return redirect('business:business_dashboard')
-        warehouses = warehouse_models.Warehouse.objects.filter(
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
             business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        warehouses = warehouse_models.Warehouse.objects.filter(
+            id__in=linked_warehouse_ids, is_active=True
         )
-        stock_filter = {'warehouse__business': business}
-        alert_filter = {'warehouse__business': business, 'status': 'active'}
-        pick_filter = {'warehouse__business': business, 'status__in': ['pending', 'assigned', 'in_progress']}
-        count_filter = {'warehouse__business': business, 'status__in': ['scheduled', 'in_progress']}
-        txn_filter = {'warehouse__business': business}
+        stock_filter = {'warehouse_id__in': linked_warehouse_ids}
+        alert_filter = {'warehouse_id__in': linked_warehouse_ids, 'status': 'active'}
+        pick_filter = {'warehouse_id__in': linked_warehouse_ids, 'status__in': ['pending', 'assigned', 'in_progress']}
+        count_filter = {'warehouse_id__in': linked_warehouse_ids, 'status__in': ['scheduled', 'in_progress']}
+        txn_filter = {'warehouse_id__in': linked_warehouse_ids}
 
     # Summary stats
     total_stock = warehouse_models.StockLevel.objects.filter(
@@ -124,8 +140,13 @@ def dashboard(request):
 
 @login_required(login_url='account_login')
 def inventory_list(request):
-    """List all inventory items"""
-    business, is_staff = get_business_filter(request)
+    """List all inventory items with detailed product information"""
+    try:
+        business, is_staff = get_business_filter(request)
+    except Exception as e:
+        logger.error(f"Error in get_business_filter: {e}", exc_info=True)
+        messages.error(request, "An error occurred. Please try again.")
+        return redirect('workforce:wf_dashboard')
 
     if not is_staff and not business:
         messages.error(request, "No business associated with your account")
@@ -135,15 +156,34 @@ def inventory_list(request):
     warehouse_id = request.GET.get('warehouse')
     search = request.GET.get('search', '')
     low_stock_only = request.GET.get('low_stock') == '1'
+    category_id = request.GET.get('category')
 
-    if is_staff:
-        stock_levels = warehouse_models.StockLevel.objects.all()
-        warehouses = warehouse_models.Warehouse.objects.filter(is_active=True)
-    else:
-        stock_levels = warehouse_models.StockLevel.objects.filter(warehouse__business=business)
-        warehouses = warehouse_models.Warehouse.objects.filter(business=business, is_active=True)
+    try:
+        if is_staff:
+            stock_levels = warehouse_models.StockLevel.objects.all()
+            warehouses = warehouse_models.Warehouse.objects.filter(is_active=True)
+        else:
+            # Get warehouses linked to this business
+            linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+                business=business, is_active=True
+            ).values_list('warehouse_id', flat=True)
+            stock_levels = warehouse_models.StockLevel.objects.filter(warehouse_id__in=linked_warehouse_ids)
+            warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
 
-    stock_levels = stock_levels.select_related('product', 'warehouse', 'location').order_by('product__item_name')
+        # Select related to avoid N+1 queries for product details
+        stock_levels = stock_levels.select_related(
+            'product',
+            'product__business',
+            'product__product_category',
+            'product__color',
+            'product__unit',
+            'warehouse',
+            'location'
+        ).order_by('product__item_name')
+    except Exception as e:
+        logger.error(f"Error setting up initial queries in inventory_list: {e}", exc_info=True)
+        messages.error(request, "An error occurred while loading inventory data.")
+        return redirect('workforce:wf_dashboard')
 
     if warehouse_id:
         stock_levels = stock_levels.filter(warehouse_id=warehouse_id)
@@ -151,25 +191,54 @@ def inventory_list(request):
     if search:
         stock_levels = stock_levels.filter(
             Q(product__item_name__icontains=search) |
-            Q(product__item_sku__icontains=search)
+            Q(product__item_sku__icontains=search) |
+            Q(product__brand_name__icontains=search) |
+            Q(product__product_id__icontains=search) |
+            Q(product__barcode__icontains=search)
         )
+
+    if category_id:
+        stock_levels = stock_levels.filter(product__product_category_id=category_id)
 
     if low_stock_only:
         stock_levels = stock_levels.filter(
             quantity_on_hand__lte=F('reorder_point') + F('quantity_reserved')
         )
 
+    # Get categories for filter (from products in stock)
+    try:
+        category_ids = stock_levels.values_list('product__product_category_id', flat=True).distinct()
+        categories = product_models.ProductCategory.objects.filter(
+            id__in=[cat_id for cat_id in category_ids if cat_id is not None]
+        ).order_by('name')
+    except Exception as e:
+        logger.error(f"Error fetching categories: {e}")
+        categories = product_models.ProductCategory.objects.none()
+
     # Pagination
     paginator = Paginator(stock_levels, 25)
     page = request.GET.get('page', 1)
     items = paginator.get_page(page)
 
+    # Calculate total inventory value
+    try:
+        total_value = sum(
+            (stock.quantity_on_hand or 0) * (stock.product.item_price if stock.product and stock.product.item_price else 0)
+            for stock in stock_levels
+        )
+    except Exception as e:
+        logger.error(f"Error calculating total inventory value: {e}")
+        total_value = 0
+
     context = {
         'stock_levels': items,
         'warehouses': warehouses,
+        'categories': categories,
         'search': search,
         'selected_warehouse': warehouse_id,
+        'selected_category': category_id,
         'low_stock_only': low_stock_only,
+        'total_value': total_value,
         'is_staff': is_staff,
     }
     return render(request, 'warehouse/inventory_list.html', context)
@@ -189,11 +258,15 @@ def stock_card(request, product_id):
             messages.error(request, "No business associated with your account")
             return redirect('business:business_dashboard')
         product = get_object_or_404(product_models.Product, pk=product_id, business=business)
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
         stock_levels = warehouse_models.StockLevel.objects.filter(
-            product=product, warehouse__business=business
+            product=product, warehouse_id__in=linked_warehouse_ids
         )
         transactions = warehouse_models.InventoryTransaction.objects.filter(
-            product=product, warehouse__business=business
+            product=product, warehouse_id__in=linked_warehouse_ids
         )
 
     stock_levels = stock_levels.select_related('warehouse', 'location')
@@ -221,8 +294,12 @@ def transaction_list(request):
         transactions = warehouse_models.InventoryTransaction.objects.all()
         warehouses = warehouse_models.Warehouse.objects.filter(is_active=True)
     else:
-        transactions = warehouse_models.InventoryTransaction.objects.filter(warehouse__business=business)
-        warehouses = warehouse_models.Warehouse.objects.filter(business=business, is_active=True)
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        transactions = warehouse_models.InventoryTransaction.objects.filter(warehouse_id__in=linked_warehouse_ids)
+        warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
 
     transactions = transactions.select_related('product', 'warehouse', 'location', 'created_by').order_by('-created_at')
 
@@ -265,53 +342,95 @@ def receive_stock(request):
         return redirect('business:business_dashboard')
 
     if request.method == 'POST':
-        # Handle stock receipt
+        # Handle stock receipt (now supports multiple products)
         warehouse_id = request.POST.get('warehouse')
-        product_id = request.POST.get('product')
         location_id = request.POST.get('location')
-        quantity = int(request.POST.get('quantity', 0))
+        reference = request.POST.get('reference', '')
         notes = request.POST.get('notes', '')
 
+        # Get arrays of products and quantities
+        product_ids = request.POST.getlist('products[]')
+        quantities = request.POST.getlist('quantities[]')
+
         try:
+            # Validate warehouse access
             if is_staff:
                 warehouse = warehouse_models.Warehouse.objects.get(pk=warehouse_id)
-                product = product_models.Product.objects.get(pk=product_id)
             else:
-                warehouse = warehouse_models.Warehouse.objects.get(pk=warehouse_id, business=business)
-                product = product_models.Product.objects.get(pk=product_id, business=business)
+                # Verify warehouse is linked to this business
+                if not warehouse_models.SellerWarehouseLink.objects.filter(
+                    business=business, warehouse_id=warehouse_id, is_active=True
+                ).exists():
+                    raise ValueError("Warehouse is not linked to your business")
+                warehouse = warehouse_models.Warehouse.objects.get(pk=warehouse_id)
 
+            # Get storage location (optional)
             location = None
             if location_id:
                 location = warehouse_models.StorageLocation.objects.get(
                     pk=location_id, warehouse=warehouse
                 )
 
-            # Get or create stock level
-            stock_level, created = warehouse_models.StockLevel.objects.get_or_create(
-                product=product,
-                warehouse=warehouse,
-                location=location,
-                defaults={'quantity_on_hand': 0}
-            )
+            # Process each product
+            received_products = []
+            total_items = 0
 
-            old_quantity = stock_level.quantity_on_hand
-            stock_level.quantity_on_hand += quantity
-            stock_level.save(update_fields=['quantity_on_hand', 'updated_at'])
+            for product_id, quantity_str in zip(product_ids, quantities):
+                if not product_id or not quantity_str:
+                    continue
 
-            # Create transaction record
-            warehouse_models.InventoryTransaction.objects.create(
-                product=product,
-                warehouse=warehouse,
-                location=location,
-                transaction_type='receive',
-                quantity=quantity,
-                quantity_before=old_quantity,
-                quantity_after=stock_level.quantity_on_hand,
-                notes=notes,
-                created_by=request.user
-            )
+                quantity = int(quantity_str)
+                if quantity <= 0:
+                    continue
 
-            messages.success(request, f"Received {quantity} units of {product.item_name}")
+                # Get product with business validation
+                if is_staff:
+                    product = product_models.Product.objects.get(pk=product_id)
+                else:
+                    product = product_models.Product.objects.get(pk=product_id, business=business)
+
+                # Get or create stock level
+                stock_level, created = warehouse_models.StockLevel.objects.get_or_create(
+                    product=product,
+                    warehouse=warehouse,
+                    location=location,
+                    defaults={'quantity_on_hand': 0}
+                )
+
+                old_quantity = stock_level.quantity_on_hand
+                stock_level.quantity_on_hand += quantity
+                stock_level.save(update_fields=['quantity_on_hand', 'updated_at'])
+
+                # Build transaction notes
+                transaction_notes = notes
+                if reference:
+                    transaction_notes = f"Ref: {reference}" + (f" | {notes}" if notes else "")
+
+                # Create transaction record
+                warehouse_models.InventoryTransaction.objects.create(
+                    product=product,
+                    warehouse=warehouse,
+                    location=location,
+                    transaction_type='receive',
+                    quantity=quantity,
+                    quantity_before=old_quantity,
+                    quantity_after=stock_level.quantity_on_hand,
+                    notes=transaction_notes,
+                    created_by=request.user
+                )
+
+                received_products.append(f"{product.item_name} ({quantity} units)")
+                total_items += quantity
+
+            # Success message
+            if len(received_products) == 1:
+                messages.success(request, f"Received {received_products[0]}")
+            else:
+                summary = ", ".join(received_products[:3])
+                if len(received_products) > 3:
+                    summary += f" and {len(received_products) - 3} more"
+                messages.success(request, f"Received {len(received_products)} products ({total_items} total items): {summary}")
+
             return redirect('warehouse:inventory_list')
 
         except Exception as e:
@@ -322,7 +441,11 @@ def receive_stock(request):
         warehouses = warehouse_models.Warehouse.objects.filter(is_active=True)
         products = product_models.Product.objects.all()
     else:
-        warehouses = warehouse_models.Warehouse.objects.filter(business=business, is_active=True)
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
         products = product_models.Product.objects.filter(business=business)
 
     context = {
@@ -356,7 +479,11 @@ def pick_list_list(request):
     if is_staff:
         pick_lists = warehouse_models.PickList.objects.all()
     else:
-        pick_lists = warehouse_models.PickList.objects.filter(warehouse__business=business)
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        pick_lists = warehouse_models.PickList.objects.filter(warehouse_id__in=linked_warehouse_ids)
 
     pick_lists = pick_lists.select_related('warehouse', 'assigned_to').order_by('-created_at')
 
@@ -397,10 +524,14 @@ def pick_list_detail(request, pk):
         if not business:
             messages.error(request, "No business associated with your account")
             return redirect('business:business_dashboard')
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
         pick_list = get_object_or_404(
             warehouse_models.PickList,
             pk=pk,
-            warehouse__business=business
+            warehouse_id__in=linked_warehouse_ids
         )
 
     items = pick_list.items.select_related(
@@ -425,10 +556,14 @@ def assign_pick_list(request, pk):
     else:
         if not business:
             return JsonResponse({'error': 'No business'}, status=400)
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
         pick_list = get_object_or_404(
             warehouse_models.PickList,
             pk=pk,
-            warehouse__business=business
+            warehouse_id__in=linked_warehouse_ids
         )
 
     if request.method == 'POST':
@@ -457,7 +592,11 @@ def cycle_count_list(request):
     if is_staff:
         cycle_counts = warehouse_models.CycleCount.objects.all()
     else:
-        cycle_counts = warehouse_models.CycleCount.objects.filter(warehouse__business=business)
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        cycle_counts = warehouse_models.CycleCount.objects.filter(warehouse_id__in=linked_warehouse_ids)
 
     cycle_counts = cycle_counts.select_related('warehouse', 'location', 'assigned_to').order_by('-scheduled_date')
 
@@ -497,10 +636,14 @@ def cycle_count_detail(request, pk):
         if not business:
             messages.error(request, "No business associated with your account")
             return redirect('business:business_dashboard')
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
         cycle_count = get_object_or_404(
             warehouse_models.CycleCount,
             pk=pk,
-            warehouse__business=business
+            warehouse_id__in=linked_warehouse_ids
         )
 
     items = cycle_count.items.select_related(
@@ -531,7 +674,11 @@ def low_stock_alerts(request):
     if is_staff:
         alerts = warehouse_models.LowStockAlert.objects.all()
     else:
-        alerts = warehouse_models.LowStockAlert.objects.filter(warehouse__business=business)
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        alerts = warehouse_models.LowStockAlert.objects.filter(warehouse_id__in=linked_warehouse_ids)
 
     alerts = alerts.select_related('product', 'warehouse').order_by('-created_at')
 
@@ -562,10 +709,14 @@ def acknowledge_alert(request, pk):
     else:
         if not business:
             return JsonResponse({'error': 'No business'}, status=400)
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
         alert = get_object_or_404(
             warehouse_models.LowStockAlert,
             pk=pk,
-            warehouse__business=business
+            warehouse_id__in=linked_warehouse_ids
         )
 
     if request.method == 'POST':
@@ -583,8 +734,9 @@ def acknowledge_alert(request, pk):
 # =============================================================================
 
 @login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
 def warehouse_list(request):
-    """List all warehouses"""
+    """List all warehouses - Superuser only"""
     business, is_staff = get_business_filter(request)
 
     if not is_staff and not business:
@@ -594,7 +746,11 @@ def warehouse_list(request):
     if is_staff:
         warehouses = warehouse_models.Warehouse.objects.all()
     else:
-        warehouses = warehouse_models.Warehouse.objects.filter(business=business)
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids)
 
     warehouses = warehouses.order_by('name')
 
@@ -606,52 +762,66 @@ def warehouse_list(request):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
 def warehouse_add(request):
-    """Add a new warehouse"""
+    """Add a new warehouse (fulfillment center) - Superuser only"""
     business, is_staff = get_business_filter(request)
 
-    if not is_staff and not business:
-        messages.error(request, "No business associated with your account")
-        return redirect('business:business_dashboard')
+    # Only staff can create fulfillment centers
+    if not is_staff:
+        messages.error(request, "Only staff can create fulfillment centers")
+        return redirect('warehouse:warehouse_list')
 
     if request.method == 'POST':
         name = request.POST.get('name')
         code = request.POST.get('code', '')
         address = request.POST.get('address', '')
-        business_id = request.POST.get('business')  # For staff to assign to a business
+        city = request.POST.get('city', '')
+        state = request.POST.get('state', '')
+        postal_code = request.POST.get('postal_code', '')
+        country = request.POST.get('country', 'Bahrain')
+        phone = request.POST.get('phone', '')
+        email = request.POST.get('email', '')
+        description = request.POST.get('description', '')
+        latitude = request.POST.get('latitude', '')
+        longitude = request.POST.get('longitude', '')
+        is_active = request.POST.get('is_active') == 'on'
+        is_default = request.POST.get('is_default') == 'on'
 
-        if is_staff:
-            if not business_id:
-                messages.error(request, "Please select a business")
-                context = {
-                    'is_staff': is_staff,
-                    'businesses': business_models.Business.objects.filter(business_status='active'),
-                }
-                return render(request, 'warehouse/warehouse_add.html', context)
-            selected_business = business_models.Business.objects.get(pk=business_id)
-        else:
-            selected_business = business
-
-        warehouse = warehouse_models.Warehouse.objects.create(
-            business=selected_business,
-            name=name,
-            code=code or None,  # Let auto-generate if empty
-            address=address
-        )
-        messages.success(request, f"Warehouse '{warehouse.name}' created")
-        return redirect('warehouse:warehouse_list')
+        try:
+            warehouse = warehouse_models.Warehouse.objects.create(
+                name=name,
+                code=code or None,  # Let auto-generate if empty
+                description=description,
+                address=address,
+                city=city,
+                state=state,
+                postal_code=postal_code,
+                country=country,
+                phone=phone,
+                email=email,
+                latitude=float(latitude) if latitude else None,
+                longitude=float(longitude) if longitude else None,
+                is_active=is_active,
+                is_default=is_default,
+                created_by=request.user
+            )
+            messages.success(request, f"Fulfillment center '{warehouse.name}' ({warehouse.code}) created successfully")
+            return redirect('warehouse:warehouse_detail', pk=warehouse.pk)
+        except Exception as e:
+            logger.exception(f"Error creating warehouse: {str(e)}")
+            messages.error(request, f"Error creating warehouse: {str(e)}")
 
     context = {
         'is_staff': is_staff,
     }
-    if is_staff:
-        context['businesses'] = business_models.Business.objects.filter(business_status='active')
     return render(request, 'warehouse/warehouse_add.html', context)
 
 
 @login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
 def warehouse_detail(request, pk):
-    """View warehouse details"""
+    """View warehouse details - Superuser only"""
     business, is_staff = get_business_filter(request)
 
     if is_staff:
@@ -660,13 +830,17 @@ def warehouse_detail(request, pk):
         if not business:
             messages.error(request, "No business associated with your account")
             return redirect('business:business_dashboard')
+        # Verify warehouse is linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
         warehouse = get_object_or_404(
             warehouse_models.Warehouse,
             pk=pk,
-            business=business
+            id__in=linked_warehouse_ids
         )
 
-    locations = warehouse.locations.order_by('location_type', 'code')
+    locations = warehouse.storage_locations.order_by('location_type', 'code')
     stock_summary = warehouse.stock_levels.aggregate(
         total_on_hand=Sum('quantity_on_hand'),
         total_reserved=Sum('quantity_reserved')
@@ -682,8 +856,9 @@ def warehouse_detail(request, pk):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
 def location_list(request):
-    """List all storage locations"""
+    """List all storage locations - Superuser only"""
     business, is_staff = get_business_filter(request)
 
     if not is_staff and not business:
@@ -694,8 +869,12 @@ def location_list(request):
         locations = warehouse_models.StorageLocation.objects.all()
         warehouses = warehouse_models.Warehouse.objects.filter(is_active=True)
     else:
-        locations = warehouse_models.StorageLocation.objects.filter(warehouse__business=business)
-        warehouses = warehouse_models.Warehouse.objects.filter(business=business, is_active=True)
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        locations = warehouse_models.StorageLocation.objects.filter(warehouse_id__in=linked_warehouse_ids)
+        warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
 
     locations = locations.select_related('warehouse', 'parent').order_by('warehouse', 'code')
 
@@ -717,8 +896,9 @@ def location_list(request):
 
 
 @login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
 def location_add(request):
-    """Add a new storage location"""
+    """Add a new storage location - Superuser only"""
     business, is_staff = get_business_filter(request)
 
     if not is_staff and not business:
@@ -736,7 +916,12 @@ def location_add(request):
             if is_staff:
                 warehouse = warehouse_models.Warehouse.objects.get(pk=warehouse_id)
             else:
-                warehouse = warehouse_models.Warehouse.objects.get(pk=warehouse_id, business=business)
+                # Verify warehouse is linked to this business
+                if not warehouse_models.SellerWarehouseLink.objects.filter(
+                    business=business, warehouse_id=warehouse_id, is_active=True
+                ).exists():
+                    raise ValueError("Warehouse is not linked to your business")
+                warehouse = warehouse_models.Warehouse.objects.get(pk=warehouse_id)
 
             parent = None
             if parent_id:
@@ -760,7 +945,11 @@ def location_add(request):
     if is_staff:
         warehouses = warehouse_models.Warehouse.objects.filter(is_active=True)
     else:
-        warehouses = warehouse_models.Warehouse.objects.filter(business=business, is_active=True)
+        # Get warehouses linked to this business
+        linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).values_list('warehouse_id', flat=True)
+        warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
 
     context = {
         'warehouses': warehouses,
@@ -768,3 +957,179 @@ def location_add(request):
         'is_staff': is_staff,
     }
     return render(request, 'warehouse/location_add.html', context)
+
+
+# =============================================================================
+# API ENDPOINTS
+# =============================================================================
+
+@login_required(login_url='account_login')
+def api_warehouse_locations(request, warehouse_id):
+    """
+    API endpoint to get pickup/dispatch locations for a specific warehouse.
+    Returns JSON list of warehouse locations.
+    Superuser access required.
+    """
+    # Check if user is superuser
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    try:
+        warehouse = get_object_or_404(warehouse_models.Warehouse, pk=warehouse_id)
+        locations = warehouse.pickup_locations.filter(is_active=True).order_by('name')
+
+        locations_data = [
+            {
+                'id': loc.id,
+                'name': loc.name,
+                'code': loc.code,
+                'address': loc.address or '',
+                'is_default': loc.is_default,
+            }
+            for loc in locations
+        ]
+
+        return JsonResponse(locations_data, safe=False)
+    except Exception as e:
+        logger.error(f"Error fetching warehouse locations: {e}")
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@login_required(login_url='account_login')
+def api_storage_locations(request, warehouse_id):
+    """
+    API endpoint to get storage locations for a specific warehouse.
+    Returns JSON list of storage locations for inventory.
+    """
+    try:
+        warehouse = get_object_or_404(warehouse_models.Warehouse, pk=warehouse_id)
+        locations = warehouse_models.StorageLocation.objects.filter(
+            warehouse=warehouse,
+            is_active=True
+        ).order_by('name')
+
+        locations_data = [
+            {
+                'id': loc.id,
+                'name': loc.name,
+                'code': loc.code or '',
+                'is_default': loc.is_default,
+            }
+            for loc in locations
+        ]
+
+        return JsonResponse(locations_data, safe=False)
+    except Exception as e:
+        logger.error(f"Error fetching storage locations: {e}")
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# =============================================================================
+# WAREHOUSE LOCATION MANAGEMENT (Pickup/Dispatch Locations)
+# =============================================================================
+
+@login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
+def warehouse_location_list(request):
+    """List all warehouse pickup/dispatch locations - Superuser only"""
+    business, is_staff = get_business_filter(request)
+
+    warehouses = warehouse_models.Warehouse.objects.filter(is_active=True).order_by('name')
+
+    # Filter by warehouse if specified
+    warehouse_id = request.GET.get('warehouse')
+    if warehouse_id:
+        locations = warehouse_models.WarehouseLocation.objects.filter(
+            warehouse_id=warehouse_id
+        ).select_related('warehouse').order_by('-is_default', 'name')
+        selected_warehouse = warehouse_models.Warehouse.objects.get(pk=warehouse_id)
+    else:
+        locations = warehouse_models.WarehouseLocation.objects.select_related(
+            'warehouse'
+        ).order_by('warehouse__name', '-is_default', 'name')
+        selected_warehouse = None
+
+    paginator = Paginator(locations, 25)
+    page = request.GET.get('page', 1)
+    items = paginator.get_page(page)
+
+    context = {
+        'locations': items,
+        'warehouses': warehouses,
+        'selected_warehouse': selected_warehouse,
+        'is_staff': is_staff,
+    }
+    return render(request, 'warehouse/warehouse_location_list.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
+def warehouse_location_add(request):
+    """Add a new warehouse pickup/dispatch location - Superuser only"""
+    business, is_staff = get_business_filter(request)
+
+    if request.method == 'POST':
+        try:
+            warehouse_id = request.POST.get('warehouse')
+            name = request.POST.get('name')
+            code = request.POST.get('code')
+            address = request.POST.get('address', '')
+            zone_number = request.POST.get('zone_number', '')
+            latitude = request.POST.get('latitude', '')
+            longitude = request.POST.get('longitude', '')
+            operating_hours = request.POST.get('operating_hours', '')
+            notes = request.POST.get('notes', '')
+            is_active = request.POST.get('is_active') == 'on'
+            is_default = request.POST.get('is_default') == 'on'
+
+            # Validate required fields
+            if not warehouse_id:
+                messages.error(request, "Please select a warehouse")
+                raise ValueError("Warehouse is required")
+
+            if not name:
+                messages.error(request, "Please enter a location name")
+                raise ValueError("Location name is required")
+
+            if not code:
+                messages.error(request, "Please enter a location code")
+                raise ValueError("Location code is required")
+
+            warehouse = get_object_or_404(warehouse_models.Warehouse, pk=warehouse_id)
+
+            # Create location
+            location = warehouse_models.WarehouseLocation.objects.create(
+                warehouse=warehouse,
+                name=name,
+                code=code,
+                address=address,
+                zone_number=int(zone_number) if zone_number else None,
+                latitude=float(latitude) if latitude else None,
+                longitude=float(longitude) if longitude else None,
+                operating_hours=operating_hours,
+                notes=notes,
+                is_active=is_active,
+                is_default=is_default
+            )
+
+            messages.success(
+                request,
+                f"Created pickup location: {location.warehouse.code}/{location.name}"
+            )
+            logger.info(f"Warehouse location created: {location} by {request.user.username}")
+
+            return redirect('warehouse:warehouse_location_list')
+
+        except Exception as e:
+            logger.error(f"Error creating warehouse location: {e}")
+            if "is required" not in str(e):
+                messages.error(request, f"Error creating location: {str(e)}")
+
+    # GET request - show form
+    warehouses = warehouse_models.Warehouse.objects.filter(is_active=True).order_by('name')
+
+    context = {
+        'warehouses': warehouses,
+        'is_staff': is_staff,
+    }
+    return render(request, 'warehouse/warehouse_location_add.html', context)
