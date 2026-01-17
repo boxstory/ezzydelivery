@@ -1,0 +1,128 @@
+{% extends 'wf_dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Delete Storage Location{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Back Button -->
+    <div class="mb-3">
+        <a href="{% url 'warehouse:location_list' %}" class="btn btn-outline-secondary btn-sm"
+           hx-get="{% url 'warehouse:location_list' %}"
+           hx-target="#main-content"
+           hx-select="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true">
+            <i class="fa-solid fa-arrow-left me-2"></i>Back to Locations
+        </a>
+    </div>
+
+    <!-- Delete Confirmation Card -->
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-danger shadow-sm">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                        Confirm Delete Storage Location
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Warning Alert -->
+                    <div class="alert alert-danger mb-4">
+                        <i class="fa-solid fa-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> This action cannot be undone. Deleting this storage location will affect all inventory at this location.
+                    </div>
+
+                    <!-- Location Details -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3">Location to Delete:</h6>
+                        <div class="bg-light border rounded p-3">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-2">
+                                        <strong>Code:</strong>
+                                        <span class="badge bg-secondary">{{ location.code }}</span>
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Name:</strong> {{ location.name }}
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Type:</strong>
+                                        <span class="badge bg-info">{{ location.get_location_type_display }}</span>
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-2">
+                                        <strong>Warehouse:</strong> {{ location.warehouse.name }}
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Barcode:</strong> <code>{{ location.barcode }}</code>
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Status:</strong>
+                                        {% if location.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Impact Warning -->
+                    <div class="alert alert-warning">
+                        <h6><i class="fa-solid fa-info-circle me-2"></i>What will happen:</h6>
+                        <ul class="mb-0">
+                            <li>This storage location will be permanently removed</li>
+                            <li>Any inventory at this location will need to be reassigned</li>
+                            <li>Historical transactions will remain unchanged</li>
+                        </ul>
+                    </div>
+
+                    <!-- Confirmation Form -->
+                    <form method="post" action="">
+                        {% csrf_token %}
+
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="confirm-delete" required>
+                            <label class="form-check-label" for="confirm-delete">
+                                <strong>I understand that this action is permanent and cannot be reversed</strong>
+                            </label>
+                        </div>
+
+                        <div class="d-flex gap-3 justify-content-center">
+                            <button type="submit" class="btn btn-danger" id="delete-button" disabled>
+                                <i class="fa-solid fa-trash me-2"></i>
+                                Yes, Delete Location
+                            </button>
+                            <a href="{% url 'warehouse:location_list' %}" class="btn btn-secondary"
+                               hx-get="{% url 'warehouse:location_list' %}"
+                               hx-target="#main-content"
+                               hx-select="#main-content"
+                               hx-swap="outerHTML"
+                               hx-push-url="true">
+                                <i class="fa-solid fa-times me-2"></i>
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Enable delete button only when checkbox is checked
+document.getElementById('confirm-delete').addEventListener('change', function() {
+    document.getElementById('delete-button').disabled = !this.checked;
+});
+</script>
+{% endblock %}
