@@ -163,6 +163,14 @@ class Driver(models.Model):
         help_text="Last date when earnings were settled/paid"
     )
 
+    # Zone Preferences
+    preferred_zone_groups = models.ManyToManyField(
+        'delivery.ZoneGroup',
+        blank=True,
+        related_name='drivers',
+        help_text="Driver's preferred delivery zone groups"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

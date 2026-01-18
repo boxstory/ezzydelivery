@@ -69,6 +69,8 @@ DriverVehicle = fleet_models.DriverVehicle
 DriverTransaction = fleet_models.DriverTransaction
 DriverSettlement = fleet_models.DriverSettlement
 DeliveryTask = delivery_models.DeliveryTask
+ZoneName = delivery_models.ZoneName
+ZoneGroup = delivery_models.ZoneGroup
 Profile = core_models.Profile
 
 logger = logging.getLogger('fleet')
@@ -297,10 +299,17 @@ def vehicle_add(request):
 @login_required(login_url='/accounts/login/')
 def vehicle_delete(request, fleet_id, vehicle_id):
     logger.debug(f'vehicle_delete for vehicle_id={vehicle_id}')
+
+    # Only staff users can delete vehicles
+    if not request.user.is_staff:
+        messages.error(request, 'Only staff members can delete vehicles. Please contact support for assistance.')
+        return redirect('/fleet/vehicle_own/')
+
     if fleet_id != request.user.id:
         return redirect('/fleet/vehicles/')
     vehicle = fleet_models.DriverVehicle.objects.filter(id=vehicle_id)
     vehicle.delete()
+    messages.success(request, 'Vehicle deleted successfully.')
     return redirect('/fleet/vehicle_own/')
 
 
@@ -768,3 +777,87 @@ def driver_profile(request, fleet_id):
         'profile_picture': profile_picture
     }
     return render(request, 'fleet/frontend/driver_profile.html', context)
+
+
+# Mobile PWA Profile ---------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
+def driver_profile_mobile(request):
+    """
+    Mobile PWA driver profile page.
+    Displays driver info, stats, vehicle, and account settings in mobile-friendly format.
+    Handles zone preference selection via POST.
+    """
+    try:
+        # Fetch driver with related data
+        driver = fleet_models.Driver.objects.select_related(
+            'user',
+            'profile'
+        ).prefetch_related(
+            'preferred_zone_groups',
+            'preferred_zone_groups__zones'
+        ).get(user_id=request.user.id)
+
+        # Handle zone group preference update
+        if request.method == 'POST' and 'update_zones' in request.POST:
+            selected_group_ids = request.POST.getlist('preferred_zone_groups')
+            driver.preferred_zone_groups.clear()
+            if selected_group_ids:
+                groups = ZoneGroup.objects.filter(id__in=selected_group_ids, is_active=True)
+                driver.preferred_zone_groups.add(*groups)
+            messages.success(request, 'Zone group preferences updated successfully.')
+            return redirect('fleet:driver_profile_mobile')
+
+        profile = driver.profile
+
+        # Get profile picture
+        profile_picture, _ = core_models.ProfilePicture.objects.get_or_create(
+            user_id=request.user.id
+        )
+
+        # Get driver vehicles
+        driver_vehicles = fleet_models.DriverVehicle.objects.filter(
+            driver_id=driver.driver_id
+        )
+
+        # Get wallet status
+        wallet_status = WalletService.get_wallet_status(driver)
+
+        # Get statistics for last 30 days
+        stats = WalletService.get_driver_statistics(driver, days=30)
+
+        # Calculate average rating
+        if driver.driver_rating_count > 0:
+            average_rating = driver.driver_rating / driver.driver_rating_count
+        else:
+            average_rating = 0
+
+        # Get driver documents count
+        documents_count = fleet_models.DriverDocument.objects.filter(
+            driver_id=driver.driver_id
+        ).count()
+
+        # Get all active zone groups
+        zone_groups = ZoneGroup.objects.filter(is_active=True).prefetch_related('zones').order_by('display_order', 'name')
+
+        # Get driver's current preferred zone group IDs
+        preferred_group_ids = list(driver.preferred_zone_groups.values_list('id', flat=True))
+
+        context = {
+            'driver': driver,
+            'profile': profile,
+            'profile_picture': profile_picture,
+            'driver_vehicles': driver_vehicles,
+            'wallet_status': wallet_status,
+            'stats': stats,
+            'average_rating': average_rating,
+            'documents_count': documents_count,
+            'zone_groups': zone_groups,
+            'preferred_group_ids': preferred_group_ids,
+        }
+
+        return render(request, 'fleet/parts/driver_profile_mobile.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        logger.warning(f"User {request.user.id} has no driver profile")
+        messages.error(request, "Driver profile not found. Please create one first.")
+        return redirect('core:main_dashboard')

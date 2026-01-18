@@ -1,0 +1,542 @@
+{% extends "fleet_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}My Profile - {% endblock title %}
+
+{% block content %}
+<!-- Mobile PWA Profile View -->
+<div class="d-md-none pwa-page">
+  <!-- Profile Header Card -->
+  <div class="pwa-profile-header">
+    <div class="pwa-profile-avatar">
+      {% if profile_picture and profile_picture.image %}
+        <img src="{{ profile_picture.image.url }}" alt="{{ profile.user.first_name }}" class="pwa-profile-avatar__img">
+      {% else %}
+        <div class="pwa-profile-avatar__placeholder">
+          <i class="fas fa-user"></i>
+        </div>
+      {% endif %}
+      <span class="pwa-profile-status pwa-profile-status--{{ driver.driver_status|lower|slugify }}"></span>
+    </div>
+    <h1 class="pwa-profile-name">{{ profile.user.first_name }} {{ profile.user.last_name }}</h1>
+    <p class="pwa-profile-code">Driver ID: {{ driver.driver_code|default:driver.driver_id }}</p>
+
+    <!-- Rating -->
+    <div class="pwa-profile-rating">
+      <div class="pwa-rating-stars">
+        {% for i in "12345" %}
+          {% if forloop.counter <= average_rating|floatformat:0|add:0 %}
+            <i class="fas fa-star"></i>
+          {% else %}
+            <i class="far fa-star"></i>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <span class="pwa-rating-value">{{ average_rating|floatformat:1 }}</span>
+      <span class="pwa-rating-count">({{ driver.driver_reviews_count }} reviews)</span>
+    </div>
+
+    <!-- Status Badge -->
+    <div class="pwa-profile-badge pwa-profile-badge--{{ driver.driver_status|lower|slugify }}">
+      {{ driver.driver_status }}
+    </div>
+  </div>
+
+  <!-- Quick Stats Grid -->
+  <div class="pwa-stats-grid pwa-stats-grid--compact">
+    <div class="pwa-stat-card">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--navy">
+        <i class="fas fa-truck"></i>
+      </div>
+      <div class="pwa-stat-card__content">
+        <span class="pwa-stat-card__value">{{ stats.total_deliveries|default:0 }}</span>
+        <span class="pwa-stat-card__label">Deliveries</span>
+      </div>
+    </div>
+    <div class="pwa-stat-card">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--success">
+        <i class="fas fa-coins"></i>
+      </div>
+      <div class="pwa-stat-card__content">
+        <span class="pwa-stat-card__value">{{ stats.total_earnings|floatformat:0|default:0 }}</span>
+        <span class="pwa-stat-card__label">Earnings (QR)</span>
+      </div>
+    </div>
+    <div class="pwa-stat-card">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--warning">
+        <i class="fas fa-wallet"></i>
+      </div>
+      <div class="pwa-stat-card__content">
+        <span class="pwa-stat-card__value">{{ driver.wallet_balance|floatformat:0 }}</span>
+        <span class="pwa-stat-card__label">Wallet (QR)</span>
+      </div>
+    </div>
+    <div class="pwa-stat-card">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--primary">
+        <i class="fas fa-star"></i>
+      </div>
+      <div class="pwa-stat-card__content">
+        <span class="pwa-stat-card__value">{{ average_rating|floatformat:1 }}</span>
+        <span class="pwa-stat-card__label">Rating</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Sections -->
+  <div class="pwa-section">
+    <h2 class="pwa-section__title">
+      <i class="fas fa-user"></i>
+      Personal Information
+    </h2>
+    <div class="pwa-info-card">
+      <div class="pwa-info-row">
+        <span class="pwa-info-label">Full Name</span>
+        <span class="pwa-info-value">{{ profile.user.first_name }} {{ profile.user.last_name }}</span>
+      </div>
+      <div class="pwa-info-row">
+        <span class="pwa-info-label">Phone</span>
+        <span class="pwa-info-value">{{ driver.driver_phone }}</span>
+      </div>
+      <div class="pwa-info-row">
+        <span class="pwa-info-label">WhatsApp</span>
+        <span class="pwa-info-value">{{ driver.driver_whatsapp }}</span>
+      </div>
+      <div class="pwa-info-row">
+        <span class="pwa-info-label">Email</span>
+        <span class="pwa-info-value">{{ profile.user.email }}</span>
+      </div>
+      <div class="pwa-info-row">
+        <span class="pwa-info-label">Languages</span>
+        <span class="pwa-info-value">{{ driver.get_driver_languages_display }}</span>
+      </div>
+      <div class="pwa-info-row">
+        <span class="pwa-info-label">License No.</span>
+        <span class="pwa-info-value">{{ driver.driver_license_number }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zone Group Preferences Section -->
+  <div class="pwa-section">
+    <h2 class="pwa-section__title">
+      <i class="fas fa-map-marker-alt"></i>
+      Preferred Zone Groups
+    </h2>
+    <div class="pwa-info-card">
+      <p class="pwa-text-muted mb-3" style="font-size: 13px;">
+        Select your preferred delivery areas. Tasks in these zones will be prioritized for you.
+      </p>
+
+      <!-- Current Selected Zone Groups Display -->
+      {% if driver.preferred_zone_groups.all %}
+      <div class="mb-3">
+        <span class="pwa-info-label">Currently Selected:</span>
+        <div class="pwa-zone-tags mt-2">
+          {% for group in driver.preferred_zone_groups.all %}
+          <span class="pwa-zone-tag">
+            <i class="fas fa-layer-group"></i> {{ group.name }}
+            <small class="text-muted">({{ group.zone_count }} zones)</small>
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <div class="mb-3">
+        <span class="pwa-text-muted"><i class="fas fa-info-circle"></i> No zone groups selected yet</span>
+      </div>
+      {% endif %}
+
+      <!-- Edit Zone Groups Button -->
+      <button type="button" class="pwa-btn pwa-btn--outline pwa-btn--sm w-100" data-bs-toggle="modal" data-bs-target="#zoneSelectionModal">
+        <i class="fas fa-edit"></i> Edit Zone Preferences
+      </button>
+    </div>
+  </div>
+
+  <!-- Vehicle Section -->
+  <div class="pwa-section">
+    <h2 class="pwa-section__title">
+      <i class="fas fa-car"></i>
+      My Vehicles
+    </h2>
+    {% if driver_vehicles %}
+      {% for vehicle in driver_vehicles %}
+      <div class="pwa-vehicle-card">
+        <div class="pwa-vehicle-icon">
+          {% if vehicle.vehicle_type == 'bike' %}
+            <i class="fas fa-motorcycle"></i>
+          {% elif vehicle.vehicle_type == 'van' %}
+            <i class="fas fa-shuttle-van"></i>
+          {% elif vehicle.vehicle_type == 'pickup' or vehicle.vehicle_type == 'pickup3ton' or vehicle.vehicle_type == 'pickup_big' %}
+            <i class="fas fa-truck-pickup"></i>
+          {% else %}
+            <i class="fas fa-car"></i>
+          {% endif %}
+        </div>
+        <div class="pwa-vehicle-info">
+          <div class="pwa-vehicle-type">{{ vehicle.get_vehicle_type_display }}</div>
+          <div class="pwa-vehicle-details">
+            {% if vehicle.vehicle_model %}{{ vehicle.vehicle_model }}{% endif %}
+            {% if vehicle.vehicle_color %} - {{ vehicle.vehicle_color }}{% endif %}
+          </div>
+          <div class="pwa-vehicle-plate">{{ vehicle.vehicle_no }}</div>
+        </div>
+        <div class="pwa-vehicle-status pwa-vehicle-status--{{ vehicle.vehicle_status|lower }}">
+          {{ vehicle.get_vehicle_status_display }}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="pwa-empty-state">
+        <i class="fas fa-car"></i>
+        <p>No vehicles registered</p>
+        <a href="{% url 'fleet:vehicle_add' %}" class="pwa-btn pwa-btn--primary pwa-btn--sm">
+          <i class="fas fa-plus"></i> Add Vehicle
+        </a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Wallet Section -->
+  <div class="pwa-section">
+    <h2 class="pwa-section__title">
+      <i class="fas fa-wallet"></i>
+      Wallet Status
+    </h2>
+    <div class="pwa-wallet-summary">
+      <div class="pwa-wallet-row">
+        <span class="pwa-wallet-label">Wallet Balance</span>
+        <span class="pwa-wallet-value {% if driver.wallet_balance < 0 %}pwa-text-danger{% else %}pwa-text-success{% endif %}">
+          {{ driver.wallet_balance|floatformat:2 }} QR
+        </span>
+      </div>
+      <div class="pwa-wallet-row">
+        <span class="pwa-wallet-label">Credit Limit</span>
+        <span class="pwa-wallet-value">{{ driver.credit_limit|floatformat:2 }} QR</span>
+      </div>
+      <div class="pwa-wallet-row">
+        <span class="pwa-wallet-label">COD in Hand</span>
+        <span class="pwa-wallet-value pwa-text-warning">{{ driver.cod_in_hand|floatformat:2 }} QR</span>
+      </div>
+      <div class="pwa-wallet-row">
+        <span class="pwa-wallet-label">Pending Earnings</span>
+        <span class="pwa-wallet-value pwa-text-navy">{{ driver.pending_earnings|floatformat:2 }} QR</span>
+      </div>
+
+      <!-- Credit Usage Progress -->
+      <div class="pwa-credit-progress">
+        <div class="pwa-credit-progress__header">
+          <span>Credit Usage</span>
+          <span>{{ driver.wallet_usage_percentage|floatformat:0 }}%</span>
+        </div>
+        <div class="pwa-credit-progress__bar">
+          <div class="pwa-credit-progress__fill {% if driver.wallet_usage_percentage >= 80 %}pwa-credit-progress__fill--warning{% elif driver.wallet_usage_percentage >= 100 %}pwa-credit-progress__fill--danger{% endif %}"
+               style="width: {{ driver.wallet_usage_percentage|floatformat:0 }}%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Documents Section -->
+  <div class="pwa-section">
+    <h2 class="pwa-section__title">
+      <i class="fas fa-file-alt"></i>
+      Documents
+    </h2>
+    <a href="{% url 'fleet:driver_documents' %}" class="pwa-menu-link">
+      <div class="pwa-menu-link__content">
+        <i class="fas fa-folder-open pwa-menu-link__icon"></i>
+        <span>View My Documents</span>
+      </div>
+      <div class="pwa-menu-link__badge">{{ documents_count }}</div>
+      <i class="fas fa-chevron-right pwa-menu-link__arrow"></i>
+    </a>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="pwa-section">
+    <h2 class="pwa-section__title">
+      <i class="fas fa-bolt"></i>
+      Quick Actions
+    </h2>
+    <div class="pwa-quick-actions-list">
+      <a href="{% url 'fleet:driver_earnings' %}" class="pwa-menu-link">
+        <i class="fas fa-coins pwa-menu-link__icon pwa-text-success"></i>
+        <span>View Earnings</span>
+        <i class="fas fa-chevron-right pwa-menu-link__arrow"></i>
+      </a>
+      <a href="{% url 'fleet:cod_collection' %}" class="pwa-menu-link">
+        <i class="fas fa-hand-holding-usd pwa-menu-link__icon pwa-text-warning"></i>
+        <span>COD Collection</span>
+        <i class="fas fa-chevron-right pwa-menu-link__arrow"></i>
+      </a>
+      <a href="{% url 'fleet:transaction_history' %}" class="pwa-menu-link">
+        <i class="fas fa-receipt pwa-menu-link__icon pwa-text-navy"></i>
+        <span>Transaction History</span>
+        <i class="fas fa-chevron-right pwa-menu-link__arrow"></i>
+      </a>
+      <a href="{% url 'fleet:driver_performance' %}" class="pwa-menu-link">
+        <i class="fas fa-chart-line pwa-menu-link__icon pwa-text-primary"></i>
+        <span>Performance</span>
+        <i class="fas fa-chevron-right pwa-menu-link__arrow"></i>
+      </a>
+      <a href="{% url 'fleet:vehicle_own' %}" class="pwa-menu-link">
+        <i class="fas fa-car pwa-menu-link__icon pwa-text-navy"></i>
+        <span>Manage Vehicles</span>
+        <i class="fas fa-chevron-right pwa-menu-link__arrow"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- Account Section -->
+  <div class="pwa-section">
+    <h2 class="pwa-section__title">
+      <i class="fas fa-cog"></i>
+      Account
+    </h2>
+    <div class="pwa-quick-actions-list">
+      <a href="{% url 'core:profile_view' %}" class="pwa-menu-link">
+        <i class="fas fa-user-edit pwa-menu-link__icon"></i>
+        <span>Edit Profile</span>
+        <i class="fas fa-chevron-right pwa-menu-link__arrow"></i>
+      </a>
+      <a href="{% url 'account_change_password' %}" class="pwa-menu-link">
+        <i class="fas fa-lock pwa-menu-link__icon"></i>
+        <span>Change Password</span>
+        <i class="fas fa-chevron-right pwa-menu-link__arrow"></i>
+      </a>
+      <a href="{% url 'account_logout' %}" class="pwa-menu-link pwa-menu-link--danger">
+        <i class="fas fa-sign-out-alt pwa-menu-link__icon"></i>
+        <span>Logout</span>
+        <i class="fas fa-chevron-right pwa-menu-link__arrow"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- Version Info -->
+  <div class="pwa-footer-info">
+    <p>EzzyDriver v1.0.0</p>
+    <p>Member since {{ driver.created_at|date:"M Y" }}</p>
+  </div>
+</div>
+
+<!-- Zone Group Selection Modal -->
+<div class="modal fade" id="zoneSelectionModal" tabindex="-1" aria-labelledby="zoneSelectionModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-navy text-white">
+        <h5 class="modal-title" id="zoneSelectionModalLabel">
+          <i class="fas fa-layer-group me-2"></i>Select Zone Groups
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="{% url 'fleet:driver_profile_mobile' %}">
+        {% csrf_token %}
+        <input type="hidden" name="update_zones" value="1">
+        <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+          <p class="text-muted small mb-3">
+            Select the delivery areas you want to cover. Tasks in these zones will be shown to you first.
+          </p>
+
+          {% if zone_groups %}
+          <div class="zone-group-list">
+            {% for group in zone_groups %}
+            <div class="zone-group-card {% if group.id in preferred_group_ids %}zone-group-card--selected{% endif %}">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="preferred_zone_groups"
+                       value="{{ group.id }}" id="group_{{ group.id }}"
+                       {% if group.id in preferred_group_ids %}checked{% endif %}>
+                <label class="form-check-label" for="group_{{ group.id }}">
+                  <div class="zone-group-name">{{ group.name }}</div>
+                  {% if group.description %}
+                  <div class="zone-group-desc">{{ group.description|truncatechars:50 }}</div>
+                  {% endif %}
+                  <div class="zone-group-zones">
+                    <i class="fas fa-map-pin"></i>
+                    <span>Zones: {{ group.zone_numbers_display|truncatechars:40 }}</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-center text-muted py-4">
+            <i class="fas fa-map fa-3x mb-3"></i>
+            <p>No zone groups available yet</p>
+            <p class="small">Contact admin to set up zone groups</p>
+          </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-navy">
+            <i class="fas fa-save me-1"></i> Save Preferences
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Desktop View -->
+<div class="d-none d-md-block">
+  <div class="container-fluid py-4">
+    <div class="row">
+      <div class="col-md-4">
+        <!-- Profile Card -->
+        <div class="card mb-4">
+          <div class="card-body text-center">
+            {% if profile_picture and profile_picture.image %}
+              <img src="{{ profile_picture.image.url }}" alt="{{ profile.user.first_name }}"
+                   class="rounded-circle mb-3" style="width: 120px; height: 120px; object-fit: cover;">
+            {% else %}
+              <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3"
+                   style="width: 120px; height: 120px;">
+                <i class="fas fa-user fa-3x text-white"></i>
+              </div>
+            {% endif %}
+            <h4>{{ profile.user.first_name }} {{ profile.user.last_name }}</h4>
+            <p class="text-muted">Driver ID: {{ driver.driver_code|default:driver.driver_id }}</p>
+            <span class="badge bg-{{ driver.driver_status|lower|slugify }}">{{ driver.driver_status }}</span>
+
+            <div class="mt-3">
+              <div class="d-flex justify-content-center">
+                {% for i in "12345" %}
+                  {% if forloop.counter <= average_rating|floatformat:0|add:0 %}
+                    <i class="fas fa-star text-warning"></i>
+                  {% else %}
+                    <i class="far fa-star text-warning"></i>
+                  {% endif %}
+                {% endfor %}
+              </div>
+              <small class="text-muted">{{ average_rating|floatformat:1 }} ({{ driver.driver_reviews_count }} reviews)</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact Info -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-address-card me-2"></i>Contact Information</h5>
+          </div>
+          <div class="card-body">
+            <p><i class="fas fa-phone me-2"></i>{{ driver.driver_phone }}</p>
+            <p><i class="fab fa-whatsapp me-2"></i>{{ driver.driver_whatsapp }}</p>
+            <p><i class="fas fa-envelope me-2"></i>{{ profile.user.email }}</p>
+            <p><i class="fas fa-language me-2"></i>{{ driver.get_driver_languages_display }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-8">
+        <!-- Stats Row -->
+        <div class="row mb-4">
+          <div class="col-md-3">
+            <div class="card text-center">
+              <div class="card-body">
+                <h3>{{ stats.total_deliveries|default:0 }}</h3>
+                <small class="text-muted">Deliveries</small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card text-center">
+              <div class="card-body">
+                <h3>{{ stats.total_earnings|floatformat:0|default:0 }}</h3>
+                <small class="text-muted">Earnings (QR)</small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card text-center">
+              <div class="card-body">
+                <h3>{{ driver.wallet_balance|floatformat:0 }}</h3>
+                <small class="text-muted">Wallet (QR)</small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card text-center">
+              <div class="card-body">
+                <h3>{{ driver.cod_in_hand|floatformat:0 }}</h3>
+                <small class="text-muted">COD in Hand (QR)</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vehicles -->
+        <div class="card mb-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-car me-2"></i>My Vehicles</h5>
+            <a href="{% url 'fleet:vehicle_add' %}" class="btn btn-sm btn-primary">
+              <i class="fas fa-plus"></i> Add
+            </a>
+          </div>
+          <div class="card-body">
+            {% if driver_vehicles %}
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Model</th>
+                      <th>Plate No.</th>
+                      <th>Color</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for vehicle in driver_vehicles %}
+                    <tr>
+                      <td>{{ vehicle.get_vehicle_type_display }}</td>
+                      <td>{{ vehicle.vehicle_model|default:"-" }}</td>
+                      <td>{{ vehicle.vehicle_no }}</td>
+                      <td>{{ vehicle.vehicle_color|default:"-" }}</td>
+                      <td>
+                        <span class="badge bg-{{ vehicle.vehicle_status|lower }}">
+                          {{ vehicle.get_vehicle_status_display }}
+                        </span>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <p class="text-muted text-center py-4">No vehicles registered</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Wallet Summary -->
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-wallet me-2"></i>Wallet Summary</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <p><strong>Wallet Balance:</strong> {{ driver.wallet_balance|floatformat:2 }} QR</p>
+                <p><strong>Credit Limit:</strong> {{ driver.credit_limit|floatformat:2 }} QR</p>
+              </div>
+              <div class="col-md-6">
+                <p><strong>COD in Hand:</strong> {{ driver.cod_in_hand|floatformat:2 }} QR</p>
+                <p><strong>Pending Earnings:</strong> {{ driver.pending_earnings|floatformat:2 }} QR</p>
+              </div>
+            </div>
+            <div class="progress mt-3" style="height: 25px;">
+              <div class="progress-bar {% if driver.wallet_usage_percentage >= 80 %}bg-warning{% elif driver.wallet_usage_percentage >= 100 %}bg-danger{% else %}bg-primary{% endif %}"
+                   role="progressbar"
+                   style="width: {{ driver.wallet_usage_percentage|floatformat:0 }}%;">
+                Credit Usage: {{ driver.wallet_usage_percentage|floatformat:0 }}%
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

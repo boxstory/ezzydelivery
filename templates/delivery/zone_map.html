@@ -1,0 +1,600 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Zone Map - {% endblock title %}
+
+{% block extra_css %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  #zone-map {
+    height: calc(100vh - 200px);
+    min-height: 500px;
+    width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  .zone-map-container {
+    padding: 20px;
+  }
+
+  .map-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .map-header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #001f3f;
+    margin: 0;
+  }
+
+  .map-stats {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .map-stat {
+    background: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    text-align: center;
+  }
+
+  .map-stat__value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #001f3f;
+  }
+
+  .map-stat__label {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+  }
+
+  .map-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .map-control-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .map-control-btn:hover {
+    border-color: #001f3f;
+    color: #001f3f;
+  }
+
+  .map-control-btn.active {
+    background: #001f3f;
+    color: white;
+    border-color: #001f3f;
+  }
+
+  .map-legend {
+    position: absolute;
+    bottom: 30px;
+    right: 10px;
+    background: white;
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    z-index: 1000;
+    font-size: 12px;
+    max-width: 200px;
+  }
+
+  .map-legend h4 {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  }
+
+  /* Custom marker styles */
+  .zone-marker {
+    background: #001f3f;
+    color: white;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+
+  .leaflet-popup-content {
+    margin: 12px;
+    min-width: 180px;
+  }
+
+  .zone-popup {
+    text-align: left;
+  }
+
+  .zone-popup__title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #001f3f;
+    margin-bottom: 4px;
+  }
+
+  .zone-popup__arabic {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 8px;
+    direction: rtl;
+  }
+
+  .zone-popup__info {
+    font-size: 12px;
+    color: #333;
+    margin-bottom: 4px;
+  }
+
+  .zone-popup__neighbours {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #eee;
+  }
+
+  .zone-popup__neighbours-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 4px;
+  }
+
+  .zone-popup__neighbour-list {
+    font-size: 11px;
+    color: #888;
+  }
+
+  /* Group filter pills */
+  .group-filters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+  }
+
+  .group-filter {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .group-filter:hover {
+    border-color: #001f3f;
+  }
+
+  .group-filter.active {
+    background: #001f3f;
+    color: white;
+    border-color: #001f3f;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    #zone-map {
+      height: calc(100vh - 280px);
+      min-height: 400px;
+    }
+
+    .map-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .map-stats {
+      width: 100%;
+    }
+
+    .map-stat {
+      flex: 1;
+      min-width: 80px;
+    }
+  }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="zone-map-container">
+  <!-- Header -->
+  <div class="map-header">
+    <h1><i class="fas fa-map-marked-alt me-2"></i>Qatar Zone Map</h1>
+    <div class="map-stats">
+      <div class="map-stat">
+        <div class="map-stat__value">{{ total_zones }}</div>
+        <div class="map-stat__label">Total Zones</div>
+      </div>
+      <div class="map-stat">
+        <div class="map-stat__value text-success">{{ zones_with_coords }}</div>
+        <div class="map-stat__label">With Coords</div>
+      </div>
+      <div class="map-stat">
+        <div class="map-stat__value text-warning">{{ zones_without_coords }}</div>
+        <div class="map-stat__label">Missing</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map Controls -->
+  <div class="map-controls">
+    <button class="map-control-btn active" id="btn-markers" onclick="toggleMarkers()">
+      <i class="fas fa-map-marker-alt me-1"></i> Markers
+    </button>
+    <button class="map-control-btn" id="btn-neighbours" onclick="toggleNeighbourLines()">
+      <i class="fas fa-project-diagram me-1"></i> Show Neighbours
+    </button>
+    <button class="map-control-btn" id="btn-labels" onclick="toggleLabels()">
+      <i class="fas fa-tags me-1"></i> Labels
+    </button>
+    <button class="map-control-btn" onclick="resetView()">
+      <i class="fas fa-compress-arrows-alt me-1"></i> Reset View
+    </button>
+  </div>
+
+  <!-- Zone Group Filters -->
+  <div class="group-filters">
+    <span class="group-filter active" data-group="all" onclick="filterByGroup('all', this)">All Zones</span>
+    {% for group in zone_groups %}
+    <span class="group-filter" data-group="{{ group.name }}" onclick="filterByGroup('{{ group.name }}', this)">
+      {{ group.name }} ({{ group.zone_count }})
+    </span>
+    {% endfor %}
+  </div>
+
+  <!-- Map Container -->
+  <div style="position: relative;">
+    <div id="zone-map"></div>
+
+    <!-- Legend -->
+    <div class="map-legend">
+      <h4><i class="fas fa-info-circle me-1"></i> Legend</h4>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #001f3f;"></div>
+        <span>Zone Marker</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #10b981;"></div>
+        <span>Selected Zone</span>
+      </div>
+      <div class="legend-item" id="legend-neighbours" style="display: none;">
+        <div style="width: 20px; height: 2px; background: #f59e0b;"></div>
+        <span>Neighbour Link</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zone List Table -->
+  <div class="card mt-4">
+    <div class="card-header bg-navy text-white">
+      <h5 class="mb-0"><i class="fas fa-list me-2"></i>Zone List</h5>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Zone #</th>
+              <th>Name</th>
+              <th>Arabic</th>
+              <th>Latitude</th>
+              <th>Longitude</th>
+              <th>Neighbours</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for zone in zones %}
+            <tr id="zone-row-{{ zone.zone_number }}">
+              <td><strong>{{ zone.zone_number }}</strong></td>
+              <td>{{ zone.zone_name }}</td>
+              <td style="direction: rtl;">{{ zone.zone_name_arabic|default:"-" }}</td>
+              <td><small>{{ zone.latitude|floatformat:5 }}</small></td>
+              <td><small>{{ zone.longitude|floatformat:5 }}</small></td>
+              <td>
+                <span class="badge bg-secondary">{{ zone.neighbour_zones.count }}</span>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-outline-primary" onclick="focusZone({{ zone.zone_number }})">
+                  <i class="fas fa-crosshairs"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // Zone data from Django
+  const zonesData = {{ zones_json|safe }};
+
+  // Map initialization - centered on Qatar
+  const map = L.map('zone-map').setView([25.276987, 51.520008], 11);
+
+  // Add OpenStreetMap tiles
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 18
+  }).addTo(map);
+
+  // Store markers and layers
+  const markers = {};
+  const labels = {};
+  const neighbourLines = [];
+  let showingNeighbours = false;
+  let showingLabels = false;
+
+  // Color palette for zone groups
+  const groupColors = {
+    'Central Doha / Downtown': '#e63946',
+    'West Bay / Al Dafna': '#457b9d',
+    'Lusail / North': '#2a9d8f',
+    'Madinat Khalifa / West Doha': '#e9c46a',
+    'East Doha / Corniche': '#f4a261',
+    'South Doha / Airport Area': '#264653',
+    'Industrial Area / Southwest': '#6c757d',
+    'Wadi Al Sail / North Central': '#9b59b6',
+    'Al Wakra / South': '#1abc9c',
+    'Outer Areas / Rural': '#95a5a6'
+  };
+
+  // Create custom marker icon
+  function createMarkerIcon(zoneNumber, color = '#001f3f') {
+    return L.divIcon({
+      className: 'custom-marker',
+      html: `<div class="zone-marker" style="background: ${color};">${zoneNumber}</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      popupAnchor: [0, -14]
+    });
+  }
+
+  // Initialize markers
+  zonesData.forEach(zone => {
+    const color = zone.groups.length > 0 ? (groupColors[zone.groups[0]] || '#001f3f') : '#001f3f';
+
+    const marker = L.marker([zone.lat, zone.lng], {
+      icon: createMarkerIcon(zone.zone_number, color),
+      zoneData: zone
+    });
+
+    // Create popup content
+    const neighbourList = zone.neighbours.map(n => `Zone ${n.zone_number}`).join(', ') || 'None';
+    const groupList = zone.groups.join(', ') || 'Unassigned';
+
+    const popupContent = `
+      <div class="zone-popup">
+        <div class="zone-popup__title">Zone ${zone.zone_number} - ${zone.name}</div>
+        ${zone.name_arabic ? `<div class="zone-popup__arabic">${zone.name_arabic}</div>` : ''}
+        <div class="zone-popup__info"><i class="fas fa-map-pin me-1"></i> ${zone.lat.toFixed(5)}, ${zone.lng.toFixed(5)}</div>
+        <div class="zone-popup__info"><i class="fas fa-layer-group me-1"></i> ${groupList}</div>
+        <div class="zone-popup__neighbours">
+          <div class="zone-popup__neighbours-title"><i class="fas fa-project-diagram me-1"></i> Neighbours (${zone.neighbour_count})</div>
+          <div class="zone-popup__neighbour-list">${neighbourList}</div>
+        </div>
+      </div>
+    `;
+
+    marker.bindPopup(popupContent);
+
+    // Click event to show neighbour lines
+    marker.on('click', function() {
+      highlightNeighbours(zone);
+    });
+
+    marker.addTo(map);
+    markers[zone.zone_number] = marker;
+
+    // Create label (hidden by default)
+    const label = L.marker([zone.lat, zone.lng], {
+      icon: L.divIcon({
+        className: 'zone-label',
+        html: `<div style="background: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.2); white-space: nowrap;">${zone.name}</div>`,
+        iconSize: [100, 20],
+        iconAnchor: [50, -10]
+      })
+    });
+    labels[zone.zone_number] = label;
+  });
+
+  // Highlight neighbours of a zone
+  function highlightNeighbours(zone) {
+    // Clear existing lines
+    clearNeighbourLines();
+
+    // Draw lines to neighbours
+    zone.neighbours.forEach(neighbour => {
+      const line = L.polyline(
+        [[zone.lat, zone.lng], [neighbour.lat, neighbour.lng]],
+        { color: '#f59e0b', weight: 2, opacity: 0.8, dashArray: '5, 5' }
+      ).addTo(map);
+      neighbourLines.push(line);
+    });
+  }
+
+  // Clear neighbour lines
+  function clearNeighbourLines() {
+    neighbourLines.forEach(line => map.removeLayer(line));
+    neighbourLines.length = 0;
+  }
+
+  // Toggle all neighbour lines
+  function toggleNeighbourLines() {
+    const btn = document.getElementById('btn-neighbours');
+    showingNeighbours = !showingNeighbours;
+
+    if (showingNeighbours) {
+      btn.classList.add('active');
+      document.getElementById('legend-neighbours').style.display = 'flex';
+
+      // Draw all neighbour lines
+      zonesData.forEach(zone => {
+        zone.neighbours.forEach(neighbour => {
+          // Only draw line once (from lower to higher zone number)
+          if (zone.zone_number < neighbour.zone_number) {
+            const line = L.polyline(
+              [[zone.lat, zone.lng], [neighbour.lat, neighbour.lng]],
+              { color: '#f59e0b', weight: 1.5, opacity: 0.5 }
+            ).addTo(map);
+            neighbourLines.push(line);
+          }
+        });
+      });
+    } else {
+      btn.classList.remove('active');
+      document.getElementById('legend-neighbours').style.display = 'none';
+      clearNeighbourLines();
+    }
+  }
+
+  // Toggle markers
+  function toggleMarkers() {
+    const btn = document.getElementById('btn-markers');
+    btn.classList.toggle('active');
+
+    Object.values(markers).forEach(marker => {
+      if (map.hasLayer(marker)) {
+        map.removeLayer(marker);
+      } else {
+        marker.addTo(map);
+      }
+    });
+  }
+
+  // Toggle labels
+  function toggleLabels() {
+    const btn = document.getElementById('btn-labels');
+    showingLabels = !showingLabels;
+    btn.classList.toggle('active');
+
+    Object.values(labels).forEach(label => {
+      if (showingLabels) {
+        label.addTo(map);
+      } else {
+        map.removeLayer(label);
+      }
+    });
+  }
+
+  // Filter by zone group
+  function filterByGroup(groupName, btn) {
+    // Update button states
+    document.querySelectorAll('.group-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Show/hide markers
+    Object.values(markers).forEach(marker => {
+      const zone = marker.options.zoneData;
+      if (groupName === 'all' || zone.groups.includes(groupName)) {
+        marker.addTo(map);
+      } else {
+        map.removeLayer(marker);
+      }
+    });
+
+    // Update labels if showing
+    if (showingLabels) {
+      Object.entries(labels).forEach(([zoneNum, label]) => {
+        const zone = zonesData.find(z => z.zone_number == zoneNum);
+        if (groupName === 'all' || (zone && zone.groups.includes(groupName))) {
+          label.addTo(map);
+        } else {
+          map.removeLayer(label);
+        }
+      });
+    }
+
+    // Clear neighbour lines
+    clearNeighbourLines();
+  }
+
+  // Focus on a specific zone
+  function focusZone(zoneNumber) {
+    const marker = markers[zoneNumber];
+    if (marker) {
+      map.setView(marker.getLatLng(), 14);
+      marker.openPopup();
+
+      // Highlight table row
+      document.querySelectorAll('tbody tr').forEach(row => row.classList.remove('table-primary'));
+      document.getElementById(`zone-row-${zoneNumber}`)?.classList.add('table-primary');
+
+      // Show neighbours
+      const zone = zonesData.find(z => z.zone_number === zoneNumber);
+      if (zone) {
+        highlightNeighbours(zone);
+      }
+    }
+  }
+
+  // Reset map view
+  function resetView() {
+    map.setView([25.276987, 51.520008], 11);
+    clearNeighbourLines();
+    document.querySelectorAll('tbody tr').forEach(row => row.classList.remove('table-primary'));
+  }
+
+  // Fit map to show all markers
+  if (zonesData.length > 0) {
+    const bounds = L.latLngBounds(zonesData.map(z => [z.lat, z.lng]));
+    map.fitBounds(bounds, { padding: [30, 30] });
+  }
+</script>
+{% endblock extra_js %}

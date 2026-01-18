@@ -4,6 +4,58 @@ from delivery import models as delivery_models
 # Register your models here.
 
 
+@admin.register(delivery_models.ZoneName)
+class ZoneNameAdmin(admin.ModelAdmin):
+    list_display = ('zone_number', 'zone_name', 'zone_name_arabic', 'latitude', 'longitude', 'has_polygon_display', 'neighbour_count', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('zone_name', 'zone_name_arabic', 'zone_number')
+    ordering = ('zone_number',)
+    filter_horizontal = ('neighbour_zones',)
+    list_editable = ('is_active',)
+    fieldsets = (
+        ('Zone Info', {
+            'fields': ('zone_number', 'zone_name', 'zone_name_arabic', 'is_active')
+        }),
+        ('Location (Center Point)', {
+            'fields': ('latitude', 'longitude')
+        }),
+        ('Boundary Polygon', {
+            'fields': ('polygon',),
+            'description': 'Enter boundary coordinates as JSON array: [[lat1, lon1], [lat2, lon2], ...]'
+        }),
+        ('Neighbours', {
+            'fields': ('neighbour_zones',),
+            'description': 'Select adjacent/nearby zones'
+        }),
+    )
+
+    def neighbour_count(self, obj):
+        return obj.neighbour_zones.count()
+    neighbour_count.short_description = 'Neighbours'
+
+    def has_polygon_display(self, obj):
+        return "Yes" if obj.has_polygon else "No"
+    has_polygon_display.short_description = 'Polygon'
+
+
+@admin.register(delivery_models.ZoneGroup)
+class ZoneGroupAdmin(admin.ModelAdmin):
+    list_display = ('name', 'zone_count', 'zone_numbers_display', 'is_active', 'display_order')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'description')
+    filter_horizontal = ('zones',)
+    ordering = ('display_order', 'name')
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'description', 'is_active', 'display_order')
+        }),
+        ('Zones', {
+            'fields': ('zones',),
+            'description': 'Select the zones that belong to this group'
+        }),
+    )
+
+
 @admin.register(delivery_models.DeliveryTask)
 class DeliveryTaskAdmin(admin.ModelAdmin):
     list_display = ('dl_task_number',  'dl_price')

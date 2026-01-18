@@ -246,17 +246,88 @@ class DeliveryTask(models.Model):
 
 
 class ZoneName(models.Model):
-    zone_name = models.CharField(max_length=100)
-    zone_number = models.PositiveIntegerField()
+    zone_number = models.PositiveIntegerField(unique=True, db_index=True)
+    zone_name = models.CharField(max_length=100, help_text="English name")
+    zone_name_arabic = models.CharField(max_length=100, blank=True, null=True, help_text="Arabic name")
+    latitude = models.DecimalField(
+        max_digits=10, decimal_places=7, blank=True, null=True,
+        help_text="Center point latitude"
+    )
+    longitude = models.DecimalField(
+        max_digits=10, decimal_places=7, blank=True, null=True,
+        help_text="Center point longitude"
+    )
+    polygon = models.JSONField(
+        blank=True, null=True,
+        help_text="Zone boundary coordinates as [[lat, lon], [lat, lon], ...] array"
+    )
+    neighbour_zones = models.ManyToManyField(
+        'self',
+        blank=True,
+        symmetrical=True,
+        help_text="Adjacent/nearby zones"
+    )
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.zone_name
+        return f"Zone {self.zone_number} - {self.zone_name}"
+
+    @property
+    def neighbour_zone_numbers(self):
+        """Returns list of neighbour zone numbers"""
+        return list(self.neighbour_zones.values_list('zone_number', flat=True))
+
+    @property
+    def has_polygon(self):
+        """Check if zone has boundary polygon defined"""
+        return bool(self.polygon and len(self.polygon) >= 3)
 
     class Meta:
-        verbose_name_plural = "Zone Name"
+        verbose_name = "Zone"
+        verbose_name_plural = "Zones"
         app_label = 'delivery'
+        ordering = ['zone_number']
+
+
+class ZoneGroup(models.Model):
+    """
+    Zone Group for grouping multiple zones into wider delivery areas.
+    Examples: West Doha, Industrial Area, Pearl Qatar, etc.
+    Drivers select zone groups to indicate their preferred delivery areas.
+    """
+    name = models.CharField(max_length=100, help_text="Group name (e.g., West Doha, Industrial Area)")
+    description = models.TextField(blank=True, null=True, help_text="Description of the area covered")
+    zones = models.ManyToManyField(
+        ZoneName,
+        related_name='zone_groups',
+        help_text="Zones included in this group"
+    )
+    is_active = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0, help_text="Order for display (lower = first)")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def zone_count(self):
+        return self.zones.count()
+
+    @property
+    def zone_numbers_display(self):
+        """Returns comma-separated zone numbers for display"""
+        numbers = self.zones.values_list('zone_number', flat=True)
+        return ', '.join(str(n) for n in sorted(numbers))
+
+    class Meta:
+        verbose_name = "Zone Group"
+        verbose_name_plural = "Zone Groups"
+        app_label = 'delivery'
+        ordering = ['display_order', 'name']
+
 
 class LatLonList(models.Model):
     zone_number = models.PositiveIntegerField()

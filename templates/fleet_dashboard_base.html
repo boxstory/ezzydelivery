@@ -8,44 +8,67 @@
   <!-- HTMX -->
   <script src="https://unpkg.com/htmx.org@2.0.3"></script>
 
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#001f3f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="EzzyDriver">
+  <link rel="apple-touch-icon" href="{% static 'webpages/img/ezzy-logo-sqr-round.png' %}">
+  <link rel="manifest" href="{% static 'manifest.json' %}">
+  <link rel="icon" type="image/png" sizes="512x512" href="{% static 'webpages/img/ezzy-logo-512-512.png' %}">
+
   <!-- Dashboard CSS - Always loaded for HTMX compatibility -->
   <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}" type="text/css" />
-  <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}" type="text/css" />
   <link rel="stylesheet" href="{% static 'webpages/css/sidebar-common.css' %}" type="text/css" />
+  <!-- Mobile PWA CSS -->
+  <link rel="stylesheet" href="{% static 'fleet/css/fleet-mobile.css' %}?v=20260118s" type="text/css" />
 
   {% block extra_css %}
   {% endblock extra_css %}
   <title>
     {% block title %}
     {% endblock title %}
-    Ezzy Dashaoard</title>
+    Ezzy Driver</title>
 </head>
 
-<body class="d-flex flex-column min-vh-100">
+<body class="d-flex flex-column min-vh-100 fleet-mobile">
   <!-- Toast Notifications -->
   {% include "includes/toast_notifications.html" %}
 
-  <div class="d-none d-md-block">
-    {% include "includes/navbar.html" %}</div>
+  <!-- Mobile PWA Header - Only visible on mobile -->
+  {% include "fleet/parts/pwa_header.html" %}
 
-  <main class="col-12 ps-2 flex-grow-1">
-    {% include "fleet/parts/dashboard_sidebar_fleet_mob.html" %}
+  <!-- Desktop Navbar - Hidden on mobile -->
+  <div class="d-none d-md-block">
+    {% include "includes/navbar.html" %}
+  </div>
+
+  <main class="col-12 ps-md-2 flex-grow-1">
+    <!-- Mobile sidebar toggle - Hidden on mobile (using bottom nav instead) -->
+    <div class="d-none d-md-block">
+      {% include "fleet/parts/dashboard_sidebar_fleet_mob.html" %}
+    </div>
     <div class="col-12 d-flex">
-      <!-- extra css -->
+      <!-- Desktop sidebar - Hidden on mobile -->
       {% block sidebar %}
-      <!-- sidebar -->
       {% include "fleet/parts/dashboard_sidebar_fleet.html" %}
       {% endblock sidebar %}
-      <!-- dashboard body content goes here -->
-      <div class="flex-grow-1">
+      <!-- Dashboard body content -->
+      <div class="flex-grow-1 pwa-content-wrapper">
         {% include "includes/messages.html" %}
         {% block content %}
         {% endblock content %}
       </div>
     </div>
   </main>
-  <!-- footer -->
-  {% include "includes/footer.html" %}
+
+  <!-- Mobile PWA Bottom Navigation - Only visible on mobile -->
+  {% include "fleet/parts/pwa_bottom_nav.html" %}
+
+  <!-- Desktop footer - Hidden on mobile -->
+  <div class="d-none d-md-block">
+    {% include "includes/footer.html" %}
+  </div>
   <!-- extra js -->
   {% include "includes/scripts.html" %}
   <!-- dashboard js -->
@@ -59,6 +82,21 @@
   {% block extra_js %}
   <!--  -->
   {% endblock extra_js %}
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/static/sw.js')
+          .then(function(registration) {
+            console.log('SW registered: ', registration.scope);
+          })
+          .catch(function(error) {
+            console.log('SW registration failed: ', error);
+          });
+      });
+    }
+  </script>
 </body>
 
 </html>

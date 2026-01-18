@@ -4,140 +4,284 @@
 {% block title %}Driver Earnings{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h1 class="h3 mb-0">My Earnings</h1>
-            <p class="text-muted">View your earnings and financial summary</p>
-        </div>
-    </div>
+<!-- Mobile PWA Earnings View -->
+<div class="pwa-content d-md-none">
+  <div class="pwa-section-header">
+    <h3 class="pwa-section-title">My Earnings</h3>
+    <span class="pwa-text-muted">Financial Summary</span>
+  </div>
 
-    <!-- Filter -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <form method="GET" class="d-flex gap-2">
-                <select name="days" class="form-select" style="max-width: 200px;" onchange="this.form.submit()">
-                    <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
-                    <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
-                    <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
-                </select>
-            </form>
-        </div>
-    </div>
+  <!-- Period Filter Pills -->
+  <div class="pwa-filter-pills">
+    <a href="?days=7" class="pwa-filter-pill {% if selected_days == 7 %}pwa-filter-pill--active{% endif %}">7 Days</a>
+    <a href="?days=30" class="pwa-filter-pill {% if selected_days == 30 or not selected_days %}pwa-filter-pill--active{% endif %}">30 Days</a>
+    <a href="?days=90" class="pwa-filter-pill {% if selected_days == 90 %}pwa-filter-pill--active{% endif %}">90 Days</a>
+  </div>
 
-    <!-- Stats Cards -->
-    {% if stats %}
-    <div class="row mb-4">
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <h6 class="text-muted mb-2">Total Earnings</h6>
-                    <h3 class="mb-0 text-success">QAR {{ stats.total_earnings|default:0 }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <h6 class="text-muted mb-2">Deliveries</h6>
-                    <h3 class="mb-0">{{ stats.total_deliveries|default:0 }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <h6 class="text-muted mb-2">Bonus</h6>
-                    <h3 class="mb-0 text-info">QAR {{ stats.total_bonus|default:0 }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <h6 class="text-muted mb-2">Deductions</h6>
-                    <h3 class="mb-0 text-danger">QAR {{ stats.total_deductions|default:0 }}</h3>
-                </div>
-            </div>
-        </div>
+  <!-- Earnings Wallet Card -->
+  {% if stats %}
+  <div class="pwa-wallet-card pwa-wallet-card--earnings">
+    <div class="pwa-wallet-card__header">
+      <span class="pwa-wallet-card__label">Total Earnings</span>
+      <i class="fa-solid fa-wallet"></i>
     </div>
-    {% endif %}
+    <div class="pwa-wallet-card__balance">{{ stats.total_earnings|default:0 }} QR</div>
+    <div class="pwa-wallet-card__footer">
+      <div class="pwa-wallet-card__stat">
+        <span class="pwa-wallet-card__stat-label">Deliveries</span>
+        <span class="pwa-wallet-card__stat-value">{{ stats.total_deliveries|default:0 }}</span>
+      </div>
+      <div class="pwa-wallet-card__stat">
+        <span class="pwa-wallet-card__stat-label">Avg/Delivery</span>
+        <span class="pwa-wallet-card__stat-value">
+          {% if stats.total_deliveries and stats.total_earnings %}
+            {% widthratio stats.total_earnings stats.total_deliveries 1 %} QR
+          {% else %}
+            0 QR
+          {% endif %}
+        </span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
-    <!-- Wallet Status -->
-    {% if wallet_status %}
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Wallet Status</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>Available Balance</span>
-                        <strong>QAR {{ wallet_status.available_balance|default:0 }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span>COD in Hand</span>
-                        <strong>QAR {{ wallet_status.cod_balance|default:0 }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span>Pending Settlement</span>
-                        <strong>QAR {{ wallet_status.pending_settlement|default:0 }}</strong>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Stats Grid -->
+  {% if stats %}
+  <div class="pwa-stats-grid">
+    <div class="pwa-stat-card">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--success">
+        <i class="fa-solid fa-truck-fast"></i>
+      </div>
+      <div class="pwa-stat-card__content">
+        <div class="pwa-stat-card__value">{{ stats.total_deliveries|default:0 }}</div>
+        <div class="pwa-stat-card__label">Deliveries</div>
+      </div>
     </div>
-    {% endif %}
+    <div class="pwa-stat-card">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--info">
+        <i class="fa-solid fa-gift"></i>
+      </div>
+      <div class="pwa-stat-card__content">
+        <div class="pwa-stat-card__value">{{ stats.total_bonus|default:0 }}</div>
+        <div class="pwa-stat-card__label">Bonus QR</div>
+      </div>
+    </div>
+    <div class="pwa-stat-card">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--danger">
+        <i class="fa-solid fa-minus-circle"></i>
+      </div>
+      <div class="pwa-stat-card__content">
+        <div class="pwa-stat-card__value">{{ stats.total_deductions|default:0 }}</div>
+        <div class="pwa-stat-card__label">Deductions</div>
+      </div>
+    </div>
+    <div class="pwa-stat-card">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--warning">
+        <i class="fa-solid fa-coins"></i>
+      </div>
+      <div class="pwa-stat-card__content">
+        <div class="pwa-stat-card__value">{{ wallet_status.cod_balance|default:0 }}</div>
+        <div class="pwa-stat-card__label">COD QR</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
-    <!-- Recent Transactions -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Recent Earning Transactions</h5>
-                    <a href="{% url 'fleet:transaction_history' %}" class="btn btn-sm btn-outline-primary">View All</a>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Type</th>
-                                    <th>Description</th>
-                                    <th class="text-end">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for txn in earning_transactions %}
-                                <tr>
-                                    <td>{{ txn.created_at|date:"d M Y H:i" }}</td>
-                                    <td>
-                                        <span class="badge {% if txn.transaction_type == 'earning' %}bg-success{% elif txn.transaction_type == 'bonus' %}bg-info{% else %}bg-danger{% endif %}">
-                                            {{ txn.get_transaction_type_display }}
-                                        </span>
-                                    </td>
-                                    <td>{{ txn.description|default:"-" }}</td>
-                                    <td class="text-end">
-                                        {% if txn.amount >= 0 %}
-                                        <span class="text-success">+QAR {{ txn.amount }}</span>
-                                        {% else %}
-                                        <span class="text-danger">QAR {{ txn.amount }}</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="4" class="text-center text-muted py-4">No transactions found</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Wallet Status Card -->
+  {% if wallet_status %}
+  <div class="pwa-card mt-4">
+    <div class="pwa-card__header">
+      <h4 class="pwa-card__title">
+        <i class="fa-solid fa-wallet me-2"></i>Wallet Status
+      </h4>
     </div>
+    <div class="pwa-card__body">
+      <div class="pwa-wallet-item">
+        <span class="pwa-wallet-item__label">Available Balance</span>
+        <span class="pwa-wallet-item__value pwa-text-success">{{ wallet_status.available_balance|default:0 }} QR</span>
+      </div>
+      <div class="pwa-wallet-item">
+        <span class="pwa-wallet-item__label">COD in Hand</span>
+        <span class="pwa-wallet-item__value">{{ wallet_status.cod_balance|default:0 }} QR</span>
+      </div>
+      <div class="pwa-wallet-item">
+        <span class="pwa-wallet-item__label">Pending Settlement</span>
+        <span class="pwa-wallet-item__value pwa-text-warning">{{ wallet_status.pending_settlement|default:0 }} QR</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Recent Transactions -->
+  <div class="pwa-section-header mt-4">
+    <h4 class="pwa-section-title">Recent Transactions</h4>
+    <a href="{% url 'fleet:transaction_history' %}" class="pwa-link">View All</a>
+  </div>
+
+  {% if earning_transactions %}
+  <div class="pwa-transaction-list">
+    {% for txn in earning_transactions %}
+    <div class="pwa-transaction-item pwa-fade-in" style="animation-delay: {{ forloop.counter0 }}50ms;">
+      <div class="pwa-transaction-item__icon {% if txn.transaction_type == 'earning' %}pwa-transaction-item__icon--success{% elif txn.transaction_type == 'bonus' %}pwa-transaction-item__icon--info{% else %}pwa-transaction-item__icon--danger{% endif %}">
+        <i class="fa-solid {% if txn.transaction_type == 'earning' %}fa-check{% elif txn.transaction_type == 'bonus' %}fa-gift{% else %}fa-minus{% endif %}"></i>
+      </div>
+      <div class="pwa-transaction-item__details">
+        <div class="pwa-transaction-item__title">{{ txn.get_transaction_type_display }}</div>
+        <div class="pwa-transaction-item__subtitle">{{ txn.description|default:"Transaction"|truncatechars:30 }}</div>
+        <div class="pwa-transaction-item__date">{{ txn.created_at|date:"M d, H:i" }}</div>
+      </div>
+      <div class="pwa-transaction-item__amount {% if txn.amount >= 0 %}pwa-text-success{% else %}pwa-text-danger{% endif %}">
+        {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount }} QR
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="pwa-empty-state pwa-empty-state--compact">
+    <div class="pwa-empty-state__icon">
+      <i class="fa-solid fa-receipt"></i>
+    </div>
+    <h4 class="pwa-empty-state__title">No Transactions Yet</h4>
+    <p class="pwa-empty-state__text">Complete deliveries to start earning</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Desktop View -->
+<div class="container-fluid py-4 d-none d-md-block">
+  <div class="row mb-4">
+    <div class="col-12">
+      <h1 class="h3 mb-0">My Earnings</h1>
+      <p class="text-muted">View your earnings and financial summary</p>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <form method="GET" class="d-flex gap-2">
+        <select name="days" class="form-select" style="max-width: 200px;" onchange="this.form.submit()">
+          <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
+          <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
+          <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
+        </select>
+      </form>
+    </div>
+  </div>
+
+  <!-- Stats Cards -->
+  {% if stats %}
+  <div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="text-muted mb-2">Total Earnings</h6>
+          <h3 class="mb-0 text-success">QAR {{ stats.total_earnings|default:0 }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="text-muted mb-2">Deliveries</h6>
+          <h3 class="mb-0">{{ stats.total_deliveries|default:0 }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="text-muted mb-2">Bonus</h6>
+          <h3 class="mb-0 text-info">QAR {{ stats.total_bonus|default:0 }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="text-muted mb-2">Deductions</h6>
+          <h3 class="mb-0 text-danger">QAR {{ stats.total_deductions|default:0 }}</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Wallet Status -->
+  {% if wallet_status %}
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">Wallet Status</h5>
+        </div>
+        <div class="card-body">
+          <div class="d-flex justify-content-between mb-2">
+            <span>Available Balance</span>
+            <strong>QAR {{ wallet_status.available_balance|default:0 }}</strong>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span>COD in Hand</span>
+            <strong>QAR {{ wallet_status.cod_balance|default:0 }}</strong>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span>Pending Settlement</span>
+            <strong>QAR {{ wallet_status.pending_settlement|default:0 }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Recent Transactions -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Recent Earning Transactions</h5>
+          <a href="{% url 'fleet:transaction_history' %}" class="btn btn-sm btn-outline-primary">View All</a>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="bg-light">
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Description</th>
+                  <th class="text-end">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for txn in earning_transactions %}
+                <tr>
+                  <td>{{ txn.created_at|date:"d M Y H:i" }}</td>
+                  <td>
+                    <span class="badge {% if txn.transaction_type == 'earning' %}bg-success{% elif txn.transaction_type == 'bonus' %}bg-info{% else %}bg-danger{% endif %}">
+                      {{ txn.get_transaction_type_display }}
+                    </span>
+                  </td>
+                  <td>{{ txn.description|default:"-" }}</td>
+                  <td class="text-end">
+                    {% if txn.amount >= 0 %}
+                    <span class="text-success">+QAR {{ txn.amount }}</span>
+                    {% else %}
+                    <span class="text-danger">QAR {{ txn.amount }}</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="4" class="text-center text-muted py-4">No transactions found</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

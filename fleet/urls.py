@@ -48,6 +48,10 @@ urlpatterns = [
      path('transactions/',
           fleet_views.transaction_history, name='transaction_history'),
 
+     # Profile
+     path('profile/',
+          fleet_views.driver_profile_mobile, name='driver_profile_mobile'),
+
      # Performance & Reports
      path('performance/',
           fleet_views.driver_performance, name='driver_performance'),

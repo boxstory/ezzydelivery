@@ -6,6 +6,10 @@ from orders import views as orders_views
 app_name = 'delivery'
 urlpatterns = [
 
+    # Zone Map
+    path('zones/map/', delivery_views.zone_map, name='zone_map'),
+    path('zones/api/', delivery_views.zone_map_api, name='zone_map_api'),
+
     # requst to user update address before delivery
     path('<str:dl_task_number>/<int:mobile_no>/',
          delivery_views.dl_address_update, name='dl_address'),

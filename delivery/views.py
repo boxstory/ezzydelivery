@@ -146,24 +146,88 @@ def all_delivery_tasks(request):
         messages.error(request, "No driver profile found for your account")
         return redirect('webpages:index')
 
-    # FIX: Optimize with select_related and prefetch_related
-    dl_tasks = delivery_models.DeliveryTask.objects.select_related(
-        'order',                    # FK: DeliveryTask → Order
-        'order__business',          # Through: Order → Business
-        'order__pickup_location',   # Through: Order → PickupLocation
-        'driver',                   # FK: DeliveryTask → Driver (if assigned)
+    # Get filter parameters (defaults: My Tasks + My Zone)
+    tab = request.GET.get('tab', 'assigned')  # 'new' or 'assigned'
+    area_filter = request.GET.get('area', 'my_zone')  # 'all', 'doha', 'my_zone', 'qatar'
+    type_filter = request.GET.get('type', 'all')  # 'all', 'public', 'pnd'
+
+    # Base queryset with optimized joins
+    base_qs = delivery_models.DeliveryTask.objects.select_related(
+        'order',
+        'order__business',
+        'order__pickup_location',
+        'driver',
+        'dl_to_address',
     ).prefetch_related(
-        'assigneddriver_set',             # Reverse FK: DeliveryTask ← AssignedDriver
-        'assigneddriver_set__driver',     # Through AssignedDriver → Driver
-        'order__order_items',             # Reverse FK: Order ← OrderItem (related_name='order_items')
-        'order__order_items__product',    # Through: OrderItem → Product
+        'assigneddriver_set',
+        'assigneddriver_set__driver',
+        'order__order_items',
+        'order__order_items__product',
+    )
+
+    # Split into new tasks and assigned tasks
+    # New tasks: published and not assigned to any driver
+    new_tasks = base_qs.filter(
+        dl_task_publish=True,
+        driver__isnull=True,
+        dl_task_status__in=['pending', 'publish_to_dms', 'assigned']
+    ).exclude(
+        dl_task_status__in=['delivered', 'cancelled', 'failed']
     ).order_by('-id')
 
-    logger.debug(f"Fetched {dl_tasks.count()} delivery tasks")
+    # Assigned tasks: assigned to current driver
+    assigned_tasks = base_qs.filter(
+        driver=driver
+    ).exclude(
+        dl_task_status__in=['delivered', 'cancelled']
+    ).order_by('-id')
+
+    # Apply area filter
+    if area_filter == 'doha':
+        # Doha zones (1-50)
+        new_tasks = new_tasks.filter(dl_to_address__dl_zone__lte=50)
+        assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone__lte=50)
+    elif area_filter == 'my_zone':
+        # Driver's zone (from profile or default zone)
+        driver_zone = getattr(driver, 'default_zone', None)
+        if driver_zone:
+            new_tasks = new_tasks.filter(dl_to_address__dl_zone=driver_zone)
+            assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone=driver_zone)
+    elif area_filter == 'qatar':
+        # All Qatar (zones > 50)
+        new_tasks = new_tasks.filter(dl_to_address__dl_zone__gt=50)
+        assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone__gt=50)
+
+    # Apply type filter
+    if type_filter == 'public':
+        new_tasks = new_tasks.filter(dl_task_publish=True)
+    elif type_filter == 'pnd':
+        # Pick and Drop tasks (category or speed based)
+        new_tasks = new_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
+        assigned_tasks = assigned_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
+
+    # Get counts
+    new_count = new_tasks.count()
+    assigned_count = assigned_tasks.count()
+
+    # Select which tasks to show based on tab
+    if tab == 'new':
+        cards = new_tasks[:50]
+    else:
+        cards = assigned_tasks[:50]
+
+    logger.debug(f"Fetched tasks: {new_count} new, {assigned_count} assigned")
 
     context = {
-        'cards': dl_tasks,
+        'cards': cards,
+        'new_tasks': new_tasks[:20],
+        'assigned_tasks': assigned_tasks[:20],
+        'new_count': new_count,
+        'assigned_count': assigned_count,
         'driver': driver,
+        'current_tab': tab,
+        'area_filter': area_filter,
+        'type_filter': type_filter,
     }
     return render(request, 'delivery/parts/tasks_all.html', context)
 
@@ -333,3 +397,88 @@ def save_location_data(request, dl_task_code):
         return JsonResponse({'message': 'Data saved successfully'})
     else:
         return JsonResponse({'message': 'Invalid request method'}, status=400)
+
+
+# Zone Map View --------------------------------------------------------------
+
+@login_required(login_url='account_login')
+def zone_map(request):
+    """
+    Display all zones on an interactive map using Leaflet.js
+    Shows zone markers with coordinates and neighbour connections.
+    """
+    # Get all zones with coordinates
+    zones = delivery_models.ZoneName.objects.filter(
+        latitude__isnull=False,
+        longitude__isnull=False
+    ).exclude(
+        latitude=0, longitude=0
+    ).prefetch_related('neighbour_zones', 'zone_groups').order_by('zone_number')
+
+    # Get zone groups for filtering
+    zone_groups = delivery_models.ZoneGroup.objects.filter(
+        is_active=True
+    ).prefetch_related('zones').order_by('display_order')
+
+    # Prepare zone data for JavaScript
+    zones_data = []
+    for zone in zones:
+        neighbour_coords = []
+        for neighbour in zone.neighbour_zones.filter(latitude__isnull=False):
+            if neighbour.latitude and neighbour.longitude:
+                neighbour_coords.append({
+                    'zone_number': neighbour.zone_number,
+                    'lat': float(neighbour.latitude),
+                    'lng': float(neighbour.longitude),
+                    'name': neighbour.zone_name
+                })
+
+        zones_data.append({
+            'zone_number': zone.zone_number,
+            'name': zone.zone_name,
+            'name_arabic': zone.zone_name_arabic or '',
+            'lat': float(zone.latitude),
+            'lng': float(zone.longitude),
+            'has_polygon': zone.has_polygon,
+            'polygon': zone.polygon if zone.polygon else None,
+            'neighbour_count': zone.neighbour_zones.count(),
+            'neighbours': neighbour_coords,
+            'groups': list(zone.zone_groups.values_list('name', flat=True))
+        })
+
+    # Summary stats
+    total_zones = delivery_models.ZoneName.objects.count()
+    zones_with_coords = zones.count()
+    zones_without_coords = total_zones - zones_with_coords
+
+    context = {
+        'zones': zones,
+        'zones_json': json.dumps(zones_data),
+        'zone_groups': zone_groups,
+        'total_zones': total_zones,
+        'zones_with_coords': zones_with_coords,
+        'zones_without_coords': zones_without_coords,
+    }
+    return render(request, 'delivery/zone_map.html', context)
+
+
+@login_required(login_url='account_login')
+def zone_map_api(request):
+    """API endpoint to get zone data as JSON"""
+    zones = delivery_models.ZoneName.objects.filter(
+        latitude__isnull=False,
+        longitude__isnull=False
+    ).exclude(latitude=0, longitude=0).prefetch_related('neighbour_zones')
+
+    zones_data = []
+    for zone in zones:
+        zones_data.append({
+            'zone_number': zone.zone_number,
+            'name': zone.zone_name,
+            'name_arabic': zone.zone_name_arabic or '',
+            'lat': float(zone.latitude),
+            'lng': float(zone.longitude),
+            'neighbour_ids': list(zone.neighbour_zones.values_list('zone_number', flat=True))
+        })
+
+    return JsonResponse({'zones': zones_data})

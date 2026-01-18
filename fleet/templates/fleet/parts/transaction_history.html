@@ -1,10 +1,91 @@
 {% extends "fleet_dashboard_base.html" %}
 {% load static %}
 
-{% block title %}Transaction History{% endblock %}
+{% block title %}Transaction History - {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<!-- Mobile PWA Transaction History View - V2 REDESIGN 20260118 -->
+<div class="d-md-none pwa-page pwa-page--transactions">
+
+  <!-- Summary Banner -->
+  <div class="txn-summary">
+    <div class="txn-summary__item">
+      <span class="txn-summary__label">Balance</span>
+      <span class="txn-summary__value">{{ wallet_status.wallet_balance|default:0|floatformat:0 }}</span>
+    </div>
+    <div class="txn-summary__divider"></div>
+    <div class="txn-summary__item">
+      <span class="txn-summary__label">COD</span>
+      <span class="txn-summary__value txn-summary__value--warning">{{ wallet_status.cod_in_hand|default:0|floatformat:0 }}</span>
+    </div>
+    <div class="txn-summary__divider"></div>
+    <div class="txn-summary__item">
+      <span class="txn-summary__label">Pending</span>
+      <span class="txn-summary__value">{{ wallet_status.pending_earnings|default:0|floatformat:0 }}</span>
+    </div>
+  </div>
+
+  <!-- Type Tabs -->
+  <div class="txn-tabs">
+    <a href="?type=all&days={{ selected_days }}" class="txn-tab {% if selected_type == 'all' %}txn-tab--active{% endif %}">All</a>
+    <a href="?type=earning&days={{ selected_days }}" class="txn-tab {% if selected_type == 'earning' %}txn-tab--active{% endif %}">Earned</a>
+    <a href="?type=cod_collection&days={{ selected_days }}" class="txn-tab {% if selected_type == 'cod_collection' %}txn-tab--active{% endif %}">COD In</a>
+    <a href="?type=cod_deposit&days={{ selected_days }}" class="txn-tab {% if selected_type == 'cod_deposit' %}txn-tab--active{% endif %}">COD Out</a>
+  </div>
+
+  <!-- Period Selector -->
+  <div class="txn-period">
+    <a href="?type={{ selected_type }}&days=7" class="txn-period__btn {% if selected_days == 7 %}txn-period__btn--active{% endif %}">7 Days</a>
+    <a href="?type={{ selected_type }}&days=30" class="txn-period__btn {% if selected_days == 30 %}txn-period__btn--active{% endif %}">30 Days</a>
+    <a href="?type={{ selected_type }}&days=90" class="txn-period__btn {% if selected_days == 90 %}txn-period__btn--active{% endif %}">90 Days</a>
+  </div>
+
+  <!-- Transaction List -->
+  <div class="txn-list">
+    {% if transactions %}
+    <div class="txn-list__header">
+      <span>{{ transactions|length }} transaction{{ transactions|length|pluralize }}</span>
+      <span>Last {{ selected_days }} days</span>
+    </div>
+    {% endif %}
+
+    {% for txn in transactions %}
+    <div class="txn-item">
+      <div class="txn-item__icon txn-item__icon--{% if txn.transaction_type == 'earning' %}green{% elif txn.transaction_type == 'bonus' %}blue{% elif txn.transaction_type == 'cod_collection' %}orange{% elif txn.transaction_type == 'cod_deposit' %}yellow{% elif txn.transaction_type == 'settlement' %}purple{% elif txn.transaction_type == 'deduction' %}red{% else %}gray{% endif %}">
+        {% if txn.transaction_type == 'earning' %}<i class="fas fa-coins"></i>
+        {% elif txn.transaction_type == 'bonus' %}<i class="fas fa-gift"></i>
+        {% elif txn.transaction_type == 'cod_collection' %}<i class="fas fa-arrow-down"></i>
+        {% elif txn.transaction_type == 'cod_deposit' %}<i class="fas fa-arrow-up"></i>
+        {% elif txn.transaction_type == 'settlement' %}<i class="fas fa-university"></i>
+        {% elif txn.transaction_type == 'deduction' %}<i class="fas fa-minus"></i>
+        {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
+      </div>
+      <div class="txn-item__info">
+        <div class="txn-item__title">{{ txn.get_transaction_type_display }}</div>
+        <div class="txn-item__meta">
+          {% if txn.delivery_task %}#{{ txn.delivery_task.dl_task_number|default:txn.delivery_task.id }}{% else %}{{ txn.description|default:"-"|truncatechars:25 }}{% endif %}
+          <span class="txn-item__dot"></span>
+          {{ txn.created_at|date:"d M" }}
+        </div>
+      </div>
+      <div class="txn-item__amount {% if txn.amount >= 0 %}txn-item__amount--plus{% else %}txn-item__amount--minus{% endif %}">
+        {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} <small>QR</small>
+      </div>
+    </div>
+    {% empty %}
+    <div class="txn-empty">
+      <i class="fas fa-receipt"></i>
+      <p>No transactions found</p>
+      <span>Try changing the filters above</span>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<!-- Desktop View -->
+<div class="d-none d-md-block">
+  <div class="container-fluid py-4">
     <div class="row mb-4">
         <div class="col-12">
             <h1 class="h3 mb-0">Transaction History</h1>
@@ -52,7 +133,7 @@
             <div class="card border-0 shadow-sm h-100 border-start border-success border-3">
                 <div class="card-body">
                     <h6 class="text-muted mb-2">Available Balance</h6>
-                    <h3 class="mb-0">QAR {{ wallet_status.available_balance|default:0 }}</h3>
+                    <h3 class="mb-0">{{ wallet_status.available_balance|default:0|floatformat:2 }} QR</h3>
                 </div>
             </div>
         </div>
@@ -60,7 +141,7 @@
             <div class="card border-0 shadow-sm h-100 border-start border-warning border-3">
                 <div class="card-body">
                     <h6 class="text-muted mb-2">COD in Hand</h6>
-                    <h3 class="mb-0">QAR {{ wallet_status.cod_balance|default:0 }}</h3>
+                    <h3 class="mb-0">{{ wallet_status.cod_balance|default:0|floatformat:2 }} QR</h3>
                 </div>
             </div>
         </div>
@@ -68,7 +149,7 @@
             <div class="card border-0 shadow-sm h-100 border-start border-info border-3">
                 <div class="card-body">
                     <h6 class="text-muted mb-2">Pending Settlement</h6>
-                    <h3 class="mb-0">QAR {{ wallet_status.pending_settlement|default:0 }}</h3>
+                    <h3 class="mb-0">{{ wallet_status.pending_settlement|default:0|floatformat:2 }} QR</h3>
                 </div>
             </div>
         </div>
@@ -99,13 +180,13 @@
                                 {% for txn in transactions %}
                                 <tr>
                                     <td>{{ txn.created_at|date:"d M Y" }}<br><small class="text-muted">{{ txn.created_at|time:"H:i" }}</small></td>
-                                    <td><code>{{ txn.transaction_number|default:"-"|truncatechars:12 }}</code></td>
+                                    <td><code>{{ txn.transaction_id|default:"-" }}</code></td>
                                     <td>
                                         <span class="badge
                                             {% if txn.transaction_type == 'earning' %}bg-success
                                             {% elif txn.transaction_type == 'bonus' %}bg-info
-                                            {% elif txn.transaction_type == 'cod_collect' %}bg-warning text-dark
-                                            {% elif txn.transaction_type == 'cod_submit' %}bg-primary
+                                            {% elif txn.transaction_type == 'cod_collection' %}bg-warning text-dark
+                                            {% elif txn.transaction_type == 'cod_deposit' %}bg-primary
                                             {% elif txn.transaction_type == 'settlement' %}bg-secondary
                                             {% elif txn.transaction_type == 'deduction' %}bg-danger
                                             {% else %}bg-dark{% endif %}">
@@ -122,9 +203,9 @@
                                     </td>
                                     <td class="text-end">
                                         {% if txn.amount >= 0 %}
-                                        <span class="text-success fw-bold">+QAR {{ txn.amount }}</span>
+                                        <span class="text-success fw-bold">+{{ txn.amount|floatformat:2 }} QR</span>
                                         {% else %}
-                                        <span class="text-danger fw-bold">QAR {{ txn.amount }}</span>
+                                        <span class="text-danger fw-bold">{{ txn.amount|floatformat:2 }} QR</span>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -143,5 +224,6 @@
             </div>
         </div>
     </div>
+  </div>
 </div>
 {% endblock %}

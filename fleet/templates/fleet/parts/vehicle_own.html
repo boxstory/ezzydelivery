@@ -3,7 +3,7 @@
 {% load crispy_forms_tags %}
 {% block content %}
   <div class="flex-fill p-2">
-    <div class=" h4 p-3" id="fleet_vehicle_own_header_title">Own Vehicels</div>
+    <div class=" h4 p-3" id="fleet_vehicle_own_header_title">Own Vehicles</div>
     <div class="table-responsive m-2 m-md-3">
       <table class="table table-responsive table-striped table-hover" id="fleet_vehicle_own_table_all">
         <thead id="fleet_vehicle_own_thead_all">
@@ -27,13 +27,24 @@
               <td scope="row">{{ vehicle.vehicle_color }}</td>
               <td scope="row">{{ vehicle.vehicle_status }}</td>
               <td class="text-center p-0">
-                <!-- delete link neeeds to setup later ********************************************************* -->
                 <a href="{% url 'fleet:vehicle_update' vehicle_id=vehicle.id %}"
                    class="btn btn-outline-dark btn-sm me-1">
                   <i class="fa-solid fa-pen"></i></a>
-                <a href="{% url 'fleet:vehicle_delete' fleet_id=request.user.id vehicle_id=vehicle.id %}"
-                   class="btn btn-outline-dark btn-sm">
-                  <i class="fa-solid fa-remove"></i></a>
+                {% if request.user.is_staff %}
+                  <!-- Staff: Direct delete link -->
+                  <a href="{% url 'fleet:vehicle_delete' fleet_id=request.user.id vehicle_id=vehicle.id %}"
+                     class="btn btn-outline-danger btn-sm"
+                     onclick="return confirm('Are you sure you want to delete this vehicle?');">
+                    <i class="fa-solid fa-trash"></i></a>
+                {% else %}
+                  <!-- Non-staff: Request help button -->
+                  <button type="button"
+                          class="btn btn-outline-warning btn-sm"
+                          data-bs-toggle="modal"
+                          data-bs-target="#helpRequestModal{{ vehicle.id }}">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                {% endif %}
               </td>
             </tr>
           {% endfor %}
@@ -44,4 +55,48 @@
       </a>
     </div>
   </div>
+
+  <!-- Help Request Modals for non-staff users -->
+  {% for vehicle in vehicles %}
+  <div class="modal fade" id="helpRequestModal{{ vehicle.id }}" tabindex="-1" aria-labelledby="helpRequestModalLabel{{ vehicle.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-warning">
+          <h5 class="modal-title" id="helpRequestModalLabel{{ vehicle.id }}">
+            <i class="fa-solid fa-circle-info me-2"></i>Request Help
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="text-center mb-3">
+            <i class="fa-solid fa-car fa-3x text-muted mb-3"></i>
+            <h6>Vehicle: {{ vehicle.vehicle_no }}</h6>
+            <p class="text-muted">{{ vehicle.vehicle_type }} - {{ vehicle.vehicle_model }}</p>
+          </div>
+          <div class="alert alert-info">
+            <i class="fa-solid fa-info-circle me-2"></i>
+            <strong>Vehicle deletion requires staff assistance.</strong>
+            <p class="mb-0 mt-2 small">To delete this vehicle, please contact our support team through one of the options below.</p>
+          </div>
+          <div class="d-grid gap-2">
+            <a href="https://wa.me/97433000000?text=Hi,%20I%20need%20help%20deleting%20my%20vehicle%20({{ vehicle.vehicle_no }})%20from%20my%20account."
+               class="btn btn-success" target="_blank">
+              <i class="fa-brands fa-whatsapp me-2"></i>Contact via WhatsApp
+            </a>
+            <a href="tel:+97433000000" class="btn btn-outline-primary">
+              <i class="fa-solid fa-phone me-2"></i>Call Support
+            </a>
+            <a href="mailto:support@ezzydelivery.qa?subject=Vehicle%20Deletion%20Request&body=Please%20help%20me%20delete%20vehicle%20{{ vehicle.vehicle_no }}%20from%20my%20account."
+               class="btn btn-outline-secondary">
+              <i class="fa-solid fa-envelope me-2"></i>Send Email
+            </a>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
 {% endblock content %}

@@ -5,11 +5,168 @@
 <link href="{% static 'fleet/css/fleet.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-  <!-- Your content here -->
-  <div class="flex-fill p-2">
+  <!-- Mobile PWA Dashboard View -->
+  <div class="pwa-content d-md-none">
+    <!-- Wallet Card (Hero) -->
+    <div class="pwa-wallet-card pwa-fade-in">
+      <div class="pwa-wallet-card__label">Available Credit</div>
+      <div class="pwa-wallet-card__balance">
+        {{ wallet_status.available_credit|default:0 }} <small>QR</small>
+      </div>
+      <div class="pwa-wallet-card__stats">
+        <div class="pwa-wallet-card__stat">
+          <span class="pwa-wallet-card__stat-value">{{ wallet_status.cod_in_hand|default:0 }}</span>
+          <span class="pwa-wallet-card__stat-label">COD In Hand</span>
+        </div>
+        <div class="pwa-wallet-card__stat">
+          <span class="pwa-wallet-card__stat-value">{{ wallet_status.pending_earnings|default:0 }}</span>
+          <span class="pwa-wallet-card__stat-label">Pending</span>
+        </div>
+        <div class="pwa-wallet-card__stat">
+          <span class="pwa-wallet-card__stat-value">{{ wallet_status.usage_percentage|floatformat:0|default:0 }}%</span>
+          <span class="pwa-wallet-card__stat-label">Usage</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="pwa-stats-grid pwa-slide-up">
+      <div class="pwa-stat-card">
+        <div class="pwa-stat-card__icon pwa-stat-card__icon--primary">
+          <i class="fa-solid fa-truck-fast"></i>
+        </div>
+        <div class="pwa-stat-card__value">{{ stats_7_days.total_deliveries|default:0 }}</div>
+        <div class="pwa-stat-card__label">Deliveries (7d)</div>
+      </div>
+      <div class="pwa-stat-card">
+        <div class="pwa-stat-card__icon pwa-stat-card__icon--success">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div class="pwa-stat-card__value">{{ stats_7_days.success_rate|floatformat:0|default:0 }}%</div>
+        <div class="pwa-stat-card__label">Success Rate</div>
+      </div>
+      <div class="pwa-stat-card">
+        <div class="pwa-stat-card__icon pwa-stat-card__icon--warning">
+          <i class="fa-solid fa-coins"></i>
+        </div>
+        <div class="pwa-stat-card__value">{{ stats_7_days.total_cod_collected|floatformat:0|default:0 }}</div>
+        <div class="pwa-stat-card__label">COD (7d)</div>
+      </div>
+      <div class="pwa-stat-card">
+        <div class="pwa-stat-card__icon pwa-stat-card__icon--primary">
+          <i class="fa-solid fa-star"></i>
+        </div>
+        <div class="pwa-stat-card__value">{{ driver.driver_rating|default:0 }}</div>
+        <div class="pwa-stat-card__label">Rating</div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="pwa-section-header">
+      <h3 class="pwa-section-title">Quick Actions</h3>
+    </div>
+    <div class="pwa-quick-actions">
+      <a href="{% url 'delivery:all_delivery_tasks' %}" class="pwa-quick-action">
+        <div class="pwa-quick-action__icon">
+          <i class="fa-solid fa-list-check"></i>
+        </div>
+        <span class="pwa-quick-action__label">My Tasks</span>
+      </a>
+      <a href="{% url 'fleet:cod_collection' %}" class="pwa-quick-action">
+        <div class="pwa-quick-action__icon pwa-quick-action__icon--success">
+          <i class="fa-solid fa-money-bill-wave"></i>
+        </div>
+        <span class="pwa-quick-action__label">COD</span>
+      </a>
+      <a href="{% url 'fleet:cod_submission' %}" class="pwa-quick-action">
+        <div class="pwa-quick-action__icon pwa-quick-action__icon--warning">
+          <i class="fa-solid fa-upload"></i>
+        </div>
+        <span class="pwa-quick-action__label">Submit COD</span>
+      </a>
+      <a href="{% url 'fleet:driver_earnings' %}" class="pwa-quick-action">
+        <div class="pwa-quick-action__icon pwa-quick-action__icon--navy">
+          <i class="fa-solid fa-wallet"></i>
+        </div>
+        <span class="pwa-quick-action__label">Earnings</span>
+      </a>
+    </div>
+
+    <!-- Today's Summary Card -->
+    <div class="pwa-card pwa-slide-up">
+      <div class="pwa-card__header">
+        <h4 class="pwa-card__title">
+          <i class="fa-solid fa-calendar-day me-2"></i>
+          Today's Summary
+        </h4>
+      </div>
+      <div class="pwa-card__body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="pwa-text-muted">Deliveries</span>
+          <span class="pwa-font-bold">{{ stats_today.total_deliveries|default:0 }}</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="pwa-text-muted">COD Collected</span>
+          <span class="pwa-font-bold pwa-text-success">{{ stats_today.total_cod_collected|floatformat:0|default:0 }} QR</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="pwa-text-muted">Earnings</span>
+          <span class="pwa-font-bold pwa-text-navy">{{ stats_today.total_earnings|floatformat:0|default:0 }} QR</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Performance Card -->
+    <div class="pwa-card">
+      <div class="pwa-card__header">
+        <h4 class="pwa-card__title">
+          <i class="fa-solid fa-chart-line me-2"></i>
+          30 Day Performance
+        </h4>
+        <a href="{% url 'fleet:driver_performance' %}" class="pwa-section-link">View All</a>
+      </div>
+      <div class="pwa-card__body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="pwa-text-muted">Total Deliveries</span>
+          <span class="pwa-font-bold">{{ stats_30_days.total_deliveries|default:0 }}</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="pwa-text-muted">Success Rate</span>
+          <span class="pwa-font-bold pwa-text-success">{{ stats_30_days.success_rate|floatformat:1|default:0 }}%</span>
+        </div>
+        <div class="pwa-progress pwa-mt-1">
+          <div class="pwa-progress__bar" style="width: {{ stats_30_days.success_rate|default:0 }}%;"></div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center pwa-mt-2">
+          <span class="pwa-text-muted">Total Earnings</span>
+          <span class="pwa-font-bold pwa-text-navy">{{ stats_30_days.total_earnings|floatformat:0|default:0 }} QR</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rating Card -->
+    {% if driver.driver_rating_count > 0 %}
+    <div class="pwa-card">
+      <div class="pwa-card__body pwa-text-center">
+        <div class="pwa-rating mb-2" style="justify-content: center;">
+          {% for i in "12345" %}
+          <i class="fa-solid fa-star {% if forloop.counter <= driver.driver_rating %}{% else %}opacity-25{% endif %}"></i>
+          {% endfor %}
+          <span class="pwa-rating__value">{{ driver.driver_rating|default:0 }}/5</span>
+        </div>
+        <p class="pwa-text-muted" style="font-size: 12px; margin: 0;">
+          Based on {{ driver.driver_rating_count }} ratings
+        </p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Desktop Dashboard View (Hidden on Mobile) -->
+  <div class="flex-fill p-2 d-none d-md-block">
     <div class="col-12 py-2">
       <section class="m-0 p-0" id="fleet_dashboard_section_main">
-        <div class="pt-3 pt-md-3 pb-0 text-dark d-none d-md-block">
+        <div class="pt-3 pt-md-3 pb-0 text-dark">
           <div class="text-center">
             <h1 class="h3 fw-bolder text-uppercase" id="fleet_dashboard_header_title">
               Driver Dashboard
