@@ -1,0 +1,235 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+EzzyDelivery is a Django-based multi-tenant delivery and logistics management platform for Qatar. It handles order management, driver fleet operations, COD (Cash on Delivery) tracking, and integrations with e-commerce platforms (Shopify, WooCommerce) and delivery management systems (ShipDay).
+
+## Commands
+
+```bash
+# Activate virtual environment
+source venvezzy/bin/activate
+
+# Install dependencies
+pip install -r ezzydelivery/requirements.txt
+
+# Run development server
+python ezzydelivery/manage.py runserver
+
+# Database migrations
+python ezzydelivery/manage.py makemigrations
+python ezzydelivery/manage.py migrate
+
+# Run tests
+python ezzydelivery/manage.py test
+
+# Run tests for specific app
+python ezzydelivery/manage.py test orders
+
+# Check for issues
+python ezzydelivery/manage.py check
+
+# Check deployment readiness
+python ezzydelivery/manage.py check --deploy
+
+# Collect static files
+python ezzydelivery/manage.py collectstatic
+
+# Create superuser
+python ezzydelivery/manage.py createsuperuser
+
+# Django shell
+python ezzydelivery/manage.py shell
+
+# Clear sessions
+python ezzydelivery/manage.py clearsessions
+
+# Celery worker (for async tasks)
+celery -A ezzydelivery worker -l info
+
+# Celery beat (for scheduled tasks)
+celery -A ezzydelivery beat -l info
+
+# Reload production server (after code changes)
+kill -HUP $(pgrep -f "gunicorn.*ezzydelivery" | head -1)
+```
+
+## Production Server
+
+The production server uses **gunicornezzy** (Gunicorn). To reload after code changes:
+
+```bash
+# Graceful reload (recommended)
+kill -HUP $(pgrep -f "gunicorn.*ezzydelivery" | head -1)
+
+# Or restart the service (requires sudo)
+sudo systemctl restart gunicornezzy
+```
+
+## Architecture
+
+### Django Apps
+
+- **core/** - User profiles, authentication, base models, custom middleware (session timeout, query inspector)
+- **business/** - Business/store management, pickup locations, business teams
+- **orders/** - Order management, order items, barcodes, address verification
+- **delivery/** - Delivery tasks and job assignments
+- **fleet/** - Driver profiles, vehicles, COD transactions
+- **dispatch/** - Order batching and dispatch optimization
+- **warehouse/** - Warehouse management
+- **product/** - Product catalog
+- **workforce/** - Staff dashboard and operations
+- **ezzy_api/** - REST API and external integrations (ShipDay DMS, Shopify, WooCommerce)
+- **webpages/** - Public marketing pages
+- **blog/** - Blog/content management
+
+### Key Integrations
+
+- **ShipDay DMS** - Delivery management system sync
+- **Shopify/WooCommerce** - E-commerce order import
+- **Celery + Redis** - Async task processing for batch operations
+- **PostgreSQL** - Production database
+
+### Authentication
+
+Uses django-allauth for authentication with social login support (Google, Facebook). Token-based API authentication via Django REST Framework.
+
+## Environment Variables
+
+Copy `ezzydelivery/envsample` to `ezzydelivery/.env` and configure:
+
+```
+SECRET_KEY=           # Django secret key
+DEBUG=                # True/False
+ALLOWED_HOSTS=        # Comma-separated hosts
+DB_NAME=              # PostgreSQL database name
+DB_USER=              # Database user
+DB_PASSWORD=          # Database password
+SHIPDAY_API_KEY=      # ShipDay integration
+SHOPIFY_ACCESS_TOKEN= # Shopify integration
+CELERY_BROKER_URL=    # Redis URL for Celery
+```
+
+## Code Conventions
+
+### Django Models
+
+**Use lists for choices, never sets:**
+```python
+# Correct
+STATUS_CHOICES = [('active', 'Active'), ('inactive', 'Inactive')]
+
+# Wrong - causes endless migrations
+STATUS_CHOICES = {('active', 'Active'), ('inactive', 'Inactive')}
+```
+
+**Use boolean values for BooleanField defaults:**
+```python
+# Correct
+is_active = models.BooleanField(default=True)
+
+# Wrong
+is_active = models.BooleanField(default="True")
+```
+
+### Query Optimization
+
+Always use `select_related()` for foreign keys and `prefetch_related()` for reverse relations to avoid N+1 queries.
+
+### CSS/Styling
+
+All styling must use the Brand Kit variables from `static/webpages/css/brand-kit.css`:
+- Never use inline styles or `<style>` tags in templates
+- Use CSS variables: `var(--brand-primary)`, `var(--spacing-md)`, etc.
+- Link CSS files in `{% block extra_css %}`
+
+### Template IDs
+
+Follow naming pattern: `{app}_{section}_{element_type}_{descriptor}`
+```html
+<table id="orders_list_table_view">
+<button id="workforce_orders_btn_export">
+```
+
+### Git Commits
+
+Format: `{type}: {description}` where type is feat/fix/refactor/docs/style/perf/test/chore
+
+## Key Files
+
+- **Settings**: `ezzydelivery/ezzydelivery/settings.py`
+- **URLs**: `ezzydelivery/ezzydelivery/urls.py`
+- **Requirements**: `ezzydelivery/requirements.txt`
+- **Brand Kit CSS**: `ezzydelivery/static/webpages/css/brand-kit.css`
+- **Documentation**: `ezzydelivery/docs/`
+
+## Claude Skills & Commands
+
+### Available Skills (`.claude/skills/`)
+| Skill | Purpose |
+|-------|---------|
+| `django-postgres.md` | Django/PostgreSQL patterns, query optimization |
+| `seo.md` | SEO best practices, meta tags, Schema.org |
+| `frontend.md` | Frontend development, CSS, JavaScript |
+| `deployment.md` | Production deployment, Gunicorn, Nginx |
+| `api-development.md` | REST API development, webhooks |
+| `testing.md` | Test patterns, coverage, mocking |
+| `orders-management.md` | Order flow, COD, driver assignment |
+
+### Available Commands (`.claude/commands/`)
+| Command | Description |
+|---------|-------------|
+| `/django` | Django/PostgreSQL expert mode |
+| `/seo` | SEO optimization mode |
+| `/frontend` | Frontend development mode |
+| `/deploy` | Production deployment |
+| `/test` | Testing and code quality |
+| `/api` | API development mode |
+| `/component` | Create UI components |
+| `/page` | Create new pages |
+| `/css-fix` | Fix CSS styling issues |
+
+## SEO & AI Search
+
+### SEO Landing Pages
+The site has 21 SEO landing pages targeting Qatar delivery keywords:
+- Location pages: `/delivery-doha/`, `/al-wakrah-delivery/`, `/lusail-delivery/`
+- Service pages: `/same-day-delivery-qatar/`, `/cod-delivery-service-qatar/`
+- Arabic pages: `/توصيل-قطر/`, `/شركة-توصيل-الدوحة/`
+
+### AI Search Optimization
+- **llms.txt**: `/llms.txt` - AI-friendly content for language models
+- **Schema.org**: JSON-LD structured data on all pages
+- **robots.txt**: Allows GPTBot, Claude-Web, PerplexityBot
+
+## Database Schema (Key Models)
+
+```
+Business ──┬── Order ──┬── OrderItem
+           │           └── DeliveryTask
+           │
+Driver ────┼── CODTransaction
+           │
+Zone ──────┘
+```
+
+## Quick Reference
+
+### Test Site Health
+```bash
+curl -sI https://ezzydelivery.qa/ | head -1
+python manage.py check --deploy
+```
+
+### View Logs
+```bash
+sudo journalctl -u gunicornezzy -f --no-pager -n 100
+```
+
+### Database Access
+```bash
+python manage.py dbshell
+python manage.py shell
+```

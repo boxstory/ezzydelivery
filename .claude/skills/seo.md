@@ -1,6 +1,36 @@
-# SEO Expert Skill - EzzyDelivery
+# SEO Expert Skill - EzzyDelivery Qatar
 
-Use this skill when working on SEO tasks: meta tags, structured data, sitemaps, content optimization, image alt tags, and search engine visibility.
+Use this skill when working on SEO tasks: meta tags, structured data, sitemaps, content optimization, image alt tags, AI search optimization, and search engine visibility.
+
+## AI Search Optimization (GEO)
+
+### LLMs.txt
+The site provides `/llms.txt` for AI language models following llmstxt.org specification.
+
+```python
+# core/views_seo.py
+@require_GET
+def llms_txt(request):
+    """AI-friendly content for language models."""
+    # Returns company info, services, coverage, links
+```
+
+### Schema.org JSON-LD
+All pages include structured data in `templates/includes/head.html`:
+- `LocalBusiness` schema with ratings, services, areas
+- `WebSite` schema with search action
+
+### robots.txt AI Crawlers
+```txt
+User-agent: GPTBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+```
 
 ## Image Alt Tag Rules
 
@@ -9,9 +39,9 @@ Use this skill when working on SEO tasks: meta tags, structured data, sitemaps, 
 ### Alt Tag Best Practices
 ```html
 <!-- GOOD: Descriptive, keyword-rich alt text -->
-<img src="delivery-truck.jpg" alt="EzzyDelivery truck making same-day delivery in downtown Lagos">
+<img src="delivery-truck.jpg" alt="EzzyDelivery truck making same-day delivery in Doha Qatar">
 <img src="driver-app.png" alt="Driver mobile app showing real-time delivery tracking map">
-<img src="warehouse.jpg" alt="EzzyDelivery warehouse with organized inventory shelves">
+<img src="warehouse.jpg" alt="EzzyDelivery warehouse with organized inventory shelves in Qatar">
 
 <!-- BAD: Empty, generic, or keyword-stuffed alt text -->
 <img src="truck.jpg" alt="">  <!-- Empty - never do this -->

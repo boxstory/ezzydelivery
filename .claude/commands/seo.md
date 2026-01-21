@@ -9,10 +9,13 @@ You are now in SEO expert mode for the EzzyDelivery project. Reference the skill
 ## SEO Stack
 | Component | Location |
 |-----------|----------|
-| Meta Tags | `templates/base.html` |
-| Structured Data | JSON-LD in template blocks |
-| Sitemap | `webpages/sitemaps.py` |
-| Robots.txt | `static/robots.txt` |
+| Meta Tags | `templates/includes/head.html` |
+| SEO Metadata | `core/seo.py` (SEOMetadata, SEOLandingPages) |
+| Structured Data | JSON-LD in `templates/includes/head.html` |
+| Sitemap | `core/sitemaps.py` |
+| Robots.txt | `core/views_seo.py` (dynamic) |
+| LLMs.txt | `core/views_seo.py` (AI search) |
+| Landing Pages | `webpages/templates/webpages/seo/` |
 
 ## Critical Rules
 
@@ -61,12 +64,38 @@ You are now in SEO expert mode for the EzzyDelivery project. Reference the skill
 User-agent: GPTBot
 Allow: /
 
-User-agent: PerplexityBot
+User-agent: Claude-Web
 Allow: /
 
-User-agent: anthropic-ai
+User-agent: PerplexityBot
 Allow: /
 ```
+
+## SEO Landing Pages (21 total)
+
+### Location Pages
+- `/delivery-doha/`
+- `/al-wakrah-delivery/`
+- `/lusail-delivery/`
+
+### Service Pages
+- `/delivery-companies-in-qatar/`
+- `/same-day-delivery-qatar/`
+- `/cod-delivery-service-qatar/`
+- `/ecommerce-delivery-qatar/`
+- `/express-delivery-qatar/`
+- `/courier-service-qatar/`
+- `/3pl-qatar/`
+- `/last-mile-delivery-qatar/`
+- `/logistics-services-qatar/`
+- `/shopify-delivery-qatar/`
+- `/business-delivery-qatar/`
+- `/package-delivery-qatar/`
+- `/food-delivery-partner-qatar/`
+
+### Arabic Keywords
+- `/توصيل-قطر/`
+- `/شركة-توصيل-الدوحة/`
 
 ## Checklists
 
