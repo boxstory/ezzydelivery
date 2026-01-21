@@ -53,6 +53,21 @@ urlpatterns = [
     path('logistics-services-qatar/', webpages_views.logistics_services_qatar, name='logistics_services_qatar'),
     path('online-store-delivery-qatar/', webpages_views.online_store_delivery_qatar, name='online_store_delivery_qatar'),
 
+    # New SEO Landing Pages - Location Specific
+    path('delivery-doha/', webpages_views.delivery_doha, name='delivery_doha'),
+    path('al-wakrah-delivery/', webpages_views.al_wakrah_delivery, name='al_wakrah_delivery'),
+    path('lusail-delivery/', webpages_views.lusail_delivery, name='lusail_delivery'),
+
+    # New SEO Landing Pages - Service Specific
+    path('business-delivery-qatar/', webpages_views.business_delivery_qatar, name='business_delivery_qatar'),
+    path('package-delivery-qatar/', webpages_views.package_delivery_qatar, name='package_delivery_qatar'),
+    path('shopify-delivery-qatar/', webpages_views.shopify_delivery_qatar, name='shopify_delivery_qatar'),
+    path('food-delivery-partner-qatar/', webpages_views.food_delivery_partner_qatar, name='food_delivery_partner_qatar'),
+
+    # New SEO Landing Pages - Arabic Keywords
+    path('توصيل-قطر/', webpages_views.delivery_qatar_arabic, name='delivery_qatar_arabic'),
+    path('شركة-توصيل-الدوحة/', webpages_views.courier_doha_arabic, name='courier_doha_arabic'),
+
     path('500/', TemplateView.as_view(template_name='page_not_found.html')),
 
 ]

@@ -41,6 +41,7 @@ class SEOLandingPageSitemap(Sitemap):
 
     def items(self):
         return [
+            # Original SEO pages
             'webpages:delivery_companies_qatar',
             'webpages:delivery_service_qatar',
             'webpages:same_day_delivery_qatar',
@@ -53,6 +54,18 @@ class SEOLandingPageSitemap(Sitemap):
             'webpages:last_mile_delivery_qatar',
             'webpages:logistics_services_qatar',
             'webpages:online_store_delivery_qatar',
+            # New location-specific pages
+            'webpages:delivery_doha',
+            'webpages:al_wakrah_delivery',
+            'webpages:lusail_delivery',
+            # New service-specific pages
+            'webpages:business_delivery_qatar',
+            'webpages:package_delivery_qatar',
+            'webpages:shopify_delivery_qatar',
+            'webpages:food_delivery_partner_qatar',
+            # Arabic keyword pages
+            'webpages:delivery_qatar_arabic',
+            'webpages:courier_doha_arabic',
         ]
 
     def location(self, item):

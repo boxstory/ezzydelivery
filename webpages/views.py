@@ -698,3 +698,126 @@ def online_store_delivery_qatar(request):
         'hero_subtitle': 'Reliable Shipping Partner for Your Online Business',
     }
     return render(request, 'webpages/seo/online_store_delivery_qatar.html', data)
+
+
+# =============================================================================
+# NEW SEO LANDING PAGES - Arabic Keywords & Location-Specific
+# =============================================================================
+
+def delivery_doha(request):
+    """Landing page for 'delivery doha' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_delivery_doha_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Delivery Service Doha',
+        'hero_subtitle': 'Fast Courier Across All Doha Districts - West Bay to Al Wakra Road',
+    }
+    return render(request, 'webpages/seo/delivery_doha.html', data)
+
+
+def business_delivery_qatar(request):
+    """Landing page for 'business delivery qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_business_delivery_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Business Delivery Qatar',
+        'hero_subtitle': 'Professional B2B Courier & Corporate Logistics Solutions',
+    }
+    return render(request, 'webpages/seo/business_delivery_qatar.html', data)
+
+
+def package_delivery_qatar(request):
+    """Landing page for 'package delivery qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_package_delivery_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Package Delivery Qatar',
+        'hero_subtitle': 'Secure Parcel Delivery Across All Qatar - Any Size, Any Weight',
+    }
+    return render(request, 'webpages/seo/package_delivery_qatar.html', data)
+
+
+def shopify_delivery_qatar(request):
+    """Landing page for 'shopify delivery qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_shopify_delivery_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Shopify Delivery Qatar',
+        'hero_subtitle': 'Seamless Shopify Integration - Auto-Sync Orders in Minutes',
+    }
+    return render(request, 'webpages/seo/shopify_delivery_qatar.html', data)
+
+
+def delivery_qatar_arabic(request):
+    """Landing page for Arabic keywords 'توصيل قطر'"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_delivery_qatar_arabic_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'توصيل قطر | خدمة توصيل سريعة',
+        'hero_subtitle': 'أفضل شركة توصيل في قطر - توصيل سريع في نفس اليوم',
+        'is_rtl': True,
+    }
+    return render(request, 'webpages/seo/delivery_qatar_arabic.html', data)
+
+
+def courier_doha_arabic(request):
+    """Landing page for Arabic keywords 'شركة توصيل الدوحة'"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_courier_doha_arabic_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'شركة توصيل الدوحة',
+        'hero_subtitle': 'كوريير قطر الموثوق لخدمات التوصيل السريع',
+        'is_rtl': True,
+    }
+    return render(request, 'webpages/seo/courier_doha_arabic.html', data)
+
+
+def food_delivery_partner_qatar(request):
+    """Landing page for 'food delivery partner qatar' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_food_delivery_partner_qatar_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Food Delivery Partner Qatar',
+        'hero_subtitle': 'Reliable Restaurant Delivery Service - Temperature-Controlled Logistics',
+    }
+    return render(request, 'webpages/seo/food_delivery_partner_qatar.html', data)
+
+
+def al_wakrah_delivery(request):
+    """Landing page for 'delivery al wakrah' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_al_wakrah_delivery_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Delivery Service Al Wakrah',
+        'hero_subtitle': 'Fast Courier in Al Wakrah - Same Day Pickup & Delivery',
+    }
+    return render(request, 'webpages/seo/al_wakrah_delivery.html', data)
+
+
+def lusail_delivery(request):
+    """Landing page for 'delivery lusail' keyword"""
+    from core.seo import SEOLandingPages
+    meta = SEOLandingPages.get_lusail_delivery_meta()
+
+    data = {
+        'seo': meta,
+        'page_title': 'Delivery Service Lusail City',
+        'hero_subtitle': 'Premium Courier Service for Lusail - Fox Hills, Marina & More',
+    }
+    return render(request, 'webpages/seo/lusail_delivery.html', data)

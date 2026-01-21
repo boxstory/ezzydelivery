@@ -522,3 +522,106 @@ class SEOLandingPages:
                 "Same-day shipping, COD & automated order sync. Scale your store."
             ),  # 155 chars
         )
+
+    # =========================================================================
+    # NEW: Arabic Keyword Pages & Location-Specific Landing Pages
+    # =========================================================================
+
+    @staticmethod
+    def get_delivery_doha_meta():
+        """Target: 'delivery doha', 'doha courier service'"""
+        return SEOMetadata.get_page_meta(
+            title="Delivery Service Doha | Fast Courier in Doha Qatar",  # 51 chars
+            description=(
+                "Fast delivery service in Doha, Qatar. Same-day courier across all Doha districts. "
+                "West Bay, Pearl, Al Sadd, Old Airport & more. COD, tracking included."
+            ),  # 154 chars
+        )
+
+    @staticmethod
+    def get_business_delivery_qatar_meta():
+        """Target: 'business delivery qatar', 'b2b delivery service qatar'"""
+        return SEOMetadata.get_page_meta(
+            title="Business Delivery Qatar | B2B Courier Service Doha",  # 51 chars
+            description=(
+                "Professional B2B delivery service in Qatar. Office-to-office courier, document delivery "
+                "& corporate logistics. Scheduled pickups, bulk rates, invoicing."
+            ),  # 155 chars
+        )
+
+    @staticmethod
+    def get_package_delivery_qatar_meta():
+        """Target: 'package delivery qatar', 'parcel delivery qatar'"""
+        return SEOMetadata.get_page_meta(
+            title="Package Delivery Qatar | Parcel Courier Service Doha",  # 53 chars
+            description=(
+                "Secure package delivery across Qatar. All sizes accepted - small parcels to large boxes. "
+                "Same-day options, insurance available, real-time tracking."
+            ),  # 153 chars
+        )
+
+    @staticmethod
+    def get_shopify_delivery_qatar_meta():
+        """Target: 'shopify delivery qatar', 'shopify fulfillment qatar'"""
+        return SEOMetadata.get_page_meta(
+            title="Shopify Delivery Qatar | E-commerce Fulfillment",  # 48 chars
+            description=(
+                "Seamless Shopify integration for Qatar stores. Auto-sync orders, print labels, track "
+                "deliveries. COD support, same-day shipping. Connect in 5 minutes."
+            ),  # 154 chars
+        )
+
+    @staticmethod
+    def get_delivery_qatar_arabic_meta():
+        """Target: 'توصيل قطر', 'خدمة توصيل قطر' (Arabic: delivery qatar)"""
+        return SEOMetadata.get_page_meta(
+            title="توصيل قطر | خدمة توصيل سريعة في الدوحة",  # Arabic: Delivery Qatar | Fast Delivery Service in Doha
+            description=(
+                "أفضل خدمة توصيل في قطر. توصيل سريع في نفس اليوم في الدوحة، الوكرة ولوسيل. "
+                "خدمة الدفع عند الاستلام متوفرة. تتبع الطلبات مباشرة."
+            ),  # Arabic description
+        )
+
+    @staticmethod
+    def get_courier_doha_arabic_meta():
+        """Target: 'شركة توصيل الدوحة', 'كوريير قطر' (Arabic: courier company doha)"""
+        return SEOMetadata.get_page_meta(
+            title="شركة توصيل الدوحة | كوريير قطر الموثوق",  # Arabic: Delivery Company Doha | Trusted Qatar Courier
+            description=(
+                "شركة توصيل موثوقة في الدوحة وجميع أنحاء قطر. توصيل طرود، مستندات وتجارة إلكترونية. "
+                "أسعار منافسة وخدمة عملاء ممتازة."
+            ),  # Arabic description
+        )
+
+    @staticmethod
+    def get_food_delivery_partner_qatar_meta():
+        """Target: 'food delivery partner qatar', 'restaurant delivery service qatar'"""
+        return SEOMetadata.get_page_meta(
+            title="Food Delivery Partner Qatar | Restaurant Courier",  # 49 chars
+            description=(
+                "Reliable food delivery partner for Qatar restaurants. Temperature-controlled delivery, "
+                "fast dispatch, branded experience. Join 100+ restaurants using us."
+            ),  # 153 chars
+        )
+
+    @staticmethod
+    def get_al_wakrah_delivery_meta():
+        """Target: 'delivery al wakrah', 'al wakrah courier'"""
+        return SEOMetadata.get_page_meta(
+            title="Delivery Service Al Wakrah | Courier Al Wakrah Qatar",  # 53 chars
+            description=(
+                "Fast delivery service in Al Wakrah, Qatar. Same-day pickup & delivery. Coverage includes "
+                "Al Wakrah City, Ezdan Village & surrounding areas. COD available."
+            ),  # 155 chars
+        )
+
+    @staticmethod
+    def get_lusail_delivery_meta():
+        """Target: 'delivery lusail', 'lusail courier service'"""
+        return SEOMetadata.get_page_meta(
+            title="Delivery Service Lusail | Courier Lusail City Qatar",  # 52 chars
+            description=(
+                "Premium delivery service in Lusail City, Qatar. Fox Hills, Marina District & Entertainment "
+                "City coverage. Same-day express, COD & business accounts."
+            ),  # 154 chars
+        )

@@ -1,22 +1,20 @@
-import debug_toolbar
 from django.contrib import admin
 from django.urls import path, include , re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from orders import views as orders_views
 from django.contrib.sitemaps.views import sitemap
-from webpages.sitemaps import StaticViewSitemap, BusinessSitemap, DriverSitemap
-from core.sitemaps import StaticViewSitemap as CoreStaticSitemap, BusinessPagesSitemap, WorkforcePagesSitemap, SEOLandingPageSitemap, BlogPostSitemap, BlogCategorySitemap
-from core.views_seo import robots_txt, security_txt, humans_txt
+from webpages.sitemaps import BusinessSitemap
+from core.sitemaps import StaticViewSitemap, BusinessPagesSitemap, WorkforcePagesSitemap, SEOLandingPageSitemap, BlogPostSitemap, BlogCategorySitemap
+from core.views_seo import robots_txt, security_txt, humans_txt, llms_txt
 from django.views.generic import TemplateView
 
 
 # Combine all sitemaps for comprehensive SEO
+# Note: Removed duplicate StaticViewSitemap from webpages and DriverSitemap (fleet blocked in robots.txt)
 sitemaps = {
     'static': StaticViewSitemap,
     'businesses': BusinessSitemap,
-    'drivers': DriverSitemap,
-    'core': CoreStaticSitemap,
     'business_pages': BusinessPagesSitemap,
     'workforce_pages': WorkforcePagesSitemap,
     'seo_landing_pages': SEOLandingPageSitemap,
@@ -32,13 +30,13 @@ admin.site.site_header = 'Ezzy Delivery Admin'
 
 urlpatterns = [
     path('dj-admin/', admin.site.urls),
-    path('__debug__/', include(debug_toolbar.urls)),
 
     #seo sitemap, robots.txt, security.txt, humans.txt - Qatar delivery SEO optimization
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
     path('robots.txt', robots_txt, name='robots_txt'),
     path('.well-known/security.txt', security_txt, name='security_txt'),
     path('humans.txt', humans_txt, name='humans_txt'),
+    path('llms.txt', llms_txt, name='llms_txt'),
      
 
     path('accounts/', include('allauth.urls')),
@@ -74,3 +72,8 @@ handler500 = 'webpages.views.handler500'
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Add debug toolbar URLs only in DEBUG mode
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns = [path('__debug__/', include(debug_toolbar.urls))] + urlpatterns
