@@ -53,6 +53,7 @@ from django.db import connection
 from django.shortcuts import redirect, render
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from core.decorators import driver_required
 
 from core import models as core_models
 from core import views as core_views
@@ -81,6 +82,7 @@ logger = logging.getLogger('fleet')
 # =============================================================================
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def fleets(request):
     """
     Display all drivers with their vehicles.
@@ -108,6 +110,7 @@ def fleets(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def fleet_dashboard(request):
     """
     Display driver dashboard with wallet statistics.
@@ -162,6 +165,7 @@ def fleet_dashboard(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def driver_documents(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -179,6 +183,7 @@ def driver_documents(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def driver_documents_upload(request, fleet_id):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -206,6 +211,7 @@ def driver_documents_upload(request, fleet_id):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def driver_documents_update(request, fleet_id, doc_id):
     logger.debug(f'driver_documents_update for doc_id={doc_id}')
     if fleet_id != request.user.id:
@@ -238,6 +244,7 @@ def driver_documents_update(request, fleet_id, doc_id):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def driver_documents_delete(request, fleet_id, doc_id):
     logger.debug(f'driver_documents_delete for doc_id={doc_id}')
     if fleet_id != request.user.id:
@@ -258,6 +265,7 @@ def driver_documents_delete(request, fleet_id, doc_id):
 # vehicle---------------------------------------------------------------------------------------------------------------------
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def vehicle_own(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -276,6 +284,7 @@ def vehicle_own(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def vehicle_add(request):
     logger.debug('vehicle_add')
     driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -297,6 +306,7 @@ def vehicle_add(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def vehicle_delete(request, fleet_id, vehicle_id):
     logger.debug(f'vehicle_delete for vehicle_id={vehicle_id}')
 
@@ -314,6 +324,7 @@ def vehicle_delete(request, fleet_id, vehicle_id):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def vehicle_update(request, vehicle_id):
     driver = fleet_models.Driver.objects.get(user_id=request.user.id)
     logger.debug(f'vehicle_update for driver_id={driver.driver_id}')
@@ -345,6 +356,7 @@ def vehicle_update(request, vehicle_id):
 
 # cod_collection ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
+@driver_required
 def cod_collection(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -380,6 +392,7 @@ def cod_collection(request):
 
 # COD Submission ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
+@driver_required
 def cod_submission(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -428,6 +441,7 @@ def cod_submission(request):
 
 # Earnings View ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
+@driver_required
 def driver_earnings(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -470,6 +484,7 @@ def driver_earnings(request):
 
 # Transaction History ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
+@driver_required
 def transaction_history(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -517,6 +532,7 @@ def transaction_history(request):
 
 # Performance & Analytics ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
+@driver_required
 def driver_performance(request):
     """Comprehensive performance dashboard for drivers"""
     try:
@@ -604,6 +620,7 @@ def driver_performance(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def driver_reports(request):
     """Generate and download various reports"""
     try:
@@ -657,6 +674,7 @@ def driver_reports(request):
 
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def driver_analytics(request):
     """Advanced analytics and visualizations"""
     try:
@@ -739,6 +757,7 @@ def driver_analytics(request):
 # Front end -------------------------------------------------------------------------------------------------------------------------------------------------
 
 @login_required(login_url='/accounts/login/')
+@driver_required
 def driver_profile(request, fleet_id):
     try:
         # Single query with select_related to avoid duplicate queries
@@ -781,6 +800,7 @@ def driver_profile(request, fleet_id):
 
 # Mobile PWA Profile ---------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
+@driver_required
 def driver_profile_mobile(request):
     """
     Mobile PWA driver profile page.

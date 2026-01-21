@@ -497,15 +497,187 @@
         }
     });
 
+    // ==================== ORDER DETAIL PANEL ====================
+
+    const OrderDetailPanel = {
+        open: function(orderId) {
+            const panel = document.getElementById('orderDetailPanel');
+            const content = document.getElementById('orderDetailContent');
+
+            if (!panel) {
+                console.warn('Order detail panel not found');
+                return;
+            }
+
+            // Show panel with animation
+            panel.classList.add('active');
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+
+            // Load order details via HTMX
+            if (typeof htmx !== 'undefined') {
+                htmx.ajax('GET', '/workforce/orders/' + orderId + '/', {
+                    target: '#orderDetailContent',
+                    swap: 'innerHTML'
+                });
+            }
+        },
+
+        close: function() {
+            const panel = document.getElementById('orderDetailPanel');
+            if (panel) {
+                panel.classList.remove('active');
+                document.body.style.overflow = ''; // Restore scrolling
+            }
+        },
+
+        init: function() {
+            // Close panel with Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    const panel = document.getElementById('orderDetailPanel');
+                    if (panel && panel.classList.contains('active')) {
+                        OrderDetailPanel.close();
+                    }
+                }
+            });
+
+            // Close on overlay click
+            const overlay = document.querySelector('.order-detail-panel-overlay');
+            if (overlay) {
+                overlay.addEventListener('click', function() {
+                    OrderDetailPanel.close();
+                });
+            }
+        }
+    };
+
+    // ==================== ORDER ACTIONS ====================
+
+    const OrderActions = {
+        publishToDelivery: function(orderId) {
+            if (confirm('Are you sure you want to publish this order to delivery?')) {
+                fetch('/workforce/orders/' + orderId + '/publish/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({ action: 'publish' })
+                })
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        showToast('Order published successfully!', 'success');
+                        // Refresh via HTMX
+                        htmx.ajax('GET', window.location.href, {
+                            target: '#main-content',
+                            select: '#main-content',
+                            swap: 'outerHTML'
+                        });
+                    } else {
+                        showToast('Error: ' + (data.error || 'Failed to publish order'), 'danger');
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error:', error);
+                    showToast('An error occurred while publishing the order', 'danger');
+                });
+            }
+        },
+
+        submitStatusUpdate: function(orderId) {
+            var statusSelect = document.getElementById('statusSelect' + orderId);
+            var status = statusSelect ? statusSelect.value : null;
+
+            if (!status) {
+                showToast('Please select a status', 'warning');
+                return;
+            }
+
+            fetch('/workforce/orders/' + orderId + '/update-status/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ status: status })
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    // Close the modal
+                    var modal = bootstrap.Modal.getInstance(document.getElementById('statusModal' + orderId));
+                    if (modal) modal.hide();
+                    showToast('Status updated successfully!', 'success');
+                    // Refresh via HTMX
+                    htmx.ajax('GET', window.location.href, {
+                        target: '#main-content',
+                        select: '#main-content',
+                        swap: 'outerHTML'
+                    });
+                } else {
+                    showToast('Error: ' + (data.error || 'Failed to update status'), 'danger');
+                }
+            })
+            .catch(function(error) {
+                console.error('Error:', error);
+                showToast('An error occurred while updating status', 'danger');
+            });
+        },
+
+        addComment: function(event, orderId) {
+            event.preventDefault();
+            const commentInput = document.getElementById('commentInput' + orderId);
+            const comment = commentInput ? commentInput.value.trim() : '';
+
+            if (!comment) return;
+
+            fetch('/workforce/orders/' + orderId + '/add-comment/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ comment: comment })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    commentInput.value = '';
+                    showToast('Comment added successfully!', 'success');
+                    // Refresh via HTMX
+                    htmx.ajax('GET', window.location.href, {
+                        target: '#main-content',
+                        select: '#main-content',
+                        swap: 'outerHTML'
+                    });
+                } else {
+                    showToast('Error: ' + (data.error || 'Failed to add comment'), 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('An error occurred while adding comment', 'danger');
+            });
+        }
+    };
+
     // Expose to global scope for inline handlers
     window.FilterManager = FilterManager;
     window.TaskActions = TaskActions;
+    window.OrderDetailPanel = OrderDetailPanel;
+    window.OrderActions = OrderActions;
     window.publishToDMS = TaskActions.publishToDMS.bind(TaskActions);
     window.publishToDriverApp = TaskActions.publishToDriverApp.bind(TaskActions);
     window.setStatusModalTask = TaskActions.setStatusModalTask.bind(TaskActions);
     window.submitStatusUpdate = TaskActions.submitStatusUpdate.bind(TaskActions);
     window.quickFilter = FilterManager.quickFilter.bind(FilterManager);
     window.removeFilter = FilterManager.removeFilter.bind(FilterManager);
+    // Order detail panel functions
+    window.openOrderDetailPanel = OrderDetailPanel.open.bind(OrderDetailPanel);
+    window.closeOrderDetailPanel = OrderDetailPanel.close.bind(OrderDetailPanel);
+    window.publishToDelivery = OrderActions.publishToDelivery.bind(OrderActions);
+    window.addComment = OrderActions.addComment.bind(OrderActions);
 
 })();
 

@@ -4,14 +4,21 @@ from delivery import models as delivery_models
 # Register your models here.
 
 
+class ZoneAreaInline(admin.TabularInline):
+    model = delivery_models.ZoneArea
+    extra = 1
+    fields = ('area_name', 'area_name_arabic', 'latitude', 'longitude', 'is_active')
+
+
 @admin.register(delivery_models.ZoneName)
 class ZoneNameAdmin(admin.ModelAdmin):
-    list_display = ('zone_number', 'zone_name', 'zone_name_arabic', 'latitude', 'longitude', 'has_polygon_display', 'neighbour_count', 'is_active')
+    list_display = ('zone_number', 'zone_name', 'zone_name_arabic', 'area_count', 'latitude', 'longitude', 'has_polygon_display', 'neighbour_count', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('zone_name', 'zone_name_arabic', 'zone_number')
     ordering = ('zone_number',)
     filter_horizontal = ('neighbour_zones',)
     list_editable = ('is_active',)
+    inlines = [ZoneAreaInline]
     fieldsets = (
         ('Zone Info', {
             'fields': ('zone_number', 'zone_name', 'zone_name_arabic', 'is_active')
@@ -36,6 +43,26 @@ class ZoneNameAdmin(admin.ModelAdmin):
     def has_polygon_display(self, obj):
         return "Yes" if obj.has_polygon else "No"
     has_polygon_display.short_description = 'Polygon'
+
+    def area_count(self, obj):
+        return obj.areas.count()
+    area_count.short_description = 'Areas'
+
+
+@admin.register(delivery_models.ZoneArea)
+class ZoneAreaAdmin(admin.ModelAdmin):
+    list_display = ('area_name', 'zone_display', 'area_name_arabic', 'latitude', 'longitude', 'is_active')
+    list_filter = ('is_active', 'zone__zone_number')
+    search_fields = ('area_name', 'area_name_arabic', 'zone__zone_name', 'zone__zone_number')
+    ordering = ('zone__zone_number', 'area_name')
+    list_select_related = ('zone',)
+    raw_id_fields = ('zone',)
+    list_per_page = 50
+
+    def zone_display(self, obj):
+        return f"Zone {obj.zone.zone_number} - {obj.zone.zone_name}"
+    zone_display.short_description = 'Zone'
+    zone_display.admin_order_field = 'zone__zone_number'
 
 
 @admin.register(delivery_models.ZoneGroup)

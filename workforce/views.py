@@ -60,6 +60,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 import csv
 from django.contrib.auth.decorators import login_required
+from core.decorators import staff_required
 from django.views.decorators.http import require_http_methods
 import json
 import logging
@@ -166,6 +167,7 @@ def paginate_queryset(request, queryset, items_per_page=10):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def wf_dashboard(request):
     from django.utils import timezone
     from django.db.models import Sum, Count, Q
@@ -264,6 +266,7 @@ def wf_dashboard(request):
 
 # Orders section  ------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
+@staff_required
 def all_orders(request):
     from django.db.models import Count
 
@@ -332,6 +335,7 @@ def all_orders(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def export_orders_csv(request):
     """
     Export orders to CSV file with applied filters
@@ -413,6 +417,7 @@ def export_orders_csv(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def export_drivers_csv(request):
     """
     Export drivers to CSV file
@@ -478,6 +483,7 @@ def export_drivers_csv(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def orders_by_seller(request):
     """
     View to display orders grouped by seller/business
@@ -526,6 +532,7 @@ def orders_by_seller(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def orders_to_publish(request):
     orders = orders_models.Order.objects.select_related(
         'business'
@@ -539,6 +546,7 @@ def orders_to_publish(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def orders_published(request):
     orders = orders_models.Order.objects.select_related(
         'business', 'pickup_location'
@@ -551,6 +559,7 @@ def orders_published(request):
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def submit_to_task(request, order_id):
     """Submit order to delivery task - now uses verification workflow"""
     from django.utils import timezone
@@ -578,6 +587,7 @@ def submit_to_task(request, order_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def verify_order_address(request, order_id):
     """Verify order address - workforce view"""
     from django.utils import timezone
@@ -674,6 +684,7 @@ def verify_order_address(request, order_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def verify_order(request, order_id):
     """Verify order - workforce view"""
     from django.utils import timezone
@@ -724,6 +735,7 @@ def verify_order(request, order_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def orders_pending_verification(request):
     """List orders pending verification"""
     verification_status = request.GET.get('verification_status', 'pending')
@@ -751,6 +763,7 @@ def orders_pending_verification(request):
 # Staff Order Creation section  ------------------------------------------------------------------------------------------------------
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def add_order(request):
     """
     Staff view to add an order for a client/seller.
@@ -940,6 +953,7 @@ def add_order(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def orders_api_guide(request):
     """
     Display API documentation for order creation.
@@ -956,6 +970,7 @@ def orders_api_guide(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def get_pickup_locations(request, business_id):
     """AJAX endpoint to get pickup locations for a business"""
     try:
@@ -976,11 +991,15 @@ def get_pickup_locations(request, business_id):
 # Delivery Tasks section  ------------------------------------------------------------------------------------------------------
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def dl_list_all(request):
     dl_tasks = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
     ).prefetch_related(
-        'order__order_comments'
+        'order__order_comments',
+        'order__order_items',
+        'order__order_items__product',
+        'task_qrcode',
     ).all().order_by('-created_at')
 
     # Get filter parameters
@@ -1040,6 +1059,7 @@ def dl_list_all(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def dl_list_incompleted_details(request):
     # Get incomplete delivery tasks (not delivered, not cancelled)
     dl_tasks = delivery_models.DeliveryTask.objects.select_related(
@@ -1056,6 +1076,7 @@ def dl_list_incompleted_details(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def dl_list_published_to_dms(request):
     dl_tasks = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
@@ -1069,6 +1090,7 @@ def dl_list_published_to_dms(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def dl_list_ready_to_published_to_dms(request):
     orders = orders_models.Order.objects.select_related(
         'business'
@@ -1089,6 +1111,7 @@ def dl_list_ready_to_published_to_dms(request):
 # Workflow Guide -----------------------------------------------------
 
 @login_required(login_url='account_login')
+@staff_required
 def workflow_guide(request):
     """Display comprehensive workflow guide for workforce/staff members"""
 
@@ -1268,6 +1291,7 @@ def workflow_guide(request):
 # Order Detail View ------------------------------------------------------------------------------------------------------
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def order_detail(request, order_id):
     """Display order detail page"""
     order = get_object_or_404(
@@ -1304,6 +1328,7 @@ def order_detail(request, order_id):
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
+@staff_required
 def cancel_order(request, order_id):
     """Cancel an order"""
     try:
@@ -1350,6 +1375,7 @@ def cancel_order(request, order_id):
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
+@staff_required
 def publish_order_to_delivery(request, order_id):
     """AJAX endpoint to publish order to delivery"""
     try:
@@ -1389,6 +1415,7 @@ def publish_order_to_delivery(request, order_id):
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
+@staff_required
 def update_order_status(request, order_id):
     """AJAX endpoint to update order status"""
     try:
@@ -1433,6 +1460,7 @@ def update_order_status(request, order_id):
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
+@staff_required
 def add_order_comment(request, order_id):
     """AJAX endpoint to add comment to order"""
     try:
@@ -1474,6 +1502,7 @@ def add_order_comment(request, order_id):
 # Delivery Task Detail View ------------------------------------------------------------------------------------------------------
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def delivery_task_detail(request, task_id):
     """
     Display detailed information about a delivery task.
@@ -1512,6 +1541,7 @@ def delivery_task_detail(request, task_id):
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
+@staff_required
 def publish_task_to_dms(request, task_id):
     """AJAX endpoint to publish delivery task to DMS"""
     try:
@@ -1537,6 +1567,7 @@ def publish_task_to_dms(request, task_id):
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
+@staff_required
 def publish_task_to_driver_app(request, task_id):
     """AJAX endpoint to publish delivery task to Driver App"""
     try:
@@ -1561,6 +1592,7 @@ def publish_task_to_driver_app(request, task_id):
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
+@staff_required
 def assign_driver_to_task(request, task_id):
     """AJAX endpoint to assign driver to delivery task"""
     try:
@@ -1598,6 +1630,7 @@ def assign_driver_to_task(request, task_id):
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
+@staff_required
 def update_task_status(request, task_id):
     """AJAX endpoint to update delivery task status"""
     try:
@@ -1633,6 +1666,7 @@ def update_task_status(request, task_id):
 # USER VERIFICATION VIEWS --------------------------------------------------------------------------------------------------------------
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def user_verification_list(request):
     """Staff view to see all users pending verification"""
     from core import models as core_models
@@ -1681,6 +1715,7 @@ def user_verification_list(request):
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
+@staff_required
 def update_verification_status(request, profile_id):
     """AJAX endpoint to update user verification status"""
     from core import models as core_models
@@ -1752,6 +1787,7 @@ def update_verification_status(request, profile_id):
 
 # Orders Section Functions
 @login_required(login_url='/accounts/login/')
+@staff_required
 def orders_dms_updated(request):
     """
     View for DMS updated orders list.
@@ -1797,6 +1833,7 @@ def orders_dms_updated(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def match_dms_task(request):
     """Manually match a delivery task to a DMS job ID."""
     from delivery import models as delivery_models
@@ -1839,6 +1876,7 @@ def match_dms_task(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def orders_reported(request):
     """View for reported orders list"""
     from orders import models as orders_models
@@ -1860,6 +1898,7 @@ def orders_reported(request):
 
 # Tasks Section Functions
 @login_required(login_url='/accounts/login/')
+@staff_required
 def tasks_followup_list(request):
     """View for follow-up tasks list"""
     tasks_list = delivery_models.DeliveryTask.objects.select_related(
@@ -1878,6 +1917,7 @@ def tasks_followup_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def tasks_dms_updated(request):
     """View for DMS updated tasks list"""
     tasks_list = delivery_models.DeliveryTask.objects.select_related(
@@ -1896,6 +1936,7 @@ def tasks_dms_updated(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def tasks_reported(request):
     """View for reported tasks list - showing rejected/cancelled tasks"""
     tasks_list = delivery_models.DeliveryTask.objects.select_related(
@@ -1915,6 +1956,7 @@ def tasks_reported(request):
 
 # DMS Links Section Functions
 @login_required(login_url='/accounts/login/')
+@staff_required
 def dms_publish_order(request):
     """View for publishing orders to DMS"""
     from orders import models as orders_models
@@ -1937,6 +1979,7 @@ def dms_publish_order(request):
 
 # Fleet Accounts Section Functions
 @login_required(login_url='/accounts/login/')
+@staff_required
 def fleet_cod_in_hand(request):
     """View for COD in hand with drivers"""
     from django.db.models import Sum, Value, DecimalField
@@ -2077,6 +2120,7 @@ def fleet_cod_in_hand(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def fleet_drivers_earnings(request):
     """View for drivers earnings"""
     drivers = fleet_models.Driver.objects.filter(
@@ -2093,6 +2137,7 @@ def fleet_drivers_earnings(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def fleet_transactions(request):
     """View for fleet transactions with filtering and sorting"""
     from django.db.models import Sum
@@ -2246,6 +2291,7 @@ def fleet_transactions(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def generate_demo_transactions(request):
     """Generate demo transactions for a driver"""
     from django.contrib import messages
@@ -2387,6 +2433,7 @@ def generate_demo_transactions(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def bulk_settle_transactions(request):
     """Bulk settle selected transactions for a driver"""
     from django.contrib import messages
@@ -2479,6 +2526,7 @@ def bulk_settle_transactions(request):
 # ==========================================
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def receipt_templates_list(request):
     """List all receipt templates"""
     templates = fleet_models.ReceiptTemplate.objects.all()
@@ -2498,6 +2546,7 @@ def receipt_templates_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def receipt_template_create(request):
     """Create a new receipt template"""
     from django.contrib import messages
@@ -2536,6 +2585,7 @@ def receipt_template_create(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def receipt_template_edit(request, template_id):
     """Edit an existing receipt template"""
     from django.contrib import messages
@@ -2575,6 +2625,7 @@ def receipt_template_edit(request, template_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def receipt_template_preview(request, template_id):
     """Preview a receipt template with sample data"""
     from django.shortcuts import get_object_or_404
@@ -2620,6 +2671,7 @@ def receipt_template_preview(request, template_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def receipt_template_delete(request, template_id):
     """Delete a receipt template"""
     from django.shortcuts import get_object_or_404
@@ -2637,6 +2689,7 @@ def receipt_template_delete(request, template_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def settlement_receipt_print(request, settlement_id):
     """Print a settlement receipt using the default or specified template"""
     from django.shortcuts import get_object_or_404
@@ -2664,6 +2717,7 @@ def settlement_receipt_print(request, settlement_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def fleet_task_sheet(request, driver_id):
     """Generate printable A4 task sheet for a driver's daily deliveries"""
     from django.shortcuts import get_object_or_404
@@ -2719,6 +2773,7 @@ def fleet_task_sheet(request, driver_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def fleet_task_sheets_list(request):
     """List view to select driver and date for task sheet printing"""
     from django.db.models import Count, Q
@@ -2759,6 +2814,7 @@ def fleet_task_sheets_list(request):
 
 # Inventory Section Functions
 @login_required(login_url='/accounts/login/')
+@staff_required
 def inventory_reports(request):
     """View for inventory reports"""
     context = {
@@ -2768,6 +2824,7 @@ def inventory_reports(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def inventory_restock_list(request):
     """View for restock list"""
     context = {
@@ -2778,6 +2835,7 @@ def inventory_restock_list(request):
 
 # Quick Links Functions
 @login_required(login_url='/accounts/login/')
+@staff_required
 def staff_reports(request):
     """View for staff reports dashboard"""
     from orders import models as orders_models
@@ -2820,6 +2878,7 @@ def staff_reports(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def staff_contacts(request):
     """View for staff contacts directory"""
     from core import models as core_models
@@ -2850,6 +2909,7 @@ def staff_contacts(request):
 # ==================== DMS (ShipDay) VIEWS ====================
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def dms_drivers_list(request):
     """View for listing all drivers from ShipDay DMS"""
     logger.info(f"Fetching Shipday carriers for user: {request.user.id if request.user.is_authenticated else 'anonymous'}")
@@ -2877,6 +2937,7 @@ def dms_drivers_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def dms_orders_list(request):
     """View for listing all orders from ShipDay DMS"""
     logger.info(f"Fetching Shipday orders for user: {request.user.id if request.user.is_authenticated else 'anonymous'}")
@@ -2904,6 +2965,7 @@ def dms_orders_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def dms_analytics(request):
     """View for DMS analytics and statistics"""
     try:
@@ -2939,6 +3001,7 @@ def dms_analytics(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def dms_sync_monitor(request):
     """View for monitoring DMS sync status"""
     try:
@@ -2976,6 +3039,7 @@ def dms_sync_monitor(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def driver_documents_list(request):
     """View for listing all driver documents with search and card/table toggle"""
     from django.db.models import Q
@@ -3014,6 +3078,7 @@ def driver_documents_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def driver_document_detail(request, document_id):
     """View for viewing and updating a specific driver document"""
     document = get_object_or_404(fleet_models.DriverDocument, id=document_id)
@@ -3054,6 +3119,7 @@ def driver_document_detail(request, document_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def vehicle_documents_list(request):
     """View for listing all vehicle documents with search and card/table toggle"""
     from django.db.models import Q
@@ -3093,6 +3159,7 @@ def vehicle_documents_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def vehicle_document_detail(request, driver_id):
     """View for viewing and updating vehicle documents for a specific driver"""
     driver = get_object_or_404(fleet_models.Driver, driver_id=driver_id)
@@ -3131,6 +3198,7 @@ def vehicle_document_detail(request, driver_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def store_documents_list(request):
     """View for listing all store/business documents with search and card/table toggle"""
     from django.db.models import Q
@@ -3169,6 +3237,7 @@ def store_documents_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def store_document_detail(request, business_id):
     """View for viewing and updating store documents for a specific business"""
     business = get_object_or_404(business_models.Business, business_id=business_id)
@@ -3208,6 +3277,7 @@ def store_document_detail(request, business_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def business_licenses_list(request):
     """View for listing all business licenses with search and card/table toggle"""
     from django.db.models import Q
@@ -3244,6 +3314,7 @@ def business_licenses_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def business_license_detail(request, business_id):
     """View for viewing and updating business license details"""
     business = get_object_or_404(business_models.Business, business_id=business_id)
@@ -3293,6 +3364,7 @@ def business_license_detail(request, business_id):
 
 # Sellers section  ------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
+@staff_required
 def sellers_list(request):
     """
     View to display all sellers/businesses in the system
@@ -3357,6 +3429,7 @@ def sellers_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def sellers_pending(request):
     """
     View to display sellers pending approval
@@ -3391,6 +3464,7 @@ def sellers_pending(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def sellers_active(request):
     """
     View to display active verified sellers
@@ -3429,6 +3503,7 @@ def sellers_active(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def sellers_inactive(request):
     """
     View to display inactive or suspended sellers
@@ -3463,6 +3538,7 @@ def sellers_inactive(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def seller_detail(request, business_id):
     """
     View for viewing comprehensive seller/business details including
@@ -3678,6 +3754,7 @@ def seller_detail(request, business_id):
 # =============================================================================
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def drivers_list(request):
     """
     View to display all drivers with search and filtering
@@ -3728,6 +3805,7 @@ def drivers_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def drivers_pending(request):
     """
     View to display drivers pending approval
@@ -3765,6 +3843,7 @@ def drivers_pending(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def drivers_active(request):
     """
     View to display active (approved) drivers
@@ -3802,6 +3881,7 @@ def drivers_active(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def drivers_inactive(request):
     """
     View to display inactive, rejected, or blocked drivers
@@ -3839,6 +3919,7 @@ def drivers_inactive(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def driver_detail(request, driver_id):
     """
     View for viewing comprehensive driver details including
@@ -3974,6 +4055,7 @@ def driver_detail(request, driver_id):
 
 
 @login_required
+@staff_required
 def suppliers_list(request):
     """
     List all businesses with fulfillment service enabled (Suppliers).
@@ -4024,6 +4106,7 @@ def suppliers_list(request):
 
 
 @login_required
+@staff_required
 def fulfilled_orders_list(request):
     """
     List all fulfilled/delivered orders (Purchase Orders).
@@ -4107,6 +4190,7 @@ def fulfilled_orders_list(request):
 # ==========================================
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def delivery_task_edit(request, task_id):
     """Edit delivery task details"""
     task = get_object_or_404(
@@ -4145,6 +4229,7 @@ def delivery_task_edit(request, task_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def bulk_print_tasks(request):
     """Generate printable view for selected tasks"""
     task_ids = request.GET.get('ids', '').split(',')
@@ -4165,6 +4250,7 @@ def bulk_print_tasks(request):
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
+@staff_required
 def bulk_publish_dms(request):
     """Bulk publish tasks to DMS"""
     try:
@@ -4199,6 +4285,7 @@ def bulk_publish_dms(request):
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
+@staff_required
 def bulk_publish_app(request):
     """Bulk publish tasks to Driver App"""
     try:
@@ -4230,6 +4317,7 @@ def bulk_publish_app(request):
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
+@staff_required
 def bulk_update_status(request):
     """Bulk update task status"""
     try:
@@ -4278,6 +4366,7 @@ def bulk_update_status(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def bulk_export_tasks(request):
     """Export selected tasks to CSV"""
     task_ids = request.GET.get('ids', '').split(',')

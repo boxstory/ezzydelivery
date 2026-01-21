@@ -159,6 +159,15 @@
     border-left: 0.1875rem solid var(--brand-primary);
 }
 
+/* Hide collapsed submenus completely - no reserved space */
+.dashboard-sidebar .multi-level.collapse:not(.show),
+.dashboard-sidebar .submenu.collapse:not(.show) {
+    display: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+}
+
 .dashboard-sidebar .multi-level .nav-link,
 .dashboard-sidebar .submenu .nav-link {
     background: var(--brand-white);
@@ -469,16 +478,44 @@
     transform: rotate(180deg);
 }
 
-/* Mobile sidebar nav container */
+/* Mobile sidebar nav container - reset dashboard-sidebar styles */
 .mobile-sidebar-nav {
-    background: linear-gradient(180deg, var(--brand-grey-100, #f8f9fa) 0%, var(--brand-grey-200, #e9ecef) 100%);
-    border-bottom: 1px solid var(--brand-grey-300, #dee2e6);
     height: auto;
     max-height: none;
     overflow: visible;
+    background: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    min-height: 0 !important;
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
 
+/* Hide nav completely when collapse is not shown - use :has() for modern browsers */
+.mobile-sidebar-nav:has(.navbar-collapse:not(.show):not(.collapsing)) {
+    display: none !important;
+}
+
+/* Fallback: Always ensure collapsed content takes no space */
+.mobile-sidebar-nav .navbar-collapse:not(.show):not(.collapsing) {
+    display: none !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Only show background when content is expanded */
 .mobile-sidebar-nav .navbar-collapse {
+    padding: 0;
+}
+
+.mobile-sidebar-nav .navbar-collapse.show,
+.mobile-sidebar-nav .navbar-collapse.collapsing {
+    display: block !important;
+    background: linear-gradient(180deg, var(--brand-grey-100, #f8f9fa) 0%, var(--brand-grey-200, #e9ecef) 100%);
+    border-bottom: 1px solid var(--brand-grey-300, #dee2e6);
     padding: 0.75rem 1rem 1rem;
 }
 
@@ -566,6 +603,14 @@
     border-radius: var(--brand-radius-sm, 0.375rem);
     margin: 0.375rem 0 0.375rem 0.75rem;
     padding: 0.5rem;
+}
+
+/* Hide collapsed submenus completely - no reserved space */
+.mobile-sidebar-nav .multi-level.collapse:not(.show) {
+    display: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
 }
 
 .mobile-sidebar-nav .multi-level .nav-link {

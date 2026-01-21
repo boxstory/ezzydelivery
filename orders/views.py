@@ -115,6 +115,63 @@ def orders_all_list(request):
     business = request.current_business
     logger.info(f"User {request.user.id} accessing orders list for business {business.business_id}")
 
+    # Get filter parameters
+    from datetime import date, timedelta
+    order_number = request.GET.get('orderNumber', '')
+    mobile = request.GET.get('mobile', '')
+    customer_name = request.GET.get('customerName', '')
+    zone = request.GET.get('zone', '')
+    c_status = request.GET.get('cStatus', '')
+    date_range = request.GET.get('dateRange', '')
+    date_from = request.GET.get('dateFrom', '')
+    date_to = request.GET.get('dateTo', '')
+    cod_status = request.GET.get('codStatus', '')
+    dl_status = request.GET.get('dlStatus', '')
+    delivered_range = request.GET.get('deliveredRange', '')
+    delivered_from = request.GET.get('deliveredFrom', '')
+    delivered_to = request.GET.get('deliveredTo', '')
+
+    # Process date range presets
+    today = date.today()
+    if date_range == 'today':
+        date_from = today.isoformat()
+        date_to = today.isoformat()
+    elif date_range == 'yesterday':
+        yesterday = today - timedelta(days=1)
+        date_from = yesterday.isoformat()
+        date_to = yesterday.isoformat()
+    elif date_range == '3days':
+        date_from = (today - timedelta(days=2)).isoformat()
+        date_to = today.isoformat()
+    elif date_range == 'week':
+        start_of_week = today - timedelta(days=today.weekday())
+        date_from = start_of_week.isoformat()
+        date_to = today.isoformat()
+    elif date_range == 'month':
+        start_of_month = today.replace(day=1)
+        date_from = start_of_month.isoformat()
+        date_to = today.isoformat()
+
+    # Process delivered date range presets
+    if delivered_range == 'today':
+        delivered_from = today.isoformat()
+        delivered_to = today.isoformat()
+    elif delivered_range == 'yesterday':
+        yesterday = today - timedelta(days=1)
+        delivered_from = yesterday.isoformat()
+        delivered_to = yesterday.isoformat()
+    elif delivered_range == '3days':
+        delivered_from = (today - timedelta(days=2)).isoformat()
+        delivered_to = today.isoformat()
+    elif delivered_range == 'week':
+        start_of_week = today - timedelta(days=today.weekday())
+        delivered_from = start_of_week.isoformat()
+        delivered_to = today.isoformat()
+    elif delivered_range == 'month':
+        start_of_month = today.replace(day=1)
+        delivered_from = start_of_month.isoformat()
+        delivered_to = today.isoformat()
+
     # FIX: Use select_related for ForeignKeys and prefetch_related for reverse relations
     items = orders_models.Order.objects.filter(
         business=business.business_id
@@ -129,7 +186,41 @@ def orders_all_list(request):
         'delivery_task',               # Reverse FK: Order ← DeliveryTask
         'delivery_task__driver',       # Through: DeliveryTask → Driver
         'delivery_task__business',     # Through: DeliveryTask → Business
-    ).order_by('-id')
+    )
+
+    # Apply filters
+    if order_number:
+        items = items.filter(order_number__icontains=order_number)
+    if mobile:
+        items = items.filter(customer_phone__icontains=mobile)
+    if customer_name:
+        items = items.filter(customer_name__icontains=customer_name)
+    if zone:
+        items = items.filter(dl_zone=zone)
+    if c_status:
+        items = items.filter(order_status=c_status)
+    if date_from:
+        items = items.filter(order_date__gte=date_from)
+    if date_to:
+        items = items.filter(order_date__lte=date_to)
+    if cod_status == 'with_cod':
+        items = items.filter(cod_amount__gt=0)
+    elif cod_status == 'no_cod':
+        items = items.filter(cod_amount=0)
+
+    # Delivery status filter
+    if dl_status == 'no_task':
+        items = items.filter(delivery_task__isnull=True)
+    elif dl_status:
+        items = items.filter(delivery_task__dl_task_status_dms=dl_status)
+
+    # Delivered date filter
+    if delivered_from:
+        items = items.filter(delivery_task__completed_at__date__gte=delivered_from)
+    if delivered_to:
+        items = items.filter(delivery_task__completed_at__date__lte=delivered_to)
+
+    items = items.order_by('-id')
 
     logger.debug(f"Fetching orders for business {business.business_id}")
 
@@ -164,6 +255,22 @@ def orders_all_list(request):
         'can_create_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_CREATE),
         'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
         'can_delete_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_DELETE),
+        # Filter values for template
+        'filters': {
+            'orderNumber': order_number,
+            'mobile': mobile,
+            'customerName': customer_name,
+            'zone': zone,
+            'cStatus': c_status,
+            'dateRange': date_range,
+            'dateFrom': date_from,
+            'dateTo': date_to,
+            'codStatus': cod_status,
+            'dlStatus': dl_status,
+            'deliveredRange': delivered_range,
+            'deliveredFrom': delivered_from,
+            'deliveredTo': delivered_to,
+        },
     }
     return render(request, 'orders/order_all_list.html', context)
 
@@ -1001,8 +1108,11 @@ def order_update(request, order_id):
 
         logger.info(f"User {request.user.id} updating order {order_id}")
 
+        # Check if user is staff (to show/hide task_created field)
+        is_staff = hasattr(request.user, 'profile') and request.user.profile.is_staff
+
         if request.method == 'POST':
-            form = orders_forms.UpdateOrderForm(request.POST, instance=order)
+            form = orders_forms.UpdateOrderForm(request.POST, instance=order, is_staff=is_staff)
 
             if order.task_status == 'dl_task_listed':
                 logger.warning(f"Cannot update order {order_id} - already published in delivery tasks")
@@ -1017,7 +1127,7 @@ def order_update(request, order_id):
             else:
                 logger.warning(f"Invalid order update form for order {order_id}: {form.errors}")
         else:
-            form = orders_forms.UpdateOrderForm(instance=order)
+            form = orders_forms.UpdateOrderForm(instance=order, is_staff=is_staff)
 
         context = {
             'form': form,

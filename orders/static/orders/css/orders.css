@@ -3,6 +3,15 @@
    ============================================ */
 @import url("https://fonts.googleapis.com/css?family=Oswald");
 
+/* ---------- FILTER SECTION ---------- */
+.filter-section .collapse:not(.show) {
+  display: none !important;
+}
+
+.filter-section .collapse {
+  overflow: hidden;
+}
+
 /* ---------- ORDER LIST ---------- */
 /* ==================== ORDER LISTING STYLES ==================== */
 
@@ -94,6 +103,49 @@
 
 .order-status-badge.status-pending {
   background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+  color: var(--brand-grey-800);
+}
+
+.order-status-badge.status-cancelled {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
+  color: var(--brand-white);
+}
+
+/* Delivery Task Info Section */
+.delivery-task-section {
+  background: var(--brand-grey-50);
+  border-radius: var(--brand-radius-sm);
+  padding: 0.5rem !important;
+  margin-top: 0.25rem;
+}
+
+.delivery-task-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.delivery-info-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.7rem;
+  color: var(--brand-grey-700);
+}
+
+.delivery-info-item i {
+  color: var(--brand-primary);
+  width: 1rem;
+  text-align: center;
+  font-size: 0.65rem;
+}
+
+.delivery-info-label {
+  font-weight: 600;
+  color: var(--brand-grey-600);
+}
+
+.delivery-info-value {
   color: var(--brand-grey-800);
 }
 
@@ -2838,5 +2890,329 @@ h1 {
 
   .order-total-value {
     font-size: 1.25rem;
+  }
+}
+
+/* =================================================================
+   ORDERS LIST VIEW TOGGLE
+   ================================================================= */
+
+.view-toggle-group {
+  display: flex;
+  background: var(--brand-grey-100, #f8f9fa);
+  border-radius: 0.5rem;
+  padding: 0.25rem;
+  gap: 0.125rem;
+}
+
+.view-toggle-group .view-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0.375rem;
+  font-size: 1rem;
+  color: var(--brand-grey-500, #6c757d);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-toggle-group .view-toggle-btn:hover {
+  color: var(--brand-grey-700, #495057);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.view-toggle-group .view-toggle-btn.active {
+  background: var(--brand-white, #fff);
+  color: var(--brand-grey-900, #212529);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* =================================================================
+   ORDERS LIST TABLE VIEW
+   ================================================================= */
+
+.orders-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--brand-radius-sm);
+  border: 1px solid var(--brand-grey-200);
+  background: var(--brand-white);
+}
+
+.orders-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.7rem;
+  table-layout: auto;
+}
+
+.orders-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.orders-table th {
+  background: linear-gradient(135deg, var(--brand-grey-100) 0%, var(--brand-grey-200) 100%);
+  border-bottom: 1px solid var(--brand-grey-300);
+  padding: 0.35rem 0.4rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--brand-grey-700);
+  white-space: nowrap;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+
+.orders-table tbody tr {
+  border-bottom: 1px solid var(--brand-grey-200);
+  transition: background-color 0.15s ease;
+}
+
+.orders-table tbody tr:nth-child(even) {
+  background-color: var(--brand-grey-50);
+}
+
+.orders-table tbody tr:hover {
+  background-color: #fff9e6;
+}
+
+.orders-table td {
+  padding: 0.3rem 0.4rem;
+  vertical-align: middle;
+  color: var(--brand-grey-700);
+  font-size: 0.7rem;
+}
+
+/* Table column specific styles */
+.orders-table .col-id {
+  width: 35px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--brand-grey-500);
+  font-size: 0.65rem;
+}
+
+.orders-table .col-order-number {
+  width: auto;
+}
+
+.orders-table .col-date {
+  width: auto;
+  color: var(--brand-grey-600);
+  font-size: 0.65rem;
+}
+
+.orders-table .col-customer {
+  width: auto;
+}
+
+.orders-table .col-phone {
+  width: auto;
+}
+
+.orders-table .col-zone {
+  width: auto;
+}
+
+.orders-table .col-address {
+  width: auto;
+  max-width: 180px;
+}
+
+.orders-table .col-cod {
+  width: auto;
+  text-align: right;
+}
+
+.orders-table .col-status {
+  width: auto;
+}
+
+.orders-table .col-actions {
+  width: 60px;
+  text-align: center;
+}
+
+/* Order number badge */
+.order-number-badge {
+  display: inline-block;
+  font-weight: 600;
+  color: var(--brand-grey-800);
+  font-size: 0.7rem;
+}
+
+/* Customer info */
+.orders-table .customer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.orders-table .customer-name {
+  font-weight: 500;
+  color: var(--brand-grey-800);
+  font-size: 0.7rem;
+}
+
+/* Phone link */
+.orders-table .phone-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--brand-grey-700);
+  text-decoration: none;
+  padding: 0.15rem 0.3rem;
+  border-radius: var(--brand-radius-sm);
+  background: var(--brand-grey-100);
+  transition: all 0.15s ease;
+  font-size: 0.65rem;
+}
+
+.orders-table .phone-link:hover {
+  background: #25D366;
+  color: white;
+}
+
+.orders-table .phone-link i {
+  color: #25D366;
+  font-size: 0.7rem;
+}
+
+.orders-table .phone-link:hover i {
+  color: white;
+}
+
+/* Zone badge */
+.zone-badge {
+  display: inline-block;
+  padding: 0.15rem 0.35rem;
+  background: var(--brand-grey-100);
+  border-radius: var(--brand-radius-sm);
+  font-size: 0.65rem;
+  color: var(--brand-grey-700);
+  font-weight: 500;
+}
+
+/* Address cell */
+.address-cell {
+  font-size: 0.65rem;
+  color: var(--brand-grey-600);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+/* COD badge */
+.cod-badge {
+  display: inline-block;
+  padding: 0.15rem 0.35rem;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
+  color: white;
+  border-radius: var(--brand-radius-sm);
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.cod-badge.cod-none {
+  background: var(--brand-grey-200);
+  color: var(--brand-grey-500);
+}
+
+/* Table status badge */
+.table-status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--brand-radius-sm);
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02rem;
+}
+
+.table-status-badge.status-delivered {
+  background: linear-gradient(135deg, #38ef7d 0%, #2dd36f 100%);
+  color: white;
+}
+
+.table-status-badge.status-pending {
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+  color: var(--brand-grey-800);
+}
+
+.table-status-badge.status-created {
+  background: linear-gradient(135deg, #667eea 0%, #5568d3 100%);
+  color: white;
+}
+
+.table-status-badge.status-cancelled {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
+  color: white;
+}
+
+/* Table actions */
+.table-actions {
+  display: flex;
+  gap: 0.375rem;
+  justify-content: center;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  border-radius: var(--brand-radius-sm, 0.25rem);
+  background: var(--brand-grey-100, #f8f9fa);
+  color: var(--brand-grey-600, #6c757d);
+  text-decoration: none;
+  transition: all 0.15s ease;
+  font-size: 0.8125rem;
+}
+
+.action-btn:hover {
+  background: var(--brand-primary, #ffd33b);
+  color: var(--brand-grey-900, #212529);
+}
+
+.action-btn.action-delete:hover {
+  background: #ff6b6b;
+  color: white;
+}
+
+.action-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Responsive table view */
+@media (max-width: 992px) {
+  .orders-table {
+    min-width: 800px;
+  }
+}
+
+@media (max-width: 768px) {
+  .view-toggle-group .view-toggle-btn {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.875rem;
+  }
+
+  .orders-table-wrapper {
+    margin: 0 -0.5rem;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
   }
 }

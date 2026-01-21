@@ -65,6 +65,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from core.decorators import business_required
 from decouple import config
 from django.core.files.storage import default_storage
 from PIL import Image
@@ -106,6 +107,7 @@ logger = logging.getLogger('business')
 
 
 @login_required(login_url='account_login')
+@business_required
 def business_dashboard(request):
     try:
         # IDOR FIX: Verify user has associated business (using cached helper)
@@ -249,6 +251,7 @@ def business_dashboard(request):
 
 
 @login_required(login_url='account_login')
+@business_required
 def driver_directory(request):
     # IDOR FIX: Get user's business with proper verification (use cached)
     business = get_cached_business(request)
@@ -270,6 +273,7 @@ def driver_directory(request):
 
 
 @login_required(login_url='account_login')
+@business_required
 def driver_directory_add(request):
     """
     Add a driver to the business directory (AJAX endpoint).
@@ -324,6 +328,7 @@ def driver_directory_add(request):
 
 
 @login_required(login_url='account_login')
+@business_required
 def driver_directory_delete(request, id):
     # IDOR FIX: Verify directory entry belongs to user's business (use cached)
     business = get_cached_business(request)
@@ -348,6 +353,7 @@ def driver_directory_delete(request, id):
 
 # pickup location add------------------------------------------------------
 @login_required(login_url='account_login')
+@business_required
 def pickup_location_list(request):
     try:
         # IDOR FIX: Verify user has associated business (using cached helper)
@@ -376,6 +382,7 @@ def pickup_location_list(request):
 
 
 @login_required(login_url='account_login')
+@business_required
 def pickup_location_add(request):
     try:
         # IDOR FIX: Verify user has associated business (using cached helper)
@@ -409,6 +416,7 @@ def pickup_location_add(request):
 
 
 @login_required(login_url='account_login')
+@business_required
 def pickup_location_delete(request, pickup_location_id):
     try:
         # IDOR FIX: Verify pickup location belongs to user's business (using cached helper)
@@ -438,6 +446,7 @@ def pickup_location_delete(request, pickup_location_id):
 
 
 @login_required(login_url='account_login')
+@business_required
 def pickup_location_update(request, pickup_location_id):
     try:
         # IDOR FIX: Verify pickup location belongs to user's business (using cached helper)
@@ -479,6 +488,7 @@ def pickup_location_update(request, pickup_location_id):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 def business_profile(request):
     # Use cached business and profile to avoid duplicate queries
     business = get_cached_business(request)
@@ -507,6 +517,7 @@ def business_profile(request):
     return render(request, 'business/frontend/business_profile.html', context)
 
 @login_required(login_url='/accounts/login/')
+@business_required
 def business_profile_display(request, business_id):
     try:
         business = business_models.Business.objects.select_related('profile', 'business_profile').get(
@@ -542,6 +553,7 @@ def business_profile_display(request, business_id):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 def all_business(request):
     business = business_models.Business.objects.select_related('profile', 'business_profile').prefetch_related('business_logo').all()
 
@@ -564,6 +576,7 @@ def all_business(request):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 def business_profile_update(request, business_id):
     # Check if user has a profile (use cached)
     profile = get_cached_profile(request)
@@ -613,6 +626,7 @@ def business_profile_update(request, business_id):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 def business_profile_info_update(request, business_id):
     user_business = get_cached_business(request)
     if user_business and user_business.business_id == business_id:
@@ -659,6 +673,7 @@ def business_profile_info_update(request, business_id):
 
 # business settings links and verify status ---------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
+@business_required
 def business_settings(request, business_id):
     # N+1 FIX: Use select_related for FK relationships
     business = business_models.Business.objects.select_related('user', 'profile').filter(business_id=business_id).first()
@@ -683,6 +698,7 @@ def business_settings(request, business_id):
 
 #business_settings_api---------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
+@business_required
 def business_settings_api_update(request, business_id, api_id):
     user_business = get_cached_business(request)
     if user_business and request.user.id == user_business.user_id:
@@ -726,6 +742,7 @@ def business_settings_api_update(request, business_id, api_id):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 def business_settings_api_add(request, business_id):
     user_business = get_cached_business(request)
     if user_business and request.user.id == user_business.user_id:
@@ -761,6 +778,7 @@ def business_settings_api_add(request, business_id):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 def business_settings_api_list(request, business_id):
     business =  business_models.Business.objects.filter(business_id=business_id).first()
     business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
@@ -776,6 +794,7 @@ def business_settings_api_list(request, business_id):
     return render(request, 'business/parts/business_settings_api_list.html', context)
 
 @login_required(login_url='/accounts/login/')
+@business_required
 def business_settings_api_delete(request, business_id, api_id):
     business = business_models.Business.objects.filter(business_id=business_id).first()
     if not business:
@@ -789,6 +808,7 @@ def business_settings_api_delete(request, business_id, api_id):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 def business_settings_api_test(request, business_id, api_id):
     business =  business_models.Business.objects.filter(business_id=business_id).first()
     business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
@@ -804,6 +824,7 @@ def business_settings_api_test(request, business_id, api_id):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 def business_settings_api_test_result(request, business_id, api_id):
     business =  business_models.Business.objects.filter(business_id=business_id).first()
     business_api = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
@@ -882,6 +903,7 @@ def business_settings_api_test_result(request, business_id, api_id):
 
 #business_logo_update---------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
+@business_required
 def business_logo_update(request, business_id):
     business_logos = business_models.BusinessLogo.objects.get(business_id=business_id)
     business_code = business_models.Business.objects.get(business_id=business_id)
@@ -951,6 +973,7 @@ from business.permissions import BusinessPermissions, TeamRoles, get_role_permis
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 @business_permission_required(BusinessPermissions.TEAM_VIEW)
 def business_teams(request, business_id):
     """
@@ -990,6 +1013,7 @@ def business_teams(request, business_id):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 @business_permission_required(BusinessPermissions.TEAM_MANAGE)
 def business_teams_add(request, business_id):
     """
@@ -1035,6 +1059,7 @@ def business_teams_add(request, business_id):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 @business_permission_required(BusinessPermissions.TEAM_MANAGE)
 def business_teams_update(request, business_id, team_id):
     """
@@ -1081,6 +1106,7 @@ def business_teams_update(request, business_id, team_id):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 @business_manager_or_owner_required()
 def business_team_permissions(request, business_id, team_id):
     """
@@ -1170,6 +1196,7 @@ def business_team_permissions(request, business_id, team_id):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 @business_permission_required(BusinessPermissions.TEAM_MANAGE)
 def business_team_remove(request, business_id, team_id):
     """
@@ -1205,6 +1232,7 @@ def business_team_remove(request, business_id, team_id):
 
 
 @login_required(login_url='/accounts/login/')
+@business_required
 @business_permission_required(BusinessPermissions.TEAM_MANAGE)
 def business_team_status_change(request, business_id, team_id):
     """
@@ -1273,6 +1301,7 @@ def business_team_status_change(request, business_id, team_id):
 # Workflow Guide -----------------------------------------------------
 
 @login_required(login_url='account_login')
+@business_required
 def workflow_guide(request):
     """Display comprehensive workflow guide for clients"""
     
@@ -1409,6 +1438,7 @@ def workflow_guide(request):
 # =============================================================================
 
 @login_required(login_url='account_login')
+@business_required
 def business_selector(request):
     """
     Show business selector when user has access to multiple businesses.
@@ -1456,6 +1486,7 @@ def business_selector(request):
 
 
 @login_required(login_url='account_login')
+@business_required
 def business_switch(request, business_id):
     """
     Switch to a different business.

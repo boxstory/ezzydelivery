@@ -330,18 +330,25 @@ class UpdateOrderForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         business_id = kwargs.pop('business_id', None)
+        is_staff = kwargs.pop('is_staff', False)
         super().__init__(*args, **kwargs)
+
+        # Hide task_created field for client users (non-staff)
+        if not is_staff:
+            del self.fields['task_created']
+
         for field in iter(self.fields):
             self.fields[field].widget.attrs.update(
                 {'class': 'form-control'})
-            self.fields['task_created'].widget = forms.CheckboxInput(
-                attrs={'class': 'form-check-input '})
-            
+            if 'task_created' in self.fields:
+                self.fields['task_created'].widget = forms.CheckboxInput(
+                    attrs={'class': 'form-check-input '})
+
             self.fields['cod_status_by_client'].widget = forms.RadioSelect(
                 choices=COD_STATUS_BY_CLIENT)
             # @todo: need to specify business only products
-            
-            
+
+
         if business_id is not None:
             self.fields['pickup_location'].queryset = business_models.PickupLocation.objects.filter(
                 business_id=business_id)

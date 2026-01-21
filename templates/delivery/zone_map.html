@@ -188,6 +188,33 @@
     color: #888;
   }
 
+  .zone-popup__actions {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+  }
+
+  .zone-popup__btn {
+    display: inline-block;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .zone-popup__btn--edit {
+    background: #001f3f;
+    color: white;
+  }
+
+  .zone-popup__btn--edit:hover {
+    background: #003366;
+    color: white;
+  }
+
   /* Group filter pills */
   .group-filters {
     display: flex;
@@ -270,6 +297,9 @@
     <button class="map-control-btn active" id="btn-markers" onclick="toggleMarkers()">
       <i class="fas fa-map-marker-alt me-1"></i> Markers
     </button>
+    <button class="map-control-btn" id="btn-polygons" onclick="togglePolygons()">
+      <i class="fas fa-draw-polygon me-1"></i> Polygons
+    </button>
     <button class="map-control-btn" id="btn-neighbours" onclick="toggleNeighbourLines()">
       <i class="fas fa-project-diagram me-1"></i> Show Neighbours
     </button>
@@ -306,6 +336,14 @@
         <div class="legend-color" style="background: #10b981;"></div>
         <span>Selected Zone</span>
       </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #f59e0b;"></div>
+        <span>Neighbour Zone</span>
+      </div>
+      <div class="legend-item" id="legend-polygons" style="display: none;">
+        <div style="width: 16px; height: 16px; background: rgba(0,31,63,0.2); border: 2px solid #001f3f; border-radius: 2px;"></div>
+        <span>Zone Boundary</span>
+      </div>
       <div class="legend-item" id="legend-neighbours" style="display: none;">
         <div style="width: 20px; height: 2px; background: #f59e0b;"></div>
         <span>Neighbour Link</span>
@@ -328,6 +366,7 @@
               <th>Arabic</th>
               <th>Latitude</th>
               <th>Longitude</th>
+              <th>Polygon</th>
               <th>Neighbours</th>
               <th>Actions</th>
             </tr>
@@ -341,12 +380,22 @@
               <td><small>{{ zone.latitude|floatformat:5 }}</small></td>
               <td><small>{{ zone.longitude|floatformat:5 }}</small></td>
               <td>
+                {% if zone.has_polygon %}
+                <span class="badge bg-success"><i class="fas fa-check"></i> {{ zone.polygon|length }}</span>
+                {% else %}
+                <span class="badge bg-secondary">-</span>
+                {% endif %}
+              </td>
+              <td>
                 <span class="badge bg-secondary">{{ zone.neighbour_zones.count }}</span>
               </td>
               <td>
-                <button class="btn btn-sm btn-outline-primary" onclick="focusZone({{ zone.zone_number }})">
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="focusZone({{ zone.zone_number }})" title="Focus on map">
                   <i class="fas fa-crosshairs"></i>
                 </button>
+                <a href="{% url 'delivery:edit_zone_polygon' zone.zone_number %}" class="btn btn-sm btn-outline-secondary" title="Edit polygon">
+                  <i class="fas fa-edit"></i>
+                </a>
               </td>
             </tr>
             {% endfor %}
@@ -377,9 +426,13 @@
   // Store markers and layers
   const markers = {};
   const labels = {};
+  const polygons = {};
   const neighbourLines = [];
+  const highlightedPolygons = [];
+  let selectedZone = null;
   let showingNeighbours = false;
   let showingLabels = false;
+  let showingPolygons = false;
 
   // Color palette for zone groups
   const groupColors = {
@@ -425,9 +478,15 @@
         ${zone.name_arabic ? `<div class="zone-popup__arabic">${zone.name_arabic}</div>` : ''}
         <div class="zone-popup__info"><i class="fas fa-map-pin me-1"></i> ${zone.lat.toFixed(5)}, ${zone.lng.toFixed(5)}</div>
         <div class="zone-popup__info"><i class="fas fa-layer-group me-1"></i> ${groupList}</div>
+        <div class="zone-popup__info"><i class="fas fa-draw-polygon me-1"></i> Polygon: ${zone.has_polygon ? zone.polygon.length + ' points' : 'Not set'}</div>
         <div class="zone-popup__neighbours">
           <div class="zone-popup__neighbours-title"><i class="fas fa-project-diagram me-1"></i> Neighbours (${zone.neighbour_count})</div>
           <div class="zone-popup__neighbour-list">${neighbourList}</div>
+        </div>
+        <div class="zone-popup__actions">
+          <a href="/delivery/zones/edit-polygon/${zone.zone_number}/" class="zone-popup__btn zone-popup__btn--edit">
+            <i class="fas fa-draw-polygon me-1"></i> Edit Polygon
+          </a>
         </div>
       </div>
     `;
@@ -452,20 +511,81 @@
       })
     });
     labels[zone.zone_number] = label;
+
+    // Create polygon if zone has polygon data
+    if (zone.polygon && zone.polygon.length >= 3) {
+      const polygonLayer = L.polygon(zone.polygon, {
+        color: color,
+        weight: 2,
+        opacity: 0.8,
+        fillColor: color,
+        fillOpacity: 0.2,
+        zoneData: zone
+      });
+
+      // Polygon popup
+      polygonLayer.bindPopup(popupContent);
+
+      // Click event to highlight neighbours
+      polygonLayer.on('click', function(e) {
+        highlightNeighbours(zone);
+      });
+
+      // Hover effects (don't override if highlighted)
+      polygonLayer.on('mouseover', function(e) {
+        if (!highlightedPolygons.includes(zone.zone_number)) {
+          this.setStyle({ fillOpacity: 0.4, weight: 3 });
+        }
+      });
+      polygonLayer.on('mouseout', function(e) {
+        if (!highlightedPolygons.includes(zone.zone_number)) {
+          this.setStyle({ fillOpacity: 0.2, weight: 2 });
+        }
+      });
+
+      polygons[zone.zone_number] = polygonLayer;
+    }
   });
 
   // Highlight neighbours of a zone
   function highlightNeighbours(zone) {
-    // Clear existing lines
+    // Clear existing highlights
     clearNeighbourLines();
+    clearHighlightedPolygons();
 
-    // Draw lines to neighbours
+    // Store selected zone
+    selectedZone = zone.zone_number;
+
+    // Highlight the selected zone's polygon
+    if (polygons[zone.zone_number] && showingPolygons) {
+      polygons[zone.zone_number].setStyle({
+        color: '#10b981',
+        weight: 4,
+        fillColor: '#10b981',
+        fillOpacity: 0.3
+      });
+      highlightedPolygons.push(zone.zone_number);
+    }
+
+    // Draw lines and highlight neighbour polygons
     zone.neighbours.forEach(neighbour => {
+      // Draw connecting line
       const line = L.polyline(
         [[zone.lat, zone.lng], [neighbour.lat, neighbour.lng]],
         { color: '#f59e0b', weight: 2, opacity: 0.8, dashArray: '5, 5' }
       ).addTo(map);
       neighbourLines.push(line);
+
+      // Highlight neighbour polygon if it exists and polygons are shown
+      if (polygons[neighbour.zone_number] && showingPolygons) {
+        polygons[neighbour.zone_number].setStyle({
+          color: '#f59e0b',
+          weight: 3,
+          fillColor: '#f59e0b',
+          fillOpacity: 0.25
+        });
+        highlightedPolygons.push(neighbour.zone_number);
+      }
     });
   }
 
@@ -473,6 +593,26 @@
   function clearNeighbourLines() {
     neighbourLines.forEach(line => map.removeLayer(line));
     neighbourLines.length = 0;
+  }
+
+  // Clear highlighted polygons and reset their styles
+  function clearHighlightedPolygons() {
+    highlightedPolygons.forEach(zoneNumber => {
+      if (polygons[zoneNumber]) {
+        const zoneData = zonesData.find(z => z.zone_number === zoneNumber);
+        const color = zoneData && zoneData.groups.length > 0
+          ? (groupColors[zoneData.groups[0]] || '#001f3f')
+          : '#001f3f';
+        polygons[zoneNumber].setStyle({
+          color: color,
+          weight: 2,
+          fillColor: color,
+          fillOpacity: 0.2
+        });
+      }
+    });
+    highlightedPolygons.length = 0;
+    selectedZone = null;
   }
 
   // Toggle all neighbour lines
@@ -533,6 +673,22 @@
     });
   }
 
+  // Toggle polygons
+  function togglePolygons() {
+    const btn = document.getElementById('btn-polygons');
+    showingPolygons = !showingPolygons;
+    btn.classList.toggle('active');
+    document.getElementById('legend-polygons').style.display = showingPolygons ? 'flex' : 'none';
+
+    Object.values(polygons).forEach(polygon => {
+      if (showingPolygons) {
+        polygon.addTo(map);
+      } else {
+        map.removeLayer(polygon);
+      }
+    });
+  }
+
   // Filter by zone group
   function filterByGroup(groupName, btn) {
     // Update button states
@@ -561,6 +717,18 @@
       });
     }
 
+    // Update polygons if showing
+    if (showingPolygons) {
+      Object.entries(polygons).forEach(([zoneNum, polygon]) => {
+        const zone = zonesData.find(z => z.zone_number == zoneNum);
+        if (groupName === 'all' || (zone && zone.groups.includes(groupName))) {
+          polygon.addTo(map);
+        } else {
+          map.removeLayer(polygon);
+        }
+      });
+    }
+
     // Clear neighbour lines
     clearNeighbourLines();
   }
@@ -569,7 +737,26 @@
   function focusZone(zoneNumber) {
     const marker = markers[zoneNumber];
     if (marker) {
-      map.setView(marker.getLatLng(), 14);
+      // If zone has polygon, fit bounds to polygon, otherwise center on marker
+      const polygon = polygons[zoneNumber];
+      if (polygon) {
+        map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+        // Show polygon if not already showing
+        if (!showingPolygons) {
+          polygon.addTo(map);
+        }
+        polygon.setStyle({ fillOpacity: 0.4, weight: 3, color: '#10b981' });
+        // Reset other polygons
+        Object.entries(polygons).forEach(([zNum, p]) => {
+          if (zNum != zoneNumber) {
+            const zone = zonesData.find(z => z.zone_number == zNum);
+            const color = zone && zone.groups.length > 0 ? (groupColors[zone.groups[0]] || '#001f3f') : '#001f3f';
+            p.setStyle({ fillOpacity: 0.2, weight: 2, color: color });
+          }
+        });
+      } else {
+        map.setView(marker.getLatLng(), 14);
+      }
       marker.openPopup();
 
       // Highlight table row
@@ -588,8 +775,33 @@
   function resetView() {
     map.setView([25.276987, 51.520008], 11);
     clearNeighbourLines();
+    clearHighlightedPolygons();
     document.querySelectorAll('tbody tr').forEach(row => row.classList.remove('table-primary'));
+
+    // Reset polygon styles
+    Object.entries(polygons).forEach(([zoneNum, polygon]) => {
+      const zone = zonesData.find(z => z.zone_number == zoneNum);
+      const color = zone && zone.groups.length > 0 ? (groupColors[zone.groups[0]] || '#001f3f') : '#001f3f';
+      polygon.setStyle({ fillOpacity: 0.2, weight: 2, color: color });
+      if (!showingPolygons) {
+        map.removeLayer(polygon);
+      }
+    });
   }
+
+  // Clear highlights when clicking on empty map area
+  map.on('click', function(e) {
+    // Small delay to check if click was on a marker/polygon (they stop propagation)
+    setTimeout(() => {
+      if (selectedZone === null) return;
+      // Check if popup is open - if so, don't clear
+      if (map._popup && map._popup.isOpen()) return;
+      // Clear highlights
+      clearNeighbourLines();
+      clearHighlightedPolygons();
+      document.querySelectorAll('tbody tr').forEach(row => row.classList.remove('table-primary'));
+    }, 100);
+  });
 
   // Fit map to show all markers
   if (zonesData.length > 0) {

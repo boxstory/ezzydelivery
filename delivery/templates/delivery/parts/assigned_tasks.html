@@ -101,11 +101,11 @@
                     <span class="fw-bold">Details:</span>
                     <tr>
                       <th class="fw-light p-0 col-5">COD Amount:</th>
-                      <td class="fw-light p-0">{{ card.order.cod_amount }}</td>
+                      <td class="fw-light p-0">{{ card.order.cod_amount }} QR</td>
                     </tr>
                     <tr>
                       <th class="fw-light p-0">Delivery charge</th>
-                      <td class="fw-light p-0">{{ card.dl_price }}</td>
+                      <td class="fw-light p-0">{{ card.dl_price }} QR</td>
                     </tr>
                     <tr>
                       <th class="fw-light p-0">Weight</th>
@@ -116,6 +116,50 @@
                       <td class="fw-light p-0">{{ card.dl_task_status }}</td>
                     </tr>
                   </table>
+                </div>
+              </div>
+              <!-- QR Code and Products Row -->
+              <div class="row mt-3 pt-3 border-top">
+                <!-- QR Code Section -->
+                <div class="col-12 col-md-3 text-center">
+                  <span class="fw-bold d-block mb-2">Task QR Code</span>
+                  {% if card.task_qrcode.first.qrcode %}
+                  <img src="{{ card.task_qrcode.first.qrcode.url }}" alt="Task QR Code" class="img-fluid mb-2" style="max-width: 150px;">
+                  <p class="small text-muted mb-0">{{ card.dl_task_number }}</p>
+                  {% else %}
+                  <div class="text-muted">
+                    <i class="fa-solid fa-qrcode fa-3x mb-2"></i>
+                    <p class="small">No QR code</p>
+                  </div>
+                  {% endif %}
+                </div>
+                <!-- Products Section -->
+                <div class="col-12 col-md-9">
+                  <span class="fw-bold d-block mb-2">Order Products</span>
+                  {% if card.order.order_items.all %}
+                  <table class="table table-sm table-bordered" id="delivery_assigned_tasks_table_products_{{ card.id }}">
+                    <thead class="table-light">
+                      <tr>
+                        <th class="fw-semibold">Product</th>
+                        <th class="fw-semibold" style="width: 80px;">SKU</th>
+                        <th class="fw-semibold text-center" style="width: 60px;">Qty</th>
+                        <th class="fw-semibold text-end" style="width: 80px;">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for item in card.order.order_items.all %}
+                      <tr>
+                        <td>{{ item.product.item_name|default:item.notes|default:"Product" }}</td>
+                        <td><small class="text-muted">{{ item.product.item_sku|default:"-" }}</small></td>
+                        <td class="text-center">{{ item.quantity }}</td>
+                        <td class="text-end">{{ item.unit_price|default:0 }} QR</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                  {% else %}
+                  <p class="text-muted mb-0"><i class="fa-solid fa-box-open me-2"></i>No products in this order</p>
+                  {% endif %}
                 </div>
               </div>
             </div>

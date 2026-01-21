@@ -9,12 +9,23 @@ urlpatterns = [
     # Zone Map
     path('zones/map/', delivery_views.zone_map, name='zone_map'),
     path('zones/api/', delivery_views.zone_map_api, name='zone_map_api'),
+    path('zones/list/', delivery_views.zone_list, name='zone_list'),
+    path('zones/groups/', delivery_views.zone_groups, name='zone_groups'),
+    path('zones/areas/', delivery_views.zone_areas, name='zone_areas'),
 
     # requst to user update address before delivery
     path('<str:dl_task_number>/<int:mobile_no>/',
          delivery_views.dl_address_update, name='dl_address'),
 
     path('ajax/get_zone_name/', delivery_views.get_zone_name, name='get_zone_name'),
+    path('get_street_polygon/<int:zone_number>/<int:street_number>/',
+         delivery_views.get_street_polygon, name='get_street_polygon'),
+
+    # Polygon Editor
+    path('zones/edit-polygon/<int:zone_number>/',
+         delivery_views.edit_zone_polygon, name='edit_zone_polygon'),
+    path('zones/save-polygon/<int:zone_number>/',
+         delivery_views.save_zone_polygon, name='save_zone_polygon'),
 
 
     # business side delivery data

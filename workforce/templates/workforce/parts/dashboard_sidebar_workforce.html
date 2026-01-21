@@ -685,7 +685,7 @@
           <span>Zones</span>
           <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
         </a>
-        <div class="collapse submenu {% if request.resolver_match.url_name == 'zone_map' %}show{% endif %}" id="submenu-zones">
+        <div class="collapse submenu {% if request.resolver_match.url_name == 'zone_map' or request.resolver_match.url_name == 'zone_list' or request.resolver_match.url_name == 'zone_groups' or request.resolver_match.url_name == 'zone_areas' %}show{% endif %}" id="submenu-zones">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a id="workforce_sidebar_link_zone_map" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'zone_map' %}active{% endif %}"
@@ -695,21 +695,24 @@
               </a>
             </li>
             <li class="nav-item">
-              <a id="workforce_sidebar_link_zone_list" class="nav-link btn submenu-link"
-                 href="{% url 'admin:delivery_zonename_changelist' %}"
-                 target="_blank">
+              <a id="workforce_sidebar_link_zone_list" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'zone_list' %}active{% endif %}"
+                 href="{% url 'delivery:zone_list' %}">
                 <i class="fa-solid fa-list me-2"></i>
                 Zone List
-                <i class="fa-solid fa-external-link-alt ms-auto small"></i>
               </a>
             </li>
             <li class="nav-item">
-              <a id="workforce_sidebar_link_zone_groups" class="nav-link btn submenu-link"
-                 href="{% url 'admin:delivery_zonegroup_changelist' %}"
-                 target="_blank">
+              <a id="workforce_sidebar_link_zone_groups" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'zone_groups' %}active{% endif %}"
+                 href="{% url 'delivery:zone_groups' %}">
                 <i class="fa-solid fa-layer-group me-2"></i>
                 Zone Groups
-                <i class="fa-solid fa-external-link-alt ms-auto small"></i>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_zone_areas" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'zone_areas' %}active{% endif %}"
+                 href="{% url 'delivery:zone_areas' %}">
+                <i class="fa-solid fa-location-dot me-2"></i>
+                Zone Areas
               </a>
             </li>
           </ul>

@@ -130,11 +130,61 @@ Each task should have:
                 </div>
                 <div class="col-md-6 col-lg-3">
                     <button class="btn btn-outline-secondary btn-sm w-100" type="button"
-                            data-bs-toggle="modal" data-bs-target="#statusModal"
-                            data-task-id="{{ dl.id }}" data-task-number="{{ dl.dl_task_number }}"
-                            onclick="setStatusModalTask(this)">
-                        <i class="fa-solid fa-sync me-1"></i>Status
+                            data-bs-toggle="collapse" data-bs-target="#taskDetails{{ dl.id }}"
+                            aria-expanded="false" aria-controls="taskDetails{{ dl.id }}">
+                        <i class="fa-solid fa-chevron-down me-1"></i>Details
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collapsible Details Section -->
+        <div class="collapse mt-3" id="taskDetails{{ dl.id }}">
+            <div class="border-top pt-3">
+                <div class="row">
+                    <!-- QR Code Section (Right side) -->
+                    <div class="col-12 col-md-3 order-md-2 text-center mb-3 mb-md-0">
+                        <span class="fw-bold d-block mb-2">Task QR Code</span>
+                        {% if dl.task_qrcode.first.qrcode %}
+                        <img src="{{ dl.task_qrcode.first.qrcode.url }}" alt="Task QR Code" class="img-fluid mb-2" style="max-width: 120px;">
+                        <p class="small text-muted mb-0">{{ dl.dl_task_number }}</p>
+                        {% else %}
+                        <div class="text-muted">
+                            <i class="fa-solid fa-qrcode fa-3x mb-2"></i>
+                            <p class="small">No QR code</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <!-- Products Section (Left side) -->
+                    <div class="col-12 col-md-9 order-md-1">
+                        <span class="fw-bold d-block mb-2">Order Products</span>
+                        {% if dl.order.order_items.all %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="fw-semibold">Product</th>
+                                        <th class="fw-semibold" style="width: 80px;">SKU</th>
+                                        <th class="fw-semibold text-center" style="width: 60px;">Qty</th>
+                                        <th class="fw-semibold text-end" style="width: 80px;">Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in dl.order.order_items.all %}
+                                    <tr>
+                                        <td>{{ item.product.item_name|default:item.notes|default:"Product" }}</td>
+                                        <td>{{ item.product.item_sku|default:"-" }}</td>
+                                        <td class="text-center">{{ item.quantity }}</td>
+                                        <td class="text-end">{{ item.unit_price|default:"-" }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted small mb-0">No products in this order</p>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>

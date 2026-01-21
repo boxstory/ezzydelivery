@@ -1,0 +1,107 @@
+{% load static %}
+{% load custom_filters %}
+
+{% if not orders %}
+<div class="text-center py-5">
+  <i class="fa-solid fa-box-open fa-3x mb-3" style="color: var(--brand-grey-400);"></i>
+  <h4 class="text-muted">No orders found</h4>
+  <p class="text-muted">Start by adding your first order</p>
+</div>
+{% else %}
+<div class="orders-table-wrapper">
+  <table class="orders-table" id="orders_list_table_view">
+    <thead>
+      <tr>
+        <th class="col-id">#</th>
+        <th class="col-order-number">Order No.</th>
+        <th class="col-date">Date</th>
+        <th class="col-customer">Customer</th>
+        <th class="col-phone">Phone</th>
+        <th class="col-zone">Zone</th>
+        <th class="col-address">Address</th>
+        <th class="col-cod">COD</th>
+        <th class="col-status">Status</th>
+        <th class="col-actions">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for order in orders %}
+      <tr class="order-table-row" data-order-id="{{ order.id }}">
+        <td class="col-id">{{ order.id }}</td>
+        <td class="col-order-number">
+          <span class="order-number-badge">{{ order.order_number }}</span>
+        </td>
+        <td class="col-date">{{ order.order_date|date:"d/m/Y" }}</td>
+        <td class="col-customer">
+          <div class="customer-info">
+            <span class="customer-name">{{ order.customer_name }}</span>
+          </div>
+        </td>
+        <td class="col-phone">
+          <a href="http://wa.me/{{ order.customer_whatsapp }}" target="_blank" class="phone-link">
+            <i class="fa-brands fa-whatsapp"></i>
+            {{ order.customer_phone }}
+          </a>
+        </td>
+        <td class="col-zone">
+          <span class="zone-badge">{% get_zone_display order %}</span>
+        </td>
+        <td class="col-address">
+          <div class="address-cell">
+            {% if order.dl_street %}St {{ order.dl_street }}{% endif %}
+            {% if order.dl_building %}, Bldg {{ order.dl_building }}{% endif %}
+            {% if not order.dl_street and not order.dl_building %}
+              {{ order.customer_address|truncatechars:30 }}
+            {% endif %}
+          </div>
+        </td>
+        <td class="col-cod">
+          {% if order.cod_amount %}
+          <span class="cod-badge">QR {{ order.cod_amount }}</span>
+          {% else %}
+          <span class="cod-badge cod-none">-</span>
+          {% endif %}
+        </td>
+        <td class="col-status">
+          {% with delivery=order.delivery_task.first %}
+            {% if delivery and delivery.dl_task_status_dms == '2' %}
+              <span class="table-status-badge status-delivered">Delivered</span>
+            {% elif delivery and delivery.dl_task_status_dms == '0' %}
+              <span class="table-status-badge status-created">Assigned</span>
+            {% elif delivery and delivery.dl_task_status_dms == '1' %}
+              <span class="table-status-badge status-pending">Started</span>
+            {% elif delivery and delivery.dl_task_status_dms == '3' %}
+              <span class="table-status-badge status-cancelled">Failed</span>
+            {% elif delivery and delivery.dl_task_status_dms == '9' %}
+              <span class="table-status-badge status-cancelled">Cancelled</span>
+            {% elif order.task_created %}
+              <span class="table-status-badge status-created">Task Created</span>
+            {% else %}
+              <span class="table-status-badge status-pending">Pending</span>
+            {% endif %}
+          {% endwith %}
+        </td>
+        <td class="col-actions">
+          <div class="table-actions">
+            {% if order.order_status == 'publish' %}
+            <span class="action-btn disabled" title="Cannot edit published orders">
+              <i class="fa fa-edit"></i>
+            </span>
+            {% else %}
+            <a href="{% url 'orders:order_update' order.id %}" class="action-btn" title="Edit Order">
+              <i class="fa fa-edit"></i>
+            </a>
+            {% endif %}
+            <a href="{% url 'orders:delete_order' order.id %}" class="action-btn action-delete" title="Delete Order">
+              <i class="fa fa-trash"></i>
+            </a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% include "includes/components/_pagination.html" with page_obj=orders per_page=per_page %}

@@ -7,24 +7,21 @@
 <link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-<div class="col-12 p-3" role="main" aria-label="Delivery Tasks List">
-    <!-- Header -->
-    <header class="orders-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h1 class="h2 mb-0"><i class="fa-solid fa-tasks me-2" aria-hidden="true"></i>All Delivery Tasks</h1>
-                <p class="mb-0 opacity-75">Manage and track all delivery tasks</p>
-            </div>
-            <div class="d-flex align-items-center gap-3">
-                <!-- View Toggle -->
-                {% include "workforce/parts/components/_tasks_view_toggle.html" %}
-                <div class="text-end" aria-label="Task count summary">
-                    <div class="fs-3 fw-bold" aria-live="polite">{{ dl_tasks.paginator.count|default:"0" }}</div>
-                    <small>Total Tasks</small>
-                </div>
-            </div>
+<!-- Page Header -->
+<header class="page-header">
+    <div class="page-header-left">
+        <h2><i class="fa-solid fa-tasks me-1" aria-hidden="true"></i>All Delivery Tasks</h2>
+        <span class="page-header-subtitle">| Manage and track</span>
+    </div>
+    <div class="page-header-right">
+        {% include "workforce/parts/components/_tasks_view_toggle.html" %}
+        <div class="page-header-count" aria-label="Task count summary">
+            <span class="count-value" aria-live="polite">{{ dl_tasks.paginator.count|default:"0" }}</span>
+            <span class="count-label">tasks</span>
         </div>
-    </header>
+    </div>
+</header>
+<div class="col-12 p-3" role="main" aria-label="Delivery Tasks List">
 
     <!-- Filter Section -->
     <div class="filter-section">

@@ -245,6 +245,68 @@ class DeliveryTask(models.Model):
         verbose_name_plural = "Delivery Task"
 
 
+class DeliveryTaskQRCode(models.Model):
+    """
+    QR Code for delivery tasks.
+    Auto-generated when a delivery task is created.
+    Contains the task number encoded as a QR code for scanning.
+    """
+    delivery_task = models.ForeignKey(
+        DeliveryTask, on_delete=models.CASCADE, related_name='task_qrcode')
+    task_number = models.CharField(max_length=100)
+    qrcode = models.ImageField(
+        upload_to="delivery/qrcodes/", blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"QR: {self.task_number}"
+
+    def save(self, *args, **kwargs):
+        # Auto-set task number from delivery task
+        if self.delivery_task and not self.task_number:
+            self.task_number = self.delivery_task.dl_task_number
+
+        # Generate QR code if not exists
+        if self.task_number and not self.qrcode:
+            self.generate_qrcode()
+
+        super().save(*args, **kwargs)
+
+    def generate_qrcode(self):
+        """Generate QR code image for the task number"""
+        import qrcode
+        from io import BytesIO
+        from django.core.files import File
+
+        # Create QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(self.task_number)
+        qr.make(fit=True)
+
+        # Create image
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        # Save to buffer
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+
+        # Save to field
+        self.qrcode.save(f"{self.task_number}_qr.png", File(buffer), save=False)
+
+    class Meta:
+        verbose_name = "Delivery Task QR Code"
+        verbose_name_plural = "Delivery Task QR Codes"
+        app_label = 'delivery'
+
+
 class ZoneName(models.Model):
     zone_number = models.PositiveIntegerField(unique=True, db_index=True)
     zone_name = models.CharField(max_length=100, help_text="English name")
@@ -272,7 +334,20 @@ class ZoneName(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
+        # Show all area names for this zone
+        area_names = list(self.areas.values_list('area_name', flat=True))
+        if area_names:
+            areas_str = ', '.join(area_names[:5])  # Limit to 5 areas for display
+            if len(area_names) > 5:
+                areas_str += f' (+{len(area_names) - 5} more)'
+            return f"Zone {self.zone_number} - {areas_str}"
         return f"Zone {self.zone_number} - {self.zone_name}"
+
+    @property
+    def all_area_names(self):
+        """Returns comma-separated list of all area names"""
+        area_names = list(self.areas.values_list('area_name', flat=True))
+        return ', '.join(area_names) if area_names else self.zone_name
 
     @property
     def neighbour_zone_numbers(self):
@@ -289,6 +364,42 @@ class ZoneName(models.Model):
         verbose_name_plural = "Zones"
         app_label = 'delivery'
         ordering = ['zone_number']
+
+
+class ZoneArea(models.Model):
+    """
+    Individual area/neighborhood names within a zone.
+    Each zone can have multiple areas (e.g., Zone 5 has Fereej Al Asmakh, Al Najada, etc.)
+    """
+    zone = models.ForeignKey(
+        ZoneName,
+        on_delete=models.CASCADE,
+        related_name='areas',
+        help_text="Parent zone"
+    )
+    area_name = models.CharField(max_length=150, help_text="English area name")
+    area_name_arabic = models.CharField(max_length=150, blank=True, null=True, help_text="Arabic area name")
+    latitude = models.DecimalField(
+        max_digits=10, decimal_places=7, blank=True, null=True,
+        help_text="Area center latitude"
+    )
+    longitude = models.DecimalField(
+        max_digits=10, decimal_places=7, blank=True, null=True,
+        help_text="Area center longitude"
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.area_name} (Zone {self.zone.zone_number})"
+
+    class Meta:
+        verbose_name = "Zone Area"
+        verbose_name_plural = "Zone Areas"
+        app_label = 'delivery'
+        ordering = ['zone__zone_number', 'area_name']
+        unique_together = ['zone', 'area_name']
 
 
 class ZoneGroup(models.Model):

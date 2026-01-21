@@ -7,21 +7,18 @@
 {% endblock extra_css %}
 {% block content %}
     <div class=" col-12 p-3">
-        <!-- Header -->
-        <div class="orders-header">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2>
-                        <i class="fa-solid fa-list-check me-2"></i>All Orders
-                    </h2>
-                    <p class="mb-0 opacity-75">Manage and track all delivery orders</p>
-                </div>
-                <div class="text-end">
-                    <div class="fs-3 fw-bold">{{ orders.paginator.count|default:"0" }}</div>
-                    <small>Total Orders</small>
+        <!-- Page Header -->
+        <header class="page-header">
+            <div class="page-header-left">
+                <h2><i class="fa-solid fa-list-check me-1"></i>All Orders</h2>
+            </div>
+            <div class="page-header-right">
+                <div class="page-header-count">
+                    <span class="count-value">{{ orders.paginator.count|default:"0" }}</span>
+                    <span class="count-label">orders</span>
                 </div>
             </div>
-        </div>
+        </header>
         <!-- Filter Section -->
         <div class="filter-section">
             <div class="filter-toggle"
@@ -234,16 +231,74 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Active Filters Display -->
-                    <div id="activeFilterTags" class="active-filter-tags mt-3">
-                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                            <span class="small fw-bold text-muted">Active Filters:</span>
-                            <div id="filterTagsContainer" class="d-flex gap-2 flex-wrap"></div>
-                        </div>
-                    </div>
                 </form>
             </div>
         </div>
+        <!-- Active Filters Display (Server-side rendered) -->
+        {% if filters.cCode or filters.dlCode or filters.mobile or filters.customerName or filters.cStatus or filters.dmsStatus or filters.dateFrom or filters.dateTo or filters.business %}
+        <div class="active-filters-bar">
+            <span class="active-filters-label"><i class="fa-solid fa-filter me-1"></i>Active Filters:</span>
+            <div class="active-filters-list">
+                {% if filters.business %}
+                <span class="filter-tag">
+                    <strong>Business:</strong> {% for biz in all_businesses %}{% if biz.business_id|stringformat:"s" == filters.business %}{{ biz.business_name }}{% endif %}{% endfor %}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'business' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                </span>
+                {% endif %}
+                {% if filters.cCode %}
+                <span class="filter-tag">
+                    <strong>Business Code:</strong> {{ filters.cCode }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'cCode' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                </span>
+                {% endif %}
+                {% if filters.dlCode %}
+                <span class="filter-tag">
+                    <strong>DL Code:</strong> {{ filters.dlCode }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dlCode' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                </span>
+                {% endif %}
+                {% if filters.mobile %}
+                <span class="filter-tag">
+                    <strong>Mobile:</strong> {{ filters.mobile }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'mobile' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                </span>
+                {% endif %}
+                {% if filters.customerName %}
+                <span class="filter-tag">
+                    <strong>Customer:</strong> {{ filters.customerName }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'customerName' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                </span>
+                {% endif %}
+                {% if filters.cStatus %}
+                <span class="filter-tag">
+                    <strong>Status:</strong> {{ filters.cStatus }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'cStatus' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                </span>
+                {% endif %}
+                {% if filters.dmsStatus %}
+                <span class="filter-tag">
+                    <strong>DMS:</strong> {{ filters.dmsStatus }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dmsStatus' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                </span>
+                {% endif %}
+                {% if filters.dateFrom %}
+                <span class="filter-tag">
+                    <strong>From:</strong> {{ filters.dateFrom }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dateFrom' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                </span>
+                {% endif %}
+                {% if filters.dateTo %}
+                <span class="filter-tag">
+                    <strong>To:</strong> {{ filters.dateTo }}
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dateTo' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                </span>
+                {% endif %}
+            </div>
+            <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-sm btn-outline-secondary ms-auto">
+                <i class="fa-solid fa-times me-1"></i>Clear All
+            </a>
+        </div>
+        {% endif %}
         <!-- Orders List -->
         {% if orders %}
             <div class="orc-list">

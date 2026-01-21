@@ -8,26 +8,16 @@
 
 {% block content %}
 <div class="col-12 p-3" role="main">
-    <!-- Header -->
-    <header class="orders-header mb-4">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-2">
-                        <li class="breadcrumb-item"><a href="{% url 'workforce:dl_list_all' %}">All Tasks</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workforce:delivery_task_detail' task.id %}">Task #{{ task.dl_task_number }}</a></li>
-                        <li class="breadcrumb-item active">Edit</li>
-                    </ol>
-                </nav>
-                <h1 class="h2 mb-0">
-                    <i class="fa-solid fa-edit me-2"></i>Edit Task #{{ task.dl_task_number }}
-                </h1>
-            </div>
-            <div>
-                <a href="{% url 'workforce:delivery_task_detail' task.id %}" class="btn btn-outline-secondary">
-                    <i class="fa-solid fa-arrow-left me-2"></i>Back to Task
-                </a>
-            </div>
+    <!-- Page Header -->
+    <header class="page-header">
+        <div class="page-header-left">
+            <h1><i class="fa-solid fa-edit me-1"></i>Edit Task #{{ task.dl_task_number }}</h1>
+            <span class="page-header-subtitle">| <a href="{% url 'workforce:dl_list_all' %}">All Tasks</a> / <a href="{% url 'workforce:delivery_task_detail' task.id %}">Task #{{ task.dl_task_number }}</a></span>
+        </div>
+        <div class="page-header-right">
+            <a href="{% url 'workforce:delivery_task_detail' task.id %}" class="btn btn-outline-dark">
+                <i class="fa-solid fa-arrow-left me-1"></i>Back
+            </a>
         </div>
     </header>
 

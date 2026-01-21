@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs):
     """Handle delivery task creation/update and push to DMS with error handling"""
 
-    if created and not instance.dl_task_publish:
+    if created:
         # Push to DMS when task is created
         try:
             from ezzy_api.views import _push_task_to_dms
@@ -38,6 +38,16 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
                 logger.warning(f"Failed to create shipping label for task {instance.dl_task_number}")
         except Exception as e:
             logger.exception(f"Error creating shipping label for task {instance.dl_task_number}: {str(e)}")
+
+        # Auto-create QR code for delivery task
+        try:
+            qrcode = delivery_models.DeliveryTaskQRCode.objects.create(
+                delivery_task=instance,
+                task_number=instance.dl_task_number
+            )
+            logger.info(f"QR code created for task {instance.dl_task_number}")
+        except Exception as e:
+            logger.exception(f"Error creating QR code for task {instance.dl_task_number}: {str(e)}")
 
     # Update DMS when task status changes
     elif not created and 'dl_task_status_dms' in (kwargs.get('update_fields') or []):
