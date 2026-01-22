@@ -85,7 +85,6 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.facebook',
 
     'django.contrib.staticfiles',
-    "debug_toolbar",
     'crispy_forms',
     'crispy_bootstrap5',
     'fontawesomefree',
@@ -108,7 +107,7 @@ INSTALLED_APPS = [
     'ezzy_api',
     'warehouse',
     'dispatch',
-
+    'ai_agent',
 
 ]
 
@@ -189,7 +188,6 @@ SESSION_COOKIE_NAME = 'ezzy_sessionid'  # Custom session cookie name for added s
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    "debug_toolbar.middleware.DebugToolbarMiddleware",
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -202,6 +200,11 @@ MIDDLEWARE = [
     # SQL query inspector - logs duplicate queries in DEBUG mode
     'core.middleware.QueryInspectorMiddleware',
 ]
+
+# Add debug toolbar only in DEBUG mode
+if DEBUG:
+    INSTALLED_APPS += ['debug_toolbar']
+    MIDDLEWARE.insert(2, 'debug_toolbar.middleware.DebugToolbarMiddleware')
 
 ROOT_URLCONF = 'ezzydelivery.urls'
 
@@ -669,5 +672,38 @@ LOGGING = {
 
 # ==========================================
 # END LOGGING CONFIGURATION
+# ==========================================
+
+
+# ==========================================
+# AI AGENT CONFIGURATION
+# ==========================================
+# Added: January 2025
+# Purpose: AI Operations Agent using Claude API
+# ==========================================
+
+# Anthropic API Configuration
+ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
+AI_AGENT_MODEL = config('AI_AGENT_MODEL', default='claude-sonnet-4-20250514')
+AI_AGENT_MAX_TOKENS = config('AI_AGENT_MAX_TOKENS', default=4096, cast=int)
+
+# Rate Limits (requests per minute)
+AI_AGENT_RATE_LIMIT_USER = config('AI_AGENT_RATE_LIMIT_USER', default=50, cast=int)
+AI_AGENT_RATE_LIMIT_BUSINESS = config('AI_AGENT_RATE_LIMIT_BUSINESS', default=200, cast=int)
+AI_AGENT_RATE_LIMIT_GLOBAL = config('AI_AGENT_RATE_LIMIT_GLOBAL', default=1000, cast=int)
+
+# Budget Limits (in USD)
+AI_AGENT_DAILY_BUDGET = config('AI_AGENT_DAILY_BUDGET', default=50.0, cast=float)
+AI_AGENT_MONTHLY_BUDGET = config('AI_AGENT_MONTHLY_BUDGET', default=1000.0, cast=float)
+
+# Feature Flags
+AI_AGENT_ENABLED = config('AI_AGENT_ENABLED', default=True, cast=bool)
+AI_AGENT_WHATSAPP_ENABLED = config('AI_AGENT_WHATSAPP_ENABLED', default=True, cast=bool)
+
+# WhatsApp/n8n Integration
+N8N_AI_AGENT_WEBHOOK_URL = config('N8N_AI_AGENT_WEBHOOK_URL', default='')
+
+# ==========================================
+# END AI AGENT CONFIGURATION
 # ==========================================
 

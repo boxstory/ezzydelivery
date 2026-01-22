@@ -65,6 +65,9 @@ urlpatterns = [
     # Dispatch & Batching (Store Portal + Rider API)
     path('dispatch/', include('dispatch.urls', namespace='dispatch')),
 
+    # AI Operations Agent
+    path('api/ai-agent/', include('ai_agent.urls', namespace='ai_agent')),
+
 ]
 
 handler404 = 'webpages.views.handler404'

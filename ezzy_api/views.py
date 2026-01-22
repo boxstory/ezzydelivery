@@ -357,8 +357,14 @@ def driver_reject_task(request, task_id):
     """Driver rejects a task"""
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
-        task = delivery_models.DeliveryTask.objects.get(id=task_id, driver=driver)
-        
+        task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id, driver=driver)
+
+        # Lock check: Prevent status change if task is Successful AND COD is settled
+        if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
+            return Response({
+                'error': 'Task is locked. Status cannot be changed after delivery is successful and COD is settled.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
         task.dl_task_status = 'rejected'
         task.dl_task_status_dms = '8'  # Decline
         task.driver = None
@@ -397,17 +403,23 @@ def driver_update_task_status(request, task_id):
     """Driver updates task status"""
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
-        task = delivery_models.DeliveryTask.objects.get(id=task_id, driver=driver)
-        
+        task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id, driver=driver)
+
+        # Lock check: Prevent status change if task is Successful AND COD is settled
+        if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
+            return Response({
+                'error': 'Task is locked. Status cannot be changed after delivery is successful and COD is settled.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
         new_status = request.data.get('status')
         dms_status = request.data.get('dms_status')
-        
+
         if new_status:
             task.dl_task_status = new_status
-        
+
         if dms_status:
             task.dl_task_status_dms = dms_status
-        
+
         task.save()
         
         # Trigger webhooks
@@ -864,12 +876,18 @@ def driver_complete_task(request, task_id):
     """Driver completes a task with delivery proof, signature, and photos"""
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
-        task = delivery_models.DeliveryTask.objects.get(id=task_id, driver=driver)
-        
+        task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id, driver=driver)
+
+        # Lock check: Prevent status change if task is Successful AND COD is settled
+        if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
+            return Response({
+                'error': 'Task is locked. Status cannot be changed after delivery is successful and COD is settled.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
         serializer = ezzy_api_serializers.TaskCompletionSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
         status_value = serializer.validated_data.get('status')
         notes = serializer.validated_data.get('notes', '')
         cod_collected = serializer.validated_data.get('cod_collected', False)
@@ -1900,8 +1918,14 @@ def webhook_receive_task_completion(request):
         driver_id = serializer.validated_data.get('driver_id')
         
         try:
-            task = delivery_models.DeliveryTask.objects.get(id=task_id)
-            
+            task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id)
+
+            # Lock check: Prevent status change if task is Successful AND COD is settled
+            if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
+                return Response({
+                    'error': 'Task is locked. Status cannot be changed after delivery is successful and COD is settled.'
+                }, status=status.HTTP_403_FORBIDDEN)
+
             if driver_id:
                 driver = fleet_models.Driver.objects.get(driver_id=driver_id)
                 if task.driver != driver:
@@ -1909,7 +1933,7 @@ def webhook_receive_task_completion(request):
                         {'error': 'Driver mismatch'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-            
+
             task.dl_task_status = status_value
             if status_value == 'delivered':
                 task.dl_task_status_dms = '2'
