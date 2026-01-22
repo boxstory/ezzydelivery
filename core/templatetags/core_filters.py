@@ -43,3 +43,11 @@ def div(value, arg):
         return float(value) / float(arg)
     except (ValueError, TypeError):
         return 0
+
+
+@register.filter
+def split(value, separator=' '):
+    """Split a string by separator and return a list."""
+    if not value:
+        return []
+    return value.split(separator)
