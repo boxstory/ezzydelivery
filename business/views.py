@@ -1035,7 +1035,11 @@ def business_teams_add(request, business_id):
         form = business_forms.TeamMemberAddForm(request.POST, business=business)
 
         if form.is_valid():
+            # Get the validated user from the form
+            user = form.get_user()
+
             team_member = form.save(commit=False)
+            team_member.user = user  # Set user from email/ID lookup
             team_member.business_id = business_id
             team_member.invited_by = request.user
             team_member.invited_at = timezone.now()
@@ -1043,7 +1047,7 @@ def business_teams_add(request, business_id):
             team_member.save()
 
             logger.info(f'Team member {team_member.id} added by user {request.user.id} for business_id={business_id}')
-            messages.success(request, f"Team member '{team_member.team_name or team_member.user.username}' added successfully.")
+            messages.success(request, f"Team member '{team_member.team_name or user.username}' added successfully.")
             return redirect("business:business_teams", business_id)
         else:
             logger.warning(f'Team profile form invalid: {form.errors}')

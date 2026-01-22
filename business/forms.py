@@ -507,7 +507,7 @@ class TeamMemberAddForm(forms.ModelForm):
     Additional permissions can be configured after creation.
 
     Fields:
-        - user: Django User account to link
+        - user_identifier: Email or User ID to look up the user (not shown in list)
         - team_name: Display name
         - team_email: Contact email
         - team_role: Role (manager, staff, viewer)
@@ -515,17 +515,27 @@ class TeamMemberAddForm(forms.ModelForm):
     Views:
         business.views.business_teams_add
     """
+    # Replace user select with text input for email/ID lookup
+    user_identifier = forms.CharField(
+        max_length=150,
+        label='User Email or ID',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter user email address or user ID',
+            'autocomplete': 'off'
+        }),
+        help_text='Enter the email address or user ID of the person you want to add.'
+    )
+
     class Meta:
         model = business_models.BusinessTeamProfile
-        fields = ['user', 'team_name', 'team_email', 'team_role']
+        fields = ['team_name', 'team_email', 'team_role']
         widgets = {
-            'user': forms.Select(attrs={'class': 'form-control', 'id': 'user-select'}),
             'team_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Display name'}),
             'team_email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email address'}),
             'team_role': forms.Select(attrs={'class': 'form-control'}),
         }
         labels = {
-            'user': 'Select User',
             'team_name': 'Display Name',
             'team_email': 'Email',
             'team_role': 'Role',
@@ -533,20 +543,63 @@ class TeamMemberAddForm(forms.ModelForm):
 
     def __init__(self, *args, business=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.business = business
+        # Reorder fields so user_identifier comes first
+        field_order = ['user_identifier', 'team_name', 'team_email', 'team_role']
+        self.order_fields(field_order)
 
-        if business:
-            # Exclude users who are already team members of this business
-            existing_user_ids = business_models.BusinessTeamProfile.objects.filter(
-                business=business
-            ).values_list('user_id', flat=True)
+    def clean_user_identifier(self):
+        """Validate and look up user by email or ID."""
+        identifier = self.cleaned_data.get('user_identifier', '').strip()
 
-            # Also exclude the business owner
-            if business.user:
-                existing_user_ids = list(existing_user_ids) + [business.user.id]
+        if not identifier:
+            raise forms.ValidationError('Please enter a user email or ID.')
 
-            self.fields['user'].queryset = User.objects.exclude(
-                id__in=existing_user_ids
-            ).order_by('username')
+        # Try to find user by email first, then by ID
+        user = None
+
+        # Check if it looks like an email
+        if '@' in identifier:
+            try:
+                user = User.objects.get(email__iexact=identifier)
+            except User.DoesNotExist:
+                raise forms.ValidationError(
+                    f'No user found with email "{identifier}". '
+                    'Please check the email address and try again.'
+                )
+        else:
+            # Try as user ID
+            try:
+                user_id = int(identifier)
+                user = User.objects.get(id=user_id)
+            except (ValueError, User.DoesNotExist):
+                raise forms.ValidationError(
+                    f'No user found with ID "{identifier}". '
+                    'Please enter a valid email address or user ID.'
+                )
+
+        # Check if user is already a team member
+        if self.business:
+            if business_models.BusinessTeamProfile.objects.filter(
+                business=self.business, user=user
+            ).exists():
+                raise forms.ValidationError(
+                    f'User "{user.username}" is already a team member of this business.'
+                )
+
+            # Check if user is the business owner
+            if self.business.user and self.business.user.id == user.id:
+                raise forms.ValidationError(
+                    'You cannot add the business owner as a team member.'
+                )
+
+        # Store the user object for later use in the view
+        self.cleaned_user = user
+        return identifier
+
+    def get_user(self):
+        """Return the validated user object."""
+        return getattr(self, 'cleaned_user', None)
 
 
 class TeamPermissionForm(forms.Form):
