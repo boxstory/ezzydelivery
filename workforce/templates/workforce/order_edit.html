@@ -1,0 +1,315 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Edit Order {{ order.order_number }} - Workforce{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
+{% endblock %}
+
+{% block content %}
+<div class="flex-fill p-3">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-1">
+                <i class="fa-solid fa-pen-to-square me-2"></i>
+                Edit Order
+            </h4>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item">
+                        <a href="{% url 'workforce:wf_dashboard' %}"
+                           hx-get="{% url 'workforce:wf_dashboard' %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">Dashboard</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a href="{% url 'workforce:wf_orders_all' %}"
+                           hx-get="{% url 'workforce:wf_orders_all' %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">Orders</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a href="{% url 'workforce:order_detail' order.id %}"
+                           hx-get="{% url 'workforce:order_detail' order.id %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">{{ order.order_number|truncatechars:20 }}</a>
+                    </li>
+                    <li class="breadcrumb-item active">Edit</li>
+                </ol>
+            </nav>
+        </div>
+        <div>
+            <a href="{% url 'workforce:order_detail' order.id %}"
+               class="btn btn-outline-secondary"
+               hx-get="{% url 'workforce:order_detail' order.id %}"
+               hx-target="#main-content"
+               hx-select="#main-content"
+               hx-swap="outerHTML"
+               hx-push-url="true">
+                <i class="fa-solid fa-times me-1"></i> Cancel
+            </a>
+        </div>
+    </div>
+
+    <form method="post" id="orderEditForm">
+        {% csrf_token %}
+        <div class="row">
+            <!-- Order Info -->
+            <div class="col-lg-8">
+                <!-- Order Information (Read-only) -->
+                <div class="card mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-info-circle me-2"></i>
+                            Order Information
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">Order Number</label>
+                                <input type="text" class="form-control" value="{{ order.order_number }}" readonly disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">Client Order Code</label>
+                                <input type="text" class="form-control" value="{{ order.client_order_code }}" readonly disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">Business</label>
+                                <input type="text" class="form-control" value="{{ order.business.business_name }}" readonly disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">Order Date</label>
+                                <input type="text" class="form-control" value="{{ order.order_date|date:'d M Y' }}" readonly disabled>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customer Information (Editable) -->
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-user me-2"></i>
+                            Customer Information
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="customer_name" class="form-label">Customer Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="customer_name" name="customer_name"
+                                       value="{{ order.customer_name }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="customer_phone" class="form-label">Phone <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="customer_phone" name="customer_phone"
+                                       value="{{ order.customer_phone }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="customer_whatsapp" class="form-label">WhatsApp</label>
+                                <input type="text" class="form-control" id="customer_whatsapp" name="customer_whatsapp"
+                                       value="{{ order.customer_whatsapp }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delivery Address (Editable) -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-location-dot me-2"></i>
+                            Delivery Address
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="dl_zone" class="form-label">Zone Number</label>
+                                <input type="number" class="form-control" id="dl_zone" name="dl_zone"
+                                       value="{{ order.dl_zone|default:'' }}" min="1" max="100">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="dl_street" class="form-label">Street Number</label>
+                                <input type="number" class="form-control" id="dl_street" name="dl_street"
+                                       value="{{ order.dl_street|default:'' }}" min="1">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="dl_building" class="form-label">Building Number</label>
+                                <input type="number" class="form-control" id="dl_building" name="dl_building"
+                                       value="{{ order.dl_building|default:'' }}" min="1">
+                            </div>
+                            <div class="col-12">
+                                <label for="customer_address" class="form-label">Full Address</label>
+                                <textarea class="form-control" id="customer_address" name="customer_address"
+                                          rows="3">{{ order.customer_address }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pickup Location -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-store me-2"></i>
+                            Pickup Location
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label for="pickup_location" class="form-label">Select Pickup Location</label>
+                                <select class="form-select" id="pickup_location" name="pickup_location">
+                                    <option value="">-- Select --</option>
+                                    {% for location in pickup_locations %}
+                                    <option value="{{ location.id }}"
+                                            {% if order.pickup_location_id == location.id %}selected{% endif %}>
+                                        {{ location.location_name }} - {{ location.pickup_location_address|truncatechars:40 }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-sticky-note me-2"></i>
+                            Notes
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label for="order_notes" class="form-label">Order Notes</label>
+                                <textarea class="form-control" id="order_notes" name="order_notes"
+                                          rows="2">{{ order.order_notes }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Payment Info -->
+                <div class="card mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-money-bill me-2"></i>
+                            Payment Details
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">COD Status</label>
+                            <div class="d-flex gap-3">
+                                {% for value, label in cod_statuses %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="cod_status_by_client"
+                                           id="cod_{{ value }}" value="{{ value }}"
+                                           {% if order.cod_status_by_client == value %}checked{% endif %}>
+                                    <label class="form-check-label" for="cod_{{ value }}">{{ label }}</label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="cod_amount" class="form-label">COD Amount (QAR)</label>
+                            <input type="number" class="form-control" id="cod_amount" name="cod_amount"
+                                   value="{{ order.cod_amount }}" min="0">
+                        </div>
+                        <div class="mb-3">
+                            <label for="dl_amount" class="form-label">Delivery Fee (QAR)</label>
+                            <input type="number" class="form-control" id="dl_amount" name="dl_amount"
+                                   value="{{ order.dl_amount }}" min="0">
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold">Total:</span>
+                            <strong class="text-success fs-5" id="totalAmount">{{ order.cod_amount|add:order.dl_amount }} QAR</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status -->
+                <div class="card mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-flag me-2"></i>
+                            Status
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="order_status" class="form-label">Order Status</label>
+                            <select class="form-select" id="order_status" name="order_status">
+                                {% for value, label in order_statuses %}
+                                <option value="{{ value }}" {% if order.order_status == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="verification_status" class="form-label">Verification Status</label>
+                            <select class="form-select" id="verification_status" name="verification_status">
+                                {% for value, label in verification_statuses %}
+                                <option value="{{ value }}" {% if order.verification_status == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="card">
+                    <div class="card-body">
+                        <button type="submit" class="btn btn-primary w-100 mb-2">
+                            <i class="fa-solid fa-save me-2"></i> Save Changes
+                        </button>
+                        <a href="{% url 'workforce:order_detail' order.id %}"
+                           class="btn btn-outline-secondary w-100"
+                           hx-get="{% url 'workforce:order_detail' order.id %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">
+                            <i class="fa-solid fa-times me-2"></i> Cancel
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Update total amount when COD or delivery fee changes
+document.getElementById('cod_amount').addEventListener('input', updateTotal);
+document.getElementById('dl_amount').addEventListener('input', updateTotal);
+
+function updateTotal() {
+    const cod = parseInt(document.getElementById('cod_amount').value) || 0;
+    const delivery = parseInt(document.getElementById('dl_amount').value) || 0;
+    document.getElementById('totalAmount').textContent = (cod + delivery) + ' QAR';
+}
+</script>
+{% endblock %}
