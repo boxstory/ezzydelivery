@@ -130,11 +130,17 @@
                             <i class="fa-solid fa-chevron-left me-2"></i> Back
                           </div>
                         </a>
+                        {% if card.dl_task_status_dms == '2' and card.order.cod_status_by_staff == 'cod_settled_with_business' %}
+                        <div class="btn btn-secondary disabled">
+                          <i class="fa-solid fa-lock me-2"></i> Locked
+                        </div>
+                        {% else %}
                         <a href="{% url 'core:main_dashboard' %}" id="delivery_all_tasks_btn_accept_{{ card.id }}">
                           <div class="btn btn-dark">
                             <i class="fa-solid fa-tick"></i> Accept Task
                           </div>
                         </a>
+                        {% endif %}
                         <a href="{% url 'core:main_dashboard' %}" id="delivery_all_tasks_btn_dashboard_{{ card.id }}">
                           <div class="btn btn-dark">
                             <i class="fa-solid fa-chart-line"></i> Dashboard

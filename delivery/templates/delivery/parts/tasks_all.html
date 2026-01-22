@@ -228,7 +228,11 @@
               {% endif %}
             </div>
             <div class="modal-footer border-0 pt-0">
-              {% if card.dl_task_status == 'pending' or card.dl_task_status == 'for_review' %}
+              {% if card.dl_task_status_dms == '2' and card.order.cod_status_by_staff == 'cod_settled_with_business' %}
+              <div class="alert alert-secondary mb-0 w-100 text-center py-2">
+                <i class="fa-solid fa-lock me-2"></i>Task completed & COD settled
+              </div>
+              {% elif card.dl_task_status == 'pending' or card.dl_task_status == 'for_review' %}
               <button type="button" class="pwa-btn pwa-btn--primary pwa-btn--block assign-driver-btn" data-task-id="{{ card.id }}">
                 <i class="fa-solid fa-check me-2"></i>Accept Task
               </button>
@@ -236,8 +240,11 @@
               <a href="tel:{{ card.dl_to_address.mobile_no }}" class="pwa-btn pwa-btn--outline" style="flex: 1;">
                 <i class="fa-solid fa-phone me-2"></i>Call
               </a>
-              <button type="button" class="pwa-btn pwa-btn--success" style="flex: 1;">
+              <button type="button" class="pwa-btn pwa-btn--success task-complete-btn" data-task-id="{{ card.id }}" style="flex: 1;">
                 <i class="fa-solid fa-check me-2"></i>Complete
+              </button>
+              <button type="button" class="pwa-btn pwa-btn--danger task-fail-btn" data-task-id="{{ card.id }}" style="flex: 1;">
+                <i class="fa-solid fa-times me-2"></i>Failed
               </button>
               {% endif %}
             </div>
@@ -433,9 +440,15 @@
             </div>
           </div>
           <div class="col-12 p-3 d-flex justify-content-end">
+            {% if card.dl_task_status_dms == '2' and card.order.cod_status_by_staff == 'cod_settled_with_business' %}
+            <div class="alert alert-secondary mb-0 py-2">
+              <i class="fa-solid fa-lock me-2"></i>Task completed & COD settled - Status locked
+            </div>
+            {% else %}
             <button class="btn btn-success assign-driver-btn"
                     data-task-id="{{ card.id }}"
                     id="delivery_tasks_all_btn_accept_{{ card.id }}">Accept Order</button>
+            {% endif %}
           </div>
         </td>
       </tr>
@@ -448,6 +461,7 @@
 {% block extra_js %}
   <script>
   $(document).ready(function () {
+    // Accept/Assign task button
     $(".assign-driver-btn").on("click", function () {
       var taskId = $(this).data("task-id");
       var btn = $(this);
@@ -462,13 +476,10 @@
         },
         success: function (response) {
           btn.html('<i class="fa-solid fa-check me-2"></i>Accepted!').removeClass('btn-success pwa-btn--primary').addClass('btn-secondary');
-          // Close modal if open
           $('.modal').modal('hide');
-          // Show toast
           if (typeof showToast === 'function') {
             showToast('Task accepted successfully!', 'success');
           }
-          // Reload after delay
           setTimeout(function() {
             location.reload();
           }, 1500);
@@ -476,6 +487,66 @@
         error: function (xhr, textStatus, errorThrown) {
           btn.prop('disabled', false).html('<i class="fa-solid fa-check me-2"></i>Accept Task');
           alert("Error assigning task: " + errorThrown);
+        },
+      });
+    });
+
+    // Complete task button
+    $(".task-complete-btn").on("click", function () {
+      var taskId = $(this).data("task-id");
+      var btn = $(this);
+      btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>...');
+
+      $.ajax({
+        type: "POST",
+        url: "/api/driver/tasks/" + taskId + "/complete/",
+        contentType: "application/json",
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+        data: JSON.stringify({ status: 'delivered' }),
+        success: function (response) {
+          btn.html('<i class="fa-solid fa-check me-2"></i>Done!');
+          $('.modal').modal('hide');
+          if (typeof showToast === 'function') {
+            showToast('Task completed successfully!', 'success');
+          }
+          setTimeout(function() {
+            location.reload();
+          }, 1500);
+        },
+        error: function (xhr) {
+          btn.prop('disabled', false).html('<i class="fa-solid fa-check me-2"></i>Complete');
+          var errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Error completing task';
+          alert(errorMsg);
+        },
+      });
+    });
+
+    // Failed task button
+    $(".task-fail-btn").on("click", function () {
+      var taskId = $(this).data("task-id");
+      var btn = $(this);
+      btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>...');
+
+      $.ajax({
+        type: "POST",
+        url: "/api/driver/tasks/" + taskId + "/complete/",
+        contentType: "application/json",
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+        data: JSON.stringify({ status: 'cancelled' }),
+        success: function (response) {
+          btn.html('<i class="fa-solid fa-times me-2"></i>Marked Failed');
+          $('.modal').modal('hide');
+          if (typeof showToast === 'function') {
+            showToast('Task marked as failed', 'warning');
+          }
+          setTimeout(function() {
+            location.reload();
+          }, 1500);
+        },
+        error: function (xhr) {
+          btn.prop('disabled', false).html('<i class="fa-solid fa-times me-2"></i>Failed');
+          var errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Error updating task';
+          alert(errorMsg);
         },
       });
     });
