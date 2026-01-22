@@ -91,18 +91,28 @@ Each task should have:
                     <td>{{ dl.order.customer_phone|default:"N/A" }}</td>
                     <td>{{ dl.driver|default:"-"|truncatechars:15 }}</td>
                     <td>
-                        {% if dl.dl_task_status_client %}
-                        <span class="status-badge status-{{ dl.dl_task_status_client }}">
-                            {{ dl.get_dl_task_status_client_display }}
-                        </span>
-                        {% else %}-{% endif %}
+                        <div class="d-flex align-items-center gap-1">
+                            {% if dl.dl_task_status_client %}
+                            <span class="status-badge status-{{ dl.dl_task_status_client }}">
+                                {{ dl.get_dl_task_status_client_display }}
+                            </span>
+                            {% else %}-{% endif %}
+                            <button class="btn btn-link btn-sm p-0 ms-1 text-secondary" data-bs-toggle="modal" data-bs-target="#statusModal" data-task-id="{{ dl.id }}" data-task-number="{{ dl.dl_task_number }}" onclick="setStatusModalTask(this)" title="Update Status">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                        </div>
                     </td>
                     <td>
-                        {% if dl.dl_task_status_dms %}
-                        <span class="status-badge status-{{ dl.dl_task_status_dms }}">
-                            {{ dl.get_dl_task_status_dms_display }}
-                        </span>
-                        {% else %}-{% endif %}
+                        <div class="d-flex align-items-center gap-1">
+                            {% if dl.dl_task_status_dms %}
+                            <span class="status-badge status-{{ dl.dl_task_status_dms }}">
+                                {{ dl.get_dl_task_status_dms_display }}
+                            </span>
+                            {% else %}-{% endif %}
+                            <button class="btn btn-link btn-sm p-0 ms-1 text-secondary" data-bs-toggle="modal" data-bs-target="#statusModal" data-task-id="{{ dl.id }}" data-task-number="{{ dl.dl_task_number }}" data-status-type="dms" onclick="setStatusModalTask(this)" title="Update DMS Status">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                        </div>
                     </td>
                     <td class="text-center">
                         <div class="btn-group btn-group-sm">
@@ -117,9 +127,6 @@ Each task should have:
                             </a>
                             <button class="btn btn-outline-primary btn-sm" onclick="publishToDMS({{ dl.id }})" title="Publish DMS" {% if dl.dl_task_publish %}disabled{% endif %}>
                                 <i class="fa-solid fa-cloud-arrow-up"></i>
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#statusModal" data-task-id="{{ dl.id }}" data-task-number="{{ dl.dl_task_number }}" onclick="setStatusModalTask(this)" title="Update Status">
-                                <i class="fa-solid fa-sync"></i>
                             </button>
                         </div>
                     </td>

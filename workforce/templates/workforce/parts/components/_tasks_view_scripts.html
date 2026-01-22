@@ -320,12 +320,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // View task detail
 function viewTaskDetail(taskId) {
-    window.location.href = '/workforce/delivery-task/' + taskId + '/';
+    const url = '/workforce/delivery-task/' + taskId + '/';
+    if (typeof htmx !== 'undefined') {
+        htmx.ajax('GET', url, {
+            target: '#main-content',
+            select: '#main-content',
+            swap: 'outerHTML'
+        });
+        history.pushState({}, '', url);
+    } else {
+        window.location.href = url;
+    }
 }
 
 // Edit task
 function editTask(taskId) {
-    window.location.href = '/workforce/delivery-task/' + taskId + '/edit/';
+    const url = '/workforce/delivery-task/' + taskId + '/edit/';
+    if (typeof htmx !== 'undefined') {
+        htmx.ajax('GET', url, {
+            target: '#main-content',
+            select: '#main-content',
+            swap: 'outerHTML'
+        });
+        history.pushState({}, '', url);
+    } else {
+        window.location.href = url;
+    }
 }
 
 // Publish single task to DMS

@@ -45,7 +45,10 @@ urlpatterns = [
 
     # Order detail and actions
     path('orders/<int:order_id>/', workforce_views.order_detail, name='order_detail'),
+    path('orders/<int:order_id>/edit/', workforce_views.order_edit, name='order_edit'),
     path('orders/<int:order_id>/cancel/', workforce_views.cancel_order, name='cancel_order'),
+    path('order/<int:order_id>/update-zone/', workforce_views.update_order_zone, name='update_order_zone'),
+    path('order/<int:order_id>/assign-driver/', workforce_views.assign_driver_to_order, name='assign_driver_to_order'),
 
     # AJAX endpoints for orders
     path('orders/<int:order_id>/publish/', workforce_views.publish_order_to_delivery, name='publish_order_to_delivery'),

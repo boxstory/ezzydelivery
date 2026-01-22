@@ -7,121 +7,261 @@
 {% endblock extra_css %}
 
 {% block content %}
-<div class="col-12 p-3" role="main">
-    <!-- Page Header -->
-    <header class="page-header">
-        <div class="page-header-left">
-            <h1><i class="fa-solid fa-edit me-1"></i>Edit Task #{{ task.dl_task_number }}</h1>
-            <span class="page-header-subtitle">| <a href="{% url 'workforce:dl_list_all' %}">All Tasks</a> / <a href="{% url 'workforce:delivery_task_detail' task.id %}">Task #{{ task.dl_task_number }}</a></span>
+<div class="flex-fill p-3">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-1">
+                <i class="fa-solid fa-pen-to-square me-2"></i>
+                Edit Delivery Task
+            </h4>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item">
+                        <a href="{% url 'workforce:wf_dashboard' %}"
+                           hx-get="{% url 'workforce:wf_dashboard' %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">Dashboard</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a href="{% url 'workforce:dl_list_all' %}"
+                           hx-get="{% url 'workforce:dl_list_all' %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">Delivery Tasks</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a href="{% url 'workforce:delivery_task_detail' task.id %}"
+                           hx-get="{% url 'workforce:delivery_task_detail' task.id %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">Task #{{ task.dl_task_number }}</a>
+                    </li>
+                    <li class="breadcrumb-item active">Edit</li>
+                </ol>
+            </nav>
         </div>
-        <div class="page-header-right">
-            <a href="{% url 'workforce:delivery_task_detail' task.id %}" class="btn btn-outline-dark">
-                <i class="fa-solid fa-arrow-left me-1"></i>Back
+        <div>
+            <a href="{% url 'workforce:delivery_task_detail' task.id %}"
+               class="btn btn-outline-secondary"
+               hx-get="{% url 'workforce:delivery_task_detail' task.id %}"
+               hx-target="#main-content"
+               hx-select="#main-content"
+               hx-swap="outerHTML"
+               hx-push-url="true">
+                <i class="fa-solid fa-times me-1"></i> Cancel
             </a>
         </div>
-    </header>
+    </div>
 
-    <div class="row">
-        <div class="col-lg-8">
-            <!-- Edit Form -->
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fa-solid fa-cog me-2"></i>Task Settings</h5>
-                </div>
-                <div class="card-body">
-                    <form method="post">
-                        {% csrf_token %}
-
+    <form method="post" id="taskEditForm">
+        {% csrf_token %}
+        <div class="row">
+            <!-- Left Column - Task & Order Details -->
+            <div class="col-lg-8">
+                <!-- Task Settings -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-cog me-2"></i>
+                            Task Settings
+                        </h5>
+                    </div>
+                    <div class="card-body">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Driver Assignment</label>
-                                <select name="driver" class="form-select">
+                                <label for="driver" class="form-label">Driver Assignment</label>
+                                <select name="driver" id="driver" class="form-select">
                                     <option value="">-- Select Driver --</option>
                                     {% for driver in drivers %}
-                                    <option value="{{ driver.id }}" {% if task.driver_id == driver.id %}selected{% endif %}>
-                                        {{ driver.driver_first_name }} {{ driver.driver_last_name }}
+                                    <option value="{{ driver.driver_id }}" {% if task.driver_id == driver.driver_id %}selected{% endif %}>
+                                        {{ driver.driver_first_name }} {{ driver.driver_last_name }} ({{ driver.driver_code }})
                                     </option>
                                     {% endfor %}
                                 </select>
-                                <small class="text-muted">Assign or change the driver for this task</small>
                             </div>
-
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Client Status</label>
-                                <select name="status" class="form-select">
+                                <label for="status" class="form-label">Task Status</label>
+                                <select name="status" id="status" class="form-select">
                                     <option value="">-- Select Status --</option>
-                                    <option value="for_review" {% if task.dl_task_status_client == 'for_review' %}selected{% endif %}>For Review</option>
-                                    <option value="0" {% if task.dl_task_status_client == '0' %}selected{% endif %}>Assigned to Driver</option>
-                                    <option value="1" {% if task.dl_task_status_client == '1' %}selected{% endif %}>In Transit</option>
-                                    <option value="2" {% if task.dl_task_status_client == '2' %}selected{% endif %}>Delivered</option>
-                                    <option value="3" {% if task.dl_task_status_client == '3' %}selected{% endif %}>Rejected</option>
-                                    <option value="9" {% if task.dl_task_status_client == '9' %}selected{% endif %}>Cancelled</option>
+                                    <option value="pending" {% if task.dl_task_status == 'pending' %}selected{% endif %}>Pending</option>
+                                    <option value="assigned" {% if task.dl_task_status == 'assigned' %}selected{% endif %}>Assigned</option>
+                                    <option value="in_transit" {% if task.dl_task_status == 'in_transit' %}selected{% endif %}>In Transit</option>
+                                    <option value="delivered" {% if task.dl_task_status == 'delivered' %}selected{% endif %}>Delivered</option>
+                                    <option value="failed" {% if task.dl_task_status == 'failed' %}selected{% endif %}>Failed</option>
+                                    <option value="cancelled" {% if task.dl_task_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
                                 </select>
-                                <small class="text-muted">Update the current status</small>
                             </div>
-
                             <div class="col-12">
-                                <label class="form-label fw-bold">Notes</label>
-                                <textarea name="notes" class="form-control" rows="4" placeholder="Add any notes about this task...">{{ task.notes|default:"" }}</textarea>
+                                <label for="notes" class="form-label">Task Notes</label>
+                                <textarea name="notes" id="notes" class="form-control" rows="2" placeholder="Add notes about this task...">{{ task.notes|default:"" }}</textarea>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div class="mt-4 d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fa-solid fa-save me-2"></i>Save Changes
-                            </button>
-                            <a href="{% url 'workforce:delivery_task_detail' task.id %}" class="btn btn-outline-secondary">
-                                Cancel
-                            </a>
+                <!-- Customer Information -->
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-user me-2"></i>
+                            Customer Information
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="customer_name" class="form-label">Customer Name</label>
+                                <input type="text" class="form-control" id="customer_name" name="customer_name"
+                                       value="{{ task.order.customer_name }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="customer_phone" class="form-label">Phone</label>
+                                <input type="text" class="form-control" id="customer_phone" name="customer_phone"
+                                       value="{{ task.order.customer_phone }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="customer_whatsapp" class="form-label">WhatsApp</label>
+                                <input type="text" class="form-control" id="customer_whatsapp" name="customer_whatsapp"
+                                       value="{{ task.order.customer_whatsapp }}">
+                            </div>
                         </div>
-                    </form>
+                    </div>
+                </div>
+
+                <!-- Delivery Address -->
+                <div class="card mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-location-dot me-2"></i>
+                            Delivery Address
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="dl_zone" class="form-label">Zone Number</label>
+                                <input type="number" class="form-control" id="dl_zone" name="dl_zone"
+                                       value="{{ task.order.dl_zone|default:'' }}" min="1" max="100">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="dl_street" class="form-label">Street Number</label>
+                                <input type="number" class="form-control" id="dl_street" name="dl_street"
+                                       value="{{ task.order.dl_street|default:'' }}" min="1">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="dl_building" class="form-label">Building Number</label>
+                                <input type="number" class="form-control" id="dl_building" name="dl_building"
+                                       value="{{ task.order.dl_building|default:'' }}" min="1">
+                            </div>
+                            <div class="col-12">
+                                <label for="customer_address" class="form-label">Full Address</label>
+                                <textarea class="form-control" id="customer_address" name="customer_address"
+                                          rows="3">{{ task.order.customer_address }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column - Sidebar -->
+            <div class="col-lg-4">
+                <!-- Task Info (Read-only) -->
+                <div class="card mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-info-circle me-2"></i>
+                            Task Info
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0 small">
+                            <dt class="col-5">Task Number</dt>
+                            <dd class="col-7">#{{ task.dl_task_number }}</dd>
+
+                            <dt class="col-5">Order Number</dt>
+                            <dd class="col-7">{{ task.order.order_number|default:"N/A" }}</dd>
+
+                            <dt class="col-5">Date</dt>
+                            <dd class="col-7">{{ task.dl_task_date|date:"d M Y" }}</dd>
+
+                            <dt class="col-5">Business</dt>
+                            <dd class="col-7">{{ task.business.business_name|default:"N/A" }}</dd>
+
+                            <dt class="col-5">Created</dt>
+                            <dd class="col-7">{{ task.created_at|date:"d M Y H:i" }}</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- COD Details -->
+                <div class="card mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-money-bill me-2"></i>
+                            COD Details
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="cod_amount" class="form-label">COD Amount (QAR)</label>
+                            <input type="number" class="form-control" id="cod_amount" name="cod_amount"
+                                   value="{{ task.order.cod_amount|default:0 }}" min="0">
+                        </div>
+                        <div class="mb-3">
+                            <label for="dl_amount" class="form-label">Delivery Fee (QAR)</label>
+                            <input type="number" class="form-control" id="dl_amount" name="dl_amount"
+                                   value="{{ task.order.dl_amount|default:0 }}" min="0">
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold">Total:</span>
+                            <strong class="text-success fs-5" id="totalAmount">
+                                {% with total=task.order.cod_amount|add:task.order.dl_amount %}
+                                {{ total|default:0 }} QAR
+                                {% endwith %}
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="card">
+                    <div class="card-body">
+                        <button type="submit" class="btn btn-primary w-100 mb-2">
+                            <i class="fa-solid fa-save me-2"></i> Save Changes
+                        </button>
+                        <a href="{% url 'workforce:delivery_task_detail' task.id %}"
+                           class="btn btn-outline-secondary w-100"
+                           hx-get="{% url 'workforce:delivery_task_detail' task.id %}"
+                           hx-target="#main-content"
+                           hx-select="#main-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true">
+                            <i class="fa-solid fa-times me-2"></i> Cancel
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div class="col-lg-4">
-            <!-- Task Info Summary -->
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fa-solid fa-info-circle me-2"></i>Task Info</h5>
-                </div>
-                <div class="card-body">
-                    <dl class="row mb-0">
-                        <dt class="col-5">Task Number</dt>
-                        <dd class="col-7">#{{ task.dl_task_number }}</dd>
-
-                        <dt class="col-5">Date</dt>
-                        <dd class="col-7">{{ task.dl_task_date|date:"d M Y" }}</dd>
-
-                        <dt class="col-5">Customer</dt>
-                        <dd class="col-7">{{ task.order.customer_name|default:"N/A" }}</dd>
-
-                        <dt class="col-5">Phone</dt>
-                        <dd class="col-7">{{ task.order.customer_phone|default:"N/A" }}</dd>
-
-                        <dt class="col-5">Business</dt>
-                        <dd class="col-7">{{ task.business.business_name|default:"N/A" }}</dd>
-
-                        {% if task.order.cod_amount %}
-                        <dt class="col-5">COD Amount</dt>
-                        <dd class="col-7 fw-bold text-success">AED {{ task.order.cod_amount }}</dd>
-                        {% endif %}
-                    </dl>
-                </div>
-            </div>
-
-            <!-- Delivery Address -->
-            {% if task.order.customer_address %}
-            <div class="card mt-3">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fa-solid fa-location-dot me-2"></i>Delivery Address</h5>
-                </div>
-                <div class="card-body">
-                    <p class="mb-0">{{ task.order.customer_address }}</p>
-                </div>
-            </div>
-            {% endif %}
-        </div>
-    </div>
+    </form>
 </div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+// Update total amount when COD or delivery fee changes
+document.getElementById('cod_amount').addEventListener('input', updateTotal);
+document.getElementById('dl_amount').addEventListener('input', updateTotal);
+
+function updateTotal() {
+    const cod = parseInt(document.getElementById('cod_amount').value) || 0;
+    const delivery = parseInt(document.getElementById('dl_amount').value) || 0;
+    document.getElementById('totalAmount').textContent = (cod + delivery) + ' QAR';
+}
+</script>
+{% endblock extra_js %}

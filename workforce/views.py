@@ -1043,6 +1043,7 @@ def dl_list_all(request):
     data = {
         'dl_tasks': dl_tasks,
         'businesses': businesses,
+        'today': timezone.localtime().date(),
         'filters': {
             'dlCode': dl_code,
             'cCode': c_code,
@@ -1071,6 +1072,7 @@ def dl_list_incompleted_details(request):
 
     data = {
         'dl_tasks': dl_tasks,
+        'today': timezone.localtime().date(),
     }
     return render(request, 'workforce/parts/lists/dl_list_incompleted.html', data)
 
@@ -1085,6 +1087,7 @@ def dl_list_published_to_dms(request):
 
     data = {
         'dl_tasks': dl_tasks,
+        'today': timezone.localtime().date(),
     }
     return render(request, 'workforce/parts/lists/dl_list_all.html', data)
 
@@ -1320,8 +1323,14 @@ def order_detail(request, order_id):
     }
 
     # Check if this is being loaded in a panel (via HTMX)
+    # Use panel template only when targeting the slide panel, not main content
     is_htmx = request.headers.get('HX-Request') == 'true'
-    template = 'workforce/order_detail_panel.html' if is_htmx else 'workforce/order_detail.html'
+    hx_target = request.headers.get('HX-Target', '')
+
+    # If targeting main-content or using hx-select, use full page template
+    # Panel template is only for the slide-out panel (orderDetailContent)
+    use_panel = is_htmx and hx_target == 'orderDetailContent'
+    template = 'workforce/order_detail_panel.html' if use_panel else 'workforce/order_detail.html'
 
     return render(request, template, context)
 
@@ -1364,6 +1373,148 @@ def cancel_order(request, order_id):
             'message': 'Order cancelled successfully',
             'order_id': order.id
         })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def assign_driver_to_order(request, order_id):
+    """Assign a driver to an order (from AI suggest result)"""
+    try:
+        order = get_object_or_404(orders_models.Order, id=order_id)
+        data = json.loads(request.body)
+        driver_id = data.get('driver_id')
+
+        if not driver_id:
+            return JsonResponse({
+                'success': False,
+                'error': 'Driver ID is required'
+            }, status=400)
+
+        # Verify driver exists and is approved
+        try:
+            driver = fleet_models.Driver.objects.get(driver_id=driver_id, driver_status='Approved')
+        except fleet_models.Driver.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'Driver {driver_id} not found or not approved'
+            }, status=400)
+
+        # Check if order already has a delivery task
+        existing_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
+
+        if existing_task:
+            # Update existing task
+            old_driver = existing_task.driver
+            existing_task.driver = driver
+            existing_task.save()
+
+            # Log the update
+            orders_models.OrderVerificationLog.objects.create(
+                order=order,
+                verified_by=request.user,
+                action='driver_reassigned',
+                old_status=str(old_driver.driver_id) if old_driver else 'None',
+                new_status=str(driver_id),
+                notes=f'Driver reassigned from AI suggestion: {driver.user.get_full_name() if driver.user else driver.driver_code}'
+            )
+        else:
+            # Create new delivery task
+            task = delivery_models.DeliveryTask.objects.create(
+                order=order,
+                driver=driver,
+                business=order.business,
+                pickup_location=order.pickup_location,
+                dl_task_status='pending',
+                dl_task_number=f'DL-{order.order_number}'
+            )
+
+            # Log the assignment
+            orders_models.OrderVerificationLog.objects.create(
+                order=order,
+                verified_by=request.user,
+                action='driver_assigned',
+                old_status='None',
+                new_status=str(driver_id),
+                notes=f'Driver assigned from AI suggestion: {driver.user.get_full_name() if driver.user else driver.driver_code}'
+            )
+
+        driver_name = driver.user.get_full_name() if driver.user else driver.driver_code
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Driver {driver_name} assigned successfully',
+            'driver_id': driver_id,
+            'driver_name': driver_name
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON data'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def update_order_zone(request, order_id):
+    """Update order delivery zone (from AI parse result)"""
+    try:
+        order = get_object_or_404(orders_models.Order, id=order_id)
+        data = json.loads(request.body)
+        zone_number = data.get('zone_number')
+
+        if not zone_number:
+            return JsonResponse({
+                'success': False,
+                'error': 'Zone number is required'
+            }, status=400)
+
+        # Verify zone exists
+        try:
+            zone = delivery_models.ZoneName.objects.get(zone_number=zone_number, is_active=True)
+        except delivery_models.ZoneName.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'Zone {zone_number} not found or inactive'
+            }, status=400)
+
+        # Update order zone
+        old_zone = order.dl_zone
+        order.dl_zone = zone_number
+        order.save()
+
+        # Log the update
+        orders_models.OrderVerificationLog.objects.create(
+            order=order,
+            verified_by=request.user,
+            action='zone_updated',
+            old_status=str(old_zone) if old_zone else 'None',
+            new_status=str(zone_number),
+            notes=f'Zone updated from AI parse: {zone.zone_name}'
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Zone updated to {zone_number} ({zone.zone_name})',
+            'zone_number': zone_number,
+            'zone_name': zone.zone_name
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON data'
+        }, status=400)
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -1424,6 +1575,7 @@ def update_order_status(request, order_id):
         # Parse JSON body
         data = json.loads(request.body)
         status = data.get('status')
+        status_type = data.get('status_type', 'order')  # 'order' or 'task'
 
         if not status:
             return JsonResponse({
@@ -1431,18 +1583,22 @@ def update_order_status(request, order_id):
                 'error': 'Status is required'
             }, status=400)
 
-        # Update task status
-        order.task_status = status
+        old_status = order.order_status if status_type == 'order' else order.task_status
+
+        # Update appropriate status field
+        if status_type == 'task':
+            order.task_status = status
+        else:
+            order.order_status = status
         order.save()
 
         # Log the status update
         from orders.models import OrderVerificationLog
         OrderVerificationLog.objects.create(
             order=order,
-            verified_by=request.user,
-            action=f'status_updated_to_{status}',
-            notes=f'Status updated to {status}',
-            new_status=status
+            performed_by=request.user,
+            action=f'{status_type}_status_updated',
+            notes=f'{status_type.title()} status changed from {old_status} to {status} by {request.user.username}',
         )
 
         return JsonResponse({
@@ -4192,7 +4348,7 @@ def fulfilled_orders_list(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def delivery_task_edit(request, task_id):
-    """Edit delivery task details"""
+    """Edit delivery task details and associated order"""
     task = get_object_or_404(
         delivery_models.DeliveryTask.objects.select_related(
             'order', 'order__business', 'driver', 'business', 'pickup_location'
@@ -4201,23 +4357,69 @@ def delivery_task_edit(request, task_id):
     )
 
     if request.method == 'POST':
-        # Handle form submission
-        driver_id = request.POST.get('driver')
-        status = request.POST.get('status')
-        notes = request.POST.get('notes', '')
+        try:
+            # Handle task fields
+            driver_id = request.POST.get('driver')
+            status = request.POST.get('status')
+            notes = request.POST.get('notes', '')
 
-        if driver_id:
-            task.driver_id = driver_id
-        if status:
-            task.dl_task_status_client = status
-        task.notes = notes
-        task.save()
+            if driver_id:
+                task.driver_id = driver_id
+            if status:
+                task.dl_task_status = status
+            task.notes = notes
+            task.save()
 
-        messages.success(request, f'Task #{task.dl_task_number} updated successfully.')
-        return redirect('workforce:delivery_task_detail', task_id=task_id)
+            # Handle order fields if order exists
+            if task.order:
+                order = task.order
 
-    # Get available drivers for dropdown
-    drivers = fleet_models.Driver.objects.filter(driver_status='active').order_by('driver_first_name')
+                # Customer details
+                order.customer_name = request.POST.get('customer_name', order.customer_name)
+                order.customer_phone = request.POST.get('customer_phone', order.customer_phone)
+                order.customer_whatsapp = request.POST.get('customer_whatsapp', order.customer_whatsapp)
+                order.customer_address = request.POST.get('customer_address', order.customer_address)
+
+                # Address components
+                dl_zone = request.POST.get('dl_zone', '')
+                dl_street = request.POST.get('dl_street', '')
+                dl_building = request.POST.get('dl_building', '')
+
+                order.dl_zone = int(dl_zone) if dl_zone and dl_zone.isdigit() else None
+                order.dl_street = int(dl_street) if dl_street and dl_street.isdigit() else None
+                order.dl_building = int(dl_building) if dl_building and dl_building.isdigit() else None
+
+                # COD details
+                cod_amount = request.POST.get('cod_amount', '0')
+                order.cod_amount = int(cod_amount) if cod_amount and cod_amount.isdigit() else 0
+
+                dl_amount = request.POST.get('dl_amount', '0')
+                order.dl_amount = int(dl_amount) if dl_amount and dl_amount.isdigit() else 0
+
+                order.save()
+
+                # Log the change
+                orders_models.OrderVerificationLog.objects.create(
+                    order=order,
+                    action='task_edited',
+                    performed_by=request.user,
+                    notes=f'Task and order edited by {request.user.username}'
+                )
+
+            messages.success(request, f'Task #{task.dl_task_number} updated successfully.')
+
+            # Check if HTMX request
+            if request.headers.get('HX-Request'):
+                return redirect('workforce:delivery_task_detail', task_id=task_id)
+            return redirect('workforce:delivery_task_detail', task_id=task_id)
+
+        except Exception as e:
+            messages.error(request, f'Error updating task: {str(e)}')
+
+    # Get available drivers for dropdown (approved drivers)
+    drivers = fleet_models.Driver.objects.filter(
+        driver_status='Approved'
+    ).order_by('driver_first_name')
 
     context = {
         'page_title': f'Edit Task #{task.dl_task_number}',
@@ -4403,5 +4605,92 @@ def bulk_export_tasks(request):
         ])
 
     return response
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def order_edit(request, order_id):
+    """Edit order details - Staff view for correcting order information"""
+    order = get_object_or_404(
+        orders_models.Order.objects.select_related(
+            'business', 'pickup_location'
+        ),
+        id=order_id
+    )
+
+    # Get pickup locations for the business
+    pickup_locations = business_models.PickupLocation.objects.filter(
+        business=order.business
+    )
+
+    if request.method == 'POST':
+        # Handle form submission
+        try:
+            # Customer details
+            order.customer_name = request.POST.get('customer_name', order.customer_name)
+            order.customer_phone = request.POST.get('customer_phone', order.customer_phone)
+            order.customer_whatsapp = request.POST.get('customer_whatsapp', order.customer_whatsapp)
+            order.customer_address = request.POST.get('customer_address', order.customer_address)
+
+            # Address components
+            dl_zone = request.POST.get('dl_zone', '')
+            dl_street = request.POST.get('dl_street', '')
+            dl_building = request.POST.get('dl_building', '')
+
+            order.dl_zone = int(dl_zone) if dl_zone and dl_zone.isdigit() else None
+            order.dl_street = int(dl_street) if dl_street and dl_street.isdigit() else None
+            order.dl_building = int(dl_building) if dl_building and dl_building.isdigit() else None
+
+            # COD details
+            cod_amount = request.POST.get('cod_amount', '0')
+            order.cod_amount = int(cod_amount) if cod_amount and cod_amount.isdigit() else 0
+            order.cod_status_by_client = request.POST.get('cod_status_by_client', order.cod_status_by_client)
+
+            # Delivery amount
+            dl_amount = request.POST.get('dl_amount', '0')
+            order.dl_amount = int(dl_amount) if dl_amount and dl_amount.isdigit() else 0
+
+            # Pickup location
+            pickup_id = request.POST.get('pickup_location')
+            if pickup_id:
+                order.pickup_location_id = pickup_id
+
+            # Order notes
+            order.order_notes = request.POST.get('order_notes', order.order_notes)
+
+            # Status
+            order.order_status = request.POST.get('order_status', order.order_status)
+            order.verification_status = request.POST.get('verification_status', order.verification_status)
+
+            order.save()
+
+            # Log the change
+            orders_models.OrderVerificationLog.objects.create(
+                order=order,
+                action='order_edited',
+                performed_by=request.user,
+                notes=f'Order edited by {request.user.username}'
+            )
+
+            messages.success(request, f'Order {order.order_number} updated successfully.')
+
+            # Check if HTMX request
+            if request.headers.get('HX-Request'):
+                return redirect('workforce:order_detail', order_id=order_id)
+            return redirect('workforce:order_detail', order_id=order_id)
+
+        except Exception as e:
+            messages.error(request, f'Error updating order: {str(e)}')
+
+    context = {
+        'page_title': f'Edit Order - {order.order_number}',
+        'order': order,
+        'pickup_locations': pickup_locations,
+        'order_statuses': orders_models.ORDER_STATUS_BY_CLIENT,
+        'verification_statuses': orders_models.Order.VERIFICATION_STATUS,
+        'cod_statuses': orders_models.COD_STATUS_BY_CLIENT,
+    }
+
+    return render(request, 'workforce/order_edit.html', context)
 
 
