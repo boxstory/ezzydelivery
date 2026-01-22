@@ -135,8 +135,19 @@
 
         <div class="detail-row">
           <span class="detail-label">Order Status</span>
-          <span class="detail-value">
-            <span class="status-value">{{ order.order_status }}</span>
+          <span class="detail-value d-flex align-items-center gap-2">
+            <span class="status-value">{{ order.get_order_status_display }}</span>
+            {% if order.order_status != 'published' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+            <button type="button" class="btn btn-link btn-sm p-0 text-primary"
+                    data-bs-toggle="modal" data-bs-target="#orderStatusModal"
+                    data-order-id="{{ order.id }}"
+                    data-order-number="{{ order.order_number }}"
+                    data-current-status="{{ order.order_status }}"
+                    onclick="setOrderStatusModal(this)"
+                    title="Update Status">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            {% endif %}
           </span>
         </div>
 
@@ -257,6 +268,38 @@
   </div>
 {% endfor %}
 
+<!-- Order Status Update Modal -->
+<div class="modal fade" id="orderStatusModal" tabindex="-1" aria-labelledby="orderStatusModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title" id="orderStatusModalLabel">
+          <i class="fa-solid fa-sync me-2"></i>Update Order Status
+        </h6>
+        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body py-2">
+        <p class="small text-muted mb-2">Order: <strong id="modalOrderNumber"></strong></p>
+        <input type="hidden" id="modalOrderId">
+        <div class="d-grid gap-1">
+          <button type="button" class="btn btn-outline-warning btn-sm text-start" onclick="updateOrderStatus('to_review')">
+            <i class="fa-solid fa-clock me-2"></i>Hold for Review
+          </button>
+          <button type="button" class="btn btn-outline-info btn-sm text-start" onclick="updateOrderStatus('ready_to_pickup')">
+            <i class="fa-solid fa-box me-2"></i>Ready to Pickup
+          </button>
+          <button type="button" class="btn btn-outline-primary btn-sm text-start" onclick="updateOrderStatus('publish')">
+            <i class="fa-solid fa-paper-plane me-2"></i>Publish for Delivery
+          </button>
+          <button type="button" class="btn btn-outline-danger btn-sm text-start" onclick="updateOrderStatus('cancelled')">
+            <i class="fa-solid fa-times-circle me-2"></i>Cancel Order
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 function toggleOrderCard(orderId) {
   const card = document.getElementById('order-card-' + orderId);
@@ -278,6 +321,59 @@ function loadProducts(orderId, event) {
       content.style.display = 'block';
       document.body.removeEventListener('htmx:afterSwap', handler);
     }
+  });
+}
+
+// Order Status Modal Functions
+function setOrderStatusModal(button) {
+  const orderId = button.getAttribute('data-order-id');
+  const orderNumber = button.getAttribute('data-order-number');
+  document.getElementById('modalOrderId').value = orderId;
+  document.getElementById('modalOrderNumber').textContent = orderNumber;
+}
+
+function getCSRFToken() {
+  // Try to get from cookie
+  const cookies = document.cookie.split(';');
+  for (let cookie of cookies) {
+    const [name, value] = cookie.trim().split('=');
+    if (name === 'csrftoken') return value;
+  }
+  // Try meta tag
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta) return meta.getAttribute('content');
+  // Try hidden input
+  const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+  if (input) return input.value;
+  return '';
+}
+
+function updateOrderStatus(newStatus) {
+  const orderId = document.getElementById('modalOrderId').value;
+
+  fetch(`/orders/${orderId}/update-status/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCSRFToken()
+    },
+    body: JSON.stringify({ status: newStatus })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Close modal
+      const modal = bootstrap.Modal.getInstance(document.getElementById('orderStatusModal'));
+      if (modal) modal.hide();
+      // Reload to reflect changes
+      location.reload();
+    } else {
+      alert('Error: ' + (data.error || 'Failed to update status'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('An error occurred while updating status');
   });
 }
 </script>

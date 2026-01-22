@@ -43,6 +43,8 @@ urlpatterns = [
     # operation links
     path('update_order_status/',
          orders_views.update_order_status, name='update_order_status'),
+    path('<int:order_id>/update-status/',
+         orders_views.update_order_status, name='update_order_status_by_id'),
 
     # Order comments
     path('order/<int:order_id>/comments/',

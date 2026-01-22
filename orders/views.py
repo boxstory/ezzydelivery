@@ -1250,23 +1250,58 @@ def order_product_list(request, order_id):
 # operation links
 
 @require_POST
-def update_order_status(request):
-    if request.method == 'POST' and request.is_ajax():
-        # Assuming you have a model named "YourModel" with a "status" field
-        order_id = request.POST.get('order_id')
-        logger.debug(f'update_order_status called for order_id: {order_id}')
-        status = request.POST.get('status')
-        logger.debug(f'New status requested: {status}')
+@login_required(login_url='/accounts/login/')
+def update_order_status(request, order_id=None):
+    """Update order status - supports both form POST and JSON body"""
+    try:
+        # Get order_id from URL or request body
+        if order_id is None:
+            # Try JSON body first
+            if request.content_type == 'application/json':
+                import json
+                data = json.loads(request.body)
+                order_id = data.get('order_id')
+                status = data.get('status')
+            else:
+                # Fall back to form POST
+                order_id = request.POST.get('order_id')
+                status = request.POST.get('status')
+        else:
+            # order_id from URL, status from body
+            if request.content_type == 'application/json':
+                import json
+                data = json.loads(request.body)
+                status = data.get('status')
+            else:
+                status = request.POST.get('status')
+
+        if not order_id or not status:
+            return JsonResponse({'success': False, 'error': 'Missing order_id or status'}, status=400)
+
         order = orders_models.Order.objects.get(pk=order_id)
+
+        # Check user has permission (owner or staff)
+        if not request.user.is_staff:
+            if hasattr(request.user, 'profile') and request.user.profile.business_id != order.business_id:
+                return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+        old_status = order.order_status
         order.order_status = status
-        logger.debug(f'Order status updated to: {order.order_status}')
         order.save()
 
-        # Return a JSON response indicating success
-        return JsonResponse({'status': 'success'})
+        logger.debug(f'Order {order_id} status updated from {old_status} to {status}')
 
-    # Return a JSON response indicating failure
-    return JsonResponse({'status': 'error'})
+        return JsonResponse({
+            'success': True,
+            'status': 'success',
+            'message': f'Order status updated to {status}'
+        })
+
+    except orders_models.Order.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Order not found'}, status=404)
+    except Exception as e:
+        logger.error(f'Error updating order status: {e}')
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
 @require_POST
