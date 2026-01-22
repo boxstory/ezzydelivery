@@ -1,0 +1,451 @@
+"""
+Agent Service
+
+Main orchestration service for the AI Operations Agent.
+Manages conversations, tool execution, and message flow.
+"""
+
+import logging
+import json
+from typing import Any, Dict, List, Optional, Generator
+from uuid import UUID
+
+from django.contrib.auth.models import User
+from django.utils import timezone
+
+from ai_agent.models import Conversation, ConversationMessage
+from ai_agent.services.claude_service import get_claude_service
+from ai_agent.tools import tool_registry
+from ai_agent.prompts.system_prompts import get_prompt_for_channel
+
+logger = logging.getLogger(__name__)
+
+
+class AgentService:
+    """
+    Main service for handling AI agent interactions.
+
+    Manages:
+    - Conversation creation and retrieval
+    - Message processing with Claude
+    - Tool execution loop
+    - Response generation
+    """
+
+    MAX_TOOL_ITERATIONS = 10  # Prevent infinite tool loops
+
+    def __init__(self):
+        self.claude_service = get_claude_service()
+
+    def get_or_create_conversation(
+        self,
+        conversation_id: Optional[str] = None,
+        channel: str = 'web',
+        user: Optional[User] = None,
+        business=None,
+        phone_number: str = ''
+    ) -> Conversation:
+        """Get existing conversation or create new one."""
+        if conversation_id:
+            try:
+                conversation = Conversation.objects.get(
+                    conversation_id=conversation_id,
+                    status='active'
+                )
+                return conversation
+            except Conversation.DoesNotExist:
+                pass
+
+        # Create new conversation
+        conversation = Conversation.objects.create(
+            channel=channel,
+            user=user,
+            business=business,
+            phone_number=phone_number,
+            status='active',
+            context={}
+        )
+
+        logger.info(f"Created new conversation: {conversation.conversation_id}")
+        return conversation
+
+    def process_message(
+        self,
+        message: str,
+        conversation: Conversation,
+        user: Optional[User] = None,
+        tools_enabled: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Process a user message and generate AI response.
+
+        Args:
+            message: User's message text
+            conversation: Conversation instance
+            user: Optional user for auth/rate limiting
+            tools_enabled: Whether to allow tool use
+
+        Returns:
+            Dict with 'response', 'tool_calls', 'conversation_id', etc.
+        """
+        # Store user message
+        user_message = ConversationMessage.objects.create(
+            conversation=conversation,
+            role='user',
+            content=message
+        )
+
+        # Build message history
+        messages = self._build_message_history(conversation)
+
+        # Get system prompt
+        system_prompt = get_prompt_for_channel(conversation.channel)
+
+        # Get available tools
+        tools = None
+        if tools_enabled:
+            tools = tool_registry.get_claude_tools()
+
+        # Call Claude
+        user_id = user.id if user else None
+        business_id = conversation.business_id if conversation.business else None
+
+        response = self.claude_service.chat(
+            messages=messages,
+            system=system_prompt,
+            tools=tools,
+            conversation=conversation,
+            user_id=user_id,
+            business_id=business_id
+        )
+
+        if response.get('error'):
+            return {
+                'success': False,
+                'error': response.get('message'),
+                'conversation_id': str(conversation.conversation_id),
+            }
+
+        # Process tool calls if any
+        tool_results = []
+        iterations = 0
+
+        while response.get('tool_calls') and iterations < self.MAX_TOOL_ITERATIONS:
+            iterations += 1
+
+            # Execute each tool call
+            for tool_call in response['tool_calls']:
+                tool_result = self._execute_tool(
+                    tool_call=tool_call,
+                    conversation=conversation,
+                    user=user
+                )
+                tool_results.append(tool_result)
+
+            # Build tool results message
+            tool_results_content = []
+            for result in tool_results[-len(response['tool_calls']):]:
+                tool_results_content.append({
+                    'type': 'tool_result',
+                    'tool_use_id': result['tool_call_id'],
+                    'content': json.dumps(result['result']),
+                })
+
+            # Add assistant message and tool results to history
+            messages.append({
+                'role': 'assistant',
+                'content': response.get('content') or '',
+            })
+
+            # Add tool use blocks
+            for tool_call in response['tool_calls']:
+                messages[-1]['content'] = [
+                    {'type': 'text', 'text': response.get('content') or ''},
+                    {
+                        'type': 'tool_use',
+                        'id': tool_call['id'],
+                        'name': tool_call['name'],
+                        'input': tool_call['input'],
+                    }
+                ] if response.get('content') else [
+                    {
+                        'type': 'tool_use',
+                        'id': tool_call['id'],
+                        'name': tool_call['name'],
+                        'input': tool_call['input'],
+                    }
+                ]
+
+            # Add tool results
+            messages.append({
+                'role': 'user',
+                'content': tool_results_content,
+            })
+
+            # Get next response
+            response = self.claude_service.chat(
+                messages=messages,
+                system=system_prompt,
+                tools=tools,
+                conversation=conversation,
+                user_id=user_id,
+                business_id=business_id
+            )
+
+            if response.get('error'):
+                break
+
+        # Store assistant response
+        final_content = response.get('content', '')
+        if final_content:
+            assistant_message = ConversationMessage.objects.create(
+                conversation=conversation,
+                role='assistant',
+                content=final_content,
+                tokens_input=response.get('tokens_input', 0),
+                tokens_output=response.get('tokens_output', 0)
+            )
+
+        return {
+            'success': True,
+            'response': final_content,
+            'conversation_id': str(conversation.conversation_id),
+            'tool_calls': tool_results,
+            'tokens_used': {
+                'input': response.get('tokens_input', 0),
+                'output': response.get('tokens_output', 0),
+            }
+        }
+
+    def process_message_stream(
+        self,
+        message: str,
+        conversation: Conversation,
+        user: Optional[User] = None,
+        tools_enabled: bool = True
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Process a message with streaming response.
+
+        Yields chunks as they arrive from Claude.
+        """
+        # Store user message
+        ConversationMessage.objects.create(
+            conversation=conversation,
+            role='user',
+            content=message
+        )
+
+        # Build message history
+        messages = self._build_message_history(conversation)
+
+        # Get system prompt and tools
+        system_prompt = get_prompt_for_channel(conversation.channel)
+        tools = tool_registry.get_claude_tools() if tools_enabled else None
+
+        user_id = user.id if user else None
+        business_id = conversation.business_id if conversation.business else None
+
+        full_response = ''
+        tool_calls = []
+
+        for chunk in self.claude_service.chat_stream(
+            messages=messages,
+            system=system_prompt,
+            tools=tools,
+            conversation=conversation,
+            user_id=user_id,
+            business_id=business_id
+        ):
+            if chunk.get('type') == 'text':
+                full_response += chunk.get('text', '')
+                yield {
+                    'type': 'text',
+                    'content': chunk.get('text', ''),
+                }
+
+            elif chunk.get('type') == 'tool_start':
+                yield {
+                    'type': 'tool_start',
+                    'tool_name': chunk.get('tool_name'),
+                }
+
+            elif chunk.get('type') == 'tool_end':
+                tool = chunk.get('tool')
+                if tool:
+                    tool_calls.append(tool)
+                    # Execute tool
+                    result = self._execute_tool(
+                        tool_call=tool,
+                        conversation=conversation,
+                        user=user
+                    )
+                    yield {
+                        'type': 'tool_result',
+                        'tool_name': tool['name'],
+                        'result': result['result'],
+                    }
+
+            elif chunk.get('type') == 'error':
+                yield {
+                    'type': 'error',
+                    'error': chunk.get('message'),
+                }
+
+            elif chunk.get('type') == 'complete':
+                # Store final response
+                if full_response:
+                    ConversationMessage.objects.create(
+                        conversation=conversation,
+                        role='assistant',
+                        content=full_response,
+                        tokens_input=chunk.get('tokens_input', 0),
+                        tokens_output=chunk.get('tokens_output', 0)
+                    )
+
+                yield {
+                    'type': 'complete',
+                    'conversation_id': str(conversation.conversation_id),
+                    'tokens_used': {
+                        'input': chunk.get('tokens_input', 0),
+                        'output': chunk.get('tokens_output', 0),
+                    }
+                }
+
+    def _build_message_history(
+        self,
+        conversation: Conversation,
+        limit: int = 20
+    ) -> List[Dict[str, Any]]:
+        """Build message history for Claude from conversation."""
+        messages = []
+
+        recent_messages = conversation.messages.order_by('-created_at')[:limit]
+
+        for msg in reversed(list(recent_messages)):
+            if msg.role == 'user':
+                messages.append({
+                    'role': 'user',
+                    'content': msg.content
+                })
+            elif msg.role == 'assistant':
+                messages.append({
+                    'role': 'assistant',
+                    'content': msg.content
+                })
+            # Skip tool messages - they're handled separately
+
+        return messages
+
+    def _execute_tool(
+        self,
+        tool_call: Dict[str, Any],
+        conversation: Conversation,
+        user: Optional[User] = None
+    ) -> Dict[str, Any]:
+        """Execute a tool call and store result."""
+        tool_name = tool_call['name']
+        tool_input = tool_call['input']
+
+        logger.info(f"Executing tool: {tool_name}")
+
+        # Execute tool
+        result = tool_registry.execute_tool(
+            tool_name=tool_name,
+            params=tool_input,
+            user=user,
+            business=conversation.business
+        )
+
+        # Store tool call in conversation
+        ConversationMessage.objects.create(
+            conversation=conversation,
+            role='tool',
+            content=json.dumps(result),
+            tool_name=tool_name,
+            tool_input=tool_input,
+            tool_output=result
+        )
+
+        return {
+            'tool_name': tool_name,
+            'tool_call_id': tool_call.get('id'),
+            'input': tool_input,
+            'result': result,
+        }
+
+    def execute_single_tool(
+        self,
+        tool_name: str,
+        params: Dict[str, Any],
+        user: Optional[User] = None,
+        business=None
+    ) -> Dict[str, Any]:
+        """
+        Execute a single tool directly without conversation.
+
+        Useful for direct API endpoints like /tools/parse-address/
+        """
+        return tool_registry.execute_tool(
+            tool_name=tool_name,
+            params=params,
+            user=user,
+            business=business
+        )
+
+    def get_conversation_history(
+        self,
+        conversation_id: str,
+        limit: int = 50
+    ) -> Dict[str, Any]:
+        """Get conversation history for display."""
+        try:
+            conversation = Conversation.objects.get(conversation_id=conversation_id)
+        except Conversation.DoesNotExist:
+            return {
+                'success': False,
+                'error': 'Conversation not found'
+            }
+
+        messages = conversation.messages.order_by('created_at')[:limit]
+
+        history = []
+        for msg in messages:
+            history.append({
+                'role': msg.role,
+                'content': msg.content,
+                'tool_name': msg.tool_name if msg.role == 'tool' else None,
+                'created_at': msg.created_at.isoformat(),
+            })
+
+        return {
+            'success': True,
+            'conversation_id': str(conversation.conversation_id),
+            'channel': conversation.channel,
+            'status': conversation.status,
+            'started_at': conversation.started_at.isoformat(),
+            'messages': history,
+            'total_tokens': conversation.total_tokens,
+        }
+
+    def close_conversation(self, conversation_id: str) -> bool:
+        """Close/archive a conversation."""
+        try:
+            conversation = Conversation.objects.get(conversation_id=conversation_id)
+            conversation.status = 'closed'
+            conversation.save()
+            return True
+        except Conversation.DoesNotExist:
+            return False
+
+
+# Singleton instance
+_agent_service = None
+
+
+def get_agent_service() -> AgentService:
+    """Get the singleton AgentService instance."""
+    global _agent_service
+    if _agent_service is None:
+        _agent_service = AgentService()
+    return _agent_service
