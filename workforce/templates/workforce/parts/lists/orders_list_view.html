@@ -349,7 +349,7 @@
                     <div class="orc-id">
                         <a href="{% url 'workforce:order_detail' order.id %}"
                            hx-get="{% url 'workforce:order_detail' order.id %}"
-                           hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">{{ order.order_number|default:order.client_order_code|truncatechars:16 }}</a>
+                           hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">{{ order.order_number|default:order.client_order_code }}</a>
                         <span class="orc-seller">{{ order.business.business_name|truncatechars:12 }}</span>
                     </div>
                     <div class="orc-customer">
@@ -1147,6 +1147,23 @@
             AIBulkProcess.updateProgress(order.orderNumber);
             await delay(100);
 
+            // Validate address exists
+            const addressToProcess = (order.customerAddress || '').trim();
+            if (!addressToProcess) {
+                const noAddrHtml = `
+                    <div class="ai-result-card" data-order-id="${order.id}">
+                        <div class="ai-result-card-header">
+                            <i class="fa-solid fa-circle-exclamation text-warning"></i>
+                            <strong>${order.orderNumber}</strong>
+                        </div>
+                        <div class="text-warning">No address available for this order</div>
+                    </div>
+                `;
+                resultsHtml += noAddrHtml;
+                AIBulkProcess.addResult(order.orderNumber, false, noAddrHtml);
+                continue;
+            }
+
             try {
                 const response = await fetch('/api/ai-agent/tools/parse-address/', {
                     method: 'POST',
@@ -1154,7 +1171,7 @@
                         'Content-Type': 'application/json',
                         'X-CSRFToken': getCSRFToken()
                     },
-                    body: JSON.stringify({ address: order.customerAddress })
+                    body: JSON.stringify({ address: addressToProcess })
                 });
 
                 const data = await response.json();
@@ -1586,14 +1603,19 @@
         AIBulkProcess.showResults(resultsHtml);
     }
 
+    // Store current single order data for AI tools
+    let currentSingleOrderData = null;
+
     // Open AI tools for a single order
     function openAIToolsForOrder(orderId, orderNumber) {
         const row = document.querySelector(`.orc-row[data-order-id="${orderId}"]`);
-        const order = {
+
+        // Store order data in a variable instead of embedding in onclick handlers
+        currentSingleOrderData = {
             id: orderId,
             orderNumber: orderNumber,
-            customerPhone: row.dataset.customerPhone,
-            customerAddress: row.dataset.customerAddress
+            customerPhone: row.dataset.customerPhone || '',
+            customerAddress: row.dataset.customerAddress || ''
         };
 
         openAIModal(`AI Tools - ${orderNumber}`);
@@ -1604,25 +1626,40 @@
                 <h6><i class="fa-solid fa-robot"></i> AI Analysis Tools</h6>
                 <p class="text-muted small mb-3">Select a tool to analyze this order:</p>
                 <div class="ai-tools-buttons">
-                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderTool('${orderId}', '${orderNumber}', '${order.customerPhone}', '${order.customerAddress}', 'parse')">
+                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderToolFromData('parse')">
                         <i class="fa-solid fa-location-dot"></i> Parse Address
                     </button>
-                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderTool('${orderId}', '${orderNumber}', '${order.customerPhone}', '${order.customerAddress}', 'verify')">
+                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderToolFromData('verify')">
                         <i class="fa-solid fa-clipboard-check"></i> Verify Order
                     </button>
-                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderTool('${orderId}', '${orderNumber}', '${order.customerPhone}', '${order.customerAddress}', 'cod')">
+                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderToolFromData('cod')">
                         <i class="fa-solid fa-shield-halved"></i> COD Risk
                     </button>
-                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderTool('${orderId}', '${orderNumber}', '${order.customerPhone}', '${order.customerAddress}', 'delivery')">
+                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderToolFromData('delivery')">
                         <i class="fa-solid fa-clock"></i> Estimate Time
                     </button>
-                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderTool('${orderId}', '${orderNumber}', '${order.customerPhone}', '${order.customerAddress}', 'driver')">
+                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderToolFromData('driver')">
                         <i class="fa-solid fa-motorcycle"></i> Suggest Driver
                     </button>
                 </div>
             </div>
             <div id="singleOrderResult"></div>
         `;
+    }
+
+    // Run AI tool from stored data (avoids special character issues)
+    function runSingleOrderToolFromData(toolType) {
+        if (!currentSingleOrderData) {
+            alert('Order data not available');
+            return;
+        }
+        runSingleOrderTool(
+            currentSingleOrderData.id,
+            currentSingleOrderData.orderNumber,
+            currentSingleOrderData.customerPhone,
+            currentSingleOrderData.customerAddress,
+            toolType
+        );
     }
 
     // Run AI tool for single order

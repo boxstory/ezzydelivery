@@ -38,6 +38,14 @@ urlpatterns = [
     path("delivery_task/assign_driver/",
          delivery_views.assign_driver, name="assign_driver"),
 
+    # Start ride - update status to in_transit
+    path("delivery_task/start_ride/",
+         delivery_views.start_ride, name="start_ride"),
+
+    # Task navigation map
+    path("task/<int:task_id>/navigation/",
+         delivery_views.task_navigation, name="task_navigation"),
+
     # ADDRESS LINK CREATE AND UPDATE FOR CUSTUMERS
     path("address_link/<str:dl_task_code>/",
          delivery_views.dl_address_link, name="dl_address_link"),

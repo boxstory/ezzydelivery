@@ -108,6 +108,10 @@ class ParseAddressTool(BaseTool):
             'landmarks': [],
             'confidence': 0.0,
             'parse_notes': [],
+            'coordinates': {
+                'latitude': None,
+                'longitude': None,
+            },
         }
 
         # Extract zone number
@@ -156,6 +160,44 @@ class ParseAddressTool(BaseTool):
                 result['area_name'] = zone_from_db.get('area_name')
                 result['confidence'] += 0.25
                 result['parse_notes'].append(f"Matched from database: {zone_from_db.get('area_name')}")
+                # Get coordinates if available
+                if zone_from_db.get('latitude') and zone_from_db.get('longitude'):
+                    result['coordinates']['latitude'] = zone_from_db['latitude']
+                    result['coordinates']['longitude'] = zone_from_db['longitude']
+
+        # Fetch zone name and coordinates if we have a zone number but missing details
+        if result['zone_number']:
+            zone_details = self._get_zone_details(result['zone_number'])
+            if zone_details:
+                # Set zone name if not already set
+                if not result['zone_name']:
+                    result['zone_name'] = zone_details.get('zone_name')
+                    result['parse_notes'].append(f"Zone name: {zone_details.get('zone_name')}")
+                # Set coordinates if not already set
+                if not result['coordinates']['latitude'] and zone_details.get('latitude'):
+                    result['coordinates']['latitude'] = zone_details['latitude']
+                    result['coordinates']['longitude'] = zone_details['longitude']
+                    result['parse_notes'].append(f"Zone {result['zone_number']} coordinates found")
+
+        # AI Search fallback if no zone found
+        if not result['zone_number']:
+            ai_result = self._ai_search_zone(address)
+            if ai_result:
+                result['zone_number'] = ai_result.get('zone_number')
+                result['zone_name'] = ai_result.get('zone_name')
+                result['area_name'] = ai_result.get('area_name')
+                result['confidence'] += 0.35
+                result['parse_notes'].append(f"AI identified zone: {ai_result.get('zone_name')} (Zone {ai_result.get('zone_number')})")
+
+                # Get coordinates for the AI-identified zone
+                if result['zone_number']:
+                    zone_details = self._get_zone_details(result['zone_number'])
+                    if zone_details:
+                        if not result['zone_name']:
+                            result['zone_name'] = zone_details.get('zone_name')
+                        if zone_details.get('latitude'):
+                            result['coordinates']['latitude'] = zone_details['latitude']
+                            result['coordinates']['longitude'] = zone_details['longitude']
 
         # Extract common landmarks
         landmarks = self._extract_landmarks(address)
@@ -191,21 +233,62 @@ class ParseAddressTool(BaseTool):
         return None
 
     def _find_zone_from_database(self, address: str) -> Optional[Dict[str, Any]]:
-        """Search ZoneName and ZoneArea models for matches."""
+        """Search ZoneName and ZoneArea models for matches with fuzzy matching."""
         from delivery.models import ZoneName, ZoneArea
 
         address_lower = address.lower()
         words = address_lower.split()
 
-        # Search area names
+        # Common Qatar area spelling variations
+        spelling_variants = {
+            'musheireb': ['mushaireb', 'msheireb', 'musheirib'],
+            'mushaireb': ['musheireb', 'msheireb', 'musheirib'],
+            'lusail': ['luseil', 'lusayl', 'lussail'],
+            'wakra': ['wakrah', 'al wakra', 'al wakrah'],
+            'khor': ['al khor', 'alkhor', 'khawr'],
+            'sadd': ['al sadd', 'alsadd'],
+            'duhail': ['al duhail', 'duheil'],
+            'rayyan': ['al rayyan', 'alrayyan'],
+            'gharafa': ['al gharafa', 'algharafa', 'gharrafa'],
+            'markhiya': ['al markhiya', 'markhiyya'],
+            'messila': ['al messila', 'messilah'],
+            'thumama': ['al thumama', 'thumamah'],
+            'waab': ['al waab', 'wab'],
+            'aziziya': ['al aziziya', 'aziziyah'],
+            'mansoura': ['al mansoura', 'mansourah'],
+            'najma': ['al najma', 'nejmah'],
+            'nasr': ['al nasr'],
+            'hilal': ['al hilal'],
+            'sailiya': ['al sailiya', 'sailiyah'],
+            'dafna': ['al dafna', 'dafnah', 'west bay'],
+            'westbay': ['west bay', 'dafna', 'al dafna'],
+            'downtown': ['mushaireb', 'msheireb', 'souq waqif'],
+            'corniche': ['doha corniche', 'al corniche'],
+            'pearl': ['the pearl', 'pearl qatar'],
+            'katara': ['katara cultural village'],
+        }
+
+        # Build search terms including variants
+        search_terms = set(words)
         for word in words:
-            if len(word) < 3:
+            word_clean = word.replace(',', '').strip()
+            if word_clean in spelling_variants:
+                search_terms.update(spelling_variants[word_clean])
+            # Also check partial matches
+            for key, variants in spelling_variants.items():
+                if key in word_clean or word_clean in key:
+                    search_terms.add(key)
+                    search_terms.update(variants)
+
+        # Search with all terms
+        for term in search_terms:
+            if len(term) < 3:
                 continue
 
             # Search in ZoneArea
             area_match = ZoneArea.objects.filter(
-                Q(area_name__icontains=word) |
-                Q(area_name_arabic__icontains=word)
+                Q(area_name__icontains=term) |
+                Q(area_name_arabic__icontains=term)
             ).select_related('zone').first()
 
             if area_match:
@@ -213,12 +296,14 @@ class ParseAddressTool(BaseTool):
                     'zone_number': area_match.zone.zone_number,
                     'zone_name': area_match.zone.zone_name,
                     'area_name': area_match.area_name,
+                    'latitude': float(area_match.zone.latitude) if area_match.zone.latitude else None,
+                    'longitude': float(area_match.zone.longitude) if area_match.zone.longitude else None,
                 }
 
             # Search in ZoneName
             zone_match = ZoneName.objects.filter(
-                Q(zone_name__icontains=word) |
-                Q(zone_name_arabic__icontains=word)
+                Q(zone_name__icontains=term) |
+                Q(zone_name_arabic__icontains=term)
             ).first()
 
             if zone_match:
@@ -226,7 +311,113 @@ class ParseAddressTool(BaseTool):
                     'zone_number': zone_match.zone_number,
                     'zone_name': zone_match.zone_name,
                     'area_name': zone_match.zone_name,
+                    'latitude': float(zone_match.latitude) if zone_match.latitude else None,
+                    'longitude': float(zone_match.longitude) if zone_match.longitude else None,
                 }
+
+        return None
+
+    def _get_zone_coordinates(self, zone_number: int) -> Optional[Dict[str, float]]:
+        """Get coordinates for a zone by zone number."""
+        from delivery.models import ZoneName
+
+        try:
+            zone = ZoneName.objects.get(zone_number=zone_number, is_active=True)
+            if zone.latitude and zone.longitude:
+                return {
+                    'latitude': float(zone.latitude),
+                    'longitude': float(zone.longitude),
+                }
+        except ZoneName.DoesNotExist:
+            pass
+        return None
+
+    def _get_zone_details(self, zone_number: int) -> Optional[Dict[str, Any]]:
+        """Get full zone details (name and coordinates) by zone number."""
+        from delivery.models import ZoneName
+
+        try:
+            zone = ZoneName.objects.get(zone_number=zone_number, is_active=True)
+            return {
+                'zone_number': zone.zone_number,
+                'zone_name': zone.zone_name,
+                'latitude': float(zone.latitude) if zone.latitude else None,
+                'longitude': float(zone.longitude) if zone.longitude else None,
+            }
+        except ZoneName.DoesNotExist:
+            pass
+        return None
+
+    def _ai_search_zone(self, address: str) -> Optional[Dict[str, Any]]:
+        """Use AI to identify the zone from address text."""
+        from delivery.models import ZoneName
+        import json
+
+        try:
+            from ai_agent.services.claude_service import get_claude_service
+            claude = get_claude_service()
+
+            # Check if service is available
+            available, msg = claude.is_available()
+            if not available:
+                logger.warning(f"AI service not available for zone search: {msg}")
+                return None
+
+            # Get list of available zones for context
+            zones = list(ZoneName.objects.filter(is_active=True).values('zone_number', 'zone_name')[:100])
+            zones_list = "\n".join([f"Zone {z['zone_number']}: {z['zone_name']}" for z in zones])
+
+            # Create prompt for Claude
+            system_prompt = """You are a Qatar address expert. Given an address or location text, identify the most likely Qatar zone number and name.
+
+Available Qatar zones:
+""" + zones_list + """
+
+Respond ONLY with a valid JSON object in this exact format:
+{"zone_number": <number>, "zone_name": "<name>", "area_name": "<area if different>", "confidence": <0.0-1.0>}
+
+If you cannot identify the zone, respond with: {"zone_number": null}
+Do not include any other text, only the JSON."""
+
+            messages = [
+                {"role": "user", "content": f"Identify the Qatar zone for this address: {address}"}
+            ]
+
+            response = claude.chat(messages=messages, system=system_prompt)
+
+            if response.get('error'):
+                logger.warning(f"AI zone search error: {response.get('message')}")
+                return None
+
+            content = response.get('content', '')
+            if not content:
+                return None
+
+            # Parse JSON response
+            try:
+                # Clean up response - extract JSON if wrapped in markdown
+                content = content.strip()
+                if content.startswith('```'):
+                    content = content.split('\n', 1)[1] if '\n' in content else content
+                    content = content.rsplit('```', 1)[0] if '```' in content else content
+                content = content.strip()
+
+                result = json.loads(content)
+                if result.get('zone_number') is not None:
+                    zone_num = int(result['zone_number'])
+                    # Verify zone exists
+                    zone = ZoneName.objects.filter(zone_number=zone_num, is_active=True).first()
+                    if zone:
+                        return {
+                            'zone_number': zone.zone_number,
+                            'zone_name': zone.zone_name,
+                            'area_name': result.get('area_name', zone.zone_name),
+                        }
+            except (json.JSONDecodeError, ValueError, TypeError) as e:
+                logger.warning(f"AI zone search JSON parse error: {e}, content: {content[:200]}")
+
+        except Exception as e:
+            logger.error(f"AI zone search error: {e}")
 
         return None
 

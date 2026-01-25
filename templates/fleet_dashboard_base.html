@@ -35,6 +35,42 @@
   <!-- Toast Notifications -->
   {% include "includes/toast_notifications.html" %}
 
+  <!-- COD Wallet Warning/Block Banner -->
+  {% if driver_wallet_blocked %}
+  <div class="cod-warning-banner cod-warning-banner--blocked" id="cod-block-banner">
+    <div class="cod-warning-banner__content">
+      <div class="cod-warning-banner__icon">
+        <i class="fa-solid fa-hand"></i>
+      </div>
+      <div class="cod-warning-banner__text">
+        <strong>COD Limit Reached!</strong>
+        <span>You have {{ driver_cod_in_hand }} QR COD in hand. Please submit COD to admin to continue accepting orders.</span>
+      </div>
+      <a href="{% url 'fleet:cod_submission' %}" class="cod-warning-banner__btn">
+        <i class="fa-solid fa-upload me-1"></i>Submit COD
+      </a>
+    </div>
+  </div>
+  {% elif driver_wallet_warning %}
+  <div class="cod-warning-banner cod-warning-banner--warning" id="cod-warning-banner">
+    <div class="cod-warning-banner__content">
+      <div class="cod-warning-banner__icon">
+        <i class="fa-solid fa-exclamation-triangle"></i>
+      </div>
+      <div class="cod-warning-banner__text">
+        <strong>COD Warning!</strong>
+        <span>Wallet usage at {{ driver_usage_percentage|floatformat:0 }}%. Available credit: {{ driver_available_credit }} QR</span>
+      </div>
+      <a href="{% url 'fleet:cod_submission' %}" class="cod-warning-banner__btn">
+        <i class="fa-solid fa-upload me-1"></i>Submit COD
+      </a>
+      <button type="button" class="cod-warning-banner__close" onclick="this.parentElement.parentElement.style.display='none'">
+        <i class="fa-solid fa-times"></i>
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Mobile PWA Header - Only visible on mobile -->
   {% include "fleet/parts/pwa_header.html" %}
 

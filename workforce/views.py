@@ -1095,15 +1095,16 @@ def dl_list_published_to_dms(request):
 @login_required(login_url='/accounts/login/')
 @staff_required
 def dl_list_ready_to_published_to_dms(request):
+    """List orders ready to be published to DMS (task_created=False)"""
     orders = orders_models.Order.objects.select_related(
-        'business'
+        'business', 'pickup_location'
     ).filter(task_created=False).order_by('-created_at')
     orders = paginate_queryset(request, orders)
 
     data = {
         'orders': orders,
     }
-    return render(request, 'workforce/parts/lists/dl_list_all.html', data)
+    return render(request, 'workforce/parts/lists/dl_list_unpublished.html', data)
 
 
 
@@ -1473,6 +1474,10 @@ def update_order_zone(request, order_id):
         order = get_object_or_404(orders_models.Order, id=order_id)
         data = json.loads(request.body)
         zone_number = data.get('zone_number')
+        street_number = data.get('street_number')
+        building_number = data.get('building_number')
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
 
         if not zone_number:
             return JsonResponse({
@@ -1489,26 +1494,50 @@ def update_order_zone(request, order_id):
                 'error': f'Zone {zone_number} not found or inactive'
             }, status=400)
 
-        # Update order zone
+        # Update order zone and address fields
         old_zone = order.dl_zone
         order.dl_zone = zone_number
+        if street_number:
+            order.dl_street = str(street_number)
+        if building_number:
+            order.dl_building = str(building_number)
         order.save()
 
+        # Update delivery task address (dl_to_address) with coordinates if available
+        coords_saved = False
+        if latitude and longitude:
+            delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
+            if delivery_task and delivery_task.dl_to_address:
+                dl_address = delivery_task.dl_to_address
+                dl_address.dl_latitude = latitude
+                dl_address.dl_longitude = longitude
+                dl_address.dl_zone = zone_number
+                if street_number:
+                    dl_address.dl_street = str(street_number)
+                if building_number:
+                    dl_address.dl_building = str(building_number)
+                dl_address.save()
+                coords_saved = True
+
         # Log the update
+        notes = f'Zone updated from AI parse: {zone.zone_name}'
+        if coords_saved:
+            notes += f' | Coordinates saved: {latitude}, {longitude}'
         orders_models.OrderVerificationLog.objects.create(
             order=order,
             verified_by=request.user,
             action='zone_updated',
             old_status=str(old_zone) if old_zone else 'None',
             new_status=str(zone_number),
-            notes=f'Zone updated from AI parse: {zone.zone_name}'
+            notes=notes
         )
 
         return JsonResponse({
             'success': True,
-            'message': f'Zone updated to {zone_number} ({zone.zone_name})',
+            'message': f'Zone updated to {zone_number} ({zone.zone_name})' + (' with coordinates' if coords_saved else ''),
             'zone_number': zone_number,
-            'zone_name': zone.zone_name
+            'zone_name': zone.zone_name,
+            'coordinates_saved': coords_saved
         })
     except json.JSONDecodeError:
         return JsonResponse({

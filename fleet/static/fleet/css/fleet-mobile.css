@@ -2449,3 +2449,151 @@ a.task-filter:hover:not(.task-filter--active) {
 .zone-group-zones i {
   color: #0066cc;
 }
+
+/* ========================================
+   COD Warning/Block Banner
+   ======================================== */
+.cod-warning-banner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  padding: 12px 16px;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.cod-warning-banner--blocked {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  color: white;
+}
+
+.cod-warning-banner--warning {
+  background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+  color: #212529;
+}
+
+.cod-warning-banner__content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 1200px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+}
+
+.cod-warning-banner__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.cod-warning-banner--blocked .cod-warning-banner__icon {
+  background: rgba(255,255,255,0.25);
+}
+
+.cod-warning-banner__text {
+  flex: 1;
+  min-width: 200px;
+}
+
+.cod-warning-banner__text strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cod-warning-banner__text span {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.cod-warning-banner__btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.cod-warning-banner--blocked .cod-warning-banner__btn {
+  background: white;
+  color: #dc3545;
+}
+
+.cod-warning-banner--blocked .cod-warning-banner__btn:hover {
+  background: #f8f9fa;
+  transform: scale(1.02);
+}
+
+.cod-warning-banner--warning .cod-warning-banner__btn {
+  background: #212529;
+  color: white;
+}
+
+.cod-warning-banner--warning .cod-warning-banner__btn:hover {
+  background: #000;
+}
+
+.cod-warning-banner__close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.7;
+  padding: 8px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.cod-warning-banner__close:hover {
+  opacity: 1;
+}
+
+/* Mobile adjustments */
+@media (max-width: 576px) {
+  .cod-warning-banner {
+    padding: 10px 12px;
+  }
+
+  .cod-warning-banner__content {
+    gap: 10px;
+  }
+
+  .cod-warning-banner__icon {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .cod-warning-banner__text strong {
+    font-size: 13px;
+  }
+
+  .cod-warning-banner__text span {
+    font-size: 12px;
+  }
+
+  .cod-warning-banner__btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}

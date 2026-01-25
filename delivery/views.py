@@ -235,7 +235,7 @@ def all_delivery_tasks(request):
 
 @login_required(login_url='account_login')
 def assign_driver(request):
-    if request.method == "POST" and request.is_ajax():
+    if request.method == "POST":
         task_id = request.POST.get("task_id")
 
         if not task_id:
@@ -256,6 +256,10 @@ def assign_driver(request):
                 driver=driver, dl_task=task
             )
             assigned_driver.save()
+
+            # Update task status to assigned when driver accepts
+            task.dl_task_status = 'assigned'
+            task.save(update_fields=['dl_task_status'])
             logger.info(f"Task {task_id} successfully assigned to driver {driver.driver_id}")
 
             return JsonResponse({"success": True})
@@ -271,6 +275,106 @@ def assign_driver(request):
             return JsonResponse({"success": False, "error": str(e)})
 
     return JsonResponse({"success": False, "error": "Invalid request"})
+
+
+@login_required(login_url='account_login')
+def start_ride(request):
+    """Start the delivery ride - update task status to in_transit"""
+    if request.method == "POST":
+        task_id = request.POST.get("task_id")
+
+        if not task_id:
+            return JsonResponse({"success": False, "error": "Task ID required"})
+
+        try:
+            # Verify user is a driver
+            driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+            # Verify task is assigned to this driver
+            assigned = delivery_models.AssignedDriver.objects.filter(
+                dl_task_id=task_id, driver=driver
+            ).exists()
+
+            if not assigned:
+                return JsonResponse({"success": False, "error": "Task not assigned to you"})
+
+            task = delivery_models.DeliveryTask.objects.get(id=task_id)
+
+            # Update status to in_transit
+            task.dl_task_status = 'in_transit'
+            task.save(update_fields=['dl_task_status'])
+            logger.info(f"Driver {driver.driver_id} started ride for task {task_id}")
+
+            return JsonResponse({
+                "success": True,
+                "redirect_url": f"/delivery/task/{task_id}/navigation/"
+            })
+
+        except fleet_models.Driver.DoesNotExist:
+            return JsonResponse({"success": False, "error": "Driver profile not found"})
+        except delivery_models.DeliveryTask.DoesNotExist:
+            return JsonResponse({"success": False, "error": "Task not found"})
+        except Exception as e:
+            logger.error(f"Error starting ride for task {task_id}: {e}")
+            return JsonResponse({"success": False, "error": str(e)})
+
+    return JsonResponse({"success": False, "error": "Invalid request"})
+
+
+@login_required(login_url='account_login')
+def task_navigation(request, task_id):
+    """Show navigation map for delivery task"""
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        # Verify task is assigned to this driver
+        assigned = delivery_models.AssignedDriver.objects.filter(
+            dl_task_id=task_id, driver=driver
+        ).exists()
+
+        if not assigned:
+            from django.contrib import messages
+            messages.error(request, "Task not assigned to you")
+            return redirect('delivery:all_delivery_tasks')
+
+        task = delivery_models.DeliveryTask.objects.select_related(
+            'order', 'order__business', 'pickup_location', 'dl_to_address'
+        ).get(id=task_id)
+
+        # Get pickup coordinates - try pickup_location first, then warehouse
+        pickup = task.pickup_location
+        pickup_lat = None
+        pickup_lon = None
+
+        if pickup and pickup.pickup_lat and pickup.pickup_lon:
+            pickup_lat = pickup.pickup_lat
+            pickup_lon = pickup.pickup_lon
+        else:
+            # Fallback to warehouse coordinates
+            from warehouse.models import Warehouse
+            warehouse = Warehouse.objects.filter(is_active=True).first()
+            if warehouse and warehouse.latitude and warehouse.longitude:
+                pickup_lat = warehouse.latitude
+                pickup_lon = warehouse.longitude
+
+        context = {
+            'task': task,
+            'pickup': task.pickup_location,
+            'dropoff': task.dl_to_address,
+            'pickup_lat': pickup_lat,
+            'pickup_lon': pickup_lon,
+        }
+
+        return render(request, 'delivery/task_navigation.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        from django.contrib import messages
+        messages.error(request, "Driver profile not found")
+        return redirect('delivery:all_delivery_tasks')
+    except delivery_models.DeliveryTask.DoesNotExist:
+        from django.contrib import messages
+        messages.error(request, "Task not found")
+        return redirect('delivery:all_delivery_tasks')
 
 
 @login_required(login_url='account_login')

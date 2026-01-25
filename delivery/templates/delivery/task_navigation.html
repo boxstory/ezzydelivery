@@ -1,0 +1,345 @@
+{% extends "fleet_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Navigation - Task #{{ task.dl_task_number }}{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'fleet/css/fleet.css' %}" rel="stylesheet" type="text/css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  .navigation-container {
+    height: calc(100vh - 60px);
+    display: flex;
+    flex-direction: column;
+  }
+  .task-info-bar {
+    background: var(--pwa-navy, #001f3f);
+    color: white;
+    padding: 12px 16px;
+  }
+  .task-info-bar__title {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .task-info-bar__subtitle {
+    font-size: 12px;
+    opacity: 0.9;
+  }
+  .map-container {
+    flex: 1;
+    position: relative;
+    min-height: 300px;
+  }
+  #navigation-map {
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
+  .destination-card {
+    position: absolute;
+    bottom: 80px;
+    left: 16px;
+    right: 16px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    padding: 16px;
+    z-index: 1000;
+  }
+  .destination-card__header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .destination-card__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--pwa-danger, #dc3545);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+  .destination-card__label {
+    font-size: 12px;
+    color: #666;
+  }
+  .destination-card__address {
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .destination-card__details {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #666;
+    flex-wrap: wrap;
+  }
+  .destination-card__detail {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .navigation-actions {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    display: flex;
+    gap: 12px;
+    z-index: 1000;
+  }
+  .navigation-actions .btn {
+    flex: 1;
+    padding: 14px;
+    font-weight: 600;
+    border-radius: 10px;
+  }
+  .btn-navigate {
+    background: var(--pwa-primary, #f7c000);
+    border: none;
+    color: #000;
+  }
+  .btn-navigate:hover {
+    background: #e5b000;
+    color: #000;
+  }
+  .btn-complete {
+    background: var(--pwa-success, #28a745);
+    border: none;
+    color: white;
+  }
+  .btn-call {
+    background: white;
+    border: 2px solid var(--pwa-navy, #001f3f);
+    color: var(--pwa-navy, #001f3f);
+    flex: 0 0 auto;
+    width: 52px;
+  }
+  .no-address-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: #f8f9fa;
+    color: #666;
+    text-align: center;
+    padding: 20px;
+  }
+  .no-address-info i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    color: #aaa;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="navigation-container">
+  <!-- Task Info Bar -->
+  <div class="task-info-bar">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <div class="task-info-bar__title">
+          <i class="fa-solid fa-truck-fast me-2"></i>Task #{{ task.dl_task_number|truncatechars:15 }}
+        </div>
+        <div class="task-info-bar__subtitle">
+          {{ task.order.business.business_name|default:"Pickup" }} &rarr; {% if dropoff %}{{ dropoff.area_name|default:"Delivery" }}{% else %}Delivery{% endif %}
+        </div>
+      </div>
+      <a href="{% url 'delivery:all_delivery_tasks' %}?tab=assigned" class="btn btn-sm btn-light">
+        <i class="fa-solid fa-arrow-left me-1"></i>Back
+      </a>
+    </div>
+  </div>
+
+  <!-- Map Container -->
+  <div class="map-container">
+    <div id="navigation-map"></div>
+
+    <!-- Destination Card -->
+    <div class="destination-card">
+      <div class="destination-card__header">
+        <div class="destination-card__icon">
+          <i class="fa-solid fa-location-dot"></i>
+        </div>
+        <div>
+          <div class="destination-card__label">Delivery Location</div>
+          <div class="destination-card__address">
+            {% if dropoff %}
+              Zone {{ dropoff.dl_zone|default:"-" }}, {{ dropoff.area_name|default:"N/A" }}
+            {% else %}
+              Address not set
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% if dropoff %}
+      <div class="destination-card__details">
+        {% if dropoff.dl_street %}
+        <div class="destination-card__detail">
+          <i class="fa-solid fa-road"></i>
+          Street {{ dropoff.dl_street }}
+        </div>
+        {% endif %}
+        {% if dropoff.dl_building %}
+        <div class="destination-card__detail">
+          <i class="fa-solid fa-building"></i>
+          Building {{ dropoff.dl_building }}
+        </div>
+        {% endif %}
+        {% if task.order.cod_amount > 0 %}
+        <div class="destination-card__detail">
+          <i class="fa-solid fa-coins"></i>
+          COD: {{ task.order.cod_amount }} QR
+        </div>
+        {% endif %}
+      </div>
+      <div class="destination-card__details">
+        <div class="destination-card__detail">
+          <i class="fa-solid fa-user"></i>
+          {{ dropoff.full_name|default:"Customer" }}
+        </div>
+        {% if dropoff.mobile_no %}
+        <div class="destination-card__detail">
+          <i class="fa-solid fa-phone"></i>
+          {{ dropoff.mobile_no }}
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Navigation Actions -->
+    <div class="navigation-actions">
+      {% if dropoff.mobile_no %}
+      <a href="tel:{{ dropoff.mobile_no }}" class="btn btn-call">
+        <i class="fa-solid fa-phone"></i>
+      </a>
+      {% endif %}
+      <button type="button" class="btn btn-navigate" id="btn-open-maps">
+        <i class="fa-solid fa-diamond-turn-right me-2"></i>Navigate
+      </button>
+      <button type="button" class="btn btn-complete" id="btn-complete-task" data-task-id="{{ task.id }}">
+        <i class="fa-solid fa-check me-2"></i>Complete
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Coordinates - use correct field names with fallback to Qatar center
+  var dropoffLat = {% if dropoff.dl_latitude %}{{ dropoff.dl_latitude }}{% else %}25.2854{% endif %};
+  var dropoffLng = {% if dropoff.dl_longitude %}{{ dropoff.dl_longitude }}{% else %}51.5310{% endif %};
+  var pickupLat = {% if pickup_lat %}{{ pickup_lat }}{% else %}25.2760{% endif %};
+  var pickupLng = {% if pickup_lon %}{{ pickup_lon }}{% else %}51.5200{% endif %};
+
+  var hasDropoffCoords = {% if dropoff.dl_latitude and dropoff.dl_longitude %}true{% else %}false{% endif %};
+  var hasPickupCoords = {% if pickup_lat and pickup_lon %}true{% else %}false{% endif %};
+
+  // Initialize Leaflet map (free, no API key needed)
+  var map = L.map('navigation-map').setView([dropoffLat, dropoffLng], 14);
+
+  // Add OpenStreetMap tiles
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(map);
+
+  // Custom icons
+  var dropoffIcon = L.divIcon({
+    className: 'custom-marker',
+    html: '<div style="background:#dc3545;width:24px;height:24px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+
+  var pickupIcon = L.divIcon({
+    className: 'custom-marker',
+    html: '<div style="background:#28a745;width:24px;height:24px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+
+  // Add markers
+  if (hasDropoffCoords) {
+    L.marker([dropoffLat, dropoffLng], {icon: dropoffIcon})
+      .addTo(map)
+      .bindPopup('<strong>Delivery Location</strong><br>{% if dropoff %}Zone {{ dropoff.dl_zone|default:"-" }}, {{ dropoff.area_name|default:"N/A" }}{% endif %}');
+  }
+
+  if (hasPickupCoords) {
+    L.marker([pickupLat, pickupLng], {icon: pickupIcon})
+      .addTo(map)
+      .bindPopup('<strong>Pickup Location</strong><br>{{ pickup.pickup_location_title|default:"Pickup" }}');
+  }
+
+  // Fit bounds to show both markers if both have coordinates
+  if (hasDropoffCoords && hasPickupCoords) {
+    var bounds = L.latLngBounds([[pickupLat, pickupLng], [dropoffLat, dropoffLng]]);
+    map.fitBounds(bounds, {padding: [50, 50]});
+  } else if (hasDropoffCoords) {
+    map.setView([dropoffLat, dropoffLng], 15);
+  } else if (hasPickupCoords) {
+    map.setView([pickupLat, pickupLng], 15);
+  }
+
+  // Open in Google Maps for navigation
+  document.getElementById('btn-open-maps').addEventListener('click', function() {
+    var url = 'https://www.google.com/maps/dir/?api=1&destination=' + dropoffLat + ',' + dropoffLng + '&travelmode=driving';
+    window.open(url, '_blank');
+  });
+
+  // Complete task
+  document.getElementById('btn-complete-task').addEventListener('click', function() {
+    var taskId = this.dataset.taskId;
+    var btn = this;
+
+    if (!confirm('Mark this delivery as completed?')) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Completing...';
+
+    fetch('/api/driver/tasks/' + taskId + '/complete/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify({ status: 'delivered' })
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+      if (data.success || data.status === 'delivered') {
+        btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Completed!';
+        btn.classList.remove('btn-complete');
+        btn.classList.add('btn-secondary');
+        if (typeof showToast === 'function') {
+          showToast('Delivery completed successfully!', 'success');
+        }
+        setTimeout(function() {
+          window.location.href = '{% url "delivery:all_delivery_tasks" %}?tab=assigned';
+        }, 1500);
+      } else {
+        throw new Error(data.error || 'Failed to complete task');
+      }
+    })
+    .catch(function(error) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Complete';
+      alert('Error: ' + error.message);
+    });
+  });
+});
+</script>
+{% endblock %}

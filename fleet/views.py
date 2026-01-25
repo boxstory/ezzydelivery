@@ -448,31 +448,52 @@ def driver_earnings(request):
 
         # Get filter parameters
         days = int(request.GET.get('days', 30))
+        status_filter = request.GET.get('status', 'all')
 
-        # Get statistics
-        stats = WalletService.get_driver_statistics(driver, days=days)
+        from datetime import timedelta
+        from django.utils import timezone
+        from delivery import models as delivery_models
+        from django.db.models import Sum
 
-        # Get wallet status
-        wallet_status = WalletService.get_wallet_status(driver)
+        start_date = timezone.now() - timedelta(days=days)
 
-        # Get earning transactions
-        earning_transactions = fleet_models.DriverTransaction.objects.filter(
-            driver=driver,
-            transaction_type__in=['earning', 'bonus', 'deduction']
-        ).select_related('delivery_task').order_by('-created_at')[:50]
-
-        # Get recent settlements
-        settlements = fleet_models.DriverSettlement.objects.filter(
+        # Get assigned task IDs for this driver
+        assigned_task_ids = delivery_models.AssignedDriver.objects.filter(
             driver=driver
-        ).order_by('-created_at')[:10]
+        ).values_list('dl_task_id', flat=True)
+
+        # Get completed delivery tasks (delivered or returned with charge)
+        completed_tasks = delivery_models.DeliveryTask.objects.filter(
+            id__in=assigned_task_ids,
+            dl_task_status__in=['delivered', 'returned'],
+            dl_task_date__gte=start_date.date()
+        ).select_related(
+            'order', 'order__business', 'pickup_location', 'dl_to_address'
+        ).order_by('-dl_task_date', '-id')
+
+        # Apply status filter
+        if status_filter == 'delivered':
+            completed_tasks = completed_tasks.filter(dl_task_status='delivered')
+        elif status_filter == 'returned':
+            completed_tasks = completed_tasks.filter(dl_task_status='returned')
+
+        # Calculate totals
+        total_delivery_fee = completed_tasks.aggregate(
+            total=Sum('dl_price')
+        )['total'] or 0
+
+        delivered_count = completed_tasks.filter(dl_task_status='delivered').count()
+        returned_count = completed_tasks.filter(dl_task_status='returned').count()
 
         context = {
             'driver': driver,
-            'stats': stats,
-            'wallet_status': wallet_status,
-            'earning_transactions': earning_transactions,
-            'settlements': settlements,
+            'completed_tasks': completed_tasks,
+            'total_delivery_fee': total_delivery_fee,
+            'delivered_count': delivered_count,
+            'returned_count': returned_count,
+            'total_count': completed_tasks.count(),
             'selected_days': days,
+            'selected_status': status_filter,
         }
 
         return render(request, 'fleet/parts/driver_earnings.html', context)
@@ -881,3 +902,128 @@ def driver_profile_mobile(request):
         logger.warning(f"User {request.user.id} has no driver profile")
         messages.error(request, "Driver profile not found. Please create one first.")
         return redirect('core:main_dashboard')
+
+
+@login_required(login_url='account_login')
+def pickup_scanner(request):
+    """
+    Display the pickup task scanner page with camera access.
+    Driver scans QR codes/barcodes to confirm pickup of items.
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        # Get assigned tasks that are pending pickup
+        from delivery import models as delivery_models
+        assigned_task_ids = delivery_models.AssignedDriver.objects.filter(
+            driver=driver
+        ).values_list('dl_task_id', flat=True)
+
+        pending_tasks = delivery_models.DeliveryTask.objects.filter(
+            id__in=assigned_task_ids,
+            dl_task_status__in=['assigned', 'pending']
+        ).select_related('order', 'order__business', 'pickup_location').order_by('dl_task_date')
+
+        context = {
+            'driver': driver,
+            'pending_tasks': pending_tasks,
+            'pending_count': pending_tasks.count(),
+        }
+
+        return render(request, 'fleet/pickup_scanner.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, "Driver profile not found.")
+        return redirect('core:main_dashboard')
+
+
+@login_required(login_url='account_login')
+def pickup_scan_process(request):
+    """
+    Process a scanned barcode/QR code for pickup confirmation.
+    Updates task status and returns result.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+    try:
+        import json
+        data = json.loads(request.body) if request.content_type == 'application/json' else request.POST
+        scanned_code = data.get('code', '').strip()
+
+        if not scanned_code:
+            return JsonResponse({'success': False, 'error': 'No code provided'})
+
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        # Find task by scanned code (could be task number, order number, or barcode)
+        from delivery import models as delivery_models
+        from orders import models as orders_models
+
+        # Try to find by task number
+        task = None
+        assigned_task_ids = delivery_models.AssignedDriver.objects.filter(
+            driver=driver
+        ).values_list('dl_task_id', flat=True)
+
+        # Search by task number
+        task = delivery_models.DeliveryTask.objects.filter(
+            id__in=assigned_task_ids,
+            dl_task_number__icontains=scanned_code
+        ).first()
+
+        # If not found, search by order number
+        if not task:
+            task = delivery_models.DeliveryTask.objects.filter(
+                id__in=assigned_task_ids,
+                order__order_number__icontains=scanned_code
+            ).first()
+
+        # If not found, search by barcode
+        if not task:
+            barcode = orders_models.OrderBarcode.objects.filter(
+                barcode_value=scanned_code
+            ).select_related('order').first()
+
+            if barcode:
+                task = delivery_models.DeliveryTask.objects.filter(
+                    id__in=assigned_task_ids,
+                    order=barcode.order
+                ).first()
+
+        if not task:
+            return JsonResponse({
+                'success': False,
+                'error': f'No matching task found for code: {scanned_code}'
+            })
+
+        # Check if already picked up
+        if task.dl_task_status == 'in_transit':
+            return JsonResponse({
+                'success': False,
+                'error': 'Task already picked up',
+                'task_number': task.dl_task_number
+            })
+
+        # Update task status to in_transit (picked up)
+        task.dl_task_status = 'in_transit'
+        task.save(update_fields=['dl_task_status'])
+
+        logger.info(f"Driver {driver.driver_id} confirmed pickup for task {task.dl_task_number}")
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Pickup confirmed!',
+            'task_number': task.dl_task_number,
+            'task_id': task.id,
+            'business': task.order.business.business_name if task.order and task.order.business else 'N/A',
+            'redirect_url': f'/delivery/task/{task.id}/navigation/'
+        })
+
+    except fleet_models.Driver.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON data'})
+    except Exception as e:
+        logger.error(f"Error processing pickup scan: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})

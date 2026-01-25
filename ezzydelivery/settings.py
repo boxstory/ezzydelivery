@@ -234,6 +234,8 @@ TEMPLATES = [
                 'business.decorators.business_permissions_context',
                 # Workforce dashboard sidebar counts
                 'workforce.context_processors.workforce_sidebar_counts',
+                # Fleet driver wallet status for COD warnings
+                'fleet.context_processors.driver_wallet_status',
             ],
         },
     },

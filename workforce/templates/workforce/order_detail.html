@@ -97,6 +97,52 @@
                             <p class="fw-bold mb-0">{{ order.client_order_code }}</p>
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label text-muted small">Verification Status</label>
+                            <p class="mb-0">
+                                {% if order.verification_status == 'pending' %}
+                                <span class="badge bg-warning text-dark fs-6">Pending</span>
+                                {% elif order.verification_status == 'verified' %}
+                                <span class="badge bg-success fs-6">Verified</span>
+                                {% elif order.verification_status == 'rejected' %}
+                                <span class="badge bg-danger fs-6">Rejected</span>
+                                {% else %}
+                                <span class="badge bg-secondary fs-6">{{ order.verification_status }}</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">DMS Status</label>
+                            <p class="mb-0">
+                                {% if delivery_task %}
+                                    {% if delivery_task.dl_task_status_dms == '0' %}
+                                    <span class="badge bg-primary fs-6"><i class="fa-solid fa-user me-1"></i>Assigned</span>
+                                    {% elif delivery_task.dl_task_status_dms == '1' %}
+                                    <span class="badge bg-info fs-6"><i class="fa-solid fa-play me-1"></i>Started</span>
+                                    {% elif delivery_task.dl_task_status_dms == '2' %}
+                                    <span class="badge bg-success fs-6"><i class="fa-solid fa-check me-1"></i>Successful</span>
+                                    {% elif delivery_task.dl_task_status_dms == '3' %}
+                                    <span class="badge bg-danger fs-6"><i class="fa-solid fa-times me-1"></i>Failed</span>
+                                    {% elif delivery_task.dl_task_status_dms == '4' %}
+                                    <span class="badge bg-warning text-dark fs-6"><i class="fa-solid fa-truck me-1"></i>In Progress</span>
+                                    {% elif delivery_task.dl_task_status_dms == '6' %}
+                                    <span class="badge bg-secondary fs-6"><i class="fa-solid fa-user-slash me-1"></i>Unassigned</span>
+                                    {% elif delivery_task.dl_task_status_dms == '7' %}
+                                    <span class="badge bg-info fs-6"><i class="fa-solid fa-thumbs-up me-1"></i>Accepted</span>
+                                    {% elif delivery_task.dl_task_status_dms == '8' %}
+                                    <span class="badge bg-danger fs-6"><i class="fa-solid fa-ban me-1"></i>Declined</span>
+                                    {% elif delivery_task.dl_task_status_dms == '9' %}
+                                    <span class="badge bg-danger fs-6"><i class="fa-solid fa-times-circle me-1"></i>Cancelled</span>
+                                    {% elif delivery_task.dl_task_status_dms == '10' %}
+                                    <span class="badge bg-dark fs-6"><i class="fa-solid fa-trash me-1"></i>Deleted</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary fs-6">{{ delivery_task.get_dl_task_status_dms_display|default:"-" }}</span>
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-muted">Not published</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label text-muted small">Order Status</label>
                             <p class="mb-0">
                                 {% if order.order_status == 'to_review' %}
@@ -109,20 +155,6 @@
                                 <span class="badge bg-danger fs-6">Cancelled</span>
                                 {% else %}
                                 <span class="badge bg-secondary fs-6">{{ order.order_status }}</span>
-                                {% endif %}
-                            </p>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label text-muted small">Verification Status</label>
-                            <p class="mb-0">
-                                {% if order.verification_status == 'pending' %}
-                                <span class="badge bg-warning text-dark fs-6">Pending</span>
-                                {% elif order.verification_status == 'verified' %}
-                                <span class="badge bg-success fs-6">Verified</span>
-                                {% elif order.verification_status == 'rejected' %}
-                                <span class="badge bg-danger fs-6">Rejected</span>
-                                {% else %}
-                                <span class="badge bg-secondary fs-6">{{ order.verification_status }}</span>
                                 {% endif %}
                             </p>
                         </div>
@@ -762,20 +794,28 @@ async function assignDriverToOrder(orderId, driverId, driverName, btn) {
 }
 
 // Save parsed zone to order
-async function saveParseResultToOrder(orderId, zoneNumber, zoneName) {
+async function saveParseResultToOrder(orderId, zoneNumber, zoneName, streetNumber, buildingNumber, latitude, longitude) {
     const btn = event.target.closest('button');
     const originalHtml = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...';
 
     try {
+        const payload = {
+            zone_number: zoneNumber,
+            street_number: streetNumber,
+            building_number: buildingNumber,
+            latitude: latitude,
+            longitude: longitude
+        };
+
         const response = await fetch(`/workforce/order/${orderId}/update-zone/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCSRFToken()
             },
-            body: JSON.stringify({ zone_number: zoneNumber })
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
@@ -786,7 +826,7 @@ async function saveParseResultToOrder(orderId, zoneNumber, zoneName) {
 
         if (data.success) {
             btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Saved!';
-            btn.classList.remove('btn-primary');
+            btn.classList.remove('btn-info');
             btn.classList.add('btn-success');
 
             // Update the zone display on the page if it exists
@@ -809,6 +849,140 @@ async function saveParseResultToOrder(orderId, zoneNumber, zoneName) {
         setTimeout(() => btn.classList.remove('btn-danger'), 2000);
         alert('Error saving zone: ' + error.message);
     }
+}
+
+// Initialize Leaflet map for AI parse result
+function initAIParseMap(lat, lng, title) {
+    const mapContainer = document.getElementById('ai-parse-map');
+    if (!mapContainer) return;
+
+    // Check if Leaflet is loaded, if not load it
+    if (typeof L === 'undefined') {
+        // Load Leaflet CSS
+        const leafletCss = document.createElement('link');
+        leafletCss.rel = 'stylesheet';
+        leafletCss.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(leafletCss);
+
+        // Load Leaflet JS
+        const leafletJs = document.createElement('script');
+        leafletJs.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        leafletJs.onload = function() {
+            createParseMap(lat, lng, title);
+        };
+        document.body.appendChild(leafletJs);
+    } else {
+        createParseMap(lat, lng, title);
+    }
+}
+
+// Store current adjusted coordinates
+var adjustedCoordinates = { lat: null, lng: null };
+
+function createParseMap(lat, lng, title) {
+    const mapContainer = document.getElementById('ai-parse-map');
+    if (!mapContainer || mapContainer._leaflet_id) return; // Prevent re-initialization
+
+    // Initialize adjusted coordinates
+    adjustedCoordinates.lat = lat;
+    adjustedCoordinates.lng = lng;
+
+    const map = L.map('ai-parse-map').setView([lat, lng], 14);
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+
+    // Light blue marker icon
+    const lightBlueIcon = L.divIcon({
+        className: 'custom-marker',
+        html: `<div style="
+            background: #17a2b8;
+            width: 28px;
+            height: 28px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(23, 162, 184, 0.5);
+            position: relative;
+            cursor: grab;
+        ">
+            <div style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%) rotate(45deg);
+                color: white;
+                font-size: 12px;
+            ">
+                <i class="fa-solid fa-location-dot"></i>
+            </div>
+        </div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+        popupAnchor: [0, -28]
+    });
+
+    // Add draggable marker
+    const marker = L.marker([lat, lng], {
+        icon: lightBlueIcon,
+        draggable: true
+    }).addTo(map);
+
+    // Update popup content
+    function updatePopup(newLat, newLng) {
+        marker.setPopupContent(`
+            <strong>${title}</strong><br>
+            <span class="text-info"><i class="fa-solid fa-arrows-up-down-left-right me-1"></i>Drag to adjust</span><br>
+            Lat: ${newLat.toFixed(6)}<br>
+            Lng: ${newLng.toFixed(6)}
+        `);
+    }
+
+    marker.bindPopup(`
+        <strong>${title}</strong><br>
+        <span class="text-info"><i class="fa-solid fa-arrows-up-down-left-right me-1"></i>Drag to adjust</span><br>
+        Lat: ${lat.toFixed(6)}<br>
+        Lng: ${lng.toFixed(6)}
+    `).openPopup();
+
+    // Handle marker drag
+    marker.on('dragend', function(e) {
+        const position = marker.getLatLng();
+        adjustedCoordinates.lat = position.lat;
+        adjustedCoordinates.lng = position.lng;
+
+        // Update popup
+        updatePopup(position.lat, position.lng);
+        marker.openPopup();
+
+        // Update coordinates display
+        const coordsDisplay = document.querySelector('.ai-result-card .text-muted.small.mb-2');
+        if (coordsDisplay) {
+            coordsDisplay.innerHTML = `${position.lat.toFixed(6)}, ${position.lng.toFixed(6)} <span class="badge bg-warning text-dark ms-1">Adjusted</span>`;
+        }
+
+        // Update the save button onclick to use adjusted coordinates
+        const saveBtn = document.querySelector('.ai-result-card button[onclick*="saveParseResultToOrder"]');
+        if (saveBtn) {
+            const onclickAttr = saveBtn.getAttribute('onclick');
+            // Replace the lat/lng values in the onclick
+            const newOnclick = onclickAttr.replace(
+                /,\s*[\d.]+,\s*[\d.]+\)$/,
+                `, ${position.lat}, ${position.lng})`
+            );
+            saveBtn.setAttribute('onclick', newOnclick);
+            // Add visual indicator that coordinates were adjusted
+            if (!saveBtn.innerHTML.includes('Adjusted')) {
+                saveBtn.innerHTML = saveBtn.innerHTML.replace('Save Zone', 'Save Zone (Adjusted)');
+            }
+        }
+    });
+
+    // Invalidate size after a short delay (helps with modal rendering)
+    setTimeout(() => map.invalidateSize(), 200);
 }
 
 // Close modal with Escape key
@@ -890,7 +1064,11 @@ async function aiParseOrderAddress(orderId, orderNumber, address) {
 
         if (data.success) {
             const result = data.data;
+            const coords = result.coordinates || {};
             AIProcess.addLog(`Zone found: ${result.zone_number || 'Not detected'}`, result.zone_number ? 'success' : 'info');
+            if (coords.latitude && coords.longitude) {
+                AIProcess.addLog(`Coordinates: ${coords.latitude}, ${coords.longitude}`, 'success');
+            }
             AIProcess.addLog(`Confidence: ${Math.round(result.confidence * 100)}%`, result.confidence > 0.7 ? 'success' : 'info');
             AIProcess.completeStep(4);
 
@@ -932,6 +1110,13 @@ async function aiParseOrderAddress(orderId, orderNumber, address) {
                             <span class="value">${result.area_name || '-'}</span>
                         </div>
                     </div>
+                    ${coords.latitude && coords.longitude ? `
+                        <div class="mt-3">
+                            <strong class="small"><i class="fa-solid fa-map-marker-alt text-info me-1"></i>Zone Coordinates:</strong>
+                            <p class="text-muted small mb-2">${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}</p>
+                            <div id="ai-parse-map" style="height: 200px; border-radius: 8px; border: 2px solid #17a2b8;"></div>
+                        </div>
+                    ` : ''}
                     ${result.landmarks && result.landmarks.length > 0 ? `
                         <div class="mt-3">
                             <strong class="small">Landmarks:</strong>
@@ -950,13 +1135,20 @@ async function aiParseOrderAddress(orderId, orderNumber, address) {
                     ` : ''}
                     ${result.zone_number ? `
                         <div class="mt-3 pt-3 border-top">
-                            <button type="button" class="btn btn-primary w-100" onclick="saveParseResultToOrder('${orderId}', ${result.zone_number}, '${(result.zone_name || '').replace(/'/g, "\\'")}')">
-                                <i class="fa-solid fa-save me-2"></i>Save Zone ${result.zone_number} to Order
+                            <button type="button" class="btn btn-info w-100" onclick="saveParseResultToOrder('${orderId}', ${result.zone_number}, '${(result.zone_name || '').replace(/'/g, "\\'")}', ${result.street_number || 'null'}, ${result.building_number || 'null'}, ${coords.latitude || 'null'}, ${coords.longitude || 'null'})">
+                                <i class="fa-solid fa-save me-2"></i>Save Zone ${result.zone_number}${coords.latitude ? ' with Coordinates' : ''} to Order
                             </button>
                         </div>
                     ` : ''}
                 </div>
             `);
+
+            // Initialize map if coordinates are available
+            if (coords.latitude && coords.longitude) {
+                setTimeout(() => {
+                    initAIParseMap(coords.latitude, coords.longitude, result.zone_name || 'Zone ' + result.zone_number);
+                }, 100);
+            }
         } else {
             AIProcess.errorStep(4);
             AIProcess.addLog(data.error || 'Failed to parse address', 'error');

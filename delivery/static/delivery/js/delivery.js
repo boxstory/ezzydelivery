@@ -3,17 +3,21 @@
    ============================================ */
 
 /* ---------- FLEET ---------- */
+/* Note: This code is for legacy all_delivery_tasks.html template.
+   The newer tasks_all.html uses Bootstrap collapse instead. */
 $(document).ready(function () {
-  $(function () {
-    $("table tr td").find("div").hide();
-    $("table").click(function (event) {
+  // Only run on pages with the legacy delivery task cards (expandable rows)
+  // Specifically target cards in rows with colspan (detail rows), not regular table content
+  var $legacyDetailCards = $("table tr td[colspan] > .card");
+
+  if ($legacyDetailCards.length > 0) {
+    // Hide the detail cards initially
+    $legacyDetailCards.hide();
+
+    // Toggle on row click (only for the data row, not the detail row)
+    $("table tr:not(:has(td[colspan]))").click(function (event) {
       event.stopPropagation();
-      var $target = $(event.target);
-      /*    if ( $target.closest("td").attr("colspan") > 1 ) {
-              $target.closest("div.expand").slideUp();
-          } else { */
-      $target.closest("tr").next().find("div").slideToggle();
-      /*  }   */
+      $(this).next("tr").find(".card").slideToggle();
     });
-  });
+  }
 });

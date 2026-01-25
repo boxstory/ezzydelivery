@@ -59,4 +59,10 @@ urlpatterns = [
           fleet_views.driver_reports, name='driver_reports'),
      path('analytics/',
           fleet_views.driver_analytics, name='driver_analytics'),
+
+     # Pickup Scanner
+     path('pickup/scanner/',
+          fleet_views.pickup_scanner, name='pickup_scanner'),
+     path('pickup/scan/',
+          fleet_views.pickup_scan_process, name='pickup_scan_process'),
 ]
