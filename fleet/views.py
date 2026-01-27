@@ -51,6 +51,8 @@ Related:
 import logging
 from django.db import connection
 from django.shortcuts import redirect, render
+from django.http import HttpResponse
+from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from core.decorators import driver_required
@@ -95,7 +97,7 @@ def fleets(request):
     """
     # N+1 FIX: Use prefetch_related to fetch all driver vehicles in one query
     fleets = fleet_models.Driver.objects.prefetch_related(
-        'driver_vehicle_set'  # Reverse FK: Driver ← DriverVehicle
+        'driver_vehicle'  # Reverse FK: Driver ← DriverVehicle (related_name='driver_vehicle')
     ).select_related(
         'user',     # FK: Driver → User
         'profile',  # FK: Driver → Profile
@@ -370,17 +372,39 @@ def cod_collection(request):
             transaction_type__in=['cod_collection', 'cod_deposit']
         ).select_related('delivery_task').order_by('-created_at')[:50]
 
-        # Get recent deliveries with COD
+        # Get COD currently in hand (not yet settled/deposited)
+        # Show all COD collected deliveries - driver's cod_in_hand balance reflects the total
+        cod_in_hand_list = delivery_models.DeliveryTask.objects.filter(
+            driver=driver,
+            cod_collected=True,
+            dl_task_status='delivered'
+        ).select_related(
+            'order',
+            'order__business',
+            'dl_to_address'
+        ).order_by('-completed_at')
+
+        # Use the driver's actual cod_in_hand value as the total
+        cod_in_hand_total = driver.cod_in_hand or 0
+        cod_in_hand_count = cod_in_hand_list.count()
+
+        # Get recent COD deliveries (settled/completed - exclude items still in hand)
+        cod_in_hand_ids = list(cod_in_hand_list.values_list('id', flat=True))
         cod_deliveries = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
             cod_collected=True
-        ).select_related('order').order_by('-completed_at')[:20]
+        ).exclude(
+            id__in=cod_in_hand_ids
+        ).select_related('order', 'order__business', 'dl_to_address').order_by('-completed_at')[:20]
 
         context = {
             'driver': driver,
             'wallet_status': wallet_status,
             'cod_transactions': cod_transactions,
             'cod_deliveries': cod_deliveries,
+            'cod_in_hand_list': cod_in_hand_list,
+            'cod_in_hand_total': cod_in_hand_total,
+            'cod_in_hand_count': cod_in_hand_count,
         }
 
         return render(request, 'fleet/parts/cod_collection.html', context)
@@ -437,6 +461,149 @@ def cod_submission(request):
     except fleet_models.Driver.DoesNotExist:
         messages.error(request, 'Driver profile not found.')
         return redirect('core:main_dashboard')
+
+
+# COD Export --------------------------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
+@driver_required
+def cod_export(request):
+    """Export COD in hand report as CSV or PDF"""
+    import csv
+    from io import BytesIO
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        export_format = request.GET.get('format', 'csv')
+        ids = request.GET.get('ids', '')
+
+        # Parse delivery IDs
+        if ids:
+            delivery_ids = [int(id) for id in ids.split(',') if id.isdigit()]
+        else:
+            delivery_ids = []
+
+        # Get deliveries with related transactions for transaction codes
+        if delivery_ids:
+            deliveries = delivery_models.DeliveryTask.objects.filter(
+                driver=driver,
+                id__in=delivery_ids,
+                cod_collected=True,
+                dl_task_status='delivered'
+            ).select_related('order', 'order__business', 'dl_to_address').prefetch_related('transactions').order_by('-completed_at')
+        else:
+            deliveries = delivery_models.DeliveryTask.objects.filter(
+                driver=driver,
+                cod_collected=True,
+                dl_task_status='delivered'
+            ).select_related('order', 'order__business', 'dl_to_address').prefetch_related('transactions').order_by('-completed_at')
+
+        if export_format == 'pdf':
+            # Generate PDF
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.enums import TA_CENTER
+
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+            elements = []
+            styles = getSampleStyleSheet()
+
+            # Title
+            title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=18, alignment=TA_CENTER, spaceAfter=20)
+            elements.append(Paragraph('COD In Hand Report', title_style))
+
+            # Driver info
+            info_style = ParagraphStyle('Info', parent=styles['Normal'], fontSize=10, spaceAfter=10)
+            elements.append(Paragraph(f'Driver: {driver.user.get_full_name() or driver.user.username}', info_style))
+            elements.append(Paragraph(f'Generated: {timezone.now().strftime("%d %b %Y %H:%M")}', info_style))
+            elements.append(Spacer(1, 20))
+
+            # Table data
+            table_data = [['#', 'TXN Code', 'Task Number', 'Business', 'Customer', 'Amount (QR)']]
+            total = 0
+            for idx, d in enumerate(deliveries, 1):
+                amount = float(d.cod_collected_amount or 0)
+                total += amount
+                # Get transaction code if available
+                txn = d.transactions.filter(transaction_type='cod_collection').first()
+                txn_code = txn.transaction_code if txn and txn.transaction_code else '-'
+                table_data.append([
+                    str(idx),
+                    txn_code[:15] if len(txn_code) > 15 else txn_code,
+                    d.dl_task_number or '-',
+                    (d.order.business.business_name if d.order and d.order.business else '-')[:20],
+                    (d.order.customer_name if d.order else '-')[:15],
+                    f'{amount:.0f}'
+                ])
+
+            # Add total row
+            table_data.append(['', '', '', '', 'Total:', f'{total:.0f}'])
+
+            # Create table
+            table = Table(table_data, colWidths=[0.3*inch, 1.1*inch, 1*inch, 1.4*inch, 1.1*inch, 0.8*inch])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#fffbeb')),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#e5e7eb')),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('TOPPADDING', (0, 1), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+            ]))
+            elements.append(table)
+
+            doc.build(elements)
+            buffer.seek(0)
+
+            response = HttpResponse(buffer, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="cod_report_{timezone.now().strftime("%Y%m%d_%H%M")}.pdf"'
+            return response
+
+        else:
+            # Generate CSV
+            response = HttpResponse(content_type='text/csv')
+            response['Content-Disposition'] = f'attachment; filename="cod_report_{timezone.now().strftime("%Y%m%d_%H%M")}.csv"'
+
+            writer = csv.writer(response)
+            writer.writerow(['#', 'TXN Code', 'Task Number', 'Order Number', 'Business', 'Customer', 'Location', 'Delivered Date', 'Delivered Time', 'COD Amount (QR)'])
+
+            total = 0
+            for idx, d in enumerate(deliveries, 1):
+                amount = float(d.cod_collected_amount or 0)
+                total += amount
+                # Get transaction code if available
+                txn = d.transactions.filter(transaction_type='cod_collection').first()
+                txn_code = txn.transaction_code if txn and txn.transaction_code else '-'
+                writer.writerow([
+                    idx,
+                    txn_code,
+                    d.dl_task_number or '-',
+                    d.order.order_number if d.order else '-',
+                    d.order.business.business_name if d.order and d.order.business else '-',
+                    d.order.customer_name if d.order else '-',
+                    d.dl_to_address.area_name if d.dl_to_address else '-',
+                    d.completed_at.strftime('%d %b %Y') if d.completed_at else '-',
+                    d.completed_at.strftime('%H:%M') if d.completed_at else '-',
+                    f'{amount:.0f}'
+                ])
+
+            writer.writerow([])
+            writer.writerow(['', '', '', '', '', '', '', '', 'Total:', f'{total:.0f}'])
+
+            return response
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found.')
+        return redirect('fleet:cod_collection')
 
 
 # Earnings View ----------------------------------------------------------------------------------------------------------------------------
