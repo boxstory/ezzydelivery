@@ -288,7 +288,18 @@ class DriverTransaction(models.Model):
         ('adjustment', 'Manual Adjustment'),
     )
 
+    PAYMENT_METHOD_CHOICES = [
+        ('cash', 'Cash'),
+        ('bank', 'Bank Transfer'),
+        ('atm', 'ATM Deposit'),
+        ('fawran', 'Fawran'),
+    ]
+
     transaction_id = models.AutoField(primary_key=True)
+    transaction_code = models.CharField(
+        max_length=50, unique=True, blank=True, null=True, db_index=True,
+        help_text="Unique transaction code (auto-generated)"
+    )
     driver = models.ForeignKey(
         Driver, on_delete=models.CASCADE, related_name='transactions'
     )
@@ -299,6 +310,10 @@ class DriverTransaction(models.Model):
     )
     description = models.CharField(max_length=255)
     reference_number = models.CharField(max_length=100, blank=True, null=True)
+    payment_method = models.CharField(
+        max_length=20, choices=PAYMENT_METHOD_CHOICES, default='cash',
+        blank=True, null=True, help_text="Payment method for COD deposit/settlement"
+    )
 
     # Related objects (optional foreign keys)
     delivery_task = models.ForeignKey(
@@ -330,7 +345,26 @@ class DriverTransaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.get_transaction_type_display()} - {self.driver} - {self.amount} QR"
+        return f"{self.transaction_code or self.transaction_id} - {self.get_transaction_type_display()} - {self.amount} QR"
+
+    def save(self, *args, **kwargs):
+        # Generate transaction code if not exists
+        if not self.transaction_code:
+            # Get transaction type prefix
+            type_prefixes = {
+                'earning': 'ERN',
+                'cod_collection': 'COD',
+                'cod_deposit': 'DEP',
+                'settlement': 'STL',
+                'deduction': 'DED',
+                'bonus': 'BNS',
+                'adjustment': 'ADJ',
+            }
+            prefix = type_prefixes.get(self.transaction_type, 'TXN')
+            timestamp = datetime.now().strftime('%y%m%d%H%M%S')
+            driver_id = self.driver.driver_id if self.driver else 0
+            self.transaction_code = f"{prefix}-{driver_id}-{timestamp}"
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name_plural = "Driver Transactions"

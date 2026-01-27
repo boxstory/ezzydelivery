@@ -399,6 +399,7 @@
             <table class="items-table">
                 <thead>
                     <tr>
+                        <th>TXN Code</th>
                         <th>Description</th>
                         <th>Date</th>
                         <th>Amount</th>
@@ -407,13 +408,14 @@
                 <tbody>
                     {% for txn in transactions %}
                     <tr>
-                        <td>{{ txn.description|truncatechars:25 }}</td>
+                        <td style="font-family: monospace; font-size: 9px;">{{ txn.transaction_code|default:"-" }}</td>
+                        <td>{{ txn.description|truncatechars:20 }}</td>
                         <td>{{ txn.created_at|date:"d/m" }}</td>
                         <td>QAR {{ txn.amount }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="3" style="text-align: center;">No transactions</td>
+                        <td colspan="4" style="text-align: center;">No transactions</td>
                     </tr>
                     {% endfor %}
                 </tbody>

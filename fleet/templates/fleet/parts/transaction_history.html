@@ -63,7 +63,7 @@
       <div class="txn-item__info">
         <div class="txn-item__title">{{ txn.get_transaction_type_display }}</div>
         <div class="txn-item__meta">
-          {% if txn.delivery_task %}#{{ txn.delivery_task.dl_task_number|default:txn.delivery_task.id }}{% else %}{{ txn.description|default:"-"|truncatechars:25 }}{% endif %}
+          <span style="font-family: monospace; font-size: 0.7rem;">{{ txn.transaction_code|default:"-" }}</span>
           <span class="txn-item__dot"></span>
           {{ txn.created_at|date:"d M" }}
         </div>
@@ -180,7 +180,7 @@
                                 {% for txn in transactions %}
                                 <tr>
                                     <td>{{ txn.created_at|date:"d M Y" }}<br><small class="text-muted">{{ txn.created_at|time:"H:i" }}</small></td>
-                                    <td><code>{{ txn.transaction_id|default:"-" }}</code></td>
+                                    <td><code style="font-size: 0.8rem;">{{ txn.transaction_code|default:"-" }}</code></td>
                                     <td>
                                         <span class="badge
                                             {% if txn.transaction_type == 'earning' %}bg-success
@@ -196,7 +196,7 @@
                                     <td>{{ txn.description|default:"-" }}</td>
                                     <td>
                                         {% if txn.delivery_task %}
-                                        <small>{{ txn.delivery_task.dl_task_number|truncatechars:15 }}</small>
+                                        <small>{{ txn.delivery_task.dl_task_number }}</small>
                                         {% else %}
                                         -
                                         {% endif %}

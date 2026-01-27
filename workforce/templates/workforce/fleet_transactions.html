@@ -402,6 +402,7 @@
                 <th style="width: 40px;">
                     <input type="checkbox" class="txn-checkbox" id="selectAll" onchange="toggleSelectAll(this)">
                 </th>
+                <th>TXN Code</th>
                 <th class="sortable" onclick="updateSort('{% if sort_by == 'date_asc' %}date_desc{% else %}date_asc{% endif %}')">
                     Date & Time
                     {% if sort_by == 'date_asc' %}<i class="fa-solid fa-sort-up ms-1"></i>
@@ -439,9 +440,11 @@
                            data-type="{{ txn.transaction_type }}"
                            data-description="{{ txn.description }}"
                            data-date="{{ txn.created_at|date:'d M Y' }}"
+                           data-txn-code="{{ txn.transaction_code }}"
                            onchange="updateBulkSelection()"
                            {% if txn.settlement or txn.transaction_type == 'settlement' or txn.transaction_type == 'cod_deposit' or txn.reference_number in deposited_refs %}disabled{% endif %}>
                 </td>
+                <td><code style="font-size: 0.75rem;">{{ txn.transaction_code|default:"-" }}</code></td>
                 <td>{{ txn.created_at|date:"d M Y, h:i A" }}</td>
                 <td>
                     <span class="transaction-type {{ txn.transaction_type }}">
@@ -553,6 +556,7 @@
                     <table>
                         <thead>
                             <tr>
+                                <th>TXN Code</th>
                                 <th>Description</th>
                                 <th>Date</th>
                                 <th style="text-align: right;">Amount</th>
@@ -672,6 +676,7 @@ function settleSelected() {
         const amount = parseFloat(cb.dataset.amount) || 0;
         totalAmount += amount;
         items.push({
+            txnCode: cb.dataset.txnCode || '-',
             description: cb.dataset.description,
             date: cb.dataset.date,
             amount: amount
@@ -695,6 +700,7 @@ function settleSelected() {
     items.forEach(item => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
+            <td style="font-family: monospace; font-size: 0.7rem;">${item.txnCode}</td>
             <td>${item.description}</td>
             <td>${item.date}</td>
             <td style="text-align: right;">QAR ${item.amount.toFixed(2)}</td>
@@ -775,7 +781,7 @@ document.addEventListener('keydown', function(e) {
 // Export to CSV functionality
 function exportToCSV() {
     const csvData = [];
-    csvData.push(['Date & Time', 'Type', 'Description', 'Amount', 'Reference', 'Balance After', 'Status']);
+    csvData.push(['TXN Code', 'Date & Time', 'Type', 'Description', 'Amount', 'Reference', 'Balance After', 'Status']);
 
     const rows = document.querySelectorAll('#transactionsTable tbody tr:not([style*="display: none"])');
     rows.forEach(row => {
@@ -784,10 +790,11 @@ function exportToCSV() {
             cells[1].textContent.trim(),
             cells[2].textContent.trim(),
             cells[3].textContent.trim(),
-            cells[4].textContent.replace('QAR', '').trim(),
-            cells[5].textContent.trim(),
+            cells[4].textContent.trim(),
+            cells[5].textContent.replace('QAR', '').trim(),
             cells[6].textContent.trim(),
-            cells[7].textContent.trim()
+            cells[7].textContent.trim(),
+            cells[8].textContent.trim()
         ];
         csvData.push(rowData);
     });
