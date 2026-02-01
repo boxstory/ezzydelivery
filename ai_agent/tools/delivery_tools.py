@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from django.db.models import Q, Count, Avg
 from django.utils import timezone
 
-from ai_agent.tools.base import BaseTool, ToolError, register_tool
+from ai_agent.tools.base import BaseTool, ToolError, register_tool, get_user_role
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,7 @@ class EstimateDeliveryTool(BaseTool):
     """
 
     name = 'estimate_delivery'
+    allowed_roles = ['staff', 'business']
     description = '''Estimate delivery time for an order based on zones and traffic.
 
     Considers:
@@ -239,6 +240,7 @@ class SuggestDriverTool(BaseTool):
     """
 
     name = 'suggest_driver'
+    allowed_roles = ['staff']
     description = '''Suggest the best driver for a delivery based on various factors.
 
     Considers:
@@ -433,6 +435,7 @@ class GetDriverStatusTool(BaseTool):
     """
 
     name = 'get_driver_status'
+    allowed_roles = ['staff', 'driver']
     description = '''Get the current status and workload of a specific driver.
 
     Returns:
@@ -455,6 +458,22 @@ class GetDriverStatusTool(BaseTool):
             }
         },
     }
+
+    def run(self, params, user=None, business=None):
+        """Override run to force driver users to only see their own data."""
+        role = get_user_role(user)
+        if role == 'driver' and user:
+            from fleet.models import Driver
+            try:
+                driver = Driver.objects.get(user=user)
+                params = {'driver_id': driver.driver_id}
+            except Driver.DoesNotExist:
+                return {
+                    'success': False,
+                    'error': 'Driver profile not found',
+                    'code': 'NOT_FOUND'
+                }
+        return super().run(params, user=user, business=business)
 
     def execute(
         self,

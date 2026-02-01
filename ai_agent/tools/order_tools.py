@@ -81,6 +81,7 @@ class LookupOrderTool(BaseTool):
     """
 
     name = 'lookup_order'
+    allowed_roles = ['staff', 'business']
     description = '''Look up order details by order number.
 
     Returns order information including:
@@ -107,10 +108,18 @@ class LookupOrderTool(BaseTool):
         },
     }
 
+    def run(self, params, user=None, business=None):
+        """Override run to inject business scoping."""
+        if business:
+            params = dict(params)
+            params['_business'] = business
+        return super().run(params, user=user, business=business)
+
     def execute(
         self,
         order_number: Optional[str] = None,
-        client_order_code: Optional[str] = None
+        client_order_code: Optional[str] = None,
+        _business=None
     ) -> Dict[str, Any]:
         from orders.models import Order
 
@@ -118,14 +127,15 @@ class LookupOrderTool(BaseTool):
             raise ToolError('Provide order_number or client_order_code', 'MISSING_PARAM')
 
         try:
+            queryset = Order.objects.select_related('business', 'pickup_location')
+            # Business users can only see their own orders
+            if _business:
+                queryset = queryset.filter(business=_business)
+
             if order_number:
-                order = Order.objects.select_related(
-                    'business', 'pickup_location'
-                ).get(order_number=order_number)
+                order = queryset.get(order_number=order_number)
             else:
-                order = Order.objects.select_related(
-                    'business', 'pickup_location'
-                ).get(client_order_code=client_order_code)
+                order = queryset.get(client_order_code=client_order_code)
         except Order.DoesNotExist:
             identifier = order_number or client_order_code
             raise ToolError(f'Order {identifier} not found', 'NOT_FOUND')
@@ -188,6 +198,7 @@ class VerifyOrderTool(BaseTool):
     """
 
     name = 'verify_order'
+    allowed_roles = ['staff', 'business']
     description = '''Verify an order for completeness and issues.
 
     Checks for:
@@ -211,14 +222,22 @@ class VerifyOrderTool(BaseTool):
         'required': ['order_number']
     }
 
-    def execute(self, order_number: str) -> Dict[str, Any]:
+    def run(self, params, user=None, business=None):
+        """Override run to inject business scoping."""
+        if business:
+            params = dict(params)
+            params['_business'] = business
+        return super().run(params, user=user, business=business)
+
+    def execute(self, order_number: str, _business=None) -> Dict[str, Any]:
         from orders.models import Order
         from delivery.models import ZoneName
 
         try:
-            order = Order.objects.select_related(
-                'business', 'pickup_location'
-            ).get(order_number=order_number)
+            queryset = Order.objects.select_related('business', 'pickup_location')
+            if _business:
+                queryset = queryset.filter(business=_business)
+            order = queryset.get(order_number=order_number)
         except Order.DoesNotExist:
             raise ToolError(f'Order {order_number} not found', 'NOT_FOUND')
 
@@ -353,6 +372,7 @@ class AssessCODRiskTool(BaseTool):
     """
 
     name = 'assess_cod_risk'
+    allowed_roles = ['staff', 'business']
     description = '''Assess the COD (Cash on Delivery) risk for a customer.
 
     Calculates a risk score (0-1) based on:
@@ -526,6 +546,7 @@ class SearchOrdersTool(BaseTool):
     """
 
     name = 'search_orders'
+    allowed_roles = ['staff']
     description = '''Search for orders using various filters.
 
     Can filter by:

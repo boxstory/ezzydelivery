@@ -17,6 +17,32 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
 
+from ai_agent.tools.base import get_user_role
+
+
+def _resolve_user_business(user):
+    """Resolve the Business instance for a user (owner or team member)."""
+    if not user or not user.is_authenticated:
+        return None
+    try:
+        role = get_user_role(user)
+        if role == 'business':
+            # Direct business owner
+            biz = user.user_business.first()
+            if biz:
+                return biz
+            # Team member
+            from business.models import BusinessTeamProfile
+            team = BusinessTeamProfile.objects.filter(
+                user=user, team_status='active'
+            ).select_related('business').first()
+            if team:
+                return team.business
+    except Exception:
+        pass
+    return None
+
+
 from ai_agent.serializers import (
     ChatRequestSerializer,
     ParseAddressRequestSerializer,
@@ -62,7 +88,7 @@ class ChatAPIView(APIView):
             conversation_id=str(serializer.validated_data.get('conversation_id', '')),
             channel=serializer.validated_data.get('channel', 'api'),
             user=request.user,
-            business=getattr(request.user, 'business', None),
+            business=_resolve_user_business(request.user),
         )
 
         # Process message
@@ -110,7 +136,7 @@ class ChatStreamAPIView(APIView):
             conversation_id=str(serializer.validated_data.get('conversation_id', '')),
             channel=serializer.validated_data.get('channel', 'api'),
             user=request.user,
-            business=getattr(request.user, 'business', None),
+            business=_resolve_user_business(request.user),
         )
 
         def generate():

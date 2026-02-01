@@ -15,6 +15,30 @@ from ai_agent.models import AgentTool
 logger = logging.getLogger(__name__)
 
 
+def get_user_role(user) -> str:
+    """
+    Detect user role from Profile flags.
+
+    Priority: staff > business > driver > anonymous
+    """
+    if user is None:
+        return 'anonymous'
+    # Staff/workforce takes priority
+    if user.is_staff:
+        return 'staff'
+    try:
+        profile = user.profile
+        if profile.is_staff:
+            return 'staff'
+        if profile.is_business:
+            return 'business'
+        if profile.is_driver:
+            return 'driver'
+    except Exception:
+        pass
+    return 'anonymous'
+
+
 class ToolError(Exception):
     """Exception raised when a tool execution fails."""
 
@@ -52,6 +76,7 @@ class BaseTool(ABC):
     description: str = ''
     parameters_schema: Dict[str, Any] = {}
     requires_auth: bool = False
+    allowed_roles: list = ['staff', 'business', 'driver']
 
     def __init__(self):
         if not self.name:
@@ -213,21 +238,25 @@ class ToolRegistry:
         """List all registered tool names."""
         return list(self._tools.keys())
 
-    def get_claude_tools(self, tool_names: Optional[list] = None) -> list:
+    def get_claude_tools(self, tool_names: Optional[list] = None, role: Optional[str] = None) -> list:
         """
         Get tool schemas for Claude API.
 
         Args:
             tool_names: Optional list of tool names to include.
                        If None, includes all tools.
+            role: Optional user role to filter tools by allowed_roles.
 
         Returns:
             List of tool schemas in Claude format
         """
         if tool_names is None:
-            tools = self._tools.values()
+            tools = list(self._tools.values())
         else:
             tools = [self._tools[name] for name in tool_names if name in self._tools]
+
+        if role:
+            tools = [t for t in tools if role in t.allowed_roles]
 
         return [tool.to_claude_schema() for tool in tools]
 
@@ -256,6 +285,16 @@ class ToolRegistry:
                 'success': False,
                 'error': f"Unknown tool: {tool_name}",
                 'code': 'UNKNOWN_TOOL'
+            }
+
+        # Role enforcement
+        role = get_user_role(user)
+        if role not in tool.allowed_roles:
+            logger.warning(f"Role {role} denied access to tool {tool_name}")
+            return {
+                'success': False,
+                'error': 'Access denied for your role',
+                'code': 'ROLE_DENIED'
             }
 
         return tool.run(params, user=user, business=business)

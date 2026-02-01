@@ -1,0 +1,43 @@
+{% comment %}
+AI Chat Widget - Reusable partial for all dashboards.
+Usage: {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="workforce" %}
+{% endcomment %}
+
+<!-- AI Assistant Chat -->
+{% csrf_token %}
+<div class="ai-chat-section mb-4" id="{{ widget_id_prefix }}_dashboard_section_ai_chat">
+  <div class="ai-chat-header">
+    <h5 class="ai-chat-title">
+      <i class="fa-solid fa-robot me-2"></i>AI Assistant
+    </h5>
+    <button class="ai-chat-toggle"
+            id="{{ widget_id_prefix }}_chat_toggle_btn"
+            type="button"
+            aria-label="Toggle chat panel">
+      <i class="fa-solid fa-chevron-down"></i>
+    </button>
+  </div>
+  <div class="ai-chat-body" id="{{ widget_id_prefix }}_chat_body">
+    <div class="ai-chat-messages" id="{{ widget_id_prefix }}_chat_messages">
+      <div class="ai-chat-message ai-chat-message--assistant">
+        <div class="ai-chat-message-content">
+          Hi! I'm your AI assistant. Ask me about orders, deliveries, drivers, or COD status.
+        </div>
+      </div>
+    </div>
+    <div class="ai-chat-input-group">
+      <input type="text"
+             class="ai-chat-input"
+             id="{{ widget_id_prefix }}_chat_input"
+             placeholder="Ask something..."
+             autocomplete="off"
+             aria-label="Chat message">
+      <button class="ai-chat-send-btn"
+              id="{{ widget_id_prefix }}_chat_send_btn"
+              type="button"
+              aria-label="Send message">
+        <i class="fa-solid fa-paper-plane"></i>
+      </button>
+    </div>
+  </div>
+</div>

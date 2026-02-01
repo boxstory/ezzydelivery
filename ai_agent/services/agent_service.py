@@ -16,7 +16,8 @@ from django.utils import timezone
 from ai_agent.models import Conversation, ConversationMessage
 from ai_agent.services.claude_service import get_claude_service
 from ai_agent.tools import tool_registry
-from ai_agent.prompts.system_prompts import get_prompt_for_channel
+from ai_agent.tools.base import get_user_role
+from ai_agent.prompts.system_prompts import get_prompt_for_role_and_channel
 
 logger = logging.getLogger(__name__)
 
@@ -98,13 +99,13 @@ class AgentService:
         # Build message history
         messages = self._build_message_history(conversation)
 
-        # Get system prompt
-        system_prompt = get_prompt_for_channel(conversation.channel)
+        # Detect user role and get role-specific prompt/tools
+        role = get_user_role(user)
+        system_prompt = get_prompt_for_role_and_channel(role, conversation.channel)
 
-        # Get available tools
         tools = None
         if tools_enabled:
-            tools = tool_registry.get_claude_tools()
+            tools = tool_registry.get_claude_tools(role=role)
 
         # Call Claude
         user_id = user.id if user else None
@@ -239,9 +240,10 @@ class AgentService:
         # Build message history
         messages = self._build_message_history(conversation)
 
-        # Get system prompt and tools
-        system_prompt = get_prompt_for_channel(conversation.channel)
-        tools = tool_registry.get_claude_tools() if tools_enabled else None
+        # Detect user role and get role-specific prompt/tools
+        role = get_user_role(user)
+        system_prompt = get_prompt_for_role_and_channel(role, conversation.channel)
+        tools = tool_registry.get_claude_tools(role=role) if tools_enabled else None
 
         user_id = user.id if user else None
         business_id = conversation.business_id if conversation.business else None

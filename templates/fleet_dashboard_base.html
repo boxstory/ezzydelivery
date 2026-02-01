@@ -21,7 +21,10 @@
   <link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}" type="text/css" />
   <link rel="stylesheet" href="{% static 'webpages/css/sidebar-common.css' %}" type="text/css" />
   <!-- Mobile PWA CSS -->
-  <link rel="stylesheet" href="{% static 'fleet/css/fleet-mobile.css' %}?v=20260118s" type="text/css" />
+  <link rel="stylesheet" href="{% static 'fleet/css/fleet-mobile.css' %}?v=20260127a" type="text/css" />
+
+  <!-- AI Chat Widget CSS -->
+  <link rel="stylesheet" href="{% static 'ai_agent/css/chat-widget.css' %}?v=20260201" type="text/css" />
 
   {% block extra_css %}
   {% endblock extra_css %}
@@ -84,13 +87,13 @@
     <div class="d-none d-md-block">
       {% include "fleet/parts/dashboard_sidebar_fleet_mob.html" %}
     </div>
-    <div class="col-12 d-flex">
+    <div class="col-12 d-flex" style="min-height: auto; align-items: flex-start;">
       <!-- Desktop sidebar - Hidden on mobile -->
       {% block sidebar %}
       {% include "fleet/parts/dashboard_sidebar_fleet.html" %}
       {% endblock sidebar %}
       <!-- Dashboard body content -->
-      <div class="flex-grow-1 pwa-content-wrapper">
+      <div class="flex-grow-1 pwa-content-wrapper" style="min-height: auto; height: auto; overflow: visible;">
         {% include "includes/messages.html" %}
         {% block content %}
         {% endblock content %}
@@ -115,6 +118,8 @@
           src="{%static 'delivery/js/delivery.js' %}"></script>
   <!-- Session timeout monitor -->
   <script src="{% static 'webpages/js/session-monitor.js' %}"></script>
+  <!-- AI Chat Widget JS -->
+  <script src="{% static 'ai_agent/js/chat-widget.js' %}?v=20260201b"></script>
   {% block extra_js %}
   <!--  -->
   {% endblock extra_js %}
