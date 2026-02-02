@@ -1576,6 +1576,7 @@ def business_switch(request, business_id):
 # Finance Section ----------------------------------------------------------------
 @login_required(login_url='account_login')
 @business_required
+@business_permission_required(BusinessPermissions.REPORTS_VIEW)
 def business_finance_dashboard(request):
     """Finance overview for business clients"""
     from django.db.models import Sum, Count
@@ -1672,6 +1673,7 @@ def business_finance_dashboard(request):
 
 @login_required(login_url='account_login')
 @business_required
+@business_permission_required(BusinessPermissions.REPORTS_VIEW)
 def business_transactions(request):
     """Transaction list view for business clients"""
     from decimal import Decimal
@@ -1719,6 +1721,7 @@ def business_transactions(request):
 
 @login_required(login_url='account_login')
 @business_required
+@business_permission_required(BusinessPermissions.REPORTS_VIEW)
 def business_cod_statement(request):
     """COD statement view for business clients"""
     from django.db.models import Sum, Count
@@ -1753,7 +1756,7 @@ def business_cod_statement(request):
     settlements = fleet_models.DriverTransaction.objects.filter(
         business=business,
         transaction_type='cod_client_settle',
-        created_at__gte=start_date
+        created_at__gte=start_date.date()
     ).select_related('created_by').order_by('-created_at')
 
     total_settled = abs(settlements.aggregate(

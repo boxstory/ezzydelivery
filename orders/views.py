@@ -1420,8 +1420,8 @@ def get_order_by_api(request):
 
     api_data = business_models.BusinessApiSettings.objects.filter(
         business_id=business.business_id,
-        is_verify_api='True',
-        is_default='True'
+        is_verify_api=True,
+        is_default=True
     ).first()
 
     if not api_data:
@@ -1431,26 +1431,23 @@ def get_order_by_api(request):
 
     logger.debug(f"Using API settings for business {business.business_id}")
 
-    # SECURITY FIX: Use environment variable for Shopify token instead of hardcoded value
-    shopify_token = config('SHOPIFY_ACCESS_TOKEN', default='')
-    if not shopify_token:
-        logger.error("SHOPIFY_ACCESS_TOKEN not configured in .env file")
-        messages.error(request, "Shopify API token not configured")
-        return redirect('business:business_settings_api_list', business.business_id)
+    # Build Shopify API URL from business API settings
+    shop_url = api_data.site_api_url.replace('https://', '').replace('http://', '')
+    order_endpoint = api_data.order_api_endpoint or '/admin/api/2024-10/orders.json'
+    api_url = f'https://{shop_url}{order_endpoint}'
 
     headers = {
         'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': shopify_token
+        'X-Shopify-Access-Token': api_data.api_access_token
     }
 
     try:
-        get_orders = requests.get('https://hn0d1z-qe.myshopify.com/admin/api/2024-10/orders.json?status=any', headers=headers, timeout=30)
+        get_orders = requests.get(api_url, headers=headers, params={'status': 'any'}, timeout=30)
     except requests.exceptions.RequestException as e:
         logger.error(f"Shopify API request failed: {e}")
         messages.error(request, "Failed to connect to Shopify API")
         return redirect('orders:orders_all_list')
-    # Parse message as json
-    GetQuestion_response = "json.loads(GetQuestion_response['Message'])"
+
     logger.debug(f'Start date from POST: {request.POST.get("start_date")}')
     if request.method == 'POST':
         order_list_start_date = request.POST.get('start_date')
@@ -1471,14 +1468,11 @@ def get_order_by_api(request):
             if order_list_start_date <= order['created_at'][:10] <= order_list_end_date
         ]
         filtered_orders.sort(key=lambda x: x['created_at'], reverse=True)
-        
+
         data={
-            'GetQuestion_response' : GetQuestion_response,
             'order_data': order_data,
-            'orders': orders,
+            'orders': filtered_orders,
             'business': business,
-
-
         }
         return render(request, 'orders/order_api_get.html', data)
     else:
@@ -1499,8 +1493,8 @@ def get_orders_by_base_api(request):
 
     business_api = business_models.BusinessApiSettings.objects.filter(
         business_id=business_id,
-        is_verify_api='True',
-        is_default='True'
+        is_verify_api=True,
+        is_default=True
     ).first()
 
     if not business_api:
@@ -1522,16 +1516,7 @@ def get_orders_by_base_api(request):
 
 
     if business_api.api_type == 'shopify':
-        shop_creds = {
-            'api_key': BASE_API_KEY,
-            'api_secret': BASE_API_SECRET,
-            'access_token': BASE_API_ACCESS_KEY, 
-        }
-
-        with open('shopify_creds.json', 'w') as f:
-            json.dump(shop_creds, f)
-
-        shop_url = "%s" % BASE_API_STORE_NAME
+        shop_url = BASE_API_STORE_NAME
         logger.debug(f'Shopify shop_url: {shop_url}')
 
         order_base_url = 'https://' + shop_url + BASE_API_ORDER_ENDPINT
@@ -1547,7 +1532,6 @@ def get_orders_by_base_api(request):
         logger.debug(f'Shopify product_count: {product_count}')
 
     elif business_api.api_type == 'woocommerce':
-        url="http://example.com",
         shop_url = 'https://' + BASE_API_STORE_NAME
         logger.debug(f'WooCommerce shop_url: {shop_url}')
  
@@ -1852,6 +1836,7 @@ def bulk_import_orders(request):
 
 
 @login_required
+@business_access_required()
 @require_POST
 def bulk_import_preview(request):
     """

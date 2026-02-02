@@ -19,8 +19,8 @@ DeliveryTask = delivery_models.DeliveryTask
 
 logger = logging.getLogger('orders')
 
-# Store old verification status for tracking changes
-_old_verification_status = {}
+# Old verification status is stored on the instance as instance._old_verification_status
+# to avoid thread-safety issues with a global dict.
 
 
 def generate_sequence_code(number):
@@ -83,7 +83,7 @@ def order_pre_save_receiver(sender, instance, *args, **kwargs):
     if instance.pk:
         try:
             old_instance = Order.objects.get(pk=instance.pk)
-            _old_verification_status[instance.pk] = old_instance.verification_status
+            instance._old_verification_status = old_instance.verification_status
         except Order.DoesNotExist:
             pass
 
@@ -179,7 +179,7 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
     
     # Handle verification status changes
     if not created:
-        old_status = _old_verification_status.get(instance.pk, '')
+        old_status = getattr(instance, '_old_verification_status', '')
         if old_status != instance.verification_status:
             from django.utils import timezone
 
@@ -209,9 +209,9 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
                     # Legacy: direct task creation
                     _create_delivery_task_from_order(instance)
         
-        # Clean up stored old status
-        if instance.pk in _old_verification_status:
-            del _old_verification_status[instance.pk]
+        # Clean up stored old status from instance
+        if hasattr(instance, '_old_verification_status'):
+            del instance._old_verification_status
 
 
 def _create_delivery_task_from_order(order):
