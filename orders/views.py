@@ -440,6 +440,7 @@ def orders_unsuccessfull_list(request):
 
 
 @login_required(login_url='account_login')
+@business_access_required()
 def latest_orders_list(request):
     business = get_cached_business(request)
     if not business:
@@ -490,6 +491,7 @@ def latest_orders_list(request):
 
 
 @login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_CREATE)
 def order_upload_file(request):
     if request.method == 'POST':
         form = orders_forms.OrderFileUploadForm(request.POST, request.FILES)
@@ -516,11 +518,13 @@ def order_upload_file(request):
     return render(request, 'orders/order_file_upload.html',  context)
 
 @login_required(login_url='account_login')
+@business_access_required()
 def order_upload_review_data(request):
     if 'uploaded_data' not in request.session:
         messages.error(request, 'No data to review. Please upload a file first.')
         return redirect('orders:order_upload_file')
 
+    business = request.current_business
     data = request.session['uploaded_data']
     logger.debug(f"Review data: {len(data)} rows to process")
 
@@ -538,15 +542,18 @@ def order_upload_review_data(request):
             edited_data.append(edited_row)
             logger.debug(f"Row {i} edited data prepared")
 
-            for row in edited_data:
-                order_form = orders_forms.AddOrderForm(row)
-                if order_form.is_valid():
-                    logger.debug(f"Order form valid for row {i}")
-                    order_form.save()
-                else:
-                    logger.warning(f"Order form invalid for row {i}: {order_form.errors}")
-                    messages.error(request, f'Error in row {i}: {order_form.errors}')
-                    return redirect('orders:order_upload_review_data')
+        # FIX: Process edited_data AFTER the loop (was inside, causing duplicates)
+        for idx, edited_row in enumerate(edited_data):
+            order_form = orders_forms.AddOrderForm(edited_row)
+            if order_form.is_valid():
+                logger.debug(f"Order form valid for row {idx}")
+                order = order_form.save(commit=False)
+                order.business = business
+                order.save()
+            else:
+                logger.warning(f"Order form invalid for row {idx}: {order_form.errors}")
+                messages.error(request, f'Error in row {idx}: {order_form.errors}')
+                return redirect('orders:order_upload_review_data')
 
         del request.session['uploaded_data']
         messages.success(request, 'Data successfully uploaded to the database.')
@@ -724,6 +731,7 @@ def add_order(request):
 
 
 @login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_CREATE)
 def add_order_bulk(request):
     """
     Handle bulk order submission from Excel-like table view.
@@ -991,9 +999,7 @@ def add_order_with_product(request):
     business = request.current_business
     OrderFormset = inlineformset_factory(orders_models.Order, orders_models.OrderItem, form=orders_forms.AddOrderProductsForm, extra=1)
     if request.method == 'POST':
-        order_product_formset = OrderFormset(queryset=orders_models.OrderItem.objects.none())
-
-
+        order_product_formset = OrderFormset(request.POST, queryset=orders_models.OrderItem.objects.none())
 
         if order_product_formset.is_valid():
                 order_product_formset.save()
@@ -1024,23 +1030,30 @@ def add_order_with_product(request):
 
 
 @login_required(login_url='account_login')
+@business_access_required()
 def deliver_to_here(request, pickup_id):
+    business = request.current_business
     pickup_location = business_models.PickupLocation.objects.filter(
-        id=pickup_id).first()
+        id=pickup_id, business_id=business.business_id).first()
+    if not pickup_location:
+        messages.error(request, "Pickup location not found.")
+        return redirect('business:pickup_location_list')
+
     if request.method == 'POST':
-        form = orders_forms.UpdateOrderForm(request.POST, )
+        form = orders_forms.UpdateOrderForm(request.POST)
         logger.debug('Form validation checking in deliver_to_here')
         if form.is_valid():
             logger.debug('Form is valid in deliver_to_here')
-            form.save()
-            form.business = business_models.Business.objects.get(
-                    business_id=request.user.id)
-            return  redirect('orders:orders_all_list')
+            order = form.save(commit=False)
+            order.business = business
+            order.save()
+            return redirect('orders:orders_all_list')
     else:
         form = orders_forms.UpdateOrderForm()
 
     context = {
         'form': form,
+        'business': business,
     }
     return render(request, 'orders/order_update.html', context)
 
@@ -1194,9 +1207,16 @@ def order_details(request, order_id):
 
 
 @login_required(login_url='account_login')
+@business_access_required()
 def update_order_product(request, order_id):
     """Update order product items using OrderItem model"""
-    order = orders_models.Order.objects.get(id=order_id)
+    # IDOR FIX: Verify order belongs to user's business
+    business = request.current_business
+    try:
+        order = orders_models.Order.objects.get(id=order_id, business=business)
+    except orders_models.Order.DoesNotExist:
+        messages.error(request, "Order not found")
+        return redirect('orders:orders_all_list')
     order_items = orders_models.OrderItem.objects.filter(order=order)
 
     if request.method == 'POST':
@@ -1221,9 +1241,12 @@ def update_order_product(request, order_id):
     return render(request, 'orders/update_order_product.html', data)
 
 @login_required(login_url='account_login')
+@business_access_required()
 def order_product_list(request, order_id):
     """List all products in an order using OrderItem model"""
-    order = get_object_or_404(orders_models.Order, id=order_id)
+    # IDOR FIX: Verify order belongs to user's business
+    business = request.current_business
+    order = get_object_or_404(orders_models.Order, id=order_id, business=business)
     logger.debug(f'Fetching product list for order {order}')
     ordered_items = order.order_items.select_related('product').all()  # Using related_name='order_items'
 
@@ -1282,7 +1305,8 @@ def update_order_status(request, order_id=None):
 
         # Check user has permission (owner or staff)
         if not request.user.is_staff:
-            if hasattr(request.user, 'profile') and request.user.profile.business_id != order.business_id:
+            user_business = get_cached_business(request)
+            if not user_business or user_business.business_id != order.business_id:
                 return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
 
         old_status = order.order_status
@@ -1305,10 +1329,16 @@ def update_order_status(request, order_id=None):
 
 
 @require_POST
+@login_required(login_url='account_login')
 def add_order_comment(request, order_id):
     """Add a comment to order's comment chain via HTMX"""
     try:
+        # IDOR FIX: Verify order belongs to user's business (or user is staff)
         order = orders_models.Order.objects.get(pk=order_id)
+        if not request.user.is_staff:
+            user_business = get_cached_business(request)
+            if not user_business or user_business.business_id != order.business_id:
+                return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
         comment_text = request.POST.get('comment', '').strip()
 
         if comment_text:
@@ -1347,7 +1377,12 @@ def add_order_comment(request, order_id):
 def get_order_comments(request, order_id):
     """Get comments list for an order"""
     try:
+        # IDOR FIX: Verify order belongs to user's business (or user is staff)
         order = orders_models.Order.objects.get(pk=order_id)
+        if not request.user.is_staff:
+            user_business = get_cached_business(request)
+            if not user_business or user_business.business_id != order.business_id:
+                return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
         comments = order.order_comments.all().order_by('created_at')
 
         # Check referer to determine which template to use

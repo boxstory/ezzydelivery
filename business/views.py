@@ -78,6 +78,7 @@ from django.db.models import Sum, Q
 from business import models as business_models
 from core import models as core_models
 from delivery import models as delivery_models
+from fleet import models as fleet_models
 from ezzydelivery.settings import BASE_DIR
 from orders import models as orders_models
 from ezzy_api import models as ezzy_api_models
@@ -119,7 +120,7 @@ def business_dashboard(request):
         logger.info(f"User {request.user.id} accessed dashboard for business {business.business_id}")
 
         profile = core_models.Profile.objects.get(user_id=business.user_id)
-        business_profile = business_models.BusinessProfile.objects.get_or_create(business_id=business.business_id)
+        business_profile, _created = business_models.BusinessProfile.objects.get_or_create(business_id=business.business_id)
 
         # N+1 FIX: Optimize queries
         location = business_models.PickupLocation.objects.filter(
@@ -144,12 +145,7 @@ def business_dashboard(request):
         # COD calculations
         cod_amount_total = all_orders.aggregate(total=Sum('cod_amount'))['total'] or 0
 
-        # COD collected (from delivered orders)
-        cod_collected = all_orders.filter(
-            task_status='delivered'
-        ).aggregate(total=Sum('cod_amount'))['total'] or 0
-
-        # Alternative: check delivery task status
+        # COD collected (from delivered orders via delivery task status)
         delivered_order_ids = delivery_tasks.filter(
             dl_task_status_client='2'
         ).values_list('order_id', flat=True)
@@ -166,7 +162,7 @@ def business_dashboard(request):
         # Follow up required (rejected orders or orders needing attention)
         followup_count = delivery_tasks.filter(
             Q(dl_task_status_client='rejected') |
-            Q(dl_task_status_client='customer_confiration_pending')
+            Q(dl_task_status_client='customer_confirmation_pending')
         ).count()
 
         # Today's orders
@@ -399,7 +395,7 @@ def pickup_location_add(request):
                 pickup_location = form.save(commit=False)
                 # IDOR FIX: Use verified business_id
                 pickup_location.business_id = business.business_id
-                form.save()
+                pickup_location.save()
                 logger.info(f"User {request.user.id} added pickup location for business {business.business_id}")
                 messages.success(request, "Pickup location added successfully")
                 return redirect("business:pickup_location_list")
@@ -653,7 +649,7 @@ def business_profile_info_update(request, business_id):
                     f.business_website = website
 
                 f.business_id = business_id
-                form.save()
+                f.save()
                 logger.info(f'Business profile updated successfully for business_id={business_id}')
                 messages.success(request, "Successful Submission")
                 return redirect("business:business_profile")
@@ -675,6 +671,12 @@ def business_profile_info_update(request, business_id):
 @login_required(login_url='/accounts/login/')
 @business_required
 def business_settings(request, business_id):
+    # IDOR FIX: Verify user owns this business
+    user_business = get_cached_business(request)
+    if not user_business or user_business.business_id != business_id:
+        messages.error(request, "You don't have permission to access this page.")
+        return redirect('business:business_dashboard')
+
     # N+1 FIX: Use select_related for FK relationships
     business = business_models.Business.objects.select_related('user', 'profile').filter(business_id=business_id).first()
     business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
@@ -780,7 +782,13 @@ def business_settings_api_add(request, business_id):
 @login_required(login_url='/accounts/login/')
 @business_required
 def business_settings_api_list(request, business_id):
-    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    # IDOR FIX: Verify user owns this business
+    user_business = get_cached_business(request)
+    if not user_business or user_business.business_id != business_id:
+        messages.error(request, "You don't have permission to access this page.")
+        return redirect('business:business_dashboard')
+
+    business = user_business
     business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id)
     api_keys = ezzy_api_models.ClientApiKey.objects.filter(business=business).order_by('-created_at')
 
@@ -796,9 +804,13 @@ def business_settings_api_list(request, business_id):
 @login_required(login_url='/accounts/login/')
 @business_required
 def business_settings_api_delete(request, business_id, api_id):
-    business = business_models.Business.objects.filter(business_id=business_id).first()
-    if not business:
-        return redirect("business:business_dashboard")
+    # IDOR FIX: Verify user owns this business
+    user_business = get_cached_business(request)
+    if not user_business or user_business.business_id != business_id:
+        messages.error(request, "You don't have permission to access this page.")
+        return redirect('business:business_dashboard')
+
+    business = user_business
 
     api_setting = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
     if api_setting:
@@ -810,7 +822,13 @@ def business_settings_api_delete(request, business_id, api_id):
 @login_required(login_url='/accounts/login/')
 @business_required
 def business_settings_api_test(request, business_id, api_id):
-    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    # IDOR FIX: Verify user owns this business
+    user_business = get_cached_business(request)
+    if not user_business or user_business.business_id != business_id:
+        messages.error(request, "You don't have permission to access this page.")
+        return redirect('business:business_dashboard')
+
+    business = user_business
     business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
     
     
@@ -826,9 +844,19 @@ def business_settings_api_test(request, business_id, api_id):
 @login_required(login_url='/accounts/login/')
 @business_required
 def business_settings_api_test_result(request, business_id, api_id):
-    business =  business_models.Business.objects.filter(business_id=business_id).first()
+    # IDOR FIX: Verify user owns this business
+    user_business = get_cached_business(request)
+    if not user_business or user_business.business_id != business_id:
+        messages.error(request, "You don't have permission to access this page.")
+        return redirect('business:business_dashboard')
+
+    business = user_business
     business_api = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
     update_time = datetime.now().strftime('%Y-%m-%d  Time : %H:%M:%S')
+
+    if not business_api:
+        messages.error(request, "API settings not found.")
+        return redirect('business:business_settings_api_list', business_id=business_id)
 
     BASE_API_KEY = business_api.api_key
     BASE_API_ACCESS_KEY = business_api.api_access_token
@@ -879,12 +907,15 @@ def business_settings_api_test_result(request, business_id, api_id):
         order_response = None
         product_response = None
 
-
-    result = order_response.json()
-    status = order_response.status_code
-
-    order_count = order_count
-    product_count = product_count
+    # Handle unsupported API types or failed responses
+    if order_response is not None:
+        result = order_response.json()
+        status = order_response.status_code
+    else:
+        result = {'error': f'API type "{business_api.api_type}" is not yet supported for testing.'}
+        status = 0
+        order_count = 0
+        product_count = 0
 
     context = {
         'business': business,
@@ -905,17 +936,20 @@ def business_settings_api_test_result(request, business_id, api_id):
 @login_required(login_url='/accounts/login/')
 @business_required
 def business_logo_update(request, business_id):
-    business_logos = business_models.BusinessLogo.objects.get(business_id=business_id)
-    business_code = business_models.Business.objects.get(business_id=business_id)
-
-    # Check if the request user matches the business user
-    if request.user.id != business_logos.business_id:
+    # IDOR FIX: Verify user owns this business
+    user_business = get_cached_business(request)
+    if not user_business or user_business.business_id != business_id:
         logger.warning(f'Unauthorized logo update attempt by user {request.user.id} for business {business_id}')
         return HttpResponseForbidden("You don't have permission to update this business logo.")
 
+    try:
+        business_logos = business_models.BusinessLogo.objects.get(business_id=business_id)
+    except business_models.BusinessLogo.DoesNotExist:
+        business_logos = business_models.BusinessLogo(business=user_business)
+
     form = business_forms.BusinessLogoForm()
     if request.method == 'POST':
-        logger.debug(f'Processing logo update for business_id={business_logos.business_id}')
+        logger.debug(f'Processing logo update for business_id={business_id}')
         form = business_forms.BusinessLogoForm(
             request.POST, request.FILES, instance=business_logos)
         if form.is_valid():
@@ -925,8 +959,8 @@ def business_logo_update(request, business_id):
             if business_logos.business_logo and business_logos.business_logo != 'business/avatar.png':
                 logger.debug(f'Old logo found: {business_logos.business_logo.path}')
 
-            f.business_id = request.user.id
-            f.path = f'business/{business_code}'
+            f.business_id = business_id
+            f.path = f'business/{user_business.business_code}'
             f.save()
 
             logger.info(f'Logo updated for business_id={business_id}')
@@ -996,9 +1030,16 @@ def business_teams(request, business_id):
         'custom_permissions'
     ).filter(business_id=business_id).order_by('-created_at')
 
-    # Add permission count to each team member
+    # Add permission count to each team member (uses prefetched custom_permissions)
+    from business.permissions import get_role_permissions
     for team in teams:
-        team.permission_count = len(team.get_effective_permissions())
+        role_perms = set(get_role_permissions(team.team_role))
+        for custom_perm in team.custom_permissions.all():  # Uses prefetch cache
+            if custom_perm.is_granted:
+                role_perms.add(custom_perm.permission_code)
+            else:
+                role_perms.discard(custom_perm.permission_code)
+        team.permission_count = len(role_perms)
 
     logger.debug(f'Loading teams for business_id={business_id}, count={teams.count()}')
 
@@ -1532,3 +1573,199 @@ def business_switch(request, business_id):
     return redirect('business:business_dashboard')
 
 
+# Finance Section ----------------------------------------------------------------
+@login_required(login_url='account_login')
+@business_required
+def business_finance_dashboard(request):
+    """Finance overview for business clients"""
+    from django.db.models import Sum, Count
+    from decimal import Decimal
+    from datetime import timedelta
+    from django.utils import timezone
+
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    days = int(request.GET.get('days', 30))
+    start_date = timezone.now() - timedelta(days=days)
+
+    # Transactions linked to this business
+    txns = fleet_models.DriverTransaction.objects.filter(
+        business=business,
+        created_at__gte=start_date
+    )
+
+    # Also get transactions linked via delivery tasks for this business
+    business_task_txns = fleet_models.DriverTransaction.objects.filter(
+        delivery_task__business=business.business_id,
+        created_at__gte=start_date
+    ).exclude(business=business)
+
+    # COD summary from delivery tasks
+    all_deliveries = delivery_models.DeliveryTask.objects.filter(
+        business=business.business_id,
+        dl_task_date__gte=start_date.date()
+    )
+
+    cod_deliveries = all_deliveries.filter(has_cod=True)
+    cod_stats = cod_deliveries.aggregate(
+        total_cod=Sum('cod_collected_amount'),
+        collected_count=Count('id', filter=Q(cod_collected=True)),
+        settled_count=Count('id', filter=Q(cod_settled=True)),
+        total_count=Count('id'),
+    )
+
+    # COD client settlements for this business
+    cod_client_settled = abs(txns.filter(
+        transaction_type='cod_client_settle'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+
+    # Charges billed to this business
+    charges = txns.filter(
+        transaction_type__in=['delivery_charge', 'fulfillment_charge', 'inventory_handling', 'other_charge']
+    ).values('transaction_type').annotate(
+        total=Sum('amount'),
+        count=Count('id')
+    )
+
+    total_charges = sum(abs(c['total']) for c in charges) if charges else Decimal('0')
+
+    # Bills for this business
+    bills_payable = abs(txns.filter(
+        transaction_type='bills_payable'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+
+    bills_receivable = abs(txns.filter(
+        transaction_type='bills_receivable'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+
+    # Delivery summary
+    delivery_stats = all_deliveries.aggregate(
+        total_deliveries=Count('id'),
+        total_delivery_charges=Sum('dl_price'),
+        delivered=Count('id', filter=Q(dl_task_status='delivered')),
+        failed=Count('id', filter=Q(dl_task_status='failed')),
+    )
+
+    # Recent transactions for this business
+    recent_transactions = txns.select_related(
+        'driver__user', 'delivery_task'
+    ).order_by('-created_at')[:15]
+
+    context = {
+        'business': business,
+        'selected_days': days,
+        'cod_stats': cod_stats,
+        'cod_client_settled': cod_client_settled,
+        'charges': charges,
+        'total_charges': total_charges,
+        'bills_payable': bills_payable,
+        'bills_receivable': bills_receivable,
+        'delivery_stats': delivery_stats,
+        'recent_transactions': recent_transactions,
+    }
+
+    return render(request, 'business/parts/business_finance_dashboard.html', context)
+
+
+@login_required(login_url='account_login')
+@business_required
+def business_transactions(request):
+    """Transaction list view for business clients"""
+    from decimal import Decimal
+    from datetime import timedelta
+    from django.utils import timezone
+
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    days = int(request.GET.get('days', 30))
+    txn_type = request.GET.get('type', 'all')
+    start_date = timezone.now() - timedelta(days=days)
+
+    transactions = fleet_models.DriverTransaction.objects.filter(
+        business=business,
+        created_at__gte=start_date
+    ).select_related('driver__user', 'delivery_task').order_by('-created_at')
+
+    if txn_type != 'all':
+        transactions = transactions.filter(transaction_type=txn_type)
+
+    # Transaction types relevant to business
+    business_types = [
+        ('cod_client_settle', 'COD Client Settlement'),
+        ('delivery_charge', 'Delivery Charge'),
+        ('fulfillment_charge', 'Fulfillment Charge'),
+        ('inventory_handling', 'Inventory Handling'),
+        ('other_charge', 'Other Charge'),
+        ('bills_payable', 'Bills Payable'),
+        ('bills_receivable', 'Bills Receivable'),
+    ]
+
+    context = {
+        'business': business,
+        'transactions': transactions,
+        'selected_days': days,
+        'selected_type': txn_type,
+        'transaction_types': business_types,
+    }
+
+    return render(request, 'business/parts/business_transactions.html', context)
+
+
+@login_required(login_url='account_login')
+@business_required
+def business_cod_statement(request):
+    """COD statement view for business clients"""
+    from django.db.models import Sum, Count
+    from decimal import Decimal
+    from datetime import timedelta
+    from django.utils import timezone
+
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    days = int(request.GET.get('days', 30))
+    start_date = timezone.now() - timedelta(days=days)
+
+    # COD deliveries for this business
+    cod_deliveries = delivery_models.DeliveryTask.objects.filter(
+        business=business.business_id,
+        has_cod=True,
+        dl_task_date__gte=start_date.date()
+    ).select_related('driver__user', 'order').order_by('-dl_task_date')
+
+    # Summary stats
+    stats = cod_deliveries.aggregate(
+        total_cod=Sum('cod_collected_amount'),
+        collected=Count('id', filter=Q(cod_collected=True)),
+        settled_driver=Count('id', filter=Q(cod_settled=True)),
+        total=Count('id'),
+    )
+
+    # COD settlements to this business
+    settlements = fleet_models.DriverTransaction.objects.filter(
+        business=business,
+        transaction_type='cod_client_settle',
+        created_at__gte=start_date
+    ).select_related('created_by').order_by('-created_at')
+
+    total_settled = abs(settlements.aggregate(
+        total=Sum('amount'))['total'] or Decimal('0'))
+
+    context = {
+        'business': business,
+        'selected_days': days,
+        'cod_deliveries': cod_deliveries,
+        'stats': stats,
+        'settlements': settlements,
+        'total_settled': total_settled,
+    }
+
+    return render(request, 'business/parts/business_cod_statement.html', context)

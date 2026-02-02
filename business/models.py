@@ -118,21 +118,21 @@ class Business(models.Model):
     business_facebook_page = models.CharField(
         max_length=100, blank=True, null=True)
     business_instagram = models.CharField(max_length=100, blank=True, null=True)
-    business_since = models.DateField(max_length=100, blank=True, null=True)
+    business_since = models.DateField(blank=True, null=True)
     business_product_category = models.CharField(
         max_length=100, blank=True, null=True)
     business_languages = models.CharField(
         max_length=100,  default='english')
     business_qid = models.CharField(max_length=11, blank=True, null=True)
-    status_choices = (
+    status_choices = [
         ('active', 'Active'),
         ('inactive', 'Inactive'),
-        ('pending', 'Aproval Pending'),
+        ('pending', 'Approval Pending'),
         ('suspended', 'Suspended'),
-    )
-    
+    ]
+
     business_status = models.CharField(
-        max_length=100,  choices=status_choices, default='aproval pending')
+        max_length=100,  choices=status_choices, default='pending')
 
     # Fulfillment Service - Businesses using EzzyDelivery's fulfillment/WMS service
     fulfillment_service_enabled = models.BooleanField(
@@ -168,7 +168,7 @@ class BusinessProfile(models.Model):
     business_zip_code = models.CharField(max_length=10, blank=True, null=True)
     business_country = models.CharField(max_length=100, blank=True, 
                                         null=True, default='Qatar')
-    business_start_date = models.DateField(max_length=100, blank=True, null=True) 
+    business_start_date = models.DateField(blank=True, null=True) 
 
     business_founters_name = models.CharField(max_length=100, blank=True, null=True)
     business_founters_bio = models.CharField(max_length=100, blank=True, null=True)
@@ -597,12 +597,12 @@ class PickupLocation(models.Model):
         blank=True, null=True)
     pickup_lat = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
     pickup_lon = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
-    status_choices = (
+    status_choices = [
         ('active', 'Active'),
         ('inactive', 'Inactive'),
-        ('aproval pending', 'Aproval Pending'),
+        ('pending', 'Approval Pending'),
         ('suspended', 'Suspended'),
-    )
+    ]
     pickup_status = models.CharField(
         max_length=100, choices=status_choices, default='active')
     created_at = models.DateTimeField(auto_now_add=True)

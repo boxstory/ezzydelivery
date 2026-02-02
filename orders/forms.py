@@ -49,19 +49,19 @@ OrderItem = orders_models.OrderItem
 # CONSTANTS
 # =============================================================================
 
-ORDER_STATUS = {
+ORDER_STATUS = [
     ('ready_to_pickup', 'Ready to pickup'),
     ('out_for_delivery', 'Out for delivery'),
-    ('customer _cofirm', 'Customer Confirmation Pending'),
+    ('customer_confirm', 'Customer Confirmation Pending'),
     ('delivered', 'Delivered'),
-    ('customer _delaying', 'Customer make delaying'),
+    ('customer_delaying', 'Customer make delaying'),
     ('cancelled', 'Cancelled'),
-}
+]
 
-COD_STATUS_BY_CLIENT = {
+COD_STATUS_BY_CLIENT = [
     ('no_cod', 'No COD'),
     ('include', 'Include'),
-}
+]
 
 
 # =============================================================================

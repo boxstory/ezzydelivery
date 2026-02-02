@@ -66,8 +66,14 @@ logger = logging.getLogger('ezzy_api')
 class OrderList(generics.ListCreateAPIView):
 
     permission_classes = [permissions.IsAuthenticated]
-    queryset = orders_models.Order.objects.all()
     serializer_class = ezzy_api_serializers.OrderSerializer
+
+    def get_queryset(self):
+        """Filter orders to only those belonging to the authenticated user's business."""
+        business = get_api_user_business(self.request)
+        if business:
+            return orders_models.Order.objects.filter(business=business)
+        return orders_models.Order.objects.none()
 
 API_KEY = config("SHIPDAY_API_KEY")
 shipday_obj = Shipday(api_key=API_KEY)
@@ -307,38 +313,46 @@ def driver_task_detail(request, task_id):
 @permission_classes([IsAuthenticated])
 def driver_accept_task(request, task_id):
     """Driver accepts a task"""
+    from django.db import transaction
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
-        task = delivery_models.DeliveryTask.objects.get(id=task_id)
-        
-        if task.driver and task.driver != driver:
-            return Response(
-                {'error': 'Task already assigned to another driver'},
-                status=status.HTTP_400_BAD_REQUEST
+
+        with transaction.atomic():
+            task = delivery_models.DeliveryTask.objects.select_for_update().get(id=task_id)
+
+            if task.driver and task.driver != driver:
+                return Response(
+                    {'error': 'Task already assigned to another driver'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            task.driver = driver
+            task.dl_task_status = 'accepted'
+            task.dl_task_status_dms = '7'  # Accepted/Acknowledged
+            task.save()
+
+            # Create AssignedDriver record
+            delivery_models.AssignedDriver.objects.get_or_create(
+                driver=driver, dl_task=task
             )
-        
-        task.driver = driver
-        task.dl_task_status = 'in_transit'
-        task.dl_task_status_dms = '7'  # Accepted/Acknowledged
-        task.save()
-        
-        # Trigger webhooks
+
+        # Trigger webhooks (outside transaction)
         webhook_payload = {
             'task_id': task_id,
             'task_number': task.dl_task_number,
-            'status': 'in_transit',
+            'status': 'accepted',
             'dms_status': '7',
             'timestamp': timezone.now().isoformat(),
             'driver_id': driver.driver_id
         }
         _send_webhook_event('task_accepted', webhook_payload, business=task.business)
-        
+
         serializer = ezzy_api_serializers.DeliveryTaskSerializer(task)
         return Response({
             'message': 'Task accepted successfully',
             'task': serializer.data
         }, status=status.HTTP_200_OK)
-    
+
     except delivery_models.DeliveryTask.DoesNotExist:
         return Response(
             {'error': 'Task not found'},
@@ -357,7 +371,13 @@ def driver_reject_task(request, task_id):
     """Driver rejects a task"""
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
-        task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id, driver=driver)
+        # Check if task is assigned to driver via DeliveryTask.driver OR AssignedDriver
+        task = delivery_models.DeliveryTask.objects.select_related('order').filter(
+            Q(driver=driver) | Q(assigneddriver__driver=driver),
+            id=task_id
+        ).distinct().first()
+        if not task:
+            raise delivery_models.DeliveryTask.DoesNotExist()
 
         # Lock check: Prevent status change if task is Successful AND COD is settled
         if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
@@ -369,6 +389,11 @@ def driver_reject_task(request, task_id):
         task.dl_task_status_dms = '8'  # Decline
         task.driver = None
         task.save()
+
+        # Clean up AssignedDriver record
+        delivery_models.AssignedDriver.objects.filter(
+            driver=driver, dl_task=task
+        ).delete()
         
         # Trigger webhooks
         webhook_payload = {
@@ -401,9 +426,19 @@ def driver_reject_task(request, task_id):
 @permission_classes([IsAuthenticated])
 def driver_update_task_status(request, task_id):
     """Driver updates task status"""
+    VALID_DRIVER_STATUSES = [
+        'accepted', 'picked_up', 'start_ride', 'out_for_delivery',
+        'in_transit', 'contacted', 'non_reachable',
+    ]
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
-        task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id, driver=driver)
+        # Check if task is assigned to driver via DeliveryTask.driver OR AssignedDriver
+        task = delivery_models.DeliveryTask.objects.select_related('order').filter(
+            Q(driver=driver) | Q(assigneddriver__driver=driver),
+            id=task_id
+        ).distinct().first()
+        if not task:
+            raise delivery_models.DeliveryTask.DoesNotExist()
 
         # Lock check: Prevent status change if task is Successful AND COD is settled
         if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
@@ -415,6 +450,10 @@ def driver_update_task_status(request, task_id):
         dms_status = request.data.get('dms_status')
 
         if new_status:
+            if new_status not in VALID_DRIVER_STATUSES:
+                return Response({
+                    'error': f'Invalid status: {new_status}. Valid statuses: {", ".join(VALID_DRIVER_STATUSES)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
             task.dl_task_status = new_status
 
         if dms_status:
@@ -541,9 +580,9 @@ def driver_statistics(request):
 # ==================== DMS APIs ====================
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_orders_list(request):
-    """Get list of all orders for DMS"""
+    """Get list of all orders for DMS (staff only)"""
     logger.info(f"DMS orders list requested by user {request.user.id}")
 
     # N+1 FIX: Use select_related for ForeignKey relationships
@@ -586,9 +625,9 @@ def dms_orders_list(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_order_detail(request, order_id):
-    """Get detailed information about a specific order"""
+    """Get detailed information about a specific order (staff only)"""
     try:
         # N+1 FIX: Use select_related for related objects
         order = orders_models.Order.objects.select_related(
@@ -608,9 +647,9 @@ def dms_order_detail(request, order_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_tasks_list(request):
-    """Get list of all delivery tasks for DMS"""
+    """Get list of all delivery tasks for DMS (staff only)"""
     logger.info(f"DMS tasks list requested by user {request.user.id}")
 
     # N+1 FIX: Use select_related for ForeignKey relationships
@@ -656,9 +695,9 @@ def dms_tasks_list(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_task_detail(request, task_id):
-    """Get detailed information about a specific task"""
+    """Get detailed information about a specific task (staff only)"""
     try:
         # N+1 FIX: Use select_related for related objects
         task = delivery_models.DeliveryTask.objects.select_related(
@@ -680,9 +719,9 @@ def dms_task_detail(request, task_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_assign_task(request):
-    """Assign a task to a driver"""
+    """Assign a task to a driver (staff only)"""
     serializer = ezzy_api_serializers.TaskAssignmentSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -732,9 +771,9 @@ def dms_assign_task(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_update_task_status(request):
-    """Update task status from DMS"""
+    """Update task status from DMS (staff only)"""
     serializer = ezzy_api_serializers.TaskStatusUpdateSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -745,20 +784,27 @@ def dms_update_task_status(request):
     dms_status = serializer.validated_data.get('dms_status')
     
     try:
-        task = delivery_models.DeliveryTask.objects.get(id=task_id)
+        task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id)
+
+        # Lock check: Prevent status change on settled tasks
+        if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
+            return Response({
+                'error': 'Task is locked. Status cannot be changed after delivery is successful and COD is settled.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
         task.dl_task_status = new_status
-        
+
         if dms_status:
             task.dl_task_status_dms = dms_status
-        
+
         task.save()
-        
+
         task_serializer = ezzy_api_serializers.DeliveryTaskSerializer(task)
         return Response({
             'message': 'Task status updated successfully',
             'task': task_serializer.data
         }, status=status.HTTP_200_OK)
-    
+
     except delivery_models.DeliveryTask.DoesNotExist:
         return Response(
             {'error': 'Task not found'},
@@ -767,9 +813,9 @@ def dms_update_task_status(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_drivers_list(request):
-    """Get list of all drivers for DMS"""
+    """Get list of all drivers for DMS (staff only)"""
     drivers = fleet_models.Driver.objects.all()
     
     # Filters
@@ -783,9 +829,9 @@ def dms_drivers_list(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_driver_detail(request, driver_id):
-    """Get detailed information about a specific driver"""
+    """Get detailed information about a specific driver (staff only)"""
     try:
         driver = fleet_models.Driver.objects.get(driver_id=driver_id)
         serializer = ezzy_api_serializers.DriverSerializer(driver)
@@ -798,9 +844,9 @@ def dms_driver_detail(request, driver_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_analytics(request):
-    """Get analytics data for DMS dashboard"""
+    """Get analytics data for DMS dashboard (staff only)"""
     # Date range from query params
     start_date = request.query_params.get('start_date', None)
     end_date = request.query_params.get('end_date', None)
@@ -876,7 +922,20 @@ def driver_complete_task(request, task_id):
     """Driver completes a task with delivery proof, signature, and photos"""
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
-        task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id, driver=driver)
+        # Check if task is assigned to driver via DeliveryTask.driver OR AssignedDriver
+        task = delivery_models.DeliveryTask.objects.select_related('order').filter(
+            Q(driver=driver) | Q(assigneddriver__driver=driver),
+            id=task_id
+        ).distinct().first()
+        if not task:
+            # Check if task exists at all
+            task_exists = delivery_models.DeliveryTask.objects.filter(id=task_id).exists()
+            if task_exists:
+                return Response(
+                    {'error': f'Task {task_id} is not assigned to you ({driver.driver_name})'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            raise delivery_models.DeliveryTask.DoesNotExist()
 
         # Lock check: Prevent status change if task is Successful AND COD is settled
         if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
@@ -893,21 +952,48 @@ def driver_complete_task(request, task_id):
         cod_collected = serializer.validated_data.get('cod_collected', False)
         cod_amount_collected = serializer.validated_data.get('cod_amount_collected')
         
-        # Update task status
+        # Update task status with DMS mapping
         task.dl_task_status = status_value
+        DMS_STATUS_MAP = {
+            'accepted': '7',      # Accepted/Acknowledged
+            'delivered': '2',     # Successful
+            'cancelled': '9',     # Cancel
+            'rejected': '8',      # Decline
+            'failed': '3',        # Failed
+        }
+        if status_value in DMS_STATUS_MAP:
+            task.dl_task_status_dms = DMS_STATUS_MAP[status_value]
+
         if status_value == 'delivered':
-            task.dl_task_status_dms = '2'  # Successful
-        elif status_value == 'cancelled':
-            task.dl_task_status_dms = '9'  # Cancel
-        elif status_value == 'rejected':
-            task.dl_task_status_dms = '8'  # Decline
-        
+            task.completed_at = timezone.now()
+
         task.save()
-        
-        # Handle COD collection
-        if cod_collected and cod_amount_collected and task.order:
-            task.order.cod_status_by_staff = 'cod_with_driver'
-            task.order.save()
+
+        # Sync order status with delivery task status
+        if task.order:
+            order = task.order
+            order_changed = False
+
+            # Handle COD collection (only on successful delivery)
+            if status_value == 'delivered' and cod_collected and cod_amount_collected:
+                order.cod_status_by_staff = 'cod_with_driver'
+                order_changed = True
+
+            # Auto-update Order status based on delivery completion
+            if status_value == 'delivered':
+                if order.business and order.business.fulfillment_service_enabled:
+                    order.order_status = 'fulfilled'
+                    order.fulfilled_at = timezone.now()
+                else:
+                    order.order_status = 'delivered'
+                order.delivered_at = timezone.now()
+                order_changed = True
+            elif status_value in ('cancelled', 'failed'):
+                order.order_status = 'cancelled'
+                order_changed = True
+
+            if order_changed:
+                order.save()
         
         # Upload documents
         documents_created = []
@@ -977,8 +1063,20 @@ def driver_upload_task_document(request, task_id):
     """Driver uploads a document for a task"""
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
-        task = delivery_models.DeliveryTask.objects.get(id=task_id, driver=driver)
-        
+        # Check assignment via DeliveryTask.driver OR AssignedDriver
+        task = delivery_models.DeliveryTask.objects.select_related('order').filter(
+            Q(driver=driver) | Q(assigneddriver__driver=driver),
+            id=task_id
+        ).distinct().first()
+        if not task:
+            raise delivery_models.DeliveryTask.DoesNotExist()
+
+        # Lock check: Prevent uploads on completed+settled tasks
+        if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
+            return Response({
+                'error': 'Task is locked. Documents cannot be uploaded after delivery is successful and COD is settled.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
         document_type = request.data.get('document_type', 'other')
         document_file = request.FILES.get('document_file')
         document_name = request.data.get('document_name', '')
@@ -1044,9 +1142,9 @@ def driver_task_documents(request, task_id):
 # ==================== DMS DOCUMENT UPLOAD APIs ====================
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_upload_task_document(request, task_id):
-    """Upload a document for a task (DMS)"""
+    """Upload a document for a task (DMS, staff only)"""
     try:
         task = delivery_models.DeliveryTask.objects.get(id=task_id)
         
@@ -1084,9 +1182,9 @@ def dms_upload_task_document(request, task_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_upload_order_document(request, order_id):
-    """Upload a document for an order (DMS)"""
+    """Upload a document for an order (DMS, staff only)"""
     try:
         order = orders_models.Order.objects.get(id=order_id)
         
@@ -1124,9 +1222,9 @@ def dms_upload_order_document(request, order_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_task_documents(request, task_id):
-    """Get all documents for a task (DMS)"""
+    """Get all documents for a task (DMS, staff only)"""
     try:
         task = delivery_models.DeliveryTask.objects.get(id=task_id)
         documents = ezzy_api_models.TaskDocument.objects.filter(task=task)
@@ -1140,9 +1238,9 @@ def dms_task_documents(request, task_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, permissions.IsAdminUser])
 def dms_order_documents(request, order_id):
-    """Get all documents for an order (DMS)"""
+    """Get all documents for an order (DMS, staff only)"""
     try:
         order = orders_models.Order.objects.get(id=order_id)
         documents = ezzy_api_models.OrderDocument.objects.filter(order=order)
@@ -1836,8 +1934,14 @@ def webhook_receive_task_status_update(request):
         
         # Update task
         try:
-            task = delivery_models.DeliveryTask.objects.get(id=task_id)
-            
+            task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id)
+
+            # Lock check: Prevent status change if task is Successful AND COD is settled
+            if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
+                return Response({
+                    'error': 'Task is locked. Status cannot be changed after delivery is successful and COD is settled.'
+                }, status=status.HTTP_403_FORBIDDEN)
+
             # Verify driver if provided
             if driver_id:
                 driver = fleet_models.Driver.objects.get(driver_id=driver_id)
@@ -1846,7 +1950,7 @@ def webhook_receive_task_status_update(request):
                         {'error': 'Driver mismatch'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-            
+
             task.dl_task_status = new_status
             if dms_status:
                 task.dl_task_status_dms = dms_status
