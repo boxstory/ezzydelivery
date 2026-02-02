@@ -363,6 +363,13 @@ def task_navigation(request, task_id):
             'order', 'order__business', 'pickup_location', 'dl_to_address'
         ).get(id=task_id)
 
+        # Get dropoff address - try dl_to_address first, then look up via order
+        dropoff = task.dl_to_address
+        if not dropoff:
+            dropoff = delivery_models.DlAddressUpdate.objects.filter(
+                order=task.order
+            ).first()
+
         # Get pickup coordinates - try pickup_location first, then warehouse
         pickup = task.pickup_location
         pickup_lat = None
@@ -382,7 +389,7 @@ def task_navigation(request, task_id):
         context = {
             'task': task,
             'pickup': task.pickup_location,
-            'dropoff': task.dl_to_address,
+            'dropoff': dropoff,
             'pickup_lat': pickup_lat,
             'pickup_lon': pickup_lon,
         }

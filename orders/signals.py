@@ -214,6 +214,132 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
             del instance._old_verification_status
 
 
+def _resolve_zone_number(zone, area_name=None):
+    """
+    Resolve a zone number from various inputs.
+    - If zone is already a valid integer, return it.
+    - If zone is a zone name string, look it up in ZoneName/ZoneArea.
+    - If area_name is provided, try matching it to get the zone number.
+    Returns zone number (int) or None.
+    """
+    # Already a number
+    if zone and str(zone).isdigit() and int(str(zone)) > 0:
+        return int(str(zone))
+
+    # Try zone as a name string
+    zone_str = str(zone).strip() if zone else ''
+    search_terms = [t for t in [zone_str, area_name] if t]
+
+    if not search_terms:
+        return None
+
+    from django.db.models import Q
+    for term in search_terms:
+        if not term:
+            continue
+        # Try ZoneName (zone_name or zone_name_arabic)
+        zone_obj = delivery_models.ZoneName.objects.filter(
+            Q(zone_name__iexact=term) | Q(zone_name_arabic__iexact=term)
+        ).first()
+        if zone_obj:
+            logger.info(f"Resolved zone name '{term}' -> zone {zone_obj.zone_number}")
+            return zone_obj.zone_number
+
+        # Try ZoneArea (area_name or area_name_arabic)
+        area_obj = delivery_models.ZoneArea.objects.select_related('zone').filter(
+            Q(area_name__iexact=term) | Q(area_name_arabic__iexact=term)
+        ).first()
+        if area_obj:
+            logger.info(f"Resolved area name '{term}' -> zone {area_obj.zone.zone_number}")
+            return area_obj.zone.zone_number
+
+    return None
+
+
+def _geocode_address_from_qnas(zone, street, building, area_name=None):
+    """
+    Look up lat/lng for a Qatar address using QNAS API.
+
+    Geocoding priority:
+    1. zone + street + building -> exact building coordinates from QNAS
+    2. zone + street (no building) -> first available building on street from QNAS
+    3. zone only (no street) -> zone center from ZoneName model
+    4. area_name only -> resolve zone from ZoneName/ZoneArea, then use zone center
+
+    Returns (latitude, longitude) as Decimals, or (None, None) on failure.
+    """
+    import requests
+    from decimal import Decimal
+    from decouple import config
+
+    # Step 1: Resolve zone number (handles zone names, area names)
+    zone_number = _resolve_zone_number(zone, area_name)
+
+    # If we have zone + street, try QNAS API for building-level coordinates
+    if zone_number and street:
+        token = config("QNAS_TOKEN", default="")
+        domain = config("QNAS_DOMAIN", default="ezzydelivery.qa")
+
+        if not token:
+            logger.warning("QNAS_TOKEN not configured, skipping QNAS geocoding")
+        else:
+            headers = {
+                "X-Token": token,
+                "X-Domain": domain,
+                "Accept": "application/json",
+                "User-Agent": "EzzyDelivery/1.0",
+                "Referer": f"https://{domain}/",
+                "Origin": f"https://{domain}",
+            }
+
+            try:
+                url = f"https://qnas.qa/get_buildings/{zone_number}/{street}"
+                resp = requests.get(url, headers=headers, timeout=10)
+
+                if resp.status_code == 200:
+                    buildings_data = resp.json()
+                    if isinstance(buildings_data, list) and buildings_data:
+                        # Try exact building match
+                        if building:
+                            building_str = str(building)
+                            for b in buildings_data:
+                                if str(b.get("building_number", "")) == building_str:
+                                    lat = Decimal(str(b["x"]))
+                                    lng = Decimal(str(b["y"]))
+                                    logger.info(f"QNAS geocoded zone={zone_number}, street={street}, building={building} -> ({lat}, {lng})")
+                                    return lat, lng
+
+                        # Building missing or not found: use first available building on street
+                        first = buildings_data[0]
+                        if first.get("x") and first.get("y"):
+                            lat = Decimal(str(first["x"]))
+                            lng = Decimal(str(first["y"]))
+                            src = "first building on street" if not building else f"building {building} not found, using nearest"
+                            logger.info(f"QNAS geocoded zone={zone_number}, street={street} ({src}) -> ({lat}, {lng})")
+                            return lat, lng
+                    else:
+                        logger.info(f"QNAS returned no buildings for zone={zone_number}, street={street}")
+                else:
+                    logger.warning(f"QNAS API returned {resp.status_code} for zone={zone_number}, street={street}")
+
+            except Exception as e:
+                logger.error(f"QNAS geocoding error for zone={zone_number}, street={street}, building={building}: {e}")
+
+    # Step 2: Fallback to zone center from ZoneName model
+    if zone_number:
+        try:
+            zone_obj = delivery_models.ZoneName.objects.get(zone_number=zone_number)
+            if zone_obj.latitude and zone_obj.longitude:
+                lat = Decimal(str(zone_obj.latitude))
+                lng = Decimal(str(zone_obj.longitude))
+                logger.info(f"Geocoded from ZoneName center: zone={zone_number} -> ({lat}, {lng})")
+                return lat, lng
+        except delivery_models.ZoneName.DoesNotExist:
+            logger.info(f"Zone {zone_number} not found in ZoneName model")
+
+    return None, None
+
+
 def _create_delivery_task_from_order(order):
     """Create delivery task from verified order (DMS push handled by delivery signal)"""
     from django.utils import timezone
@@ -235,6 +361,17 @@ def _create_delivery_task_from_order(order):
                 'dl_unit': '0',
             }
         )
+
+        # Auto-geocode via QNAS if any address info is available
+        if order.dl_zone or order.dl_street or address_update.area_name:
+            lat, lng = _geocode_address_from_qnas(
+                order.dl_zone, order.dl_street, order.dl_building,
+                area_name=address_update.area_name
+            )
+            if lat is not None and lng is not None:
+                address_update.dl_latitude = lat
+                address_update.dl_longitude = lng
+                address_update.save(update_fields=['dl_latitude', 'dl_longitude'])
 
         # Create delivery task (DMS push will be handled automatically by delivery_task_post_save_receiver signal)
         delivery_task = DeliveryTask.objects.create(
