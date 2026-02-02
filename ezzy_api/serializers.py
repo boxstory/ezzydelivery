@@ -137,9 +137,11 @@ class TaskAssignmentSerializer(serializers.Serializer):
 class TaskStatusUpdateSerializer(serializers.Serializer):
     task_id = serializers.IntegerField()
     status = serializers.ChoiceField(choices=[
-        'for_review', 'pending', 'address_pending', 'customer_confiration_pending',
-        'customer_delaying', 'dl_pending_payment', 'publish_to_dms', 'out_for_delivery', 'in_transit',
-        'delivered', 'rejected', 'cancelled'
+        'for_review', 'pending', 'assigned', 'accepted', 'picked_up',
+        'start_ride', 'out_for_delivery', 'in_transit', 'contacted',
+        'non_reachable', 'address_pending', 'customer_confiration_pending',
+        'customer_delaying', 'dl_pending_payment', 'publish_to_dms',
+        'delivered', 'failed', 'rejected', 'cancelled',
     ])
     dms_status = serializers.ChoiceField(
         choices=['0', '1', '2', '3', '4', '6', '7', '8', '9', '10'],
@@ -294,7 +296,11 @@ class WebhookDeliverySerializer(serializers.ModelSerializer):
 # Webhook Payload Serializers (for receiving webhooks from driver apps)
 class WebhookTaskStatusUpdateSerializer(serializers.Serializer):
     task_id = serializers.IntegerField()
-    status = serializers.CharField()
+    status = serializers.ChoiceField(choices=[
+        'for_review', 'pending', 'assigned', 'accepted', 'picked_up',
+        'start_ride', 'out_for_delivery', 'in_transit', 'contacted',
+        'non_reachable', 'delivered', 'failed', 'rejected', 'cancelled',
+    ])
     dms_status = serializers.CharField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
     timestamp = serializers.DateTimeField(required=False)
@@ -303,7 +309,7 @@ class WebhookTaskStatusUpdateSerializer(serializers.Serializer):
 
 class WebhookTaskCompletionSerializer(serializers.Serializer):
     task_id = serializers.IntegerField()
-    status = serializers.ChoiceField(choices=['delivered', 'cancelled', 'rejected'])
+    status = serializers.ChoiceField(choices=['delivered', 'cancelled', 'rejected', 'failed'])
     cod_collected = serializers.BooleanField(required=False, default=False)
     cod_amount_collected = serializers.IntegerField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True)

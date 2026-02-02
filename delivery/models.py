@@ -168,7 +168,7 @@ class DeliveryTask(models.Model):
         max_length=100, choices=dl_task_status_client)
     dl_task_status = models.CharField(max_length=100, choices=dl_task_status)
     dl_task_status_dms = models.CharField(
-        max_length=100, default=6, choices=dl_task_status_dms)
+        max_length=100, default='6', choices=dl_task_status_dms)
     dl_task_date = models.DateField(auto_now_add=True)
     order = models.ForeignKey(orders_models.Order, on_delete=models.DO_NOTHING, related_name='delivery_task')
     dl_address_update = models.ForeignKey(
@@ -490,6 +490,7 @@ class AssignedDriver(models.Model):
     class Meta:
         verbose_name_plural = "Assigned Driver"
         app_label = 'delivery'
+        unique_together = [('driver', 'dl_task')]
 
 
 def shipping_label_upload_path(instance, filename):

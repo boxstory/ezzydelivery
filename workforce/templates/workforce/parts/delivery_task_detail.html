@@ -46,11 +46,11 @@
                     </div>
                     <div class="col-md-6 mb-3">
                         <small class="text-muted d-block mb-1">COD Amount</small>
-                        <strong class="text-success">{{ task.order.cod }} QAR</strong>
+                        <strong class="text-success">{{ task.order.cod_amount|default:0 }} QAR</strong>
                     </div>
                     <div class="col-md-6 mb-3">
                         <small class="text-muted d-block mb-1">Assigned Driver</small>
-                        <strong>{{ task.assigned_driver.name|default:"Not Assigned" }}</strong>
+                        <strong>{{ task.driver|default:"Not Assigned" }}</strong>
                     </div>
                     <div class="col-12 mb-3">
                         <small class="text-muted d-block mb-1">Delivery Address</small>
@@ -237,11 +237,11 @@
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Delivery Date:</span>
-                        <strong>{{ task.scheduled_delivery_date|date:"M d, Y"|default:"Not Scheduled" }}</strong>
+                        <strong>{{ task.dl_task_date|date:"M d, Y"|default:"Not Scheduled" }}</strong>
                     </div>
                     <div class="d-flex justify-content-between">
                         <span class="text-muted">Priority:</span>
-                        <span class="badge bg-{{ task.priority_color }}">{{ task.priority|title }}</span>
+                        <span class="badge bg-secondary">{{ task.dl_speed|default:"Normal" }}</span>
                     </div>
                 </div>
             </div>

@@ -149,8 +149,10 @@ function bulkAction(action) {
             bulkExport(selectedIds);
             break;
         case 'status_pending':
+        case 'status_out_for_delivery':
         case 'status_in_transit':
         case 'status_delivered':
+        case 'status_failed':
         case 'status_rejected':
         case 'status_cancelled':
             const status = action.replace('status_', '');
@@ -406,8 +408,8 @@ function setStatusModalTask(button) {
     const taskNumber = button.getAttribute('data-task-number');
     const modal = document.getElementById('statusModal');
     if (modal) {
-        modal.querySelector('#modalTaskId')?.setAttribute('value', taskId);
-        modal.querySelector('#modalTaskNumber')?.textContent = taskNumber;
+        modal.querySelector('#statusModalTaskId')?.setAttribute('value', taskId);
+        modal.querySelector('#statusModalTaskNumber')?.textContent = taskNumber;
     }
 }
 

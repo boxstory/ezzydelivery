@@ -13,6 +13,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth import authenticate
 from django.utils import timezone
 from decouple import config
+from django.db import transaction
 from django.db.models import Q, Count, Sum
 from datetime import datetime, timedelta
 
@@ -313,7 +314,6 @@ def driver_task_detail(request, task_id):
 @permission_classes([IsAuthenticated])
 def driver_accept_task(request, task_id):
     """Driver accepts a task"""
-    from django.db import transaction
     try:
         driver = fleet_models.Driver.objects.get(user=request.user)
 
@@ -553,7 +553,10 @@ def driver_statistics(request):
         
         total_tasks = tasks.count()
         completed_tasks = tasks.filter(dl_task_status='delivered').count()
-        in_progress_tasks = tasks.filter(dl_task_status='in_transit').count()
+        in_progress_tasks = tasks.filter(dl_task_status__in=[
+            'accepted', 'picked_up', 'start_ride', 'out_for_delivery',
+            'in_transit', 'contacted', 'non_reachable'
+        ]).count()
         total_earnings = tasks.filter(dl_task_status='delivered').aggregate(
             total=Sum('dl_price')
         )['total'] or 0
@@ -964,8 +967,15 @@ def driver_complete_task(request, task_id):
         if status_value in DMS_STATUS_MAP:
             task.dl_task_status_dms = DMS_STATUS_MAP[status_value]
 
-        if status_value == 'delivered':
+        if status_value in ('delivered', 'failed', 'cancelled'):
             task.completed_at = timezone.now()
+
+        # Track COD on task-level fields
+        if cod_collected:
+            task.cod_collected = True
+            task.cod_collected_at = timezone.now()
+        if cod_amount_collected:
+            task.cod_collected_amount = cod_amount_collected
 
         task.save()
 
@@ -2022,51 +2032,65 @@ def webhook_receive_task_completion(request):
         driver_id = serializer.validated_data.get('driver_id')
         
         try:
-            task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id)
+            with transaction.atomic():
+                task = delivery_models.DeliveryTask.objects.select_related('order', 'order__business').select_for_update().get(id=task_id)
 
-            # Lock check: Prevent status change if task is Successful AND COD is settled
-            if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
-                return Response({
-                    'error': 'Task is locked. Status cannot be changed after delivery is successful and COD is settled.'
-                }, status=status.HTTP_403_FORBIDDEN)
+                # Lock check: Prevent status change if task is Successful AND COD is settled
+                if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
+                    return Response({
+                        'error': 'Task is locked. Status cannot be changed after delivery is successful and COD is settled.'
+                    }, status=status.HTTP_403_FORBIDDEN)
 
-            if driver_id:
-                driver = fleet_models.Driver.objects.get(driver_id=driver_id)
-                if task.driver != driver:
-                    return Response(
-                        {'error': 'Driver mismatch'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+                if driver_id:
+                    driver = fleet_models.Driver.objects.get(driver_id=driver_id)
+                    if task.driver != driver:
+                        return Response(
+                            {'error': 'Driver mismatch'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
 
-            task.dl_task_status = status_value
-            if status_value == 'delivered':
-                task.dl_task_status_dms = '2'
-                task.completed_at = timezone.now()
-            elif status_value == 'cancelled':
-                task.dl_task_status_dms = '9'
-            elif status_value == 'rejected':
-                task.dl_task_status_dms = '8'
-            task.save()
-
-            # Handle COD and update Order status
-            if task.order:
-                order = task.order
-                if cod_collected and cod_amount_collected:
-                    order.cod_status_by_staff = 'cod_with_driver'
-
-                # Auto-update Order status based on delivery completion
+                task.dl_task_status = status_value
                 if status_value == 'delivered':
-                    # Check if business has fulfillment service enabled
-                    if order.business and order.business.fulfillment_service_enabled:
-                        order.order_status = 'fulfilled'
-                        order.fulfilled_at = timezone.now()
-                    else:
-                        order.order_status = 'delivered'
-                    order.delivered_at = timezone.now()
-                elif status_value == 'cancelled':
-                    order.order_status = 'cancelled'
+                    task.dl_task_status_dms = '2'
+                    task.completed_at = timezone.now()
+                elif status_value in ('failed', 'cancelled'):
+                    task.dl_task_status_dms = '9' if status_value == 'cancelled' else '3'
+                    task.completed_at = timezone.now()
+                elif status_value == 'rejected':
+                    task.dl_task_status_dms = '8'
 
-                order.save()
+                # Track COD on task-level fields
+                if cod_collected:
+                    task.cod_collected = True
+                    task.cod_collected_at = timezone.now()
+                if cod_amount_collected:
+                    task.cod_collected_amount = cod_amount_collected
+
+                task.save()
+
+                # Handle COD and update Order status
+                if task.order:
+                    order = task.order
+                    order_changed = False
+                    if cod_collected and cod_amount_collected:
+                        order.cod_status_by_staff = 'cod_with_driver'
+                        order_changed = True
+
+                    # Auto-update Order status based on delivery completion
+                    if status_value == 'delivered':
+                        if order.business and order.business.fulfillment_service_enabled:
+                            order.order_status = 'fulfilled'
+                            order.fulfilled_at = timezone.now()
+                        else:
+                            order.order_status = 'delivered'
+                        order.delivered_at = timezone.now()
+                        order_changed = True
+                    elif status_value in ('cancelled', 'failed'):
+                        order.order_status = 'cancelled'
+                        order_changed = True
+
+                    if order_changed:
+                        order.save()
             
             # Trigger webhooks
             webhook_payload = {

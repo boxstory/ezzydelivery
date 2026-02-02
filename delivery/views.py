@@ -44,6 +44,7 @@ from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
+from django.db import transaction, IntegrityError
 from decouple import config
 import geocoder
 import json
@@ -257,27 +258,28 @@ def assign_driver(request):
         if not task_id:
             return JsonResponse({"success": False, "error": "Task ID required"})
 
-        if delivery_models.AssignedDriver.objects.filter(dl_task_id=task_id).exists():
-            logger.info(f"Task {task_id} already assigned to a driver")
-            return JsonResponse({"success": False, "error": "Task already assigned"})
-
         try:
             # IDOR FIX: Verify user is a driver
             driver = fleet_models.Driver.objects.get(user_id=request.user.id)
 
-            task = delivery_models.DeliveryTask.objects.get(id=task_id)
-            logger.info(f"Driver {driver.driver_id} assigning themselves to task {task_id}")
+            with transaction.atomic():
+                task = delivery_models.DeliveryTask.objects.select_for_update().get(id=task_id)
 
-            assigned_driver = delivery_models.AssignedDriver(
-                driver=driver, dl_task=task
-            )
-            assigned_driver.save()
+                if delivery_models.AssignedDriver.objects.filter(dl_task_id=task_id).exists():
+                    logger.info(f"Task {task_id} already assigned to a driver")
+                    return JsonResponse({"success": False, "error": "Task already assigned"})
 
-            # Update task: set driver and status to accepted
-            task.driver = driver
-            task.dl_task_status = 'accepted'
-            task.save(update_fields=['driver', 'dl_task_status'])
-            logger.info(f"Task {task_id} accepted by driver {driver.driver_id}")
+                logger.info(f"Driver {driver.driver_id} assigning themselves to task {task_id}")
+
+                delivery_models.AssignedDriver.objects.create(
+                    driver=driver, dl_task=task
+                )
+
+                # Update task: set driver and status to accepted
+                task.driver = driver
+                task.dl_task_status = 'accepted'
+                task.save(update_fields=['driver', 'dl_task_status'])
+                logger.info(f"Task {task_id} accepted by driver {driver.driver_id}")
 
             return JsonResponse({"success": True})
 
@@ -287,6 +289,9 @@ def assign_driver(request):
         except delivery_models.DeliveryTask.DoesNotExist:
             logger.warning(f"Task {task_id} not found")
             return JsonResponse({"success": False, "error": "Task not found"})
+        except IntegrityError:
+            logger.warning(f"Task {task_id} assignment race condition caught")
+            return JsonResponse({"success": False, "error": "Task already assigned"})
         except Exception as e:
             logger.error(f"Error assigning task {task_id} to driver: {e}")
             return JsonResponse({"success": False, "error": str(e)})

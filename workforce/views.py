@@ -70,7 +70,7 @@ from django.core.paginator import (
     PageNotAnInteger,
 )
 from django.urls import reverse
-from django.db.models import Count
+from django.db.models import Count, Q
 
 from business import models as business_models
 from core import models as core_models
@@ -869,6 +869,16 @@ def add_order(request):
                 }
             }
 
+            # Parse scheduled time if provided
+            scheduled_delivery = request.POST.get('scheduled_delivery') == 'on'
+            scheduled_time = None
+            if scheduled_delivery and request.POST.get('scheduled_time'):
+                from datetime import datetime
+                try:
+                    scheduled_time = datetime.strptime(request.POST.get('scheduled_time'), '%H:%M').time()
+                except ValueError:
+                    scheduled_time = None
+
             # Create order
             order = orders_models.Order(
                 business=business,
@@ -882,6 +892,9 @@ def add_order(request):
                 dl_building=safe_int(request.POST.get('dl_building')),
                 cod_amount=safe_int(request.POST.get('cod_amount')),
                 dl_amount=safe_int(request.POST.get('dl_amount')),
+                order_type=request.POST.get('order_type', 'normal_delivery'),
+                scheduled_delivery=scheduled_delivery,
+                scheduled_time=scheduled_time,
                 order_notes=combined_notes[:100] if combined_notes else '',
                 deadline_date=request.POST.get('deadline_date', '').strip(),
                 order_status='to_review',
@@ -1021,7 +1034,11 @@ def dl_list_all(request):
     if mobile:
         dl_tasks = dl_tasks.filter(order__customer_phone__icontains=mobile)
     if driver_name:
-        dl_tasks = dl_tasks.filter(driver__name__icontains=driver_name)
+        dl_tasks = dl_tasks.filter(
+            Q(driver__user__first_name__icontains=driver_name) |
+            Q(driver__user__last_name__icontains=driver_name) |
+            Q(driver__user__username__icontains=driver_name)
+        )
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
     if dms_status:
@@ -1066,7 +1083,7 @@ def dl_list_incompleted_details(request):
     dl_tasks = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
     ).exclude(
-        dl_task_status_dms__in=['delivered', 'cancelled']
+        dl_task_status_dms__in=['2', '9']  # 2=Successful, 9=Cancel
     ).order_by('-created_at')
     dl_tasks = paginate_queryset(request, dl_tasks)
 
@@ -1818,8 +1835,23 @@ def assign_driver_to_task(request, task_id):
 @staff_required
 def update_task_status(request, task_id):
     """AJAX endpoint to update delivery task status"""
+    VALID_STATUSES = [
+        'for_review', 'pending', 'assigned', 'accepted', 'picked_up',
+        'start_ride', 'out_for_delivery', 'in_transit', 'contacted',
+        'non_reachable', 'delivered', 'failed', 'rejected', 'cancelled',
+    ]
     try:
-        task = get_object_or_404(delivery_models.DeliveryTask, id=task_id)
+        task = get_object_or_404(
+            delivery_models.DeliveryTask.objects.select_related('order'),
+            id=task_id
+        )
+
+        # Lock check: Prevent status change on settled tasks
+        if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
+            return JsonResponse({
+                'success': False,
+                'error': 'Task is locked. Status cannot be changed after delivery is successful and COD is settled.'
+            }, status=403)
 
         # Parse JSON body
         data = json.loads(request.body)
@@ -1831,9 +1863,15 @@ def update_task_status(request, task_id):
                 'error': 'Status is required'
             }, status=400)
 
+        if status not in VALID_STATUSES:
+            return JsonResponse({
+                'success': False,
+                'error': f'Invalid status: {status}'
+            }, status=400)
+
         # Update task status
         task.dl_task_status = status
-        task.save()
+        task.save(update_fields=['dl_task_status'])
 
         return JsonResponse({
             'success': True,
@@ -2162,6 +2200,116 @@ def dms_publish_order(request):
     return render(request, 'workforce/dms_publish_order.html', context)
 
 
+# Finance Dashboard Section Functions
+@login_required(login_url='/accounts/login/')
+@staff_required
+def workforce_finance_dashboard(request):
+    """Comprehensive finance dashboard for workforce staff"""
+    from django.db.models import Sum, Count, Q, F
+    from decimal import Decimal
+    from datetime import timedelta
+
+    days = int(request.GET.get('days', 30))
+    start_date = timezone.now() - timedelta(days=days)
+
+    # All drivers summary
+    drivers = fleet_models.Driver.objects.filter(
+        driver_status='Approved'
+    ).select_related('user')
+
+    driver_totals = drivers.aggregate(
+        total_wallet=Sum('wallet_balance'),
+        total_cod_in_hand=Sum('cod_in_hand'),
+        total_pending_earnings=Sum('pending_earnings'),
+        total_credit_limit=Sum('credit_limit'),
+    )
+
+    # Transaction summary for the period
+    txns = fleet_models.DriverTransaction.objects.filter(created_at__gte=start_date)
+
+    # COD pipeline
+    cod_collected = abs(txns.filter(
+        transaction_type='cod_collection'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+
+    cod_driver_settled = abs(txns.filter(
+        transaction_type__in=['cod_deposit', 'cod_driver_settle']
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+
+    cod_client_settled = abs(txns.filter(
+        transaction_type='cod_client_settle'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+
+    cod_returned = abs(txns.filter(
+        transaction_type='cod_return'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+
+    # Earnings & settlements
+    earnings_total = txns.filter(
+        transaction_type='earning'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    settlements_total = abs(txns.filter(
+        transaction_type='settlement'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+
+    # Charges summary
+    charges_summary = txns.filter(
+        transaction_type__in=['delivery_charge', 'fulfillment_charge', 'inventory_handling', 'other_charge']
+    ).values('transaction_type').annotate(
+        total=Sum('amount'),
+        count=Count('id')
+    )
+
+    total_charges = sum(abs(c['total']) for c in charges_summary) if charges_summary else Decimal('0')
+
+    # Bills payable / receivable
+    bills_payable = abs(txns.filter(
+        transaction_type='bills_payable'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+
+    bills_receivable = abs(txns.filter(
+        transaction_type='bills_receivable'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+
+    # Drivers with highest COD in hand (top 10)
+    top_cod_drivers = drivers.filter(
+        cod_in_hand__gt=0
+    ).order_by('-cod_in_hand')[:10]
+
+    # Recent transactions (last 20)
+    recent_transactions = txns.select_related(
+        'driver__user', 'delivery_task', 'business'
+    ).order_by('-created_at')[:20]
+
+    # Transaction counts by type
+    type_breakdown = txns.values('transaction_type').annotate(
+        count=Count('id'),
+        total=Sum('amount')
+    ).order_by('-count')
+
+    context = {
+        'selected_days': days,
+        'driver_totals': driver_totals,
+        'driver_count': drivers.count(),
+        'cod_collected': cod_collected,
+        'cod_driver_settled': cod_driver_settled,
+        'cod_client_settled': cod_client_settled,
+        'cod_returned': cod_returned,
+        'earnings_total': earnings_total,
+        'settlements_total': settlements_total,
+        'charges_summary': charges_summary,
+        'total_charges': total_charges,
+        'bills_payable': bills_payable,
+        'bills_receivable': bills_receivable,
+        'top_cod_drivers': top_cod_drivers,
+        'recent_transactions': recent_transactions,
+        'type_breakdown': type_breakdown,
+    }
+
+    return render(request, 'workforce/workforce_finance_dashboard.html', context)
+
+
 # Fleet Accounts Section Functions
 @login_required(login_url='/accounts/login/')
 @staff_required
@@ -2219,9 +2367,8 @@ def fleet_cod_in_hand(request):
             total=Sum('cod_collected_amount')
         ).values('total')
 
-        drivers = fleet_models.Driver.objects.filter(
-            driver_status='Approved'
-        ).select_related('user').annotate(
+        # Show all drivers (not just approved) for COD tracking
+        drivers = fleet_models.Driver.objects.all().select_related('user').annotate(
             period_cod=Coalesce(
                 Subquery(cod_subquery),
                 Value(0),
@@ -2231,9 +2378,8 @@ def fleet_cod_in_hand(request):
     else:
         # No date filter - show current cod_in_hand
         from django.db.models import F
-        drivers = fleet_models.Driver.objects.filter(
-            driver_status='Approved'
-        ).select_related('user').annotate(
+        # Show all drivers (not just approved) for COD tracking
+        drivers = fleet_models.Driver.objects.all().select_related('user').annotate(
             period_cod=F('cod_in_hand')
         )
 
@@ -2319,6 +2465,216 @@ def fleet_drivers_earnings(request):
         'page_title': 'Drivers Earnings',
     }
     return render(request, 'workforce/fleet_drivers_earnings.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def cod_settlement_report(request):
+    """COD Settlement Report - Select drivers, settle COD, export PDF"""
+    from django.db.models import Sum, F
+    from delivery import models as delivery_models
+    from datetime import timedelta
+
+    # Date filters
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    today = timezone.now().date()
+    if not date_from:
+        date_from = (today - timedelta(days=7)).isoformat()
+    if not date_to:
+        date_to = today.isoformat()
+
+    # Get drivers with unsettled COD (all drivers, not just approved)
+    drivers = fleet_models.Driver.objects.filter(
+        cod_in_hand__gt=0
+    ).select_related('user').order_by('-cod_in_hand')
+
+    # Get unsettled COD deliveries grouped by driver
+    unsettled_tasks = delivery_models.DeliveryTask.objects.filter(
+        cod_collected=True,
+        dl_task_status='delivered',
+        order__cod_status_by_staff='cod_with_driver'
+    ).select_related('driver', 'driver__user', 'order').order_by('-completed_at')
+
+    # Apply date filter if provided
+    if date_from:
+        unsettled_tasks = unsettled_tasks.filter(completed_at__date__gte=date_from)
+    if date_to:
+        unsettled_tasks = unsettled_tasks.filter(completed_at__date__lte=date_to)
+
+    # Calculate totals
+    total_unsettled = drivers.aggregate(total=Sum('cod_in_hand'))['total'] or 0
+    drivers_with_cod = drivers.count()
+
+    context = {
+        'drivers': drivers,
+        'unsettled_tasks': unsettled_tasks[:100],
+        'page_title': 'COD Settlement Report',
+        'total_unsettled': total_unsettled,
+        'drivers_with_cod': drivers_with_cod,
+        'date_from': date_from,
+        'date_to': date_to,
+    }
+    return render(request, 'workforce/cod_settlement_report.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def cod_settlement_action(request):
+    """Process COD settlement for selected drivers"""
+    from django.http import JsonResponse
+    from fleet.wallet_service import WalletService
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    driver_ids = request.POST.getlist('driver_ids[]')
+    payment_method = request.POST.get('payment_method', 'cash')
+    reference = request.POST.get('reference', '')
+
+    if not driver_ids:
+        return JsonResponse({'error': 'No drivers selected'}, status=400)
+
+    wallet_service = WalletService()
+    settled_drivers = []
+    total_settled = 0
+
+    for driver_id in driver_ids:
+        try:
+            driver = fleet_models.Driver.objects.get(driver_id=driver_id)
+            cod_amount = driver.cod_in_hand
+
+            if cod_amount > 0:
+                # Record COD deposit transaction with payment method
+                # Pass no delivery_ids so submit_cod_to_admin settles oldest tasks automatically
+                wallet_service.submit_cod_to_admin(
+                    driver=driver,
+                    amount=cod_amount,
+                    created_by=request.user,
+                    reference_number=reference,
+                    payment_method=payment_method,
+                    notes=f"COD settlement via {payment_method}"
+                )
+                settled_drivers.append({
+                    'name': driver.driver_name,
+                    'amount': float(cod_amount),
+                    'payment_method': payment_method
+                })
+                total_settled += cod_amount
+        except fleet_models.Driver.DoesNotExist:
+            continue
+
+    return JsonResponse({
+        'success': True,
+        'settled_count': len(settled_drivers),
+        'total_settled': float(total_settled),
+        'settled_drivers': settled_drivers,
+        'payment_method': payment_method
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def cod_settlement_pdf(request):
+    """Generate PDF report for COD settlement"""
+    from django.http import HttpResponse
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch, mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from io import BytesIO
+    from django.db.models import Sum
+
+    driver_ids = request.GET.getlist('driver_ids')
+
+    # Get selected drivers or all with COD
+    if driver_ids:
+        drivers = fleet_models.Driver.objects.filter(
+            driver_id__in=driver_ids,
+            cod_in_hand__gt=0
+        ).select_related('user').order_by('-cod_in_hand')
+    else:
+        drivers = fleet_models.Driver.objects.filter(
+            driver_status='Approved',
+            cod_in_hand__gt=0
+        ).select_related('user').order_by('-cod_in_hand')
+
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Title
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, alignment=1, spaceAfter=20)
+    elements.append(Paragraph('COD Settlement Report', title_style))
+    elements.append(Paragraph(f'Date: {timezone.now().strftime("%d %b %Y, %H:%M")}', styles['Normal']))
+    elements.append(Spacer(1, 20))
+
+    # Summary
+    total_cod = drivers.aggregate(total=Sum('cod_in_hand'))['total'] or 0
+    summary_style = ParagraphStyle('Summary', parent=styles['Normal'], fontSize=12, spaceAfter=10)
+    elements.append(Paragraph(f'<b>Total Drivers:</b> {drivers.count()}', summary_style))
+    elements.append(Paragraph(f'<b>Total COD to Collect:</b> {total_cod} QR', summary_style))
+    elements.append(Spacer(1, 20))
+
+    # Table data
+    data = [['#', 'Driver Name', 'Driver ID', 'Phone', 'COD Amount (QR)']]
+    for i, driver in enumerate(drivers, 1):
+        data.append([
+            str(i),
+            driver.driver_name,
+            driver.driver_id,
+            driver.driver_mobile or '-',
+            f'{driver.cod_in_hand:.2f}'
+        ])
+
+    # Add total row
+    data.append(['', '', '', 'TOTAL:', f'{total_cod:.2f}'])
+
+    # Create table
+    table = Table(data, colWidths=[30, 120, 80, 90, 90])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#001f3f')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -2), colors.white),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f0f0f0')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ALIGN', (-1, 1), (-1, -1), 'RIGHT'),
+    ]))
+    elements.append(table)
+
+    # Signature section
+    elements.append(Spacer(1, 40))
+    sig_data = [
+        ['Staff Signature:', '_' * 30, 'Driver Signature:', '_' * 30],
+        ['Name:', '_' * 30, 'Name:', '_' * 30],
+        ['Date:', '_' * 30, 'Date:', '_' * 30],
+    ]
+    sig_table = Table(sig_data, colWidths=[80, 130, 80, 130])
+    sig_table.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 15),
+    ]))
+    elements.append(sig_table)
+
+    doc.build(elements)
+
+    # Return PDF response
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    filename = f'cod_settlement_{timezone.now().strftime("%Y%m%d_%H%M")}.pdf'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 @login_required(login_url='/accounts/login/')
@@ -2520,6 +2876,7 @@ def generate_demo_transactions(request):
         cod_amount = Decimal(random.randint(50, 500))
         earning_amount = Decimal(random.randint(15, 50))
         cod_in_hand += cod_amount
+        wallet_balance -= cod_amount  # COD collection decreases wallet
         pending_earnings += earning_amount
 
         # COD Collection transaction
@@ -2556,7 +2913,9 @@ def generate_demo_transactions(request):
         txn_date = now - timedelta(days=days_ago, hours=random.randint(10, 18))
 
         deposit_amount = Decimal(random.randint(200, 800))
+        deposit_amount = min(deposit_amount, cod_in_hand)  # Can't deposit more than in hand
         cod_in_hand = max(Decimal('0.00'), cod_in_hand - deposit_amount)
+        wallet_balance += deposit_amount  # COD deposit increases wallet
 
         transactions_to_create.append(fleet_models.DriverTransaction(
             driver=driver,
@@ -2608,10 +2967,11 @@ def generate_demo_transactions(request):
     # Bulk create all transactions
     fleet_models.DriverTransaction.objects.bulk_create(transactions_to_create)
 
-    # Update driver's current balances
+    # Update driver's current balances including wallet_balance
     driver.cod_in_hand = cod_in_hand
     driver.pending_earnings = pending_earnings
-    driver.save(update_fields=['cod_in_hand', 'pending_earnings'])
+    driver.wallet_balance = wallet_balance
+    driver.save(update_fields=['cod_in_hand', 'pending_earnings', 'wallet_balance'])
 
     messages.success(request, f'Successfully generated {len(transactions_to_create)} demo transactions for {driver.user.first_name} {driver.user.last_name}')
     return redirect(f"{reverse('workforce:fleet_transactions')}?driver_id={driver_id}")
@@ -2649,7 +3009,7 @@ def bulk_settle_transactions(request):
 
     # Get transactions that can be settled (pending earnings and COD collections)
     transactions = fleet_models.DriverTransaction.objects.filter(
-        transaction_id__in=transaction_ids,
+        id__in=transaction_ids,
         driver=driver,
         settlement__isnull=True  # Not already settled
     ).exclude(
@@ -4387,6 +4747,11 @@ def delivery_task_edit(request, task_id):
 
     if request.method == 'POST':
         try:
+            # Lock check: Prevent editing settled tasks
+            if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
+                messages.error(request, 'Task is locked. Cannot edit after delivery is successful and COD is settled.')
+                return redirect(request.path)
+
             # Handle task fields
             driver_id = request.POST.get('driver')
             status = request.POST.get('status')
@@ -4568,21 +4933,37 @@ def bulk_update_status(request):
                 'error': 'Status is required'
             }, status=400)
 
-        # Map simple status names to actual values
-        status_mapping = {
-            'pending': 'for_review',
-            'in_transit': '1',
-            'delivered': '2',
-            'rejected': '3',
-            'cancelled': '9',
+        # Validate status against allowed choices
+        VALID_STATUSES = [
+            'for_review', 'pending', 'assigned', 'accepted', 'picked_up',
+            'start_ride', 'out_for_delivery', 'in_transit', 'contacted',
+            'non_reachable', 'delivered', 'failed', 'rejected', 'cancelled',
+        ]
+        if status not in VALID_STATUSES:
+            return JsonResponse({
+                'success': False,
+                'error': f'Invalid status: {status}'
+            }, status=400)
+
+        # DMS status mapping for sync
+        DMS_STATUS_MAP = {
+            'delivered': '2', 'cancelled': '9', 'rejected': '8',
+            'failed': '3', 'accepted': '7',
         }
 
-        actual_status = status_mapping.get(status, status)
-
-        # Update all selected tasks
-        updated = delivery_models.DeliveryTask.objects.filter(
+        # Update all selected tasks (excluding locked tasks)
+        tasks = delivery_models.DeliveryTask.objects.select_related('order').filter(
             id__in=task_ids
-        ).update(dl_task_status_client=actual_status)
+        ).exclude(
+            dl_task_status_dms='2',
+            order__cod_status_by_staff='cod_settled_with_business'
+        )
+        for task in tasks:
+            task.dl_task_status = status
+            if status in DMS_STATUS_MAP:
+                task.dl_task_status_dms = DMS_STATUS_MAP[status]
+            task.save(update_fields=['dl_task_status', 'dl_task_status_dms'])
+        updated = tasks.count()
 
         return JsonResponse({
             'success': True,
