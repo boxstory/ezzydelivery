@@ -134,13 +134,16 @@ class DeliveryTask(models.Model):
     dl_task_status = (
         ('for_review', 'For Review'),
         ('pending', 'Pending'),
-        ('address_pending', 'Address Pending'),
-        ('customer_confiration_pending', 'Customer Confirmation Pending'),
-        ('customer_delaying', 'Customer make delaying'),
-        ('dl_pending_payment', 'Pending Delivery charge Payment'),
-        ('publish_to_dms', 'Publish to DMS'),
+        ('assigned', 'Assigned'),
+        ('accepted', 'Accepted'),
+        ('picked_up', 'Picked Up'),
+        ('start_ride', 'Start Ride'),
+        ('out_for_delivery', 'Out for Delivery'),
         ('in_transit', 'In Transit'),
+        ('contacted', 'Contacted & Confirmed'),
+        ('non_reachable', 'Non Reachable'),
         ('delivered', 'Delivered'),
+        ('failed', 'Failed'),
         ('rejected', 'Rejected'),
         ('cancelled', 'Cancelled'),
     )
@@ -220,6 +223,22 @@ class DeliveryTask(models.Model):
     cod_collected_at = models.DateTimeField(
         null=True, blank=True,
         help_text="When COD was collected"
+    )
+    cod_settled = models.BooleanField(
+        default=False,
+        help_text="Whether COD has been submitted/settled with admin"
+    )
+    cod_settled_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When COD was submitted to admin"
+    )
+    earnings_settled = models.BooleanField(
+        default=False,
+        help_text="Whether driver earnings have been settled/paid out"
+    )
+    earnings_settled_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When driver earnings were settled"
     )
     completed_at = models.DateTimeField(
         null=True, blank=True,

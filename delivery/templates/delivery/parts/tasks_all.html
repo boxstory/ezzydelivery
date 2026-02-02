@@ -6,44 +6,53 @@
   <div class="pwa-content d-md-none">
 
     <!-- Task Tabs -->
-    <div class="task-tabs">
-      <a href="?tab=new&area={{ area_filter }}&type={{ type_filter }}"
-         class="task-tab {% if current_tab == 'new' %}task-tab--active{% endif %}">
-        <span class="task-tab__label">New Tasks</span>
-        <span class="task-tab__badge">{{ new_count }}</span>
+    <div class="task-tabs task-tabs--three">
+      <a href="?tab=all&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}"
+         class="task-tab {% if current_tab == 'all' %}task-tab--active{% endif %}">
+        <span class="task-tab__label">All</span>
+        <span class="task-tab__badge">{{ all_count }}</span>
       </a>
-      <a href="?tab=assigned&area={{ area_filter }}&type={{ type_filter }}"
+      <a href="?tab=assigned&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}"
          class="task-tab {% if current_tab == 'assigned' %}task-tab--active{% endif %}">
-        <span class="task-tab__label">My Tasks</span>
+        <span class="task-tab__label">Assigned</span>
         <span class="task-tab__badge">{{ assigned_count }}</span>
       </a>
+      <a href="?tab=accepted&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}"
+         class="task-tab {% if current_tab == 'accepted' %}task-tab--active{% endif %}">
+        <span class="task-tab__label">Accepted</span>
+        <span class="task-tab__badge">{{ accepted_count }}</span>
+      </a>
     </div>
 
-    <!-- Area Filters -->
-    <div class="task-filters">
-      <a href="?tab={{ current_tab }}&area=all&type={{ type_filter }}"
-         class="task-filter {% if area_filter == 'all' %}task-filter--active{% endif %}">All</a>
-      <a href="?tab={{ current_tab }}&area=doha&type={{ type_filter }}"
-         class="task-filter {% if area_filter == 'doha' %}task-filter--active{% endif %}">Doha</a>
-      <a href="?tab={{ current_tab }}&area=my_zone&type={{ type_filter }}"
-         class="task-filter {% if area_filter == 'my_zone' %}task-filter--active{% endif %}">My Zone</a>
-      <a href="?tab={{ current_tab }}&area=qatar&type={{ type_filter }}"
-         class="task-filter {% if area_filter == 'qatar' %}task-filter--active{% endif %}">All Qatar</a>
-    </div>
-
-    <!-- Type Filters -->
-    <div class="task-filters task-filters--secondary">
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type=all"
-         class="task-filter task-filter--sm {% if type_filter == 'all' %}task-filter--active{% endif %}">All Types</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type=public"
-         class="task-filter task-filter--sm {% if type_filter == 'public' %}task-filter--active{% endif %}">Public</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type=pnd"
-         class="task-filter task-filter--sm {% if type_filter == 'pnd' %}task-filter--active{% endif %}">PnD</a>
+    <!-- Sub Filters (Area, Type, Status) -->
+    <div class="task-filters task-filters--compact">
+      <a href="?tab={{ current_tab }}&area=all&type={{ type_filter }}&status={{ status_filter }}"
+         class="task-filter task-filter--xs {% if area_filter == 'all' %}task-filter--active{% endif %}">All</a>
+      <a href="?tab={{ current_tab }}&area=doha&type={{ type_filter }}&status={{ status_filter }}"
+         class="task-filter task-filter--xs {% if area_filter == 'doha' %}task-filter--active{% endif %}">Doha</a>
+      <a href="?tab={{ current_tab }}&area=my_zone&type={{ type_filter }}&status={{ status_filter }}"
+         class="task-filter task-filter--xs {% if area_filter == 'my_zone' %}task-filter--active{% endif %}">My Zone</a>
+      <span class="task-filter-divider">|</span>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type=public&status={{ status_filter }}"
+         class="task-filter task-filter--xs {% if type_filter == 'public' %}task-filter--active{% endif %}">Public</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type=pnd&status={{ status_filter }}"
+         class="task-filter task-filter--xs {% if type_filter == 'pnd' %}task-filter--active{% endif %}">PnD</a>
+      {% if current_tab == 'accepted' %}
+      <span class="task-filter-divider">|</span>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all"
+         class="task-filter task-filter--xs {% if status_filter == 'all' %}task-filter--active{% endif %}">All</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=picked_up"
+         class="task-filter task-filter--xs {% if status_filter == 'picked_up' %}task-filter--active{% endif %}">Picked</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=in_transit"
+         class="task-filter task-filter--xs {% if status_filter == 'in_transit' %}task-filter--active{% endif %}">Transit</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=contacted"
+         class="task-filter task-filter--xs {% if status_filter == 'contacted' %}task-filter--active{% endif %}">Contacted</a>
+      {% endif %}
     </div>
 
     <!-- Task Count Header -->
     <div class="task-list-header">
-      <span>{{ cards|length }} {% if current_tab == 'new' %}available{% else %}assigned{% endif %} task{{ cards|length|pluralize }}</span>
+      <span>{{ cards|length }} {% if current_tab == 'all' %}available{% elif current_tab == 'assigned' %}assigned{% else %}accepted{% endif %} task{{ cards|length|pluralize }}</span>
     </div>
 
     {% if cards %}
@@ -51,13 +60,18 @@
       {% for card in cards %}
       <div class="pwa-task-card pwa-fade-in" style="animation-delay: {{ forloop.counter0 }}00ms; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#taskModal{{ card.id }}">
         <div class="pwa-task-card__header">
-          <span class="pwa-task-card__id">#{{ card.dl_task_number|truncatechars:15 }}</span>
-          <span class="pwa-task-card__status pwa-task-card__status--{% if card.dl_task_status == 'delivered' %}delivered{% elif card.dl_task_status == 'in_transit' %}transit{% elif card.dl_task_status == 'cancelled' %}cancelled{% else %}pending{% endif %}">
-            {{ card.dl_task_status|title }}
+          <span class="pwa-task-card__id" title="{{ card.dl_task_number }}">#{{ card.dl_task_number }}</span>
+          <span class="pwa-task-card__status pwa-task-card__status--{% if card.dl_task_status == 'delivered' %}delivered{% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' or card.dl_task_status == 'start_ride' %}transit{% elif card.dl_task_status == 'cancelled' or card.dl_task_status == 'failed' %}cancelled{% elif card.dl_task_status == 'accepted' or card.dl_task_status == 'picked_up' %}accepted{% else %}pending{% endif %}">
+            {{ card.get_dl_task_status_display }}
           </span>
         </div>
 
         <div class="pwa-task-card__body">
+          <!-- Business Name Row -->
+          <div class="pwa-task-card__business">
+            <i class="fa-solid fa-store me-1"></i>
+            <span>{{ card.order.business.business_name|default:"N/A" }}</span>
+          </div>
           <div class="pwa-task-card__route">
             <div class="pwa-task-card__route-line">
               <div class="pwa-task-card__route-dot"></div>
@@ -67,7 +81,7 @@
             <div class="pwa-task-card__route-info">
               <div class="pwa-task-card__location">
                 <div class="pwa-task-card__location-label">Pickup</div>
-                <div class="pwa-task-card__location-value">{{ card.pickup_location.pickup_location_title|default:"N/A"|truncatechars:30 }}</div>
+                <div class="pwa-task-card__location-value">{{ card.pickup_location.pickup_location_title|default:"N/A" }}</div>
               </div>
               <div class="pwa-task-card__location">
                 <div class="pwa-task-card__location-label">Dropoff</div>
@@ -100,18 +114,22 @@
             </div>
             {% endif %}
           </div>
-          {% if current_tab == 'new' %}
-            {% if card.dl_task_status == 'pending' or card.dl_task_status == 'for_review' or card.dl_task_status == 'assigned' %}
+          {% if current_tab == 'all' %}
+            {% if card.dl_task_status == 'pending' or card.dl_task_status == 'for_review' %}
             <button type="button" class="btn btn-sm btn-success assign-driver-btn" data-task-id="{{ card.id }}" onclick="event.stopPropagation();">
               <i class="fa-solid fa-plus me-1"></i>Accept
             </button>
             {% endif %}
           {% elif current_tab == 'assigned' %}
-            {% if card.dl_task_status == 'assigned' or card.dl_task_status == 'pending' %}
+            <button type="button" class="btn btn-sm btn-success accept-task-btn" data-task-id="{{ card.id }}" onclick="event.stopPropagation();">
+              <i class="fa-solid fa-check me-1"></i>Accept
+            </button>
+          {% elif current_tab == 'accepted' %}
+            {% if card.dl_task_status == 'accepted' %}
             <button type="button" class="btn btn-sm btn-primary start-ride-btn" data-task-id="{{ card.id }}" onclick="event.stopPropagation();">
               <i class="fa-solid fa-car me-1"></i>Start Ride
             </button>
-            {% elif card.dl_task_status == 'in_transit' %}
+            {% else %}
             <a href="{% url 'delivery:task_navigation' card.id %}" class="btn btn-sm btn-info" onclick="event.stopPropagation();">
               <i class="fa-solid fa-map-location-dot me-1"></i>View Map
             </a>
@@ -167,18 +185,20 @@
 
               <!-- Order Details -->
               <div class="row g-2 mb-3">
-                <div class="col-6">
+                <div class="col-{% if card.order.order_type == 'pick_and_drop' %}6{% else %}12{% endif %}">
                   <div class="pwa-stat-card">
                     <div class="pwa-stat-card__label">COD Amount</div>
                     <div class="pwa-stat-card__value pwa-text-success">{{ card.order.cod_amount|default:0 }} QR</div>
                   </div>
                 </div>
+                {% if card.order.order_type == 'pick_and_drop' %}
                 <div class="col-6">
                   <div class="pwa-stat-card">
                     <div class="pwa-stat-card__label">Delivery Fee</div>
                     <div class="pwa-stat-card__value">{{ card.dl_price|default:0 }} QR</div>
                   </div>
                 </div>
+                {% endif %}
               </div>
 
               <!-- Status & Date -->
@@ -186,8 +206,8 @@
                 <div>
                   <small class="text-muted">Status</small>
                   <p class="mb-0">
-                    <span class="badge bg-{% if card.dl_task_status == 'delivered' %}success{% elif card.dl_task_status == 'in_transit' %}primary{% elif card.dl_task_status == 'cancelled' %}danger{% else %}warning{% endif %}">
-                      {{ card.dl_task_status|title }}
+                    <span class="badge bg-{% if card.dl_task_status == 'delivered' %}success{% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' or card.dl_task_status == 'start_ride' %}primary{% elif card.dl_task_status == 'cancelled' or card.dl_task_status == 'failed' %}danger{% elif card.dl_task_status == 'accepted' or card.dl_task_status == 'picked_up' %}info{% else %}warning{% endif %}">
+                      {{ card.get_dl_task_status_display }}
                     </span>
                   </p>
                 </div>
@@ -237,20 +257,25 @@
               <div class="alert alert-secondary mb-0 w-100 text-center py-2">
                 <i class="fa-solid fa-lock me-2"></i>Task completed & COD settled
               </div>
-              {% elif card.dl_task_status == 'pending' or card.dl_task_status == 'for_review' or card.dl_task_status == 'assigned' %}
+              {% elif card.dl_task_status == 'pending' or card.dl_task_status == 'for_review' %}
               <button type="button" class="pwa-btn pwa-btn--primary pwa-btn--block assign-driver-btn" data-task-id="{{ card.id }}">
                 <i class="fa-solid fa-check me-2"></i>Accept Task
               </button>
-              {% elif card.dl_task_status == 'in_transit' %}
+              {% elif card.dl_task_status == 'assigned' %}
+              <button type="button" class="pwa-btn pwa-btn--primary pwa-btn--block accept-task-btn" data-task-id="{{ card.id }}">
+                <i class="fa-solid fa-check me-2"></i>Accept Task
+              </button>
+              {% elif card.dl_task_status == 'accepted' %}
+              <button type="button" class="pwa-btn pwa-btn--primary pwa-btn--block start-ride-btn" data-task-id="{{ card.id }}">
+                <i class="fa-solid fa-car me-2"></i>Start Ride
+              </button>
+              {% else %}
               <a href="tel:{{ card.dl_to_address.mobile_no }}" class="pwa-btn pwa-btn--outline" style="flex: 1;">
                 <i class="fa-solid fa-phone me-2"></i>Call
               </a>
-              <button type="button" class="pwa-btn pwa-btn--success task-complete-btn" data-task-id="{{ card.id }}" style="flex: 1;">
-                <i class="fa-solid fa-check me-2"></i>Complete
-              </button>
-              <button type="button" class="pwa-btn pwa-btn--danger task-fail-btn" data-task-id="{{ card.id }}" style="flex: 1;">
-                <i class="fa-solid fa-times me-2"></i>Failed
-              </button>
+              <a href="{% url 'delivery:task_navigation' card.id %}" class="pwa-btn pwa-btn--primary" style="flex: 1;">
+                <i class="fa-solid fa-map-location-dot me-2"></i>Navigate
+              </a>
               {% endif %}
             </div>
           </div>
@@ -291,11 +316,11 @@
         {% for card in cards %}
           <tr data-order-id="{{ card.id }}" class="data-order-row">
             <td>
-              <div class="fw-bold text-primary">#{{ card.dl_task_number|truncatechars:12 }}</div>
+              <div class="fw-bold text-primary dl-number-fit" title="{{ card.dl_task_number }}">#{{ card.dl_task_number }}</div>
               <small class="text-muted">{{ card.dl_task_date|date:"M d, Y" }} {{ card.dl_to_address.time_slot|default:"" }}</small>
             </td>
             <td>
-              <div>{{ card.order.business.business_name|default:"N/A"|truncatechars:18 }}</div>
+              <div>{{ card.order.business.business_name|default:"N/A" }}</div>
               {% if card.order.cod_amount > 0 %}
               <span class="badge bg-warning text-dark">COD: {{ card.order.cod_amount }} QR</span>
               {% else %}
@@ -308,7 +333,7 @@
                   <i class="fa-solid fa-circle text-success" style="font-size: 8px;"></i>
                 </div>
                 <div class="flex-grow-1">
-                  <div>{{ card.pickup_location.pickup_location_title|default:"N/A"|truncatechars:25 }}</div>
+                  <div>{{ card.pickup_location.pickup_location_title|default:"N/A" }}</div>
                 </div>
               </div>
               <div class="d-flex align-items-start mt-1">
@@ -316,13 +341,13 @@
                   <i class="fa-solid fa-circle text-danger" style="font-size: 8px;"></i>
                 </div>
                 <div class="flex-grow-1">
-                  <div>Zone {{ card.dl_to_address.dl_zone|default:"-" }}, {{ card.dl_to_address.area_name|default:"N/A"|truncatechars:18 }}</div>
+                  <div>Zone {{ card.dl_to_address.dl_zone|default:"-" }}, {{ card.dl_to_address.area_name|default:"N/A" }}</div>
                 </div>
               </div>
             </td>
             <td>
-              <span class="badge {% if card.dl_task_status == 'delivered' %}bg-success{% elif card.dl_task_status == 'in_transit' %}bg-primary{% elif card.dl_task_status == 'cancelled' %}bg-danger{% else %}bg-secondary{% endif %}">
-                {{ card.dl_task_status|title }}
+              <span class="badge {% if card.dl_task_status == 'delivered' %}bg-success{% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' %}bg-primary{% elif card.dl_task_status == 'cancelled' %}bg-danger{% else %}bg-secondary{% endif %}">
+                {{ card.get_dl_task_status_display }}
               </span>
             </td>
             <td>
@@ -395,10 +420,12 @@
                       <th class="fw-light p-0 col-5">COD Amount:</th>
                       <td class="fw-light p-0">{{ card.order.cod_amount }} QR</td>
                     </tr>
+                    {% if card.order.order_type == 'pick_and_drop' %}
                     <tr>
                       <th class="fw-light p-0">Delivery charge</th>
                       <td class="fw-light p-0">{{ card.dl_price }} QR</td>
                     </tr>
+                    {% endif %}
                     <tr>
                       <th class="fw-light p-0">Weight</th>
                       <td class="fw-light p-0">{{ card.dl_waight }}</td>
@@ -465,7 +492,7 @@
 {% block extra_js %}
   <script>
   $(document).ready(function () {
-    // Accept task button (New Tasks tab)
+    // Accept task button (All Tasks tab - assigns driver)
     $(".assign-driver-btn").on("click", function () {
       var taskId = $(this).data("task-id");
       var btn = $(this);
@@ -482,7 +509,7 @@
           btn.html('<i class="fa-solid fa-check me-1"></i>Accepted').removeClass('btn-success').addClass('btn-secondary');
           $('.modal').modal('hide');
           if (typeof showToast === 'function') {
-            showToast('Task accepted! Go to My Tasks to start ride.', 'success');
+            showToast('Task accepted! Go to Accepted tab to start ride.', 'success');
           }
           setTimeout(function() {
             location.reload();
@@ -495,7 +522,37 @@
       });
     });
 
-    // Start Ride button (My Tasks tab)
+    // Accept assigned task button (Assigned Tasks tab - changes status to accepted)
+    $(".accept-task-btn").on("click", function () {
+      var taskId = $(this).data("task-id");
+      var btn = $(this);
+      btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Accepting...');
+
+      $.ajax({
+        type: "POST",
+        url: "/api/driver/tasks/" + taskId + "/complete/",
+        contentType: "application/json",
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+        data: JSON.stringify({ status: 'accepted' }),
+        success: function (response) {
+          btn.html('<i class="fa-solid fa-check me-1"></i>Accepted').removeClass('btn-success').addClass('btn-secondary');
+          $('.modal').modal('hide');
+          if (typeof showToast === 'function') {
+            showToast('Task accepted! Go to Accepted tab to start ride.', 'success');
+          }
+          setTimeout(function() {
+            location.reload();
+          }, 1500);
+        },
+        error: function (xhr) {
+          btn.prop('disabled', false).html('<i class="fa-solid fa-check me-1"></i>Accept');
+          var errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Error accepting task';
+          alert(errorMsg);
+        },
+      });
+    });
+
+    // Start Ride button (Accepted Tasks tab)
     $(".start-ride-btn").on("click", function () {
       var taskId = $(this).data("task-id");
       var btn = $(this);

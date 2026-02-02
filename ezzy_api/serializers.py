@@ -138,7 +138,7 @@ class TaskStatusUpdateSerializer(serializers.Serializer):
     task_id = serializers.IntegerField()
     status = serializers.ChoiceField(choices=[
         'for_review', 'pending', 'address_pending', 'customer_confiration_pending',
-        'customer_delaying', 'dl_pending_payment', 'publish_to_dms', 'in_transit',
+        'customer_delaying', 'dl_pending_payment', 'publish_to_dms', 'out_for_delivery', 'in_transit',
         'delivered', 'rejected', 'cancelled'
     ])
     dms_status = serializers.ChoiceField(
@@ -230,8 +230,8 @@ class EcommerceIntegrationSerializer(serializers.ModelSerializer):
 
 # Task Completion Serializer
 class TaskCompletionSerializer(serializers.Serializer):
-    task_id = serializers.IntegerField()
-    status = serializers.ChoiceField(choices=['delivered', 'cancelled', 'rejected'])
+    task_id = serializers.IntegerField(required=False)
+    status = serializers.ChoiceField(choices=['delivered', 'cancelled', 'rejected', 'failed', 'accepted'])
     delivery_proof = serializers.FileField(required=False, allow_null=True)
     signature = serializers.FileField(required=False, allow_null=True)
     photo = serializers.FileField(required=False, allow_null=True)

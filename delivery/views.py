@@ -146,10 +146,11 @@ def all_delivery_tasks(request):
         messages.error(request, "No driver profile found for your account")
         return redirect('webpages:index')
 
-    # Get filter parameters (defaults: My Tasks + My Zone)
-    tab = request.GET.get('tab', 'assigned')  # 'new' or 'assigned'
+    # Get filter parameters (defaults: Accepted Tasks + My Zone)
+    tab = request.GET.get('tab', 'accepted')  # 'all', 'assigned', 'accepted'
     area_filter = request.GET.get('area', 'my_zone')  # 'all', 'doha', 'my_zone', 'qatar'
     type_filter = request.GET.get('type', 'all')  # 'all', 'public', 'pnd'
+    status_filter = request.GET.get('status', 'all')  # 'all' or specific status
 
     # Base queryset with optimized joins
     base_qs = delivery_models.DeliveryTask.objects.select_related(
@@ -166,69 +167,84 @@ def all_delivery_tasks(request):
         'task_qrcode',
     )
 
-    # Split into new tasks and assigned tasks
-    # New tasks: published and not assigned to any driver
-    new_tasks = base_qs.filter(
+    # All tasks: published and available (not assigned to any driver)
+    all_tasks = base_qs.filter(
         dl_task_publish=True,
         driver__isnull=True,
-        dl_task_status__in=['pending', 'publish_to_dms', 'assigned']
+        dl_task_status__in=['pending', 'for_review']
     ).exclude(
         dl_task_status__in=['delivered', 'cancelled', 'failed']
     ).order_by('-id')
 
-    # Assigned tasks: assigned to current driver
+    # Assigned tasks: assigned to current driver but not yet accepted
     assigned_tasks = base_qs.filter(
-        driver=driver
-    ).exclude(
-        dl_task_status__in=['delivered', 'cancelled']
+        driver=driver,
+        dl_task_status='assigned'
     ).order_by('-id')
 
-    # Apply area filter
+    # Accepted tasks: accepted by driver (all active statuses beyond assigned)
+    accepted_tasks = base_qs.filter(
+        driver=driver,
+        dl_task_status__in=['accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable']
+    ).order_by('-id')
+
+    # Apply area filter to all querysets
     if area_filter == 'doha':
         # Doha zones (1-50)
-        new_tasks = new_tasks.filter(dl_to_address__dl_zone__lte=50)
+        all_tasks = all_tasks.filter(dl_to_address__dl_zone__lte=50)
         assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone__lte=50)
+        accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone__lte=50)
     elif area_filter == 'my_zone':
         # Driver's zone (from profile or default zone)
         driver_zone = getattr(driver, 'default_zone', None)
         if driver_zone:
-            new_tasks = new_tasks.filter(dl_to_address__dl_zone=driver_zone)
+            all_tasks = all_tasks.filter(dl_to_address__dl_zone=driver_zone)
             assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone=driver_zone)
+            accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone=driver_zone)
     elif area_filter == 'qatar':
         # All Qatar (zones > 50)
-        new_tasks = new_tasks.filter(dl_to_address__dl_zone__gt=50)
+        all_tasks = all_tasks.filter(dl_to_address__dl_zone__gt=50)
         assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone__gt=50)
+        accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone__gt=50)
 
     # Apply type filter
     if type_filter == 'public':
-        new_tasks = new_tasks.filter(dl_task_publish=True)
+        all_tasks = all_tasks.filter(dl_task_publish=True)
     elif type_filter == 'pnd':
         # Pick and Drop tasks (category or speed based)
-        new_tasks = new_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
+        all_tasks = all_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
         assigned_tasks = assigned_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
+        accepted_tasks = accepted_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
+
+    # Apply status filter
+    if status_filter and status_filter != 'all':
+        accepted_tasks = accepted_tasks.filter(dl_task_status=status_filter)
 
     # Get counts
-    new_count = new_tasks.count()
+    all_count = all_tasks.count()
     assigned_count = assigned_tasks.count()
+    accepted_count = accepted_tasks.count()
 
     # Select which tasks to show based on tab
-    if tab == 'new':
-        cards = new_tasks[:50]
-    else:
+    if tab == 'all':
+        cards = all_tasks[:50]
+    elif tab == 'assigned':
         cards = assigned_tasks[:50]
+    else:
+        cards = accepted_tasks[:50]
 
-    logger.debug(f"Fetched tasks: {new_count} new, {assigned_count} assigned")
+    logger.debug(f"Fetched tasks: {all_count} all, {assigned_count} assigned, {accepted_count} accepted")
 
     context = {
         'cards': cards,
-        'new_tasks': new_tasks[:20],
-        'assigned_tasks': assigned_tasks[:20],
-        'new_count': new_count,
+        'all_count': all_count,
         'assigned_count': assigned_count,
+        'accepted_count': accepted_count,
         'driver': driver,
         'current_tab': tab,
         'area_filter': area_filter,
         'type_filter': type_filter,
+        'status_filter': status_filter,
     }
     return render(request, 'delivery/parts/tasks_all.html', context)
 
@@ -257,10 +273,11 @@ def assign_driver(request):
             )
             assigned_driver.save()
 
-            # Update task status to assigned when driver accepts
-            task.dl_task_status = 'assigned'
-            task.save(update_fields=['dl_task_status'])
-            logger.info(f"Task {task_id} successfully assigned to driver {driver.driver_id}")
+            # Update task: set driver and status to accepted
+            task.driver = driver
+            task.dl_task_status = 'accepted'
+            task.save(update_fields=['driver', 'dl_task_status'])
+            logger.info(f"Task {task_id} accepted by driver {driver.driver_id}")
 
             return JsonResponse({"success": True})
 
@@ -300,8 +317,8 @@ def start_ride(request):
 
             task = delivery_models.DeliveryTask.objects.get(id=task_id)
 
-            # Update status to in_transit
-            task.dl_task_status = 'in_transit'
+            # Update status to out_for_delivery
+            task.dl_task_status = 'out_for_delivery'
             task.save(update_fields=['dl_task_status'])
             logger.info(f"Driver {driver.driver_id} started ride for task {task_id}")
 

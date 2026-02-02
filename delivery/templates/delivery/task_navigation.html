@@ -121,6 +121,58 @@
     flex: 0 0 auto;
     width: 52px;
   }
+  .btn-whatsapp {
+    background: #25D366;
+    border: none;
+    color: white;
+    flex: 0 0 auto;
+    width: 52px;
+  }
+  .btn-whatsapp:hover {
+    background: #1da851;
+    color: white;
+  }
+  .btn-start {
+    background: var(--pwa-primary, #f7c000);
+    border: none;
+    color: #000;
+  }
+  .btn-start:hover {
+    background: #e5b000;
+    color: #000;
+  }
+  .btn-pickup {
+    background: #17a2b8;
+    border: none;
+    color: white;
+  }
+  .btn-pickup:hover {
+    background: #138496;
+    color: white;
+  }
+  .btn-contacted {
+    background: #6c757d;
+    border: none;
+    color: white;
+  }
+  .btn-contacted:hover {
+    background: #5a6268;
+    color: white;
+  }
+  .btn-non-reachable {
+    background: #343a40;
+    border: none;
+    color: white;
+  }
+  .btn-non-reachable:hover {
+    background: #23272b;
+    color: white;
+  }
+  .action-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
   .no-address-info {
     display: flex;
     flex-direction: column;
@@ -147,13 +199,13 @@
     <div class="d-flex justify-content-between align-items-center">
       <div>
         <div class="task-info-bar__title">
-          <i class="fa-solid fa-truck-fast me-2"></i>Task #{{ task.dl_task_number|truncatechars:15 }}
+          <i class="fa-solid fa-truck-fast me-2"></i>Task #{{ task.dl_task_number }}
         </div>
         <div class="task-info-bar__subtitle">
           {{ task.order.business.business_name|default:"Pickup" }} &rarr; {% if dropoff %}{{ dropoff.area_name|default:"Delivery" }}{% else %}Delivery{% endif %}
         </div>
       </div>
-      <a href="{% url 'delivery:all_delivery_tasks' %}?tab=assigned" class="btn btn-sm btn-light">
+      <a href="{% url 'delivery:all_delivery_tasks' %}?tab=accepted" class="btn btn-sm btn-light">
         <i class="fa-solid fa-arrow-left me-1"></i>Back
       </a>
     </div>
@@ -219,16 +271,102 @@
     <!-- Navigation Actions -->
     <div class="navigation-actions">
       {% if dropoff.mobile_no %}
-      <a href="tel:{{ dropoff.mobile_no }}" class="btn btn-call">
+      <a href="tel:{{ dropoff.mobile_no }}" class="btn btn-call" title="Call Customer">
         <i class="fa-solid fa-phone"></i>
       </a>
+      <a href="#" class="btn btn-whatsapp" id="btn-whatsapp-location" title="Send Location via WhatsApp"
+         data-phone="{{ task.order.customer_whatsapp|default:dropoff.mobile_no }}">
+        <i class="fa-brands fa-whatsapp"></i>
+      </a>
       {% endif %}
-      <button type="button" class="btn btn-navigate" id="btn-open-maps">
-        <i class="fa-solid fa-diamond-turn-right me-2"></i>Navigate
+      <button type="button" class="btn btn-navigate flex-grow-1" id="btn-open-maps">
+        <i class="fa-solid fa-diamond-turn-right me-1"></i>Navigate
       </button>
-      <button type="button" class="btn btn-complete" id="btn-complete-task" data-task-id="{{ task.id }}">
-        <i class="fa-solid fa-check me-2"></i>Complete
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#statusModal">
+        <i class="fa-solid fa-list-check me-1"></i>Actions
       </button>
+    </div>
+
+    <!-- Status Actions Modal -->
+    <div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="statusModalLabel">
+              <i class="fa-solid fa-list-check me-2"></i>Update Task Status
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Current Status Badge -->
+            <div class="text-center mb-3">
+              <span class="badge bg-primary fs-6">Current: {{ task.get_dl_task_status_display }}</span>
+            </div>
+            <div class="d-grid gap-2">
+              {% if task.dl_task_status == 'picked_up' or task.dl_task_status == 'start_ride' or task.dl_task_status == 'out_for_delivery' or task.dl_task_status == 'in_transit' or task.dl_task_status == 'contacted' or task.dl_task_status == 'non_reachable' %}
+              <button type="button" class="btn btn-outline-success btn-lg" disabled>
+                <i class="fa-solid fa-check me-2"></i>Picked Up <i class="fa-solid fa-circle-check ms-2"></i>
+              </button>
+              {% else %}
+              <button type="button" class="btn btn-info btn-lg" id="btn-picked-up" data-task-id="{{ task.id }}">
+                <i class="fa-solid fa-box me-2"></i>Picked Up
+              </button>
+              {% endif %}
+
+              {% if task.dl_task_status == 'start_ride' or task.dl_task_status == 'out_for_delivery' or task.dl_task_status == 'in_transit' or task.dl_task_status == 'contacted' or task.dl_task_status == 'non_reachable' %}
+              <button type="button" class="btn btn-outline-success btn-lg" disabled>
+                <i class="fa-solid fa-check me-2"></i>Start Ride <i class="fa-solid fa-circle-check ms-2"></i>
+              </button>
+              {% else %}
+              <button type="button" class="btn btn-warning btn-lg" id="btn-start-ride" data-task-id="{{ task.id }}">
+                <i class="fa-solid fa-play me-2"></i>Start Ride
+              </button>
+              {% endif %}
+
+              {% if task.dl_task_status == 'contacted' %}
+              <button type="button" class="btn btn-outline-success btn-lg" disabled>
+                <i class="fa-solid fa-check me-2"></i>Contacted & Confirmed <i class="fa-solid fa-circle-check ms-2"></i>
+              </button>
+              {% else %}
+              <button type="button" class="btn btn-secondary btn-lg" id="btn-contacted" data-task-id="{{ task.id }}">
+                <i class="fa-solid fa-phone-volume me-2"></i>Contacted & Confirmed
+              </button>
+              {% endif %}
+
+              {% if task.dl_task_status == 'non_reachable' %}
+              <button type="button" class="btn btn-outline-warning btn-lg" disabled>
+                <i class="fa-solid fa-exclamation-triangle me-2"></i>Non Reachable <i class="fa-solid fa-circle-check ms-2"></i>
+              </button>
+              {% else %}
+              <button type="button" class="btn btn-dark btn-lg" id="btn-non-reachable" data-task-id="{{ task.id }}">
+                <i class="fa-solid fa-phone-slash me-2"></i>Non Reachable
+              </button>
+              {% endif %}
+
+              <hr>
+              {% if task.dl_task_status == 'delivered' %}
+              <button type="button" class="btn btn-outline-success btn-lg" disabled>
+                <i class="fa-solid fa-check me-2"></i>Delivered <i class="fa-solid fa-circle-check ms-2"></i>
+              </button>
+              {% else %}
+              <button type="button" class="btn btn-success btn-lg" id="btn-complete-task" data-task-id="{{ task.id }}">
+                <i class="fa-solid fa-check me-2"></i>Delivered
+              </button>
+              {% endif %}
+
+              {% if task.dl_task_status == 'failed' %}
+              <button type="button" class="btn btn-outline-danger btn-lg" disabled>
+                <i class="fa-solid fa-times me-2"></i>Failed <i class="fa-solid fa-circle-check ms-2"></i>
+              </button>
+              {% else %}
+              <button type="button" class="btn btn-danger btn-lg" id="btn-failed-task" data-task-id="{{ task.id }}">
+                <i class="fa-solid fa-times me-2"></i>Failed
+              </button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -300,8 +438,75 @@ document.addEventListener('DOMContentLoaded', function() {
     window.open(url, '_blank');
   });
 
-  // Complete task
-  document.getElementById('btn-complete-task').addEventListener('click', function() {
+  // Send location via WhatsApp
+  var whatsappBtn = document.getElementById('btn-whatsapp-location');
+  if (whatsappBtn) {
+    whatsappBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      var phone = this.dataset.phone.replace(/\D/g, '');
+      if (!phone.startsWith('974') && phone.length === 8) {
+        phone = '974' + phone;
+      }
+      var locationUrl = 'https://www.google.com/maps?q=' + dropoffLat + ',' + dropoffLng;
+      var message = 'Hello! I am the delivery driver. Here is your delivery location: ' + locationUrl;
+      var whatsappUrl = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
+      window.open(whatsappUrl, '_blank');
+    });
+  }
+
+  // Start Ride (if exists)
+  var btnStartRide = document.getElementById('btn-start-ride');
+  if (btnStartRide) {
+    btnStartRide.addEventListener('click', function() {
+      var taskId = this.dataset.taskId;
+      var btn = this;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting...';
+
+      fetch('/api/driver/tasks/' + taskId + '/status/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ status: 'out_for_delivery', dms_status: '1' })
+      })
+      .then(function(response) {
+        if (!response.ok) {
+          return response.json().then(function(data) {
+            throw new Error(data.error || 'Failed to start ride');
+          });
+        }
+        return response.json();
+      })
+      .then(function(data) {
+        btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Started!';
+        btn.classList.remove('btn-start');
+        btn.classList.add('btn-secondary');
+        // Close modal
+        var modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
+        if (modal) modal.hide();
+        if (typeof showToast === 'function') {
+          showToast('Ride started!', 'success');
+        }
+        // Reload page
+        setTimeout(function() {
+          location.reload();
+        }, 1000);
+      })
+      .catch(function(error) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-play me-2"></i>Start Ride';
+        alert('Error: ' + error.message);
+      });
+    });
+  }
+
+  // Complete task (if exists)
+  var btnComplete = document.getElementById('btn-complete-task');
+  if (btnComplete) {
+    btnComplete.addEventListener('click', function() {
     var taskId = this.dataset.taskId;
     var btn = this;
 
@@ -318,28 +523,150 @@ document.addEventListener('DOMContentLoaded', function() {
       },
       body: JSON.stringify({ status: 'delivered' })
     })
-    .then(function(response) { return response.json(); })
-    .then(function(data) {
-      if (data.success || data.status === 'delivered') {
-        btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Completed!';
-        btn.classList.remove('btn-complete');
-        btn.classList.add('btn-secondary');
-        if (typeof showToast === 'function') {
-          showToast('Delivery completed successfully!', 'success');
-        }
-        setTimeout(function() {
-          window.location.href = '{% url "delivery:all_delivery_tasks" %}?tab=assigned';
-        }, 1500);
-      } else {
-        throw new Error(data.error || 'Failed to complete task');
+    .then(function(response) {
+      if (!response.ok) {
+        return response.json().then(function(data) {
+          throw new Error(data.error || 'Failed to complete task');
+        });
       }
+      return response.json();
+    })
+    .then(function(data) {
+      btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Completed!';
+      btn.classList.remove('btn-complete');
+      btn.classList.add('btn-secondary');
+      // Close modal
+      var modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
+      if (modal) modal.hide();
+      if (typeof showToast === 'function') {
+        showToast('Delivery completed successfully!', 'success');
+      }
+      setTimeout(function() {
+        window.location.href = '{% url "delivery:all_delivery_tasks" %}?tab=accepted';
+      }, 1500);
     })
     .catch(function(error) {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Complete';
+      btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Delivered';
       alert('Error: ' + error.message);
     });
-  });
+    });
+  }
+
+  // Helper function for status update buttons
+  function updateTaskStatus(btn, taskId, status, successText, originalHtml) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Updating...';
+
+    fetch('/api/driver/tasks/' + taskId + '/status/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify({ status: status })
+    })
+    .then(function(response) {
+      if (!response.ok) {
+        return response.json().then(function(data) {
+          throw new Error(data.error || 'Failed to update status');
+        });
+      }
+      return response.json();
+    })
+    .then(function(data) {
+      btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>' + successText;
+      btn.classList.add('btn-secondary');
+      // Close modal
+      var modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
+      if (modal) modal.hide();
+      if (typeof showToast === 'function') {
+        showToast('Status updated: ' + successText, 'success');
+      }
+      // Reload page to reflect status change
+      setTimeout(function() {
+        location.reload();
+      }, 1000);
+    })
+    .catch(function(error) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+      alert('Error: ' + error.message);
+    });
+  }
+
+  // Picked Up button (if exists)
+  var btnPickedUp = document.getElementById('btn-picked-up');
+  if (btnPickedUp) {
+    btnPickedUp.addEventListener('click', function() {
+      updateTaskStatus(this, this.dataset.taskId, 'picked_up', 'Picked Up', '<i class="fa-solid fa-box me-1"></i>Picked Up');
+    });
+  }
+
+  // Contacted & Confirmed button (if exists)
+  var btnContacted = document.getElementById('btn-contacted');
+  if (btnContacted) {
+    btnContacted.addEventListener('click', function() {
+      updateTaskStatus(this, this.dataset.taskId, 'contacted', 'Contacted & Confirmed', '<i class="fa-solid fa-phone-volume me-1"></i>Contacted & Confirmed');
+    });
+  }
+
+  // Non Reachable button (if exists)
+  var btnNonReachable = document.getElementById('btn-non-reachable');
+  if (btnNonReachable) {
+    btnNonReachable.addEventListener('click', function() {
+      updateTaskStatus(this, this.dataset.taskId, 'non_reachable', 'Non Reachable', '<i class="fa-solid fa-phone-slash me-1"></i>Non Reachable');
+    });
+  }
+
+  // Failed button (if exists)
+  var btnFailed = document.getElementById('btn-failed-task');
+  if (btnFailed) {
+    btnFailed.addEventListener('click', function() {
+      var taskId = this.dataset.taskId;
+      var btn = this;
+
+      if (!confirm('Mark this delivery as failed?')) return;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Updating...';
+
+      fetch('/api/driver/tasks/' + taskId + '/complete/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ status: 'failed' })
+      })
+      .then(function(response) {
+        if (!response.ok) {
+          return response.json().then(function(data) {
+            throw new Error(data.error || 'Failed to update status');
+          });
+        }
+        return response.json();
+      })
+      .then(function(data) {
+        btn.innerHTML = '<i class="fa-solid fa-times me-1"></i>Failed';
+        btn.classList.add('btn-secondary');
+        // Close modal
+        var modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
+        if (modal) modal.hide();
+        if (typeof showToast === 'function') {
+          showToast('Delivery marked as failed', 'warning');
+        }
+        setTimeout(function() {
+          window.location.href = '{% url "delivery:all_delivery_tasks" %}?tab=accepted';
+        }, 1500);
+      })
+      .catch(function(error) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-times me-1"></i>Failed';
+        alert('Error: ' + error.message);
+      });
+    });
+  }
 });
 </script>
 {% endblock %}
