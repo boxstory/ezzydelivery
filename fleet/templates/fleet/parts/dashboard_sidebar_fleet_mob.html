@@ -95,6 +95,13 @@
                         <li class="nav-item">
                             <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
                                 <a class="nav-link flex-fill p-0 py-2 text-start"
+                                    href="{% url 'fleet:fleet_finance_summary' %}"><i
+                                        class="fa-solid fa-chart-pie my-2 pt-1 pe-2"></i>Finance Summary</a>
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
+                                <a class="nav-link flex-fill p-0 py-2 text-start"
                                     href="{% url 'fleet:cod_collection' %}"><i
                                         class="fa-solid fa-sack-dollar my-2 pt-1 pe-2"></i>COD In Hand</a>
                             </div>
@@ -102,15 +109,15 @@
                         <li class="nav-item">
                             <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
                                 <a class="nav-link flex-fill p-0 py-2 text-start"
-                                    href="{% url 'fleet:cod_collection' %}"> <i
-                                        class="fa-solid fa-wallet my-2 pt-1 pe-2"></i>DLs Earnigns</a>
+                                    href="{% url 'fleet:driver_earnings' %}"> <i
+                                        class="fa-solid fa-coins my-2 pt-1 pe-2"></i>Earnings</a>
                             </div>
                         </li>
                         <li class="nav-item">
                             <div class="d-flex btn btn-outline-dark nav-link justify-content-start ps-3 p-0">
                                 <a class="nav-link flex-fill p-0 py-2 text-start"
-                                    href="{% url 'fleet:cod_collection' %}"> <i
-                                        class="fa-solid fa-money-bill-transfer my-2 pt-1 pe-2"></i>Transactions</a>
+                                    href="{% url 'fleet:transaction_history' %}"> <i
+                                        class="fa-solid fa-receipt my-2 pt-1 pe-2"></i>Transactions</a>
                             </div>
                         </li>
                     </ul>
@@ -169,7 +176,7 @@
             </li>
             <hr />
             <li class="nav-item">
-                <a class="nav-link" href="{% url 'fleet:driver_profile' user_profile.id %}">
+                <a class="nav-link" href="{% if user_profile.id %}{% url 'fleet:driver_profile' user_profile.id %}{% else %}{% url 'fleet:driver_profile_mobile' %}{% endif %}">
                     <div class="d-flex btn btn-outline-dark nav-link justify-content-start">
                         <i class="fa-solid fa-store px-4 pb-1"></i>
                         <p class="flex-fill ">Profile</p>

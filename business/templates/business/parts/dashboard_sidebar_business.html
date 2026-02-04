@@ -224,6 +224,63 @@
 
       <hr />
 
+      <!-- FINANCE SECTION -->
+      <li class="nav-item {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}active{% endif %}">
+        <div class="nav-link d-flex justify-content-start align-items-center {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}active{% endif %}"
+             data-bs-toggle="collapse"
+             data-bs-target="#submenu-finance"
+             data-title="Finance"
+             aria-expanded="{% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}true{% else %}false{% endif %}">
+          <i class="fa-solid fa-chart-pie me-2"></i>
+          <span class="flex-fill text-start">Finance</span>
+          <i class="fa-solid fa-caret-down ms-auto"></i>
+        </div>
+        <div class="multi-level collapse {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}show{% endif %} rounded-3"
+             role="list"
+             id="submenu-finance">
+          <ul class="flex-column nav text-black">
+            <li class="nav-item {% if current_url == 'business_finance_dashboard' %}active{% endif %}">
+              <a class="nav-link d-flex align-items-center {% if current_url == 'business_finance_dashboard' %}active{% endif %}"
+                 href="{% url 'business:business_finance_dashboard' %}"
+                 hx-get="{% url 'business:business_finance_dashboard' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-gauge-high me-2"></i>
+                <span>Finance Dashboard</span>
+              </a>
+            </li>
+            <li class="nav-item {% if current_url == 'business_transactions' %}active{% endif %}">
+              <a class="nav-link d-flex align-items-center {% if current_url == 'business_transactions' %}active{% endif %}"
+                 href="{% url 'business:business_transactions' %}"
+                 hx-get="{% url 'business:business_transactions' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-receipt me-2"></i>
+                <span>Transactions</span>
+              </a>
+            </li>
+            <li class="nav-item {% if current_url == 'business_cod_statement' %}active{% endif %}">
+              <a class="nav-link d-flex align-items-center {% if current_url == 'business_cod_statement' %}active{% endif %}"
+                 href="{% url 'business:business_cod_statement' %}"
+                 hx-get="{% url 'business:business_cod_statement' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-money-bill me-2"></i>
+                <span>COD Statement</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <hr />
+
       <!-- SETTINGS SECTION - Only visible to business owner -->
       {% if is_business_owner %}
       <li class="nav-item {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}active{% endif %}">

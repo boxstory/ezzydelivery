@@ -33,19 +33,19 @@
   </div>
   {% endif %}
 
-  <!-- Quick Action - Submit COD -->
+  <!-- Quick Actions -->
   <div class="pwa-quick-actions mb-4">
-    <a href="{% url 'fleet:cod_submission' %}" class="pwa-quick-action">
-      <div class="pwa-quick-action__icon" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-        <i class="fa-solid fa-hand-holding-dollar"></i>
-      </div>
-      <span class="pwa-quick-action__label">Submit COD</span>
-    </a>
-    <a href="{% url 'fleet:transaction_history' %}?type=cod_collection&days=90" class="pwa-quick-action">
+    <a href="{% url 'fleet:transaction_history' %}?type=cod_deposit&days=90" class="pwa-quick-action">
       <div class="pwa-quick-action__icon" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
         <i class="fa-solid fa-clock-rotate-left"></i>
       </div>
-      <span class="pwa-quick-action__label">History</span>
+      <span class="pwa-quick-action__label">Submission History</span>
+    </a>
+    <a href="{% url 'fleet:driver_earnings' %}" class="pwa-quick-action">
+      <div class="pwa-quick-action__icon" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+        <i class="fa-solid fa-coins"></i>
+      </div>
+      <span class="pwa-quick-action__label">Earnings</span>
     </a>
   </div>
 
@@ -117,20 +117,83 @@
     </div>
     {% endfor %}
   </div>
+  <!-- COD Submission Form (Mobile) -->
+  <div class="pwa-section-header">
+    <h4 class="pwa-section-title">Submit COD</h4>
+  </div>
+  <div class="pwa-info-card mb-4" style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 1px solid #a7f3d0;">
+    <form method="POST" action="{% url 'fleet:cod_submission' %}" id="mob-cod-form">
+      {% csrf_token %}
+      <input type="hidden" name="delivery_ids" id="mob-delivery-ids" value="">
+      <div class="mb-3">
+        <label for="mob-amount" class="form-label fw-semibold" style="font-size: 0.85rem;">Amount (QR)</label>
+        <input type="number" class="form-control" id="mob-amount" name="amount" step="0.01" min="0" max="{{ cod_in_hand_total }}" placeholder="0.00" required style="font-size: 1.2rem; font-weight: 600; text-align: center; padding: 12px;">
+        <small class="text-muted">Maximum: {{ cod_in_hand_total|floatformat:2 }} QR</small>
+      </div>
+      <div class="mb-3">
+        <label for="mob-payment-method" class="form-label fw-semibold" style="font-size: 0.85rem;">Payment Method</label>
+        <select class="form-select" id="mob-payment-method" name="payment_method">
+          <option value="cash">Cash</option>
+          <option value="bank">Bank Transfer</option>
+          <option value="atm">ATM Deposit</option>
+          <option value="fawran">Fawran</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label for="mob-reference" class="form-label fw-semibold" style="font-size: 0.85rem;">Reference Number <span class="text-muted fw-normal">(Optional)</span></label>
+        <input type="text" class="form-control" id="mob-reference" name="reference_number" placeholder="e.g. Bank transfer ref, receipt no.">
+      </div>
+      <button type="submit" class="btn btn-success w-100 py-3" style="border-radius: 12px; font-weight: 600;">
+        <i class="fa-solid fa-hand-holding-dollar me-2"></i>Submit COD
+      </button>
+    </form>
+  </div>
   {% else %}
   <div class="text-center py-5 mb-4" style="background: #f0fdf4; border-radius: 16px;">
     <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
       <i class="fa-solid fa-check text-success" style="font-size: 1.5rem;"></i>
     </div>
     <h5 class="text-success mb-1" style="font-size: 1rem;">All Settled!</h5>
-    <p class="text-muted mb-0" style="font-size: 0.85rem;">No pending COD to collect</p>
+    <p class="text-muted mb-0" style="font-size: 0.85rem;">No pending COD to submit</p>
+  </div>
+  {% endif %}
+
+  <!-- COD Settlement Transactions (Settlement History) -->
+  {% if cod_transactions %}
+  <div class="pwa-section-header">
+    <h4 class="pwa-section-title">COD Settlement Transactions</h4>
+    <span class="pwa-text-muted">Settlement history</span>
+  </div>
+
+  <div class="pwa-transaction-list mb-4">
+    {% for txn in cod_transactions %}
+    <div class="pwa-transaction-item view-txn-report-btn" style="cursor: pointer;"
+      data-txn-code="{{ txn.transaction_code|default:'-' }}">
+      <div class="pwa-transaction-item__icon {% if txn.transaction_type == 'cod_deposit' %}pwa-transaction-item__icon--warning{% else %}pwa-transaction-item__icon--success{% endif %}">
+        <i class="fa-solid {% if txn.transaction_type == 'cod_deposit' %}fa-building-columns{% else %}fa-coins{% endif %}"></i>
+      </div>
+      <div class="pwa-transaction-item__details">
+        <div class="pwa-transaction-item__title">{{ txn.get_transaction_type_display }}</div>
+        <div class="pwa-transaction-item__subtitle">
+          <span style="font-family: monospace; font-size: 0.7rem; color: #6b7280;">{{ txn.transaction_code|default:"-" }}</span>
+        </div>
+        <div class="pwa-transaction-item__date">{{ txn.created_at|date:"M d, H:i" }}</div>
+      </div>
+      <div class="d-flex flex-column align-items-end gap-1">
+        <div class="pwa-transaction-item__amount {% if txn.amount >= 0 %}pwa-text-success{% else %}pwa-text-danger{% endif %}">
+          {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount }} QR
+        </div>
+        <span style="font-size: 0.65rem; color: #8b5cf6;"><i class="fa-solid fa-eye me-1"></i>View</span>
+      </div>
+    </div>
+    {% endfor %}
   </div>
   {% endif %}
 
   <!-- Recent COD Deliveries -->
   <div class="pwa-section-header">
     <h4 class="pwa-section-title">Recent COD Deliveries</h4>
-    <span class="pwa-text-muted">{{ cod_deliveries|length }} deliveries</span>
+    <span class="pwa-text-muted">{{ cod_deliveries|length }} completed</span>
   </div>
 
   {% if cod_deliveries %}
@@ -163,33 +226,6 @@
     <p class="pwa-empty-state__text">Complete deliveries with COD to see them here</p>
   </div>
   {% endif %}
-
-  <!-- COD Transactions -->
-  {% if cod_transactions %}
-  <div class="pwa-section-header mt-4">
-    <h4 class="pwa-section-title">COD Transactions</h4>
-  </div>
-
-  <div class="pwa-transaction-list">
-    {% for txn in cod_transactions %}
-    <div class="pwa-transaction-item">
-      <div class="pwa-transaction-item__icon {% if txn.transaction_type == 'cod_deposit' %}pwa-transaction-item__icon--warning{% else %}pwa-transaction-item__icon--success{% endif %}">
-        <i class="fa-solid {% if txn.transaction_type == 'cod_deposit' %}fa-building-columns{% else %}fa-coins{% endif %}"></i>
-      </div>
-      <div class="pwa-transaction-item__details">
-        <div class="pwa-transaction-item__title">{{ txn.get_transaction_type_display }}</div>
-        <div class="pwa-transaction-item__subtitle">
-          <span style="font-family: monospace; font-size: 0.7rem; color: #6b7280;">{{ txn.transaction_code|default:"-" }}</span>
-        </div>
-        <div class="pwa-transaction-item__date">{{ txn.created_at|date:"M d, H:i" }}</div>
-      </div>
-      <div class="pwa-transaction-item__amount {% if txn.amount >= 0 %}pwa-text-success{% else %}pwa-text-danger{% endif %}">
-        {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount }} QR
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
 </div>
 
 <!-- Desktop View -->
@@ -203,28 +239,40 @@
 
   {% if wallet_status %}
   <div class="row mb-2">
-    <div class="col-md-4 mb-2">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body py-2">
-          <h6 class="text-muted mb-1" style="font-size: 0.8rem;">COD in Hand</h6>
-          <h4 class="mb-0 text-success">QAR {{ wallet_status.cod_in_hand|default:0|floatformat:0 }}</h4>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-4 mb-2">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body py-2">
-          <h6 class="text-muted mb-1" style="font-size: 0.8rem;">Total COD Orders</h6>
-          <h4 class="mb-0 text-warning">{{ cod_in_hand_list|length }} Orders</h4>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-4 mb-2">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body py-2 text-center">
-          <a href="{% url 'fleet:cod_submission' %}" class="btn btn-success">
-            <i class="fa-solid fa-hand-holding-dollar me-2"></i>Submit COD
-          </a>
+    <div class="col-12 mb-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="row g-3">
+            <div class="col-3">
+              <div class="d-flex align-items-center mb-1">
+                <i class="fa-solid fa-hand-holding-dollar me-2" style="color: #d97706;"></i>
+                <span class="text-muted" style="font-size: 0.8rem;">COD in Hand</span>
+              </div>
+              <h4 class="mb-0 fw-bold" style="color: #d97706;">{{ wallet_status.cod_in_hand|default:0|floatformat:0 }} <span style="font-size: 0.75rem; font-weight: 500;">QR</span></h4>
+            </div>
+            <div class="col-3">
+              <div class="d-flex align-items-center mb-1">
+                <i class="fa-solid fa-receipt me-2" style="color: #f59e0b;"></i>
+                <span class="text-muted" style="font-size: 0.8rem;">Total COD Orders</span>
+              </div>
+              <h4 class="mb-0 fw-bold text-warning">{{ cod_in_hand_list|length }} <span style="font-size: 0.75rem; font-weight: 500;">Orders</span></h4>
+            </div>
+            <div class="col-3">
+              <div class="d-flex align-items-center mb-1">
+                <i class="fa-solid fa-wallet me-2" style="color: #3b82f6;"></i>
+                <span class="text-muted" style="font-size: 0.8rem;">Wallet Balance</span>
+              </div>
+              <h4 class="mb-0 fw-bold" style="color: #3b82f6;">{{ wallet_status.wallet_balance|default:0|floatformat:0 }} <span style="font-size: 0.75rem; font-weight: 500;">QR</span></h4>
+              <div class="text-muted" style="font-size: 0.75rem;">Limit: {{ wallet_status.credit_limit|default:0|floatformat:0 }} QR</div>
+            </div>
+            <div class="col-3">
+              <div class="d-flex align-items-center mb-1">
+                <i class="fa-solid fa-clock me-2" style="color: #8b5cf6;"></i>
+                <span class="text-muted" style="font-size: 0.8rem;">Pending Earnings</span>
+              </div>
+              <h4 class="mb-0 fw-bold" style="color: #8b5cf6;">{{ wallet_status.pending_earnings|default:0|floatformat:0 }} <span style="font-size: 0.75rem; font-weight: 500;">QR</span></h4>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -235,6 +283,21 @@
   <div class="row mb-2">
     <div class="col-12">
       <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
+        <!-- Header -->
+        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+              <div class="me-3" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                <i class="fa-solid fa-hand-holding-dollar text-white" style="font-size: 1.5rem;"></i>
+              </div>
+              <div>
+                <h5 class="mb-0 text-white fw-bold">COD In Hand</h5>
+                <small class="text-white" style="opacity: 0.9;">Pending settlement</small>
+              </div>
+            </div>
+            <span class="badge bg-white text-dark">{{ cod_in_hand_list|length }} orders</span>
+          </div>
+        </div>
         <!-- Action Bar -->
         {% if cod_in_hand_list %}
         <div class="px-3 py-2 border-bottom" style="background: #fffbeb;">
@@ -251,8 +314,8 @@
               <button type="button" class="btn btn-sm btn-outline-secondary" id="cod-export-csv-btn" disabled>
                 <i class="fa-solid fa-file-csv me-1"></i>Export CSV
               </button>
-              <button type="button" class="btn btn-sm btn-outline-danger" id="cod-export-pdf-btn" disabled>
-                <i class="fa-solid fa-file-pdf me-1"></i>Save and Submit
+              <button type="button" class="btn btn-sm btn-outline-success" id="cod-export-pdf-btn" disabled>
+                <i class="fa-solid fa-file-pdf me-1"></i>Save and Submit COD
               </button>
             </div>
           </div>
@@ -343,8 +406,130 @@
     </div>
   </div>
 
-  <!-- Recent COD Deliveries Table -->
+  <!-- COD Settlement Transactions Table (Settlement History) -->
   <div class="row mb-2">
+    <div class="col-12">
+      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
+        <!-- Header with gradient -->
+        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+              <div class="me-3" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                <i class="fa-solid fa-clock-rotate-left text-white" style="font-size: 1.5rem;"></i>
+              </div>
+              <div>
+                <h5 class="mb-0 text-white fw-bold">COD Settlement Transactions</h5>
+                <small class="text-white" style="opacity: 0.9;">Settlement history</small>
+              </div>
+            </div>
+            <a href="{% url 'fleet:transaction_history' %}?type=cod_collection&days=90" class="btn btn-light btn-sm">
+              <i class="fa-solid fa-arrow-right me-1"></i>View All
+            </a>
+          </div>
+        </div>
+        <!-- Table -->
+        {% if cod_transactions %}
+          <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size: 0.875rem;">
+              <thead style="background: #f5f3ff;">
+                <tr>
+                  <th class="py-3 ps-4" style="font-weight: 600; color: #5b21b6; border: none; width: 5%;">#</th>
+                  <th class="py-3" style="font-weight: 600; color: #5b21b6; border: none;">Transaction</th>
+                  <th class="py-3" style="font-weight: 600; color: #5b21b6; border: none;">Details / Reference</th>
+                  <th class="py-3" style="font-weight: 600; color: #5b21b6; border: none;">Balance After</th>
+                  <th class="py-3" style="font-weight: 600; color: #5b21b6; border: none;">Date</th>
+                  <th class="py-3 pe-4 text-end" style="font-weight: 600; color: #5b21b6; border: none;">Amount</th>
+                  <th class="py-3 text-center" style="font-weight: 600; color: #5b21b6; border: none; width: 80px;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for txn in cod_transactions %}
+                <tr style="border-bottom: 1px solid #f3f4f6;">
+                  <td class="py-3 ps-4 text-muted">{{ forloop.counter }}</td>
+                  <td class="py-3">
+                    <div class="d-flex align-items-center">
+                      <div class="me-3" style="width: 40px; height: 40px; background: linear-gradient(135deg, {% if txn.transaction_type == 'cod_deposit' %}#fef3c7, #fde68a{% elif txn.transaction_type == 'cod_collection' %}#d1fae5, #a7f3d0{% else %}#ede9fe, #ddd6fe{% endif %}); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid {% if txn.transaction_type == 'cod_deposit' %}fa-building-columns{% elif txn.transaction_type == 'cod_collection' %}fa-coins{% else %}fa-exchange-alt{% endif %}" style="font-size: 1rem; color: {% if txn.transaction_type == 'cod_deposit' %}#d97706{% elif txn.transaction_type == 'cod_collection' %}#059669{% else %}#7c3aed{% endif %};"></i>
+                      </div>
+                      <div>
+                        <div class="fw-semibold" style="color: #1f2937;">{{ txn.get_transaction_type_display }}</div>
+                        <div style="font-size: 0.75rem;">
+                          <span style="font-family: monospace; color: #6b7280;">{{ txn.transaction_code|default:"-" }}</span>
+                          {% if txn.payment_method %}
+                          <span class="badge ms-1" style="background: #f3f4f6; color: #6b7280; font-size: 0.65rem; font-weight: 500;">
+                            <i class="fa-solid {% if txn.payment_method == 'cash' %}fa-money-bill{% elif txn.payment_method == 'bank' %}fa-university{% elif txn.payment_method == 'atm' %}fa-credit-card{% else %}fa-mobile-alt{% endif %} me-1"></i>
+                            {{ txn.get_payment_method_display|default:txn.payment_method }}
+                          </span>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="py-3">
+                    <div style="font-size: 0.85rem;">
+                      <div class="fw-medium" style="color: #374151; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        {{ txn.description|default:"COD Transaction" }}
+                      </div>
+                      <div style="font-size: 0.75rem; color: #9ca3af;">
+                        {% if txn.reference_number %}Ref: {{ txn.reference_number }}{% endif %}
+                        {% if txn.notes %}<span class="ms-2"><i class="fa-solid fa-sticky-note me-1"></i>{{ txn.notes|truncatechars:20 }}</span>{% endif %}
+                      </div>
+                    </div>
+                  </td>
+                  <td class="py-3">
+                    <div style="font-size: 0.8rem;">
+                      <div style="color: #d97706;">
+                        <i class="fa-solid fa-hand-holding-dollar me-1"></i>{{ txn.cod_in_hand_after|default:"-"|floatformat:0 }} QR
+                      </div>
+                      <div class="text-muted">
+                        <i class="fa-solid fa-wallet me-1"></i>{{ txn.wallet_balance_after|default:"-"|floatformat:0 }} QR
+                      </div>
+                    </div>
+                  </td>
+                  <td class="py-3">
+                    <div style="font-size: 0.85rem;">
+                      <div class="text-muted">{{ txn.created_at|date:"d M Y"|default:"-" }}</div>
+                      <div style="color: #6b7280; font-size: 0.8rem;">
+                        <i class="fa-regular fa-clock me-1"></i>{{ txn.created_at|date:"H:i"|default:"-" }}
+                      </div>
+                    </div>
+                  </td>
+                  <td class="py-3 pe-4 text-end">
+                    {% if txn.amount >= 0 %}
+                    <span class="fw-bold" style="color: #059669; font-size: 1.1rem;">+{{ txn.amount|floatformat:0 }}</span>
+                    {% else %}
+                    <span class="fw-bold" style="color: #dc2626; font-size: 1.1rem;">{{ txn.amount|floatformat:0 }}</span>
+                    {% endif %}
+                    <span class="text-muted" style="font-size: 0.75rem;">QR</span>
+                  </td>
+                  <td class="py-3 text-center">
+                    <button type="button" class="btn btn-sm btn-outline-primary view-txn-report-btn"
+                      data-txn-code="{{ txn.transaction_code|default:'-' }}"
+                      title="View Report">
+                      <i class="fa-solid fa-eye"></i>
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-center py-5">
+            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+              <i class="fa-solid fa-clock-rotate-left" style="font-size: 2rem; color: #8b5cf6;"></i>
+            </div>
+            <h5 class="text-muted mb-2">No Transactions Yet</h5>
+            <p class="text-muted mb-0">COD transactions will appear here after settlement</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent COD Deliveries Table -->
+  <div class="row">
     <div class="col-12">
       <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
         <!-- Header with gradient -->
@@ -434,120 +619,6 @@
       </div>
     </div>
   </div>
-
-  <!-- COD Transactions Table -->
-  <div class="row">
-    <div class="col-12">
-      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
-        <!-- Header with gradient -->
-        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-              <div class="me-3" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                <i class="fa-solid fa-clock-rotate-left text-white" style="font-size: 1.5rem;"></i>
-              </div>
-              <div>
-                <h5 class="mb-0 text-white fw-bold">COD Transactions</h5>
-                <small class="text-white" style="opacity: 0.9;">Settlement history</small>
-              </div>
-            </div>
-            <a href="{% url 'fleet:transaction_history' %}?type=cod_collection&days=90" class="btn btn-light btn-sm">
-              <i class="fa-solid fa-arrow-right me-1"></i>View All
-            </a>
-          </div>
-        </div>
-        <!-- Table -->
-        {% if cod_transactions %}
-          <div class="table-responsive">
-            <table class="table table-hover mb-0" style="font-size: 0.875rem;">
-              <thead style="background: #f5f3ff;">
-                <tr>
-                  <th class="py-3 ps-4" style="font-weight: 600; color: #5b21b6; border: none; width: 5%;">#</th>
-                  <th class="py-3" style="font-weight: 600; color: #5b21b6; border: none;">Transaction</th>
-                  <th class="py-3" style="font-weight: 600; color: #5b21b6; border: none;">Details / Reference</th>
-                  <th class="py-3" style="font-weight: 600; color: #5b21b6; border: none;">Balance After</th>
-                  <th class="py-3" style="font-weight: 600; color: #5b21b6; border: none;">Date</th>
-                  <th class="py-3 pe-4 text-end" style="font-weight: 600; color: #5b21b6; border: none;">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for txn in cod_transactions %}
-                <tr style="border-bottom: 1px solid #f3f4f6;">
-                  <td class="py-3 ps-4 text-muted">{{ forloop.counter }}</td>
-                  <td class="py-3">
-                    <div class="d-flex align-items-center">
-                      <div class="me-3" style="width: 40px; height: 40px; background: linear-gradient(135deg, {% if txn.transaction_type == 'cod_deposit' %}#fef3c7, #fde68a{% elif txn.transaction_type == 'cod_collection' %}#d1fae5, #a7f3d0{% else %}#ede9fe, #ddd6fe{% endif %}); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                        <i class="fa-solid {% if txn.transaction_type == 'cod_deposit' %}fa-building-columns{% elif txn.transaction_type == 'cod_collection' %}fa-coins{% else %}fa-exchange-alt{% endif %}" style="font-size: 1rem; color: {% if txn.transaction_type == 'cod_deposit' %}#d97706{% elif txn.transaction_type == 'cod_collection' %}#059669{% else %}#7c3aed{% endif %};"></i>
-                      </div>
-                      <div>
-                        <div class="fw-semibold" style="color: #1f2937;">{{ txn.get_transaction_type_display }}</div>
-                        <div style="font-size: 0.75rem;">
-                          <span style="font-family: monospace; color: #6b7280;">{{ txn.transaction_code|default:"-" }}</span>
-                          {% if txn.payment_method %}
-                          <span class="badge ms-1" style="background: #f3f4f6; color: #6b7280; font-size: 0.65rem; font-weight: 500;">
-                            <i class="fa-solid {% if txn.payment_method == 'cash' %}fa-money-bill{% elif txn.payment_method == 'bank' %}fa-university{% elif txn.payment_method == 'atm' %}fa-credit-card{% else %}fa-mobile-alt{% endif %} me-1"></i>
-                            {{ txn.get_payment_method_display|default:txn.payment_method }}
-                          </span>
-                          {% endif %}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3">
-                    <div style="font-size: 0.85rem;">
-                      <div class="fw-medium" style="color: #374151; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        {{ txn.description|default:"COD Transaction" }}
-                      </div>
-                      <div style="font-size: 0.75rem; color: #9ca3af;">
-                        {% if txn.reference_number %}Ref: {{ txn.reference_number }}{% endif %}
-                        {% if txn.notes %}<span class="ms-2"><i class="fa-solid fa-sticky-note me-1"></i>{{ txn.notes|truncatechars:20 }}</span>{% endif %}
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3">
-                    <div style="font-size: 0.8rem;">
-                      <div style="color: #d97706;">
-                        <i class="fa-solid fa-hand-holding-dollar me-1"></i>{{ txn.cod_in_hand_after|default:"-"|floatformat:0 }} QR
-                      </div>
-                      <div class="text-muted">
-                        <i class="fa-solid fa-wallet me-1"></i>{{ txn.wallet_balance_after|default:"-"|floatformat:0 }} QR
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3">
-                    <div style="font-size: 0.85rem;">
-                      <div class="text-muted">{{ txn.created_at|date:"d M Y"|default:"-" }}</div>
-                      <div style="color: #6b7280; font-size: 0.8rem;">
-                        <i class="fa-regular fa-clock me-1"></i>{{ txn.created_at|date:"H:i"|default:"-" }}
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3 pe-4 text-end">
-                    {% if txn.amount >= 0 %}
-                    <span class="fw-bold" style="color: #059669; font-size: 1.1rem;">+{{ txn.amount|floatformat:0 }}</span>
-                    {% else %}
-                    <span class="fw-bold" style="color: #dc2626; font-size: 1.1rem;">{{ txn.amount|floatformat:0 }}</span>
-                    {% endif %}
-                    <span class="text-muted" style="font-size: 0.75rem;">QR</span>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% else %}
-          <div class="text-center py-5">
-            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-              <i class="fa-solid fa-clock-rotate-left" style="font-size: 2rem; color: #8b5cf6;"></i>
-            </div>
-            <h5 class="text-muted mb-2">No Transactions Yet</h5>
-            <p class="text-muted mb-0">COD transactions will appear here after settlement</p>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- COD Submit Modal -->
@@ -599,6 +670,127 @@
     </div>
   </div>
 </div>
+<!-- Transaction Report Modal -->
+<div class="modal fade" id="txnReportModal" tabindex="-1" aria-labelledby="txnReportModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-header border-0 py-3" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+        <div class="d-flex align-items-center">
+          <div class="me-3" style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+            <i class="fa-solid fa-file-invoice text-white"></i>
+          </div>
+          <div>
+            <h5 class="modal-title text-white fw-bold mb-0" id="txnReportModalLabel">Transaction Report</h5>
+            <small class="text-white" style="opacity: 0.9;" id="txn-modal-code"></small>
+          </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <!-- Loading State -->
+        <div id="txn-modal-loading" class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="text-muted mt-2 mb-0" style="font-size: 0.85rem;">Loading transaction details...</p>
+        </div>
+
+        <!-- Content (hidden until loaded) -->
+        <div id="txn-modal-content" style="display: none;">
+          <!-- Transaction Summary -->
+          <div class="p-4 pb-0">
+            <div class="text-center mb-3 pb-3" style="border-bottom: 2px dashed #e5e7eb;">
+              <div class="mb-1" id="txn-modal-type" style="font-size: 0.85rem; color: #6b7280;"></div>
+              <div id="txn-modal-amount" style="font-size: 2rem; font-weight: 700;"></div>
+              <div id="txn-modal-date" style="font-size: 0.8rem; color: #9ca3af;"></div>
+            </div>
+
+            <!-- Details -->
+            <div class="mb-3">
+              <div class="d-flex justify-content-between py-2" style="border-bottom: 1px solid #f3f4f6;">
+                <span class="text-muted" style="font-size: 0.85rem;">Description</span>
+                <span class="fw-medium" style="font-size: 0.85rem;" id="txn-modal-description"></span>
+              </div>
+              <div class="d-flex justify-content-between py-2" style="border-bottom: 1px solid #f3f4f6;">
+                <span class="text-muted" style="font-size: 0.85rem;">Payment Method</span>
+                <span class="fw-medium" style="font-size: 0.85rem;" id="txn-modal-payment"></span>
+              </div>
+              <div class="d-flex justify-content-between py-2" style="border-bottom: 1px solid #f3f4f6;" id="txn-modal-ref-row">
+                <span class="text-muted" style="font-size: 0.85rem;">Reference No.</span>
+                <span class="fw-medium" style="font-size: 0.85rem; font-family: monospace;" id="txn-modal-reference"></span>
+              </div>
+              <div class="d-flex justify-content-between py-2" style="border-bottom: 1px solid #f3f4f6;" id="txn-modal-notes-row">
+                <span class="text-muted" style="font-size: 0.85rem;">Notes</span>
+                <span class="fw-medium" style="font-size: 0.85rem; max-width: 200px; text-align: right;" id="txn-modal-notes"></span>
+              </div>
+            </div>
+
+            <!-- Balance After -->
+            <div class="p-3 mb-3" style="background: #f9fafb; border-radius: 12px;">
+              <div class="fw-semibold mb-2" style="font-size: 0.8rem; color: #374151;">Balance After Transaction</div>
+              <div class="d-flex justify-content-between py-1">
+                <span style="font-size: 0.8rem; color: #6b7280;"><i class="fa-solid fa-hand-holding-dollar me-1" style="color: #d97706;"></i>COD in Hand</span>
+                <span class="fw-semibold" style="font-size: 0.85rem; color: #d97706;" id="txn-modal-cod-after"></span>
+              </div>
+              <div class="d-flex justify-content-between py-1">
+                <span style="font-size: 0.8rem; color: #6b7280;"><i class="fa-solid fa-wallet me-1" style="color: #3b82f6;"></i>Wallet Balance</span>
+                <span class="fw-semibold" style="font-size: 0.85rem; color: #3b82f6;" id="txn-modal-wallet-after"></span>
+              </div>
+              <div class="d-flex justify-content-between py-1">
+                <span style="font-size: 0.8rem; color: #6b7280;"><i class="fa-solid fa-clock me-1" style="color: #8b5cf6;"></i>Pending Earnings</span>
+                <span class="fw-semibold" style="font-size: 0.85rem; color: #8b5cf6;" id="txn-modal-earnings-after"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- COD Orders List -->
+          <div id="txn-modal-orders-section">
+            <div class="px-4 pb-2">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0" style="color: #374151;">
+                  <i class="fa-solid fa-list-check me-2" style="color: #8b5cf6;"></i>COD Orders
+                </h6>
+                <span class="badge" style="background: #ede9fe; color: #7c3aed;" id="txn-modal-orders-count"></span>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm mb-0" style="font-size: 0.85rem;">
+                <thead style="background: #f5f3ff;">
+                  <tr>
+                    <th class="py-2 ps-4" style="font-weight: 600; color: #5b21b6; border: none;">#</th>
+                    <th class="py-2" style="font-weight: 600; color: #5b21b6; border: none;">Task</th>
+                    <th class="py-2" style="font-weight: 600; color: #5b21b6; border: none;">Business</th>
+                    <th class="py-2" style="font-weight: 600; color: #5b21b6; border: none;">Customer</th>
+                    <th class="py-2" style="font-weight: 600; color: #5b21b6; border: none;">Delivered</th>
+                    <th class="py-2 pe-4 text-end" style="font-weight: 600; color: #5b21b6; border: none;">Amount</th>
+                  </tr>
+                </thead>
+                <tbody id="txn-modal-orders-body">
+                </tbody>
+                <tfoot style="background: #ede9fe;">
+                  <tr>
+                    <td colspan="5" class="py-2 ps-4 fw-bold" style="border: none; color: #5b21b6;">Total COD</td>
+                    <td class="py-2 pe-4 text-end fw-bold" style="border: none; color: #7c3aed; font-size: 1rem;" id="txn-modal-orders-total"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <!-- No Orders Message -->
+            <div id="txn-modal-no-orders" class="text-center py-4" style="display: none;">
+              <i class="fa-solid fa-inbox text-muted" style="font-size: 1.5rem;"></i>
+              <p class="text-muted mt-2 mb-0" style="font-size: 0.85rem;">No linked orders found for this transaction</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0" style="background: #f9fafb;">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="fa-solid fa-times me-1"></i>Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -632,10 +824,14 @@ document.addEventListener('DOMContentLoaded', function() {
       selectedTotalEl.style.display = 'inline';
       exportCsvBtn.disabled = false;
       exportPdfBtn.disabled = false;
+      exportPdfBtn.classList.remove('btn-outline-success');
+      exportPdfBtn.classList.add('btn-success');
     } else {
       selectedTotalEl.style.display = 'none';
       exportCsvBtn.disabled = true;
       exportPdfBtn.disabled = true;
+      exportPdfBtn.classList.remove('btn-success');
+      exportPdfBtn.classList.add('btn-outline-success');
     }
 
     // Update select all checkbox state
@@ -720,6 +916,135 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Download PDF and redirect to submission
     window.location.href = '{% url "fleet:cod_export" %}?format=pdf&ids=' + ids.join(',') + '&submit=1';
+  });
+
+  // ===================== VIEW TRANSACTION REPORT =====================
+  var loadingSpinner = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><p class="text-muted mt-2 mb-0" style="font-size: 0.85rem;">Loading transaction details...</p>';
+
+  document.querySelectorAll('.view-txn-report-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Prevent checkbox toggle if clicking the button inside a table row
+      if (e.target.closest('.cod-row-checkbox')) return;
+
+      const txnCode = this.dataset.txnCode;
+
+      // Reset loading indicator to default spinner
+      document.getElementById('txn-modal-loading').innerHTML = loadingSpinner;
+      document.getElementById('txn-modal-loading').classList.add('text-center', 'py-5');
+      document.getElementById('txn-modal-loading').style.display = 'block';
+      document.getElementById('txn-modal-content').style.display = 'none';
+
+      var modalEl = document.getElementById('txnReportModal');
+      var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+      if (!txnCode || txnCode === '-') {
+        // Show modal with message for older transactions without codes
+        document.getElementById('txn-modal-loading').innerHTML = '<div class="text-center py-5"><i class="fa-solid fa-info-circle text-warning" style="font-size: 2rem;"></i><p class="text-muted mt-3 mb-0">This is an older transaction without detailed records.<br>New transactions will have full reports available.</p></div>';
+        document.getElementById('txn-modal-code').textContent = 'Legacy Transaction';
+        modal.show();
+        return;
+      }
+
+      // Show modal with loading state
+      document.getElementById('txn-modal-code').textContent = txnCode;
+      modal.show();
+
+      // Fetch transaction detail via AJAX
+      fetch('{% url "fleet:cod_transaction_detail" %}?code=' + encodeURIComponent(txnCode))
+        .then(function(resp) {
+          if (!resp.ok) {
+            throw new Error('Server returned ' + resp.status);
+          }
+          return resp.json();
+        })
+        .then(function(data) {
+          if (data.error) {
+            document.getElementById('txn-modal-loading').innerHTML = '<div class="text-center py-4"><i class="fa-solid fa-exclamation-triangle text-danger" style="font-size: 2rem;"></i><p class="text-danger mt-2">' + data.error + '</p></div>';
+            return;
+          }
+
+          // Populate transaction info
+          document.getElementById('txn-modal-code').textContent = data.transaction_code;
+          document.getElementById('txn-modal-type').textContent = data.transaction_type;
+          document.getElementById('txn-modal-date').textContent = data.date;
+          document.getElementById('txn-modal-description').textContent = data.description || 'COD Transaction';
+          document.getElementById('txn-modal-payment').textContent = data.payment_method;
+          document.getElementById('txn-modal-cod-after').textContent = Math.round(data.cod_in_hand_after) + ' QR';
+          document.getElementById('txn-modal-wallet-after').textContent = Math.round(data.wallet_balance_after) + ' QR';
+          document.getElementById('txn-modal-earnings-after').textContent = Math.round(data.pending_earnings_after) + ' QR';
+
+          // Amount with color
+          var amountEl = document.getElementById('txn-modal-amount');
+          if (data.amount >= 0) {
+            amountEl.textContent = '+' + Math.abs(Math.round(data.amount)) + ' QR';
+            amountEl.style.color = '#059669';
+          } else {
+            amountEl.textContent = '-' + Math.abs(Math.round(data.amount)) + ' QR';
+            amountEl.style.color = '#dc2626';
+          }
+
+          // Reference (hide if empty)
+          var refRow = document.getElementById('txn-modal-ref-row');
+          if (data.reference_number) {
+            document.getElementById('txn-modal-reference').textContent = data.reference_number;
+            refRow.style.display = 'flex';
+          } else {
+            refRow.style.display = 'none';
+          }
+
+          // Notes (hide if empty)
+          var notesRow = document.getElementById('txn-modal-notes-row');
+          if (data.notes) {
+            document.getElementById('txn-modal-notes').textContent = data.notes;
+            notesRow.style.display = 'flex';
+          } else {
+            notesRow.style.display = 'none';
+          }
+
+          // Build orders table
+          var ordersBody = document.getElementById('txn-modal-orders-body');
+          ordersBody.innerHTML = '';
+
+          if (data.orders && data.orders.length > 0) {
+            document.getElementById('txn-modal-orders-section').querySelector('.table-responsive').style.display = 'block';
+            document.getElementById('txn-modal-no-orders').style.display = 'none';
+            document.getElementById('txn-modal-orders-count').textContent = data.orders_count + ' order' + (data.orders_count > 1 ? 's' : '');
+
+            data.orders.forEach(function(order, idx) {
+              var tr = document.createElement('tr');
+              tr.style.borderBottom = '1px solid #f3f4f6';
+              tr.innerHTML =
+                '<td class="py-2 ps-4 text-muted">' + (idx + 1) + '</td>' +
+                '<td class="py-2"><span style="font-family: monospace; font-size: 0.8rem;">' + order.task_number + '</span></td>' +
+                '<td class="py-2"><span class="fw-medium" style="color: #374151;">' + order.business + '</span></td>' +
+                '<td class="py-2">' +
+                  '<div class="fw-medium" style="color: #374151;">' + order.customer + '</div>' +
+                  '<div class="text-muted" style="font-size: 0.75rem;"><i class="fa-solid fa-location-dot me-1"></i>' + order.location + '</div>' +
+                '</td>' +
+                '<td class="py-2"><span class="text-muted" style="font-size: 0.8rem;">' + order.delivered_at + '</span></td>' +
+                '<td class="py-2 pe-4 text-end fw-semibold" style="color: #d97706;">' + Math.round(order.amount) + ' QR</td>';
+              ordersBody.appendChild(tr);
+            });
+
+            document.getElementById('txn-modal-orders-total').textContent = Math.round(data.orders_total) + ' QR';
+          } else {
+            document.getElementById('txn-modal-orders-section').querySelector('.table-responsive').style.display = 'none';
+            document.getElementById('txn-modal-no-orders').style.display = 'block';
+            document.getElementById('txn-modal-orders-count').textContent = '0 orders';
+          }
+
+          // Show content, hide loading
+          document.getElementById('txn-modal-loading').style.display = 'none';
+          document.getElementById('txn-modal-content').style.display = 'block';
+        })
+        .catch(function(err) {
+          console.error('Transaction detail fetch error:', err);
+          document.getElementById('txn-modal-loading').innerHTML = '<div class="text-center py-4"><i class="fa-solid fa-exclamation-triangle text-danger" style="font-size: 2rem;"></i><p class="text-danger mt-2">Failed to load transaction details</p><small class="text-muted">' + err.message + '</small></div>';
+        });
+    });
   });
 
   // ===================== MOBILE VIEW =====================

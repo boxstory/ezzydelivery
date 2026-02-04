@@ -221,25 +221,52 @@ class BusinessProfile(models.Model):
 
 
 class BusinessApiSettings(models.Model):
-    type_choices = (
+    """
+    API credentials for e-commerce platform integrations.
+
+    Supported Platforms:
+        - Shopify: Uses api_key (API Key), api_secret (API Secret), api_access_token
+        - WooCommerce: Uses api_key (Consumer Key), api_secret (Consumer Secret), site_api_url
+        - TikTok Shop: Uses api_key (App Key), api_secret (App Secret), api_access_token,
+                       tiktok_shop_id, tiktok_shop_cipher, tiktok_refresh_token
+        - Others: Generic API key/secret configuration
+    """
+    type_choices = [
         ('shopify', 'Shopify'),
-        ('woocommerce', 'Woocommerce'),
+        ('woocommerce', 'WooCommerce'),
+        ('tiktokshop', 'TikTok Shop'),
         ('magento', 'Magento'),
-        ('opencart', 'Opencart'),
-        ('prestashop', 'Prestashop'),
-        ('bigcommerce', 'Bigcommerce'),
+        ('opencart', 'OpenCart'),
+        ('prestashop', 'PrestaShop'),
+        ('bigcommerce', 'BigCommerce'),
         ('custom', 'Custom'),
-    )
+    ]
     api_type = models.CharField(
         max_length=100, choices=type_choices, default='custom')
-    api_access_token = models.CharField(max_length=100, blank=True, null=True)
-    api_key = models.CharField(max_length=100, blank=True, null=True)
-    api_secret = models.CharField(max_length=100, blank=True, null=True)
-    api_version = models.CharField(max_length=100, blank=True, null=True)
-    site_api_url = models.CharField(max_length=100, blank=True, null=True)
+    api_access_token = models.CharField(max_length=255, blank=True, null=True,
+        help_text='Access token for API authentication')
+    api_key = models.CharField(max_length=100, blank=True, null=True,
+        help_text='API Key / App Key / Consumer Key')
+    api_secret = models.CharField(max_length=100, blank=True, null=True,
+        help_text='API Secret / App Secret / Consumer Secret')
+    api_version = models.CharField(max_length=100, blank=True, null=True,
+        help_text='API version (e.g., 202309 for TikTok Shop)')
+    site_api_url = models.CharField(max_length=255, blank=True, null=True,
+        help_text='Store URL or API base URL')
     site_contry = models.CharField(max_length=100, blank=True, null=True, default='Qatar')
-    order_api_endpoint = models.CharField(max_length=100, blank=True, null=True)
-    product_api_endpoint = models.CharField(max_length=100, blank=True, null=True)
+    order_api_endpoint = models.CharField(max_length=255, blank=True, null=True)
+    product_api_endpoint = models.CharField(max_length=255, blank=True, null=True)
+
+    # TikTok Shop specific fields
+    tiktok_shop_id = models.CharField(max_length=100, blank=True, null=True,
+        help_text='TikTok Shop ID (obtained after OAuth authorization)')
+    tiktok_shop_cipher = models.CharField(max_length=255, blank=True, null=True,
+        help_text='TikTok Shop cipher for API requests')
+    tiktok_refresh_token = models.CharField(max_length=255, blank=True, null=True,
+        help_text='TikTok refresh token for renewing access token')
+    tiktok_token_expires_at = models.DateTimeField(blank=True, null=True,
+        help_text='When the TikTok access token expires')
+
     is_verify_api = models.BooleanField(default=False)
     is_default = models.BooleanField(default=False)
     business = models.ForeignKey(

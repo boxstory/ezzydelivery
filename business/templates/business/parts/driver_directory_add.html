@@ -1,21 +1,56 @@
-{% extends "business_dashboard_base.html" %} {% load static %}
-<!-- extra css -->
-{% load crispy_forms_tags %} {% block content %}
-<div class="p-3 col-12  " id="client_driver_add_container_main">
-  <div class="h4 p-3 text-center" id="client_driver_add_section_header">
-    <h2 id="client_driver_add_title_form">Add Drivers to directory</h2>
-    <form method="POST" htmx-post id="client_driver_add_form_main">
-      {% csrf_token %} {{ form | crispy }}
-      <button
-        type="submit"
-        class="btn pe-3 text-dark"
-        href="{% url 'business:driver_directory_add'  %}"
-        id="client_driver_add_btn_submit"
-      >
-        Add
-      </button>
-    </form>
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
 
-    {% endblock content %}
-  </div>
+{% block content %}
+<div class="p-3 col-12" id="client_driver_add_container_main">
+    <div class="h4 p-3 text-center" id="client_driver_add_section_header">
+        <h2 id="client_driver_add_title_form">Add Drivers to Directory</h2>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-6">
+            <form method="POST"
+                  hx-post="{% url 'business:driver_directory_add' %}"
+                  hx-target="#client_driver_add_container_main"
+                  hx-swap="outerHTML"
+                  id="client_driver_add_form_main">
+                {% csrf_token %}
+
+                {% if form.errors %}
+                <div class="alert alert-danger" role="alert">
+                    <strong>Please correct the errors below:</strong>
+                    <ul class="mb-0">
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                        <li>{{ field.label }}: {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {{ form|crispy }}
+
+                <div class="d-flex justify-content-center gap-2 mt-3">
+                    <button type="submit"
+                            class="btn btn-primary"
+                            id="client_driver_add_btn_submit">
+                        <i class="fas fa-plus me-2"></i>Add Driver
+                    </button>
+                    <a href="{% url 'business:driver_directory' %}"
+                       class="btn btn-outline-secondary"
+                       hx-get="{% url 'business:driver_directory' %}"
+                       hx-target="#main-content"
+                       hx-swap="innerHTML">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
+{% endblock content %}

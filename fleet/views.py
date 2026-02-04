@@ -366,11 +366,11 @@ def cod_collection(request):
         # Get wallet status
         wallet_status = WalletService.get_wallet_status(driver)
 
-        # Get COD transactions
+        # Get COD settlement transactions (only deposits/submissions to admin)
         cod_transactions = fleet_models.DriverTransaction.objects.filter(
             driver=driver,
-            transaction_type__in=['cod_collection', 'cod_deposit']
-        ).select_related('delivery_task').order_by('-created_at')[:50]
+            transaction_type='cod_deposit'
+        ).select_related('delivery_task').order_by('-created_at')[:20]
 
         # Get COD currently in hand (not yet settled/deposited)
         # Only show COD that hasn't been submitted to admin yet
@@ -422,8 +422,13 @@ def cod_collection(request):
 @login_required(login_url='/accounts/login/')
 @driver_required
 def cod_submission(request):
+    """Handle COD submission - redirects GET to cod_collection, processes POST"""
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        # Redirect GET requests to cod_collection (consolidated page)
+        if request.method == 'GET':
+            return redirect('fleet:cod_collection')
 
         if request.method == 'POST':
             amount = request.POST.get('amount')

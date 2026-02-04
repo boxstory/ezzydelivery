@@ -66,6 +66,11 @@ COD_STATUS_BY_STAFF = [
         ('cod_settled_with_business', 'COD Settled with Business'),
     ]
 
+ORDER_TYPE_CHOICES = [
+        ('normal_delivery', 'Normal Delivery'),
+        ('pick_and_drop', 'Pick and Drop'),
+    ]
+
 class Order(models.Model):
 
     # Create your models here.
@@ -95,7 +100,12 @@ class Order(models.Model):
     cod_amount = models.IntegerField(default=0)
     dl_included = models.BooleanField(default=True)
     dl_amount = models.IntegerField(default=0)
-    
+    order_type = models.CharField(
+        max_length=20, choices=ORDER_TYPE_CHOICES, default='normal_delivery',
+        help_text="Order type: normal delivery or pick and drop")
+    scheduled_delivery = models.BooleanField(default=False, help_text="Whether delivery is scheduled for a specific time")
+    scheduled_time = models.TimeField(blank=True, null=True, help_text="Scheduled delivery time if scheduled_delivery is True")
+
     # Verification tracking
     VERIFICATION_STATUS = (
         ('pending', 'Pending Verification'),

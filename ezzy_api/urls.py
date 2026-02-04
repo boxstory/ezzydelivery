@@ -48,6 +48,8 @@ urlpatterns = [
     path('integrations/', ezzy_api_views.list_integrations, name='list_integrations'),
     path('integrations/shopify/import/', ezzy_api_views.import_shopify_orders, name='import_shopify_orders'),
     path('integrations/woocommerce/import/', ezzy_api_views.import_woocommerce_orders, name='import_woocommerce_orders'),
+    path('integrations/tiktokshop/import/', ezzy_api_views.import_tiktokshop_orders, name='import_tiktokshop_orders'),
+    path('integrations/tiktokshop/test/', ezzy_api_views.test_tiktokshop_connection, name='test_tiktokshop_connection'),
     
     # ==================== WEBHOOK APIs ====================
     # Webhook receivers (from driver apps)

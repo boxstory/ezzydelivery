@@ -723,11 +723,12 @@ def business_settings_api_update(request, business_id, api_id):
         business = user_business if user_business.business_id == business_id else None
         if not business:
             return redirect('business:business_settings', business_id=user_business.business_id)
-        business_apis = business_models.BusinessApiSettings.objects.filter(id=api_id).first()
+        business_apis = business_models.BusinessApiSettings.objects.filter(id=api_id, business=business).first()
+        if not business_apis:
+            messages.error(request, "API settings not found.")
+            return redirect('business:business_settings', business_id=business_id)
+
         form = business_forms.businessApiSettingsForm(instance=business_apis)
-        # Hide the business field and set it to the current business
-        form.fields['business'].widget = forms.HiddenInput()
-        form.fields['business'].initial = business
 
         if request.method == 'POST':
             logger.debug(f'Updating API settings for business_id={business_id}, api_id={api_id}')
@@ -735,11 +736,13 @@ def business_settings_api_update(request, business_id, api_id):
                 request.POST, instance=business_apis)
 
             if form.is_valid():
-                f = form.save(commit=False)
-                if f.is_verify_api:
-                    f.is_verify_api = False
-
-                form.save()
+                api_settings = form.save(commit=False)
+                # Reset verification when settings change
+                if api_settings.is_verify_api:
+                    api_settings.is_verify_api = False
+                # Ensure business is set (for security)
+                api_settings.business = business
+                api_settings.save()
                 logger.info(f'API settings updated successfully for business_id={business_id}, api_id={api_id}')
                 messages.success(request, "Successful Submission")
                 return redirect("business:business_settings", business_id)
@@ -767,17 +770,17 @@ def business_settings_api_add(request, business_id):
         business = user_business if user_business.business_id == business_id else None
         if not business:
             return redirect('business:business_settings', business_id=user_business.business_id)
-        form = business_forms.businessApiSettingsForm(initial={'business': business})
-        # Hide the business field and set it to the current business
-        form.fields['business'].widget = forms.HiddenInput()
-        form.fields['business'].initial = business
+        form = business_forms.businessApiSettingsForm()
 
         if request.method == 'POST':
             logger.debug(f'Adding API settings for business_id={business_id}')
             form = business_forms.businessApiSettingsForm(request.POST)
 
             if form.is_valid():
-                form.save()
+                # Set business before saving (excluded from form for security)
+                api_settings = form.save(commit=False)
+                api_settings.business = business
+                api_settings.save()
                 logger.info(f'API settings added successfully for business_id={business_id}')
                 messages.success(request, "Successful Submission")
                 return redirect("business:business_settings", business_id)

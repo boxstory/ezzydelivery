@@ -60,8 +60,8 @@
           </ul>
         </div>
       </li>
-      <li class="nav-item {% if request.resolver_match.url_name == 'cod_collection' or request.resolver_match.url_name == 'cod_submission' or request.resolver_match.url_name == 'driver_earnings' or request.resolver_match.url_name == 'transaction_history' %}active{% endif %}">
-        <div class="nav-link btn {% if request.resolver_match.url_name == 'cod_collection' or request.resolver_match.url_name == 'cod_submission' or request.resolver_match.url_name == 'driver_earnings' or request.resolver_match.url_name == 'transaction_history' %}active{% endif %}"
+      <li class="nav-item {% if request.resolver_match.url_name == 'fleet_finance_summary' or request.resolver_match.url_name == 'cod_collection' or request.resolver_match.url_name == 'driver_earnings' or request.resolver_match.url_name == 'transaction_history' %}active{% endif %}">
+        <div class="nav-link btn {% if request.resolver_match.url_name == 'fleet_finance_summary' or request.resolver_match.url_name == 'cod_collection' or request.resolver_match.url_name == 'driver_earnings' or request.resolver_match.url_name == 'transaction_history' %}active{% endif %}"
              data-bs-toggle="collapse"
              data-bs-target="#submenu-accounts"
              aria-expanded="false">
@@ -71,16 +71,16 @@
         </div>
         <div class="multi-level collapse submenu" id="submenu-accounts">
           <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'cod_collection' %}active{% endif %}">
-              <a class="nav-link btn {% if request.resolver_match.url_name == 'cod_collection' %}active{% endif %}" href="{% url 'fleet:cod_collection' %}">
-                <i class="fa-solid fa-sack-dollar me-2"></i>
-                COD In Hand
+            <li class="nav-item {% if request.resolver_match.url_name == 'fleet_finance_summary' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'fleet_finance_summary' %}active{% endif %}" href="{% url 'fleet:fleet_finance_summary' %}">
+                <i class="fa-solid fa-chart-pie me-2"></i>
+                Finance Summary
               </a>
             </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'cod_submission' %}active{% endif %}">
-              <a class="nav-link btn {% if request.resolver_match.url_name == 'cod_submission' %}active{% endif %}" href="{% url 'fleet:cod_submission' %}">
-                <i class="fa-solid fa-money-bill-transfer me-2"></i>
-                Submit COD
+            <li class="nav-item {% if request.resolver_match.url_name == 'cod_collection' or request.resolver_match.url_name == 'cod_submission' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'cod_collection' or request.resolver_match.url_name == 'cod_submission' %}active{% endif %}" href="{% url 'fleet:cod_collection' %}">
+                <i class="fa-solid fa-sack-dollar me-2"></i>
+                COD In Hand
               </a>
             </li>
             <li class="nav-item {% if request.resolver_match.url_name == 'driver_earnings' %}active{% endif %}">
@@ -163,7 +163,7 @@
       <hr class="sidebar-divider" />
 
       <li class="nav-item {% if request.resolver_match.url_name == 'driver_profile' %}active{% endif %}">
-        <a class="nav-link btn {% if request.resolver_match.url_name == 'driver_profile' %}active{% endif %}" href="{% url 'fleet:driver_profile' user_profile.id %}">
+        <a class="nav-link btn {% if request.resolver_match.url_name == 'driver_profile' %}active{% endif %}" href="{% if user_profile.id %}{% url 'fleet:driver_profile' user_profile.id %}{% else %}{% url 'fleet:driver_profile_mobile' %}{% endif %}">
           <i class="fa-solid fa-user me-2"></i>
           <span>Profile</span>
         </a>

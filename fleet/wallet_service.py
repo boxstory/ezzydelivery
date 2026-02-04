@@ -32,12 +32,13 @@ class WalletService:
     @staticmethod
     def record_transaction(driver, transaction_type, amount, description,
                           delivery_task=None, settlement=None, created_by=None,
-                          reference_number=None, notes=None):
+                          reference_number=None, notes=None, payment_method=None,
+                          business=None):
         """
         Record a financial transaction and update driver balances
 
         Args:
-            driver: Driver instance
+            driver: Driver instance (optional for accounting-only transactions)
             transaction_type: One of DriverTransaction.TRANSACTION_TYPES
             amount: Decimal amount (positive for credits, negative for debits)
             description: String description of transaction
@@ -46,50 +47,60 @@ class WalletService:
             created_by: Optional User who created the transaction
             reference_number: Optional reference number
             notes: Optional additional notes
+            payment_method: Optional payment method (cash, bank, atm, fawran)
+            business: Optional Business instance for business-linked transactions
 
         Returns:
             DriverTransaction instance
         """
+        # Types that affect driver wallet balances
+        DRIVER_WALLET_TYPES = [
+            'earning', 'cod_collection', 'cod_deposit', 'cod_driver_settle',
+            'cod_return', 'settlement', 'deduction', 'bonus', 'adjustment',
+        ]
+
         with transaction.atomic():
-            # Lock the driver row to prevent race conditions
-            driver = Driver.objects.select_for_update().get(pk=driver.pk)
+            # Lock the driver row if this transaction affects driver balances
+            if driver and transaction_type in DRIVER_WALLET_TYPES:
+                driver = Driver.objects.select_for_update().get(pk=driver.pk)
 
-            # Update driver balances based on transaction type
-            if transaction_type == 'earning':
-                driver.pending_earnings += amount
-                driver.total_earnings += amount
-            elif transaction_type == 'cod_collection':
-                # COD collection decreases wallet (like using credit)
-                driver.wallet_balance -= abs(amount)
-                driver.cod_in_hand += abs(amount)
-            elif transaction_type == 'cod_deposit':
-                # COD deposit increases wallet (like making payment)
-                driver.wallet_balance += abs(amount)
-                driver.cod_in_hand -= abs(amount)
-            elif transaction_type == 'settlement':
-                # Settlement clears pending earnings
-                driver.pending_earnings -= abs(amount)
-                driver.last_settlement_date = timezone.now()
-            elif transaction_type in ['deduction', 'bonus', 'adjustment']:
-                # These affect wallet balance directly
-                driver.wallet_balance += amount
+                # Update driver balances based on transaction type
+                if transaction_type == 'earning':
+                    driver.pending_earnings += amount
+                    driver.total_earnings += amount
+                elif transaction_type == 'cod_collection':
+                    driver.wallet_balance -= abs(amount)
+                    driver.cod_in_hand += abs(amount)
+                elif transaction_type in ['cod_deposit', 'cod_driver_settle']:
+                    driver.wallet_balance += abs(amount)
+                    driver.cod_in_hand -= abs(amount)
+                elif transaction_type == 'cod_return':
+                    driver.wallet_balance += abs(amount)
+                    driver.cod_in_hand -= abs(amount)
+                elif transaction_type == 'settlement':
+                    driver.pending_earnings -= abs(amount)
+                    driver.last_settlement_date = timezone.now()
+                elif transaction_type in ['deduction', 'bonus', 'adjustment']:
+                    driver.wallet_balance += amount
 
-            driver.save()
+                driver.save()
 
             # Create transaction record
             trans = DriverTransaction.objects.create(
                 driver=driver,
+                business=business,
                 transaction_type=transaction_type,
                 amount=amount,
                 description=description,
                 reference_number=reference_number,
                 delivery_task=delivery_task,
                 settlement=settlement,
-                wallet_balance_after=driver.wallet_balance,
-                cod_in_hand_after=driver.cod_in_hand,
-                pending_earnings_after=driver.pending_earnings,
+                wallet_balance_after=driver.wallet_balance if driver else Decimal('0'),
+                cod_in_hand_after=driver.cod_in_hand if driver else Decimal('0'),
+                pending_earnings_after=driver.pending_earnings if driver else Decimal('0'),
                 created_by=created_by,
-                notes=notes
+                notes=notes,
+                payment_method=payment_method
             )
 
             return trans
@@ -159,7 +170,7 @@ class WalletService:
             }
 
     @staticmethod
-    def submit_cod_to_admin(driver, amount, created_by=None, reference_number=None, notes=None):
+    def submit_cod_to_admin(driver, amount, created_by=None, reference_number=None, notes=None, payment_method=None, delivery_ids=None):
         """
         Process driver's COD submission to admin
 
@@ -169,6 +180,8 @@ class WalletService:
             created_by: User processing the submission
             reference_number: Optional payment/deposit reference
             notes: Optional notes
+            payment_method: Optional payment method (cash, bank, atm, fawran)
+            delivery_ids: Optional list of delivery task IDs to mark as settled
 
         Returns:
             DriverTransaction instance
@@ -176,16 +189,205 @@ class WalletService:
         if driver.cod_in_hand < amount:
             raise ValueError(f"Driver only has {driver.cod_in_hand} QR in hand, cannot submit {amount} QR")
 
+        # Get payment method display name for description
+        payment_method_display = {
+            'cash': 'Cash',
+            'bank': 'Bank Transfer',
+            'atm': 'ATM Deposit',
+            'fawran': 'Fawran'
+        }.get(payment_method, 'Cash')
+
         trans = WalletService.record_transaction(
             driver=driver,
             transaction_type='cod_deposit',
             amount=amount,
-            description=f"COD deposit to admin - {amount} QR",
+            description=f"COD deposit to admin - {amount} QR via {payment_method_display}",
             created_by=created_by,
             reference_number=reference_number,
-            notes=notes
+            notes=notes,
+            payment_method=payment_method
         )
 
+        # Mark corresponding delivery tasks as COD settled
+        if delivery_ids:
+            # Settle specific deliveries
+            DeliveryTask.objects.filter(
+                id__in=delivery_ids,
+                driver=driver,
+                cod_collected=True,
+                cod_settled=False
+            ).update(cod_settled=True, cod_settled_at=timezone.now())
+        else:
+            # No specific IDs provided - settle oldest unsettled tasks up to the deposit amount
+            remaining = Decimal(str(amount))
+            unsettled_tasks = DeliveryTask.objects.filter(
+                driver=driver,
+                cod_collected=True,
+                cod_settled=False
+            ).order_by('completed_at')
+
+            task_ids_to_settle = []
+            for task in unsettled_tasks:
+                task_cod = task.cod_collected_amount or Decimal('0')
+                if task_cod <= Decimal('0'):
+                    continue
+                if remaining >= task_cod:
+                    task_ids_to_settle.append(task.id)
+                    remaining -= task_cod
+                if remaining <= Decimal('0'):
+                    break
+
+            if task_ids_to_settle:
+                DeliveryTask.objects.filter(id__in=task_ids_to_settle).update(
+                    cod_settled=True, cod_settled_at=timezone.now()
+                )
+
+        return trans
+
+    @staticmethod
+    def settle_cod_with_client(business, amount, delivery_task_ids=None,
+                               created_by=None, reference_number=None, notes=None,
+                               payment_method=None):
+        """
+        Record COD settlement from EzzyDelivery to business client.
+
+        Args:
+            business: Business instance receiving the COD
+            amount: Decimal amount being settled
+            delivery_task_ids: Optional list of DeliveryTask IDs included
+            created_by: User processing the settlement
+            reference_number: Payment reference
+            notes: Optional notes
+            payment_method: Payment method used
+
+        Returns:
+            DriverTransaction instance
+        """
+        with transaction.atomic():
+            trans = WalletService.record_transaction(
+                driver=None,
+                transaction_type='cod_client_settle',
+                amount=amount,
+                description=f"COD settlement to {business.business_name} - {amount} QR",
+                created_by=created_by,
+                reference_number=reference_number,
+                notes=notes,
+                payment_method=payment_method,
+                business=business
+            )
+
+            if delivery_task_ids:
+                DeliveryTask.objects.filter(
+                    id__in=delivery_task_ids,
+                    cod_collected=True
+                ).update(
+                    cod_client_settled=True,
+                    cod_client_settled_at=timezone.now()
+                )
+
+            return trans
+
+    @staticmethod
+    def record_cod_return(driver, delivery_task, amount, created_by=None, notes=None):
+        """
+        Record a COD return/reversal for a returned order.
+
+        Args:
+            driver: Driver instance
+            delivery_task: DeliveryTask being returned
+            amount: Decimal COD amount to reverse
+            created_by: User processing the return
+            notes: Optional notes
+
+        Returns:
+            DriverTransaction instance
+        """
+        trans = WalletService.record_transaction(
+            driver=driver,
+            transaction_type='cod_return',
+            amount=amount,
+            description=f"COD return for task {delivery_task.dl_task_number}",
+            delivery_task=delivery_task,
+            created_by=created_by,
+            reference_number=delivery_task.dl_task_number,
+            notes=notes
+        )
+        return trans
+
+    @staticmethod
+    def record_charge(charge_type, amount, description, delivery_task=None,
+                      driver=None, business=None, created_by=None,
+                      reference_number=None, notes=None):
+        """
+        Record a service charge (delivery, fulfillment, inventory, other).
+
+        Args:
+            charge_type: One of 'delivery_charge', 'fulfillment_charge',
+                         'inventory_handling', 'other_charge'
+            amount: Decimal charge amount
+            description: Charge description
+            delivery_task: Optional related DeliveryTask
+            driver: Optional Driver instance
+            business: Optional Business instance
+            created_by: User recording the charge
+            reference_number: Optional reference
+            notes: Optional notes
+
+        Returns:
+            DriverTransaction instance
+        """
+        valid_charge_types = [
+            'delivery_charge', 'fulfillment_charge',
+            'inventory_handling', 'other_charge'
+        ]
+        if charge_type not in valid_charge_types:
+            raise ValueError(f"Invalid charge type: {charge_type}. Must be one of {valid_charge_types}")
+
+        trans = WalletService.record_transaction(
+            driver=driver,
+            transaction_type=charge_type,
+            amount=amount,
+            description=description,
+            delivery_task=delivery_task,
+            created_by=created_by,
+            reference_number=reference_number,
+            notes=notes,
+            business=business
+        )
+        return trans
+
+    @staticmethod
+    def record_accounting_entry(entry_type, amount, description, business=None,
+                                created_by=None, reference_number=None, notes=None):
+        """
+        Record an accounting entry (bills payable or bills receivable).
+
+        Args:
+            entry_type: One of 'bills_payable', 'bills_receivable'
+            amount: Decimal amount
+            description: Entry description
+            business: Optional Business instance
+            created_by: User recording the entry
+            reference_number: Optional reference
+            notes: Optional notes
+
+        Returns:
+            DriverTransaction instance
+        """
+        valid_types = ['bills_payable', 'bills_receivable']
+        if entry_type not in valid_types:
+            raise ValueError(f"Invalid entry type: {entry_type}. Must be one of {valid_types}")
+
+        trans = WalletService.record_transaction(
+            driver=None,
+            transaction_type=entry_type,
+            amount=amount,
+            description=description,
+            created_by=created_by,
+            reference_number=reference_number,
+            notes=notes,
+            business=business
+        )
         return trans
 
     @staticmethod

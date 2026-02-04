@@ -1,0 +1,422 @@
+{% extends "fleet_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Finance Summary{% endblock %}
+
+{% block content %}
+<!-- Mobile PWA Finance Summary -->
+<div class="pwa-content d-md-none">
+  <div class="pwa-section-header">
+    <h3 class="pwa-section-title">Finance</h3>
+    <span class="pwa-text-muted">Overview</span>
+  </div>
+
+  <!-- Period Filter Pills -->
+  <div class="pwa-filter-pills">
+    <a href="?days=7" class="pwa-filter-pill {% if selected_days == 7 %}pwa-filter-pill--active{% endif %}">7 Days</a>
+    <a href="?days=30" class="pwa-filter-pill {% if selected_days == 30 or not selected_days %}pwa-filter-pill--active{% endif %}">30 Days</a>
+    <a href="?days=90" class="pwa-filter-pill {% if selected_days == 90 %}pwa-filter-pill--active{% endif %}">90 Days</a>
+  </div>
+
+  <!-- Wallet Card -->
+  <div class="pwa-wallet-card">
+    <div class="pwa-wallet-card__header">
+      <span class="pwa-wallet-card__label">Wallet Balance</span>
+      <i class="fa-solid fa-wallet"></i>
+    </div>
+    <div class="pwa-wallet-card__balance">{{ wallet_status.wallet_balance|floatformat:2 }} QR</div>
+    <div class="pwa-wallet-card__footer">
+      <div class="pwa-wallet-card__stat">
+        <span class="pwa-wallet-card__stat-label">Credit Limit</span>
+        <span class="pwa-wallet-card__stat-value">{{ wallet_status.credit_limit|floatformat:0 }}</span>
+      </div>
+      <div class="pwa-wallet-card__stat">
+        <span class="pwa-wallet-card__stat-label">Available</span>
+        <span class="pwa-wallet-card__stat-value">{{ wallet_status.available_credit|floatformat:0 }}</span>
+      </div>
+      <div class="pwa-wallet-card__stat">
+        <span class="pwa-wallet-card__stat-label">Usage</span>
+        <span class="pwa-wallet-card__stat-value">{{ wallet_status.usage_percentage|floatformat:0 }}%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- COD Pipeline -->
+  <div class="pwa-section-header mt-4">
+    <h4 class="pwa-section-title">COD Pipeline</h4>
+  </div>
+  <div class="pwa-stats-row">
+    <div class="pwa-stat-card">
+      <div class="pwa-stat-card__icon" style="background: var(--brand-warning-light, #fff3cd);">
+        <i class="fas fa-arrow-down" style="color: var(--brand-warning, #ffc107);"></i>
+      </div>
+      <div class="pwa-stat-card__value">{{ cod_collected|floatformat:0 }}</div>
+      <div class="pwa-stat-card__label">Collected</div>
+    </div>
+    <div class="pwa-stat-card">
+      <div class="pwa-stat-card__icon" style="background: var(--brand-success-light, #d1e7dd);">
+        <i class="fas fa-arrow-up" style="color: var(--brand-success, #198754);"></i>
+      </div>
+      <div class="pwa-stat-card__value">{{ cod_deposited|floatformat:0 }}</div>
+      <div class="pwa-stat-card__label">Deposited</div>
+    </div>
+    <div class="pwa-stat-card">
+      <div class="pwa-stat-card__icon" style="background: #fce4ec;">
+        <i class="fas fa-rotate-left" style="color: #e53935;"></i>
+      </div>
+      <div class="pwa-stat-card__value">{{ cod_returned|floatformat:0 }}</div>
+      <div class="pwa-stat-card__label">Returned</div>
+    </div>
+  </div>
+  <div class="pwa-wallet-card mt-2" style="background: linear-gradient(135deg, #ff9800, #f57c00);">
+    <div class="pwa-wallet-card__header">
+      <span class="pwa-wallet-card__label">COD in Hand</span>
+      <i class="fa-solid fa-hand-holding-dollar"></i>
+    </div>
+    <div class="pwa-wallet-card__balance">{{ wallet_status.cod_in_hand|floatformat:2 }} QR</div>
+  </div>
+
+  <!-- Earnings Summary -->
+  <div class="pwa-section-header mt-4">
+    <h4 class="pwa-section-title">Earnings</h4>
+  </div>
+  <div class="pwa-transaction-list">
+    <div class="pwa-transaction-item">
+      <div class="pwa-transaction-item__icon pwa-transaction-item__icon--success">
+        <i class="fas fa-coins"></i>
+      </div>
+      <div class="pwa-transaction-item__details">
+        <div class="pwa-transaction-item__title">Total Earned</div>
+        <div class="pwa-transaction-item__subtitle">Last {{ selected_days }} days</div>
+      </div>
+      <div class="pwa-transaction-item__amount pwa-text-success">{{ earnings_total|floatformat:2 }} QR</div>
+    </div>
+    <div class="pwa-transaction-item">
+      <div class="pwa-transaction-item__icon" style="background: #e8eaf6;"><i class="fas fa-university" style="color: #5c6bc0;"></i></div>
+      <div class="pwa-transaction-item__details">
+        <div class="pwa-transaction-item__title">Settlements Paid</div>
+      </div>
+      <div class="pwa-transaction-item__amount">{{ settlements_total|floatformat:2 }} QR</div>
+    </div>
+    <div class="pwa-transaction-item">
+      <div class="pwa-transaction-item__icon" style="background: #e8f5e9;"><i class="fas fa-gift" style="color: #43a047;"></i></div>
+      <div class="pwa-transaction-item__details">
+        <div class="pwa-transaction-item__title">Bonuses</div>
+      </div>
+      <div class="pwa-transaction-item__amount pwa-text-success">{{ bonuses_total|floatformat:2 }} QR</div>
+    </div>
+    <div class="pwa-transaction-item">
+      <div class="pwa-transaction-item__icon pwa-transaction-item__icon--danger">
+        <i class="fas fa-minus"></i>
+      </div>
+      <div class="pwa-transaction-item__details">
+        <div class="pwa-transaction-item__title">Deductions</div>
+      </div>
+      <div class="pwa-transaction-item__amount" style="color: var(--brand-danger, #dc3545);">{{ deductions_total|floatformat:2 }} QR</div>
+    </div>
+  </div>
+  <div class="pwa-wallet-card mt-2" style="background: linear-gradient(135deg, #4caf50, #388e3c);">
+    <div class="pwa-wallet-card__header">
+      <span class="pwa-wallet-card__label">Pending Earnings</span>
+      <i class="fa-solid fa-clock"></i>
+    </div>
+    <div class="pwa-wallet-card__balance">{{ wallet_status.pending_earnings|floatformat:2 }} QR</div>
+  </div>
+
+  <!-- Recent Transactions -->
+  <div class="pwa-section-header mt-4">
+    <h4 class="pwa-section-title">Recent Transactions</h4>
+    <a href="{% url 'fleet:transaction_history' %}" class="pwa-text-muted">View All</a>
+  </div>
+
+  <div class="txn-list">
+    {% for txn in recent_transactions %}
+    <div class="txn-item">
+      <div class="txn-item__icon txn-item__icon--{% if txn.transaction_type == 'earning' %}green{% elif txn.transaction_type == 'bonus' %}blue{% elif txn.transaction_type == 'cod_collection' %}orange{% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}yellow{% elif txn.transaction_type == 'cod_return' %}orange{% elif txn.transaction_type == 'settlement' %}purple{% elif txn.transaction_type == 'deduction' %}red{% else %}gray{% endif %}">
+        {% if txn.transaction_type == 'earning' %}<i class="fas fa-coins"></i>
+        {% elif txn.transaction_type == 'bonus' %}<i class="fas fa-gift"></i>
+        {% elif txn.transaction_type == 'cod_collection' %}<i class="fas fa-arrow-down"></i>
+        {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}<i class="fas fa-arrow-up"></i>
+        {% elif txn.transaction_type == 'cod_return' %}<i class="fas fa-rotate-left"></i>
+        {% elif txn.transaction_type == 'settlement' %}<i class="fas fa-university"></i>
+        {% elif txn.transaction_type == 'deduction' %}<i class="fas fa-minus"></i>
+        {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
+      </div>
+      <div class="txn-item__info">
+        <div class="txn-item__title">{{ txn.get_transaction_type_display }}</div>
+        <div class="txn-item__meta">
+          <span style="font-family: monospace; font-size: 0.7rem;">{{ txn.transaction_code|default:"-" }}</span>
+          <span class="txn-item__dot"></span>
+          {{ txn.created_at|date:"d M" }}
+        </div>
+      </div>
+      <div class="txn-item__amount {% if txn.amount >= 0 %}txn-item__amount--plus{% else %}txn-item__amount--minus{% endif %}">
+        {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} <small>QR</small>
+      </div>
+    </div>
+    {% empty %}
+    <div class="txn-empty">
+      <i class="fas fa-receipt"></i>
+      <p>No transactions yet</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="pwa-section-header mt-4">
+    <h4 class="pwa-section-title">Quick Actions</h4>
+  </div>
+  <div class="d-flex gap-2 flex-wrap mb-4">
+    <a href="{% url 'fleet:cod_submission' %}" class="btn btn-warning btn-sm flex-fill"><i class="fas fa-arrow-up me-1"></i> Submit COD</a>
+    <a href="{% url 'fleet:cod_collection' %}" class="btn btn-outline-warning btn-sm flex-fill"><i class="fas fa-money-bill me-1"></i> COD History</a>
+    <a href="{% url 'fleet:driver_earnings' %}" class="btn btn-outline-success btn-sm flex-fill"><i class="fas fa-coins me-1"></i> Earnings</a>
+    <a href="{% url 'fleet:transaction_history' %}" class="btn btn-outline-primary btn-sm flex-fill"><i class="fas fa-list me-1"></i> All Transactions</a>
+  </div>
+</div>
+
+<!-- Desktop View -->
+<div class="d-none d-md-block">
+  <div class="container-fluid py-4">
+    <div class="row mb-4">
+      <div class="col-12 d-flex justify-content-between align-items-center">
+        <div>
+          <h1 class="h3 mb-0">Finance Summary</h1>
+          <p class="text-muted mb-0">Overview of your financial activity</p>
+        </div>
+        <form method="GET" class="d-flex gap-2">
+          <select name="days" class="form-select" style="max-width: 160px;" onchange="this.form.submit()">
+            <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
+            <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
+            <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
+            <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
+          </select>
+        </form>
+      </div>
+    </div>
+
+    <!-- Wallet Overview Cards -->
+    <div class="row mb-4">
+      <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <h6 class="text-muted mb-2">Wallet Balance</h6>
+              <i class="fas fa-wallet text-primary"></i>
+            </div>
+            <h3 class="mb-1">{{ wallet_status.wallet_balance|floatformat:2 }} QR</h3>
+            <small class="text-muted">Credit Limit: {{ wallet_status.credit_limit|floatformat:0 }} QR</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <h6 class="text-muted mb-2">COD in Hand</h6>
+              <i class="fas fa-hand-holding-dollar text-warning"></i>
+            </div>
+            <h3 class="mb-1">{{ wallet_status.cod_in_hand|floatformat:2 }} QR</h3>
+            <small class="text-muted">Available Credit: {{ wallet_status.available_credit|floatformat:0 }} QR</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <h6 class="text-muted mb-2">Pending Earnings</h6>
+              <i class="fas fa-clock text-success"></i>
+            </div>
+            <h3 class="mb-1">{{ wallet_status.pending_earnings|floatformat:2 }} QR</h3>
+            <small class="text-muted">Total: {{ wallet_status.total_earnings|floatformat:0 }} QR</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 {% if wallet_status.is_blocked %}border-danger{% elif wallet_status.is_warning %}border-warning{% else %}border-info{% endif %}">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <h6 class="text-muted mb-2">Wallet Usage</h6>
+              <i class="fas fa-gauge-high {% if wallet_status.is_blocked %}text-danger{% elif wallet_status.is_warning %}text-warning{% else %}text-info{% endif %}"></i>
+            </div>
+            <h3 class="mb-1">{{ wallet_status.usage_percentage|floatformat:1 }}%</h3>
+            <small class="{% if wallet_status.is_blocked %}text-danger{% elif wallet_status.is_warning %}text-warning{% else %}text-muted{% endif %}">
+              {% if wallet_status.is_blocked %}Wallet Blocked{% elif wallet_status.is_warning %}Warning - Submit COD{% else %}Normal{% endif %}
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mb-4">
+      <!-- COD Pipeline -->
+      <div class="col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">COD Pipeline</h5>
+            <a href="{% url 'fleet:cod_collection' %}" class="btn btn-sm btn-outline-warning">View Details</a>
+          </div>
+          <div class="card-body">
+            <div class="row text-center">
+              <div class="col-4">
+                <div class="p-3 rounded" style="background: #fff3cd;">
+                  <i class="fas fa-arrow-down fa-2x text-warning mb-2 d-block"></i>
+                  <h4 class="mb-0">{{ cod_collected|floatformat:0 }}</h4>
+                  <small class="text-muted">Collected</small>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="p-3 rounded" style="background: #d1e7dd;">
+                  <i class="fas fa-arrow-up fa-2x text-success mb-2 d-block"></i>
+                  <h4 class="mb-0">{{ cod_deposited|floatformat:0 }}</h4>
+                  <small class="text-muted">Deposited</small>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="p-3 rounded" style="background: #fce4ec;">
+                  <i class="fas fa-rotate-left fa-2x mb-2 d-block" style="color: #e53935;"></i>
+                  <h4 class="mb-0">{{ cod_returned|floatformat:0 }}</h4>
+                  <small class="text-muted">Returned</small>
+                </div>
+              </div>
+            </div>
+            <div class="mt-3">
+              <a href="{% url 'fleet:cod_submission' %}" class="btn btn-warning w-100">
+                <i class="fas fa-arrow-up me-1"></i> Submit COD to Admin
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Earnings Summary -->
+      <div class="col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Earnings Summary</h5>
+            <a href="{% url 'fleet:driver_earnings' %}" class="btn btn-sm btn-outline-success">View Details</a>
+          </div>
+          <div class="card-body">
+            <table class="table table-borderless mb-0">
+              <tbody>
+                <tr>
+                  <td><i class="fas fa-coins text-success me-2"></i> Delivery Earnings</td>
+                  <td class="text-end fw-bold text-success">{{ earnings_total|floatformat:2 }} QR</td>
+                </tr>
+                <tr>
+                  <td><i class="fas fa-gift text-info me-2"></i> Bonuses</td>
+                  <td class="text-end fw-bold text-info">{{ bonuses_total|floatformat:2 }} QR</td>
+                </tr>
+                <tr>
+                  <td><i class="fas fa-minus text-danger me-2"></i> Deductions</td>
+                  <td class="text-end fw-bold text-danger">{{ deductions_total|floatformat:2 }} QR</td>
+                </tr>
+                <tr class="border-top">
+                  <td><i class="fas fa-university text-secondary me-2"></i> Settlements Paid</td>
+                  <td class="text-end fw-bold">{{ settlements_total|floatformat:2 }} QR</td>
+                </tr>
+                <tr class="border-top">
+                  <td class="fw-bold"><i class="fas fa-clock text-success me-2"></i> Pending Earnings</td>
+                  <td class="text-end fw-bold text-success fs-5">{{ wallet_status.pending_earnings|floatformat:2 }} QR</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transaction Breakdown + Recent Transactions -->
+    <div class="row">
+      <!-- Transaction Breakdown by Type -->
+      <div class="col-md-4 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-white">
+            <h5 class="mb-0">Transaction Breakdown</h5>
+          </div>
+          <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+              {% for tc in type_counts %}
+              <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                  <span class="badge bg-secondary me-2">{{ tc.count }}</span>
+                  {{ tc.transaction_type|title }}
+                </div>
+                <span class="fw-bold {% if tc.total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                  {{ tc.total|floatformat:0 }} QR
+                </span>
+              </div>
+              {% empty %}
+              <div class="list-group-item text-center text-muted py-4">
+                No transactions in this period
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Transactions -->
+      <div class="col-md-8 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Recent Transactions</h5>
+            <a href="{% url 'fleet:transaction_history' %}" class="btn btn-sm btn-outline-primary">View All</a>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead class="bg-light">
+                  <tr>
+                    <th>Date</th>
+                    <th>Code</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th class="text-end">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for txn in recent_transactions %}
+                  <tr>
+                    <td><small>{{ txn.created_at|date:"d M" }}<br>{{ txn.created_at|time:"H:i" }}</small></td>
+                    <td><code style="font-size: 0.75rem;">{{ txn.transaction_code|default:"-" }}</code></td>
+                    <td>
+                      <span class="badge
+                        {% if txn.transaction_type == 'earning' %}bg-success
+                        {% elif txn.transaction_type == 'bonus' %}bg-info
+                        {% elif txn.transaction_type == 'cod_collection' %}bg-warning text-dark
+                        {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}bg-primary
+                        {% elif txn.transaction_type == 'cod_return' %}bg-warning text-dark
+                        {% elif txn.transaction_type == 'settlement' %}bg-secondary
+                        {% elif txn.transaction_type == 'deduction' %}bg-danger
+                        {% else %}bg-dark{% endif %}">
+                        {{ txn.get_transaction_type_display }}
+                      </span>
+                    </td>
+                    <td><small>{{ txn.description|default:"-"|truncatechars:40 }}</small></td>
+                    <td class="text-end">
+                      {% if txn.amount >= 0 %}
+                      <span class="text-success fw-bold">+{{ txn.amount|floatformat:2 }} QR</span>
+                      {% else %}
+                      <span class="text-danger fw-bold">{{ txn.amount|floatformat:2 }} QR</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                      <i class="fas fa-receipt fa-2x mb-2 d-block"></i>
+                      No transactions found
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

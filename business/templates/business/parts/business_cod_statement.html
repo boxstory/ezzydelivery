@@ -1,0 +1,172 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}COD Statement{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+      <div>
+        <h1 class="h3 mb-0">COD Statement</h1>
+        <p class="text-muted mb-0">{{ business.business_name }} - Cash on Delivery Summary</p>
+      </div>
+      <form method="GET" class="d-flex gap-2">
+        <select name="days" class="form-select" style="max-width: 160px;" onchange="this.form.submit()">
+          <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
+          <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
+          <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
+          <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
+        </select>
+      </form>
+    </div>
+  </div>
+
+  <!-- COD Summary Cards -->
+  <div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-3">
+      <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
+        <div class="card-body">
+          <h6 class="text-muted mb-2">Total COD Orders</h6>
+          <h3 class="mb-0">{{ stats.total|default:0 }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+      <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
+        <div class="card-body">
+          <h6 class="text-muted mb-2">COD Collected</h6>
+          <h3 class="mb-0">{{ stats.total_cod|default:0|floatformat:2 }} QR</h3>
+          <small class="text-muted">{{ stats.collected|default:0 }} orders</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+      <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
+        <div class="card-body">
+          <h6 class="text-muted mb-2">Settled to You</h6>
+          <h3 class="mb-0">{{ total_settled|floatformat:2 }} QR</h3>
+          <small class="text-muted">{{ stats.settled_driver|default:0 }} orders</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+      <div class="card border-0 shadow-sm h-100 border-start border-4 {% if stats.total_cod and total_settled < stats.total_cod %}border-danger{% else %}border-secondary{% endif %}">
+        <div class="card-body">
+          <h6 class="text-muted mb-2">Pending Settlement</h6>
+          {% with pending=stats.total_cod|default:0 %}
+          <h3 class="mb-0">{{ pending|floatformat:2 }} QR</h3>
+          {% endwith %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settlement History -->
+  {% if settlements %}
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="fas fa-handshake me-2 text-success"></i>COD Settlements</h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="bg-light">
+                <tr>
+                  <th>Date</th>
+                  <th>Transaction Code</th>
+                  <th>Description</th>
+                  <th>Processed By</th>
+                  <th class="text-end">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for s in settlements %}
+                <tr>
+                  <td>{{ s.created_at|date:"d M Y" }} <small class="text-muted">{{ s.created_at|time:"H:i" }}</small></td>
+                  <td><code>{{ s.transaction_code|default:"-" }}</code></td>
+                  <td>{{ s.description|default:"-" }}</td>
+                  <td>{{ s.created_by.first_name|default:"-" }}</td>
+                  <td class="text-end fw-bold text-success">{{ s.amount|floatformat:2 }} QR</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- COD Deliveries List -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="fas fa-money-bill me-2 text-warning"></i>COD Deliveries</h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="bg-light">
+                <tr>
+                  <th>Date</th>
+                  <th>Task #</th>
+                  <th>Order #</th>
+                  <th>Driver</th>
+                  <th>COD Amount</th>
+                  <th>Collected</th>
+                  <th>Driver Settled</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for task in cod_deliveries %}
+                <tr>
+                  <td>{{ task.dl_task_date|date:"d M Y" }}</td>
+                  <td><span class="fw-bold text-primary">#{{ task.dl_task_number }}</span></td>
+                  <td>
+                    {% if task.order %}
+                    #{{ task.order.order_number|default:"-" }}
+                    {% else %}-{% endif %}
+                  </td>
+                  <td>
+                    {% if task.driver %}
+                    {{ task.driver.user.first_name|default:"-" }}
+                    {% else %}-{% endif %}
+                  </td>
+                  <td>{{ task.cod_collected_amount|default:0|floatformat:2 }} QR</td>
+                  <td>
+                    {% if task.cod_collected %}
+                    <span class="badge bg-success">Yes</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark">Pending</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if task.cod_settled %}
+                    <span class="badge bg-success">Settled</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Pending</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="7" class="text-center text-muted py-4">
+                    <i class="fas fa-money-bill fa-2x mb-2 d-block"></i>
+                    No COD deliveries found
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

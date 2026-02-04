@@ -486,9 +486,17 @@ body.fleet-mobile {
 }
 
 .pwa-task-card__id {
-  font-size: 12px;
+  font-size: clamp(9px, 2.5vw, 12px);
   font-weight: 600;
   color: var(--pwa-navy);
+  word-break: break-all;
+  cursor: pointer;
+}
+
+.dl-number-fit {
+  font-size: clamp(10px, 2.5vw, 14px);
+  word-break: break-all;
+  cursor: pointer;
 }
 
 .pwa-task-card__status {
@@ -521,6 +529,31 @@ body.fleet-mobile {
 
 .pwa-task-card__body {
   padding: 12px 16px;
+}
+
+.pwa-task-card__business {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pwa-navy);
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--pwa-border);
+  line-height: 1.4;
+}
+
+.pwa-task-card__business span {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.pwa-task-card__business i {
+  font-size: 12px;
+  color: var(--pwa-text-muted);
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .pwa-task-card__route {
@@ -578,6 +611,9 @@ body.fleet-mobile {
   font-size: 14px;
   font-weight: 500;
   color: var(--pwa-text-primary);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.4;
 }
 
 .pwa-task-card__footer {
@@ -2117,6 +2153,12 @@ body.fleet-mobile {
   border: 1px solid #e0e0e0;
 }
 
+.task-tabs--three a.task-tab {
+  padding: 10px 6px;
+  font-size: 13px;
+  gap: 4px;
+}
+
 a.task-tab {
   flex: 1;
   display: flex;
@@ -2170,39 +2212,49 @@ a.task-tab.task-tab--active {
 /* Task Filters */
 .task-filters {
   display: flex;
-  gap: 6px;
-  padding: 0 12px;
-  margin-bottom: 8px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-
-.task-filters::-webkit-scrollbar {
-  display: none;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 8px;
+  margin-bottom: 6px;
 }
 
 .task-filters--secondary {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 a.task-filter {
-  flex-shrink: 0;
   display: inline-block;
-  padding: 8px 16px;
-  font-size: 13px;
+  padding: 5px 12px;
+  font-size: 14px;
   font-weight: 500;
   color: #333 !important;
   text-decoration: none !important;
   background: #ffffff;
   border: 1px solid #d0d0d0;
-  border-radius: 20px;
+  border-radius: 10px;
   transition: all 0.2s;
 }
 
 a.task-filter.task-filter--sm {
-  padding: 6px 14px;
+  padding: 5px 10px;
+  font-size: 14px;
+}
+
+a.task-filter.task-filter--xs {
+  padding: 4px 8px;
   font-size: 12px;
+  border-radius: 8px;
+}
+
+.task-filters--compact {
+  margin-bottom: 4px;
+  gap: 3px;
+}
+
+.task-filter-divider {
+  color: #ccc;
+  font-size: 12px;
+  padding: 0 2px;
 }
 
 a.task-filter.task-filter--active {
@@ -2596,4 +2648,66 @@ a.task-filter:hover:not(.task-filter--active) {
     padding: 6px 12px;
     font-size: 12px;
   }
+}
+
+/* ========================================
+   Square Checkboxes - Override Bootstrap
+   ======================================== */
+.pwa-content .form-check-input,
+.pwa-content input[type="checkbox"],
+.pwa-transaction-list .form-check-input,
+.pwa-transaction-list input[type="checkbox"],
+.mob-cod-checkbox,
+#mob-cod-select-all {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  max-width: 18px !important;
+  border: 2px solid #9ca3af !important;
+  border-radius: 3px !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  cursor: pointer !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  position: relative !important;
+}
+
+.pwa-content .form-check-input:checked,
+.pwa-content input[type="checkbox"]:checked,
+.mob-cod-checkbox:checked,
+#mob-cod-select-all:checked {
+  background-color: #f7c000 !important;
+  border-color: #f7c000 !important;
+  background-image: none !important;
+}
+
+.pwa-content .form-check-input:checked::before,
+.pwa-content input[type="checkbox"]:checked::before,
+.mob-cod-checkbox:checked::before,
+#mob-cod-select-all:checked::before {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  top: 1px !important;
+  left: 5px !important;
+  width: 5px !important;
+  height: 9px !important;
+  border: solid #1f1f1f !important;
+  border-width: 0 2px 2px 0 !important;
+  transform: rotate(45deg) !important;
+}
+
+.pwa-content .form-check-input:focus,
+.mob-cod-checkbox:focus,
+#mob-cod-select-all:focus {
+  border-color: #f7c000 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.3) !important;
 }

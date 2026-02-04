@@ -1631,6 +1631,194 @@ def list_integrations(request):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def import_tiktokshop_orders(request):
+    """
+    Import orders from TikTok Shop.
+
+    Request body:
+        - business_id: Business ID (required)
+        - order_status: Filter by status (optional, e.g., AWAITING_SHIPMENT)
+        - start_date: Start date for order filter (optional)
+        - end_date: End date for order filter (optional)
+        - limit: Max orders to import (optional, default 50)
+
+    Returns:
+        - imported_order_ids: List of imported order IDs
+        - errors: List of error messages
+    """
+    from ezzy_api.tiktok_shop_service import TikTokShopService, create_order_from_tiktok, TikTokShopAPIError
+
+    business_id = request.data.get('business_id')
+    order_status = request.data.get('order_status')
+    start_date = request.data.get('start_date')
+    end_date = request.data.get('end_date')
+    limit = request.data.get('limit', 50)
+
+    if not business_id:
+        return Response(
+            {'error': 'business_id is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        business = business_models.Business.objects.get(business_id=business_id)
+        api_settings = business_models.BusinessApiSettings.objects.filter(
+            business=business,
+            api_type='tiktokshop',
+            is_verify_api=True
+        ).first()
+
+        if not api_settings:
+            return Response(
+                {'error': 'TikTok Shop API settings not found or not verified'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Initialize TikTok Shop service
+        service = TikTokShopService(api_settings)
+
+        # Check if token needs refresh
+        if api_settings.tiktok_token_expires_at:
+            if timezone.now() >= api_settings.tiktok_token_expires_at - timedelta(hours=1):
+                service.refresh_access_token()
+
+        imported_orders = []
+        errors = []
+
+        # Convert dates to timestamps if provided
+        create_time_from = None
+        create_time_to = None
+        if start_date:
+            create_time_from = int(datetime.fromisoformat(start_date).timestamp())
+        if end_date:
+            create_time_to = int(datetime.fromisoformat(end_date).timestamp())
+
+        # Fetch orders from TikTok Shop
+        page_token = None
+        total_imported = 0
+
+        while total_imported < limit:
+            try:
+                result = service.get_orders(
+                    order_status=order_status,
+                    create_time_from=create_time_from,
+                    create_time_to=create_time_to,
+                    page_size=min(100, limit - total_imported),
+                    page_token=page_token
+                )
+
+                orders = result.get('orders', [])
+                if not orders:
+                    break
+
+                for tiktok_order in orders:
+                    try:
+                        order = create_order_from_tiktok(tiktok_order, business)
+                        if order:
+                            imported_orders.append(order.id)
+                            total_imported += 1
+                    except Exception as e:
+                        errors.append(f"Order {tiktok_order.get('order_id')}: {str(e)}")
+
+                page_token = result.get('next_page_token')
+                if not page_token:
+                    break
+
+            except TikTokShopAPIError as e:
+                errors.append(f"API Error: {e.message}")
+                break
+
+        # Update integration status
+        integration, created = ezzy_api_models.EcommerceIntegration.objects.get_or_create(
+            business=business,
+            platform='tiktokshop',
+            defaults={'api_settings': api_settings}
+        )
+        integration.last_sync = timezone.now()
+        integration.sync_status = 'active' if not errors else 'error'
+        integration.sync_error = '\n'.join(errors) if errors else None
+        integration.total_orders_imported += len(imported_orders)
+        integration.save()
+
+        return Response({
+            'message': f'Imported {len(imported_orders)} orders from TikTok Shop',
+            'imported_order_ids': imported_orders,
+            'errors': errors
+        }, status=status.HTTP_200_OK)
+
+    except business_models.Business.DoesNotExist:
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'TikTok Shop import failed: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def test_tiktokshop_connection(request):
+    """
+    Test TikTok Shop API connection.
+
+    Request body:
+        - business_id: Business ID (required)
+
+    Returns:
+        - success: Boolean indicating connection success
+        - message: Status message
+    """
+    from ezzy_api.tiktok_shop_service import TikTokShopService
+
+    business_id = request.data.get('business_id')
+
+    if not business_id:
+        return Response(
+            {'error': 'business_id is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        business = business_models.Business.objects.get(business_id=business_id)
+        api_settings = business_models.BusinessApiSettings.objects.filter(
+            business=business,
+            api_type='tiktokshop'
+        ).first()
+
+        if not api_settings:
+            return Response(
+                {'error': 'TikTok Shop API settings not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Test connection
+        service = TikTokShopService(api_settings)
+        result = service.test_connection()
+
+        if result.get('success'):
+            # Mark API as verified
+            api_settings.is_verify_api = True
+            api_settings.save()
+
+        return Response(result, status=status.HTTP_200_OK)
+
+    except business_models.Business.DoesNotExist:
+        return Response(
+            {'error': 'Business not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'success': False, 'message': f'Connection test failed: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 # ==================== HELPER FUNCTIONS ====================
 
 def _create_order_from_shopify(shopify_order, business):

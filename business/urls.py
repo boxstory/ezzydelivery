@@ -33,7 +33,7 @@ urlpatterns = [
          name='business_settings_api_update'),
     path('<int:business_id>/settings/api/<int:api_id>/test/', business_views.business_settings_api_test,
          name='business_settings_api_test'),
-    path('<int:business_id>/settings/api/<int:api_id>/test/result', business_views.business_settings_api_test_result,
+    path('<int:business_id>/settings/api/<int:api_id>/test/result/', business_views.business_settings_api_test_result,
          name='business_settings_api_test_result'),
     path('<int:business_id>/settings/api/<int:api_id>/delete/', business_views.business_settings_api_delete,
          name='business_settings_api_delete'),
@@ -85,5 +85,10 @@ urlpatterns = [
     # business selector (for users with multiple businesses)
     path('selector/', business_views.business_selector, name='business_selector'),
     path('switch/<int:business_id>/', business_views.business_switch, name='business_switch'),
+
+    # Finance section
+    path('finance/', business_views.business_finance_dashboard, name='business_finance_dashboard'),
+    path('finance/transactions/', business_views.business_transactions, name='business_transactions'),
+    path('finance/cod-statement/', business_views.business_cod_statement, name='business_cod_statement'),
 
 ]

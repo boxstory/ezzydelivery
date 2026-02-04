@@ -30,7 +30,8 @@
     <a href="?type=all&days={{ selected_days }}" class="txn-tab {% if selected_type == 'all' %}txn-tab--active{% endif %}">All</a>
     <a href="?type=earning&days={{ selected_days }}" class="txn-tab {% if selected_type == 'earning' %}txn-tab--active{% endif %}">Earned</a>
     <a href="?type=cod_collection&days={{ selected_days }}" class="txn-tab {% if selected_type == 'cod_collection' %}txn-tab--active{% endif %}">COD In</a>
-    <a href="?type=cod_deposit&days={{ selected_days }}" class="txn-tab {% if selected_type == 'cod_deposit' %}txn-tab--active{% endif %}">COD Out</a>
+    <a href="?type=cod_deposit&days={{ selected_days }}" class="txn-tab {% if selected_type == 'cod_deposit' or selected_type == 'cod_driver_settle' %}txn-tab--active{% endif %}">COD Out</a>
+    <a href="?type=cod_return&days={{ selected_days }}" class="txn-tab {% if selected_type == 'cod_return' %}txn-tab--active{% endif %}">Returns</a>
   </div>
 
   <!-- Period Selector -->
@@ -51,13 +52,18 @@
 
     {% for txn in transactions %}
     <div class="txn-item">
-      <div class="txn-item__icon txn-item__icon--{% if txn.transaction_type == 'earning' %}green{% elif txn.transaction_type == 'bonus' %}blue{% elif txn.transaction_type == 'cod_collection' %}orange{% elif txn.transaction_type == 'cod_deposit' %}yellow{% elif txn.transaction_type == 'settlement' %}purple{% elif txn.transaction_type == 'deduction' %}red{% else %}gray{% endif %}">
+      <div class="txn-item__icon txn-item__icon--{% if txn.transaction_type == 'earning' %}green{% elif txn.transaction_type == 'bonus' %}blue{% elif txn.transaction_type == 'cod_collection' %}orange{% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}yellow{% elif txn.transaction_type == 'cod_return' %}orange{% elif txn.transaction_type == 'settlement' %}purple{% elif txn.transaction_type == 'deduction' %}red{% elif txn.transaction_type == 'delivery_charge' or txn.transaction_type == 'fulfillment_charge' %}blue{% else %}gray{% endif %}">
         {% if txn.transaction_type == 'earning' %}<i class="fas fa-coins"></i>
         {% elif txn.transaction_type == 'bonus' %}<i class="fas fa-gift"></i>
         {% elif txn.transaction_type == 'cod_collection' %}<i class="fas fa-arrow-down"></i>
-        {% elif txn.transaction_type == 'cod_deposit' %}<i class="fas fa-arrow-up"></i>
+        {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}<i class="fas fa-arrow-up"></i>
+        {% elif txn.transaction_type == 'cod_return' %}<i class="fas fa-rotate-left"></i>
+        {% elif txn.transaction_type == 'cod_client_settle' %}<i class="fas fa-handshake"></i>
         {% elif txn.transaction_type == 'settlement' %}<i class="fas fa-university"></i>
         {% elif txn.transaction_type == 'deduction' %}<i class="fas fa-minus"></i>
+        {% elif txn.transaction_type == 'delivery_charge' %}<i class="fas fa-truck"></i>
+        {% elif txn.transaction_type == 'fulfillment_charge' %}<i class="fas fa-box"></i>
+        {% elif txn.transaction_type == 'inventory_handling' %}<i class="fas fa-warehouse"></i>
         {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
       </div>
       <div class="txn-item__info">
@@ -132,8 +138,8 @@
         <div class="col-md-4 col-sm-6 mb-3">
             <div class="card border-0 shadow-sm h-100 border-start border-success border-3">
                 <div class="card-body">
-                    <h6 class="text-muted mb-2">Available Balance</h6>
-                    <h3 class="mb-0">{{ wallet_status.available_balance|default:0|floatformat:2 }} QR</h3>
+                    <h6 class="text-muted mb-2">Wallet Balance</h6>
+                    <h3 class="mb-0">{{ wallet_status.wallet_balance|default:0|floatformat:2 }} QR</h3>
                 </div>
             </div>
         </div>
@@ -141,15 +147,15 @@
             <div class="card border-0 shadow-sm h-100 border-start border-warning border-3">
                 <div class="card-body">
                     <h6 class="text-muted mb-2">COD in Hand</h6>
-                    <h3 class="mb-0">{{ wallet_status.cod_balance|default:0|floatformat:2 }} QR</h3>
+                    <h3 class="mb-0">{{ wallet_status.cod_in_hand|default:0|floatformat:2 }} QR</h3>
                 </div>
             </div>
         </div>
         <div class="col-md-4 col-sm-6 mb-3">
             <div class="card border-0 shadow-sm h-100 border-start border-info border-3">
                 <div class="card-body">
-                    <h6 class="text-muted mb-2">Pending Settlement</h6>
-                    <h3 class="mb-0">{{ wallet_status.pending_settlement|default:0|floatformat:2 }} QR</h3>
+                    <h6 class="text-muted mb-2">Pending Earnings</h6>
+                    <h3 class="mb-0">{{ wallet_status.pending_earnings|default:0|floatformat:2 }} QR</h3>
                 </div>
             </div>
         </div>
@@ -186,9 +192,14 @@
                                             {% if txn.transaction_type == 'earning' %}bg-success
                                             {% elif txn.transaction_type == 'bonus' %}bg-info
                                             {% elif txn.transaction_type == 'cod_collection' %}bg-warning text-dark
-                                            {% elif txn.transaction_type == 'cod_deposit' %}bg-primary
+                                            {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}bg-primary
+                                            {% elif txn.transaction_type == 'cod_return' %}bg-warning text-dark
+                                            {% elif txn.transaction_type == 'cod_client_settle' %}bg-primary
                                             {% elif txn.transaction_type == 'settlement' %}bg-secondary
                                             {% elif txn.transaction_type == 'deduction' %}bg-danger
+                                            {% elif txn.transaction_type == 'delivery_charge' or txn.transaction_type == 'fulfillment_charge' %}bg-info
+                                            {% elif txn.transaction_type == 'inventory_handling' or txn.transaction_type == 'other_charge' %}bg-secondary
+                                            {% elif txn.transaction_type == 'bills_payable' or txn.transaction_type == 'bills_receivable' %}bg-dark
                                             {% else %}bg-dark{% endif %}">
                                             {{ txn.get_transaction_type_display }}
                                         </span>

@@ -1,0 +1,206 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Finance Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+      <div>
+        <h1 class="h3 mb-0">Finance Dashboard</h1>
+        <p class="text-muted mb-0">{{ business.business_name }} - Financial Overview</p>
+      </div>
+      <form method="GET" class="d-flex gap-2">
+        <select name="days" class="form-select" style="max-width: 160px;" onchange="this.form.submit()">
+          <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
+          <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
+          <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
+          <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
+        </select>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delivery Summary Cards -->
+  <div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <h6 class="text-muted mb-2">Total Deliveries</h6>
+            <i class="fas fa-truck text-primary"></i>
+          </div>
+          <h3 class="mb-1">{{ delivery_stats.total_deliveries|default:0 }}</h3>
+          <small class="text-muted">Last {{ selected_days }} days</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100 border-start border-4 border-info">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <h6 class="text-muted mb-2">Delivery Charges</h6>
+            <i class="fas fa-file-invoice text-info"></i>
+          </div>
+          <h3 class="mb-1">{{ delivery_stats.total_delivery_charges|default:0|floatformat:2 }} QR</h3>
+          <small class="text-muted">Total billed</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <h6 class="text-muted mb-2">COD Collected</h6>
+            <i class="fas fa-hand-holding-dollar text-warning"></i>
+          </div>
+          <h3 class="mb-1">{{ cod_stats.total_cod|default:0|floatformat:2 }} QR</h3>
+          <small class="text-muted">{{ cod_stats.collected_count|default:0 }} of {{ cod_stats.total_count|default:0 }} orders</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <h6 class="text-muted mb-2">COD Settled to You</h6>
+            <i class="fas fa-handshake text-success"></i>
+          </div>
+          <h3 class="mb-1">{{ cod_client_settled|floatformat:2 }} QR</h3>
+          <small class="text-muted">{{ cod_stats.settled_count|default:0 }} orders settled</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charges & Bills -->
+  <div class="row mb-4">
+    <!-- Service Charges -->
+    <div class="col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="fas fa-file-invoice me-2 text-info"></i>Service Charges</h5>
+        </div>
+        <div class="card-body">
+          <table class="table table-borderless mb-0">
+            <tbody>
+              {% for charge in charges %}
+              <tr>
+                <td>{{ charge.transaction_type|title }}</td>
+                <td class="text-end fw-bold">{{ charge.total|floatformat:2 }} QR</td>
+                <td class="text-end"><span class="badge bg-secondary">{{ charge.count }}</span></td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="3" class="text-center text-muted py-3">No service charges</td>
+              </tr>
+              {% endfor %}
+              {% if charges %}
+              <tr class="border-top">
+                <td class="fw-bold">Total Charges</td>
+                <td class="text-end fw-bold text-info">{{ total_charges|floatformat:2 }} QR</td>
+                <td></td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bills -->
+    <div class="col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2 text-dark"></i>Billing Summary</h5>
+        </div>
+        <div class="card-body">
+          <table class="table table-borderless mb-0">
+            <tbody>
+              <tr>
+                <td><i class="fas fa-arrow-right text-danger me-2"></i>Amount Owed (Payable)</td>
+                <td class="text-end fw-bold text-danger">{{ bills_payable|floatformat:2 }} QR</td>
+              </tr>
+              <tr>
+                <td><i class="fas fa-arrow-left text-success me-2"></i>Amount Due (Receivable)</td>
+                <td class="text-end fw-bold text-success">{{ bills_receivable|floatformat:2 }} QR</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Transactions -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="fas fa-list me-2"></i>Recent Transactions</h5>
+          <a href="{% url 'business:business_transactions' %}" class="btn btn-sm btn-outline-primary">View All</a>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="bg-light">
+                <tr>
+                  <th>Date</th>
+                  <th>Code</th>
+                  <th>Type</th>
+                  <th>Description</th>
+                  <th class="text-end">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for txn in recent_transactions %}
+                <tr>
+                  <td><small>{{ txn.created_at|date:"d M Y" }}<br>{{ txn.created_at|time:"H:i" }}</small></td>
+                  <td><code style="font-size: 0.75rem;">{{ txn.transaction_code|default:"-" }}</code></td>
+                  <td>
+                    <span class="badge
+                      {% if txn.transaction_type == 'cod_client_settle' %}bg-success
+                      {% elif txn.transaction_type == 'delivery_charge' or txn.transaction_type == 'fulfillment_charge' %}bg-info
+                      {% elif txn.transaction_type == 'bills_payable' %}bg-danger
+                      {% elif txn.transaction_type == 'bills_receivable' %}bg-success
+                      {% else %}bg-dark{% endif %}">
+                      {{ txn.get_transaction_type_display }}
+                    </span>
+                  </td>
+                  <td><small>{{ txn.description|default:"-"|truncatechars:50 }}</small></td>
+                  <td class="text-end">
+                    {% if txn.amount >= 0 %}
+                    <span class="text-success fw-bold">+{{ txn.amount|floatformat:2 }} QR</span>
+                    {% else %}
+                    <span class="text-danger fw-bold">{{ txn.amount|floatformat:2 }} QR</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-4">
+                    <i class="fas fa-receipt fa-2x mb-2 d-block"></i>
+                    No transactions found for this period
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Links -->
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'business:business_transactions' %}" class="btn btn-outline-primary"><i class="fas fa-list me-1"></i> All Transactions</a>
+        <a href="{% url 'business:business_cod_statement' %}" class="btn btn-outline-warning"><i class="fas fa-money-bill me-1"></i> COD Statement</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

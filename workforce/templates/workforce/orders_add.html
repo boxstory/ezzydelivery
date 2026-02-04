@@ -144,13 +144,30 @@
                             {% endif %}
                         </select>
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="order_type">Order Type</label>
+                        <select class="form-input" id="order_type" name="order_type">
+                            <option value="normal_delivery" selected>Normal Delivery</option>
+                            <option value="pick_and_drop">Pick and Drop</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
                         <label class="form-label" for="deadline_date">Delivery Date/Time Preference</label>
                         <input type="text" class="form-input" id="deadline_date" name="deadline_date" placeholder="e.g., Tomorrow, ASAP, Jan 15 evening">
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label class="form-label" for="order_date">Order Date</label>
                         <input type="date" class="form-input" id="order_date" name="order_date" value="{{ today }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="form-check mt-4">
+                            <input type="checkbox" class="form-check-input" id="scheduled_delivery" name="scheduled_delivery" onchange="toggleScheduledTime()">
+                            <label class="form-check-label" for="scheduled_delivery">Scheduled Delivery</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3" id="scheduled_time_container" style="display: none;">
+                        <label class="form-label" for="scheduled_time">Scheduled Time</label>
+                        <input type="time" class="form-input" id="scheduled_time" name="scheduled_time">
                     </div>
                 </div>
 
@@ -196,6 +213,22 @@
 
 {% block extra_js %}
 <script>
+// Toggle scheduled time field visibility
+function toggleScheduledTime() {
+    var checkbox = document.getElementById('scheduled_delivery');
+    var timeContainer = document.getElementById('scheduled_time_container');
+    var timeInput = document.getElementById('scheduled_time');
+
+    if (checkbox.checked) {
+        timeContainer.style.display = 'block';
+        timeInput.required = true;
+    } else {
+        timeContainer.style.display = 'none';
+        timeInput.required = false;
+        timeInput.value = '';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Convert Arabic/Persian numerals to English
     function convertArabicNumerals(text) {

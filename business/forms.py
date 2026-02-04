@@ -113,8 +113,21 @@ class businessRegisterForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.Business
-        fields = '__all__'
-
+        # Fix: Explicitly list allowed fields to prevent mass assignment
+        fields = [
+            'business_name',
+            'business_phone',
+            'business_whatsapp',
+            'business_email',
+            'business_bio',
+            'business_facebook_page',
+            'business_instagram',
+            'business_since',
+            'business_product_category',
+            'business_languages',
+            'business_qid',
+        ]
+        # Exclude sensitive/internal fields
         exclude = ['profile', 'business_id', 'user',
                    'business_status', 'business_code', 'updated_at', 'created_at']
         widgets = {
@@ -201,22 +214,29 @@ class businessApiSettingsForm(forms.ModelForm):
     E-commerce API integration settings form.
 
     Allows businesses to configure API connections to their e-commerce
-    platforms (Shopify, WooCommerce, Magento, etc.) for automatic order import.
+    platforms (Shopify, WooCommerce, TikTok Shop, Magento, etc.) for automatic order import.
 
     Fields:
-        - api_type: Platform type (shopify, woocommerce, magento, etc.)
-        - api_key: API key/consumer key
-        - api_secret: API secret/consumer secret
-        - api_access_token: Access token (Shopify)
-        - api_version: API version
-        - site_api_url: Store URL (with https://)
-        - order_api_endpoint: Order API endpoint path
-        - product_api_endpoint: Product API endpoint path
-        - site_contry: Store country (default: Qatar)
-        - business: Associated business (hidden field)
+        Common Fields:
+            - api_type: Platform type (shopify, woocommerce, tiktokshop, etc.)
+            - api_key: API key/consumer key/App Key
+            - api_secret: API secret/consumer secret/App Secret
+            - api_access_token: Access token
+            - api_version: API version
+            - site_api_url: Store URL (with https://)
+            - order_api_endpoint: Order API endpoint path
+            - product_api_endpoint: Product API endpoint path
+            - site_contry: Store country (default: Qatar)
+
+        TikTok Shop Specific:
+            - tiktok_shop_id: Shop ID from TikTok authorization
+            - tiktok_shop_cipher: Shop cipher for API requests
+            - tiktok_refresh_token: Refresh token for renewing access
 
     Note:
-        is_verify_api is excluded and set automatically after API test.
+        - business is set in the view, not exposed in form
+        - is_verify_api is excluded and set automatically after API test
+        - TikTok fields are only shown when api_type is 'tiktokshop'
 
     Template:
         business/parts/business_settings_api_add.html
@@ -228,17 +248,89 @@ class businessApiSettingsForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.BusinessApiSettings
-        fields = '__all__'
-        exclude = ['is_verify_api']
+        # Fix: Explicitly list allowed fields to prevent mass assignment
+        fields = [
+            'api_type',
+            'api_key',
+            'api_secret',
+            'api_access_token',
+            'api_version',
+            'site_api_url',
+            'order_api_endpoint',
+            'product_api_endpoint',
+            'site_contry',
+            # TikTok Shop specific fields
+            'tiktok_shop_id',
+            'tiktok_shop_cipher',
+            'tiktok_refresh_token',
+        ]
+        # Exclude sensitive/internal fields
+        exclude = ['business', 'is_verify_api', 'tiktok_token_expires_at']
 
         labels = {
-            "api_type": "API Type",
-            "api_key": "API Key",
-            "api_secret": "API Secret",
-            "site_api_url": "Site URL ( with https:// )",
+            "api_type": "Platform Type",
+            "api_key": "API Key / App Key",
+            "api_secret": "API Secret / App Secret",
+            "api_access_token": "Access Token",
+            "api_version": "API Version",
+            "site_api_url": "Site URL (with https://)",
             "order_api_endpoint": "Order API URL",
             "product_api_endpoint": "Product API URL",
+            "site_contry": "Country",
+            "tiktok_shop_id": "TikTok Shop ID",
+            "tiktok_shop_cipher": "TikTok Shop Cipher",
+            "tiktok_refresh_token": "TikTok Refresh Token",
         }
+
+        help_texts = {
+            "api_type": "Select your e-commerce platform",
+            "api_key": "For TikTok Shop: App Key from TikTok Partner Center",
+            "api_secret": "For TikTok Shop: App Secret from TikTok Partner Center",
+            "api_access_token": "OAuth access token (obtained after authorization)",
+            "api_version": "For TikTok Shop: use 202309 or later",
+            "site_api_url": "Your store URL or API endpoint base URL",
+            "tiktok_shop_id": "Obtained from TikTok Shop OAuth authorization",
+            "tiktok_shop_cipher": "Obtained from TikTok Shop OAuth authorization",
+            "tiktok_refresh_token": "Used to refresh access token before expiry",
+        }
+
+        widgets = {
+            'api_type': forms.Select(attrs={'class': 'form-select', 'id': 'api_type_select'}),
+            'api_key': forms.TextInput(attrs={'class': 'form-control'}),
+            'api_secret': forms.PasswordInput(attrs={'class': 'form-control', 'autocomplete': 'off'}, render_value=True),
+            'api_access_token': forms.TextInput(attrs={'class': 'form-control'}),
+            'api_version': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., 202309'}),
+            'site_api_url': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://'}),
+            'order_api_endpoint': forms.TextInput(attrs={'class': 'form-control'}),
+            'product_api_endpoint': forms.TextInput(attrs={'class': 'form-control'}),
+            'site_contry': forms.TextInput(attrs={'class': 'form-control'}),
+            'tiktok_shop_id': forms.TextInput(attrs={'class': 'form-control tiktok-field'}),
+            'tiktok_shop_cipher': forms.TextInput(attrs={'class': 'form-control tiktok-field'}),
+            'tiktok_refresh_token': forms.TextInput(attrs={'class': 'form-control tiktok-field'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make TikTok-specific fields not required by default
+        self.fields['tiktok_shop_id'].required = False
+        self.fields['tiktok_shop_cipher'].required = False
+        self.fields['tiktok_refresh_token'].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        api_type = cleaned_data.get('api_type')
+
+        # Validate TikTok Shop specific requirements
+        if api_type == 'tiktokshop':
+            api_key = cleaned_data.get('api_key')
+            api_secret = cleaned_data.get('api_secret')
+
+            if not api_key:
+                self.add_error('api_key', 'App Key is required for TikTok Shop integration.')
+            if not api_secret:
+                self.add_error('api_secret', 'App Secret is required for TikTok Shop integration.')
+
+        return cleaned_data
 
 
 
@@ -287,7 +379,36 @@ class BusinessProfileForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.BusinessProfile
-        fields = '__all__'
+        # Fix: Explicitly list allowed fields
+        fields = [
+            'business_description',
+            'business_mision',
+            'business_mision_detailed',
+            'business_about_part_1',
+            'business_about_part_2',
+            'business_uniqueness_title',
+            'business_uniqueness_description',
+            'business_address',
+            'business_city',
+            'business_state',
+            'business_zip_code',
+            'business_country',
+            'business_start_date',
+            'business_founters_name',
+            'business_founters_bio',
+            'business_catagory_main',
+            'business_catagory_detailed',
+            'business_website',
+            'business_facebook_page',
+            'business_instagram',
+            'business_tiktok',
+            'business_youtube',
+            'business_twitter',
+            'business_linkedin',
+            'business_snapchat',
+            'business_email',
+            'business_phone',
+        ]
         exclude = ['business', 'updated_at', 'created_at']
         widgets = {
             'business_start_date': forms.DateInput(attrs={
@@ -367,7 +488,8 @@ class BusinessLogoForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.BusinessLogo
-        fields = '__all__'
+        # Fix: Explicitly list allowed fields
+        fields = ['business_logo']
         exclude = ['business', 'updated_at', 'created_at']
             
 
@@ -406,7 +528,17 @@ class PickupLocationsAddForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.PickupLocation
-        fields = '__all__'
+        # Fix: Explicitly list allowed fields
+        fields = [
+            'pickup_location_title',
+            'locality',
+            'pickup_zone_no',
+            'pickup_street_no',
+            'pickup_building_no',
+            'pickup_lat',
+            'pickup_lon',
+            'pickup_status',
+        ]
         exclude = ['business', 'updated_at', 'created_at']
 
 
@@ -427,7 +559,8 @@ class DriverDirectoryAddForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.DriverDirectory
-        fields = '__all__'
+        # Fix: Explicitly list allowed fields
+        fields = ['driver']
         exclude = ['business', 'updated_at', 'created_at']
 
 

@@ -43,10 +43,16 @@ urlpatterns = [
           fleet_views.cod_collection, name='cod_collection'),
      path('cod_submission/',
           fleet_views.cod_submission, name='cod_submission'),
+     path('cod_export/',
+          fleet_views.cod_export, name='cod_export'),
+     path('cod_transaction_detail/',
+          fleet_views.cod_transaction_detail, name='cod_transaction_detail'),
      path('earnings/',
           fleet_views.driver_earnings, name='driver_earnings'),
      path('transactions/',
           fleet_views.transaction_history, name='transaction_history'),
+     path('finance/',
+          fleet_views.fleet_finance_summary, name='fleet_finance_summary'),
 
      # Profile
      path('profile/',
