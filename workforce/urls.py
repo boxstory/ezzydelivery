@@ -101,12 +101,22 @@ urlpatterns = [
     path('dms/analytics/', workforce_views.dms_analytics, name='dms_analytics'),
     path('dms/sync-monitor/', workforce_views.dms_sync_monitor, name='dms_sync_monitor'),
 
+    # Finance Dashboard
+    path('finance/', workforce_views.workforce_finance_dashboard, name='workforce_finance_dashboard'),
+
     # Fleet Accounts URLs
     path('fleet/cod-in-hand/', workforce_views.fleet_cod_in_hand, name='fleet_cod_in_hand'),
     path('fleet/drivers-earnings/', workforce_views.fleet_drivers_earnings, name='fleet_drivers_earnings'),
+    path('fleet/earnings-verification/', workforce_views.earnings_verification, name='earnings_verification'),
+    path('fleet/earnings-verification/action/', workforce_views.earnings_verification_action, name='earnings_verification_action'),
     path('fleet/transactions/', workforce_views.fleet_transactions, name='fleet_transactions'),
     path('fleet/generate-demo-transactions/', workforce_views.generate_demo_transactions, name='generate_demo_transactions'),
     path('fleet/bulk-settle-transactions/', workforce_views.bulk_settle_transactions, name='bulk_settle_transactions'),
+
+    # COD Settlement Report URLs
+    path('fleet/cod-settlement/', workforce_views.cod_settlement_report, name='cod_settlement_report'),
+    path('fleet/cod-settlement/action/', workforce_views.cod_settlement_action, name='cod_settlement_action'),
+    path('fleet/cod-settlement/pdf/', workforce_views.cod_settlement_pdf, name='cod_settlement_pdf'),
 
     # Receipt Templates URLs
     path('receipt-templates/', workforce_views.receipt_templates_list, name='receipt_templates_list'),

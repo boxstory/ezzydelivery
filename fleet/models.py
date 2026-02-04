@@ -277,16 +277,56 @@ class DriverDocument(models.Model):
 
 
 class DriverTransaction(models.Model):
-    """Track all financial transactions for drivers (earnings, COD, settlements)"""
-    TRANSACTION_TYPES = (
-        ('earning', 'Task Earning'),
+    """Track all financial transactions for drivers, businesses, and accounting"""
+
+    # Transaction type prefix mapping for code generation
+    TYPE_PREFIXES = {
+        # COD Transactions
+        'cod_collection': 'CODC',
+        'cod_driver_settle': 'CODS',
+        'cod_client_settle': 'CODCS',
+        'cod_return': 'CODR',
+        # Delivery / Service Charges
+        'delivery_charge': 'DLVC',
+        'fulfillment_charge': 'FULF',
+        'inventory_handling': 'INVH',
+        'other_charge': 'OTHR',
+        # Accounting
+        'bills_payable': 'BPAY',
+        'bills_receivable': 'BREC',
+        # Earnings & Settlements
+        'earning': 'EARN',
+        'settlement': 'STLM',
+        'deduction': 'DEDC',
+        'bonus': 'BONS',
+        'adjustment': 'ADJT',
+        # Legacy (backward compat)
+        'cod_deposit': 'CODS',
+    }
+
+    TRANSACTION_TYPES = [
+        # COD Transactions
         ('cod_collection', 'COD Collection'),
-        ('cod_deposit', 'COD Deposit to Admin'),
+        ('cod_driver_settle', 'COD Driver Settlement'),
+        ('cod_client_settle', 'COD Client Settlement'),
+        ('cod_return', 'COD Return'),
+        # Delivery / Service Charges
+        ('delivery_charge', 'Delivery Charge'),
+        ('fulfillment_charge', 'Fulfillment Charge'),
+        ('inventory_handling', 'Inventory Handling Charge'),
+        ('other_charge', 'Other Charges'),
+        # Accounting
+        ('bills_payable', 'Bills Payable'),
+        ('bills_receivable', 'Bills Receivable'),
+        # Earnings & Settlements
+        ('earning', 'Task Earning'),
         ('settlement', 'Earnings Settlement'),
         ('deduction', 'Deduction'),
         ('bonus', 'Bonus/Incentive'),
         ('adjustment', 'Manual Adjustment'),
-    )
+        # Legacy (kept for backward compatibility with existing data)
+        ('cod_deposit', 'COD Deposit to Admin'),
+    ]
 
     PAYMENT_METHOD_CHOICES = [
         ('cash', 'Cash'),
@@ -295,15 +335,20 @@ class DriverTransaction(models.Model):
         ('fawran', 'Fawran'),
     ]
 
-    transaction_id = models.AutoField(primary_key=True)
     transaction_code = models.CharField(
         max_length=50, unique=True, blank=True, null=True, db_index=True,
-        help_text="Unique transaction code (auto-generated)"
+        help_text="Unique transaction code (auto-generated, format: TYPECODE-YYYYMMDD-SEQ)"
     )
     driver = models.ForeignKey(
-        Driver, on_delete=models.CASCADE, related_name='transactions'
+        Driver, on_delete=models.CASCADE, related_name='transactions',
+        null=True, blank=True
     )
-    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
+    business = models.ForeignKey(
+        'business.Business', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='transactions',
+        help_text="Business associated with this transaction"
+    )
+    transaction_type = models.CharField(max_length=30, choices=TRANSACTION_TYPES)
     amount = models.DecimalField(
         max_digits=10, decimal_places=2,
         help_text="Positive for credits, negative for debits"
@@ -345,26 +390,35 @@ class DriverTransaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.transaction_code or self.transaction_id} - {self.get_transaction_type_display()} - {self.amount} QR"
+        return f"{self.transaction_code or self.pk} - {self.get_transaction_type_display()} - {self.amount} QR"
 
     def save(self, *args, **kwargs):
-        # Generate transaction code if not exists
         if not self.transaction_code:
-            # Get transaction type prefix
-            type_prefixes = {
-                'earning': 'ERN',
-                'cod_collection': 'COD',
-                'cod_deposit': 'DEP',
-                'settlement': 'STL',
-                'deduction': 'DED',
-                'bonus': 'BNS',
-                'adjustment': 'ADJ',
-            }
-            prefix = type_prefixes.get(self.transaction_type, 'TXN')
-            timestamp = datetime.now().strftime('%y%m%d%H%M%S')
-            driver_id = self.driver.driver_id if self.driver else 0
-            self.transaction_code = f"{prefix}-{driver_id}-{timestamp}"
+            self.transaction_code = self._generate_transaction_code()
         super().save(*args, **kwargs)
+
+    def _generate_transaction_code(self):
+        """Generate transaction code: {TYPECODE}-{YYYYMMDD}-{daily_seq:04d}"""
+        from django.db.models import Max
+
+        prefix = self.TYPE_PREFIXES.get(self.transaction_type, 'TXN')
+        today_str = datetime.now().strftime('%Y%m%d')
+        code_pattern = f"{prefix}-{today_str}-"
+
+        # Get next daily sequence for this prefix+date
+        last = DriverTransaction.objects.filter(
+            transaction_code__startswith=code_pattern
+        ).aggregate(max_code=Max('transaction_code'))['max_code']
+
+        if last:
+            try:
+                seq = int(last.split('-')[-1]) + 1
+            except (ValueError, IndexError):
+                seq = 1
+        else:
+            seq = 1
+
+        return f"{code_pattern}{seq:04d}"
 
     class Meta:
         verbose_name_plural = "Driver Transactions"
@@ -534,3 +588,66 @@ class ReceiptTemplate(models.Model):
     class Meta:
         verbose_name_plural = "Receipt Templates"
         ordering = ['template_type', '-is_default', 'name']
+
+
+class ZoneEarningsRate(models.Model):
+    """
+    Zone-based driver earnings rate table.
+
+    For fulfillment/normal delivery: Based on delivery zone
+    For pick & drop: Based on pickup zone to delivery zone combination
+    """
+    ORDER_TYPE_CHOICES = [
+        ('normal_delivery', 'Normal Delivery (Fulfillment)'),
+        ('pick_and_drop', 'Pick and Drop'),
+    ]
+
+    order_type = models.CharField(
+        max_length=20, choices=ORDER_TYPE_CHOICES, default='normal_delivery',
+        help_text="Order type this rate applies to"
+    )
+
+    # For normal delivery: only delivery_zone is used
+    # For pick & drop: both pickup_zone and delivery_zone are used
+    pickup_zone = models.ForeignKey(
+        'delivery.ZoneName', on_delete=models.CASCADE,
+        related_name='pickup_earnings_rates',
+        null=True, blank=True,
+        help_text="Pickup zone (only for pick & drop orders)"
+    )
+    delivery_zone = models.ForeignKey(
+        'delivery.ZoneName', on_delete=models.CASCADE,
+        related_name='delivery_earnings_rates',
+        help_text="Delivery zone"
+    )
+
+    # Earnings rate
+    driver_rate = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00,
+        help_text="Driver earnings rate in QR"
+    )
+
+    # Distance-based rate (for pick & drop)
+    per_km_rate = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00,
+        help_text="Per kilometer rate for distance-based calculation"
+    )
+    base_rate = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00,
+        help_text="Base rate before distance calculation"
+    )
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        if self.order_type == 'pick_and_drop' and self.pickup_zone:
+            return f"Zone {self.pickup_zone.zone_number} → {self.delivery_zone.zone_number}: {self.driver_rate} QR"
+        return f"Zone {self.delivery_zone.zone_number}: {self.driver_rate} QR ({self.get_order_type_display()})"
+
+    class Meta:
+        verbose_name = "Zone Earnings Rate"
+        verbose_name_plural = "Zone Earnings Rates"
+        unique_together = ['order_type', 'pickup_zone', 'delivery_zone']
+        ordering = ['order_type', 'delivery_zone__zone_number']

@@ -321,8 +321,20 @@
           <span>Fleet A/Cs</span>
           <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
         </a>
-        <div class="collapse submenu {% if request.resolver_match.url_name in 'fleet_cod_in_hand,fleet_drivers_earnings,fleet_transactions' %}show{% endif %}" id="submenu-accounts">
+        <div class="collapse submenu {% if request.resolver_match.url_name in 'workforce_finance_dashboard,fleet_cod_in_hand,fleet_drivers_earnings,earnings_verification,fleet_transactions,cod_settlement_report' %}show{% endif %}" id="submenu-accounts">
           <ul class="nav flex-column">
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_finance" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'workforce_finance_dashboard' %}active{% endif %}"
+                 href="{% url 'workforce:workforce_finance_dashboard' %}"
+                 hx-get="{% url 'workforce:workforce_finance_dashboard' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-chart-pie me-2"></i>
+                Finance Dashboard
+              </a>
+            </li>
             <li class="nav-item">
               <a id="workforce_sidebar_link_fleet_cod" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'fleet_cod_in_hand' %}active{% endif %}"
                  href="{% url 'workforce:fleet_cod_in_hand' %}"
@@ -345,6 +357,18 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-money-bill-wave me-2"></i>
                 DLs Earnings
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_earnings_verification" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'earnings_verification' %}active{% endif %}"
+                 href="{% url 'workforce:earnings_verification' %}"
+                 hx-get="{% url 'workforce:earnings_verification' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-clipboard-check me-2"></i>
+                Earnings Verification
               </a>
             </li>
             <li class="nav-item">

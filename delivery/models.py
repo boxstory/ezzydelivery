@@ -249,6 +249,43 @@ class DeliveryTask(models.Model):
         help_text="Whether earnings have been added to driver's wallet"
     )
 
+    # Earnings Verification Fields (for staff approval)
+    EARNINGS_VERIFICATION_STATUS = [
+        ('pending', 'Pending Verification'),
+        ('verified', 'Verified'),
+        ('published', 'Published'),
+        ('rejected', 'Rejected'),
+    ]
+    earnings_verification_status = models.CharField(
+        max_length=20, choices=EARNINGS_VERIFICATION_STATUS, default='pending',
+        help_text="Earnings verification status by staff"
+    )
+    calculated_earnings = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="System-calculated driver earnings (before verification)"
+    )
+    verified_earnings = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Staff-verified/adjusted driver earnings"
+    )
+    earnings_verified_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='verified_earnings',
+        help_text="Staff member who verified the earnings"
+    )
+    earnings_verified_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When earnings were verified by staff"
+    )
+    earnings_published_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When earnings were published and visible to driver"
+    )
+    earnings_notes = models.TextField(
+        blank=True, null=True,
+        help_text="Staff notes about earnings verification"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

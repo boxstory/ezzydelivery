@@ -373,10 +373,11 @@ def cod_collection(request):
         ).select_related('delivery_task').order_by('-created_at')[:50]
 
         # Get COD currently in hand (not yet settled/deposited)
-        # Show all COD collected deliveries - driver's cod_in_hand balance reflects the total
+        # Only show COD that hasn't been submitted to admin yet
         cod_in_hand_list = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
             cod_collected=True,
+            cod_settled=False,  # Only unsettled COD
             dl_task_status='delivered'
         ).select_related(
             'order',
@@ -384,8 +385,11 @@ def cod_collection(request):
             'dl_to_address'
         ).order_by('-completed_at')
 
-        # Use the driver's actual cod_in_hand value as the total
-        cod_in_hand_total = driver.cod_in_hand or 0
+        # Calculate total from actual list items so it matches the displayed list
+        from django.db.models import Sum
+        cod_in_hand_total = cod_in_hand_list.aggregate(
+            total=Sum('cod_collected_amount')
+        )['total'] or 0
         cod_in_hand_count = cod_in_hand_list.count()
 
         # Get recent COD deliveries (settled/completed - exclude items still in hand)
@@ -425,12 +429,18 @@ def cod_submission(request):
             amount = request.POST.get('amount')
             reference_number = request.POST.get('reference_number', '')
             notes = request.POST.get('notes', '')
+            payment_method = request.POST.get('payment_method', 'cash')
+            delivery_ids_str = request.POST.get('delivery_ids', '')
+
+            # Parse selected delivery IDs
+            delivery_ids = [int(x) for x in delivery_ids_str.split(',') if x.strip().isdigit()] if delivery_ids_str else None
 
             try:
-                amount = float(amount)
+                from decimal import Decimal, InvalidOperation
+                amount = Decimal(str(amount))
                 if amount <= 0:
                     messages.error(request, 'Amount must be greater than zero.')
-                elif amount > float(driver.cod_in_hand):
+                elif amount > driver.cod_in_hand:
                     messages.error(request, f'You only have {driver.cod_in_hand} QR in hand.')
                 else:
                     # Process COD submission
@@ -439,11 +449,13 @@ def cod_submission(request):
                         amount=amount,
                         created_by=request.user,
                         reference_number=reference_number,
-                        notes=notes
+                        notes=notes,
+                        payment_method=payment_method,
+                        delivery_ids=delivery_ids
                     )
                     messages.success(request, f'Successfully submitted {amount} QR COD to admin.')
                     return redirect('fleet:cod_collection')
-            except ValueError as e:
+            except (ValueError, InvalidOperation) as e:
                 messages.error(request, str(e))
             except Exception as e:
                 messages.error(request, f'Error processing submission: {str(e)}')
@@ -451,9 +463,41 @@ def cod_submission(request):
         # Get wallet status
         wallet_status = WalletService.get_wallet_status(driver)
 
+        # Get pending COD deliveries (unsettled)
+        cod_in_hand_list = delivery_models.DeliveryTask.objects.filter(
+            driver=driver,
+            cod_collected=True,
+            cod_settled=False,
+            dl_task_status='delivered'
+        ).select_related(
+            'order',
+            'order__business',
+            'dl_to_address'
+        ).order_by('-completed_at')
+
+        # Calculate total from actual list so it matches displayed items
+        from django.db.models import Sum
+        cod_in_hand_total = cod_in_hand_list.aggregate(
+            total=Sum('cod_collected_amount')
+        )['total'] or 0
+
+        # Reference number is optional - driver can enter their own (e.g. bank transfer ref)
+        # Transaction code (CODS-YYYYMMDD-NNNN) serves as the unique identifier
+        auto_reference = ''
+
+        # Recent COD submissions (cod_deposit / cod_driver_settle)
+        recent_submissions = fleet_models.DriverTransaction.objects.filter(
+            driver=driver,
+            transaction_type__in=['cod_deposit', 'cod_driver_settle']
+        ).order_by('-created_at')[:10]
+
         context = {
             'driver': driver,
             'wallet_status': wallet_status,
+            'cod_in_hand_list': cod_in_hand_list,
+            'cod_in_hand_total': cod_in_hand_total,
+            'auto_reference': auto_reference,
+            'recent_submissions': recent_submissions,
         }
 
         return render(request, 'fleet/parts/cod_submission.html', context)
@@ -467,14 +511,16 @@ def cod_submission(request):
 @login_required(login_url='/accounts/login/')
 @driver_required
 def cod_export(request):
-    """Export COD in hand report as CSV or PDF"""
+    """Export COD in hand report as CSV or PDF, and optionally submit COD settlement"""
     import csv
     from io import BytesIO
+    from decimal import Decimal
 
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
         export_format = request.GET.get('format', 'csv')
         ids = request.GET.get('ids', '')
+        submit_settlement = request.GET.get('submit', '') == '1'
 
         # Parse delivery IDs
         if ids:
@@ -488,14 +534,52 @@ def cod_export(request):
                 driver=driver,
                 id__in=delivery_ids,
                 cod_collected=True,
+                cod_settled=False,  # Only unsettled COD
                 dl_task_status='delivered'
             ).select_related('order', 'order__business', 'dl_to_address').prefetch_related('transactions').order_by('-completed_at')
         else:
             deliveries = delivery_models.DeliveryTask.objects.filter(
                 driver=driver,
                 cod_collected=True,
+                cod_settled=False,  # Only unsettled COD
                 dl_task_status='delivered'
             ).select_related('order', 'order__business', 'dl_to_address').prefetch_related('transactions').order_by('-completed_at')
+
+        # Calculate total COD amount for selected deliveries
+        total_cod = sum(Decimal(str(d.cod_collected_amount or 0)) for d in deliveries)
+
+        # Process COD settlement if submit=1
+        if submit_settlement and total_cod > 0:
+            try:
+                # Submit COD to admin using wallet service
+                from fleet.wallet_service import WalletService
+
+                # Create COD deposit transaction
+                txn = WalletService.submit_cod_to_admin(
+                    driver=driver,
+                    amount=total_cod,
+                    created_by=request.user,
+                    reference_number=f"COD-SUBMIT-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                    notes=f"COD submission for {len(delivery_ids)} deliveries",
+                    payment_method='cash'
+                )
+
+                # Mark deliveries as COD settled
+                deliveries.update(cod_settled=True, cod_settled_at=timezone.now())
+
+                messages.success(request, f'COD settlement of {total_cod} QR submitted successfully! Transaction: {txn.transaction_code}')
+                logger.info(f"Driver {driver.driver_id} submitted COD: {total_cod} QR for {len(delivery_ids)} deliveries")
+
+                # Redirect to show success message instead of returning PDF
+                return redirect('fleet:cod_collection')
+
+            except ValueError as e:
+                messages.error(request, str(e))
+                return redirect('fleet:cod_collection')
+            except Exception as e:
+                logger.error(f"COD settlement error for driver {driver.driver_id}: {str(e)}")
+                messages.error(request, 'Error processing COD settlement. Please try again.')
+                return redirect('fleet:cod_collection')
 
         if export_format == 'pdf':
             # Generate PDF
@@ -606,6 +690,85 @@ def cod_export(request):
         return redirect('fleet:cod_collection')
 
 
+# COD Transaction Detail (AJAX) ------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
+@driver_required
+def cod_transaction_detail(request):
+    """Return JSON with the delivery tasks linked to a COD transaction"""
+    from django.http import JsonResponse
+    from datetime import timedelta
+
+    txn_code = request.GET.get('code', '')
+    if not txn_code:
+        return JsonResponse({'error': 'Missing transaction code'}, status=400)
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        txn = fleet_models.DriverTransaction.objects.get(
+            transaction_code=txn_code,
+            driver=driver
+        )
+
+        orders = []
+
+        if txn.transaction_type == 'cod_collection' and txn.delivery_task:
+            # Single COD collection - one delivery task linked
+            d = txn.delivery_task
+            orders.append({
+                'task_number': d.dl_task_number or '-',
+                'business': d.order.business.business_name if d.order and d.order.business else '-',
+                'customer': d.order.customer_name if d.order else '-',
+                'location': d.dl_to_address.area_name if d.dl_to_address else '-',
+                'delivered_at': d.completed_at.strftime('%d %b %Y, %H:%M') if d.completed_at else '-',
+                'amount': float(d.cod_collected_amount or 0),
+            })
+        elif txn.transaction_type in ['cod_deposit', 'cod_driver_settle']:
+            # COD settlement - find tasks settled at the same time
+            # Match delivery tasks whose cod_settled_at is within 5 seconds of the transaction
+            window = timedelta(seconds=5)
+            settled_tasks = delivery_models.DeliveryTask.objects.filter(
+                driver=driver,
+                cod_collected=True,
+                cod_settled=True,
+                cod_settled_at__gte=txn.created_at - window,
+                cod_settled_at__lte=txn.created_at + window,
+            ).select_related('order', 'order__business', 'dl_to_address').order_by('-completed_at')
+
+            for d in settled_tasks:
+                orders.append({
+                    'task_number': d.dl_task_number or '-',
+                    'business': d.order.business.business_name if d.order and d.order.business else '-',
+                    'customer': d.order.customer_name if d.order else '-',
+                    'location': d.dl_to_address.area_name if d.dl_to_address else '-',
+                    'delivered_at': d.completed_at.strftime('%d %b %Y, %H:%M') if d.completed_at else '-',
+                    'amount': float(d.cod_collected_amount or 0),
+                })
+
+        total = sum(o['amount'] for o in orders)
+
+        return JsonResponse({
+            'transaction_code': txn.transaction_code,
+            'transaction_type': txn.get_transaction_type_display(),
+            'amount': float(txn.amount),
+            'date': txn.created_at.strftime('%d %b %Y, %H:%M'),
+            'description': txn.description or '',
+            'reference_number': txn.reference_number or '',
+            'payment_method': txn.get_payment_method_display() if txn.payment_method else '-',
+            'notes': txn.notes or '',
+            'cod_in_hand_after': float(txn.cod_in_hand_after or 0),
+            'wallet_balance_after': float(txn.wallet_balance_after or 0),
+            'pending_earnings_after': float(txn.pending_earnings_after or 0),
+            'orders': orders,
+            'orders_total': total,
+            'orders_count': len(orders),
+        })
+
+    except fleet_models.DriverTransaction.DoesNotExist:
+        return JsonResponse({'error': 'Transaction not found'}, status=404)
+    except fleet_models.Driver.DoesNotExist:
+        return JsonResponse({'error': 'Driver not found'}, status=404)
+
+
 # Earnings View ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @driver_required
@@ -613,26 +776,70 @@ def driver_earnings(request):
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
 
+        from datetime import timedelta
+        from decimal import Decimal, InvalidOperation
+        from django.utils import timezone
+        from django.core.paginator import Paginator
+        from delivery import models as delivery_models
+        from django.db.models import Sum, Case, When, DecimalField, Value
+
+        # Handle settlement submission
+        if request.method == 'POST':
+            amount = request.POST.get('amount', '0')
+            notes = request.POST.get('notes', '')
+            delivery_ids_str = request.POST.get('delivery_ids', '')
+
+            delivery_ids = [int(x) for x in delivery_ids_str.split(',')
+                          if x.strip().isdigit()] if delivery_ids_str else []
+
+            try:
+                amount = Decimal(str(amount))
+                if amount <= 0:
+                    messages.error(request, 'Amount must be greater than zero.')
+                elif amount > driver.pending_earnings:
+                    messages.error(request, f'You only have {driver.pending_earnings} QR in pending earnings.')
+                else:
+                    from django.db import transaction
+                    with transaction.atomic():
+                        # Create settlement transaction
+                        txn = WalletService.record_transaction(
+                            driver=driver,
+                            transaction_type='settlement',
+                            amount=amount,
+                            description=f"Earnings settlement - {amount} QR for {len(delivery_ids)} deliveries",
+                            created_by=request.user,
+                            notes=notes,
+                        )
+
+                        # Mark selected deliveries as earnings settled
+                        if delivery_ids:
+                            delivery_models.DeliveryTask.objects.filter(
+                                id__in=delivery_ids,
+                                driver=driver,
+                                earnings_settled=False
+                            ).update(
+                                earnings_settled=True,
+                                earnings_settled_at=timezone.now()
+                            )
+
+                    messages.success(request, f'Settlement of {amount} QR submitted successfully. Transaction: {txn.transaction_code}')
+                    return redirect('fleet:driver_earnings')
+            except (ValueError, InvalidOperation) as e:
+                messages.error(request, str(e))
+            except Exception as e:
+                messages.error(request, f'Error processing settlement: {str(e)}')
+
         # Get filter parameters
         days = int(request.GET.get('days', 30))
         status_filter = request.GET.get('status', 'all')
-
-        from datetime import timedelta
-        from django.utils import timezone
-        from delivery import models as delivery_models
-        from django.db.models import Sum
+        settlement_filter = request.GET.get('settlement', 'all')
 
         start_date = timezone.now() - timedelta(days=days)
 
-        # Get assigned task IDs for this driver
-        assigned_task_ids = delivery_models.AssignedDriver.objects.filter(
-            driver=driver
-        ).values_list('dl_task_id', flat=True)
-
-        # Get completed delivery tasks (delivered or returned with charge)
+        # Get completed delivery tasks using direct driver FK (consistent with dashboard)
         completed_tasks = delivery_models.DeliveryTask.objects.filter(
-            id__in=assigned_task_ids,
-            dl_task_status__in=['delivered', 'returned'],
+            driver=driver,
+            dl_task_status__in=['delivered', 'failed'],
             dl_task_date__gte=start_date.date()
         ).select_related(
             'order', 'order__business', 'pickup_location', 'dl_to_address'
@@ -642,25 +849,90 @@ def driver_earnings(request):
         if status_filter == 'delivered':
             completed_tasks = completed_tasks.filter(dl_task_status='delivered')
         elif status_filter == 'returned':
-            completed_tasks = completed_tasks.filter(dl_task_status='returned')
+            completed_tasks = completed_tasks.filter(dl_task_status='failed')
 
-        # Calculate totals
-        total_delivery_fee = completed_tasks.aggregate(
-            total=Sum('dl_price')
-        )['total'] or 0
+        # Apply settlement status filter
+        if settlement_filter == 'pending':
+            completed_tasks = completed_tasks.filter(earnings_settled=False)
+        elif settlement_filter == 'settled':
+            completed_tasks = completed_tasks.filter(earnings_settled=True)
+
+        # Calculate totals using driver_earnings field (actual driver earnings)
+        # Fall back to dl_price for tasks where driver_earnings hasn't been calculated
+        totals = completed_tasks.aggregate(
+            total_earnings=Sum(
+                Case(
+                    When(driver_earnings__isnull=False, then='driver_earnings'),
+                    default='dl_price',
+                    output_field=DecimalField(max_digits=10, decimal_places=2)
+                )
+            )
+        )
+        total_delivery_fee = totals['total_earnings'] or 0
 
         delivered_count = completed_tasks.filter(dl_task_status='delivered').count()
-        returned_count = completed_tasks.filter(dl_task_status='returned').count()
+        returned_count = completed_tasks.filter(dl_task_status='failed').count()
+        total_count = completed_tasks.count()
+
+        # Get unsettled deliveries for settlement selection
+        # Only show published earnings (verified by staff)
+        unsettled_tasks = delivery_models.DeliveryTask.objects.filter(
+            driver=driver,
+            dl_task_status='delivered',
+            earnings_settled=False,
+            earnings_verification_status='published'  # Only published earnings can be settled
+        ).select_related(
+            'order', 'order__business', 'dl_to_address'
+        ).order_by('-completed_at')
+
+        unsettled_total = unsettled_tasks.aggregate(
+            total=Sum(
+                Case(
+                    When(driver_earnings__isnull=False, then='driver_earnings'),
+                    default='dl_price',
+                    output_field=DecimalField(max_digits=10, decimal_places=2)
+                )
+            )
+        )['total'] or 0
+
+        # Paginate completed tasks - 10 per page
+        paginator = Paginator(completed_tasks, 10)
+        page_number = request.GET.get('page', 1)
+        page_obj = paginator.get_page(page_number)
+
+        # Build filter params string for pagination component
+        filter_params = f'days={days}&status={status_filter}&settlement={settlement_filter}'
+
+        # Recent earning & settlement transactions
+        recent_settlements = fleet_models.DriverTransaction.objects.filter(
+            driver=driver,
+            transaction_type__in=['earning', 'settlement', 'bonus', 'deduction', 'adjustment']
+        ).order_by('-created_at')[:10]
+
+        # Count pending verification (deliveries waiting for staff verification)
+        pending_verification_count = delivery_models.DeliveryTask.objects.filter(
+            driver=driver,
+            dl_task_status='delivered',
+            earnings_verification_status='pending'
+        ).count()
 
         context = {
             'driver': driver,
-            'completed_tasks': completed_tasks,
+            'completed_tasks': page_obj,
+            'page_obj': page_obj,
+            'filter_params': filter_params,
             'total_delivery_fee': total_delivery_fee,
             'delivered_count': delivered_count,
             'returned_count': returned_count,
-            'total_count': completed_tasks.count(),
+            'total_count': total_count,
             'selected_days': days,
             'selected_status': status_filter,
+            'selected_settlement': settlement_filter,
+            'recent_settlements': recent_settlements,
+            'unsettled_tasks': unsettled_tasks,
+            'unsettled_total': unsettled_total,
+            'pending_earnings': driver.pending_earnings or 0,
+            'pending_verification_count': pending_verification_count,
         }
 
         return render(request, 'fleet/parts/driver_earnings.html', context)
@@ -712,6 +984,104 @@ def transaction_history(request):
         }
 
         return render(request, 'fleet/parts/transaction_history.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found.')
+        return redirect('core:main_dashboard')
+
+
+# Finance Summary ----------------------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
+@driver_required
+def fleet_finance_summary(request):
+    """Finance overview dashboard for drivers"""
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        from datetime import timedelta
+        from django.db.models import Sum, Count, Q
+        from decimal import Decimal
+
+        days = int(request.GET.get('days', 30))
+        start_date = timezone.now() - timedelta(days=days)
+
+        # Wallet status
+        wallet_status = WalletService.get_wallet_status(driver)
+
+        # Transaction summary by type for the period
+        txns = fleet_models.DriverTransaction.objects.filter(
+            driver=driver,
+            created_at__gte=start_date
+        )
+
+        # COD pipeline summary
+        cod_collected = txns.filter(
+            transaction_type='cod_collection'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+        cod_deposited = txns.filter(
+            transaction_type__in=['cod_deposit', 'cod_driver_settle']
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+        cod_returned = txns.filter(
+            transaction_type='cod_return'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+        # Earnings summary
+        earnings_total = txns.filter(
+            transaction_type='earning'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+        settlements_total = txns.filter(
+            transaction_type='settlement'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+        bonuses_total = txns.filter(
+            transaction_type='bonus'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+        deductions_total = txns.filter(
+            transaction_type='deduction'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+        # Charges summary
+        charges = txns.filter(
+            transaction_type__in=['delivery_charge', 'fulfillment_charge', 'inventory_handling', 'other_charge']
+        ).values('transaction_type').annotate(
+            total=Sum('amount'),
+            count=Count('id')
+        )
+
+        charges_dict = {c['transaction_type']: c for c in charges}
+
+        # Recent transactions (last 10)
+        recent_transactions = txns.select_related(
+            'delivery_task', 'settlement', 'created_by'
+        ).order_by('-created_at')[:10]
+
+        # Transaction count by type
+        type_counts = txns.values('transaction_type').annotate(
+            count=Count('id'),
+            total=Sum('amount')
+        ).order_by('-count')
+
+        context = {
+            'driver': driver,
+            'wallet_status': wallet_status,
+            'selected_days': days,
+            'cod_collected': abs(cod_collected),
+            'cod_deposited': abs(cod_deposited),
+            'cod_returned': abs(cod_returned),
+            'earnings_total': earnings_total,
+            'settlements_total': abs(settlements_total),
+            'bonuses_total': bonuses_total,
+            'deductions_total': abs(deductions_total),
+            'charges_dict': charges_dict,
+            'recent_transactions': recent_transactions,
+            'type_counts': type_counts,
+        }
+
+        return render(request, 'fleet/parts/fleet_finance_summary.html', context)
 
     except fleet_models.Driver.DoesNotExist:
         messages.error(request, 'Driver profile not found.')

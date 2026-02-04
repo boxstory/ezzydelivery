@@ -2469,6 +2469,180 @@ def fleet_drivers_earnings(request):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+def earnings_verification(request):
+    """
+    Staff view to verify and publish driver earnings.
+    Shows completed deliveries with pending earnings verification.
+    Allows bulk verify/publish with editable earnings.
+    """
+    from django.db.models import Sum, Case, When, DecimalField, F
+    from delivery import models as delivery_models
+    from datetime import timedelta
+
+    # Filters
+    driver_id = request.GET.get('driver', '')
+    status_filter = request.GET.get('status', 'pending')
+    days = int(request.GET.get('days', 7))
+
+    start_date = timezone.now() - timedelta(days=days)
+
+    # Base queryset - completed deliveries with COD delivered
+    tasks = delivery_models.DeliveryTask.objects.filter(
+        dl_task_status='delivered',
+        dl_task_date__gte=start_date.date()
+    ).select_related(
+        'driver', 'driver__user', 'order', 'order__business',
+        'pickup_location', 'dl_to_address', 'earnings_verified_by'
+    ).order_by('-completed_at', '-id')
+
+    # Apply filters
+    if driver_id:
+        tasks = tasks.filter(driver_id=driver_id)
+
+    if status_filter and status_filter != 'all':
+        tasks = tasks.filter(earnings_verification_status=status_filter)
+
+    # Calculate stats
+    stats = {
+        'pending_count': tasks.filter(earnings_verification_status='pending').count(),
+        'verified_count': tasks.filter(earnings_verification_status='verified').count(),
+        'published_count': tasks.filter(earnings_verification_status='published').count(),
+        'total_pending_earnings': tasks.filter(
+            earnings_verification_status='pending'
+        ).aggregate(
+            total=Sum(Case(
+                When(calculated_earnings__isnull=False, then='calculated_earnings'),
+                When(driver_earnings__isnull=False, then='driver_earnings'),
+                default='dl_price',
+                output_field=DecimalField(max_digits=10, decimal_places=2)
+            ))
+        )['total'] or 0,
+    }
+
+    # Get approved drivers for filter dropdown
+    drivers = fleet_models.Driver.objects.filter(
+        driver_status='Approved'
+    ).select_related('user').order_by('user__first_name')
+
+    # Paginate
+    tasks_paginated = paginate_queryset(request, tasks, items_per_page=50)
+
+    context = {
+        'tasks': tasks_paginated,
+        'drivers': drivers,
+        'stats': stats,
+        'selected_driver': driver_id,
+        'selected_status': status_filter,
+        'selected_days': days,
+        'page_title': 'Earnings Verification',
+    }
+    return render(request, 'workforce/earnings_verification.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def earnings_verification_action(request):
+    """
+    Process bulk earnings verification actions.
+    Actions: verify, publish, reject, update_amount
+    """
+    from django.http import JsonResponse
+    from delivery import models as delivery_models
+    from decimal import Decimal, InvalidOperation
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    action = request.POST.get('action', '')
+    task_ids = request.POST.getlist('task_ids[]')
+    earnings_updates = request.POST.get('earnings_updates', '{}')
+
+    if not task_ids:
+        return JsonResponse({'error': 'No tasks selected'}, status=400)
+
+    try:
+        import json
+        earnings_dict = json.loads(earnings_updates) if earnings_updates else {}
+    except json.JSONDecodeError:
+        earnings_dict = {}
+
+    updated_count = 0
+    errors = []
+
+    for task_id in task_ids:
+        try:
+            task = delivery_models.DeliveryTask.objects.select_related('driver').get(id=task_id)
+
+            # Update earnings amount if provided
+            if str(task_id) in earnings_dict:
+                try:
+                    new_amount = Decimal(str(earnings_dict[str(task_id)]))
+                    task.verified_earnings = new_amount
+                except (ValueError, InvalidOperation):
+                    errors.append(f"Invalid amount for task {task_id}")
+                    continue
+
+            if action == 'verify':
+                task.earnings_verification_status = 'verified'
+                task.earnings_verified_by = request.user
+                task.earnings_verified_at = timezone.now()
+                # Set verified_earnings to calculated or driver_earnings if not already set
+                if not task.verified_earnings:
+                    task.verified_earnings = task.calculated_earnings or task.driver_earnings or task.dl_price or 0
+                task.save()
+                updated_count += 1
+
+            elif action == 'publish':
+                # Can only publish verified tasks
+                if task.earnings_verification_status not in ['verified', 'pending']:
+                    errors.append(f"Task {task_id} cannot be published")
+                    continue
+
+                task.earnings_verification_status = 'published'
+                task.earnings_published_at = timezone.now()
+                if not task.earnings_verified_by:
+                    task.earnings_verified_by = request.user
+                    task.earnings_verified_at = timezone.now()
+
+                # Update driver_earnings with verified amount
+                final_earnings = task.verified_earnings or task.calculated_earnings or task.driver_earnings or task.dl_price or 0
+                task.driver_earnings = final_earnings
+                task.save()
+
+                # Update driver's pending_earnings
+                if task.driver:
+                    task.driver.pending_earnings = (task.driver.pending_earnings or Decimal('0.00')) + Decimal(str(final_earnings))
+                    task.driver.save(update_fields=['pending_earnings'])
+
+                updated_count += 1
+
+            elif action == 'reject':
+                task.earnings_verification_status = 'rejected'
+                task.earnings_verified_by = request.user
+                task.earnings_verified_at = timezone.now()
+                task.save()
+                updated_count += 1
+
+            elif action == 'update':
+                # Just update the earnings amount
+                task.save()
+                updated_count += 1
+
+        except delivery_models.DeliveryTask.DoesNotExist:
+            errors.append(f"Task {task_id} not found")
+        except Exception as e:
+            errors.append(f"Error processing task {task_id}: {str(e)}")
+
+    return JsonResponse({
+        'success': True,
+        'updated': updated_count,
+        'errors': errors,
+        'message': f'{updated_count} task(s) updated successfully'
+    })
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
 def cod_settlement_report(request):
     """COD Settlement Report - Select drivers, settle COD, export PDF"""
     from django.db.models import Sum, F

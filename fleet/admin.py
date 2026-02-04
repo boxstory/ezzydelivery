@@ -51,7 +51,7 @@ class DriverDocumentAdmin(admin.ModelAdmin):
 
 @admin.register(fleet_models.DriverTransaction)
 class DriverTransactionAdmin(admin.ModelAdmin):
-    list_display = ('transaction_id', 'driver', 'transaction_type', 'amount',
+    list_display = ('transaction_code', 'driver', 'transaction_type', 'amount',
                     'wallet_balance_after', 'cod_in_hand_after', 'created_at')
     list_filter = ('transaction_type', 'created_at')
     search_fields = ('driver__driver_code', 'description', 'reference_number')
@@ -132,3 +132,30 @@ class DriverSettlementAdmin(admin.ModelAdmin):
             updated += 1
         self.message_user(request, f'{updated} settlement(s) marked as paid.')
     mark_as_paid.short_description = 'Mark selected as Paid'
+
+
+@admin.register(fleet_models.ZoneEarningsRate)
+class ZoneEarningsRateAdmin(admin.ModelAdmin):
+    list_display = ('order_type', 'pickup_zone', 'delivery_zone', 'driver_rate',
+                    'per_km_rate', 'base_rate', 'is_active')
+    list_filter = ('order_type', 'is_active', 'delivery_zone')
+    search_fields = ('pickup_zone__zone_name', 'delivery_zone__zone_name')
+    list_per_page = 50
+    list_editable = ('driver_rate', 'per_km_rate', 'base_rate', 'is_active')
+
+    fieldsets = (
+        ('Order Type', {
+            'fields': ('order_type',)
+        }),
+        ('Zone Configuration', {
+            'fields': ('pickup_zone', 'delivery_zone'),
+            'description': 'For Normal Delivery, only delivery zone is needed. For Pick & Drop, both zones are required.'
+        }),
+        ('Earnings Rates', {
+            'fields': ('driver_rate', 'base_rate', 'per_km_rate'),
+            'description': 'driver_rate: Fixed rate for zone. For distance-based: base_rate + (per_km_rate * distance)'
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+    )

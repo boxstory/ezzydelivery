@@ -3,6 +3,11 @@
 
 {% block title %}Driver Earnings{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'fleet/css/fleet.css' %}">
+<link rel="stylesheet" href="{% static 'fleet/css/fleet-mobile.css' %}">
+{% endblock %}
+
 {% block content %}
 <!-- Mobile PWA Earnings View -->
 <div class="pwa-content d-md-none">
@@ -13,15 +18,15 @@
 
   <!-- Period Filter Pills -->
   <div class="pwa-filter-pills">
-    <a href="?days=7&status={{ selected_status }}" class="pwa-filter-pill {% if selected_days == 7 %}pwa-filter-pill--active{% endif %}">7 Days</a>
-    <a href="?days=30&status={{ selected_status }}" class="pwa-filter-pill {% if selected_days == 30 or not selected_days %}pwa-filter-pill--active{% endif %}">30 Days</a>
-    <a href="?days=90&status={{ selected_status }}" class="pwa-filter-pill {% if selected_days == 90 %}pwa-filter-pill--active{% endif %}">90 Days</a>
+    <a href="?days=7&status={{ selected_status }}&settlement={{ selected_settlement }}" class="pwa-filter-pill {% if selected_days == 7 %}pwa-filter-pill--active{% endif %}">7 Days</a>
+    <a href="?days=30&status={{ selected_status }}&settlement={{ selected_settlement }}" class="pwa-filter-pill {% if selected_days == 30 or not selected_days %}pwa-filter-pill--active{% endif %}">30 Days</a>
+    <a href="?days=90&status={{ selected_status }}&settlement={{ selected_settlement }}" class="pwa-filter-pill {% if selected_days == 90 %}pwa-filter-pill--active{% endif %}">90 Days</a>
   </div>
 
   <!-- Earnings Wallet Card -->
   <div class="pwa-wallet-card pwa-wallet-card--earnings">
     <div class="pwa-wallet-card__header">
-      <span class="pwa-wallet-card__label">Total Delivery Fee</span>
+      <span class="pwa-wallet-card__label">Total Earnings</span>
       <i class="fa-solid fa-truck-fast"></i>
     </div>
     <div class="pwa-wallet-card__balance">{{ total_delivery_fee|floatformat:2 }} QR</div>
@@ -31,21 +36,109 @@
         <span class="pwa-wallet-card__stat-value">{{ delivered_count }}</span>
       </div>
       <div class="pwa-wallet-card__stat">
-        <span class="pwa-wallet-card__stat-label">Returned</span>
-        <span class="pwa-wallet-card__stat-value">{{ returned_count }}</span>
+        <span class="pwa-wallet-card__stat-label">Processing</span>
+        <span class="pwa-wallet-card__stat-value" style="color: #f59e0b;">{{ pending_verification_count }}</span>
       </div>
       <div class="pwa-wallet-card__stat">
-        <span class="pwa-wallet-card__stat-label">Total</span>
-        <span class="pwa-wallet-card__stat-value">{{ total_count }}</span>
+        <span class="pwa-wallet-card__stat-label">Ready</span>
+        <span class="pwa-wallet-card__stat-value">{{ pending_earnings|floatformat:0 }} QR</span>
       </div>
     </div>
   </div>
 
+  <!-- Unsettled Earnings Section (Mobile) -->
+  {% if unsettled_tasks %}
+  <div class="pwa-section-header mt-4">
+    <h4 class="pwa-section-title">Unsettled Earnings</h4>
+    <div class="d-flex align-items-center gap-1">
+      <input type="checkbox" class="form-check-input" id="mob-earn-select-all">
+      <span class="pwa-text-muted" style="font-size: 0.75rem;">Select All</span>
+    </div>
+  </div>
+
+  <!-- Mobile Selection Bar -->
+  <div class="mb-2 p-2 rounded" id="mob-earn-action-bar" style="background: #eff6ff; display: none;">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <span class="text-muted" style="font-size: 0.8rem;"><span id="mob-earn-selected-num">0</span> selected</span>
+        <span class="fw-semibold ms-2" style="color: #2563eb; font-size: 0.8rem;" id="mob-earn-selected-total"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="pwa-transaction-list mb-4">
+    {% for task in unsettled_tasks %}
+    <div class="pwa-transaction-item pwa-fade-in" style="animation-delay: {{ forloop.counter0 }}50ms; border-left: 4px solid #10b981;" data-delivery-id="{{ task.id }}" data-amount="{% if task.driver_earnings %}{{ task.driver_earnings }}{% else %}{{ task.dl_price|default:0 }}{% endif %}">
+      <div class="me-2" style="flex-shrink: 0;">
+        <input type="checkbox" class="form-check-input mob-earn-checkbox" value="{{ task.id }}">
+      </div>
+      <div class="pwa-transaction-item__icon pwa-transaction-item__icon--success">
+        <i class="fa-solid fa-check"></i>
+      </div>
+      <div class="pwa-transaction-item__details">
+        <div class="pwa-transaction-item__title">{{ task.order.business.business_name|default:"Order"|truncatechars:25 }}</div>
+        <div class="pwa-transaction-item__subtitle">
+          <span style="background: #f3f4f6; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 0.7rem;">{{ task.dl_task_number }}</span>
+        </div>
+        <div class="pwa-transaction-item__date">
+          <i class="fa-regular fa-clock me-1"></i>{{ task.completed_at|date:"d M, H:i"|default:task.dl_task_date|date:"d M" }}
+        </div>
+      </div>
+      <div class="pwa-transaction-item__amount" style="color: #059669; font-weight: 700; font-size: 1rem;">
+        {% if task.driver_earnings %}{{ task.driver_earnings|floatformat:0 }}{% else %}{{ task.dl_price|default:0 }}{% endif %} <span style="font-size: 0.75rem;">QR</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Mobile Settlement Form -->
+  <div class="pwa-section-header">
+    <h4 class="pwa-section-title">Request Settlement</h4>
+  </div>
+  <div class="pwa-info-card mb-4">
+    <form method="POST" id="mob-settle-form">
+      {% csrf_token %}
+      <input type="hidden" name="delivery_ids" id="mob-settle-delivery-ids" value="">
+      <div class="mb-3">
+        <label for="mob-settle-amount" class="form-label fw-semibold" style="font-size: 0.85rem;">Amount (QR)</label>
+        <input type="number" class="form-control" id="mob-settle-amount" name="amount" step="0.01" min="0" max="{{ pending_earnings }}" placeholder="0.00" required style="font-size: 1.2rem; font-weight: 600; text-align: center; padding: 12px;">
+        <small class="text-muted">Pending Earnings: {{ pending_earnings|floatformat:2 }} QR</small>
+      </div>
+      <div class="mb-3">
+        <label for="mob-settle-notes" class="form-label fw-semibold" style="font-size: 0.85rem;">Notes <span class="text-muted fw-normal">(Optional)</span></label>
+        <textarea class="form-control" id="mob-settle-notes" name="notes" rows="2" placeholder="Any additional notes..."></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary w-100 py-3" style="border-radius: 12px; font-weight: 600;">
+        <i class="fa-solid fa-file-invoice-dollar me-2"></i>Request Settlement
+      </button>
+    </form>
+  </div>
+  {% else %}
+  <div class="text-center py-4 mb-4 mt-4" style="background: #f0fdf4; border-radius: 16px;">
+    <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+      <i class="fa-solid fa-check text-success" style="font-size: 1.5rem;"></i>
+    </div>
+    <h5 class="text-success mb-1" style="font-size: 1rem;">All Settled!</h5>
+    <p class="text-muted mb-0" style="font-size: 0.85rem;">No pending earnings to settle</p>
+  </div>
+  {% endif %}
+
   <!-- Status Filter -->
   <div class="pwa-filter-pills mt-3">
-    <a href="?days={{ selected_days }}&status=all" class="pwa-filter-pill {% if selected_status == 'all' or not selected_status %}pwa-filter-pill--active{% endif %}">All</a>
-    <a href="?days={{ selected_days }}&status=delivered" class="pwa-filter-pill {% if selected_status == 'delivered' %}pwa-filter-pill--active{% endif %}">Delivered</a>
-    <a href="?days={{ selected_days }}&status=returned" class="pwa-filter-pill {% if selected_status == 'returned' %}pwa-filter-pill--active{% endif %}">Returned</a>
+    <a href="?days={{ selected_days }}&status=all&settlement={{ selected_settlement }}" class="pwa-filter-pill {% if selected_status == 'all' or not selected_status %}pwa-filter-pill--active{% endif %}">All</a>
+    <a href="?days={{ selected_days }}&status=delivered&settlement={{ selected_settlement }}" class="pwa-filter-pill {% if selected_status == 'delivered' %}pwa-filter-pill--active{% endif %}">Delivered</a>
+    <a href="?days={{ selected_days }}&status=returned&settlement={{ selected_settlement }}" class="pwa-filter-pill {% if selected_status == 'returned' %}pwa-filter-pill--active{% endif %}">Returned</a>
+  </div>
+
+  <!-- Settlement Status Filter -->
+  <div class="pwa-filter-pills mt-2">
+    <a href="?days={{ selected_days }}&status={{ selected_status }}&settlement=all" class="pwa-filter-pill {% if selected_settlement == 'all' or not selected_settlement %}pwa-filter-pill--active{% endif %}">All</a>
+    <a href="?days={{ selected_days }}&status={{ selected_status }}&settlement=pending" class="pwa-filter-pill {% if selected_settlement == 'pending' %}pwa-filter-pill--active{% endif %}" style="{% if selected_settlement == 'pending' %}background: #fef3c7; color: #92400e; border-color: #fcd34d;{% endif %}">
+      <i class="fa-solid fa-clock me-1"></i>Pending
+    </a>
+    <a href="?days={{ selected_days }}&status={{ selected_status }}&settlement=settled" class="pwa-filter-pill {% if selected_settlement == 'settled' %}pwa-filter-pill--active{% endif %}" style="{% if selected_settlement == 'settled' %}background: #dbeafe; color: #1e40af; border-color: #93c5fd;{% endif %}">
+      <i class="fa-solid fa-check me-1"></i>Settled
+    </a>
   </div>
 
   <!-- Completed Orders List -->
@@ -62,21 +155,47 @@
         <i class="fa-solid {% if task.dl_task_status == 'delivered' %}fa-check{% else %}fa-rotate-left{% endif %}"></i>
       </div>
       <div class="pwa-transaction-item__details">
-        <div class="pwa-transaction-item__title">#{{ task.dl_task_number|truncatechars:15 }}</div>
+        <div class="pwa-transaction-item__title">#{{ task.dl_task_number }}</div>
         <div class="pwa-transaction-item__subtitle">{{ task.order.business.business_name|default:"N/A"|truncatechars:25 }}</div>
         <div class="pwa-transaction-item__date">
           {{ task.dl_task_date|date:"M d, Y" }}
-          <span class="badge {% if task.dl_task_status == 'delivered' %}bg-success{% else %}bg-warning text-dark{% endif %} ms-2">
-            {{ task.dl_task_status|title }}
+        </div>
+        <div class="pwa-transaction-item__badges mt-1">
+          <span class="badge {% if task.dl_task_status == 'delivered' %}bg-success{% elif task.dl_task_status == 'failed' %}bg-warning text-dark{% else %}bg-secondary{% endif %}" style="font-size: 0.65rem;">
+            {% if task.dl_task_status == 'failed' %}Returned{% else %}{{ task.dl_task_status|title }}{% endif %}
           </span>
+          {% if task.order.cod_amount and task.order.cod_amount > 0 %}
+            {% if task.cod_settled %}
+            <span class="badge ms-1" style="background: #d1fae5; color: #065f46; font-size: 0.65rem;"><i class="fa-solid fa-check me-1"></i>COD</span>
+            {% elif task.cod_collected %}
+            <span class="badge ms-1" style="background: #dbeafe; color: #1e40af; font-size: 0.65rem;"><i class="fa-solid fa-hand-holding-dollar me-1"></i>COD</span>
+            {% else %}
+            <span class="badge ms-1" style="background: #fee2e2; color: #991b1b; font-size: 0.65rem;"><i class="fa-solid fa-clock me-1"></i>COD</span>
+            {% endif %}
+          {% endif %}
+          {% if task.earnings_verification_status == 'published' %}
+            {% if task.earnings_settled %}
+            <span class="badge ms-1" style="background: #d1fae5; color: #065f46; font-size: 0.65rem;"><i class="fa-solid fa-check me-1"></i>Paid</span>
+            {% else %}
+            <span class="badge ms-1" style="background: #dbeafe; color: #1e40af; font-size: 0.65rem;"><i class="fa-solid fa-wallet me-1"></i>Ready</span>
+            {% endif %}
+          {% elif task.earnings_verification_status == 'rejected' %}
+          <span class="badge ms-1" style="background: #fee2e2; color: #991b1b; font-size: 0.65rem;"><i class="fa-solid fa-times me-1"></i>Rejected</span>
+          {% else %}
+          <span class="badge ms-1" style="background: #fef3c7; color: #92400e; font-size: 0.65rem;"><i class="fa-solid fa-clock me-1"></i>Processing</span>
+          {% endif %}
         </div>
       </div>
       <div class="pwa-transaction-item__amount pwa-text-success">
-        +{{ task.dl_price|default:0 }} QR
+        +{% if task.driver_earnings %}{{ task.driver_earnings|floatformat:2 }}{% else %}{{ task.dl_price|default:0 }}{% endif %} QR
       </div>
     </div>
     {% endfor %}
   </div>
+
+  <!-- Mobile Pagination -->
+  {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params show_per_page='false' show_goto='false' variant='compact' %}
+
   {% else %}
   <div class="pwa-empty-state pwa-empty-state--compact">
     <div class="pwa-empty-state__icon">
@@ -84,6 +203,37 @@
     </div>
     <h4 class="pwa-empty-state__title">No Completed Orders</h4>
     <p class="pwa-empty-state__text">Complete deliveries to see your earnings</p>
+  </div>
+  {% endif %}
+
+  <!-- Recent Earning & Settlement Transactions (Mobile) -->
+  {% if recent_settlements %}
+  <div class="pwa-section-header mt-4">
+    <h4 class="pwa-section-title">Recent Transactions</h4>
+    <span class="pwa-text-muted" style="font-size: 0.75rem;">Last {{ recent_settlements|length }}</span>
+  </div>
+  <div class="pwa-transaction-list mb-4">
+    {% for txn in recent_settlements %}
+    <div class="pwa-transaction-item pwa-fade-in" style="animation-delay: {{ forloop.counter0 }}50ms; border-left: 4px solid {% if txn.transaction_type == 'earning' %}#10b981{% elif txn.transaction_type == 'settlement' %}#3b82f6{% elif txn.transaction_type == 'bonus' %}#8b5cf6{% elif txn.transaction_type == 'deduction' %}#ef4444{% else %}#6b7280{% endif %};">
+      <div class="pwa-transaction-item__icon" style="background: linear-gradient(135deg, {% if txn.transaction_type == 'earning' %}#d1fae5, #a7f3d0{% elif txn.transaction_type == 'settlement' %}#dbeafe, #bfdbfe{% elif txn.transaction_type == 'bonus' %}#ede9fe, #ddd6fe{% elif txn.transaction_type == 'deduction' %}#fee2e2, #fecaca{% else %}#f3f4f6, #e5e7eb{% endif %});">
+        <i class="fa-solid {% if txn.transaction_type == 'earning' %}fa-coins{% elif txn.transaction_type == 'settlement' %}fa-file-invoice-dollar{% elif txn.transaction_type == 'bonus' %}fa-gift{% elif txn.transaction_type == 'deduction' %}fa-minus-circle{% else %}fa-sliders{% endif %}" style="color: {% if txn.transaction_type == 'earning' %}#059669{% elif txn.transaction_type == 'settlement' %}#2563eb{% elif txn.transaction_type == 'bonus' %}#7c3aed{% elif txn.transaction_type == 'deduction' %}#dc2626{% else %}#4b5563{% endif %};"></i>
+      </div>
+      <div class="pwa-transaction-item__details">
+        <div class="pwa-transaction-item__title">
+          <span style="font-family: monospace; font-size: 0.8rem;">{{ txn.transaction_code }}</span>
+        </div>
+        <div class="pwa-transaction-item__subtitle">
+          <span class="badge" style="font-size: 0.65rem; background: {% if txn.transaction_type == 'earning' %}#d1fae5; color: #065f46{% elif txn.transaction_type == 'settlement' %}#dbeafe; color: #1e40af{% elif txn.transaction_type == 'bonus' %}#ede9fe; color: #5b21b6{% elif txn.transaction_type == 'deduction' %}#fee2e2; color: #991b1b{% else %}#f3f4f6; color: #374151{% endif %};">{{ txn.get_transaction_type_display }}</span>
+        </div>
+        <div class="pwa-transaction-item__date">
+          <i class="fa-regular fa-clock me-1"></i>{{ txn.created_at|date:"d M Y, H:i" }}
+        </div>
+      </div>
+      <div class="pwa-transaction-item__amount" style="color: {% if txn.transaction_type == 'deduction' %}#dc2626{% elif txn.transaction_type == 'settlement' %}#2563eb{% else %}#059669{% endif %}; font-weight: 700; font-size: 1rem;">
+        {% if txn.transaction_type == 'deduction' %}-{% else %}+{% endif %}{{ txn.amount|floatformat:0 }} <span style="font-size: 0.75rem;">QR</span>
+      </div>
+    </div>
+    {% endfor %}
   </div>
   {% endif %}
 </div>
@@ -111,41 +261,186 @@
           <option value="delivered" {% if selected_status == 'delivered' %}selected{% endif %}>Delivered</option>
           <option value="returned" {% if selected_status == 'returned' %}selected{% endif %}>Returned</option>
         </select>
+        <select name="settlement" class="form-select" style="max-width: 180px;" onchange="this.form.submit()">
+          <option value="all" {% if selected_settlement == 'all' or not selected_settlement %}selected{% endif %}>All Settlement</option>
+          <option value="pending" {% if selected_settlement == 'pending' %}selected{% endif %}>Pending</option>
+          <option value="settled" {% if selected_settlement == 'settled' %}selected{% endif %}>Settled</option>
+        </select>
       </form>
     </div>
   </div>
 
   <!-- Stats Cards -->
   <div class="row mb-4">
-    <div class="col-md-3 col-sm-6 mb-3">
+    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
       <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
         <div class="card-body">
-          <h6 class="text-muted mb-2">Total Delivery Fee</h6>
+          <h6 class="text-muted mb-2">Total Earnings</h6>
           <h3 class="mb-0 text-success">{{ total_delivery_fee|floatformat:2 }} QR</h3>
         </div>
       </div>
     </div>
-    <div class="col-md-3 col-sm-6 mb-3">
-      <div class="card border-0 shadow-sm h-100">
+    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+      <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
         <div class="card-body">
-          <h6 class="text-muted mb-2">Delivered Orders</h6>
-          <h3 class="mb-0 text-primary">{{ delivered_count }}</h3>
+          <h6 class="text-muted mb-2">Pending Payout</h6>
+          <h3 class="mb-0 text-primary">{{ pending_earnings|floatformat:2 }} QR</h3>
         </div>
       </div>
     </div>
-    <div class="col-md-3 col-sm-6 mb-3">
+    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+      <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
+        <div class="card-body">
+          <h6 class="text-muted mb-2">Awaiting Verification</h6>
+          <h3 class="mb-0 text-warning">{{ pending_verification_count }}</h3>
+          <small class="text-muted">Being processed</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body">
-          <h6 class="text-muted mb-2">Returned Orders</h6>
+          <h6 class="text-muted mb-2">Delivered</h6>
+          <h3 class="mb-0 text-success">{{ delivered_count }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="text-muted mb-2">Returned</h6>
           <h3 class="mb-0 text-warning">{{ returned_count }}</h3>
         </div>
       </div>
     </div>
-    <div class="col-md-3 col-sm-6 mb-3">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <h6 class="text-muted mb-2">Total Orders</h6>
-          <h3 class="mb-0">{{ total_count }}</h3>
+  </div>
+
+  <!-- Settlement Section -->
+  <div class="row mb-4">
+    <!-- Unsettled Deliveries List -->
+    <div class="col-lg-7 mb-4">
+      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
+        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+              <div class="me-3" style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                <i class="fa-solid fa-coins text-white"></i>
+              </div>
+              <div>
+                <h5 class="mb-0 text-white fw-bold">Unsettled Earnings</h5>
+                <small class="text-white" style="opacity: 0.9;">Select deliveries to settle</small>
+              </div>
+            </div>
+            <span class="badge bg-white text-dark">{{ unsettled_tasks|length }} deliveries</span>
+          </div>
+        </div>
+
+        {% if unsettled_tasks %}
+        <div class="px-3 py-2 border-bottom" style="background: #ecfdf5;">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+              <input type="checkbox" class="form-check-input" id="desk-earn-select-all" style="cursor: pointer;">
+              <span class="text-muted" style="font-size: 0.85rem;">Select All</span>
+              <span class="ms-2 text-muted" style="font-size: 0.85rem;">
+                <span id="desk-earn-selected-num">0</span> selected
+              </span>
+              <span id="desk-earn-selected-total" class="fw-semibold ms-1" style="color: #059669; font-size: 0.85rem; display: none;">
+                (<span id="desk-earn-selected-amount">0</span> QR)
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+          <table class="table table-hover mb-0" style="font-size: 0.875rem;">
+            <thead style="background: #ecfdf5; position: sticky; top: 0; z-index: 1;">
+              <tr>
+                <th class="py-2 ps-3" style="font-weight: 600; color: #065f46; border: none; width: 40px;"></th>
+                <th class="py-2" style="font-weight: 600; color: #065f46; border: none;">Order Details</th>
+                <th class="py-2" style="font-weight: 600; color: #065f46; border: none;">Customer</th>
+                <th class="py-2" style="font-weight: 600; color: #065f46; border: none;">Delivered</th>
+                <th class="py-2 pe-3 text-end" style="font-weight: 600; color: #065f46; border: none;">Earning</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for task in unsettled_tasks %}
+              <tr style="border-bottom: 1px solid #f3f4f6;" data-delivery-id="{{ task.id }}" data-amount="{% if task.driver_earnings %}{{ task.driver_earnings }}{% else %}{{ task.dl_price|default:0 }}{% endif %}">
+                <td class="py-2 ps-3">
+                  <input type="checkbox" class="form-check-input desk-earn-checkbox" value="{{ task.id }}" style="cursor: pointer;">
+                </td>
+                <td class="py-2">
+                  <div class="fw-semibold" style="color: #1f2937; font-size: 0.85rem;">{{ task.order.business.business_name|default:"-"|truncatechars:20 }}</div>
+                  <div style="font-size: 0.75rem;">
+                    <span class="text-muted" style="font-family: monospace;">{{ task.dl_task_number }}</span>
+                  </div>
+                </td>
+                <td class="py-2">
+                  <div class="fw-medium" style="color: #374151; font-size: 0.85rem;">{{ task.order.customer_name|default:"-"|truncatechars:20 }}</div>
+                  <div class="text-muted" style="font-size: 0.75rem;">
+                    <i class="fa-solid fa-location-dot me-1"></i>{{ task.dl_to_address.area_name|default:"-" }}
+                  </div>
+                </td>
+                <td class="py-2">
+                  <div class="text-muted" style="font-size: 0.8rem;">{{ task.completed_at|date:"d M"|default:task.dl_task_date|date:"d M" }}</div>
+                  <div style="color: #9ca3af; font-size: 0.75rem;">{{ task.completed_at|date:"H:i"|default:"-" }}</div>
+                </td>
+                <td class="py-2 pe-3 text-end">
+                  <span class="fw-bold" style="color: #059669;">{% if task.driver_earnings %}{{ task.driver_earnings|floatformat:0 }}{% else %}{{ task.dl_price|default:0 }}{% endif %}</span>
+                  <span class="text-muted" style="font-size: 0.7rem;">QR</span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot style="background: #ecfdf5;">
+              <tr>
+                <td colspan="4" class="py-2 ps-3 fw-bold" style="border: none;">Total Unsettled</td>
+                <td class="py-2 pe-3 text-end fw-bold" style="border: none; color: #059669;">{{ unsettled_total|floatformat:0 }} QR</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+          <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+            <i class="fa-solid fa-check text-success" style="font-size: 1.5rem;"></i>
+          </div>
+          <h5 class="text-success mb-1">All Settled!</h5>
+          <p class="text-muted mb-0">No pending earnings to settle</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Settlement Form -->
+    <div class="col-lg-5 mb-4">
+      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
+        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
+          <div class="d-flex align-items-center">
+            <div class="me-3" style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+              <i class="fa-solid fa-file-invoice-dollar text-white"></i>
+            </div>
+            <div>
+              <h5 class="mb-0 text-white fw-bold">Request Settlement</h5>
+              <small class="text-white" style="opacity: 0.9;">Enter amount or select deliveries</small>
+            </div>
+          </div>
+        </div>
+        <div class="card-body p-4">
+          <form method="POST" id="desk-settle-form">
+            {% csrf_token %}
+            <input type="hidden" name="delivery_ids" id="desk-settle-delivery-ids" value="">
+            <div class="mb-3">
+              <label for="desk-settle-amount" class="form-label fw-semibold">Amount (QR)</label>
+              <input type="number" class="form-control form-control-lg" id="desk-settle-amount" name="amount" step="0.01" min="0" max="{{ pending_earnings }}" placeholder="0.00" required style="font-size: 1.3rem; font-weight: 600; text-align: center;">
+              <small class="text-muted">Pending Earnings: {{ pending_earnings|floatformat:2 }} QR</small>
+            </div>
+            <div class="mb-4">
+              <label for="desk-settle-notes" class="form-label fw-semibold">Notes <span class="text-muted fw-normal">(Optional)</span></label>
+              <textarea class="form-control" id="desk-settle-notes" name="notes" rows="2" placeholder="Any additional notes..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 py-2" style="font-weight: 600;">
+              <i class="fa-solid fa-file-invoice-dollar me-2"></i>Request Settlement
+            </button>
+          </form>
         </div>
       </div>
     </div>
@@ -167,7 +462,10 @@
                   <th>DL No</th>
                   <th>Business</th>
                   <th>Dropoff Location</th>
-                  <th>Status</th>
+                  <th>DL Status</th>
+                  <th>COD Status</th>
+                  <th>Verification</th>
+                  <th>Payout Status</th>
                   <th class="text-end">Delivery Fee</th>
                 </tr>
               </thead>
@@ -176,7 +474,7 @@
                 <tr>
                   <td>{{ task.dl_task_date|date:"d M Y" }}</td>
                   <td>
-                    <span class="fw-bold text-primary">#{{ task.dl_task_number|truncatechars:12 }}</span>
+                    <span class="fw-bold text-primary">#{{ task.dl_task_number }}</span>
                   </td>
                   <td>{{ task.order.business.business_name|default:"N/A"|truncatechars:20 }}</td>
                   <td>
@@ -187,17 +485,54 @@
                     {% endif %}
                   </td>
                   <td>
-                    <span class="badge {% if task.dl_task_status == 'delivered' %}bg-success{% else %}bg-warning text-dark{% endif %}">
-                      {{ task.dl_task_status|title }}
+                    <span class="badge {% if task.dl_task_status == 'delivered' %}bg-success{% elif task.dl_task_status == 'failed' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                      {% if task.dl_task_status == 'failed' %}Returned{% else %}{{ task.dl_task_status|title }}{% endif %}
                     </span>
                   </td>
+                  <td>
+                    {% if task.order.cod_amount and task.order.cod_amount > 0 %}
+                      {% if task.cod_settled %}
+                      <span class="badge" style="background: #d1fae5; color: #065f46;"><i class="fa-solid fa-check me-1"></i>Settled</span>
+                      {% elif task.cod_collected %}
+                      <span class="badge" style="background: #dbeafe; color: #1e40af;"><i class="fa-solid fa-hand-holding-dollar me-1"></i>Collected</span>
+                      {% else %}
+                      <span class="badge" style="background: #fef3c7; color: #92400e;"><i class="fa-solid fa-clock me-1"></i>Pending</span>
+                      {% endif %}
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if task.earnings_verification_status == 'published' %}
+                    <span class="badge" style="background: #d1fae5; color: #065f46;"><i class="fa-solid fa-check me-1"></i>Verified</span>
+                    {% elif task.earnings_verification_status == 'verified' %}
+                    <span class="badge" style="background: #dbeafe; color: #1e40af;"><i class="fa-solid fa-clipboard-check me-1"></i>Processing</span>
+                    {% elif task.earnings_verification_status == 'rejected' %}
+                    <span class="badge" style="background: #fee2e2; color: #991b1b;"><i class="fa-solid fa-times me-1"></i>Rejected</span>
+                    {% else %}
+                    <span class="badge" style="background: #fef3c7; color: #92400e;"><i class="fa-solid fa-clock me-1"></i>Pending</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if task.earnings_settled %}
+                    <span class="badge" style="background: #d1fae5; color: #065f46;"><i class="fa-solid fa-check me-1"></i>Paid</span>
+                    {% elif task.earnings_verification_status == 'published' %}
+                    <span class="badge" style="background: #dbeafe; color: #1e40af;"><i class="fa-solid fa-wallet me-1"></i>Ready</span>
+                    {% else %}
+                    <span class="badge" style="background: #f3f4f6; color: #6b7280;"><i class="fa-solid fa-hourglass me-1"></i>Waiting</span>
+                    {% endif %}
+                  </td>
                   <td class="text-end">
-                    <span class="text-success fw-bold">+{{ task.dl_price|default:0 }} QR</span>
+                    {% if task.earnings_verification_status == 'published' or task.driver_earnings %}
+                    <span class="text-success fw-bold">+{% if task.verified_earnings %}{{ task.verified_earnings|floatformat:2 }}{% elif task.driver_earnings %}{{ task.driver_earnings|floatformat:2 }}{% else %}{{ task.dl_price|default:0 }}{% endif %} QR</span>
+                    {% else %}
+                    <span class="text-muted">Processing</span>
+                    {% endif %}
                   </td>
                 </tr>
                 {% empty %}
                 <tr>
-                  <td colspan="6" class="text-center text-muted py-4">
+                  <td colspan="9" class="text-center text-muted py-4">
                     <i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>
                     No completed orders found
                   </td>
@@ -207,8 +542,191 @@
             </table>
           </div>
         </div>
+        <!-- Desktop Pagination -->
+        {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params %}
       </div>
     </div>
   </div>
+
+  <!-- Recent Earning & Settlement Transactions (Desktop) -->
+  {% if recent_settlements %}
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
+        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+              <div class="me-3" style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                <i class="fa-solid fa-clock-rotate-left text-white"></i>
+              </div>
+              <div>
+                <h5 class="mb-0 text-white fw-bold">Recent Transactions</h5>
+                <small class="text-white" style="opacity: 0.9;">Last {{ recent_settlements|length }} earning & settlement records</small>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0" style="font-size: 0.875rem;">
+            <thead style="background: #eff6ff;">
+              <tr>
+                <th class="py-2 ps-3" style="font-weight: 600; color: #1e40af; border: none;">Transaction Code</th>
+                <th class="py-2" style="font-weight: 600; color: #1e40af; border: none;">Type</th>
+                <th class="py-2" style="font-weight: 600; color: #1e40af; border: none;">Description</th>
+                <th class="py-2" style="font-weight: 600; color: #1e40af; border: none;">Date</th>
+                <th class="py-2 pe-3 text-end" style="font-weight: 600; color: #1e40af; border: none;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for txn in recent_settlements %}
+              <tr style="border-bottom: 1px solid #f3f4f6;">
+                <td class="py-2 ps-3">
+                  <span style="font-family: monospace; font-weight: 600; color: {% if txn.transaction_type == 'earning' %}#059669{% elif txn.transaction_type == 'settlement' %}#2563eb{% elif txn.transaction_type == 'bonus' %}#7c3aed{% elif txn.transaction_type == 'deduction' %}#dc2626{% else %}#4b5563{% endif %};">{{ txn.transaction_code }}</span>
+                </td>
+                <td class="py-2">
+                  {% if txn.transaction_type == 'earning' %}
+                  <span class="badge" style="background: #d1fae5; color: #065f46;"><i class="fa-solid fa-coins me-1"></i>Earning</span>
+                  {% elif txn.transaction_type == 'settlement' %}
+                  <span class="badge" style="background: #dbeafe; color: #1e40af;"><i class="fa-solid fa-file-invoice-dollar me-1"></i>Settlement</span>
+                  {% elif txn.transaction_type == 'bonus' %}
+                  <span class="badge" style="background: #ede9fe; color: #5b21b6;"><i class="fa-solid fa-gift me-1"></i>Bonus</span>
+                  {% elif txn.transaction_type == 'deduction' %}
+                  <span class="badge" style="background: #fee2e2; color: #991b1b;"><i class="fa-solid fa-minus-circle me-1"></i>Deduction</span>
+                  {% else %}
+                  <span class="badge" style="background: #f3f4f6; color: #374151;"><i class="fa-solid fa-sliders me-1"></i>Adjustment</span>
+                  {% endif %}
+                </td>
+                <td class="py-2">
+                  <span class="text-muted" style="font-size: 0.85rem;">{{ txn.description|truncatechars:40 }}</span>
+                </td>
+                <td class="py-2">
+                  <div style="font-size: 0.85rem;">{{ txn.created_at|date:"d M Y" }}</div>
+                  <div class="text-muted" style="font-size: 0.75rem;">{{ txn.created_at|date:"H:i" }}</div>
+                </td>
+                <td class="py-2 pe-3 text-end">
+                  <span class="fw-bold" style="color: {% if txn.transaction_type == 'deduction' %}#dc2626{% elif txn.transaction_type == 'settlement' %}#2563eb{% else %}#059669{% endif %};">
+                    {% if txn.transaction_type == 'deduction' %}-{% else %}+{% endif %}{{ txn.amount|floatformat:0 }}
+                  </span>
+                  <span class="text-muted" style="font-size: 0.7rem;">QR</span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // ===================== DESKTOP SETTLEMENT =====================
+  const deskEarnSelectAll = document.getElementById('desk-earn-select-all');
+  const deskEarnCheckboxes = document.querySelectorAll('.desk-earn-checkbox');
+  const deskEarnSelectedNum = document.getElementById('desk-earn-selected-num');
+  const deskEarnSelectedTotal = document.getElementById('desk-earn-selected-total');
+  const deskEarnSelectedAmount = document.getElementById('desk-earn-selected-amount');
+  const deskSettleAmount = document.getElementById('desk-settle-amount');
+  const deskSettleDeliveryIds = document.getElementById('desk-settle-delivery-ids');
+
+  function updateDeskEarnSelection() {
+    const checked = document.querySelectorAll('.desk-earn-checkbox:checked');
+    const count = checked.length;
+    let total = 0;
+    const ids = [];
+
+    checked.forEach(function(cb) {
+      const row = cb.closest('tr');
+      total += parseFloat(row.dataset.amount) || 0;
+      ids.push(cb.value);
+    });
+
+    if (deskEarnSelectedNum) deskEarnSelectedNum.textContent = count;
+    if (deskEarnSelectedAmount) deskEarnSelectedAmount.textContent = total.toFixed(0);
+    if (deskEarnSelectedTotal) deskEarnSelectedTotal.style.display = count > 0 ? 'inline' : 'none';
+
+    if (count > 0 && deskSettleAmount) {
+      deskSettleAmount.value = total.toFixed(2);
+    }
+
+    if (deskSettleDeliveryIds) deskSettleDeliveryIds.value = ids.join(',');
+
+    if (deskEarnSelectAll) {
+      deskEarnSelectAll.checked = count === deskEarnCheckboxes.length && count > 0;
+      deskEarnSelectAll.indeterminate = count > 0 && count < deskEarnCheckboxes.length;
+    }
+  }
+
+  if (deskEarnSelectAll) {
+    deskEarnSelectAll.addEventListener('change', function() {
+      deskEarnCheckboxes.forEach(function(cb) { cb.checked = deskEarnSelectAll.checked; });
+      updateDeskEarnSelection();
+    });
+  }
+
+  deskEarnCheckboxes.forEach(function(cb) {
+    cb.addEventListener('change', updateDeskEarnSelection);
+  });
+
+  // ===================== MOBILE SETTLEMENT =====================
+  const mobEarnSelectAll = document.getElementById('mob-earn-select-all');
+  const mobEarnCheckboxes = document.querySelectorAll('.mob-earn-checkbox');
+  const mobEarnActionBar = document.getElementById('mob-earn-action-bar');
+  const mobEarnSelectedNum = document.getElementById('mob-earn-selected-num');
+  const mobEarnSelectedTotal = document.getElementById('mob-earn-selected-total');
+  const mobSettleAmount = document.getElementById('mob-settle-amount');
+  const mobSettleDeliveryIds = document.getElementById('mob-settle-delivery-ids');
+
+  function updateMobEarnSelection() {
+    const checked = document.querySelectorAll('.mob-earn-checkbox:checked');
+    const count = checked.length;
+    let total = 0;
+    const ids = [];
+
+    mobEarnCheckboxes.forEach(function(cb) {
+      const item = cb.closest('.pwa-transaction-item');
+      item.style.background = '';
+      item.style.borderLeftColor = '#10b981';
+    });
+
+    checked.forEach(function(cb) {
+      const item = cb.closest('.pwa-transaction-item');
+      total += parseFloat(item.dataset.amount) || 0;
+      ids.push(cb.value);
+      item.style.background = 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
+      item.style.borderLeftColor = '#2563eb';
+    });
+
+    if (mobEarnSelectedNum) mobEarnSelectedNum.textContent = count;
+    if (mobEarnSelectedTotal) mobEarnSelectedTotal.textContent = total.toFixed(0) + ' QR';
+    if (mobEarnActionBar) mobEarnActionBar.style.display = count > 0 ? 'block' : 'none';
+
+    if (count > 0 && mobSettleAmount) {
+      mobSettleAmount.value = total.toFixed(2);
+    }
+
+    if (mobSettleDeliveryIds) mobSettleDeliveryIds.value = ids.join(',');
+
+    if (mobEarnSelectAll) {
+      mobEarnSelectAll.checked = count === mobEarnCheckboxes.length && count > 0;
+      mobEarnSelectAll.indeterminate = count > 0 && count < mobEarnCheckboxes.length;
+    }
+  }
+
+  if (mobEarnSelectAll) {
+    mobEarnSelectAll.addEventListener('change', function() {
+      mobEarnCheckboxes.forEach(function(cb) { cb.checked = mobEarnSelectAll.checked; });
+      updateMobEarnSelection();
+    });
+  }
+
+  mobEarnCheckboxes.forEach(function(cb) {
+    cb.addEventListener('change', updateMobEarnSelection);
+  });
+});
+</script>
 {% endblock %}
