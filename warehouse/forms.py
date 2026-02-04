@@ -282,6 +282,9 @@ class ReceiveStockForm(forms.Form):
 
     def __init__(self, business, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Fix: Store business for validation
+        self.business = business
+
         # Get warehouses linked to this business
         linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
             business=business,
@@ -292,6 +295,23 @@ class ReceiveStockForm(forms.Form):
             id__in=linked_warehouse_ids,
             is_active=True
         )
+
+    def clean_product(self):
+        """Fix: Validate product belongs to the user's business to prevent IDOR."""
+        from product.models import Product
+        product_id = self.cleaned_data.get('product')
+
+        if product_id and self.business:
+            try:
+                product = Product.objects.get(id=product_id)
+                if product.business_id != self.business.business_id:
+                    raise forms.ValidationError(
+                        'You do not have permission to receive stock for this product.'
+                    )
+            except Product.DoesNotExist:
+                raise forms.ValidationError('Product not found.')
+
+        return product_id
 
 
 # =============================================================================

@@ -12,7 +12,15 @@
       <div class="row">
         <div class="col-md-12">
           <form method="post" id="fleet_vehicle_add_form_main">
-            {% csrf_token %} {{ form | crispy }}
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger mb-3" role="alert">
+              {% for error in form.non_field_errors %}
+              <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {{ form | crispy }}
             <button type="submit" class="btn btn-dark align-content-center" id="fleet_vehicle_add_btn_submit">ADD VEHICLE</button>
             <a href="{% url 'fleet:vehicle_own' %}" class="text-decoration-none">
               <div class="btn btn-outline-dark text-decoration-none" id="fleet_vehicle_add_btn_back">BACK</div>

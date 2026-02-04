@@ -35,11 +35,25 @@ class AddItemsForm(forms.ModelForm):
         model = product_models.Product
         verbose_name = 'Product'
         verbose_name_plural = 'Products'
-        fields = '__all__'
-        exclude = ('inventory', 'business', 'items_sku', 'product_id')  # product_id is auto-generated
+        # Fix: Explicitly list allowed fields instead of __all__
+        fields = [
+            'brand_name',
+            'item_name',
+            'item_sku',
+            'barcode',
+            'color',
+            'size',
+            'unit',
+            'item_price',
+            'item_discription',
+            'brand_logo',
+            'product_image',
+            'product_category',
+        ]
+        # Exclude protected fields - business set in view, product_id auto-generated
+        exclude = ['business', 'product_id', 'created_at', 'updated_at']
         widgets = {
             'item_name': forms.TextInput(attrs={'class': 'form-control'}),
             'item_price': forms.NumberInput(attrs={'class': 'form-control'}),
-            'item_quantity': forms.NumberInput(attrs={'class': 'form-control'}),
-
+            'item_discription': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }

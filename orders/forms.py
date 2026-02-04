@@ -224,9 +224,21 @@ class AddOrderProductsForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        # Fix: Accept business_id for IDOR validation
+        self.business_id = kwargs.pop('business_id', None)
         super().__init__(*args, **kwargs)
         self.fields['product'].widget.attrs.update({'class': 'form-control'})
         self.fields['notes'].required = False
+
+    def clean_order(self):
+        """Fix: Validate order belongs to the user's business to prevent IDOR."""
+        order = self.cleaned_data.get('order')
+        if order and self.business_id:
+            if order.business_id != self.business_id:
+                raise forms.ValidationError(
+                    'You do not have permission to add products to this order.'
+                )
+        return order
 
         # Filter products by business if order instance exists
         if self.instance and self.instance.order_id:
@@ -282,7 +294,41 @@ class OrderFileUploadForm(forms.Form):
     View:
         orders.views.order_file_upload
     """
-    file = forms.FileField()
+    # Fix: Add file validation
+    file = forms.FileField(
+        help_text='Upload a CSV file with order data. Maximum file size: 5MB.',
+        widget=forms.FileInput(attrs={'accept': '.csv'})
+    )
+
+    # Maximum file size in bytes (5MB)
+    MAX_FILE_SIZE = 5 * 1024 * 1024
+
+    def clean_file(self):
+        """Validate uploaded file is a CSV and within size limits."""
+        uploaded_file = self.cleaned_data.get('file')
+
+        if uploaded_file:
+            # Check file size
+            if uploaded_file.size > self.MAX_FILE_SIZE:
+                raise forms.ValidationError(
+                    f'File size exceeds maximum limit of 5MB. '
+                    f'Your file is {uploaded_file.size / (1024*1024):.2f}MB.'
+                )
+
+            # Check file extension
+            if not uploaded_file.name.lower().endswith('.csv'):
+                raise forms.ValidationError(
+                    'Invalid file type. Please upload a CSV file.'
+                )
+
+            # Check content type
+            content_type = uploaded_file.content_type
+            if content_type not in ['text/csv', 'application/csv', 'text/plain']:
+                raise forms.ValidationError(
+                    'Invalid file format. Please upload a valid CSV file.'
+                )
+
+        return uploaded_file
 
 
 class UpdateOrderForm(forms.ModelForm):

@@ -40,6 +40,13 @@
         </div>
         <form method="POST" id="client_location_update_form_main">
             {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger mb-3" role="alert">
+                {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
             <div class="form-card-body">
                 {{ form | crispy }}
             </div>

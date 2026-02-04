@@ -119,7 +119,10 @@ def business_dashboard(request):
             return redirect('core:main_dashboard')
         logger.info(f"User {request.user.id} accessed dashboard for business {business.business_id}")
 
-        profile = core_models.Profile.objects.get(user_id=business.user_id)
+        # Fix: Use cached profile instead of extra query
+        profile = get_cached_profile(request)
+        if not profile:
+            profile = core_models.Profile.objects.filter(user_id=business.user_id).first()
         business_profile, _created = business_models.BusinessProfile.objects.get_or_create(business_id=business.business_id)
 
         # N+1 FIX: Optimize queries
@@ -191,21 +194,32 @@ def business_dashboard(request):
             Q(order_status='customer_confirmation_pending')
         ).select_related('pickup_location').order_by('-id')[:5]
 
-        # Team statistics
-        team_members = business_models.BusinessTeamProfile.objects.filter(
-            business_id=business.business_id
-        ).select_related('user')
+        # Team statistics - Fix: Use aggregates to reduce queries from 4 to 2
+        from django.db.models import Count, Case, When, IntegerField
 
-        total_team_members = team_members.count()
-        active_team_members = team_members.filter(team_status='active').count()
-        pending_team_members = team_members.filter(team_status='pending').count()
+        team_stats = business_models.BusinessTeamProfile.objects.filter(
+            business_id=business.business_id
+        ).aggregate(
+            total=Count('id'),
+            active=Count(Case(When(team_status='active', then=1), output_field=IntegerField())),
+            pending=Count(Case(When(team_status='pending', then=1), output_field=IntegerField())),
+        )
+
+        total_team_members = team_stats['total']
+        active_team_members = team_stats['active']
+        pending_team_members = team_stats['pending']
 
         # Recent team members (latest 3)
-        recent_team_members = team_members.order_by('-created_at')[:3]
+        recent_team_members = business_models.BusinessTeamProfile.objects.filter(
+            business_id=business.business_id
+        ).select_related('user').order_by('-created_at')[:3]
 
         # Check if user has multiple businesses (for business switcher)
         user_businesses = get_all_user_businesses(request.user)
         show_business_switcher = len(user_businesses) > 1
+
+        # Fix: Add is_business_owner for sidebar visibility
+        is_business_owner = business.user_id == request.user.id if business.user_id else False
 
         context = {
             'profile': profile,
@@ -232,6 +246,8 @@ def business_dashboard(request):
             # Business switcher
             'show_business_switcher': show_business_switcher,
             'user_businesses': user_businesses,
+            # Permissions
+            'is_business_owner': is_business_owner,
         }
         return render(request, 'business/business_dashboard.html', context)
     except business_models.Business.DoesNotExist:
@@ -685,15 +701,15 @@ def business_settings(request, business_id):
     stores = business_models.PickupLocation.objects.filter(business_id=business_id)
     logger.debug(f'Loading business settings for business_id={business_id}: apis={business_apis.count()}, teams={teams.count()}, stores={stores.count()}')
 
-    
-    
+    # Fix: Add is_business_owner for sidebar visibility
+    is_business_owner = business.user_id == request.user.id if business and business.user_id else False
 
     context = {
         'business': business,
         'business_apis': business_apis,
         'teams': teams,
         'stores': stores,
-
+        'is_business_owner': is_business_owner,
     }
     return render(request, 'business/parts/business_settings.html', context)
 
@@ -868,54 +884,91 @@ def business_settings_api_test_result(request, business_id, api_id):
 
     BASE_API_STORE_NAME = BASE_API_STORE_NAME.replace('https://', '')
 
-    if business_api.api_type == 'shopify':
-        shop_url = BASE_API_STORE_NAME
-        logger.debug(f'Testing Shopify API for shop_url={shop_url}')
+    # Initialize variables with defaults to prevent undefined variable errors
+    order_response = None
+    product_response = None
+    order_count = 0
+    product_count = 0
+    result = {}
+    status = 0
+    error_message = None
 
-        order_base_url = 'https://' + shop_url + BASE_API_ORDER_ENDPINT
-        product_base_url = 'https://' + shop_url + BASE_API_PRODUCT_ENDPINT
-        header_value = {'X-Shopify-Access-Token': BASE_API_ACCESS_KEY, 'Content-Type': 'application/json'}
+    try:
+        if business_api.api_type == 'shopify':
+            shop_url = BASE_API_STORE_NAME
+            logger.debug(f'Testing Shopify API for shop_url={shop_url}')
 
-        order_response = requests.get(order_base_url, headers=header_value, params={'status': 'any', 'limit': 10})
-        order_count = len(order_response.json().get('orders', []))
-        logger.debug(f'Shopify order_count={order_count}')
+            order_base_url = 'https://' + shop_url + BASE_API_ORDER_ENDPINT
+            product_base_url = 'https://' + shop_url + BASE_API_PRODUCT_ENDPINT
+            header_value = {'X-Shopify-Access-Token': BASE_API_ACCESS_KEY, 'Content-Type': 'application/json'}
 
-        product_response = requests.get(product_base_url, headers=header_value)
-        product_count = len(product_response.json().get('products', []))
-        logger.debug(f'Shopify product_count={product_count}')
+            order_response = requests.get(order_base_url, headers=header_value, params={'status': 'any', 'limit': 10}, timeout=30)
+            order_response.raise_for_status()
+            order_count = len(order_response.json().get('orders', []))
+            logger.debug(f'Shopify order_count={order_count}')
 
-    elif business_api.api_type == 'woocommerce':
-        shop_url = 'https://' + BASE_API_STORE_NAME
-        logger.debug(f'Testing WooCommerce API for shop_url={shop_url}')
+            product_response = requests.get(product_base_url, headers=header_value, timeout=30)
+            product_response.raise_for_status()
+            product_count = len(product_response.json().get('products', []))
+            logger.debug(f'Shopify product_count={product_count}')
 
-        wcapi = WooAPI(
-            url=shop_url,
-            consumer_key=BASE_API_KEY,
-            consumer_secret=BASE_API_SECRET,
-            version="wc/v3",
-        )
+        elif business_api.api_type == 'woocommerce':
+            shop_url = 'https://' + BASE_API_STORE_NAME
+            logger.debug(f'Testing WooCommerce API for shop_url={shop_url}')
 
-        order_response = wcapi.get("orders")
-        order_count = order_response.headers.get('X-WP-Total')
-        logger.debug(f'WooCommerce order_count={order_count}')
+            wcapi = WooAPI(
+                url=shop_url,
+                consumer_key=BASE_API_KEY,
+                consumer_secret=BASE_API_SECRET,
+                version="wc/v3",
+                timeout=30,
+            )
 
-        product_response = wcapi.get("products", params={"per_page": 20})
-        product_count = product_response.headers.get('X-WP-Total')
-        logger.debug(f'WooCommerce product_count={product_count}')
- 
-    else:
-        order_response = None
-        product_response = None
+            order_response = wcapi.get("orders")
+            # Fix: Convert header string to int safely
+            order_count_str = order_response.headers.get('X-WP-Total', '0')
+            order_count = int(order_count_str) if order_count_str else 0
+            logger.debug(f'WooCommerce order_count={order_count}')
 
-    # Handle unsupported API types or failed responses
-    if order_response is not None:
-        result = order_response.json()
-        status = order_response.status_code
+            product_response = wcapi.get("products", params={"per_page": 20})
+            # Fix: Convert header string to int safely
+            product_count_str = product_response.headers.get('X-WP-Total', '0')
+            product_count = int(product_count_str) if product_count_str else 0
+            logger.debug(f'WooCommerce product_count={product_count}')
+
+        else:
+            error_message = f'API type "{business_api.api_type}" is not yet supported for testing.'
+
+    except requests.exceptions.Timeout:
+        error_message = 'Connection timed out. Please check your API URL and try again.'
+        logger.error(f'API test timeout for business {business_id}, api {api_id}')
+    except requests.exceptions.ConnectionError:
+        error_message = 'Could not connect to the API. Please check your store URL.'
+        logger.error(f'API connection error for business {business_id}, api {api_id}')
+    except requests.exceptions.HTTPError as e:
+        error_message = f'API returned error: {e.response.status_code} - {e.response.reason}'
+        logger.error(f'API HTTP error for business {business_id}, api {api_id}: {e}')
+    except ValueError as e:
+        error_message = f'Invalid response from API: {str(e)}'
+        logger.error(f'API value error for business {business_id}, api {api_id}: {e}')
+    except Exception as e:
+        error_message = f'An unexpected error occurred: {str(e)}'
+        logger.exception(f'API test exception for business {business_id}, api {api_id}')
+
+    # Handle response data
+    if error_message:
+        result = {'error': error_message}
+        status = 0
+    elif order_response is not None:
+        try:
+            result = order_response.json()
+            status = order_response.status_code
+        except ValueError:
+            result = {'error': 'Invalid JSON response from API'}
+            status = order_response.status_code if order_response else 0
     else:
         result = {'error': f'API type "{business_api.api_type}" is not yet supported for testing.'}
         status = 0
-        order_count = 0
-        product_count = 0
 
     context = {
         'business': business,
@@ -981,10 +1034,8 @@ def business_logo_update(request, business_id):
     context = {
         'form': form,
         'form_title': 'Business logo Update',
-    }   
-  
-        
-        
+        'business': user_business,
+    }
     return render(request, 'business/parts/business_logo_update.html', context)
 
 

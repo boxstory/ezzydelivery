@@ -115,16 +115,25 @@ class CareersForm(forms.ModelForm):
     """
     class Meta:
         model = Careers
-        fields = '__all__'
+        # Fix: Explicitly list allowed fields instead of __all__
+        fields = [
+            'full_name',
+            'email',
+            'mobile',
+            'qid',
+            'job',
+            'self_intro',
+        ]
+        # Exclude auto-generated fields
+        exclude = ['date']
 
     def clean_qid(self):
         qid = self.cleaned_data.get('qid')
-        print(type(qid))
+        # Fix: Removed debug print statement
         qid = str(qid)
-        # Check if qid is 10 digits and starts with 2 or 3
+        # Check if qid is 11 digits and starts with 2 or 3
         if not (len(qid) == 11 and qid.isdigit() and (qid.startswith('2') or qid.startswith('3'))):
-            raise forms.ValidationError("The qid should be real")
-
+            raise forms.ValidationError("QID must be 11 digits and start with 2 or 3.")
         return qid
 
     
@@ -160,28 +169,105 @@ class PricingEnquiryForm(forms.ModelForm):
     View:
         webpages.views.delivery_inquiry
     """
-    # Override boolean fields with ChoiceField for Yes/No radio buttons
-    is_personalized_product = forms.ChoiceField(choices=[ (False, 'No'),(True, 'Yes')])
-    is_registered_company_in_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
-    is_located_in_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
-    is_team_available_in_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
-    is_required_COD_service = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
-    speed_delivery_offer_to_customers = forms.MultipleChoiceField(choices=[('5Days', '6: 5 Days Delivery'), ('NextDay48', '5: Next 48 Hrs Delivery'),('NextDay24', '4: Next 24 Hrs Delivery'),('SameDay', '3: Same Day Delivery'),('WithIn6Hr', '2: With In 6Hrs'),('WithIn2Hr', '1: With In 2Hrs'), ('None', 'None') ])
-    is_required_fulfillment_service_for_operate_from_outside_qatar = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
-    is_required_fulfillment_service_for_make_hub_in_doha = forms.ChoiceField(choices=[(True, 'Yes'), (False, 'No')])
-    is_frequent_same_day_pick_and_delivery_required = forms.ChoiceField(choices=[(False, 'No'), (True, 'Yes, Pick And Delivery Same time') ])
-    is_special_handling_required = forms.ChoiceField(choices=[(False, 'No'), (True, 'Yes')])
-    type_of_pickup_location = forms.ChoiceField(choices=[('Home', 'Home'), ("Office", 'Office'), ("Store", 'Store'), ("Multiple Store", 'Multiple Store'), ("Fulfillment", 'Fulfillment')])
-    typical_package_size = forms.MultipleChoiceField(choices=[('Packets samll (Below 20cm)', 'Packets samll (Below 20cm)'), ('Packets Big (above 20cm)', 'Packets Big (above 20cm)'), ('Boxs samll', 'Boxs samll (Below 20cm)'),('Boxs Big', 'Boxs Big (Above 20cm)'),('Boxs Bigger', 'Boxs Bigger (Above  50cm)')])
-    pickup_location_time_slab = forms.MultipleChoiceField(choices=[('AllDay', 'All day'), ('Office Timing 8Am-3Pm', 'Office Timing( 8Am - 3Pm)'),('Before11Am', 'Before 11Am'), ('11AM-4Pm', '11AM-4Pm'), ('After4PM', 'After 4PM')])
-    avarage_number_of_order_last_week = forms.ChoiceField(choices=[('1-4', '1 to 4'),('5-25', '5 to 25'), ('26-60', '26 to 60'), ('61-100', '61 to 100'),('100-200', '100 to 200'),('200-300', '200 to 300'),('300-500', '300 to 500'),('500-1000', '500 to 1000'),('1000-1500', '1000 to 1500'),('1500+', '1500+')])
-    avarage_number_of_order_done_last_month = forms.ChoiceField(choices=[('1-4', '1 to 4'),('5-25', '5 to 25'), ('26-60', '26 to 60'), ('61-100', '61 to 100'),('100-200', '100 to 200'),('200-300', '200 to 300'),('300-500', '300 to 500'),('500-1000', '500 to 1000'),('1000-1500', '1000 to 1500'),('1500+', '1500+')])
-    avarage_number_of_order_expect_next_month = forms.ChoiceField(choices=[('1-4', '1 to 4'),('5-25', '5 to 25'), ('26-60', '26 to 60'), ('61-100', '61 to 100'),('100-200', '100 to 200'),('200-300', '200 to 300'),('300-500', '300 to 500'),('500-1000', '500 to 1000'),('1000-1500', '1000 to 1500'),('1500+', '1500+')])
-    orders_expected_in_next_3_months_milestone = forms.ChoiceField(choices=[('1-4', '1 to 4'),('5-25', '5 to 25'), ('26-60', '26 to 60'), ('61-100', '61 to 100'),('100-200', '100 to 200'),('200-300', '200 to 300'),('300-500', '300 to 500'),('500-1000', '500 to 1000'),('1000-1500', '1000 to 1500'),('1500+', '1500+')])
+    # Fix: Override boolean fields with string choices for proper form handling
+    is_personalized_product = forms.ChoiceField(choices=[('false', 'No'), ('true', 'Yes')])
+    is_registered_company_in_qatar = forms.ChoiceField(choices=[('true', 'Yes'), ('false', 'No')])
+    is_located_in_qatar = forms.ChoiceField(choices=[('true', 'Yes'), ('false', 'No')])
+    is_team_available_in_qatar = forms.ChoiceField(choices=[('true', 'Yes'), ('false', 'No')])
+    is_required_COD_service = forms.ChoiceField(choices=[('true', 'Yes'), ('false', 'No')])
+    speed_delivery_offer_to_customers = forms.MultipleChoiceField(choices=[
+        ('5Days', '5 Days Delivery'),
+        ('NextDay48', 'Next 48 Hrs Delivery'),
+        ('NextDay24', 'Next 24 Hrs Delivery'),
+        ('SameDay', 'Same Day Delivery'),
+        ('WithIn6Hr', 'Within 6 Hrs'),
+        ('WithIn2Hr', 'Within 2 Hrs'),
+        ('None', 'None'),
+    ])
+    is_required_fulfillment_service_for_operate_from_outside_qatar = forms.ChoiceField(choices=[('true', 'Yes'), ('false', 'No')])
+    is_required_fulfillment_service_for_make_hub_in_doha = forms.ChoiceField(choices=[('true', 'Yes'), ('false', 'No')])
+    is_frequent_same_day_pick_and_delivery_required = forms.ChoiceField(choices=[('false', 'No'), ('true', 'Yes, Pick And Delivery Same time')])
+    is_special_handling_required = forms.ChoiceField(choices=[('false', 'No'), ('true', 'Yes')])
+    type_of_pickup_location = forms.ChoiceField(choices=[
+        ('Home', 'Home'),
+        ('Office', 'Office'),
+        ('Store', 'Store'),
+        ('Multiple Store', 'Multiple Store'),
+        ('Fulfillment', 'Fulfillment'),
+    ])
+    typical_package_size = forms.MultipleChoiceField(choices=[
+        ('Packets small (Below 20cm)', 'Packets small (Below 20cm)'),
+        ('Packets Big (above 20cm)', 'Packets Big (above 20cm)'),
+        ('Boxes small', 'Boxes small (Below 20cm)'),
+        ('Boxes Big', 'Boxes Big (Above 20cm)'),
+        ('Boxes Bigger', 'Boxes Bigger (Above 50cm)'),
+    ])
+    pickup_location_time_slab = forms.MultipleChoiceField(choices=[
+        ('AllDay', 'All day'),
+        ('Office Timing 8Am-3Pm', 'Office Timing (8Am - 3Pm)'),
+        ('Before11Am', 'Before 11Am'),
+        ('11AM-4Pm', '11AM-4Pm'),
+        ('After4PM', 'After 4PM'),
+    ])
+    avarage_number_of_order_last_week = forms.ChoiceField(choices=[
+        ('1-4', '1 to 4'), ('5-25', '5 to 25'), ('26-60', '26 to 60'),
+        ('61-100', '61 to 100'), ('100-200', '100 to 200'), ('200-300', '200 to 300'),
+        ('300-500', '300 to 500'), ('500-1000', '500 to 1000'),
+        ('1000-1500', '1000 to 1500'), ('1500+', '1500+'),
+    ])
+    avarage_number_of_order_done_last_month = forms.ChoiceField(choices=[
+        ('1-4', '1 to 4'), ('5-25', '5 to 25'), ('26-60', '26 to 60'),
+        ('61-100', '61 to 100'), ('100-200', '100 to 200'), ('200-300', '200 to 300'),
+        ('300-500', '300 to 500'), ('500-1000', '500 to 1000'),
+        ('1000-1500', '1000 to 1500'), ('1500+', '1500+'),
+    ])
+    avarage_number_of_order_expect_next_month = forms.ChoiceField(choices=[
+        ('1-4', '1 to 4'), ('5-25', '5 to 25'), ('26-60', '26 to 60'),
+        ('61-100', '61 to 100'), ('100-200', '100 to 200'), ('200-300', '200 to 300'),
+        ('300-500', '300 to 500'), ('500-1000', '500 to 1000'),
+        ('1000-1500', '1000 to 1500'), ('1500+', '1500+'),
+    ])
+    orders_expected_in_next_3_months_milestone = forms.ChoiceField(choices=[
+        ('1-4', '1 to 4'), ('5-25', '5 to 25'), ('26-60', '26 to 60'),
+        ('61-100', '61 to 100'), ('100-200', '100 to 200'), ('200-300', '200 to 300'),
+        ('300-500', '300 to 500'), ('500-1000', '500 to 1000'),
+        ('1000-1500', '1000 to 1500'), ('1500+', '1500+'),
+    ])
 
     class Meta:
         model = PricingEnquiry
-        fields = '__all__'  # Include all fields from the model
+        # Fix: Explicitly list allowed fields instead of __all__
+        fields = [
+            'full_name',
+            'business_name',
+            'business_contact_number',
+            'operation_team_contact_number',
+            'website_url',
+            'social_profile',
+            'product_category',
+            'is_personalized_product',
+            'is_registered_company_in_qatar',
+            'is_located_in_qatar',
+            'is_team_available_in_qatar',
+            'is_required_COD_service',
+            'is_required_fulfillment_service_for_operate_from_outside_qatar',
+            'is_required_fulfillment_service_for_make_hub_in_doha',
+            'avarage_number_of_order_last_week',
+            'avarage_number_of_order_done_last_month',
+            'avarage_number_of_order_expect_next_month',
+            'orders_expected_in_next_3_months_milestone',
+            'speed_delivery_offer_to_customers',
+            'is_frequent_same_day_pick_and_delivery_required',
+            'preferred_delivery_time_window',
+            'typical_package_size',
+            'is_special_handling_required',
+            'type_of_pickup_location',
+            'pickup_Location_area_name',
+            'pickup_location_time_slab',
+            'number_of_pickup_times_in_day',
+        ]
+        # Exclude auto-generated fields
+        exclude = ['date_created', 'date_modified']
 
     def __init__(self, *args, **kwargs):
         super(PricingEnquiryForm, self).__init__(*args, **kwargs)
