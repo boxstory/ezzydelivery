@@ -774,6 +774,189 @@ def cod_transaction_detail(request):
         return JsonResponse({'error': 'Driver not found'}, status=404)
 
 
+# COD Transaction PDF ------------------------------------------------------------------------------------------------------------
+@login_required(login_url='/accounts/login/')
+@driver_required
+def cod_transaction_pdf(request):
+    """Generate PDF report for a specific COD transaction"""
+    from io import BytesIO
+    from datetime import timedelta
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+
+    txn_code = request.GET.get('code', '')
+    if not txn_code:
+        messages.error(request, 'Missing transaction code')
+        return redirect('fleet:cod_collection')
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        txn = fleet_models.DriverTransaction.objects.get(
+            transaction_code=txn_code,
+            driver=driver
+        )
+
+        # Get linked orders
+        orders = []
+        if txn.transaction_type == 'cod_collection' and txn.delivery_task:
+            d = txn.delivery_task
+            orders.append({
+                'task_number': d.dl_task_number or '-',
+                'business': d.order.business.business_name if d.order and d.order.business else '-',
+                'customer': d.order.customer_name if d.order else '-',
+                'location': d.dl_to_address.area_name if d.dl_to_address else '-',
+                'delivered_at': d.completed_at.strftime('%d %b %Y, %H:%M') if d.completed_at else '-',
+                'amount': float(d.cod_collected_amount or 0),
+            })
+        elif txn.transaction_type in ['cod_deposit', 'cod_driver_settle']:
+            window = timedelta(seconds=5)
+            settled_tasks = delivery_models.DeliveryTask.objects.filter(
+                driver=driver,
+                cod_collected=True,
+                cod_settled=True,
+                cod_settled_at__gte=txn.created_at - window,
+                cod_settled_at__lte=txn.created_at + window,
+            ).select_related('order', 'order__business', 'dl_to_address').order_by('-completed_at')
+
+            for d in settled_tasks:
+                orders.append({
+                    'task_number': d.dl_task_number or '-',
+                    'business': d.order.business.business_name if d.order and d.order.business else '-',
+                    'customer': d.order.customer_name if d.order else '-',
+                    'location': d.dl_to_address.area_name if d.dl_to_address else '-',
+                    'delivered_at': d.completed_at.strftime('%d %b %Y, %H:%M') if d.completed_at else '-',
+                    'amount': float(d.cod_collected_amount or 0),
+                })
+
+        orders_total = sum(o['amount'] for o in orders)
+
+        # Generate PDF
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Title
+        title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=18, alignment=TA_CENTER, spaceAfter=10)
+        elements.append(Paragraph('Transaction Report', title_style))
+
+        # Transaction code
+        code_style = ParagraphStyle('Code', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER, textColor=colors.HexColor('#6b7280'))
+        elements.append(Paragraph(f'{txn.transaction_code}', code_style))
+        elements.append(Spacer(1, 20))
+
+        # Transaction summary
+        info_style = ParagraphStyle('Info', parent=styles['Normal'], fontSize=10, spaceAfter=6)
+        amount_color = '#059669' if txn.amount >= 0 else '#dc2626'
+        amount_sign = '+' if txn.amount >= 0 else ''
+
+        summary_data = [
+            ['Type:', txn.get_transaction_type_display()],
+            ['Amount:', f'{amount_sign}{abs(float(txn.amount)):.0f} QR'],
+            ['Date:', txn.created_at.strftime('%d %b %Y, %H:%M')],
+            ['Description:', txn.description or '-'],
+            ['Payment Method:', txn.get_payment_method_display() if txn.payment_method else '-'],
+        ]
+        if txn.reference_number:
+            summary_data.append(['Reference:', txn.reference_number])
+        if txn.notes:
+            summary_data.append(['Notes:', txn.notes[:50]])
+
+        summary_table = Table(summary_data, colWidths=[1.5*inch, 4.5*inch])
+        summary_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#6b7280')),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 15))
+
+        # Balance after transaction
+        balance_style = ParagraphStyle('Balance', parent=styles['Heading2'], fontSize=12, spaceAfter=8)
+        elements.append(Paragraph('Balance After Transaction', balance_style))
+
+        balance_data = [
+            ['COD in Hand:', f'{float(txn.cod_in_hand_after or 0):.0f} QR'],
+            ['Wallet Balance:', f'{float(txn.wallet_balance_after or 0):.0f} QR'],
+            ['Pending Earnings:', f'{float(txn.pending_earnings_after or 0):.0f} QR'],
+        ]
+        balance_table = Table(balance_data, colWidths=[1.5*inch, 2*inch])
+        balance_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#6b7280')),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica-Bold'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f9fafb')),
+        ]))
+        elements.append(balance_table)
+        elements.append(Spacer(1, 20))
+
+        # Orders table (if any)
+        if orders:
+            orders_title = ParagraphStyle('OrdersTitle', parent=styles['Heading2'], fontSize=12, spaceAfter=10)
+            elements.append(Paragraph(f'COD Orders ({len(orders)})', orders_title))
+
+            orders_data = [['#', 'Task', 'Business', 'Customer', 'Delivered', 'Amount']]
+            for idx, o in enumerate(orders, 1):
+                orders_data.append([
+                    str(idx),
+                    o['task_number'][:12] if len(o['task_number']) > 12 else o['task_number'],
+                    o['business'][:18] if len(o['business']) > 18 else o['business'],
+                    o['customer'][:15] if len(o['customer']) > 15 else o['customer'],
+                    o['delivered_at'],
+                    f"{o['amount']:.0f} QR"
+                ])
+            orders_data.append(['', '', '', '', 'Total:', f'{orders_total:.0f} QR'])
+
+            orders_table = Table(orders_data, colWidths=[0.3*inch, 0.9*inch, 1.3*inch, 1.1*inch, 1.2*inch, 0.8*inch])
+            orders_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#8b5cf6')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#ede9fe')),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#e5e7eb')),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('TOPPADDING', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+            ]))
+            elements.append(orders_table)
+
+        # Footer
+        elements.append(Spacer(1, 30))
+        footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=colors.HexColor('#9ca3af'))
+        elements.append(Paragraph(f'Generated on {timezone.now().strftime("%d %b %Y, %H:%M")} | Driver: {driver.user.get_full_name() or driver.user.username}', footer_style))
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="txn_{txn.transaction_code}.pdf"'
+        return response
+
+    except fleet_models.DriverTransaction.DoesNotExist:
+        messages.error(request, 'Transaction not found')
+        return redirect('fleet:cod_collection')
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found')
+        return redirect('fleet:cod_collection')
+
+
 # Earnings View ----------------------------------------------------------------------------------------------------------------------------
 @login_required(login_url='/accounts/login/')
 @driver_required

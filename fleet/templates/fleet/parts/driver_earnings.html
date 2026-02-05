@@ -239,7 +239,7 @@
 </div>
 
 <!-- Desktop View -->
-<div class="container-fluid py-4 d-none d-md-block">
+<div class="container-fluid py-4 px-2 d-none d-md-block">
   <div class="row mb-4">
     <div class="col-12">
       <h1 class="h3 mb-0">My Earnings</h1>
@@ -271,46 +271,29 @@
   </div>
 
   <!-- Stats Cards -->
-  <div class="row mb-4">
-    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-      <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
-        <div class="card-body">
-          <h6 class="text-muted mb-2">Total Earnings</h6>
-          <h3 class="mb-0 text-success">{{ total_delivery_fee|floatformat:2 }} QR</h3>
-        </div>
+  <div class="d-flex flex-wrap gap-3 mb-4">
+    <div class="card border-0 shadow-sm border-start border-4 border-success flex-fill p-0" style="min-width: 200px;">
+      <div class="card-body">
+        <h6 class="text-muted mb-1 small">Total Earnings</h6>
+        <h4 class="mb-0 text-success">{{ total_delivery_fee|floatformat:2 }} QR</h4>
       </div>
     </div>
-    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-      <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
-        <div class="card-body">
-          <h6 class="text-muted mb-2">Pending Payout</h6>
-          <h3 class="mb-0 text-primary">{{ pending_earnings|floatformat:2 }} QR</h3>
-        </div>
+    <div class="card border-0 shadow-sm border-start border-4 border-primary flex-fill p-0" style="min-width: 200px;">
+      <div class="card-body">
+        <h6 class="text-muted mb-1 small">Unsettled Earnings</h6>
+        <h4 class="mb-0 text-primary">{{ unsettled_total|floatformat:2 }} QR</h4>
       </div>
     </div>
-    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-      <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
-        <div class="card-body">
-          <h6 class="text-muted mb-2">Awaiting Verification</h6>
-          <h3 class="mb-0 text-warning">{{ pending_verification_count }}</h3>
-          <small class="text-muted">Being processed</small>
-        </div>
+    <div class="card border-0 shadow-sm border-start border-4 border-warning flex-fill p-0" style="min-width: 200px;">
+      <div class="card-body">
+        <h6 class="text-muted mb-1 small">Awaiting Verification</h6>
+        <h4 class="mb-0 text-warning">{{ pending_verification_count }}</h4>
       </div>
     </div>
-    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <h6 class="text-muted mb-2">Delivered</h6>
-          <h3 class="mb-0 text-success">{{ delivered_count }}</h3>
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <h6 class="text-muted mb-2">Returned</h6>
-          <h3 class="mb-0 text-warning">{{ returned_count }}</h3>
-        </div>
+    <div class="card border-0 shadow-sm flex-fill p-0" style="min-width: 200px;">
+      <div class="card-body">
+        <h6 class="text-muted mb-1 small">Delivered / Returned</h6>
+        <h4 class="mb-0"><span class="text-success">{{ delivered_count }}</span> / <span class="text-warning">{{ returned_count }}</span></h4>
       </div>
     </div>
   </div>
@@ -318,130 +301,83 @@
   <!-- Settlement Section -->
   <div class="row mb-4">
     <!-- Unsettled Deliveries List -->
-    <div class="col-lg-7 mb-4">
-      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
-        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-              <div class="me-3" style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                <i class="fa-solid fa-coins text-white"></i>
-              </div>
-              <div>
-                <h5 class="mb-0 text-white fw-bold">Unsettled Earnings</h5>
-                <small class="text-white" style="opacity: 0.9;">Select deliveries to settle</small>
-              </div>
-            </div>
-            <span class="badge bg-white text-dark">{{ unsettled_tasks|length }} deliveries</span>
-          </div>
+    <div class="col-lg-8 mb-4">
+      <div class="listing-container">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fa-solid fa-coins text-success"></i>Unsettled Earnings</h6>
+          <span class="listing-badge">{{ unsettled_tasks|length }} items</span>
         </div>
-
         {% if unsettled_tasks %}
-        <div class="px-3 py-2 border-bottom" style="background: #ecfdf5;">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-2">
-              <input type="checkbox" class="form-check-input" id="desk-earn-select-all" style="cursor: pointer;">
-              <span class="text-muted" style="font-size: 0.85rem;">Select All</span>
-              <span class="ms-2 text-muted" style="font-size: 0.85rem;">
-                <span id="desk-earn-selected-num">0</span> selected
-              </span>
-              <span id="desk-earn-selected-total" class="fw-semibold ms-1" style="color: #059669; font-size: 0.85rem; display: none;">
-                (<span id="desk-earn-selected-amount">0</span> QR)
-              </span>
-            </div>
-          </div>
+        <div class="listing-selection-bar">
+          <input type="checkbox" class="form-check-input" id="desk-earn-select-all">
+          <span class="listing-selection-count">Select All | <span id="desk-earn-selected-num">0</span> selected</span>
+          <span id="desk-earn-selected-total" class="listing-selection-total" style="display: none;">
+            (<span id="desk-earn-selected-amount">0</span> QR)
+          </span>
         </div>
-        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-          <table class="table table-hover mb-0" style="font-size: 0.875rem;">
-            <thead style="background: #ecfdf5; position: sticky; top: 0; z-index: 1;">
+        <div class="listing-scroll">
+          <table class="listing-table">
+            <thead>
               <tr>
-                <th class="py-2 ps-3" style="font-weight: 600; color: #065f46; border: none; width: 40px;"></th>
-                <th class="py-2" style="font-weight: 600; color: #065f46; border: none;">Order Details</th>
-                <th class="py-2" style="font-weight: 600; color: #065f46; border: none;">Customer</th>
-                <th class="py-2" style="font-weight: 600; color: #065f46; border: none;">Delivered</th>
-                <th class="py-2 pe-3 text-end" style="font-weight: 600; color: #065f46; border: none;">Earning</th>
+                <th style="width: 30px;"></th>
+                <th>Business</th>
+                <th>DL#</th>
+                <th>Customer</th>
+                <th>Area</th>
+                <th>Date</th>
+                <th class="text-end">Earning</th>
               </tr>
             </thead>
             <tbody>
               {% for task in unsettled_tasks %}
-              <tr style="border-bottom: 1px solid #f3f4f6;" data-delivery-id="{{ task.id }}" data-amount="{% if task.driver_earnings %}{{ task.driver_earnings }}{% else %}{{ task.dl_price|default:0 }}{% endif %}">
-                <td class="py-2 ps-3">
-                  <input type="checkbox" class="form-check-input desk-earn-checkbox" value="{{ task.id }}" style="cursor: pointer;">
-                </td>
-                <td class="py-2">
-                  <div class="fw-semibold" style="color: #1f2937; font-size: 0.85rem;">{{ task.order.business.business_name|default:"-"|truncatechars:20 }}</div>
-                  <div style="font-size: 0.75rem;">
-                    <span class="text-muted" style="font-family: monospace;">{{ task.dl_task_number }}</span>
-                  </div>
-                </td>
-                <td class="py-2">
-                  <div class="fw-medium" style="color: #374151; font-size: 0.85rem;">{{ task.order.customer_name|default:"-"|truncatechars:20 }}</div>
-                  <div class="text-muted" style="font-size: 0.75rem;">
-                    <i class="fa-solid fa-location-dot me-1"></i>{{ task.dl_to_address.area_name|default:"-" }}
-                  </div>
-                </td>
-                <td class="py-2">
-                  <div class="text-muted" style="font-size: 0.8rem;">{{ task.completed_at|date:"d M"|default:task.dl_task_date|date:"d M" }}</div>
-                  <div style="color: #9ca3af; font-size: 0.75rem;">{{ task.completed_at|date:"H:i"|default:"-" }}</div>
-                </td>
-                <td class="py-2 pe-3 text-end">
-                  <span class="fw-bold" style="color: #059669;">{% if task.driver_earnings %}{{ task.driver_earnings|floatformat:0 }}{% else %}{{ task.dl_price|default:0 }}{% endif %}</span>
-                  <span class="text-muted" style="font-size: 0.7rem;">QR</span>
-                </td>
+              <tr data-delivery-id="{{ task.id }}" data-amount="{% if task.driver_earnings %}{{ task.driver_earnings }}{% else %}{{ task.dl_price|default:0 }}{% endif %}">
+                <td><input type="checkbox" class="form-check-input desk-earn-checkbox" value="{{ task.id }}"></td>
+                <td>{{ task.order.business.business_name|default:"-"|truncatechars:18 }}</td>
+                <td><code>{{ task.dl_task_number }}</code></td>
+                <td>{{ task.order.customer_name|default:"-"|truncatechars:18 }}</td>
+                <td class="text-muted">{{ task.dl_to_address.area_name|default:"-"|truncatechars:15 }}</td>
+                <td class="text-muted">{{ task.completed_at|date:"d M"|default:task.dl_task_date|date:"d M" }}</td>
+                <td class="text-end fw-bold text-success">{% if task.driver_earnings %}{{ task.driver_earnings|floatformat:0 }}{% else %}{{ task.dl_price|default:0 }}{% endif %}</td>
               </tr>
               {% endfor %}
             </tbody>
-            <tfoot style="background: #ecfdf5;">
+            <tfoot>
               <tr>
-                <td colspan="4" class="py-2 ps-3 fw-bold" style="border: none;">Total Unsettled</td>
-                <td class="py-2 pe-3 text-end fw-bold" style="border: none; color: #059669;">{{ unsettled_total|floatformat:0 }} QR</td>
+                <td colspan="6" class="fw-bold">Total</td>
+                <td class="text-end fw-bold text-success">{{ unsettled_total|floatformat:0 }} QR</td>
               </tr>
             </tfoot>
           </table>
         </div>
         {% else %}
-        <div class="text-center py-5">
-          <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
-            <i class="fa-solid fa-check text-success" style="font-size: 1.5rem;"></i>
-          </div>
-          <h5 class="text-success mb-1">All Settled!</h5>
-          <p class="text-muted mb-0">No pending earnings to settle</p>
+        <div class="listing-empty">
+          <i class="fa-solid fa-check-circle text-success"></i>
+          <p>All earnings settled</p>
         </div>
         {% endif %}
       </div>
     </div>
 
     <!-- Settlement Form -->
-    <div class="col-lg-5 mb-4">
-      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
-        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
-          <div class="d-flex align-items-center">
-            <div class="me-3" style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-              <i class="fa-solid fa-file-invoice-dollar text-white"></i>
-            </div>
-            <div>
-              <h5 class="mb-0 text-white fw-bold">Request Settlement</h5>
-              <small class="text-white" style="opacity: 0.9;">Enter amount or select deliveries</small>
-            </div>
+    <div class="col-lg-4 mb-4">
+      <h6 class="listing-section-title"><i class="fa-solid fa-file-invoice-dollar text-primary"></i>Request Settlement</h6>
+      <div class="listing-form-panel">
+        <form method="POST" id="desk-settle-form">
+          {% csrf_token %}
+          <input type="hidden" name="delivery_ids" id="desk-settle-delivery-ids" value="">
+          <div class="mb-2">
+            <label for="desk-settle-amount" class="form-label">Amount (QR)</label>
+            <input type="number" class="form-control" id="desk-settle-amount" name="amount" step="0.01" min="0" max="{{ unsettled_total }}" placeholder="0.00" required style="font-weight: 600; text-align: center;">
+            <small class="text-muted">Available: {{ unsettled_total|floatformat:2 }} QR</small>
           </div>
-        </div>
-        <div class="card-body p-4">
-          <form method="POST" id="desk-settle-form">
-            {% csrf_token %}
-            <input type="hidden" name="delivery_ids" id="desk-settle-delivery-ids" value="">
-            <div class="mb-3">
-              <label for="desk-settle-amount" class="form-label fw-semibold">Amount (QR)</label>
-              <input type="number" class="form-control form-control-lg" id="desk-settle-amount" name="amount" step="0.01" min="0" max="{{ pending_earnings }}" placeholder="0.00" required style="font-size: 1.3rem; font-weight: 600; text-align: center;">
-              <small class="text-muted">Pending Earnings: {{ pending_earnings|floatformat:2 }} QR</small>
-            </div>
-            <div class="mb-4">
-              <label for="desk-settle-notes" class="form-label fw-semibold">Notes <span class="text-muted fw-normal">(Optional)</span></label>
-              <textarea class="form-control" id="desk-settle-notes" name="notes" rows="2" placeholder="Any additional notes..."></textarea>
-            </div>
-            <button type="submit" class="btn btn-primary w-100 py-2" style="font-weight: 600;">
-              <i class="fa-solid fa-file-invoice-dollar me-2"></i>Request Settlement
-            </button>
-          </form>
-        </div>
+          <div class="mb-2">
+            <label for="desk-settle-notes" class="form-label">Notes <span class="text-muted fw-normal">(Optional)</span></label>
+            <textarea class="form-control form-control-sm" id="desk-settle-notes" name="notes" rows="2" placeholder="Any additional notes..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm w-100">
+            <i class="fa-solid fa-file-invoice-dollar me-2"></i>Request Settlement
+          </button>
+        </form>
       </div>
     </div>
   </div>
@@ -449,171 +385,115 @@
   <!-- Completed Orders Table -->
   <div class="row">
     <div class="col-12">
-      <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white">
-          <h5 class="mb-0">Completed Orders</h5>
+      <div class="listing-container">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fa-solid fa-list-check text-secondary"></i>Completed Orders</h6>
+          <span class="listing-badge">{{ total_count }} items</span>
         </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="bg-light">
-                <tr>
-                  <th>Date</th>
-                  <th>DL No</th>
-                  <th>Business</th>
-                  <th>Dropoff Location</th>
-                  <th>DL Status</th>
-                  <th>COD Status</th>
-                  <th>Verification</th>
-                  <th>Payout Status</th>
-                  <th class="text-end">Delivery Fee</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for task in completed_tasks %}
-                <tr>
-                  <td>{{ task.dl_task_date|date:"d M Y" }}</td>
-                  <td>
-                    <span class="fw-bold text-primary">#{{ task.dl_task_number }}</span>
-                  </td>
-                  <td>{{ task.order.business.business_name|default:"N/A"|truncatechars:20 }}</td>
-                  <td>
-                    {% if task.dl_to_address %}
-                    Zone {{ task.dl_to_address.dl_zone|default:"-" }}, {{ task.dl_to_address.area_name|default:"N/A" }}
-                    {% else %}
-                    N/A
-                    {% endif %}
-                  </td>
-                  <td>
-                    <span class="badge {% if task.dl_task_status == 'delivered' %}bg-success{% elif task.dl_task_status == 'failed' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                      {% if task.dl_task_status == 'failed' %}Returned{% else %}{{ task.dl_task_status|title }}{% endif %}
-                    </span>
-                  </td>
-                  <td>
-                    {% if task.order.cod_amount and task.order.cod_amount > 0 %}
-                      {% if task.cod_settled %}
-                      <span class="badge" style="background: #d1fae5; color: #065f46;"><i class="fa-solid fa-check me-1"></i>Settled</span>
-                      {% elif task.cod_collected %}
-                      <span class="badge" style="background: #dbeafe; color: #1e40af;"><i class="fa-solid fa-hand-holding-dollar me-1"></i>Collected</span>
-                      {% else %}
-                      <span class="badge" style="background: #fef3c7; color: #92400e;"><i class="fa-solid fa-clock me-1"></i>Pending</span>
-                      {% endif %}
-                    {% else %}
-                    <span class="text-muted">-</span>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if task.earnings_verification_status == 'published' %}
-                    <span class="badge" style="background: #d1fae5; color: #065f46;"><i class="fa-solid fa-check me-1"></i>Verified</span>
-                    {% elif task.earnings_verification_status == 'verified' %}
-                    <span class="badge" style="background: #dbeafe; color: #1e40af;"><i class="fa-solid fa-clipboard-check me-1"></i>Processing</span>
-                    {% elif task.earnings_verification_status == 'rejected' %}
-                    <span class="badge" style="background: #fee2e2; color: #991b1b;"><i class="fa-solid fa-times me-1"></i>Rejected</span>
-                    {% else %}
-                    <span class="badge" style="background: #fef3c7; color: #92400e;"><i class="fa-solid fa-clock me-1"></i>Pending</span>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if task.earnings_settled %}
-                    <span class="badge" style="background: #d1fae5; color: #065f46;"><i class="fa-solid fa-check me-1"></i>Paid</span>
-                    {% elif task.earnings_verification_status == 'published' %}
-                    <span class="badge" style="background: #dbeafe; color: #1e40af;"><i class="fa-solid fa-wallet me-1"></i>Ready</span>
-                    {% else %}
-                    <span class="badge" style="background: #f3f4f6; color: #6b7280;"><i class="fa-solid fa-hourglass me-1"></i>Waiting</span>
-                    {% endif %}
-                  </td>
-                  <td class="text-end">
-                    {% if task.earnings_verification_status == 'published' or task.driver_earnings %}
-                    <span class="text-success fw-bold">+{% if task.verified_earnings %}{{ task.verified_earnings|floatformat:2 }}{% elif task.driver_earnings %}{{ task.driver_earnings|floatformat:2 }}{% else %}{{ task.dl_price|default:0 }}{% endif %} QR</span>
-                    {% else %}
-                    <span class="text-muted">Processing</span>
-                    {% endif %}
-                  </td>
-                </tr>
-                {% empty %}
-                <tr>
-                  <td colspan="9" class="text-center text-muted py-4">
-                    <i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>
-                    No completed orders found
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <!-- Desktop Pagination -->
-        {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params %}
+        <table class="listing-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>DL#</th>
+              <th>Business</th>
+              <th>Area</th>
+              <th>Status</th>
+              <th>COD</th>
+              <th>Verify</th>
+              <th>Payout</th>
+              <th class="text-end">Fee</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for task in completed_tasks %}
+            <tr>
+              <td>{{ task.dl_task_date|date:"d M" }}</td>
+              <td><code>{{ task.dl_task_number }}</code></td>
+              <td>{{ task.order.business.business_name|default:"-" }}</td>
+              <td class="text-muted">{{ task.dl_to_address.area_name|default:"-"|truncatechars:12 }}</td>
+              <td>
+                <span class="listing-status {% if task.dl_task_status == 'delivered' %}success{% elif task.dl_task_status == 'failed' %}warning{% else %}muted{% endif %}">
+                  {% if task.dl_task_status == 'delivered' %}<i class="fa-solid fa-check"></i>{% elif task.dl_task_status == 'failed' %}<i class="fa-solid fa-rotate-left"></i>{% else %}<i class="fa-solid fa-circle"></i>{% endif %}
+                </span>
+              </td>
+              <td>
+                {% if task.order.cod_amount and task.order.cod_amount > 0 %}
+                <span class="listing-status {% if task.cod_settled %}success{% elif task.cod_collected %}primary{% else %}warning{% endif %}">
+                  {% if task.cod_settled %}<i class="fa-solid fa-check"></i>{% elif task.cod_collected %}<i class="fa-solid fa-hand-holding-dollar"></i>{% else %}<i class="fa-solid fa-clock"></i>{% endif %}
+                </span>
+                {% else %}-{% endif %}
+              </td>
+              <td>
+                <span class="listing-status {% if task.earnings_verification_status == 'published' %}success{% elif task.earnings_verification_status == 'verified' %}primary{% elif task.earnings_verification_status == 'rejected' %}danger{% else %}warning{% endif %}">
+                  {% if task.earnings_verification_status == 'published' %}<i class="fa-solid fa-check"></i>{% elif task.earnings_verification_status == 'verified' %}<i class="fa-solid fa-clipboard-check"></i>{% elif task.earnings_verification_status == 'rejected' %}<i class="fa-solid fa-times"></i>{% else %}<i class="fa-solid fa-clock"></i>{% endif %}
+                </span>
+              </td>
+              <td>
+                <span class="listing-status {% if task.earnings_settled %}success{% elif task.earnings_verification_status == 'published' %}primary{% else %}muted{% endif %}">
+                  {% if task.earnings_settled %}<i class="fa-solid fa-check"></i>{% elif task.earnings_verification_status == 'published' %}<i class="fa-solid fa-wallet"></i>{% else %}<i class="fa-solid fa-hourglass"></i>{% endif %}
+                </span>
+              </td>
+              <td class="text-end">
+                {% if task.earnings_verification_status == 'published' or task.driver_earnings %}
+                <span class="fw-bold text-success">{% if task.verified_earnings %}{{ task.verified_earnings|floatformat:0 }}{% elif task.driver_earnings %}{{ task.driver_earnings|floatformat:0 }}{% else %}{{ task.dl_price|default:0 }}{% endif %}</span>
+                {% else %}<span class="text-muted">-</span>{% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9" class="listing-empty">No completed orders found</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
+      <!-- Desktop Pagination -->
+      {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params %}
     </div>
   </div>
 
-  <!-- Recent Earning & Settlement Transactions (Desktop) -->
+  <!-- Recent Transactions -->
   {% if recent_settlements %}
   <div class="row mt-4">
     <div class="col-12">
-      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
-        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-              <div class="me-3" style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                <i class="fa-solid fa-clock-rotate-left text-white"></i>
-              </div>
-              <div>
-                <h5 class="mb-0 text-white fw-bold">Recent Transactions</h5>
-                <small class="text-white" style="opacity: 0.9;">Last {{ recent_settlements|length }} earning & settlement records</small>
-              </div>
-            </div>
-          </div>
+      <div class="listing-container">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fa-solid fa-clock-rotate-left text-primary"></i>Recent Transactions</h6>
+          <span class="listing-badge">{{ recent_settlements|length }} items</span>
         </div>
-        <div class="table-responsive">
-          <table class="table table-hover mb-0" style="font-size: 0.875rem;">
-            <thead style="background: #eff6ff;">
-              <tr>
-                <th class="py-2 ps-3" style="font-weight: 600; color: #1e40af; border: none;">Transaction Code</th>
-                <th class="py-2" style="font-weight: 600; color: #1e40af; border: none;">Type</th>
-                <th class="py-2" style="font-weight: 600; color: #1e40af; border: none;">Description</th>
-                <th class="py-2" style="font-weight: 600; color: #1e40af; border: none;">Date</th>
-                <th class="py-2 pe-3 text-end" style="font-weight: 600; color: #1e40af; border: none;">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for txn in recent_settlements %}
-              <tr style="border-bottom: 1px solid #f3f4f6;">
-                <td class="py-2 ps-3">
-                  <span style="font-family: monospace; font-weight: 600; color: {% if txn.transaction_type == 'earning' %}#059669{% elif txn.transaction_type == 'settlement' %}#2563eb{% elif txn.transaction_type == 'bonus' %}#7c3aed{% elif txn.transaction_type == 'deduction' %}#dc2626{% else %}#4b5563{% endif %};">{{ txn.transaction_code }}</span>
-                </td>
-                <td class="py-2">
-                  {% if txn.transaction_type == 'earning' %}
-                  <span class="badge" style="background: #d1fae5; color: #065f46;"><i class="fa-solid fa-coins me-1"></i>Earning</span>
-                  {% elif txn.transaction_type == 'settlement' %}
-                  <span class="badge" style="background: #dbeafe; color: #1e40af;"><i class="fa-solid fa-file-invoice-dollar me-1"></i>Settlement</span>
-                  {% elif txn.transaction_type == 'bonus' %}
-                  <span class="badge" style="background: #ede9fe; color: #5b21b6;"><i class="fa-solid fa-gift me-1"></i>Bonus</span>
-                  {% elif txn.transaction_type == 'deduction' %}
-                  <span class="badge" style="background: #fee2e2; color: #991b1b;"><i class="fa-solid fa-minus-circle me-1"></i>Deduction</span>
-                  {% else %}
-                  <span class="badge" style="background: #f3f4f6; color: #374151;"><i class="fa-solid fa-sliders me-1"></i>Adjustment</span>
-                  {% endif %}
-                </td>
-                <td class="py-2">
-                  <span class="text-muted" style="font-size: 0.85rem;">{{ txn.description|truncatechars:40 }}</span>
-                </td>
-                <td class="py-2">
-                  <div style="font-size: 0.85rem;">{{ txn.created_at|date:"d M Y" }}</div>
-                  <div class="text-muted" style="font-size: 0.75rem;">{{ txn.created_at|date:"H:i" }}</div>
-                </td>
-                <td class="py-2 pe-3 text-end">
-                  <span class="fw-bold" style="color: {% if txn.transaction_type == 'deduction' %}#dc2626{% elif txn.transaction_type == 'settlement' %}#2563eb{% else %}#059669{% endif %};">
-                    {% if txn.transaction_type == 'deduction' %}-{% else %}+{% endif %}{{ txn.amount|floatformat:0 }}
-                  </span>
-                  <span class="text-muted" style="font-size: 0.7rem;">QR</span>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+        <table class="listing-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Date</th>
+              <th class="text-end">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for txn in recent_settlements %}
+            <tr>
+              <td><code>{{ txn.transaction_code }}</code></td>
+              <td>
+                <span class="listing-status {% if txn.transaction_type == 'earning' %}success{% elif txn.transaction_type == 'settlement' %}primary{% elif txn.transaction_type == 'deduction' %}danger{% else %}muted{% endif %}">
+                  {% if txn.transaction_type == 'earning' %}<i class="fa-solid fa-coins"></i>
+                  {% elif txn.transaction_type == 'settlement' %}<i class="fa-solid fa-file-invoice-dollar"></i>
+                  {% elif txn.transaction_type == 'bonus' %}<i class="fa-solid fa-gift"></i>
+                  {% elif txn.transaction_type == 'deduction' %}<i class="fa-solid fa-minus-circle"></i>
+                  {% else %}<i class="fa-solid fa-sliders"></i>{% endif %}
+                </span>
+                {{ txn.get_transaction_type_display }}
+              </td>
+              <td class="text-2line" title="{{ txn.description|default:'' }}">{{ txn.description|default:"-" }}</td>
+              <td class="text-muted">{{ txn.created_at|date:"d M, H:i" }}</td>
+              <td class="text-end fw-bold {% if txn.transaction_type == 'deduction' %}text-danger{% elif txn.transaction_type == 'settlement' %}text-primary{% else %}text-success{% endif %}">
+                {% if txn.transaction_type == 'deduction' %}-{% else %}+{% endif %}{{ txn.amount|floatformat:0 }} QR
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

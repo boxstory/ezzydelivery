@@ -280,250 +280,123 @@
   {% endif %}
 
   <!-- COD In Hand List (Pending Settlement) -->
-  <div class="row mb-2">
+  <div class="row mb-3">
     <div class="col-12">
-      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
-        <!-- Header -->
-        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-              <div class="me-3" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                <i class="fa-solid fa-hand-holding-dollar text-white" style="font-size: 1.5rem;"></i>
-              </div>
-              <div>
-                <h5 class="mb-0 text-white fw-bold">COD In Hand</h5>
-                <small class="text-white" style="opacity: 0.9;">Pending settlement</small>
-              </div>
-            </div>
-            <span class="badge bg-white text-dark">{{ cod_in_hand_list|length }} orders</span>
+      <div class="listing-container">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fa-solid fa-hand-holding-dollar text-warning"></i>COD In Hand</h6>
+          <span class="listing-badge">{{ cod_in_hand_list|length }} orders</span>
+        </div>
+        {% if cod_in_hand_list %}
+        <div class="listing-selection-bar">
+          <input type="checkbox" class="form-check-input" id="cod-select-all">
+          <span class="listing-selection-count"><span id="cod-selected-num">0</span> selected</span>
+          <span id="cod-selected-total" class="listing-selection-total" style="display: none;">
+            Total: <span id="cod-selected-amount">0</span> QR
+          </span>
+          <div class="ms-auto d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="cod-export-csv-btn" disabled>
+              <i class="fa-solid fa-file-csv me-1"></i>CSV
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-success" id="cod-export-pdf-btn" disabled>
+              <i class="fa-solid fa-file-pdf me-1"></i>Submit
+            </button>
           </div>
         </div>
-        <!-- Action Bar -->
-        {% if cod_in_hand_list %}
-        <div class="px-3 py-2 border-bottom" style="background: #fffbeb;">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-3">
-              <span id="cod-selected-count" class="text-muted" style="font-size: 0.85rem;">
-                <span id="cod-selected-num">0</span> selected
-              </span>
-              <span id="cod-selected-total" class="fw-semibold" style="color: #d97706; font-size: 0.85rem; display: none;">
-                Total: <span id="cod-selected-amount">0</span> QR
-              </span>
-            </div>
-            <div class="d-flex gap-2">
-              <button type="button" class="btn btn-sm btn-outline-secondary" id="cod-export-csv-btn" disabled>
-                <i class="fa-solid fa-file-csv me-1"></i>Export CSV
-              </button>
-              <button type="button" class="btn btn-sm btn-outline-success" id="cod-export-pdf-btn" disabled>
-                <i class="fa-solid fa-file-pdf me-1"></i>Save and Submit COD
-              </button>
-            </div>
-          </div>
+        <table class="listing-table" id="cod-in-hand-table">
+          <thead>
+            <tr>
+              <th style="width: 30px;"></th>
+              <th>Business</th>
+              <th>DL#</th>
+              <th>Customer</th>
+              <th>Area</th>
+              <th>Date</th>
+              <th class="text-end">COD</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for delivery in cod_in_hand_list %}
+            <tr data-delivery-id="{{ delivery.id }}" data-amount="{{ delivery.cod_collected_amount|default:0 }}" data-task="{{ delivery.dl_task_number }}" data-customer="{{ delivery.order.customer_name|default:'-' }}" data-mobile="{{ delivery.order.customer_phone|default:'-' }}">
+              <td><input type="checkbox" class="form-check-input cod-row-checkbox" value="{{ delivery.id }}"></td>
+              <td>{{ delivery.order.business.business_name|default:"-" }}</td>
+              <td><code>{{ delivery.dl_task_number }}</code></td>
+              <td>{{ delivery.order.customer_name|default:"-" }}</td>
+              <td class="text-muted">{{ delivery.dl_to_address.area_name|default:"-" }}</td>
+              <td class="text-muted">{{ delivery.completed_at|date:"d M"|default:"-" }}</td>
+              <td class="text-end fw-bold text-warning">{{ delivery.cod_collected_amount|default:0|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="6" class="fw-bold">Total</td>
+              <td class="text-end fw-bold text-warning">{{ cod_in_hand_total|floatformat:0 }} QR</td>
+            </tr>
+          </tfoot>
+        </table>
+        {% else %}
+        <div class="listing-empty">
+          <i class="fa-solid fa-check-circle text-success"></i>
+          <p>All COD settled</p>
         </div>
         {% endif %}
-        <!-- Table -->
-        {% if cod_in_hand_list %}
-          <div class="table-responsive">
-            <table class="table table-hover mb-0" id="cod-in-hand-table" style="font-size: 0.875rem;">
-              <thead style="background: #fef3c7;">
-                <tr>
-                  <th class="py-3 ps-3" style="font-weight: 600; color: #92400e; border: none; width: 40px;">
-                    <input type="checkbox" class="form-check-input" id="cod-select-all" style="cursor: pointer;">
-                  </th>
-                  <th class="py-3" style="font-weight: 600; color: #92400e; border: none; width: 5%;">#</th>
-                  <th class="py-3" style="font-weight: 600; color: #92400e; border: none;">Order Details</th>
-                  <th class="py-3" style="font-weight: 600; color: #92400e; border: none;">Customer / Location</th>
-                  <th class="py-3" style="font-weight: 600; color: #92400e; border: none;">Delivered</th>
-                  <th class="py-3 pe-4 text-end" style="font-weight: 600; color: #92400e; border: none;">COD Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for delivery in cod_in_hand_list %}
-                <tr style="border-bottom: 1px solid #f3f4f6;" data-delivery-id="{{ delivery.id }}" data-amount="{{ delivery.cod_collected_amount|default:0 }}" data-task="{{ delivery.dl_task_number }}" data-customer="{{ delivery.order.customer_name|default:'-' }}" data-mobile="{{ delivery.order.customer_phone|default:'-' }}">
-                  <td class="py-3 ps-3">
-                    <input type="checkbox" class="form-check-input cod-row-checkbox" value="{{ delivery.id }}" style="cursor: pointer;">
-                  </td>
-                  <td class="py-3 text-muted">{{ forloop.counter }}</td>
-                  <td class="py-3">
-                    <div class="d-flex align-items-center">
-                      <div class="me-3" style="width: 40px; height: 40px; background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                        <i class="fa-solid fa-box" style="font-size: 1rem; color: #4f46e5;"></i>
-                      </div>
-                      <div>
-                        <div class="fw-semibold" style="color: #1f2937;">{{ delivery.order.business.business_name|default:"-" }}</div>
-                        <div class="d-flex align-items-center gap-2" style="font-size: 0.8rem;">
-                          <span class="text-muted">{{ delivery.dl_task_number }}</span>
-                          {% if delivery.order.order_number %}
-                          <span style="color: #6b7280;">|</span>
-                          <span style="color: #4f46e5;">ORD-{{ delivery.order.order_number }}</span>
-                          {% endif %}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3">
-                    <div style="font-size: 0.85rem;">
-                      <div class="fw-medium" style="color: #374151;">{{ delivery.order.customer_name|default:"-" }}</div>
-                      <div class="text-muted" style="font-size: 0.8rem;">
-                        <i class="fa-solid fa-location-dot me-1" style="color: #9ca3af;"></i>
-                        {{ delivery.dl_to_address.area_name|default:delivery.order.customer_address|default:"-" }}
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3">
-                    <div style="font-size: 0.85rem;">
-                      <div class="text-muted">{{ delivery.completed_at|date:"d M Y"|default:"-" }}</div>
-                      <div style="color: #6b7280; font-size: 0.8rem;">
-                        <i class="fa-regular fa-clock me-1"></i>{{ delivery.completed_at|date:"H:i"|default:"-" }}
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3 pe-4 text-end">
-                    <span class="fw-bold" style="color: #d97706; font-size: 1.1rem;">{{ delivery.cod_collected_amount|default:0|floatformat:0 }}</span>
-                    <span class="text-muted" style="font-size: 0.75rem;">QR</span>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-              <tfoot style="background: #fffbeb;">
-                <tr>
-                  <td colspan="5" class="py-3 ps-4 fw-bold" style="border: none;">Total COD In Hand</td>
-                  <td class="py-3 pe-4 text-end fw-bold" style="border: none; color: #d97706; font-size: 1.1rem;">{{ cod_in_hand_total|floatformat:0 }} QR</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          {% else %}
-          <div class="text-center py-5">
-            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-              <i class="fa-solid fa-check text-success" style="font-size: 2rem;"></i>
-            </div>
-            <h5 class="text-success mb-2">All Settled!</h5>
-            <p class="text-muted mb-0">No pending COD to collect</p>
-          </div>
-          {% endif %}
       </div>
     </div>
   </div>
 
-  <!-- COD Settlement Transactions Table (Settlement History) -->
-  <div class="row mb-2">
+  <!-- COD Settlement Transactions Table -->
+  <div class="row mb-3">
     <div class="col-12">
-      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
-        <!-- Header with gradient -->
-        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-              <div class="me-3" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                <i class="fa-solid fa-clock-rotate-left text-white" style="font-size: 1.5rem;"></i>
-              </div>
-              <div>
-                <h5 class="mb-0 text-white fw-bold">COD Settlement Transactions</h5>
-                <small class="text-white" style="opacity: 0.9;">Settlement history</small>
-              </div>
-            </div>
-            <a href="{% url 'fleet:transaction_history' %}?type=cod_collection&days=90" class="btn btn-light btn-sm">
-              <i class="fa-solid fa-arrow-right me-1"></i>View All
-            </a>
-          </div>
+      <div class="listing-container">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fa-solid fa-clock-rotate-left text-primary"></i>COD Transactions</h6>
+          <a href="{% url 'fleet:transaction_history' %}?type=cod_collection&days=90" class="btn btn-sm btn-outline-primary">View All</a>
         </div>
-        <!-- Table -->
         {% if cod_transactions %}
-          <div class="table-responsive">
-            <table class="table table-hover mb-0" style="font-size: 0.875rem;">
-              <thead style="background: #f5f3ff;">
-                <tr>
-                  <th class="py-3 ps-4" style="font-weight: 600; color: #5b21b6; border: none; width: 5%;">#</th>
-                  <th class="py-3" style="font-weight: 600; color: #5b21b6; border: none;">Transaction</th>
-                  <th class="py-3" style="font-weight: 600; color: #5b21b6; border: none;">Details / Reference</th>
-                  <th class="py-3" style="font-weight: 600; color: #5b21b6; border: none;">Balance After</th>
-                  <th class="py-3" style="font-weight: 600; color: #5b21b6; border: none;">Date</th>
-                  <th class="py-3 pe-4 text-end" style="font-weight: 600; color: #5b21b6; border: none;">Amount</th>
-                  <th class="py-3 text-center" style="font-weight: 600; color: #5b21b6; border: none; width: 80px;">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for txn in cod_transactions %}
-                <tr style="border-bottom: 1px solid #f3f4f6;">
-                  <td class="py-3 ps-4 text-muted">{{ forloop.counter }}</td>
-                  <td class="py-3">
-                    <div class="d-flex align-items-center">
-                      <div class="me-3" style="width: 40px; height: 40px; background: linear-gradient(135deg, {% if txn.transaction_type == 'cod_deposit' %}#fef3c7, #fde68a{% elif txn.transaction_type == 'cod_collection' %}#d1fae5, #a7f3d0{% else %}#ede9fe, #ddd6fe{% endif %}); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                        <i class="fa-solid {% if txn.transaction_type == 'cod_deposit' %}fa-building-columns{% elif txn.transaction_type == 'cod_collection' %}fa-coins{% else %}fa-exchange-alt{% endif %}" style="font-size: 1rem; color: {% if txn.transaction_type == 'cod_deposit' %}#d97706{% elif txn.transaction_type == 'cod_collection' %}#059669{% else %}#7c3aed{% endif %};"></i>
-                      </div>
-                      <div>
-                        <div class="fw-semibold" style="color: #1f2937;">{{ txn.get_transaction_type_display }}</div>
-                        <div style="font-size: 0.75rem;">
-                          <span style="font-family: monospace; color: #6b7280;">{{ txn.transaction_code|default:"-" }}</span>
-                          {% if txn.payment_method %}
-                          <span class="badge ms-1" style="background: #f3f4f6; color: #6b7280; font-size: 0.65rem; font-weight: 500;">
-                            <i class="fa-solid {% if txn.payment_method == 'cash' %}fa-money-bill{% elif txn.payment_method == 'bank' %}fa-university{% elif txn.payment_method == 'atm' %}fa-credit-card{% else %}fa-mobile-alt{% endif %} me-1"></i>
-                            {{ txn.get_payment_method_display|default:txn.payment_method }}
-                          </span>
-                          {% endif %}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3">
-                    <div style="font-size: 0.85rem;">
-                      <div class="fw-medium" style="color: #374151; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        {{ txn.description|default:"COD Transaction" }}
-                      </div>
-                      <div style="font-size: 0.75rem; color: #9ca3af;">
-                        {% if txn.reference_number %}Ref: {{ txn.reference_number }}{% endif %}
-                        {% if txn.notes %}<span class="ms-2"><i class="fa-solid fa-sticky-note me-1"></i>{{ txn.notes|truncatechars:20 }}</span>{% endif %}
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3">
-                    <div style="font-size: 0.8rem;">
-                      <div style="color: #d97706;">
-                        <i class="fa-solid fa-hand-holding-dollar me-1"></i>{{ txn.cod_in_hand_after|default:"-"|floatformat:0 }} QR
-                      </div>
-                      <div class="text-muted">
-                        <i class="fa-solid fa-wallet me-1"></i>{{ txn.wallet_balance_after|default:"-"|floatformat:0 }} QR
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3">
-                    <div style="font-size: 0.85rem;">
-                      <div class="text-muted">{{ txn.created_at|date:"d M Y"|default:"-" }}</div>
-                      <div style="color: #6b7280; font-size: 0.8rem;">
-                        <i class="fa-regular fa-clock me-1"></i>{{ txn.created_at|date:"H:i"|default:"-" }}
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3 pe-4 text-end">
-                    {% if txn.amount >= 0 %}
-                    <span class="fw-bold" style="color: #059669; font-size: 1.1rem;">+{{ txn.amount|floatformat:0 }}</span>
-                    {% else %}
-                    <span class="fw-bold" style="color: #dc2626; font-size: 1.1rem;">{{ txn.amount|floatformat:0 }}</span>
-                    {% endif %}
-                    <span class="text-muted" style="font-size: 0.75rem;">QR</span>
-                  </td>
-                  <td class="py-3 text-center">
-                    <button type="button" class="btn btn-sm btn-outline-primary view-txn-report-btn"
-                      data-txn-code="{{ txn.transaction_code|default:'-' }}"
-                      title="View Report">
-                      <i class="fa-solid fa-eye"></i>
-                    </button>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% else %}
-          <div class="text-center py-5">
-            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-              <i class="fa-solid fa-clock-rotate-left" style="font-size: 2rem; color: #8b5cf6;"></i>
-            </div>
-            <h5 class="text-muted mb-2">No Transactions Yet</h5>
-            <p class="text-muted mb-0">COD transactions will appear here after settlement</p>
-          </div>
-          {% endif %}
+        <table class="listing-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Balance</th>
+              <th>Date</th>
+              <th class="text-end">Amount</th>
+              <th class="text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for txn in cod_transactions %}
+            <tr>
+              <td><code>{{ txn.transaction_code|default:"-" }}</code></td>
+              <td>
+                <span class="listing-status {% if txn.transaction_type == 'cod_deposit' %}warning{% elif txn.transaction_type == 'cod_collection' %}success{% else %}primary{% endif %}">
+                  <i class="fa-solid {% if txn.transaction_type == 'cod_deposit' %}fa-building-columns{% elif txn.transaction_type == 'cod_collection' %}fa-coins{% else %}fa-exchange-alt{% endif %}"></i>
+                </span>
+                {{ txn.get_transaction_type_display }}
+              </td>
+              <td class="text-2line" title="{{ txn.description|default:'' }}">{{ txn.description|default:"-" }}</td>
+              <td class="text-muted">{{ txn.cod_in_hand_after|default:0|floatformat:0 }} QR</td>
+              <td class="text-muted">{{ txn.created_at|date:"d M, H:i" }}</td>
+              <td class="text-end fw-bold {% if txn.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
+                {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} QR
+              </td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-primary view-txn-report-btn" data-txn-code="{{ txn.transaction_code|default:'-' }}">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="listing-empty">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+          <p>No transactions yet</p>
         </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -531,91 +404,45 @@
   <!-- Recent COD Deliveries Table -->
   <div class="row">
     <div class="col-12">
-      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
-        <!-- Header with gradient -->
-        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-              <div class="me-3" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                <i class="fa-solid fa-truck-fast text-white" style="font-size: 1.5rem;"></i>
-              </div>
-              <div>
-                <h5 class="mb-0 text-white fw-bold">Recent COD Deliveries</h5>
-                <small class="text-white" style="opacity: 0.9;">Completed collections</small>
-              </div>
-            </div>
-            <span class="badge bg-white text-dark">{{ cod_deliveries|length }} deliveries</span>
-          </div>
+      <div class="listing-container">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fa-solid fa-truck-fast text-success"></i>Recent COD Deliveries</h6>
+          <span class="listing-badge">{{ cod_deliveries|length }} deliveries</span>
         </div>
-        <!-- Table -->
         {% if cod_deliveries %}
-          <div class="table-responsive">
-            <table class="table table-hover mb-0" style="font-size: 0.875rem;">
-              <thead style="background: #ecfdf5;">
-                <tr>
-                  <th class="py-3 ps-4" style="font-weight: 600; color: #047857; border: none; width: 5%;">#</th>
-                  <th class="py-3" style="font-weight: 600; color: #047857; border: none;">Order Details</th>
-                  <th class="py-3" style="font-weight: 600; color: #047857; border: none;">Customer / Location</th>
-                  <th class="py-3" style="font-weight: 600; color: #047857; border: none;">Delivered</th>
-                  <th class="py-3 pe-4 text-end" style="font-weight: 600; color: #047857; border: none;">COD Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for delivery in cod_deliveries %}
-                <tr style="border-bottom: 1px solid #f3f4f6;">
-                  <td class="py-3 ps-4 text-muted">{{ forloop.counter }}</td>
-                  <td class="py-3">
-                    <div class="d-flex align-items-center">
-                      <div class="me-3" style="width: 40px; height: 40px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                        <i class="fa-solid fa-check" style="font-size: 1rem; color: #059669;"></i>
-                      </div>
-                      <div>
-                        <div class="fw-semibold" style="color: #1f2937;">{{ delivery.order.business.business_name|default:"-" }}</div>
-                        <div class="d-flex align-items-center gap-2" style="font-size: 0.8rem;">
-                          <span class="text-muted">{{ delivery.dl_task_number }}</span>
-                          {% if delivery.order.order_number %}
-                          <span style="color: #6b7280;">|</span>
-                          <span style="color: #059669;">ORD-{{ delivery.order.order_number }}</span>
-                          {% endif %}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3">
-                    <div style="font-size: 0.85rem;">
-                      <div class="fw-medium" style="color: #374151;">{{ delivery.order.customer_name|default:"-" }}</div>
-                      <div class="text-muted" style="font-size: 0.8rem;">
-                        <i class="fa-solid fa-location-dot me-1" style="color: #9ca3af;"></i>
-                        {{ delivery.dl_to_address.area_name|default:delivery.order.customer_address|default:"-" }}
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3">
-                    <div style="font-size: 0.85rem;">
-                      <div class="text-muted">{{ delivery.completed_at|date:"d M Y"|default:"-" }}</div>
-                      <div style="color: #6b7280; font-size: 0.8rem;">
-                        <i class="fa-regular fa-clock me-1"></i>{{ delivery.completed_at|date:"H:i"|default:"-" }}
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-3 pe-4 text-end">
-                    <span class="fw-bold" style="color: #059669; font-size: 1.1rem;">{{ delivery.cod_collected_amount|default:0|floatformat:0 }}</span>
-                    <span class="text-muted" style="font-size: 0.75rem;">QR</span>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% else %}
-          <div class="text-center py-5">
-            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-              <i class="fa-solid fa-coins text-muted" style="font-size: 2rem;"></i>
-            </div>
-            <h5 class="text-muted mb-2">No COD Deliveries</h5>
-            <p class="text-muted mb-0">Complete deliveries with COD to see them here</p>
-          </div>
-          {% endif %}
+        <table class="listing-table">
+          <thead>
+            <tr>
+              <th>Business</th>
+              <th>DL#</th>
+              <th>Customer</th>
+              <th>Area</th>
+              <th>Delivered</th>
+              <th class="text-end">COD</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for delivery in cod_deliveries %}
+            <tr>
+              <td>
+                <span class="listing-status success"><i class="fa-solid fa-check"></i></span>
+                {{ delivery.order.business.business_name|default:"-" }}
+              </td>
+              <td><code>{{ delivery.dl_task_number }}</code></td>
+              <td>{{ delivery.order.customer_name|default:"-" }}</td>
+              <td class="text-muted">{{ delivery.dl_to_address.area_name|default:"-" }}</td>
+              <td class="text-muted">{{ delivery.completed_at|date:"d M"|default:"-" }}<br><span style="font-size: 0.7rem;">{{ delivery.completed_at|time:"H:i"|default:"" }}</span></td>
+              <td class="text-end fw-bold text-success">{{ delivery.cod_collected_amount|default:0|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="listing-empty">
+          <i class="fa-solid fa-coins"></i>
+          <p>No COD deliveries yet</p>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -784,6 +611,9 @@
         </div>
       </div>
       <div class="modal-footer border-0" style="background: #f9fafb;">
+        <button type="button" class="btn btn-success" id="txn-share-pdf-btn">
+          <i class="fa-solid fa-file-pdf me-1"></i>Share PDF
+        </button>
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
           <i class="fa-solid fa-times me-1"></i>Close
         </button>
@@ -796,6 +626,7 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // ===================== COD SELECTION (Desktop) =====================
   const selectAllCheckbox = document.getElementById('cod-select-all');
   const rowCheckboxes = document.querySelectorAll('.cod-row-checkbox');
   const selectedCountEl = document.getElementById('cod-selected-num');
@@ -804,7 +635,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const exportCsvBtn = document.getElementById('cod-export-csv-btn');
   const exportPdfBtn = document.getElementById('cod-export-pdf-btn');
 
-  if (!selectAllCheckbox) return;
+  if (selectAllCheckbox) {
+  // Desktop COD selection code starts here
 
   function updateSelection() {
     const checkedBoxes = document.querySelectorAll('.cod-row-checkbox:checked');
@@ -903,6 +735,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const modal = new bootstrap.Modal(document.getElementById('codSubmitModal'));
     modal.show();
   });
+  } // End of if (selectAllCheckbox)
 
   // Confirm Submit
   document.getElementById('cod-confirm-submit-btn')?.addEventListener('click', function() {
@@ -926,10 +759,14 @@ document.addEventListener('DOMContentLoaded', function() {
       e.preventDefault();
       e.stopPropagation();
 
-      // Prevent checkbox toggle if clicking the button inside a table row
-      if (e.target.closest('.cod-row-checkbox')) return;
-
       const txnCode = this.dataset.txnCode;
+
+      // Check if modal elements exist
+      var modalEl = document.getElementById('txnReportModal');
+      if (!modalEl) {
+        console.error('Modal element not found');
+        return;
+      }
 
       // Reset loading indicator to default spinner
       document.getElementById('txn-modal-loading').innerHTML = loadingSpinner;
@@ -937,7 +774,6 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('txn-modal-loading').style.display = 'block';
       document.getElementById('txn-modal-content').style.display = 'none';
 
-      var modalEl = document.getElementById('txnReportModal');
       var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
 
       if (!txnCode || txnCode === '-') {
@@ -1046,6 +882,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
   });
+
+  // ===================== SHARE PDF BUTTON =====================
+  const sharePdfBtn = document.getElementById('txn-share-pdf-btn');
+  if (sharePdfBtn) {
+    sharePdfBtn.addEventListener('click', function() {
+      const txnCode = document.getElementById('txn-modal-code').textContent;
+      if (!txnCode || txnCode === '-' || txnCode === 'Legacy Transaction') {
+        alert('PDF not available for this transaction');
+        return;
+      }
+      // Open PDF in new tab for download/share
+      window.open('{% url "fleet:cod_transaction_pdf" %}?code=' + encodeURIComponent(txnCode), '_blank');
+    });
+  }
 
   // ===================== MOBILE VIEW =====================
   const mobSelectAll = document.getElementById('mob-cod-select-all');

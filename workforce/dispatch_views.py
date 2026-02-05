@@ -8,6 +8,7 @@ from datetime import timedelta
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from core.decorators import staff_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.utils import timezone
@@ -29,6 +30,7 @@ logger = logging.getLogger('dispatch')
 # ========================================
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def dispatch_dashboard(request):
     """Main dispatch operations dashboard for workforce staff."""
     now = timezone.now()
@@ -88,6 +90,7 @@ def dispatch_dashboard(request):
 # ========================================
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def batch_list(request):
     """List all batches with filtering."""
     batches = OrderBatch.objects.select_related(
@@ -127,6 +130,7 @@ def batch_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def batch_detail(request, batch_id):
     """View batch details."""
     batch = get_object_or_404(
@@ -152,6 +156,7 @@ def batch_detail(request, batch_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def manual_release_batch(request, batch_id):
     """Manually release a holding batch."""
     if request.method != 'POST':
@@ -183,6 +188,7 @@ def manual_release_batch(request, batch_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def cancel_batch(request, batch_id):
     """Cancel a batch."""
     if request.method != 'POST':
@@ -214,6 +220,7 @@ def cancel_batch(request, batch_id):
 # ========================================
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def shift_list(request):
     """List all shifts with filtering."""
     shifts = RiderShift.objects.select_related(
@@ -243,7 +250,7 @@ def shift_list(request):
 
     # Get data for filter dropdowns
     locations = PickupLocation.objects.filter(pickup_status='active')
-    riders = Driver.objects.filter(driver_status='Approved')
+    riders = Driver.objects.filter(driver_status='Approved').select_related('user')
 
     # Get today for template default value
     today_date = timezone.now().date()
@@ -263,6 +270,7 @@ def shift_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def shift_create(request):
     """Create a new shift."""
     if request.method == 'POST':
@@ -313,6 +321,7 @@ def shift_create(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def shift_detail(request, shift_id):
     """View shift details."""
     shift = get_object_or_404(
@@ -338,6 +347,7 @@ def shift_detail(request, shift_id):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def shift_edit(request, shift_id):
     """Edit a shift."""
     shift = get_object_or_404(RiderShift, id=shift_id)
@@ -371,6 +381,7 @@ def shift_edit(request, shift_id):
 # ========================================
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def kpi_dashboard(request):
     """KPI overview dashboard."""
     # Get selected date or default to today
@@ -379,14 +390,17 @@ def kpi_dashboard(request):
 
     if date_str:
         from datetime import datetime
-        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        try:
+            selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = timezone.now().date()
     else:
         selected_date = timezone.now().date()
 
     # Filter KPIs
     kpis = RiderKPI.objects.filter(
         date=selected_date
-    ).select_related('rider', 'pickup_location')
+    ).select_related('rider', 'rider__user', 'pickup_location')
 
     if location_filter:
         kpis = kpis.filter(pickup_location_id=location_filter)
@@ -416,6 +430,7 @@ def kpi_dashboard(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def rider_kpi_detail(request, rider_id):
     """View KPI details for a specific rider."""
     rider = get_object_or_404(
@@ -453,6 +468,7 @@ def rider_kpi_detail(request, rider_id):
 # ========================================
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def config_list(request):
     """List all dispatch configs."""
     configs = DispatchConfig.objects.select_related(
@@ -467,18 +483,34 @@ def config_list(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def config_edit(request, location_id):
     """Edit dispatch config for a location."""
     location = get_object_or_404(PickupLocation, id=location_id)
     config = DispatchConfig.get_config_for_location(location)
 
     if request.method == 'POST':
-        # Update config fields
-        config.max_batch_size = int(request.POST.get('max_batch_size', 2))
-        config.hold_window_seconds = int(request.POST.get('hold_window_seconds', 180))
-        config.sla_minutes = int(request.POST.get('sla_minutes', 60))
-        config.sla_buffer_minutes = int(request.POST.get('sla_buffer_minutes', 15))
-        config.max_orders_per_rider = int(request.POST.get('max_orders_per_rider', 2))
+        # Update config fields with safe int conversion
+        try:
+            config.max_batch_size = int(request.POST.get('max_batch_size', 2))
+        except (ValueError, TypeError):
+            config.max_batch_size = 2
+        try:
+            config.hold_window_seconds = int(request.POST.get('hold_window_seconds', 180))
+        except (ValueError, TypeError):
+            config.hold_window_seconds = 180
+        try:
+            config.sla_minutes = int(request.POST.get('sla_minutes', 60))
+        except (ValueError, TypeError):
+            config.sla_minutes = 60
+        try:
+            config.sla_buffer_minutes = int(request.POST.get('sla_buffer_minutes', 15))
+        except (ValueError, TypeError):
+            config.sla_buffer_minutes = 15
+        try:
+            config.max_orders_per_rider = int(request.POST.get('max_orders_per_rider', 2))
+        except (ValueError, TypeError):
+            config.max_orders_per_rider = 2
         config.batching_enabled = request.POST.get('batching_enabled') == 'on'
         config.auto_assignment_enabled = request.POST.get('auto_assignment_enabled') == 'on'
         config.save()
@@ -508,6 +540,7 @@ def config_edit(request, location_id):
 # ========================================
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def batch_monitor_partial(request):
     """HTMX partial for real-time batch monitoring."""
     active_batches = OrderBatch.objects.filter(
@@ -524,6 +557,7 @@ def batch_monitor_partial(request):
 
 
 @login_required(login_url='/accounts/login/')
+@staff_required
 def shift_status_partial(request):
     """HTMX partial for shift status overview."""
     active_shifts = RiderShift.objects.filter(

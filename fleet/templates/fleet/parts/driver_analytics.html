@@ -62,9 +62,9 @@
                         <i class="fa-solid fa-clock me-2"></i>
                         Peak Delivery Hours
                     </h5>
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead class="table-light">
+                    <div class="listing-container" style="box-shadow: none;">
+                        <table class="listing-table">
+                            <thead>
                                 <tr>
                                     <th>Time</th>
                                     <th class="text-end">Deliveries</th>
@@ -77,11 +77,13 @@
                                     <td class="fw-bold">{{ hour.hour }}</td>
                                     <td class="text-end">{{ hour.deliveries }}</td>
                                     <td class="text-end">
-                                        <span class="badge bg-primary">
+                                        <span class="listing-status primary">
                                             {% widthratio hour.deliveries cod_count|add:prepaid_count 100 %}%
                                         </span>
                                     </td>
                                 </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="text-center text-muted py-3">No data available</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -98,10 +100,10 @@
                         <i class="fa-solid fa-layer-group me-2"></i>
                         Delivery Categories
                     </h5>
-                    {% if delivery_categories %}
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead class="table-light">
+                    <div class="listing-container" style="box-shadow: none;">
+                        {% if delivery_categories %}
+                        <table class="listing-table">
+                            <thead>
                                 <tr>
                                     <th>Category</th>
                                     <th class="text-end">Count</th>
@@ -125,10 +127,13 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                        {% else %}
+                        <div class="listing-empty">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <p>No category data available</p>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% else %}
-                    <p class="text-muted text-center py-4">No category data available</p>
-                    {% endif %}
                 </section>
             </div>
             <div class="col-md-6">
@@ -137,10 +142,10 @@
                         <i class="fa-solid fa-gauge-high me-2"></i>
                         Delivery Speed Types
                     </h5>
-                    {% if delivery_speeds %}
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead class="table-light">
+                    <div class="listing-container" style="box-shadow: none;">
+                        {% if delivery_speeds %}
+                        <table class="listing-table">
+                            <thead>
                                 <tr>
                                     <th>Speed Type</th>
                                     <th class="text-end">Count</th>
@@ -164,10 +169,13 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                        {% else %}
+                        <div class="listing-empty">
+                            <i class="fa-solid fa-gauge-high"></i>
+                            <p>No speed data available</p>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% else %}
-                    <p class="text-muted text-center py-4">No speed data available</p>
-                    {% endif %}
                 </section>
             </div>
         </div>

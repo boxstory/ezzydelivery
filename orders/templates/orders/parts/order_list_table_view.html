@@ -2,97 +2,86 @@
 {% load custom_filters %}
 
 {% if not orders %}
-<div class="text-center py-5">
-  <i class="fa-solid fa-box-open fa-3x mb-3" style="color: var(--brand-grey-400);"></i>
-  <h4 class="text-muted">No orders found</h4>
-  <p class="text-muted">Start by adding your first order</p>
+<div class="listing-empty">
+  <i class="fa-solid fa-box-open"></i>
+  <p>No orders found</p>
+  <small class="text-muted">Start by adding your first order</small>
 </div>
 {% else %}
-<div class="orders-table-wrapper">
-  <table class="orders-table" id="orders_list_table_view">
+<div class="listing-container">
+  <table class="listing-table" id="orders_list_table_view">
     <thead>
       <tr>
-        <th class="col-id">#</th>
-        <th class="col-order-number">Order No.</th>
-        <th class="col-date">Date</th>
-        <th class="col-customer">Customer</th>
-        <th class="col-phone">Phone</th>
-        <th class="col-zone">Zone</th>
-        <th class="col-address">Address</th>
-        <th class="col-cod">COD</th>
-        <th class="col-status">Status</th>
-        <th class="col-actions">Actions</th>
+        <th>Order No.</th>
+        <th>Date</th>
+        <th>Customer</th>
+        <th>Phone</th>
+        <th>Zone</th>
+        <th>Address</th>
+        <th>COD</th>
+        <th>Status</th>
+        <th class="text-center">Actions</th>
       </tr>
     </thead>
     <tbody>
       {% for order in orders %}
       <tr class="order-table-row" data-order-id="{{ order.id }}">
-        <td class="col-id">{{ order.id }}</td>
-        <td class="col-order-number">
-          <span class="order-number-badge">{{ order.order_number }}</span>
-        </td>
-        <td class="col-date">{{ order.order_date|date:"d/m/Y" }}</td>
-        <td class="col-customer">
-          <div class="customer-info">
-            <span class="customer-name">{{ order.customer_name }}</span>
-          </div>
-        </td>
-        <td class="col-phone">
-          <a href="http://wa.me/{{ order.customer_whatsapp }}" target="_blank" class="phone-link">
-            <i class="fa-brands fa-whatsapp"></i>
-            {{ order.customer_phone }}
+        <td><code>{{ order.order_number }}</code></td>
+        <td class="text-muted">{{ order.order_date|date:"d/m/Y" }}</td>
+        <td>{{ order.customer_name }}</td>
+        <td>
+          <a href="http://wa.me/{{ order.customer_whatsapp }}" target="_blank" class="text-success">
+            <i class="fa-brands fa-whatsapp me-1"></i>{{ order.customer_phone }}
           </a>
         </td>
-        <td class="col-zone">
-          <span class="zone-badge">{% get_zone_display order %}</span>
+        <td>
+          <span class="listing-status primary">{% get_zone_display order %}</span>
         </td>
-        <td class="col-address">
-          <div class="address-cell">
-            {% if order.dl_street %}St {{ order.dl_street }}{% endif %}
-            {% if order.dl_building %}, Bldg {{ order.dl_building }}{% endif %}
-            {% if not order.dl_street and not order.dl_building %}
-              {{ order.customer_address|truncatechars:30 }}
-            {% endif %}
-          </div>
-        </td>
-        <td class="col-cod">
-          {% if order.cod_amount %}
-          <span class="cod-badge">QR {{ order.cod_amount }}</span>
-          {% else %}
-          <span class="cod-badge cod-none">-</span>
+        <td class="text-2line" title="{% if order.dl_street %}St {{ order.dl_street }}{% endif %}{% if order.dl_building %}, Bldg {{ order.dl_building }}{% endif %}{% if not order.dl_street and not order.dl_building %}{{ order.customer_address }}{% endif %}">
+          {% if order.dl_street %}St {{ order.dl_street }}{% endif %}
+          {% if order.dl_building %}, Bldg {{ order.dl_building }}{% endif %}
+          {% if not order.dl_street and not order.dl_building %}
+            {{ order.customer_address }}
           {% endif %}
         </td>
-        <td class="col-status">
+        <td>
+          {% if order.cod_amount %}
+          <span class="fw-bold text-warning">{{ order.cod_amount }} QR</span>
+          {% else %}
+          <span class="text-muted">-</span>
+          {% endif %}
+        </td>
+        <td>
           {% with delivery=order.delivery_task.first %}
             {% if delivery and delivery.dl_task_status_dms == '2' %}
-              <span class="table-status-badge status-delivered">Delivered</span>
+              <span class="listing-status success"><i class="fa-solid fa-check"></i></span> Delivered
             {% elif delivery and delivery.dl_task_status_dms == '0' %}
-              <span class="table-status-badge status-created">Assigned</span>
+              <span class="listing-status primary"><i class="fa-solid fa-user"></i></span> Assigned
             {% elif delivery and delivery.dl_task_status_dms == '1' %}
-              <span class="table-status-badge status-pending">Started</span>
+              <span class="listing-status warning"><i class="fa-solid fa-truck"></i></span> Started
             {% elif delivery and delivery.dl_task_status_dms == '3' %}
-              <span class="table-status-badge status-cancelled">Failed</span>
+              <span class="listing-status danger"><i class="fa-solid fa-times"></i></span> Failed
             {% elif delivery and delivery.dl_task_status_dms == '9' %}
-              <span class="table-status-badge status-cancelled">Cancelled</span>
+              <span class="listing-status danger"><i class="fa-solid fa-ban"></i></span> Cancelled
             {% elif order.task_created %}
-              <span class="table-status-badge status-created">Task Created</span>
+              <span class="listing-status info"><i class="fa-solid fa-clipboard-check"></i></span> Task Created
             {% else %}
-              <span class="table-status-badge status-pending">Pending</span>
+              <span class="listing-status warning"><i class="fa-solid fa-clock"></i></span> Pending
             {% endif %}
           {% endwith %}
         </td>
-        <td class="col-actions">
-          <div class="table-actions">
+        <td class="text-center">
+          <div class="d-flex gap-1 justify-content-center">
             {% if order.order_status == 'publish' %}
-            <span class="action-btn disabled" title="Cannot edit published orders">
+            <span class="btn btn-sm btn-outline-secondary disabled" title="Cannot edit published orders">
               <i class="fa fa-edit"></i>
             </span>
             {% else %}
-            <a href="{% url 'orders:order_update' order.id %}" class="action-btn" title="Edit Order">
+            <a href="{% url 'orders:order_update' order.id %}" class="btn btn-sm btn-outline-primary" title="Edit Order">
               <i class="fa fa-edit"></i>
             </a>
             {% endif %}
-            <a href="{% url 'orders:delete_order' order.id %}" class="action-btn action-delete" title="Delete Order">
+            <a href="{% url 'orders:delete_order' order.id %}" class="btn btn-sm btn-outline-danger" title="Delete Order">
               <i class="fa fa-trash"></i>
             </a>
           </div>

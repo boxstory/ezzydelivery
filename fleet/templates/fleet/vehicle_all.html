@@ -1,29 +1,43 @@
-<div class="p-3">
-    <table class="table table-hover" id="fleet_vehicles_table_all">
+<div class="listing-container">
+    <table class="listing-table" id="fleet_vehicles_table_all">
         <thead id="fleet_vehicles_thead_all">
             <tr>
-                <th scope="col">Type</th>
-                <th scope="col">Plate No</th>
-                <th scope="col">Model</th>
-                <th scope="col">Color</th>
-                <th scope="col">Status</th>
-                <th scope="col">Actions</th>
+                <th>Type</th>
+                <th>Plate No</th>
+                <th>Model</th>
+                <th>Color</th>
+                <th>Status</th>
+                <th class="text-center">Actions</th>
             </tr>
         </thead>
         <tbody id="fleet_vehicles_tbody_all">
             {% for vehicle in vehicles %}
-                <tr >
-                    <td scope="row">{{ vehicle.vehicle_type }}</td>
-                    <td>{{ vehicle.vehicle_no }}</td>
-                    <td scope="row">{{ vehicle.vehicle_model }}</td>
-                    <td scope="row">{{ vehicle.vehicle_color }}</td>
-                    <td scope="row">{{ vehicle.vehicle_status }}</td>
-                    <td>
-                        <!-- delete link neeeds to setup later ********************************************************* -->
-                        <a href=" #">
-                            <i class="fa-solid fa-delete-left"></i> </a>
-                    </td>
-                </tr>
+            <tr>
+                <td>
+                    <span class="listing-status primary"><i class="fa-solid fa-car"></i></span>
+                    {{ vehicle.vehicle_type }}
+                </td>
+                <td><code>{{ vehicle.vehicle_no }}</code></td>
+                <td>{{ vehicle.vehicle_model }}</td>
+                <td>{{ vehicle.vehicle_color }}</td>
+                <td>
+                    <span class="listing-status {% if vehicle.vehicle_status == 'active' %}success{% else %}warning{% endif %}">
+                        {{ vehicle.vehicle_status }}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <a href="#" class="btn btn-sm btn-outline-danger" title="Delete">
+                        <i class="fa-solid fa-trash"></i>
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="listing-empty">
+                    <i class="fa-solid fa-car"></i>
+                    <p>No vehicles found</p>
+                </td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>

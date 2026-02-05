@@ -66,36 +66,33 @@
   {% if settlements %}
   <div class="row mb-4">
     <div class="col-12">
-      <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white">
-          <h5 class="mb-0"><i class="fas fa-handshake me-2 text-success"></i>COD Settlements</h5>
+      <div class="listing-container">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fas fa-handshake me-2 text-success"></i>COD Settlements</h6>
+          <span class="listing-badge">{{ settlements|length }} items</span>
         </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="bg-light">
-                <tr>
-                  <th>Date</th>
-                  <th>Transaction Code</th>
-                  <th>Description</th>
-                  <th>Processed By</th>
-                  <th class="text-end">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for s in settlements %}
-                <tr>
-                  <td>{{ s.created_at|date:"d M Y" }} <small class="text-muted">{{ s.created_at|time:"H:i" }}</small></td>
-                  <td><code>{{ s.transaction_code|default:"-" }}</code></td>
-                  <td>{{ s.description|default:"-" }}</td>
-                  <td>{{ s.created_by.first_name|default:"-" }}</td>
-                  <td class="text-end fw-bold text-success">{{ s.amount|floatformat:2 }} QR</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <table class="listing-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Code</th>
+              <th>Description</th>
+              <th>By</th>
+              <th class="text-end">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in settlements %}
+            <tr>
+              <td>{{ s.created_at|date:"d M" }}<br><span class="text-muted" style="font-size: 0.65rem;">{{ s.created_at|time:"H:i" }}</span></td>
+              <td><code>{{ s.transaction_code|default:"-" }}</code></td>
+              <td class="text-2line" title="{{ s.description|default:'' }}">{{ s.description|default:"-" }}</td>
+              <td>{{ s.created_by.first_name|default:"-" }}</td>
+              <td class="text-end fw-bold text-success">{{ s.amount|floatformat:0 }} QR</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -104,67 +101,56 @@
   <!-- COD Deliveries List -->
   <div class="row">
     <div class="col-12">
-      <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white">
-          <h5 class="mb-0"><i class="fas fa-money-bill me-2 text-warning"></i>COD Deliveries</h5>
+      <div class="listing-container">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fas fa-money-bill me-2 text-warning"></i>COD Deliveries</h6>
+          <span class="listing-badge">{{ cod_deliveries|length }} items</span>
         </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="bg-light">
-                <tr>
-                  <th>Date</th>
-                  <th>Task #</th>
-                  <th>Order #</th>
-                  <th>Driver</th>
-                  <th>COD Amount</th>
-                  <th>Collected</th>
-                  <th>Driver Settled</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for task in cod_deliveries %}
-                <tr>
-                  <td>{{ task.dl_task_date|date:"d M Y" }}</td>
-                  <td><span class="fw-bold text-primary">#{{ task.dl_task_number }}</span></td>
-                  <td>
-                    {% if task.order %}
-                    #{{ task.order.order_number|default:"-" }}
-                    {% else %}-{% endif %}
-                  </td>
-                  <td>
-                    {% if task.driver %}
-                    {{ task.driver.user.first_name|default:"-" }}
-                    {% else %}-{% endif %}
-                  </td>
-                  <td>{{ task.cod_collected_amount|default:0|floatformat:2 }} QR</td>
-                  <td>
-                    {% if task.cod_collected %}
-                    <span class="badge bg-success">Yes</span>
-                    {% else %}
-                    <span class="badge bg-warning text-dark">Pending</span>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if task.cod_settled %}
-                    <span class="badge bg-success">Settled</span>
-                    {% else %}
-                    <span class="badge bg-secondary">Pending</span>
-                    {% endif %}
-                  </td>
-                </tr>
-                {% empty %}
-                <tr>
-                  <td colspan="7" class="text-center text-muted py-4">
-                    <i class="fas fa-money-bill fa-2x mb-2 d-block"></i>
-                    No COD deliveries found
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <table class="listing-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Task #</th>
+              <th>Order #</th>
+              <th>Driver</th>
+              <th>COD</th>
+              <th>Collected</th>
+              <th>Settled</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for task in cod_deliveries %}
+            <tr>
+              <td>{{ task.dl_task_date|date:"d M" }}</td>
+              <td><code>#{{ task.dl_task_number }}</code></td>
+              <td>{% if task.order %}#{{ task.order.order_number|default:"-" }}{% else %}-{% endif %}</td>
+              <td>{% if task.driver %}{{ task.driver.user.first_name|default:"-" }}{% else %}-{% endif %}</td>
+              <td>{{ task.cod_collected_amount|default:0|floatformat:0 }} QR</td>
+              <td>
+                {% if task.cod_collected %}
+                <span class="listing-status success"><i class="fas fa-check"></i></span>
+                {% else %}
+                <span class="listing-status warning"><i class="fas fa-clock"></i></span>
+                {% endif %}
+              </td>
+              <td>
+                {% if task.cod_settled %}
+                <span class="listing-status success"><i class="fas fa-check"></i></span>
+                {% else %}
+                <span class="listing-status"><i class="fas fa-clock"></i></span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="listing-empty">
+                <i class="fas fa-money-bill"></i>
+                No COD deliveries found
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

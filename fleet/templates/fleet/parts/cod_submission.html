@@ -232,92 +232,55 @@
   <div class="row">
     <!-- COD List -->
     <div class="col-lg-7 mb-4">
-      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
-        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-              <div class="me-3" style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                <i class="fa-solid fa-hand-holding-dollar text-white"></i>
-              </div>
-              <div>
-                <h5 class="mb-0 text-white fw-bold">Pending COD Orders</h5>
-                <small class="text-white" style="opacity: 0.9;">Select orders to submit</small>
-              </div>
-            </div>
-            <span class="badge bg-white text-dark">{{ cod_in_hand_list|length }} orders</span>
-          </div>
+      <div class="listing-container">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fa-solid fa-hand-holding-dollar text-warning"></i>Pending COD Orders</h6>
+          <span class="listing-badge">{{ cod_in_hand_list|length }} orders</span>
         </div>
-
         {% if cod_in_hand_list %}
-        <div class="px-3 py-2 border-bottom" style="background: #fffbeb;">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-2">
-              <input type="checkbox" class="form-check-input" id="desk-select-all" style="cursor: pointer;">
-              <span class="text-muted" style="font-size: 0.85rem;">Select All</span>
-              <span class="ms-2 text-muted" style="font-size: 0.85rem;">
-                <span id="desk-selected-num">0</span> selected
-              </span>
-              <span id="desk-selected-total" class="fw-semibold ms-1" style="color: #d97706; font-size: 0.85rem; display: none;">
-                (<span id="desk-selected-amount">0</span> QR)
-              </span>
-            </div>
-          </div>
+        <div class="listing-selection-bar">
+          <input type="checkbox" class="form-check-input" id="desk-select-all">
+          <span class="listing-selection-count"><span id="desk-selected-num">0</span> selected</span>
+          <span id="desk-selected-total" class="listing-selection-total" style="display: none;">
+            Total: <span id="desk-selected-amount">0</span> QR
+          </span>
         </div>
-        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-          <table class="table table-hover mb-0" style="font-size: 0.875rem;">
-            <thead style="background: #fef3c7; position: sticky; top: 0; z-index: 1;">
-              <tr>
-                <th class="py-2 ps-3" style="font-weight: 600; color: #92400e; border: none; width: 40px;"></th>
-                <th class="py-2" style="font-weight: 600; color: #92400e; border: none;">Order Details</th>
-                <th class="py-2" style="font-weight: 600; color: #92400e; border: none;">Customer</th>
-                <th class="py-2" style="font-weight: 600; color: #92400e; border: none;">Delivered</th>
-                <th class="py-2 pe-3 text-end" style="font-weight: 600; color: #92400e; border: none;">COD Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for delivery in cod_in_hand_list %}
-              <tr style="border-bottom: 1px solid #f3f4f6;" data-delivery-id="{{ delivery.id }}" data-amount="{{ delivery.cod_collected_amount|default:0 }}">
-                <td class="py-2 ps-3">
-                  <input type="checkbox" class="form-check-input desk-row-checkbox" value="{{ delivery.id }}" style="cursor: pointer;">
-                </td>
-                <td class="py-2">
-                  <div class="fw-semibold" style="color: #1f2937; font-size: 0.85rem;">{{ delivery.order.business.business_name|default:"-"|truncatechars:20 }}</div>
-                  <div style="font-size: 0.75rem;">
-                    <span class="text-muted" style="font-family: monospace;">{{ delivery.dl_task_number }}</span>
-                  </div>
-                </td>
-                <td class="py-2">
-                  <div class="fw-medium" style="color: #374151; font-size: 0.85rem;">{{ delivery.order.customer_name|default:"-"|truncatechars:20 }}</div>
-                  <div class="text-muted" style="font-size: 0.75rem;">
-                    <i class="fa-solid fa-location-dot me-1"></i>{{ delivery.dl_to_address.area_name|default:"-" }}
-                  </div>
-                </td>
-                <td class="py-2">
-                  <div class="text-muted" style="font-size: 0.8rem;">{{ delivery.completed_at|date:"d M"|default:"-" }}</div>
-                  <div style="color: #9ca3af; font-size: 0.75rem;">{{ delivery.completed_at|date:"H:i"|default:"-" }}</div>
-                </td>
-                <td class="py-2 pe-3 text-end">
-                  <span class="fw-bold" style="color: #d97706;">{{ delivery.cod_collected_amount|default:0|floatformat:0 }}</span>
-                  <span class="text-muted" style="font-size: 0.7rem;">QR</span>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-            <tfoot style="background: #fffbeb;">
-              <tr>
-                <td colspan="4" class="py-2 ps-3 fw-bold" style="border: none;">Total</td>
-                <td class="py-2 pe-3 text-end fw-bold" style="border: none; color: #d97706;">{{ cod_in_hand_total|floatformat:0 }} QR</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+        <table class="listing-table">
+          <thead>
+            <tr>
+              <th style="width: 30px;"></th>
+              <th>Business</th>
+              <th>DL#</th>
+              <th>Customer</th>
+              <th>Area</th>
+              <th>Date</th>
+              <th class="text-end">COD</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for delivery in cod_in_hand_list %}
+            <tr data-delivery-id="{{ delivery.id }}" data-amount="{{ delivery.cod_collected_amount|default:0 }}">
+              <td><input type="checkbox" class="form-check-input desk-row-checkbox" value="{{ delivery.id }}"></td>
+              <td>{{ delivery.order.business.business_name|default:"-" }}</td>
+              <td><code>{{ delivery.dl_task_number }}</code></td>
+              <td>{{ delivery.order.customer_name|default:"-" }}</td>
+              <td class="text-muted">{{ delivery.dl_to_address.area_name|default:"-" }}</td>
+              <td class="text-muted">{{ delivery.completed_at|date:"d M"|default:"-" }}</td>
+              <td class="text-end fw-bold text-warning">{{ delivery.cod_collected_amount|default:0|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="6" class="fw-bold">Total</td>
+              <td class="text-end fw-bold text-warning">{{ cod_in_hand_total|floatformat:0 }} QR</td>
+            </tr>
+          </tfoot>
+        </table>
         {% else %}
-        <div class="text-center py-5">
-          <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
-            <i class="fa-solid fa-check text-success" style="font-size: 1.5rem;"></i>
-          </div>
-          <h5 class="text-success mb-1">All Settled!</h5>
-          <p class="text-muted mb-0">No pending COD to submit</p>
+        <div class="listing-empty">
+          <i class="fa-solid fa-check-circle text-success"></i>
+          <p>All COD settled</p>
         </div>
         {% endif %}
       </div>
@@ -376,70 +339,43 @@
   {% if recent_submissions %}
   <div class="row mt-4">
     <div class="col-12">
-      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
-        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-              <div class="me-3" style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                <i class="fa-solid fa-clock-rotate-left text-white"></i>
-              </div>
-              <div>
-                <h5 class="mb-0 text-white fw-bold">Recent COD Submissions</h5>
-                <small class="text-white" style="opacity: 0.9;">Last {{ recent_submissions|length }} submissions</small>
-              </div>
-            </div>
-          </div>
+      <div class="listing-container">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fa-solid fa-clock-rotate-left me-2 text-success"></i>Recent COD Submissions</h6>
+          <span class="listing-badge">{{ recent_submissions|length }} items</span>
         </div>
-        <div class="table-responsive">
-          <table class="table table-hover mb-0" style="font-size: 0.875rem;">
-            <thead style="background: #f0fdf4;">
-              <tr>
-                <th class="py-2 ps-3" style="font-weight: 600; color: #065f46; border: none;">Transaction Code</th>
-                <th class="py-2" style="font-weight: 600; color: #065f46; border: none;">Payment Method</th>
-                <th class="py-2" style="font-weight: 600; color: #065f46; border: none;">Reference</th>
-                <th class="py-2" style="font-weight: 600; color: #065f46; border: none;">Date</th>
-                <th class="py-2 pe-3 text-end" style="font-weight: 600; color: #065f46; border: none;">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for txn in recent_submissions %}
-              <tr style="border-bottom: 1px solid #f3f4f6;">
-                <td class="py-2 ps-3">
-                  <span style="font-family: monospace; font-weight: 600; color: #059669;">{{ txn.transaction_code }}</span>
-                </td>
-                <td class="py-2">
-                  {% if txn.payment_method == 'cash' %}
-                  <span class="badge" style="background: #fef3c7; color: #92400e;"><i class="fa-solid fa-money-bill me-1"></i>Cash</span>
-                  {% elif txn.payment_method == 'bank' %}
-                  <span class="badge" style="background: #dbeafe; color: #1e40af;"><i class="fa-solid fa-building-columns me-1"></i>Bank Transfer</span>
-                  {% elif txn.payment_method == 'atm' %}
-                  <span class="badge" style="background: #e0e7ff; color: #3730a3;"><i class="fa-solid fa-credit-card me-1"></i>ATM Deposit</span>
-                  {% elif txn.payment_method == 'fawran' %}
-                  <span class="badge" style="background: #fce7f3; color: #9d174d;"><i class="fa-solid fa-bolt me-1"></i>Fawran</span>
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
-                </td>
-                <td class="py-2">
-                  {% if txn.reference_number %}
-                  <span class="text-muted" style="font-family: monospace; font-size: 0.8rem;">{{ txn.reference_number|truncatechars:25 }}</span>
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
-                </td>
-                <td class="py-2">
-                  <div style="font-size: 0.85rem;">{{ txn.created_at|date:"d M Y" }}</div>
-                  <div class="text-muted" style="font-size: 0.75rem;">{{ txn.created_at|date:"H:i" }}</div>
-                </td>
-                <td class="py-2 pe-3 text-end">
-                  <span class="fw-bold" style="color: #059669;">{{ txn.amount|floatformat:0 }}</span>
-                  <span class="text-muted" style="font-size: 0.7rem;">QR</span>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+        <table class="listing-table">
+          <thead>
+            <tr>
+              <th>Transaction Code</th>
+              <th>Method</th>
+              <th>Reference</th>
+              <th>Date</th>
+              <th class="text-end">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for txn in recent_submissions %}
+            <tr>
+              <td><code style="color: #059669;">{{ txn.transaction_code }}</code></td>
+              <td>
+                {% if txn.payment_method == 'cash' %}
+                <span class="listing-status warning"><i class="fa-solid fa-money-bill"></i></span> Cash
+                {% elif txn.payment_method == 'bank' %}
+                <span class="listing-status primary"><i class="fa-solid fa-building-columns"></i></span> Bank
+                {% elif txn.payment_method == 'atm' %}
+                <span class="listing-status"><i class="fa-solid fa-credit-card"></i></span> ATM
+                {% elif txn.payment_method == 'fawran' %}
+                <span class="listing-status"><i class="fa-solid fa-bolt"></i></span> Fawran
+                {% else %}-{% endif %}
+              </td>
+              <td>{% if txn.reference_number %}<code>{{ txn.reference_number|truncatechars:20 }}</code>{% else %}-{% endif %}</td>
+              <td>{{ txn.created_at|date:"d M" }}<br><span class="text-muted" style="font-size: 0.65rem;">{{ txn.created_at|time:"H:i" }}</span></td>
+              <td class="text-end fw-bold text-success">{{ txn.amount|floatformat:0 }} QR</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

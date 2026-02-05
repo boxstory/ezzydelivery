@@ -131,63 +131,73 @@
                 </div>
             </div>
             <!-- documents section -----------  -->
-            <div class="counter bg-light p-4" id="fleet_driver_profile_section_documents">
-                <h2 class="h3 fw-bold" id="fleet_driver_profile_title_documents">Available Documents</h2>
-                <hr>
-                <table class="table table-borderless" id="fleet_driver_profile_table_documents">
+            <div class="listing-container" id="fleet_driver_profile_section_documents">
+                <div class="listing-header">
+                    <h6 class="listing-title"><i class="fa-solid fa-file-alt text-primary"></i>Available Documents</h6>
+                </div>
+                <table class="listing-table" id="fleet_driver_profile_table_documents">
                     <thead id="fleet_driver_profile_thead_documents">
                         <tr>
-                            <th scope="col">#</th>
-                            <th scope="col">Type</th>
-                            <th scope="col">Doc No</th>
-                            <th scope="col">Expiry Date</th>
+                            <th>#</th>
+                            <th>Type</th>
+                            <th>Doc No</th>
+                            <th>Expiry Date</th>
                         </tr>
                     </thead>
                     <tbody id="fleet_driver_profile_tbody_documents">
                         {% for doc in driver_documents %}
                         <tr>
-                            <th>{{ forloop.counter }}</th>
+                            <td>{{ forloop.counter }}</td>
                             <td>{{ doc.document_type }}</td>
-                            <td>***{{ doc.document_no|slice:"-5:" }}</td>
+                            <td><code>***{{ doc.document_no|slice:"-5:" }}</code></td>
                             <td>{{ doc.document_expiry_date|date:'M-y' }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">No documents available</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
             <!-- vehicle section   -->
-            <div class="counter bg-light p-4 my-3" id="fleet_driver_profile_section_vehicles">
-                <div class="row">
-                    <h2 class="h3 fw-bold" id="fleet_driver_profile_title_vehicles">Owned Vehicle Details</h2>
-                    <hr>
-                    <table class="table table-borderless" id="fleet_driver_profile_table_vehicles">
-                        <thead id="fleet_driver_profile_thead_vehicles">
-                            <tr>
-                                <th scope="col">#</th>
-                                <th scope="col">Type</th>
-                                <th scope="col">Model</th>
-                                <th scope="col">Added on</th>
-                                <th scope="col">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="fleet_driver_profile_tbody_vehicles">
-                            {% if not driver_vehicle %}
-                            <th scope="col"></th>
-                            <td>No Vehicles Added</td>
-                            {% else %}
-                            {% for vehicle in driver_vehicle %}
-                            <tr>
-                                <th scope="row">{{ forloop.counter }}</th>
-                                <td>{{ vehicle.vehicle_type }}</td>
-                                <td>{{ vehicle.vehicle_model }}</td>
-                                <td>{{ vehicle.vehicle_date }}</td>
-                                <td>{{ vehicle.vehicle_status }}</td>
-                            </tr>
-                            {% endfor %}
-                            {% endif %}
-                        </tbody>
-                    </table>
+            <div class="listing-container my-3" id="fleet_driver_profile_section_vehicles">
+                <div class="listing-header">
+                    <h6 class="listing-title"><i class="fa-solid fa-car text-primary"></i>Owned Vehicle Details</h6>
                 </div>
+                <table class="listing-table" id="fleet_driver_profile_table_vehicles">
+                    <thead id="fleet_driver_profile_thead_vehicles">
+                        <tr>
+                            <th>#</th>
+                            <th>Type</th>
+                            <th>Model</th>
+                            <th>Added on</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fleet_driver_profile_tbody_vehicles">
+                        {% for vehicle in driver_vehicle %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>
+                                <span class="listing-status primary"><i class="fa-solid fa-car"></i></span>
+                                {{ vehicle.vehicle_type }}
+                            </td>
+                            <td>{{ vehicle.vehicle_model }}</td>
+                            <td class="text-muted">{{ vehicle.vehicle_date }}</td>
+                            <td>
+                                <span class="listing-status {% if vehicle.vehicle_status == 'active' %}success{% else %}warning{% endif %}">
+                                    {{ vehicle.vehicle_status }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-3">No vehicles added</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

@@ -47,6 +47,8 @@ urlpatterns = [
           fleet_views.cod_export, name='cod_export'),
      path('cod_transaction_detail/',
           fleet_views.cod_transaction_detail, name='cod_transaction_detail'),
+     path('cod_transaction_pdf/',
+          fleet_views.cod_transaction_pdf, name='cod_transaction_pdf'),
      path('earnings/',
           fleet_views.driver_earnings, name='driver_earnings'),
      path('transactions/',

@@ -3,56 +3,68 @@
 {% load crispy_forms_tags %}
 {% block content %}
   <div class="flex-fill p-2">
-    <div class=" h4 p-3" id="fleet_vehicle_own_header_title">Own Vehicles</div>
-    <div class="table-responsive m-2 m-md-3">
-      <table class="table table-responsive table-striped table-hover" id="fleet_vehicle_own_table_all">
+    <div class="listing-container m-2 m-md-3">
+      <div class="listing-header">
+        <h6 class="listing-title"><i class="fa-solid fa-car text-primary"></i>Own Vehicles</h6>
+        <a href="{% url 'fleet:vehicle_add' %}" class="btn btn-sm btn-primary">
+          <i class="fa-solid fa-plus me-1"></i>Add Vehicle
+        </a>
+      </div>
+      <table class="listing-table" id="fleet_vehicle_own_table_all">
         <thead id="fleet_vehicle_own_thead_all">
-          <tr class="bg-dark text-light">
-            <th scope="col">Type</th>
-            <th scope="col d-flex">
-              <span class="d-none d-md-inline">Plate</span> No
-            </th>
-            <th scope="col">Model</th>
-            <th scope="col">Color</th>
-            <th scope="col">Status</th>
-            <th scope="col" class="text-center">Actions</th>
+          <tr>
+            <th>Type</th>
+            <th>Plate No</th>
+            <th>Model</th>
+            <th>Color</th>
+            <th>Status</th>
+            <th class="text-center">Actions</th>
           </tr>
         </thead>
         <tbody id="fleet_vehicle_own_tbody_all">
           {% for vehicle in vehicles %}
-            <tr>
-              <td scope="row">{{ vehicle.vehicle_type }}</td>
-              <td>{{ vehicle.vehicle_no }}</td>
-              <td scope="row">{{ vehicle.vehicle_model }}</td>
-              <td scope="row">{{ vehicle.vehicle_color }}</td>
-              <td scope="row">{{ vehicle.vehicle_status }}</td>
-              <td class="text-center p-0">
-                <a href="{% url 'fleet:vehicle_update' vehicle_id=vehicle.id %}"
-                   class="btn btn-outline-dark btn-sm me-1">
-                  <i class="fa-solid fa-pen"></i></a>
-                {% if request.user.is_staff %}
-                  <!-- Staff: Direct delete link -->
-                  <a href="{% url 'fleet:vehicle_delete' fleet_id=request.user.id vehicle_id=vehicle.id %}"
-                     class="btn btn-outline-danger btn-sm"
-                     onclick="return confirm('Are you sure you want to delete this vehicle?');">
-                    <i class="fa-solid fa-trash"></i></a>
-                {% else %}
-                  <!-- Non-staff: Request help button -->
-                  <button type="button"
-                          class="btn btn-outline-warning btn-sm"
-                          data-bs-toggle="modal"
-                          data-bs-target="#helpRequestModal{{ vehicle.id }}">
-                    <i class="fa-solid fa-trash"></i>
-                  </button>
-                {% endif %}
-              </td>
-            </tr>
+          <tr>
+            <td>
+              <span class="listing-status primary"><i class="fa-solid fa-car"></i></span>
+              {{ vehicle.vehicle_type }}
+            </td>
+            <td><code>{{ vehicle.vehicle_no }}</code></td>
+            <td>{{ vehicle.vehicle_model }}</td>
+            <td>{{ vehicle.vehicle_color }}</td>
+            <td>
+              <span class="listing-status {% if vehicle.vehicle_status == 'active' %}success{% else %}warning{% endif %}">
+                {{ vehicle.vehicle_status }}
+              </span>
+            </td>
+            <td class="text-center">
+              <a href="{% url 'fleet:vehicle_update' vehicle_id=vehicle.id %}"
+                 class="btn btn-sm btn-outline-primary me-1" title="Edit">
+                <i class="fa-solid fa-pen"></i></a>
+              {% if request.user.is_staff %}
+              <a href="{% url 'fleet:vehicle_delete' fleet_id=request.user.id vehicle_id=vehicle.id %}"
+                 class="btn btn-sm btn-outline-danger"
+                 onclick="return confirm('Are you sure you want to delete this vehicle?');" title="Delete">
+                <i class="fa-solid fa-trash"></i></a>
+              {% else %}
+              <button type="button"
+                      class="btn btn-sm btn-outline-warning"
+                      data-bs-toggle="modal"
+                      data-bs-target="#helpRequestModal{{ vehicle.id }}" title="Request Delete">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="listing-empty">
+              <i class="fa-solid fa-car"></i>
+              <p>No vehicles registered</p>
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
-      <a href="{% url 'fleet:vehicle_add' %}" class="justify-content-end">
-        <div class="btn btn-outline-dark text-decoration-none" id="fleet_vehicle_own_btn_add">ADD VEHICLE</div>
-      </a>
     </div>
   </div>
 

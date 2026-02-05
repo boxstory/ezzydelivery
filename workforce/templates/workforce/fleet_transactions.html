@@ -694,17 +694,26 @@ function settleSelected() {
     document.getElementById('receiptDriverId').textContent = '{{ selected_driver.driver_id }}';
     document.getElementById('receiptTotal').textContent = 'QAR ' + totalAmount.toFixed(2);
 
-    // Populate items
+    // Populate items (using textContent to prevent XSS)
     const tbody = document.getElementById('receiptItemsBody');
     tbody.innerHTML = '';
     items.forEach(item => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td style="font-family: monospace; font-size: 0.7rem;">${item.txnCode}</td>
-            <td>${item.description}</td>
-            <td>${item.date}</td>
-            <td style="text-align: right;">QAR ${item.amount.toFixed(2)}</td>
-        `;
+        const tdCode = document.createElement('td');
+        tdCode.style.fontFamily = 'monospace';
+        tdCode.style.fontSize = '0.7rem';
+        tdCode.textContent = item.txnCode;
+        const tdDesc = document.createElement('td');
+        tdDesc.textContent = item.description;
+        const tdDate = document.createElement('td');
+        tdDate.textContent = item.date;
+        const tdAmount = document.createElement('td');
+        tdAmount.style.textAlign = 'right';
+        tdAmount.textContent = 'QAR ' + item.amount.toFixed(2);
+        tr.appendChild(tdCode);
+        tr.appendChild(tdDesc);
+        tr.appendChild(tdDate);
+        tr.appendChild(tdAmount);
         tbody.appendChild(tr);
     });
 

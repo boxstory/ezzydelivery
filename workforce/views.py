@@ -944,8 +944,8 @@ def add_order(request):
             messages.error(request, error_msg)
 
         except Exception as e:
-            logger.error(f'Error creating order: {e}')
-            error_msg = f'Error creating order: {str(e)}'
+            logger.exception('Error creating order: %s', str(e))
+            error_msg = 'An error occurred while creating the order. Please try again.'
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({'success': False, 'error': error_msg}, status=400)
             messages.error(request, error_msg)
@@ -1320,17 +1320,15 @@ def order_detail(request, order_id):
         id=order_id
     )
 
-    # Get related data
+    # Get related data with select_related to avoid N+1 queries
     order_items = orders_models.OrderItem.objects.filter(order=order)
-    order_comments = orders_models.OrderComments.objects.filter(order=order).order_by('-created_at')
-    verification_logs = orders_models.OrderVerificationLog.objects.filter(order=order).order_by('-created_at')
+    order_comments = orders_models.OrderComments.objects.filter(order=order).select_related('user').order_by('-created_at')
+    verification_logs = orders_models.OrderVerificationLog.objects.filter(order=order).select_related('verified_by', 'performed_by').order_by('-created_at')
 
-    # Get delivery task if exists
-    delivery_task = None
-    try:
-        delivery_task = delivery_models.DeliveryTask.objects.get(order=order)
-    except delivery_models.DeliveryTask.DoesNotExist:
-        pass
+    # Get delivery task if exists with related driver
+    delivery_task = delivery_models.DeliveryTask.objects.select_related(
+        'driver', 'driver__user', 'pickup_location'
+    ).filter(order=order).first()
 
     context = {
         'order': order,
@@ -1392,9 +1390,10 @@ def cancel_order(request, order_id):
             'order_id': order.id
         })
     except Exception as e:
+        logger.exception("Error cancelling order %s: %s", order_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while cancelling the order'
         }, status=400)
 
 
@@ -1423,44 +1422,47 @@ def assign_driver_to_order(request, order_id):
                 'error': f'Driver {driver_id} not found or not approved'
             }, status=400)
 
-        # Check if order already has a delivery task
-        existing_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
+        # Check if order already has a delivery task - use select_for_update to prevent race conditions
+        from django.db import transaction
 
-        if existing_task:
-            # Update existing task
-            old_driver = existing_task.driver
-            existing_task.driver = driver
-            existing_task.save()
+        with transaction.atomic():
+            existing_task = delivery_models.DeliveryTask.objects.select_for_update().filter(order=order).first()
 
-            # Log the update
-            orders_models.OrderVerificationLog.objects.create(
-                order=order,
-                verified_by=request.user,
-                action='driver_reassigned',
-                old_status=str(old_driver.driver_id) if old_driver else 'None',
-                new_status=str(driver_id),
-                notes=f'Driver reassigned from AI suggestion: {driver.user.get_full_name() if driver.user else driver.driver_code}'
-            )
-        else:
-            # Create new delivery task
-            task = delivery_models.DeliveryTask.objects.create(
-                order=order,
-                driver=driver,
-                business=order.business,
-                pickup_location=order.pickup_location,
-                dl_task_status='pending',
-                dl_task_number=f'DL-{order.order_number}'
-            )
+            if existing_task:
+                # Update existing task
+                old_driver = existing_task.driver
+                existing_task.driver = driver
+                existing_task.save()
 
-            # Log the assignment
-            orders_models.OrderVerificationLog.objects.create(
-                order=order,
-                verified_by=request.user,
-                action='driver_assigned',
-                old_status='None',
-                new_status=str(driver_id),
-                notes=f'Driver assigned from AI suggestion: {driver.user.get_full_name() if driver.user else driver.driver_code}'
-            )
+                # Log the update
+                orders_models.OrderVerificationLog.objects.create(
+                    order=order,
+                    verified_by=request.user,
+                    action='driver_reassigned',
+                    old_status=str(old_driver.driver_id) if old_driver else 'None',
+                    new_status=str(driver_id),
+                    notes=f'Driver reassigned from AI suggestion: {driver.user.get_full_name() if driver.user else driver.driver_code}'
+                )
+            else:
+                # Create new delivery task
+                task = delivery_models.DeliveryTask.objects.create(
+                    order=order,
+                    driver=driver,
+                    business=order.business,
+                    pickup_location=order.pickup_location,
+                    dl_task_status='pending',
+                    dl_task_number=f'DL-{order.order_number}'
+                )
+
+                # Log the assignment
+                orders_models.OrderVerificationLog.objects.create(
+                    order=order,
+                    verified_by=request.user,
+                    action='driver_assigned',
+                    old_status='None',
+                    new_status=str(driver_id),
+                    notes=f'Driver assigned from AI suggestion: {driver.user.get_full_name() if driver.user else driver.driver_code}'
+                )
 
         driver_name = driver.user.get_full_name() if driver.user else driver.driver_code
 
@@ -1476,9 +1478,10 @@ def assign_driver_to_order(request, order_id):
             'error': 'Invalid JSON data'
         }, status=400)
     except Exception as e:
+        logger.exception("Error assigning driver to order %s: %s", order_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while assigning driver'
         }, status=400)
 
 
@@ -1562,9 +1565,10 @@ def update_order_zone(request, order_id):
             'error': 'Invalid JSON data'
         }, status=400)
     except Exception as e:
+        logger.exception("Error updating zone for order %s: %s", order_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while updating zone'
         }, status=400)
 
 
@@ -1604,9 +1608,10 @@ def publish_order_to_delivery(request, order_id):
             'order_status': order.order_status
         })
     except Exception as e:
+        logger.exception("Error publishing order %s: %s", order_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while publishing order'
         }, status=400)
 
 
@@ -1654,9 +1659,10 @@ def update_order_status(request, order_id):
             'new_status': status
         })
     except Exception as e:
+        logger.exception("Error updating status for order %s: %s", order_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while updating order status'
         }, status=400)
 
 
@@ -1695,9 +1701,10 @@ def add_order_comment(request, order_id):
             'created_at': comment.created_at.strftime('%B %d, %Y %H:%M')
         })
     except Exception as e:
+        logger.exception("Error adding comment to order %s: %s", order_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while adding comment'
         }, status=400)
 
 
@@ -1761,9 +1768,10 @@ def publish_task_to_dms(request, task_id):
             'task_number': task.dl_task_number
         })
     except Exception as e:
+        logger.exception("Error publishing task %s to DMS: %s", task_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while publishing task to DMS'
         }, status=400)
 
 
@@ -1786,9 +1794,10 @@ def publish_task_to_driver_app(request, task_id):
             'task_number': task.dl_task_number
         })
     except Exception as e:
+        logger.exception("Error publishing task %s to driver app: %s", task_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while publishing task to driver app'
         }, status=400)
 
 
@@ -1824,9 +1833,10 @@ def assign_driver_to_task(request, task_id):
             'driver_name': str(driver)
         })
     except Exception as e:
+        logger.exception("Error assigning driver to task %s: %s", task_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while assigning driver'
         }, status=400)
 
 
@@ -1880,9 +1890,10 @@ def update_task_status(request, task_id):
             'new_status': status
         })
     except Exception as e:
+        logger.exception("Error updating task %s status: %s", task_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while updating task status'
         }, status=400)
 
 
@@ -1973,7 +1984,7 @@ def update_verification_status(request, profile_id):
                     business = business_models.Business.objects.get(user=profile.user)
                     business.business_status = 'active'
                     business.save()
-                except:
+                except business_models.Business.DoesNotExist:
                     pass
 
             if profile.is_driver:
@@ -1981,7 +1992,7 @@ def update_verification_status(request, profile_id):
                     driver = fleet_models.Driver.objects.get(user=profile.user)
                     driver.driver_status = 'Approved'
                     driver.save()
-                except:
+                except fleet_models.Driver.DoesNotExist:
                     pass
 
         elif new_status == 'rejected':
@@ -2000,9 +2011,10 @@ def update_verification_status(request, profile_id):
             'new_status': new_status
         })
     except Exception as e:
+        logger.exception("Error updating verification status for profile %s: %s", profile_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while updating verification status'
         }, status=400)
 
 
@@ -2092,8 +2104,8 @@ def match_dms_task(request):
             logger.warning(f"Failed to match - delivery task {delivery_task_number} not found")
 
         except Exception as e:
-            messages.error(request, f'An error occurred while matching: {str(e)}')
-            logger.error(f"Error matching task {delivery_task_number} to DMS ID {dms_job_id}: {str(e)}")
+            messages.error(request, 'An error occurred while matching. Please try again.')
+            logger.exception("Error matching task %s to DMS ID %s: %s", delivery_task_number, dms_job_id, str(e))
 
     return redirect('workforce:wf_orders_dms_updated')
 
@@ -2209,7 +2221,12 @@ def workforce_finance_dashboard(request):
     from decimal import Decimal
     from datetime import timedelta
 
-    days = int(request.GET.get('days', 30))
+    try:
+        days = int(request.GET.get('days', 30))
+        if days < 1 or days > 365:
+            days = 30
+    except (ValueError, TypeError):
+        days = 30
     start_date = timezone.now() - timedelta(days=days)
 
     # All drivers summary
@@ -2609,10 +2626,17 @@ def earnings_verification_action(request):
                 task.driver_earnings = final_earnings
                 task.save()
 
-                # Update driver's pending_earnings
+                # Update driver's pending_earnings atomically using F() to prevent race conditions
                 if task.driver:
-                    task.driver.pending_earnings = (task.driver.pending_earnings or Decimal('0.00')) + Decimal(str(final_earnings))
-                    task.driver.save(update_fields=['pending_earnings'])
+                    from django.db.models import F
+                    fleet_models.Driver.objects.filter(driver_id=task.driver.driver_id).update(
+                        pending_earnings=F('pending_earnings') + Decimal(str(final_earnings))
+                    )
+                    # Handle case where pending_earnings was NULL
+                    fleet_models.Driver.objects.filter(
+                        driver_id=task.driver.driver_id,
+                        pending_earnings__isnull=True
+                    ).update(pending_earnings=Decimal(str(final_earnings)))
 
                 updated_count += 1
 
@@ -2631,7 +2655,8 @@ def earnings_verification_action(request):
         except delivery_models.DeliveryTask.DoesNotExist:
             errors.append(f"Task {task_id} not found")
         except Exception as e:
-            errors.append(f"Error processing task {task_id}: {str(e)}")
+            logger.exception("Error processing task %s: %s", task_id, str(e))
+            errors.append(f"Error processing task {task_id}")
 
     return JsonResponse({
         'success': True,
@@ -3197,40 +3222,69 @@ def bulk_settle_transactions(request):
     # Calculate total settlement amount
     total_amount = sum(txn.amount for txn in transactions)
 
-    # Create a settlement record
-    settlement_code = f"STL-{timezone.now().strftime('%Y%m%d%H%M%S')}-{driver_id}"
+    # Wrap entire settlement operation in transaction.atomic for data consistency
+    from django.db import transaction as db_transaction
+    from django.db.models import F
+    from django.db.models.functions import Greatest
 
-    settlement = fleet_models.DriverSettlement.objects.create(
-        driver=driver,
-        settlement_code=settlement_code,
-        period_start=transactions.order_by('created_at').first().created_at.date(),
-        period_end=timezone.now().date(),
-        total_deliveries=transactions.filter(transaction_type='earning').count(),
-        gross_earnings=total_amount,
-        net_amount=total_amount,
-        created_by=request.user,
-        status='paid',
-        paid_at=timezone.now(),
-    )
-
-    # Link transactions to settlement
-    transactions.update(settlement=settlement)
-
-    # Update driver balances
+    # Pre-calculate amounts before entering atomic block (transactions queryset will be re-evaluated)
+    transaction_list = list(transactions)
     earnings_settled = sum(
-        txn.amount for txn in transactions if txn.transaction_type == 'earning'
+        (txn.amount for txn in transaction_list if txn.transaction_type == 'earning'),
+        Decimal('0.00')
     )
     cod_settled = sum(
-        abs(txn.amount) for txn in transactions if txn.transaction_type == 'cod_collection'
+        (abs(txn.amount) for txn in transaction_list if txn.transaction_type == 'cod_collection'),
+        Decimal('0.00')
     )
 
-    if earnings_settled > 0:
-        driver.pending_earnings = max(Decimal('0.00'), (driver.pending_earnings or Decimal('0.00')) - earnings_settled)
-    if cod_settled > 0:
-        driver.cod_in_hand = max(Decimal('0.00'), (driver.cod_in_hand or Decimal('0.00')) - cod_settled)
+    with db_transaction.atomic():
+        # Create a settlement record
+        settlement_code = f"STL-{timezone.now().strftime('%Y%m%d%H%M%S')}-{driver_id}"
 
-    driver.last_settlement_date = timezone.now()
-    driver.save(update_fields=['pending_earnings', 'cod_in_hand', 'last_settlement_date'])
+        # Check if transactions still exist (might have been settled by another request)
+        first_txn = transactions.order_by('created_at').first()
+        if not first_txn:
+            messages.warning(request, 'Transactions were already settled by another request')
+            return redirect(f"{reverse('workforce:fleet_transactions')}?driver_id={driver_id}")
+
+        settlement = fleet_models.DriverSettlement.objects.create(
+            driver=driver,
+            settlement_code=settlement_code,
+            period_start=first_txn.created_at.date(),
+            period_end=timezone.now().date(),
+            total_deliveries=transactions.filter(transaction_type='earning').count(),
+            gross_earnings=total_amount,
+            net_amount=total_amount,
+            created_by=request.user,
+            status='paid',
+            paid_at=timezone.now(),
+        )
+
+        # Link transactions to settlement
+        transactions.update(settlement=settlement)
+
+        # Update driver balances atomically using F() to prevent race conditions
+        if earnings_settled > 0:
+            # Use Greatest to ensure we don't go below zero
+            fleet_models.Driver.objects.filter(driver_id=driver_id).update(
+                pending_earnings=Greatest(
+                    F('pending_earnings') - earnings_settled,
+                    Decimal('0.00')
+                )
+            )
+        if cod_settled > 0:
+            fleet_models.Driver.objects.filter(driver_id=driver_id).update(
+                cod_in_hand=Greatest(
+                    F('cod_in_hand') - cod_settled,
+                    Decimal('0.00')
+                )
+            )
+
+        # Update last_settlement_date
+        fleet_models.Driver.objects.filter(driver_id=driver_id).update(
+            last_settlement_date=timezone.now()
+        )
 
     messages.success(
         request,
@@ -3644,8 +3698,8 @@ def dms_drivers_list(request):
             error_message = "ShipDay API is not configured. Please check SHIPDAY_API_KEY in settings."
             logger.warning(error_message)
     except Exception as e:
-        error_message = f"Error fetching Shipday carriers: {str(e)}"
-        logger.error(error_message)
+        error_message = "Error fetching Shipday carriers. Please try again later."
+        logger.exception("Error fetching Shipday carriers: %s", str(e))
 
     context = {
         'page_title': 'DMS Drivers List',
@@ -3672,8 +3726,8 @@ def dms_orders_list(request):
             error_message = "ShipDay API is not configured. Please check SHIPDAY_API_KEY in settings."
             logger.warning(error_message)
     except Exception as e:
-        error_message = f"Error fetching Shipday orders: {str(e)}"
-        logger.error(error_message)
+        error_message = "Error fetching Shipday orders. Please try again later."
+        logger.exception("Error fetching Shipday orders: %s", str(e))
 
     context = {
         'page_title': 'DMS Orders List',
@@ -3710,10 +3764,10 @@ def dms_analytics(request):
             'published_orders': published_orders,
         }
     except Exception as e:
-        logger.error(f"Error fetching DMS analytics: {e}")
+        logger.exception("Error fetching DMS analytics: %s", str(e))
         context = {
             'page_title': 'DMS Analytics',
-            'error_message': str(e),
+            'error_message': 'Error loading analytics. Please try again later.',
         }
 
     return render(request, 'workforce/dms_analytics.html', context)
@@ -3745,10 +3799,10 @@ def dms_sync_monitor(request):
             'failed_sync': failed_sync,
         }
     except Exception as e:
-        logger.error(f"Error fetching DMS sync monitor data: {e}")
+        logger.exception("Error fetching DMS sync monitor data: %s", str(e))
         context = {
             'page_title': 'DMS Sync Monitor',
-            'error_message': str(e),
+            'error_message': 'Error loading sync monitor. Please try again later.',
         }
 
     return render(request, 'workforce/dms_sync_monitor.html', context)
@@ -3824,9 +3878,10 @@ def driver_document_detail(request, document_id):
                 'message': 'Document updated successfully'
             })
         except Exception as e:
+            logger.exception("Error updating driver document %s: %s", document_id, str(e))
             return JsonResponse({
                 'success': False,
-                'error': str(e)
+                'error': 'An error occurred while updating document'
             }, status=400)
 
     context = {
@@ -3902,9 +3957,10 @@ def vehicle_document_detail(request, driver_id):
                     'message': 'Vehicle updated successfully'
                 })
         except Exception as e:
+            logger.exception("Error updating vehicle for driver %s: %s", driver_id, str(e))
             return JsonResponse({
                 'success': False,
-                'error': str(e)
+                'error': 'An error occurred while updating vehicle'
             }, status=400)
 
     context = {
@@ -3963,7 +4019,7 @@ def store_document_detail(request, business_id):
 
     try:
         business_profile = business.business_profile
-    except:
+    except business_models.Business.business_profile.RelatedObjectDoesNotExist:
         business_profile = None
 
     if request.method == 'POST':
@@ -3981,9 +4037,10 @@ def store_document_detail(request, business_id):
                 'message': 'Store document updated successfully'
             })
         except Exception as e:
+            logger.exception("Error updating store document for business %s: %s", business_id, str(e))
             return JsonResponse({
                 'success': False,
-                'error': str(e)
+                'error': 'An error occurred while updating store document'
             }, status=400)
 
     context = {
@@ -4040,7 +4097,7 @@ def business_license_detail(request, business_id):
 
     try:
         business_profile = business.business_profile
-    except:
+    except business_models.Business.business_profile.RelatedObjectDoesNotExist:
         business_profile = None
 
     if request.method == 'POST':
@@ -4067,9 +4124,10 @@ def business_license_detail(request, business_id):
                 'message': 'Business license updated successfully'
             })
         except Exception as e:
+            logger.exception("Error updating business license %s: %s", business_id, str(e))
             return JsonResponse({
                 'success': False,
-                'error': str(e)
+                'error': 'An error occurred while updating business license'
             }, status=400)
 
     context = {
@@ -4417,9 +4475,10 @@ def seller_detail(request, business_id):
                 'message': 'Seller updated successfully'
             })
         except Exception as e:
+            logger.exception("Error updating seller %s: %s", business_id, str(e))
             return JsonResponse({
                 'success': False,
-                'error': str(e)
+                'error': 'An error occurred while updating seller'
             }, status=400)
 
     # Build documents list from business profile fields (if available)
@@ -4745,9 +4804,10 @@ def driver_detail(request, driver_id):
                 'message': 'Driver updated successfully'
             })
         except Exception as e:
+            logger.exception("Error updating driver %s: %s", driver_id, str(e))
             return JsonResponse({
                 'success': False,
-                'error': str(e)
+                'error': 'An error occurred while updating driver'
             }, status=400)
 
     context = {
@@ -4982,7 +5042,8 @@ def delivery_task_edit(request, task_id):
             return redirect('workforce:delivery_task_detail', task_id=task_id)
 
         except Exception as e:
-            messages.error(request, f'Error updating task: {str(e)}')
+            logger.exception("Error updating task %s: %s", task_id, str(e))
+            messages.error(request, 'An error occurred while updating the task')
 
     # Get available drivers for dropdown (approved drivers)
     drivers = fleet_models.Driver.objects.filter(
@@ -5047,9 +5108,10 @@ def bulk_publish_dms(request):
             'updated_count': updated
         })
     except Exception as e:
+        logger.exception("Error bulk publishing to DMS: %s", str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while publishing tasks to DMS'
         }, status=400)
 
 
@@ -5079,9 +5141,10 @@ def bulk_publish_app(request):
             'updated_count': updated
         })
     except Exception as e:
+        logger.exception("Error bulk publishing to driver app: %s", str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while publishing tasks to driver app'
         }, status=400)
 
 
@@ -5145,9 +5208,10 @@ def bulk_update_status(request):
             'updated_count': updated
         })
     except Exception as e:
+        logger.exception("Error bulk updating task status: %s", str(e))
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while updating task status'
         }, status=400)
 
 
@@ -5264,7 +5328,8 @@ def order_edit(request, order_id):
             return redirect('workforce:order_detail', order_id=order_id)
 
         except Exception as e:
-            messages.error(request, f'Error updating order: {str(e)}')
+            logger.exception("Error updating order %s: %s", order_id, str(e))
+            messages.error(request, 'An error occurred while updating the order')
 
     context = {
         'page_title': f'Edit Order - {order.order_number}',

@@ -79,42 +79,37 @@
         {% if settlements %}
         <div class="row g-3 mb-4">
             <div class="col-12">
-                <section class="p-4 bg-white rounded shadow-sm" id="fleet_reports_card_settlements">
-                    <h5 class="fw-bold mb-3" id="fleet_reports_title_settlements">
-                        <i class="fa-solid fa-file-invoice me-2"></i>
-                        Recent Settlement Reports
-                    </h5>
-                    <div class="table-responsive">
-                        <table class="table table-hover" id="fleet_reports_table_settlements">
-                            <thead class="table-light" id="fleet_reports_thead_settlements">
-                                <tr>
-                                    <th>Settlement ID</th>
-                                    <th>Period</th>
-                                    <th class="text-end">Amount</th>
-                                    <th>Paid Date</th>
-                                    <th class="text-center">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for settlement in settlements %}
-                                <tr>
-                                    <td class="fw-bold">#{{ settlement.id }}</td>
-                                    <td>
-                                        {{ settlement.period_start|date:"M d, Y" }} - {{ settlement.period_end|date:"M d, Y" }}
-                                    </td>
-                                    <td class="text-end fw-bold text-success">{{ settlement.amount|floatformat:2 }} QR</td>
-                                    <td>{{ settlement.paid_at|date:"M d, Y" }}</td>
-                                    <td class="text-center">
-                                        <button type="button" class="btn btn-sm btn-outline-primary btn-download-settlement" data-settlement-id="{{ settlement.id }}">
-                                            <i class="fa-solid fa-download me-1"></i>Download
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                <div class="listing-container" id="fleet_reports_card_settlements">
+                    <div class="listing-header">
+                        <h6 class="listing-title"><i class="fa-solid fa-file-invoice text-primary"></i>Recent Settlement Reports</h6>
                     </div>
-                </section>
+                    <table class="listing-table" id="fleet_reports_table_settlements">
+                        <thead id="fleet_reports_thead_settlements">
+                            <tr>
+                                <th>Settlement ID</th>
+                                <th>Period</th>
+                                <th class="text-end">Amount</th>
+                                <th>Paid Date</th>
+                                <th class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for settlement in settlements %}
+                            <tr>
+                                <td><code>#{{ settlement.id }}</code></td>
+                                <td>{{ settlement.period_start|date:"M d" }} - {{ settlement.period_end|date:"M d, Y" }}</td>
+                                <td class="text-end fw-bold text-success">{{ settlement.amount|floatformat:2 }} QR</td>
+                                <td class="text-muted">{{ settlement.paid_at|date:"M d, Y" }}</td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-primary btn-download-settlement" data-settlement-id="{{ settlement.id }}">
+                                        <i class="fa-solid fa-download me-1"></i>Download
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
         {% endif %}

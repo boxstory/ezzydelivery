@@ -221,94 +221,86 @@
   <div class="row mb-4">
     <!-- Top COD in Hand Drivers -->
     <div class="col-md-5 mb-3">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <h5 class="mb-0"><i class="fas fa-ranking-star me-2 text-warning"></i>Top COD in Hand</h5>
+      <div class="listing-container h-100">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fas fa-ranking-star me-2 text-warning"></i>Top COD in Hand</h6>
           <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="btn btn-sm btn-outline-warning">View All</a>
         </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="bg-light">
-                <tr>
-                  <th>Driver</th>
-                  <th class="text-end">COD in Hand</th>
-                  <th class="text-end">Wallet</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for d in top_cod_drivers %}
-                <tr>
-                  <td>
-                    <a href="{% url 'workforce:driver_detail' d.driver_id %}" class="text-decoration-none">
-                      {{ d.user.first_name }} {{ d.user.last_name }}
-                    </a>
-                    <br><small class="text-muted">{{ d.driver_code }}</small>
-                  </td>
-                  <td class="text-end fw-bold text-warning">{{ d.cod_in_hand|floatformat:0 }} QR</td>
-                  <td class="text-end">{{ d.wallet_balance|floatformat:0 }} QR</td>
-                </tr>
-                {% empty %}
-                <tr>
-                  <td colspan="3" class="text-center text-muted py-3">No drivers with COD</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <table class="listing-table">
+          <thead>
+            <tr>
+              <th>Driver</th>
+              <th class="text-end">COD</th>
+              <th class="text-end">Wallet</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in top_cod_drivers %}
+            <tr>
+              <td>
+                <a href="{% url 'workforce:driver_detail' d.driver_id %}" class="text-decoration-none">
+                  {{ d.user.first_name }} {{ d.user.last_name }}
+                </a>
+                <div class="text-muted" style="font-size: 0.65rem;">{{ d.driver_code }}</div>
+              </td>
+              <td class="text-end fw-bold text-warning">{{ d.cod_in_hand|floatformat:0 }}</td>
+              <td class="text-end">{{ d.wallet_balance|floatformat:0 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="3" class="listing-empty">No drivers with COD</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
 
     <!-- Transaction Breakdown -->
     <div class="col-md-7 mb-3">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <h5 class="mb-0"><i class="fas fa-chart-pie me-2 text-primary"></i>Transaction Breakdown</h5>
+      <div class="listing-container h-100">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fas fa-chart-pie me-2 text-primary"></i>Transaction Breakdown</h6>
           <a href="{% url 'workforce:fleet_transactions' %}" class="btn btn-sm btn-outline-primary">View All</a>
         </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="bg-light">
-                <tr>
-                  <th>Type</th>
-                  <th class="text-center">Count</th>
-                  <th class="text-end">Total Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for tb in type_breakdown %}
-                <tr>
-                  <td>
-                    <span class="badge
-                      {% if tb.transaction_type == 'earning' %}bg-success
-                      {% elif tb.transaction_type == 'cod_collection' %}bg-warning text-dark
-                      {% elif tb.transaction_type == 'cod_deposit' or tb.transaction_type == 'cod_driver_settle' %}bg-primary
-                      {% elif tb.transaction_type == 'cod_client_settle' %}bg-info
-                      {% elif tb.transaction_type == 'cod_return' %}bg-warning text-dark
-                      {% elif tb.transaction_type == 'settlement' %}bg-secondary
-                      {% elif tb.transaction_type == 'deduction' %}bg-danger
-                      {% elif tb.transaction_type == 'bonus' %}bg-info
-                      {% elif tb.transaction_type == 'delivery_charge' or tb.transaction_type == 'fulfillment_charge' %}bg-info
-                      {% else %}bg-dark{% endif %} me-2">
-                      {{ tb.transaction_type|title }}
-                    </span>
-                  </td>
-                  <td class="text-center">{{ tb.count }}</td>
-                  <td class="text-end fw-bold {% if tb.total >= 0 %}text-success{% else %}text-danger{% endif %}">
-                    {{ tb.total|floatformat:2 }} QR
-                  </td>
-                </tr>
-                {% empty %}
-                <tr>
-                  <td colspan="3" class="text-center text-muted py-3">No transactions in period</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <table class="listing-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th class="text-center">Count</th>
+              <th class="text-end">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tb in type_breakdown %}
+            <tr>
+              <td>
+                <span class="listing-status
+                  {% if tb.transaction_type == 'earning' %}success
+                  {% elif tb.transaction_type == 'cod_collection' or tb.transaction_type == 'cod_return' %}warning
+                  {% elif tb.transaction_type == 'cod_deposit' or tb.transaction_type == 'cod_driver_settle' %}primary
+                  {% elif tb.transaction_type == 'deduction' %}danger
+                  {% else %}{% endif %}">
+                  {% if tb.transaction_type == 'earning' %}<i class="fas fa-coins"></i>
+                  {% elif tb.transaction_type == 'cod_collection' %}<i class="fas fa-arrow-down"></i>
+                  {% elif tb.transaction_type == 'cod_deposit' or tb.transaction_type == 'cod_driver_settle' %}<i class="fas fa-arrow-up"></i>
+                  {% elif tb.transaction_type == 'deduction' %}<i class="fas fa-minus"></i>
+                  {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
+                </span>
+                {{ tb.transaction_type|title }}
+              </td>
+              <td class="text-center">{{ tb.count }}</td>
+              <td class="text-end fw-bold {% if tb.total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                {{ tb.total|floatformat:0 }} QR
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="3" class="listing-empty">No transactions in period</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -316,82 +308,67 @@
   <!-- Recent Transactions -->
   <div class="row">
     <div class="col-12">
-      <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <h5 class="mb-0"><i class="fas fa-list me-2"></i>Recent Transactions</h5>
-          <a href="{% url 'workforce:fleet_transactions' %}" class="btn btn-sm btn-outline-primary">View All Transactions</a>
+      <div class="listing-container">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fas fa-list me-2 text-primary"></i>Recent Transactions</h6>
+          <a href="{% url 'workforce:fleet_transactions' %}" class="btn btn-sm btn-outline-primary">View All</a>
         </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="bg-light">
-                <tr>
-                  <th>Date</th>
-                  <th>Code</th>
-                  <th>Driver</th>
-                  <th>Type</th>
-                  <th>Description</th>
-                  <th>Business</th>
-                  <th class="text-end">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for txn in recent_transactions %}
-                <tr>
-                  <td><small>{{ txn.created_at|date:"d M" }}<br>{{ txn.created_at|time:"H:i" }}</small></td>
-                  <td><code style="font-size: 0.75rem;">{{ txn.transaction_code|default:"-" }}</code></td>
-                  <td>
-                    {% if txn.driver %}
-                    <a href="{% url 'workforce:driver_detail' txn.driver.driver_id %}" class="text-decoration-none">
-                      {{ txn.driver.user.first_name|default:"-" }}
-                    </a>
-                    {% else %}
-                    <span class="text-muted">-</span>
-                    {% endif %}
-                  </td>
-                  <td>
-                    <span class="badge
-                      {% if txn.transaction_type == 'earning' %}bg-success
-                      {% elif txn.transaction_type == 'cod_collection' %}bg-warning text-dark
-                      {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}bg-primary
-                      {% elif txn.transaction_type == 'cod_client_settle' %}bg-info
-                      {% elif txn.transaction_type == 'cod_return' %}bg-warning text-dark
-                      {% elif txn.transaction_type == 'settlement' %}bg-secondary
-                      {% elif txn.transaction_type == 'deduction' %}bg-danger
-                      {% elif txn.transaction_type == 'delivery_charge' or txn.transaction_type == 'fulfillment_charge' %}bg-info
-                      {% elif txn.transaction_type == 'bills_payable' or txn.transaction_type == 'bills_receivable' %}bg-dark
-                      {% else %}bg-dark{% endif %}">
-                      {{ txn.get_transaction_type_display }}
-                    </span>
-                  </td>
-                  <td><small>{{ txn.description|default:"-"|truncatechars:40 }}</small></td>
-                  <td>
-                    {% if txn.business %}
-                    <small>{{ txn.business.business_name|truncatechars:20 }}</small>
-                    {% else %}
-                    <span class="text-muted">-</span>
-                    {% endif %}
-                  </td>
-                  <td class="text-end">
-                    {% if txn.amount >= 0 %}
-                    <span class="text-success fw-bold">+{{ txn.amount|floatformat:2 }} QR</span>
-                    {% else %}
-                    <span class="text-danger fw-bold">{{ txn.amount|floatformat:2 }} QR</span>
-                    {% endif %}
-                  </td>
-                </tr>
-                {% empty %}
-                <tr>
-                  <td colspan="7" class="text-center text-muted py-4">
-                    <i class="fas fa-receipt fa-2x mb-2 d-block"></i>
-                    No transactions found
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <table class="listing-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Code</th>
+              <th>Driver</th>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Business</th>
+              <th class="text-end">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for txn in recent_transactions %}
+            <tr>
+              <td>{{ txn.created_at|date:"d M" }}<br><span class="text-muted" style="font-size: 0.65rem;">{{ txn.created_at|time:"H:i" }}</span></td>
+              <td><code>{{ txn.transaction_code|default:"-" }}</code></td>
+              <td>
+                {% if txn.driver %}
+                <a href="{% url 'workforce:driver_detail' txn.driver.driver_id %}" class="text-decoration-none">
+                  {{ txn.driver.user.first_name|default:"-" }}
+                </a>
+                {% else %}-{% endif %}
+              </td>
+              <td>
+                <span class="listing-status
+                  {% if txn.transaction_type == 'earning' %}success
+                  {% elif txn.transaction_type == 'cod_collection' or txn.transaction_type == 'cod_return' %}warning
+                  {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}primary
+                  {% elif txn.transaction_type == 'deduction' %}danger
+                  {% else %}{% endif %}">
+                  {% if txn.transaction_type == 'earning' %}<i class="fas fa-coins"></i>
+                  {% elif txn.transaction_type == 'cod_collection' %}<i class="fas fa-arrow-down"></i>
+                  {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}<i class="fas fa-arrow-up"></i>
+                  {% elif txn.transaction_type == 'settlement' %}<i class="fas fa-university"></i>
+                  {% elif txn.transaction_type == 'deduction' %}<i class="fas fa-minus"></i>
+                  {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
+                </span>
+                {{ txn.get_transaction_type_display }}
+              </td>
+              <td class="text-2line" title="{{ txn.description|default:'' }}">{{ txn.description|default:"-" }}</td>
+              <td class="text-2line" title="{{ txn.business.business_name|default:'' }}">{% if txn.business %}{{ txn.business.business_name }}{% else %}-{% endif %}</td>
+              <td class="text-end fw-bold {% if txn.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
+                {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} QR
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="listing-empty">
+                <i class="fas fa-receipt"></i>
+                No transactions found
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

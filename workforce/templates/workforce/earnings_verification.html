@@ -162,43 +162,45 @@
   <!-- Earnings Table -->
   <div class="row">
     <div class="col-12">
-      <div class="card border-0 shadow">
-        <div class="card-header bg-white py-3">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-3">
-              <input type="checkbox" class="form-check-input" id="select-all" style="cursor: pointer;">
-              <span class="text-muted">Select All</span>
-              <span class="badge bg-secondary" id="selected-count">0 selected</span>
-            </div>
-            <div class="btn-group">
-              <button type="button" class="btn btn-sm btn-outline-primary" onclick="bulkAction('verify')" id="btn-verify" disabled>
-                <i class="fa-solid fa-check me-1"></i> Verify
-              </button>
-              <button type="button" class="btn btn-sm btn-outline-success" onclick="bulkAction('publish')" id="btn-publish" disabled>
-                <i class="fa-solid fa-paper-plane me-1"></i> Publish
-              </button>
-              <button type="button" class="btn btn-sm btn-outline-danger" onclick="bulkAction('reject')" id="btn-reject" disabled>
-                <i class="fa-solid fa-times me-1"></i> Reject
-              </button>
-            </div>
+      <div class="listing-container">
+        <div class="listing-header">
+          <h6 class="listing-title"><i class="fa-solid fa-coins text-success me-2"></i>Earnings Verification</h6>
+          <span class="listing-badge">{{ tasks|length }} tasks</span>
+        </div>
+        <div class="listing-selection-bar">
+          <div class="d-flex align-items-center gap-3">
+            <input type="checkbox" class="form-check-input" id="select-all" style="cursor: pointer;">
+            <span class="text-muted">Select All</span>
+            <span class="badge bg-secondary" id="selected-count">0 selected</span>
+          </div>
+          <div class="btn-group">
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="bulkAction('verify')" id="btn-verify" disabled>
+              <i class="fa-solid fa-check me-1"></i> Verify
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="bulkAction('publish')" id="btn-publish" disabled>
+              <i class="fa-solid fa-paper-plane me-1"></i> Publish
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="bulkAction('reject')" id="btn-reject" disabled>
+              <i class="fa-solid fa-times me-1"></i> Reject
+            </button>
           </div>
         </div>
-        <div class="table-responsive">
-          <table class="table table-hover mb-0" style="font-size: 0.875rem;">
-            <thead style="background: #f8fafc;">
+        <div class="listing-scroll">
+          <table class="listing-table">
+            <thead>
               <tr>
                 <th style="width: 40px;"></th>
                 <th>Task</th>
                 <th>Driver</th>
                 <th>Business</th>
-                <th>Order Type</th>
+                <th>Type</th>
                 <th>Zones</th>
-                <th>DL Status</th>
-                <th>COD Status</th>
+                <th>DL</th>
+                <th>COD</th>
                 <th>Calculated</th>
                 <th>Verified</th>
                 <th>Status</th>
-                <th>Verified By</th>
+                <th>By</th>
               </tr>
             </thead>
             <tbody>
@@ -209,55 +211,36 @@
                          data-calculated="{{ task.calculated_earnings|default:task.driver_earnings|default:task.dl_price|default:0 }}">
                 </td>
                 <td>
-                  <div class="fw-semibold" style="font-family: monospace;">{{ task.dl_task_number }}</div>
-                  <div class="text-muted small">{{ task.dl_task_date|date:"d M Y" }}</div>
+                  <code>{{ task.dl_task_number }}</code>
+                  <div class="text-muted" style="font-size: 0.65rem;">{{ task.dl_task_date|date:"d M" }}</div>
                 </td>
                 <td>
                   {% if task.driver %}
-                  <div class="fw-medium">{{ task.driver.user.first_name }}</div>
-                  <div class="text-muted small">{{ task.driver.driver_code }}</div>
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
+                  {{ task.driver.user.first_name }}
+                  <div class="text-muted" style="font-size: 0.65rem;">{{ task.driver.driver_code }}</div>
+                  {% else %}-{% endif %}
                 </td>
-                <td>
-                  <div>{{ task.order.business.business_name|default:"-"|truncatechars:20 }}</div>
-                </td>
+                <td class="text-2line" title="{{ task.order.business.business_name|default:'' }}">{{ task.order.business.business_name|default:"-" }}</td>
                 <td>
                   {% if task.order.order_type == 'pick_and_drop' %}
-                  <span class="badge" style="background: #ede9fe; color: #5b21b6;">Pick & Drop</span>
+                  <span class="listing-status" style="background: #ede9fe; color: #5b21b6;">P&D</span>
                   {% else %}
-                  <span class="badge" style="background: #e0f2fe; color: #0369a1;">Normal</span>
+                  <span class="listing-status primary">N</span>
                   {% endif %}
                 </td>
-                <td>
-                  <div class="small">
-                    {% if task.pickup_location %}
-                    <span class="text-muted">P:</span> Z{{ task.pickup_location.pickup_zone_no|default:"-" }}
-                    {% endif %}
-                    <br>
-                    <span class="text-muted">D:</span> Z{{ task.dl_to_address.dl_zone|default:"-" }}
-                  </div>
+                <td style="font-size: 0.65rem;">
+                  {% if task.pickup_location %}P:Z{{ task.pickup_location.pickup_zone_no|default:"-" }}{% endif %}
+                  D:Z{{ task.dl_to_address.dl_zone|default:"-" }}
                 </td>
-                <td>
-                  <span class="badge bg-success">Delivered</span>
-                </td>
+                <td><span class="listing-status success"><i class="fas fa-check"></i></span></td>
                 <td>
                   {% if task.order.cod_amount and task.order.cod_amount > 0 %}
-                    {% if task.cod_settled %}
-                    <span class="badge" style="background: #d1fae5; color: #065f46;"><i class="fa-solid fa-check me-1"></i>Settled</span>
-                    {% elif task.cod_collected %}
-                    <span class="badge" style="background: #dbeafe; color: #1e40af;">Collected</span>
-                    {% else %}
-                    <span class="badge" style="background: #fef3c7; color: #92400e;">Pending</span>
-                    {% endif %}
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
+                    {% if task.cod_settled %}<span class="listing-status success"><i class="fas fa-check"></i></span>
+                    {% elif task.cod_collected %}<span class="listing-status primary"><i class="fas fa-hand-holding-dollar"></i></span>
+                    {% else %}<span class="listing-status warning"><i class="fas fa-clock"></i></span>{% endif %}
+                  {% else %}-{% endif %}
                 </td>
-                <td>
-                  <span class="text-muted">{{ task.calculated_earnings|default:task.driver_earnings|default:task.dl_price|default:0|floatformat:0 }} QR</span>
-                </td>
+                <td class="text-muted">{{ task.calculated_earnings|default:task.driver_earnings|default:task.dl_price|default:0|floatformat:0 }}</td>
                 <td>
                   <input type="number" class="earnings-input"
                          id="earnings-{{ task.id }}"
@@ -265,34 +248,25 @@
                          data-original="{{ task.verified_earnings|default:task.calculated_earnings|default:task.driver_earnings|default:task.dl_price|default:0 }}"
                          step="0.01" min="0"
                          {% if task.earnings_verification_status == 'published' %}disabled{% endif %}>
-                  <span class="small text-muted">QR</span>
                 </td>
                 <td>
                   <span class="verification-badge verification-badge--{{ task.earnings_verification_status }}">
-                    {% if task.earnings_verification_status == 'pending' %}
-                    <i class="fa-solid fa-clock me-1"></i>Pending
-                    {% elif task.earnings_verification_status == 'verified' %}
-                    <i class="fa-solid fa-check me-1"></i>Verified
-                    {% elif task.earnings_verification_status == 'published' %}
-                    <i class="fa-solid fa-paper-plane me-1"></i>Published
-                    {% elif task.earnings_verification_status == 'rejected' %}
-                    <i class="fa-solid fa-times me-1"></i>Rejected
-                    {% endif %}
+                    {% if task.earnings_verification_status == 'pending' %}<i class="fa-solid fa-clock"></i>
+                    {% elif task.earnings_verification_status == 'verified' %}<i class="fa-solid fa-check"></i>
+                    {% elif task.earnings_verification_status == 'published' %}<i class="fa-solid fa-paper-plane"></i>
+                    {% elif task.earnings_verification_status == 'rejected' %}<i class="fa-solid fa-times"></i>{% endif %}
                   </span>
                 </td>
                 <td>
                   {% if task.earnings_verified_by %}
-                  <div class="small">{{ task.earnings_verified_by.first_name }}</div>
-                  <div class="text-muted small">{{ task.earnings_verified_at|date:"d M H:i" }}</div>
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
+                  {{ task.earnings_verified_by.first_name|slice:":8" }}
+                  {% else %}-{% endif %}
                 </td>
               </tr>
               {% empty %}
               <tr>
-                <td colspan="12" class="text-center py-5 text-muted">
-                  <i class="fa-solid fa-inbox fa-3x mb-3 d-block"></i>
+                <td colspan="12" class="listing-empty">
+                  <i class="fa-solid fa-inbox"></i>
                   No deliveries found matching your filters
                 </td>
               </tr>
@@ -300,10 +274,8 @@
             </tbody>
           </table>
         </div>
-
-        <!-- Pagination -->
         {% if tasks.has_other_pages %}
-        <div class="card-footer bg-white">
+        <div style="padding: 8px 12px; border-top: 1px solid var(--brand-grey-200);">
           {% include "includes/components/_pagination.html" with page_obj=tasks %}
         </div>
         {% endif %}
