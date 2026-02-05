@@ -1,12 +1,13 @@
 {% extends "fleet_dashboard_base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load zone_tags %}
 {% block content %}
   <!-- Mobile PWA Task List View -->
   <div class="pwa-content d-md-none">
 
     <!-- Task Tabs -->
-    <div class="task-tabs task-tabs--three">
+    <div class="task-tabs task-tabs--four">
       <a href="?tab=all&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}"
          class="task-tab {% if current_tab == 'all' %}task-tab--active{% endif %}">
         <span class="task-tab__label">New</span>
@@ -19,50 +20,114 @@
       </a>
       <a href="?tab=accepted&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}"
          class="task-tab {% if current_tab == 'accepted' %}task-tab--active{% endif %}">
-        <span class="task-tab__label">Accepted</span>
+        <span class="task-tab__label">Active</span>
         <span class="task-tab__badge">{{ accepted_count }}</span>
+      </a>
+      <a href="?tab=history&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}"
+         class="task-tab {% if current_tab == 'history' %}task-tab--active{% endif %}">
+        <span class="task-tab__label">History</span>
+        <span class="task-tab__badge">{{ history_count }}</span>
       </a>
     </div>
 
-    <!-- Sub Filters (Area, Type, Status) -->
-    <div class="task-filters task-filters--compact">
-      <a href="?tab={{ current_tab }}&area=all&type={{ type_filter }}&status={{ status_filter }}"
-         class="task-filter task-filter--xs {% if area_filter == 'all' %}task-filter--active{% endif %}">All</a>
-      <a href="?tab={{ current_tab }}&area=doha&type={{ type_filter }}&status={{ status_filter }}"
-         class="task-filter task-filter--xs {% if area_filter == 'doha' %}task-filter--active{% endif %}">Doha</a>
-      <a href="?tab={{ current_tab }}&area=my_zone&type={{ type_filter }}&status={{ status_filter }}"
-         class="task-filter task-filter--xs {% if area_filter == 'my_zone' %}task-filter--active{% endif %}">My Zone</a>
-      <span class="task-filter-divider">|</span>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type=public&status={{ status_filter }}"
-         class="task-filter task-filter--xs {% if type_filter == 'public' %}task-filter--active{% endif %}">Public</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type=pnd&status={{ status_filter }}"
-         class="task-filter task-filter--xs {% if type_filter == 'pnd' %}task-filter--active{% endif %}">PnD</a>
+    <!-- Area & Type Filters - 3 buttons in one row -->
+    <div class="d-flex gap-2 px-2 mb-2" style="width: 100%;">
+      <a href="?tab={{ current_tab }}&area=all&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}"
+         class="btn {% if area_filter == 'all' and not zone_filter %}btn-dark{% else %}btn-outline-secondary{% endif %} flex-fill"
+         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">
+        <i class="fa-solid fa-globe me-1"></i>All
+      </a>
+      <a href="?tab={{ current_tab }}&area=my_zone&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}"
+         class="btn {% if area_filter == 'my_zone' and not zone_filter %}btn-dark{% else %}btn-outline-secondary{% endif %} flex-fill"
+         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">
+        My Zone
+      </a>
+      <!-- Zone Dropdown -->
+      <div class="dropdown flex-fill">
+        <button class="btn {% if zone_filter %}btn-primary{% else %}btn-outline-secondary{% endif %} dropdown-toggle w-100"
+                type="button" data-bs-toggle="dropdown"
+                style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">
+          <i class="fa-solid fa-map-marker-alt me-1"></i>{% if zone_filter %}Z{{ zone_filter }}{% else %}Zone{% endif %}
+        </button>
+        <ul class="dropdown-menu" style="max-height: 300px; overflow-y: auto; min-width: 140px;">
+          <li>
+            <a class="dropdown-item py-2 {% if not zone_filter %}active{% endif %}"
+               href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}"
+               style="font-size: 14px;">
+              <i class="fa-solid fa-globe me-2"></i>All Zones
+            </a>
+          </li>
+          <li><hr class="dropdown-divider my-1"></li>
+          {% for zone in available_zones %}
+          <li>
+            <a class="dropdown-item py-2 {% if zone_filter == zone.zone_number|stringformat:'d' %}active{% endif %}"
+               href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}&zone={{ zone.zone_number }}"
+               style="font-size: 14px;">
+              <i class="fa-solid fa-location-dot me-2 text-muted"></i>Zone {{ zone.zone_number }}{% if zone.active_groups %} - {{ zone.active_groups.0.name }}{% endif %}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
     </div>
-    {% if current_tab == 'assigned' %}
-    <!-- Status Filters for Active Tasks -->
-    <div class="task-filters task-filters--compact">
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all"
-         class="task-filter task-filter--xs {% if status_filter == 'all' %}task-filter--active{% endif %}">All</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=accepted"
-         class="task-filter task-filter--xs {% if status_filter == 'accepted' %}task-filter--active{% endif %}">Accepted</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=in_transit"
-         class="task-filter task-filter--xs {% if status_filter == 'in_transit' or status_filter == 'out_for_delivery' %}task-filter--active{% endif %}">Transit</a>
+    {% if current_tab == 'accepted' %}
+    <!-- Status Filters for Active Tasks - Large buttons for drivers -->
+    <div class="d-flex flex-wrap gap-2 px-2 mb-2">
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all&sort={{ sort_by }}&zone={{ zone_filter }}"
+         class="btn {% if status_filter == 'all' %}btn-dark{% else %}btn-outline-secondary{% endif %}"
+         style="min-height: 44px; min-width: 50px; font-size: 14px; font-weight: 600; border-radius: 10px;">All</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=accepted&sort={{ sort_by }}&zone={{ zone_filter }}"
+         class="btn {% if status_filter == 'accepted' %}btn-info{% else %}btn-outline-secondary{% endif %}"
+         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Accepted</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=picked_up&sort={{ sort_by }}&zone={{ zone_filter }}"
+         class="btn {% if status_filter == 'picked_up' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Picked</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=in_transit&sort={{ sort_by }}&zone={{ zone_filter }}"
+         class="btn {% if status_filter == 'in_transit' or status_filter == 'out_for_delivery' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Transit</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=contacted&sort={{ sort_by }}&zone={{ zone_filter }}"
+         class="btn {% if status_filter == 'contacted' %}btn-secondary{% else %}btn-outline-secondary{% endif %}"
+         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Contacted</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=non_reachable&sort={{ sort_by }}&zone={{ zone_filter }}"
+         class="btn {% if status_filter == 'non_reachable' %}btn-warning{% else %}btn-outline-secondary{% endif %}"
+         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Non Reach</a>
     </div>
-    {% elif current_tab == 'accepted' %}
-    <!-- Status Filters for History/Completed Tasks -->
-    <div class="task-filters task-filters--compact">
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all"
-         class="task-filter task-filter--xs {% if status_filter == 'all' %}task-filter--active{% endif %}">All</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=delivered"
-         class="task-filter task-filter--xs {% if status_filter == 'delivered' %}task-filter--active{% endif %}" style="{% if status_filter == 'delivered' %}background: var(--brand-success, #28a745); color: white;{% endif %}">Delivered</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=failed"
-         class="task-filter task-filter--xs {% if status_filter == 'failed' or status_filter == 'cancelled' %}task-filter--active{% endif %}" style="{% if status_filter == 'failed' or status_filter == 'cancelled' %}background: var(--brand-danger, #dc3545); color: white;{% endif %}">Failed</a>
+    {% elif current_tab == 'history' %}
+    <!-- Status Filters for History/Completed Tasks - Large buttons for drivers -->
+    <div class="d-flex flex-wrap gap-2 px-2 mb-2">
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all&sort={{ sort_by }}&zone={{ zone_filter }}"
+         class="btn {% if status_filter == 'all' %}btn-dark{% else %}btn-outline-secondary{% endif %}"
+         style="min-height: 44px; min-width: 50px; font-size: 14px; font-weight: 600; border-radius: 10px;">All</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=delivered&sort={{ sort_by }}&zone={{ zone_filter }}"
+         class="btn {% if status_filter == 'delivered' %}btn-success{% else %}btn-outline-success{% endif %}"
+         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Delivered</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=failed&sort={{ sort_by }}&zone={{ zone_filter }}"
+         class="btn {% if status_filter == 'failed' or status_filter == 'cancelled' %}btn-danger{% else %}btn-outline-danger{% endif %}"
+         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Failed</a>
     </div>
     {% endif %}
 
-    <!-- Task Count Header -->
-    <div class="task-list-header">
-      <span>{{ cards|length }} {% if current_tab == 'all' %}new{% elif current_tab == 'assigned' %}assigned{% else %}accepted{% endif %} task{{ cards|length|pluralize }}</span>
+    <!-- Task Count Header with Sort Options -->
+    <div class="d-flex justify-content-between align-items-center px-2 mb-2">
+      <span class="fw-bold" style="font-size: 16px;">{{ cards|length }} {% if current_tab == 'all' %}new{% elif current_tab == 'assigned' %}assigned{% elif current_tab == 'accepted' %}active{% else %}completed{% endif %} task{{ cards|length|pluralize }}</span>
+      <div class="d-flex gap-2 align-items-center">
+        <span class="text-muted" style="font-size: 12px;">Sort:</span>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort=date&zone={{ zone_filter }}"
+           class="btn {% if sort_by == 'date' or not sort_by %}btn-dark{% else %}btn-outline-secondary{% endif %}"
+           style="min-height: 40px; min-width: 40px; font-size: 16px; border-radius: 10px; padding: 8px;">
+          <i class="fa-solid fa-calendar"></i>
+        </a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort=zone&zone={{ zone_filter }}"
+           class="btn {% if sort_by == 'zone' %}btn-dark{% else %}btn-outline-secondary{% endif %}"
+           style="min-height: 40px; min-width: 40px; font-size: 16px; border-radius: 10px; padding: 8px;">
+          <i class="fa-solid fa-location-dot"></i>
+        </a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort=status&zone={{ zone_filter }}"
+           class="btn {% if sort_by == 'status' %}btn-dark{% else %}btn-outline-secondary{% endif %}"
+           style="min-height: 40px; min-width: 40px; font-size: 16px; border-radius: 10px; padding: 8px;">
+          <i class="fa-solid fa-circle-check"></i>
+        </a>
+      </div>
     </div>
 
     {% if cards %}
@@ -97,7 +162,7 @@
                 <div class="pwa-task-card__location-label">Dropoff</div>
                 <div class="pwa-task-card__location-value">
                   {% if card.dl_to_address %}
-                    Zone {{ card.dl_to_address.dl_zone|default:"-" }}, {{ card.dl_to_address.area_name|default:"N/A" }}
+                    Zone {{ card.dl_to_address.dl_zone|default:"-" }}{% with zg=zone_group_map|get_zone_group:card.dl_to_address.dl_zone %}{% if zg %} - {{ zg }}{% endif %}{% endwith %}, {{ card.dl_to_address.area_name|default:"N/A" }}
                   {% else %}
                     N/A
                   {% endif %}
@@ -131,25 +196,25 @@
             </button>
             {% endif %}
           {% elif current_tab == 'assigned' %}
-            {% if card.dl_task_status == 'assigned' or card.dl_task_status == 'accepted' %}
-            <button type="button" class="btn btn-sm btn-success mobile-accept-btn" data-task-id="{{ card.id }}">
+            {% if card.dl_task_status == 'assigned' %}
+            <button type="button" class="btn btn-sm btn-success mobile-accept-btn" data-task-id="{{ card.id }}" onclick="event.stopPropagation();">
               <i class="fa-solid fa-check me-1"></i>Accept
+            </button>
+            {% endif %}
+          {% elif current_tab == 'accepted' %}
+            {% if card.dl_task_status == 'accepted' %}
+            <button type="button" class="btn btn-sm btn-primary start-ride-btn" data-task-id="{{ card.id }}" onclick="event.stopPropagation();">
+              <i class="fa-solid fa-car me-1"></i>Start
             </button>
             {% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' or card.dl_task_status == 'start_ride' %}
             <a href="{% url 'delivery:task_navigation' card.id %}" class="btn btn-sm btn-info" onclick="event.stopPropagation();">
               <i class="fa-solid fa-map me-1"></i>Map
             </a>
             {% endif %}
-          {% elif current_tab == 'accepted' %}
-            {% if card.dl_task_status == 'accepted' %}
-            <button type="button" class="btn btn-sm btn-primary start-ride-btn" data-task-id="{{ card.id }}" onclick="event.stopPropagation();">
-              <i class="fa-solid fa-car me-1"></i>Start Ride
-            </button>
-            {% else %}
-            <a href="{% url 'delivery:task_navigation' card.id %}" class="btn btn-sm btn-info" onclick="event.stopPropagation();">
-              <i class="fa-solid fa-map-location-dot me-1"></i>View Map
-            </a>
-            {% endif %}
+          {% elif current_tab == 'history' %}
+            <span class="badge bg-{% if card.dl_task_status == 'delivered' %}success{% else %}danger{% endif %}">
+              {{ card.get_dl_task_status_display }}
+            </span>
           {% endif %}
         </div>
       </div>
@@ -163,94 +228,154 @@
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              <!-- Task ID -->
-              <div class="mb-3">
-                <small class="text-muted">Task ID</small>
-                <p class="fw-bold mb-0">{{ card.dl_task_number }}</p>
-              </div>
-
-              <!-- Pickup Info -->
-              <div class="pwa-card mb-3">
-                <div class="pwa-card__body">
-                  <div class="d-flex align-items-center mb-2">
-                    <div class="pwa-task-card__route-dot me-2"></div>
-                    <strong>Pickup Location</strong>
-                  </div>
-                  <p class="mb-1">{{ card.pickup_location.pickup_location_title|default:"N/A" }}</p>
-                  <p class="text-muted small mb-0">{{ card.order.business.business_name }}</p>
-                </div>
-              </div>
-
-              <!-- Dropoff Info -->
-              <div class="pwa-card mb-3">
-                <div class="pwa-card__body">
-                  <div class="d-flex align-items-center mb-2">
-                    <div class="pwa-task-card__route-dot pwa-task-card__route-dot--end me-2"></div>
-                    <strong>Dropoff Location</strong>
-                  </div>
-                  {% if card.dl_to_address %}
-                  <p class="mb-1">Zone {{ card.dl_to_address.dl_zone }}, {{ card.dl_to_address.area_name|default:"" }}</p>
-                  <p class="text-muted small mb-0">
-                    Street {{ card.dl_to_address.dl_street|default:"-" }}, Building {{ card.dl_to_address.dl_building|default:"-" }}
-                  </p>
-                  {% else %}
-                  <p class="mb-0 text-muted">Address not available</p>
-                  {% endif %}
-                </div>
-              </div>
-
-              <!-- Order Details -->
-              <div class="row g-2 mb-3">
-                <div class="col-{% if card.order.order_type == 'pick_and_drop' %}6{% else %}12{% endif %}">
-                  <div class="pwa-stat-card">
-                    <div class="pwa-stat-card__label">COD Amount</div>
-                    <div class="pwa-stat-card__value pwa-text-success">{{ card.order.cod_amount|default:0 }} QR</div>
-                  </div>
-                </div>
-                {% if card.order.order_type == 'pick_and_drop' %}
-                <div class="col-6">
-                  <div class="pwa-stat-card">
-                    <div class="pwa-stat-card__label">Delivery Fee</div>
-                    <div class="pwa-stat-card__value">{{ card.dl_price|default:0 }} QR</div>
-                  </div>
-                </div>
-                {% endif %}
-              </div>
-
-              <!-- Status & Date -->
-              <div class="d-flex justify-content-between mb-3">
+              <!-- Task ID & Status Header -->
+              <div class="d-flex justify-content-between align-items-start mb-3">
                 <div>
-                  <small class="text-muted">Status</small>
-                  <p class="mb-0">
-                    <span class="badge bg-{% if card.dl_task_status == 'delivered' %}success{% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' or card.dl_task_status == 'start_ride' %}primary{% elif card.dl_task_status == 'cancelled' or card.dl_task_status == 'failed' %}danger{% elif card.dl_task_status == 'accepted' or card.dl_task_status == 'picked_up' %}info{% else %}warning{% endif %}">
-                      {{ card.get_dl_task_status_display }}
-                    </span>
-                  </p>
+                  <small class="text-muted">Task ID</small>
+                  <p class="fw-bold mb-0">{{ card.dl_task_number }}</p>
+                  <small class="text-muted">{{ card.dl_task_date|date:"M d, Y" }} · {{ card.dl_speed|default:"Normal" }}</small>
                 </div>
-                <div class="text-end">
-                  <small class="text-muted">Date</small>
-                  <p class="mb-0 fw-bold">{{ card.dl_task_date }}</p>
+                <span class="badge bg-{% if card.dl_task_status == 'delivered' %}success{% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' or card.dl_task_status == 'start_ride' %}primary{% elif card.dl_task_status == 'cancelled' or card.dl_task_status == 'failed' %}danger{% elif card.dl_task_status == 'accepted' or card.dl_task_status == 'picked_up' %}info{% else %}warning{% endif %}" style="font-size: 0.85rem;">
+                  {{ card.get_dl_task_status_display }}
+                </span>
+              </div>
+
+              <!-- Quick Action Buttons: Navigate, Call, WhatsApp (Always Visible) -->
+              <div class="d-flex gap-2 mb-3" style="width: 100%;">
+                <a href="#" class="btn btn-outline-primary flex-fill d-flex align-items-center justify-content-center"
+                   style="min-height: 48px; font-size: 16px; border-radius: 10px; padding: 8px;"
+                   data-lat="{% if card.dl_to_address %}{{ card.dl_to_address.dl_latitude|default:'0' }}{% else %}0{% endif %}"
+                   data-lng="{% if card.dl_to_address %}{{ card.dl_to_address.dl_longitude|default:'0' }}{% else %}0{% endif %}"
+                   data-zone="{% if card.dl_to_address %}{{ card.dl_to_address.dl_zone|default:'' }}{% else %}{{ card.order.dl_zone|default:'' }}{% endif %}"
+                   data-area="{% if card.dl_to_address %}{{ card.dl_to_address.area_name|default:'' }}{% endif %}"
+                   data-street="{% if card.dl_to_address %}{{ card.dl_to_address.dl_street|default:'' }}{% else %}{{ card.order.dl_street|default:'' }}{% endif %}"
+                   data-building="{% if card.dl_to_address %}{{ card.dl_to_address.dl_building|default:'' }}{% else %}{{ card.order.dl_building|default:'' }}{% endif %}"
+                   onclick="event.stopPropagation(); openNavigation(this);">
+                  <i class="fa-solid fa-location-dot me-1"></i> Map
+                </a>
+                <a href="tel:{% if card.dl_to_address and card.dl_to_address.mobile_no %}{{ card.dl_to_address.mobile_no }}{% else %}{{ card.order.customer_phone|default:'' }}{% endif %}"
+                   class="btn btn-success flex-fill d-flex align-items-center justify-content-center"
+                   style="min-height: 48px; font-size: 16px; border-radius: 10px; padding: 8px;"
+                   onclick="event.stopPropagation();">
+                  <i class="fa-solid fa-phone me-1"></i> Call
+                </a>
+                <a href="#" class="btn flex-fill d-flex align-items-center justify-content-center"
+                   style="min-height: 48px; font-size: 16px; border-radius: 10px; padding: 8px; background: #25D366; color: white; border: none;"
+                   data-phone="{% if card.order.customer_whatsapp %}{{ card.order.customer_whatsapp }}{% elif card.dl_to_address and card.dl_to_address.mobile_no %}{{ card.dl_to_address.mobile_no }}{% else %}{{ card.order.customer_phone|default:'' }}{% endif %}"
+                   data-name="{% if card.dl_to_address and card.dl_to_address.full_name %}{{ card.dl_to_address.full_name }}{% else %}{{ card.order.customer_name|default:'Customer' }}{% endif %}"
+                   onclick="event.stopPropagation(); openWhatsApp(this);">
+                  <i class="fa-brands fa-whatsapp fa-lg"></i>
+                </a>
+              </div>
+
+              <!-- Customer Info Card -->
+              {% if card.dl_to_address %}
+              <div class="pwa-card mb-3" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                <div class="pwa-card__body py-2">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <small class="text-muted d-block">Customer</small>
+                      <span class="fw-bold">{{ card.dl_to_address.full_name|default:"N/A" }}</span>
+                    </div>
+                    <span class="text-muted small">{{ card.dl_to_address.mobile_no|default:"N/A" }}</span>
+                  </div>
+                </div>
+              </div>
+              {% endif %}
+
+              <!-- Location Route -->
+              <div class="pwa-card mb-3">
+                <div class="pwa-card__body p-0">
+                  <div class="d-flex">
+                    <!-- Route Line -->
+                    <div class="d-flex flex-column align-items-center me-3 py-2">
+                      <div class="pwa-task-card__route-dot"></div>
+                      <div class="pwa-task-card__route-connector" style="height: 60px;"></div>
+                      <div class="pwa-task-card__route-dot pwa-task-card__route-dot--end"></div>
+                    </div>
+                    <!-- Location Details -->
+                    <div class="flex-grow-1 py-2">
+                      <div class="mb-3">
+                        <small class="text-muted">Pickup</small>
+                        <p class="mb-0 fw-medium">{{ card.pickup_location.pickup_location_title|default:"N/A" }}</p>
+                        <small class="text-muted">{{ card.order.business.business_name }}</small>
+                      </div>
+                      <div>
+                        <small class="text-muted">Dropoff</small>
+                        {% if card.dl_to_address %}
+                        <p class="mb-0 fw-medium">Zone {{ card.dl_to_address.dl_zone }}{% with zg=zone_group_map|get_zone_group:card.dl_to_address.dl_zone %}{% if zg %} - {{ zg }}{% endif %}{% endwith %}, {{ card.dl_to_address.area_name|default:"" }}</p>
+                        <small class="text-muted">
+                          St {{ card.dl_to_address.dl_street|default:"-" }}, Bld {{ card.dl_to_address.dl_building|default:"-" }}{% if card.dl_to_address.dl_unit %}, Unit {{ card.dl_to_address.dl_unit }}{% endif %}
+                        </small>
+                        {% if card.dl_to_address.is_villa_compound or card.dl_to_address.is_flat or card.dl_to_address.is_office %}
+                        <div class="mt-1">
+                          {% if card.dl_to_address.is_villa_compound %}<span class="badge bg-light text-dark me-1"><i class="fa-solid fa-house me-1"></i>Villa</span>{% endif %}
+                          {% if card.dl_to_address.is_flat %}<span class="badge bg-light text-dark me-1"><i class="fa-solid fa-building me-1"></i>Flat</span>{% endif %}
+                          {% if card.dl_to_address.is_office %}<span class="badge bg-light text-dark me-1"><i class="fa-solid fa-briefcase me-1"></i>Office</span>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% else %}
+                        <p class="mb-0 text-muted">Address not available</p>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <!-- Description -->
-              {% if card.dl_task_description %}
+              <!-- COD Amount -->
+              <div class="pwa-stat-card mb-3">
+                <div class="pwa-stat-card__label">COD Amount</div>
+                <div class="pwa-stat-card__value pwa-text-success" style="font-size: 28px;">{{ card.order.cod_amount|default:0 }} QR</div>
+              </div>
+
+              <!-- Additional Info -->
+              <div class="row g-2 mb-3">
+                <div class="col-4">
+                  <small class="text-muted d-block">Type</small>
+                  <span class="badge bg-{% if card.order.order_type == 'pick_and_drop' %}info{% else %}secondary{% endif %}" style="font-size: 0.7rem;">
+                    {{ card.order.get_order_type_display|default:"Standard" }}
+                  </span>
+                </div>
+                <div class="col-4 text-center">
+                  <small class="text-muted d-block">Weight</small>
+                  <span class="fw-medium">{{ card.dl_waight|default:"-" }}</span>
+                </div>
+                <div class="col-4 text-end">
+                  <small class="text-muted d-block">Order #</small>
+                  <span class="fw-medium text-primary" style="font-size: 0.8rem;">{{ card.order.order_number|default:"-" }}</span>
+                </div>
+              </div>
+
+              <!-- Payment Method -->
+              {% if card.order.payment_method %}
               <div class="mb-3">
-                <small class="text-muted">Notes</small>
-                <p class="mb-0">{{ card.dl_task_description }}</p>
+                <small class="text-muted d-block">Payment</small>
+                <span class="badge bg-{% if card.order.payment_method == 'cod' %}warning text-dark{% else %}success{% endif %}">
+                  <i class="fa-solid fa-{% if card.order.payment_method == 'cod' %}money-bill{% else %}credit-card{% endif %} me-1"></i>
+                  {{ card.order.get_payment_method_display|default:card.order.payment_method|upper }}
+                </span>
+              </div>
+              {% endif %}
+
+              <!-- Notes / Description -->
+              {% if card.dl_task_description %}
+              <div class="mb-3 p-2 rounded" style="background: #fff3cd;">
+                <small class="text-muted d-block"><i class="fa-solid fa-sticky-note me-1"></i>Notes</small>
+                <p class="mb-0 small">{{ card.dl_task_description }}</p>
               </div>
               {% endif %}
 
               <!-- Order Products -->
               {% if card.order.order_items.all %}
               <div class="mb-3">
-                <small class="text-muted d-block mb-2">Products</small>
-                <div class="list-group list-group-flush">
+                <small class="text-muted d-block mb-2"><i class="fa-solid fa-box me-1"></i>Products ({{ card.order.order_items.count }})</small>
+                <div class="list-group list-group-flush" style="max-height: 150px; overflow-y: auto;">
                   {% for item in card.order.order_items.all %}
                   <div class="list-group-item px-0 py-2 bg-transparent">
                     <div class="d-flex justify-content-between align-items-center">
                       <div>
-                        <span class="fw-medium">{{ item.product.item_name|default:item.notes|default:"Product" }}</span>
+                        <span class="fw-medium small">{{ item.product.item_name|default:item.notes|default:"Product" }}</span>
                         {% if item.product.item_sku %}
                         <small class="text-muted d-block">SKU: {{ item.product.item_sku }}</small>
                         {% endif %}
@@ -277,17 +402,53 @@
               <button type="button" class="pwa-btn pwa-btn--primary pwa-btn--block assign-driver-btn" data-task-id="{{ card.id }}">
                 <i class="fa-solid fa-check me-2"></i>Accept Task
               </button>
-              {% elif card.dl_task_status == 'assigned' or card.dl_task_status == 'accepted' %}
+              {% elif card.dl_task_status == 'assigned' %}
               <button type="button" class="pwa-btn pwa-btn--primary pwa-btn--block accept-task-btn" data-task-id="{{ card.id }}">
                 <i class="fa-solid fa-check me-2"></i>Accept Task
               </button>
-              {% else %}
-              <a href="tel:{{ card.dl_to_address.mobile_no }}" class="pwa-btn pwa-btn--outline" style="flex: 1;">
-                <i class="fa-solid fa-phone me-2"></i>Call
-              </a>
-              <a href="{% url 'delivery:task_navigation' card.id %}" class="pwa-btn pwa-btn--primary" style="flex: 1;">
-                <i class="fa-solid fa-map-location-dot me-2"></i>Navigate
-              </a>
+              {% elif card.dl_task_status == 'accepted' %}
+              <button type="button" class="pwa-btn pwa-btn--primary pwa-btn--block start-ride-btn" data-task-id="{{ card.id }}">
+                <i class="fa-solid fa-car me-2"></i>Start Ride
+              </button>
+              {% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' or card.dl_task_status == 'start_ride' %}
+              <div class="d-flex flex-column gap-2 w-100">
+                <div class="d-flex gap-2">
+                  <a href="tel:{% if card.dl_to_address %}{{ card.dl_to_address.mobile_no }}{% else %}{{ card.order.customer_phone }}{% endif %}" class="btn btn-success" style="flex: 1; min-height: 48px; font-size: 16px; font-weight: 600; border-radius: 10px;">
+                    <i class="fa-solid fa-phone me-2"></i>Call
+                  </a>
+                  <a href="{% url 'delivery:task_navigation' card.id %}" class="btn btn-primary" style="flex: 1; min-height: 48px; font-size: 16px; font-weight: 600; border-radius: 10px;">
+                    <i class="fa-solid fa-map-location-dot me-2"></i>Navigate
+                  </a>
+                </div>
+                <a href="{% url 'delivery:task_navigation' card.id %}" class="btn btn-dark w-100" style="min-height: 48px; font-size: 16px; font-weight: 600; border-radius: 10px;">
+                  <i class="fa-solid fa-list-check me-2"></i>Update Status
+                </a>
+              </div>
+              {% elif card.dl_task_status == 'non_reachable' or card.dl_task_status == 'contacted' %}
+              <div class="d-flex flex-column gap-2 w-100">
+                <div class="alert alert-warning mb-0 py-2 text-center">
+                  <i class="fa-solid fa-phone-slash me-1"></i>{{ card.get_dl_task_status_display }}
+                </div>
+                <div class="d-flex gap-2">
+                  <a href="tel:{% if card.dl_to_address %}{{ card.dl_to_address.mobile_no }}{% else %}{{ card.order.customer_phone }}{% endif %}" class="btn btn-success" style="flex: 1; min-height: 48px; font-size: 16px; font-weight: 600; border-radius: 10px;">
+                    <i class="fa-solid fa-phone me-1"></i>Recall
+                  </a>
+                  <a href="{% url 'delivery:task_navigation' card.id %}" class="btn btn-primary" style="flex: 1; min-height: 48px; font-size: 16px; font-weight: 600; border-radius: 10px;">
+                    <i class="fa-solid fa-map-location-dot me-1"></i>Navigate
+                  </a>
+                </div>
+                <a href="{% url 'delivery:task_navigation' card.id %}" class="btn btn-dark w-100" style="min-height: 48px; font-size: 16px; font-weight: 600; border-radius: 10px;">
+                  <i class="fa-solid fa-list-check me-2"></i>Update Status
+                </a>
+              </div>
+              {% elif card.dl_task_status == 'delivered' %}
+              <div class="alert alert-success mb-0 w-100 text-center py-2">
+                <i class="fa-solid fa-check-circle me-2"></i>Delivered Successfully
+              </div>
+              {% elif card.dl_task_status == 'failed' or card.dl_task_status == 'cancelled' %}
+              <div class="alert alert-danger mb-0 w-100 text-center py-2">
+                <i class="fa-solid fa-times-circle me-2"></i>{{ card.get_dl_task_status_display }}
+              </div>
               {% endif %}
             </div>
           </div>
@@ -301,17 +462,19 @@
       <div class="pwa-empty-state__icon">
         <i class="fa-solid fa-inbox"></i>
       </div>
-      <h4 class="pwa-empty-state__title">No {% if current_tab == 'all' %}New{% elif current_tab == 'assigned' %}Assigned{% else %}Accepted{% endif %} Tasks</h4>
+      <h4 class="pwa-empty-state__title">No {% if current_tab == 'all' %}New{% elif current_tab == 'assigned' %}Assigned{% elif current_tab == 'accepted' %}Active{% else %}Completed{% endif %} Tasks</h4>
       <p class="pwa-empty-state__text">
         {% if current_tab == 'all' %}
           No new tasks available right now. Check back later!
         {% elif current_tab == 'assigned' %}
           No tasks assigned to you. Check New tab to accept tasks.
+        {% elif current_tab == 'accepted' %}
+          No active tasks. Accept tasks from New or Assigned tabs.
         {% else %}
-          You haven't accepted any tasks yet.
+          No completed tasks in your history yet.
         {% endif %}
       </p>
-      {% if current_tab == 'assigned' %}
+      {% if current_tab == 'assigned' or current_tab == 'accepted' %}
       <a href="?tab=all" class="pwa-btn pwa-btn--primary">
         <i class="fa-solid fa-list me-2"></i>View New Tasks
       </a>
@@ -336,7 +499,10 @@
           Assigned <span class="badge bg-light text-dark ms-1">{{ assigned_count }}</span>
         </a>
         <a href="?tab=accepted&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}" class="btn btn-sm {% if current_tab == 'accepted' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-          Accepted <span class="badge bg-light text-dark ms-1">{{ accepted_count }}</span>
+          Active <span class="badge bg-light text-dark ms-1">{{ accepted_count }}</span>
+        </a>
+        <a href="?tab=history&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}" class="btn btn-sm {% if current_tab == 'history' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          History <span class="badge bg-light text-dark ms-1">{{ history_count }}</span>
         </a>
       </div>
       <span class="text-muted">|</span>
@@ -345,14 +511,14 @@
         <a href="?tab={{ current_tab }}&area=doha&type={{ type_filter }}&status={{ status_filter }}" class="btn btn-sm {% if area_filter == 'doha' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">Doha</a>
         <a href="?tab={{ current_tab }}&area=my_zone&type={{ type_filter }}&status={{ status_filter }}" class="btn btn-sm {% if area_filter == 'my_zone' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">My Zone</a>
       </div>
-      {% if current_tab == 'assigned' %}
+      {% if current_tab == 'accepted' %}
       <span class="text-muted">|</span>
       <div class="btn-group">
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all" class="btn btn-sm {% if status_filter == 'all' %}btn-info{% else %}btn-outline-info{% endif %}">All</a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=accepted" class="btn btn-sm {% if status_filter == 'accepted' %}btn-info{% else %}btn-outline-info{% endif %}">Accepted</a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=in_transit" class="btn btn-sm {% if status_filter == 'in_transit' or status_filter == 'out_for_delivery' %}btn-info{% else %}btn-outline-info{% endif %}">In Transit</a>
       </div>
-      {% elif current_tab == 'accepted' %}
+      {% elif current_tab == 'history' %}
       <span class="text-muted">|</span>
       <div class="btn-group">
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all" class="btn btn-sm {% if status_filter == 'all' %}btn-info{% else %}btn-outline-info{% endif %}">All</a>
@@ -363,7 +529,7 @@
     </div>
     <div class="listing-container" id="delivery_tasks_all_container">
       <div class="listing-header">
-        <h6 class="listing-title"><i class="fa-solid fa-list-check text-primary"></i>{% if current_tab == 'all' %}New{% elif current_tab == 'assigned' %}Assigned{% else %}Accepted{% endif %} Tasks</h6>
+        <h6 class="listing-title"><i class="fa-solid fa-list-check text-primary"></i>{% if current_tab == 'all' %}New{% elif current_tab == 'assigned' %}Assigned{% elif current_tab == 'accepted' %}Active{% else %}History{% endif %} Tasks</h6>
         <span class="text-muted">{{ cards|length }} task{{ cards|length|pluralize }}</span>
       </div>
       <table class="listing-table" id="delivery_tasks_all_table">
@@ -400,7 +566,7 @@
               </div>
               <div class="d-flex align-items-center">
                 <i class="fa-solid fa-circle text-danger me-2" style="font-size: 6px;"></i>
-                <span>Zone {{ card.dl_to_address.dl_zone|default:"-" }}, {{ card.dl_to_address.area_name|default:"N/A" }}</span>
+                <span>Zone {{ card.dl_to_address.dl_zone|default:"-" }}{% with zg=zone_group_map|get_zone_group:card.dl_to_address.dl_zone %}{% if zg %} - {{ zg }}{% endif %}{% endwith %}, {{ card.dl_to_address.area_name|default:"N/A" }}</span>
               </div>
             </td>
             <td>
@@ -432,7 +598,7 @@
                   <div class="col-12 col-md-4">
                     <div class="fw-bold text-danger mb-2"><i class="fa-solid fa-location-dot me-1"></i>To</div>
                     <div class="small">
-                      <div class="mb-1"><span class="text-muted">Zone & Place:</span> {{ card.dl_to_address.dl_zone|default:"-" }} - {{ card.dl_to_address.area_name|default:"N/A" }}</div>
+                      <div class="mb-1"><span class="text-muted">Zone & Place:</span> {{ card.dl_to_address.dl_zone|default:"-" }}{% with zg=zone_group_map|get_zone_group:card.dl_to_address.dl_zone %}{% if zg %} ({{ zg }}){% endif %}{% endwith %} - {{ card.dl_to_address.area_name|default:"N/A" }}</div>
                       <div class="mb-1"><span class="text-muted">St & Bld:</span> {{ card.dl_to_address.dl_street|default:"-" }} - {{ card.dl_to_address.dl_building|default:"-" }}</div>
                       <div class="mb-1"><span class="text-muted">Customer:</span> {{ card.dl_to_address.full_name|default:"N/A" }}</div>
                       <div><span class="text-muted">Notes:</span> {{ card.dl_task_description|default:"-" }}</div>
@@ -487,14 +653,22 @@
                   <button class="btn btn-sm btn-success assign-driver-btn" data-task-id="{{ card.id }}">
                     <i class="fa-solid fa-plus me-1"></i>Accept Order
                   </button>
-                  {% elif card.dl_task_status == 'assigned' or card.dl_task_status == 'accepted' %}
+                  {% elif card.dl_task_status == 'assigned' %}
                   <button class="btn btn-sm btn-success accept-task-btn" data-task-id="{{ card.id }}">
                     <i class="fa-solid fa-check me-1"></i>Accept Task
                   </button>
-                  {% elif card.dl_task_status == 'out_for_delivery' %}
+                  {% elif card.dl_task_status == 'accepted' %}
+                  <button class="btn btn-sm btn-primary start-ride-btn" data-task-id="{{ card.id }}">
+                    <i class="fa-solid fa-car me-1"></i>Start Ride
+                  </button>
+                  {% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' %}
                   <a href="{% url 'delivery:task_navigation' card.id %}" class="btn btn-sm btn-info">
                     <i class="fa-solid fa-map-location-dot me-1"></i>View Map
                   </a>
+                  {% elif card.dl_task_status == 'delivered' %}
+                  <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Delivered</span>
+                  {% elif card.dl_task_status == 'failed' or card.dl_task_status == 'cancelled' %}
+                  <span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>{{ card.get_dl_task_status_display }}</span>
                   {% endif %}
                 </div>
               </div>
@@ -515,6 +689,47 @@
 {% endblock content %}
 {% block extra_js %}
   <script>
+  // Open Google Maps navigation
+  function openNavigation(btn) {
+    var lat = parseFloat(btn.dataset.lat) || 0;
+    var lng = parseFloat(btn.dataset.lng) || 0;
+    var hasCoords = (lat !== 0 && lng !== 0);
+
+    var url;
+    if (hasCoords) {
+      // Use coordinates for precise navigation
+      url = 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng + '&travelmode=driving';
+    } else {
+      // Fall back to address text search
+      var addressParts = [];
+      if (btn.dataset.zone) addressParts.push('Zone ' + btn.dataset.zone);
+      if (btn.dataset.area) addressParts.push(btn.dataset.area);
+      if (btn.dataset.street) addressParts.push('Street ' + btn.dataset.street);
+      if (btn.dataset.building) addressParts.push('Building ' + btn.dataset.building);
+      addressParts.push('Qatar');
+      var addressText = addressParts.join(', ');
+      url = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addressText);
+    }
+    window.open(url, '_blank');
+  }
+
+  // Open WhatsApp chat
+  function openWhatsApp(btn) {
+    var phone = (btn.dataset.phone || '').replace(/\D/g, '');
+    if (!phone) {
+      alert('No phone number available');
+      return;
+    }
+    // Add Qatar country code if needed
+    if (!phone.startsWith('974') && phone.length === 8) {
+      phone = '974' + phone;
+    }
+    var name = btn.dataset.name || 'Customer';
+    var message = 'Hello ' + name + '! This is your delivery driver from EzzyDelivery. I am on my way with your order.';
+    var whatsappUrl = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
+    window.open(whatsappUrl, '_blank');
+  }
+
   $(document).ready(function () {
     // Accept task button (All Tasks tab - assigns driver)
     $(".assign-driver-btn").on("click", function () {
@@ -604,8 +819,6 @@
       var taskId = $(this).data("task-id");
       var btn = $(this);
 
-      console.log('Mobile Accept clicked, task ID:', taskId);
-
       if (!taskId) {
         alert('Task ID not found');
         return false;
@@ -616,29 +829,25 @@
       $.ajax({
         type: "POST",
         url: "/delivery/delivery_task/accept_task/",
-        data: {
-          task_id: taskId,
-          csrfmiddlewaretoken: "{{ csrf_token }}",
-        },
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+        data: { task_id: taskId },
         success: function (response) {
-          console.log('Mobile Accept response:', response);
           if (response.success) {
             btn.html('<i class="fa-solid fa-check"></i>').removeClass('btn-success').addClass('btn-secondary');
-            if (typeof showToast === 'function') {
-              showToast('Task accepted!', 'success');
-            }
-            setTimeout(function() {
-              location.reload();
-            }, 800);
+            alert('Task accepted!');
+            location.reload();
           } else {
             btn.prop('disabled', false).html('<i class="fa-solid fa-check me-1"></i>Accept');
-            alert(response.error || 'Failed');
+            alert('Failed: ' + (response.error || 'Unknown error'));
           }
         },
         error: function (xhr, status, error) {
-          console.log('Mobile Accept error:', error);
           btn.prop('disabled', false).html('<i class="fa-solid fa-check me-1"></i>Accept');
-          alert('Error: ' + error);
+          var errMsg = 'Error: ' + status + ' - ' + error;
+          if (xhr.status === 403) {
+            errMsg = 'Session expired. Please refresh the page.';
+          }
+          alert(errMsg);
         },
       });
 

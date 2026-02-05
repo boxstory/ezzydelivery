@@ -415,6 +415,12 @@ class ZoneName(models.Model):
         """Check if zone has boundary polygon defined"""
         return bool(self.polygon and len(self.polygon) >= 3)
 
+    @property
+    def primary_zone_group_name(self):
+        """Returns the name of the first active zone group this zone belongs to"""
+        group = self.zone_groups.filter(is_active=True).order_by('display_order').first()
+        return group.name if group else None
+
     class Meta:
         verbose_name = "Zone"
         verbose_name_plural = "Zones"

@@ -148,11 +148,13 @@ def all_delivery_tasks(request):
         messages.error(request, "No driver profile found for your account")
         return redirect('webpages:index')
 
-    # Get filter parameters (defaults: Accepted Tasks + My Zone)
-    tab = request.GET.get('tab', 'accepted')  # 'all', 'assigned', 'accepted'
+    # Get filter parameters (defaults: Active Tasks + My Zone)
+    tab = request.GET.get('tab', 'accepted')  # 'all', 'assigned', 'accepted', 'history'
     area_filter = request.GET.get('area', 'my_zone')  # 'all', 'doha', 'my_zone', 'qatar'
     type_filter = request.GET.get('type', 'all')  # 'all', 'public', 'pnd'
     status_filter = request.GET.get('status', 'all')  # 'all' or specific status
+    sort_by = request.GET.get('sort', 'date')  # 'date', 'zone', 'status'
+    zone_filter = request.GET.get('zone', '')  # specific zone number or empty for all
 
     # Base queryset with optimized joins
     base_qs = delivery_models.DeliveryTask.objects.select_related(
@@ -178,14 +180,20 @@ def all_delivery_tasks(request):
         dl_task_status__in=['delivered', 'cancelled', 'failed']
     ).order_by('-id')
 
-    # Assigned tasks: Active tasks assigned to driver (not yet completed)
+    # Assigned tasks: Tasks assigned to driver but not yet accepted
     assigned_tasks = base_qs.filter(
         driver=driver,
-        dl_task_status__in=['assigned', 'accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable']
+        dl_task_status='assigned'
     ).order_by('-id')
 
-    # Accepted/History tasks: Completed tasks (delivered, failed, cancelled)
+    # Accepted tasks: Active tasks driver has accepted (not yet completed)
     accepted_tasks = base_qs.filter(
+        driver=driver,
+        dl_task_status__in=['accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable']
+    ).order_by('-id')
+
+    # History tasks: Completed tasks (delivered, failed, cancelled)
+    history_tasks = base_qs.filter(
         driver=driver,
         dl_task_status__in=['delivered', 'failed', 'cancelled']
     ).order_by('-id')
@@ -196,18 +204,34 @@ def all_delivery_tasks(request):
         all_tasks = all_tasks.filter(dl_to_address__dl_zone__lte=50)
         assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone__lte=50)
         accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone__lte=50)
+        history_tasks = history_tasks.filter(dl_to_address__dl_zone__lte=50)
     elif area_filter == 'my_zone':
-        # Driver's zone (from profile or default zone)
-        driver_zone = getattr(driver, 'default_zone', None)
-        if driver_zone:
-            all_tasks = all_tasks.filter(dl_to_address__dl_zone=driver_zone)
-            assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone=driver_zone)
-            accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone=driver_zone)
+        # Get zones from driver's preferred zone groups
+        my_zones = list(
+            delivery_models.ZoneName.objects.filter(
+                zone_groups__in=driver.preferred_zone_groups.all(),
+                zone_groups__is_active=True
+            ).values_list('zone_number', flat=True).distinct()
+        )
+        if my_zones:
+            all_tasks = all_tasks.filter(dl_to_address__dl_zone__in=my_zones)
+            assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone__in=my_zones)
+            accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone__in=my_zones)
+            history_tasks = history_tasks.filter(dl_to_address__dl_zone__in=my_zones)
     elif area_filter == 'qatar':
         # All Qatar (zones > 50)
         all_tasks = all_tasks.filter(dl_to_address__dl_zone__gt=50)
         assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone__gt=50)
         accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone__gt=50)
+        history_tasks = history_tasks.filter(dl_to_address__dl_zone__gt=50)
+
+    # Apply specific zone filter (overrides area filter if set)
+    if zone_filter and zone_filter.isdigit():
+        zone_num = int(zone_filter)
+        all_tasks = all_tasks.filter(dl_to_address__dl_zone=zone_num)
+        assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone=zone_num)
+        accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone=zone_num)
+        history_tasks = history_tasks.filter(dl_to_address__dl_zone=zone_num)
 
     # Apply type filter
     if type_filter == 'public':
@@ -217,51 +241,102 @@ def all_delivery_tasks(request):
         all_tasks = all_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
         assigned_tasks = assigned_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
         accepted_tasks = accepted_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
+        history_tasks = history_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
 
     # Apply status filter
     if status_filter and status_filter != 'all':
         if status_filter == 'in_transit':
-            # Include related transit statuses (for assigned/active tasks)
-            assigned_tasks = assigned_tasks.filter(dl_task_status__in=['in_transit', 'out_for_delivery', 'start_ride'])
+            # Include related transit statuses (for accepted/active tasks)
+            accepted_tasks = accepted_tasks.filter(dl_task_status__in=['in_transit', 'out_for_delivery', 'start_ride'])
         elif status_filter == 'failed':
-            # Include failed and cancelled (for history/accepted tasks)
-            accepted_tasks = accepted_tasks.filter(dl_task_status__in=['failed', 'cancelled'])
+            # Include failed and cancelled (for history tasks)
+            history_tasks = history_tasks.filter(dl_task_status__in=['failed', 'cancelled'])
         elif status_filter == 'delivered':
-            # Delivered tasks (for history/accepted tasks)
-            accepted_tasks = accepted_tasks.filter(dl_task_status='delivered')
+            # Delivered tasks (for history tasks)
+            history_tasks = history_tasks.filter(dl_task_status='delivered')
         elif status_filter == 'accepted':
-            # Accepted but not started (for assigned/active tasks)
-            assigned_tasks = assigned_tasks.filter(dl_task_status='accepted')
-        else:
-            # Generic filter for both
-            accepted_tasks = accepted_tasks.filter(dl_task_status=status_filter)
-            assigned_tasks = assigned_tasks.filter(dl_task_status=status_filter)
+            # Accepted but not started (for accepted/active tasks)
+            accepted_tasks = accepted_tasks.filter(dl_task_status='accepted')
+        elif status_filter == 'picked_up':
+            # Picked up tasks
+            accepted_tasks = accepted_tasks.filter(dl_task_status='picked_up')
+        elif status_filter == 'contacted':
+            # Contacted tasks
+            accepted_tasks = accepted_tasks.filter(dl_task_status='contacted')
+        elif status_filter == 'non_reachable':
+            # Non reachable tasks
+            accepted_tasks = accepted_tasks.filter(dl_task_status='non_reachable')
+
+    # Apply sorting
+    if sort_by == 'zone':
+        sort_order = ['dl_to_address__dl_zone', '-dl_task_date', '-id']
+    elif sort_by == 'status':
+        sort_order = ['dl_task_status', '-dl_task_date', '-id']
+    else:  # 'date' (default)
+        sort_order = ['-dl_task_date', '-id']
+
+    all_tasks = all_tasks.order_by(*sort_order)
+    assigned_tasks = assigned_tasks.order_by(*sort_order)
+    accepted_tasks = accepted_tasks.order_by(*sort_order)
+    history_tasks = history_tasks.order_by(*sort_order)
 
     # Get counts
     all_count = all_tasks.count()
     assigned_count = assigned_tasks.count()
     accepted_count = accepted_tasks.count()
+    history_count = history_tasks.count()
 
     # Select which tasks to show based on tab
     if tab == 'all':
         cards = all_tasks[:50]
     elif tab == 'assigned':
         cards = assigned_tasks[:50]
-    else:
+    elif tab == 'accepted':
         cards = accepted_tasks[:50]
+    else:  # tab == 'history'
+        cards = history_tasks[:50]
 
-    logger.debug(f"Fetched tasks: {all_count} all, {assigned_count} assigned, {accepted_count} accepted")
+    logger.debug(f"Fetched tasks: {all_count} all, {assigned_count} assigned, {accepted_count} accepted, {history_count} history")
+
+    # Get available zones from current tasks for the dropdown
+    zone_numbers = delivery_models.DeliveryTask.objects.filter(
+        dl_to_address__isnull=False
+    ).values_list('dl_to_address__dl_zone', flat=True).distinct()
+    zone_numbers = [z for z in zone_numbers if z is not None][:50]  # Limit to 50 zones
+
+    # Get ZoneName objects with prefetched zone groups
+    from django.db.models import Prefetch
+    available_zones = delivery_models.ZoneName.objects.filter(
+        zone_number__in=zone_numbers
+    ).prefetch_related(
+        Prefetch(
+            'zone_groups',
+            queryset=delivery_models.ZoneGroup.objects.filter(is_active=True).order_by('display_order'),
+            to_attr='active_groups'
+        )
+    ).order_by('zone_number')
+
+    # Build lookup map for task cards
+    zone_group_map = {
+        zone.zone_number: zone.active_groups[0].name
+        for zone in available_zones if zone.active_groups
+    }
 
     context = {
         'cards': cards,
         'all_count': all_count,
         'assigned_count': assigned_count,
         'accepted_count': accepted_count,
+        'history_count': history_count,
         'driver': driver,
         'current_tab': tab,
         'area_filter': area_filter,
         'type_filter': type_filter,
         'status_filter': status_filter,
+        'sort_by': sort_by,
+        'zone_filter': zone_filter,
+        'available_zones': available_zones,
+        'zone_group_map': zone_group_map,
     }
     return render(request, 'delivery/parts/tasks_all.html', context)
 
@@ -320,6 +395,7 @@ def accept_task(request):
     """Accept an assigned task - update status from assigned to accepted"""
     if request.method == "POST":
         task_id = request.POST.get("task_id")
+        logger.info(f"Accept task request: task_id={task_id}, user={request.user.id}")
 
         if not task_id:
             return JsonResponse({"success": False, "error": "Task ID required"})
@@ -327,30 +403,35 @@ def accept_task(request):
         try:
             # Verify user is a driver
             driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+            logger.info(f"Driver found: {driver.id}")
 
-            with transaction.atomic():
-                # Get task by ID
-                task = delivery_models.DeliveryTask.objects.select_for_update().get(id=task_id)
+            # Get task by ID
+            task = delivery_models.DeliveryTask.objects.get(id=task_id)
+            logger.info(f"Task found: {task.id}, status={task.dl_task_status}, driver={task.driver_id}")
 
-                # Check if task is assigned to this driver
-                is_assigned = (task.driver == driver) or \
-                              delivery_models.AssignedDriver.objects.filter(dl_task=task, driver=driver).exists()
+            # Check if task is assigned to this driver
+            is_assigned = (task.driver_id == driver.id) if task.driver_id else False
+            if not is_assigned:
+                is_assigned = delivery_models.AssignedDriver.objects.filter(dl_task=task, driver=driver).exists()
 
-                if not is_assigned and task.driver is not None:
-                    return JsonResponse({"success": False, "error": "Task is assigned to another driver"})
+            logger.info(f"Is assigned to this driver: {is_assigned}")
 
-                # Assign driver if not assigned
-                if task.driver is None:
-                    task.driver = driver
-                    # Create AssignedDriver record if not exists
-                    if not delivery_models.AssignedDriver.objects.filter(dl_task=task, driver=driver).exists():
-                        delivery_models.AssignedDriver.objects.create(driver=driver, dl_task=task)
+            if not is_assigned and task.driver_id is not None:
+                return JsonResponse({"success": False, "error": "Task is assigned to another driver"})
 
-                # Update task status to accepted
-                task.dl_task_status = 'accepted'
-                task.dl_task_status_dms = '7'  # Accepted/Acknowledged in DMS
-                task.save()
-                logger.info(f"Task {task_id} accepted by driver {driver.driver_id}")
+            # Assign driver if not assigned
+            if task.driver_id is None:
+                task.driver = driver
+                # Create AssignedDriver record if not exists
+                if not delivery_models.AssignedDriver.objects.filter(dl_task=task, driver=driver).exists():
+                    delivery_models.AssignedDriver.objects.create(driver=driver, dl_task=task)
+                logger.info(f"Driver {driver.id} assigned to task {task_id}")
+
+            # Update task status to accepted
+            task.dl_task_status = 'accepted'
+            task.dl_task_status_dms = '7'  # Accepted/Acknowledged in DMS
+            task.save(update_fields=['dl_task_status', 'dl_task_status_dms', 'driver'])
+            logger.info(f"Task {task_id} accepted by driver {driver.id}")
 
             return JsonResponse({"success": True})
 
@@ -361,7 +442,7 @@ def accept_task(request):
             logger.warning(f"Task {task_id} not found")
             return JsonResponse({"success": False, "error": "Task not found"})
         except Exception as e:
-            logger.error(f"Error accepting task {task_id}: {e}")
+            logger.error(f"Error accepting task {task_id}: {e}", exc_info=True)
             return JsonResponse({"success": False, "error": str(e)})
 
     return JsonResponse({"success": False, "error": "Invalid request"})
