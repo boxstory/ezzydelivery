@@ -13,6 +13,7 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.utils import timezone
 from django.db.models import Count, Sum, Avg, Q
+from django.db import transaction
 from django.core.paginator import Paginator
 
 from dispatch.models import (
@@ -105,7 +106,11 @@ def batch_list(request):
     if status_filter:
         batches = batches.filter(status=status_filter)
     if location_filter:
-        batches = batches.filter(pickup_location_id=location_filter)
+        try:
+            location_id = int(location_filter)
+            batches = batches.filter(pickup_location_id=location_id)
+        except (ValueError, TypeError):
+            pass  # Invalid location filter, skip filtering
     if date_filter:
         batches = batches.filter(created_at__date=date_filter)
 
@@ -162,29 +167,37 @@ def manual_release_batch(request, batch_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
-    batch = get_object_or_404(OrderBatch, id=batch_id)
+    try:
+        with transaction.atomic():
+            # Lock the batch row to prevent concurrent modifications
+            batch = OrderBatch.objects.select_for_update().filter(id=batch_id).first()
+            if not batch:
+                return JsonResponse({'error': 'Batch not found'}, status=404)
 
-    if batch.status not in ['pending', 'holding']:
-        return JsonResponse(
-            {'error': f'Cannot release batch in {batch.status} status'},
-            status=400
-        )
+            if batch.status not in ['pending', 'holding']:
+                return JsonResponse(
+                    {'error': f'Cannot release batch in {batch.status} status'},
+                    status=400
+                )
 
-    BatchService.release_batch(batch, reason='manual')
+            BatchService.release_batch(batch, reason='manual')
 
-    DispatchLog.objects.create(
-        action='manual_override',
-        batch=batch,
-        performed_by=request.user,
-        details={'action': 'manual_release'}
-    )
+            DispatchLog.objects.create(
+                action='manual_override',
+                batch=batch,
+                performed_by=request.user,
+                details={'action': 'manual_release'}
+            )
 
-    messages.success(request, f'Batch {batch.batch_code} released successfully.')
+        messages.success(request, f'Batch {batch.batch_code} released successfully.')
 
-    if request.headers.get('HX-Request'):
-        return render(request, 'workforce/dispatch/partials/batch_card.html', {'batch': batch})
+        if request.headers.get('HX-Request'):
+            return render(request, 'workforce/dispatch/partials/batch_card.html', {'batch': batch})
 
-    return redirect('workforce:dispatch_batch_detail', batch_id=batch_id)
+        return redirect('workforce:dispatch_batch_detail', batch_id=batch_id)
+    except Exception as e:
+        logger.error(f"Error releasing batch {batch_id}: {e}")
+        return JsonResponse({'error': 'Failed to release batch'}, status=500)
 
 
 @login_required(login_url='/accounts/login/')
@@ -194,25 +207,33 @@ def cancel_batch(request, batch_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
-    batch = get_object_or_404(OrderBatch, id=batch_id)
+    try:
+        with transaction.atomic():
+            # Lock the batch row to prevent concurrent modifications
+            batch = OrderBatch.objects.select_for_update().filter(id=batch_id).first()
+            if not batch:
+                return JsonResponse({'error': 'Batch not found'}, status=404)
 
-    if batch.status in ['completed', 'cancelled']:
-        return JsonResponse(
-            {'error': f'Cannot cancel batch in {batch.status} status'},
-            status=400
-        )
+            if batch.status in ['completed', 'cancelled']:
+                return JsonResponse(
+                    {'error': f'Cannot cancel batch in {batch.status} status'},
+                    status=400
+                )
 
-    BatchService.cancel_batch(batch, reason='manual')
+            BatchService.cancel_batch(batch, reason='manual')
 
-    DispatchLog.objects.create(
-        action='batch_cancelled',
-        batch=batch,
-        performed_by=request.user,
-        details={'reason': 'manual_cancellation'}
-    )
+            DispatchLog.objects.create(
+                action='batch_cancelled',
+                batch=batch,
+                performed_by=request.user,
+                details={'reason': 'manual_cancellation'}
+            )
 
-    messages.success(request, f'Batch {batch.batch_code} cancelled.')
-    return redirect('workforce:dispatch_batch_list')
+        messages.success(request, f'Batch {batch.batch_code} cancelled.')
+        return redirect('workforce:dispatch_batch_list')
+    except Exception as e:
+        logger.error(f"Error cancelling batch {batch_id}: {e}")
+        return JsonResponse({'error': 'Failed to cancel batch'}, status=500)
 
 
 # ========================================
@@ -235,7 +256,11 @@ def shift_list(request):
     if status_filter:
         shifts = shifts.filter(status=status_filter)
     if location_filter:
-        shifts = shifts.filter(pickup_location_id=location_filter)
+        try:
+            location_id = int(location_filter)
+            shifts = shifts.filter(pickup_location_id=location_id)
+        except (ValueError, TypeError):
+            pass  # Invalid location filter, skip filtering
     if date_filter:
         shifts = shifts.filter(scheduled_start__date=date_filter)
     else:
@@ -277,8 +302,50 @@ def shift_create(request):
         rider_id = request.POST.get('rider')
         location_id = request.POST.get('pickup_location')
         shift_type = request.POST.get('shift_type', 'custom')
-        scheduled_start = request.POST.get('scheduled_start')
-        scheduled_end = request.POST.get('scheduled_end')
+        scheduled_start_str = request.POST.get('scheduled_start')
+        scheduled_end_str = request.POST.get('scheduled_end')
+
+        # Validate required fields
+        if not rider_id or not location_id or not scheduled_start_str or not scheduled_end_str:
+            messages.error(request, 'All fields are required.')
+            return redirect('workforce:dispatch_shift_create')
+
+        # Validate shift_type
+        valid_shift_types = [choice[0] for choice in RiderShift.SHIFT_TYPE]
+        if shift_type not in valid_shift_types:
+            messages.error(request, 'Invalid shift type.')
+            return redirect('workforce:dispatch_shift_create')
+
+        # Parse and validate datetime values
+        try:
+            from datetime import datetime
+            # Try common datetime formats
+            for fmt in ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']:
+                try:
+                    scheduled_start = datetime.strptime(scheduled_start_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                raise ValueError('Invalid start time format')
+
+            for fmt in ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']:
+                try:
+                    scheduled_end = datetime.strptime(scheduled_end_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                raise ValueError('Invalid end time format')
+
+            # Validate end time is after start time
+            if scheduled_end <= scheduled_start:
+                messages.error(request, 'End time must be after start time.')
+                return redirect('workforce:dispatch_shift_create')
+
+        except ValueError as e:
+            messages.error(request, f'Invalid datetime format: {e}')
+            return redirect('workforce:dispatch_shift_create')
 
         try:
             rider = Driver.objects.get(driver_id=rider_id)
@@ -304,8 +371,8 @@ def shift_create(request):
             messages.success(request, f'Shift {shift.shift_code} created successfully.')
             return redirect('workforce:dispatch_shift_list')
 
-        except (Driver.DoesNotExist, PickupLocation.DoesNotExist) as e:
-            messages.error(request, f'Error creating shift: {e}')
+        except (Driver.DoesNotExist, PickupLocation.DoesNotExist):
+            messages.error(request, 'Invalid rider or location selected.')
 
     # GET request - show form
     locations = PickupLocation.objects.filter(pickup_status='active')
@@ -353,10 +420,60 @@ def shift_edit(request, shift_id):
     shift = get_object_or_404(RiderShift, id=shift_id)
 
     if request.method == 'POST':
-        shift.shift_type = request.POST.get('shift_type', shift.shift_type)
-        shift.scheduled_start = request.POST.get('scheduled_start', shift.scheduled_start)
-        shift.scheduled_end = request.POST.get('scheduled_end', shift.scheduled_end)
-        shift.status = request.POST.get('status', shift.status)
+        from datetime import datetime
+
+        # Validate shift_type
+        shift_type = request.POST.get('shift_type', shift.shift_type)
+        valid_shift_types = [choice[0] for choice in RiderShift.SHIFT_TYPE]
+        if shift_type not in valid_shift_types:
+            messages.error(request, 'Invalid shift type.')
+            return redirect('workforce:dispatch_shift_edit', shift_id=shift_id)
+
+        # Validate status
+        status = request.POST.get('status', shift.status)
+        valid_statuses = [choice[0] for choice in RiderShift.SHIFT_STATUS]
+        if status not in valid_statuses:
+            messages.error(request, 'Invalid status.')
+            return redirect('workforce:dispatch_shift_edit', shift_id=shift_id)
+
+        # Parse datetime values if provided
+        scheduled_start_str = request.POST.get('scheduled_start')
+        scheduled_end_str = request.POST.get('scheduled_end')
+
+        scheduled_start = shift.scheduled_start
+        scheduled_end = shift.scheduled_end
+
+        if scheduled_start_str:
+            for fmt in ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']:
+                try:
+                    scheduled_start = datetime.strptime(scheduled_start_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                messages.error(request, 'Invalid start time format.')
+                return redirect('workforce:dispatch_shift_edit', shift_id=shift_id)
+
+        if scheduled_end_str:
+            for fmt in ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']:
+                try:
+                    scheduled_end = datetime.strptime(scheduled_end_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                messages.error(request, 'Invalid end time format.')
+                return redirect('workforce:dispatch_shift_edit', shift_id=shift_id)
+
+        # Validate end time is after start time
+        if scheduled_end <= scheduled_start:
+            messages.error(request, 'End time must be after start time.')
+            return redirect('workforce:dispatch_shift_edit', shift_id=shift_id)
+
+        shift.shift_type = shift_type
+        shift.scheduled_start = scheduled_start
+        shift.scheduled_end = scheduled_end
+        shift.status = status
         shift.save()
 
         messages.success(request, f'Shift {shift.shift_code} updated.')
@@ -403,7 +520,11 @@ def kpi_dashboard(request):
     ).select_related('rider', 'rider__user', 'pickup_location')
 
     if location_filter:
-        kpis = kpis.filter(pickup_location_id=location_filter)
+        try:
+            location_id = int(location_filter)
+            kpis = kpis.filter(pickup_location_id=location_id)
+        except (ValueError, TypeError):
+            pass  # Invalid location filter, skip filtering
 
     kpis = kpis.order_by('-total_orders')
 

@@ -446,6 +446,20 @@ function getCookie(name) {
     return cookieValue;
 }
 
+// Escape HTML to prevent XSS attacks
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Escape string for use in JavaScript attributes
+function escapeAttr(text) {
+    if (text === null || text === undefined) return '';
+    return String(text).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
 function getCSRFToken() {
     // Try multiple sources for CSRF token
     let token = null;
@@ -532,7 +546,7 @@ const AIProcess = {
         const isProcessing = this.currentSteps.some(s => s.status === 'active');
 
         let stepsHtml = this.currentSteps.map((step, i) => `
-            <div class="ai-process-step ${step.status || 'pending'}">
+            <div class="ai-process-step ${escapeAttr(step.status || 'pending')}">
                 <div class="ai-step-indicator">
                     ${step.status === 'completed' ? '<i class="fa-solid fa-check"></i>' :
                       step.status === 'error' ? '<i class="fa-solid fa-times"></i>' :
@@ -540,9 +554,9 @@ const AIProcess = {
                       (i + 1)}
                 </div>
                 <div class="ai-step-content">
-                    <div class="ai-step-title">${step.title}</div>
+                    <div class="ai-step-title">${escapeHtml(step.title)}</div>
                     <div class="ai-step-status">
-                        ${step.status === 'active' ? `<span class="ai-step-spinner"></span>${step.activeText || 'Processing...'}` :
+                        ${step.status === 'active' ? `<span class="ai-step-spinner"></span>${escapeHtml(step.activeText || 'Processing...')}` :
                           step.status === 'completed' ? '<i class="fa-solid fa-check text-success me-1"></i>Complete' :
                           step.status === 'error' ? '<i class="fa-solid fa-times text-danger me-1"></i>Error' :
                           'Waiting...'}
@@ -561,9 +575,9 @@ const AIProcess = {
                     </div>
                     <div class="ai-process-log">
                         ${this.logs.map(log => `
-                            <div class="log-entry ${log.type}">
-                                <span class="log-time">[${log.time}]</span>
-                                <span class="log-message">${log.message}</span>
+                            <div class="log-entry ${escapeAttr(log.type)}">
+                                <span class="log-time">[${escapeHtml(log.time)}]</span>
+                                <span class="log-message">${escapeHtml(log.message)}</span>
                             </div>
                         `).join('')}
                     </div>
@@ -604,7 +618,7 @@ const AIProcess = {
         // Keep process steps and append results at the end
         const progress = this.getProgress();
         let stepsHtml = this.currentSteps.map((step, i) => `
-            <div class="ai-process-step ${step.status || 'pending'}">
+            <div class="ai-process-step ${escapeAttr(step.status || 'pending')}">
                 <div class="ai-step-indicator">
                     ${step.status === 'completed' ? '<i class="fa-solid fa-check"></i>' :
                       step.status === 'error' ? '<i class="fa-solid fa-times"></i>' :
@@ -612,9 +626,9 @@ const AIProcess = {
                       (i + 1)}
                 </div>
                 <div class="ai-step-content">
-                    <div class="ai-step-title">${step.title}</div>
+                    <div class="ai-step-title">${escapeHtml(step.title)}</div>
                     <div class="ai-step-status">
-                        ${step.status === 'active' ? `<span class="ai-step-spinner"></span>${step.activeText || 'Processing...'}` :
+                        ${step.status === 'active' ? `<span class="ai-step-spinner"></span>${escapeHtml(step.activeText || 'Processing...')}` :
                           step.status === 'completed' ? '<i class="fa-solid fa-check text-success me-1"></i>Complete' :
                           step.status === 'error' ? '<i class="fa-solid fa-times text-danger me-1"></i>Error' :
                           'Waiting...'}
@@ -1135,8 +1149,8 @@ async function aiParseOrderAddress(orderId, orderNumber, address) {
                     ` : ''}
                     ${result.zone_number ? `
                         <div class="mt-3 pt-3 border-top">
-                            <button type="button" class="btn btn-info w-100" onclick="saveParseResultToOrder('${orderId}', ${result.zone_number}, '${(result.zone_name || '').replace(/'/g, "\\'")}', ${result.street_number || 'null'}, ${result.building_number || 'null'}, ${coords.latitude || 'null'}, ${coords.longitude || 'null'})">
-                                <i class="fa-solid fa-save me-2"></i>Save Zone ${result.zone_number}${coords.latitude ? ' with Coordinates' : ''} to Order
+                            <button type="button" class="btn btn-info w-100" onclick="saveParseResultToOrder('${escapeAttr(orderId)}', ${parseInt(result.zone_number) || 0}, '${escapeAttr(result.zone_name || '')}', ${parseInt(result.street_number) || 'null'}, ${parseInt(result.building_number) || 'null'}, ${parseFloat(coords.latitude) || 'null'}, ${parseFloat(coords.longitude) || 'null'})">
+                                <i class="fa-solid fa-save me-2"></i>Save Zone ${escapeHtml(result.zone_number)}${coords.latitude ? ' with Coordinates' : ''} to Order
                             </button>
                         </div>
                     ` : ''}
@@ -1692,24 +1706,24 @@ async function aiSuggestDriverDetail(orderId, orderNumber) {
                     driversHtml += `
                         <div class="d-flex align-items-center justify-content-between p-2 mb-2 rounded" style="background: var(--brand-grey-50); border: 1px solid var(--brand-grey-200);">
                             <div>
-                                <strong>${driver.name}</strong>
-                                <small class="text-muted ms-2">${driver.driver_code || ''}</small>
+                                <strong>${escapeHtml(driver.name)}</strong>
+                                <small class="text-muted ms-2">${escapeHtml(driver.driver_code || '')}</small>
                                 <div class="small text-muted">
-                                    <i class="fa-solid fa-star text-warning"></i> ${driver.rating || 0}
-                                    | Match Score: ${driver.score}
+                                    <i class="fa-solid fa-star text-warning"></i> ${parseFloat(driver.rating) || 0}
+                                    | Match Score: ${parseInt(driver.score) || 0}
                                 </div>
                                 ${driver.match_factors && driver.match_factors.length > 0 ? `
-                                    <div class="small text-success">${driver.match_factors.join(' • ')}</div>
+                                    <div class="small text-success">${driver.match_factors.map(f => escapeHtml(f)).join(' • ')}</div>
                                 ` : ''}
                             </div>
                             <div class="d-flex align-items-center gap-1">
-                                <a href="tel:${driver.phone}" class="btn btn-sm btn-outline-secondary" title="Call">
+                                <a href="tel:${escapeAttr(driver.phone)}" class="btn btn-sm btn-outline-secondary" title="Call">
                                     <i class="fa-solid fa-phone"></i>
                                 </a>
-                                <a href="https://wa.me/${driver.phone}" target="_blank" class="btn btn-sm btn-outline-success" title="WhatsApp">
+                                <a href="https://wa.me/${escapeAttr(driver.phone)}" target="_blank" class="btn btn-sm btn-outline-success" title="WhatsApp">
                                     <i class="fa-brands fa-whatsapp"></i>
                                 </a>
-                                <button type="button" class="btn btn-sm btn-primary" onclick="assignDriverToOrder('${orderId}', ${driver.driver_id}, '${driver.name.replace(/'/g, "\\'")}', this)" title="Assign Driver">
+                                <button type="button" class="btn btn-sm btn-primary" onclick="assignDriverToOrder('${escapeAttr(orderId)}', ${parseInt(driver.driver_id) || 0}, '${escapeAttr(driver.name)}', this)" title="Assign Driver">
                                     <i class="fa-solid fa-user-check"></i> Assign
                                 </button>
                             </div>

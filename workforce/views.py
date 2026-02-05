@@ -1620,6 +1620,16 @@ def publish_order_to_delivery(request, order_id):
 @staff_required
 def update_order_status(request, order_id):
     """AJAX endpoint to update order status"""
+    # Valid status values for validation
+    VALID_ORDER_STATUSES = [
+        'to_review', 'to_publish', 'published', 'processing', 'ready_to_pickup',
+        'in_transit', 'delivered', 'failed', 'cancelled', 'returned', 'reported'
+    ]
+    VALID_TASK_STATUSES = [
+        'pending', 'dl_task_listed', 'assigned', 'in_progress', 'completed',
+        'failed', 'cancelled'
+    ]
+
     try:
         order = get_object_or_404(orders_models.Order, id=order_id)
 
@@ -1632,6 +1642,25 @@ def update_order_status(request, order_id):
             return JsonResponse({
                 'success': False,
                 'error': 'Status is required'
+            }, status=400)
+
+        # Validate status_type
+        if status_type not in ('order', 'task'):
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid status_type. Must be "order" or "task"'
+            }, status=400)
+
+        # Validate status against allowed values
+        if status_type == 'task' and status not in VALID_TASK_STATUSES:
+            return JsonResponse({
+                'success': False,
+                'error': f'Invalid task status: {status}'
+            }, status=400)
+        elif status_type == 'order' and status not in VALID_ORDER_STATUSES:
+            return JsonResponse({
+                'success': False,
+                'error': f'Invalid order status: {status}'
             }, status=400)
 
         old_status = order.order_status if status_type == 'order' else order.task_status
@@ -2499,7 +2528,12 @@ def earnings_verification(request):
     # Filters
     driver_id = request.GET.get('driver', '')
     status_filter = request.GET.get('status', 'pending')
-    days = int(request.GET.get('days', 7))
+    try:
+        days = int(request.GET.get('days', 7))
+        if days < 1 or days > 365:
+            days = 7
+    except (ValueError, TypeError):
+        days = 7
 
     start_date = timezone.now() - timedelta(days=days)
 
@@ -2586,9 +2620,16 @@ def earnings_verification_action(request):
     updated_count = 0
     errors = []
 
+    # Fetch all tasks at once to avoid N+1 queries
+    tasks_queryset = delivery_models.DeliveryTask.objects.select_related('driver').filter(id__in=task_ids)
+    tasks_dict = {str(task.id): task for task in tasks_queryset}
+
     for task_id in task_ids:
         try:
-            task = delivery_models.DeliveryTask.objects.select_related('driver').get(id=task_id)
+            task = tasks_dict.get(str(task_id))
+            if not task:
+                errors.append(f"Task {task_id} not found")
+                continue
 
             # Update earnings amount if provided
             if str(task_id) in earnings_dict:
@@ -2626,17 +2667,13 @@ def earnings_verification_action(request):
                 task.driver_earnings = final_earnings
                 task.save()
 
-                # Update driver's pending_earnings atomically using F() to prevent race conditions
+                # Update driver's pending_earnings atomically using F() and Coalesce to prevent race conditions
                 if task.driver:
                     from django.db.models import F
+                    from django.db.models.functions import Coalesce
                     fleet_models.Driver.objects.filter(driver_id=task.driver.driver_id).update(
-                        pending_earnings=F('pending_earnings') + Decimal(str(final_earnings))
+                        pending_earnings=Coalesce(F('pending_earnings'), Decimal('0')) + Decimal(str(final_earnings))
                     )
-                    # Handle case where pending_earnings was NULL
-                    fleet_models.Driver.objects.filter(
-                        driver_id=task.driver.driver_id,
-                        pending_earnings__isnull=True
-                    ).update(pending_earnings=Decimal(str(final_earnings)))
 
                 updated_count += 1
 
@@ -2652,8 +2689,6 @@ def earnings_verification_action(request):
                 task.save()
                 updated_count += 1
 
-        except delivery_models.DeliveryTask.DoesNotExist:
-            errors.append(f"Task {task_id} not found")
         except Exception as e:
             logger.exception("Error processing task %s: %s", task_id, str(e))
             errors.append(f"Error processing task {task_id}")
@@ -2723,6 +2758,7 @@ def cod_settlement_report(request):
 def cod_settlement_action(request):
     """Process COD settlement for selected drivers"""
     from django.http import JsonResponse
+    from django.db import transaction
     from fleet.wallet_service import WalletService
 
     if request.method != 'POST':
@@ -2735,32 +2771,38 @@ def cod_settlement_action(request):
     if not driver_ids:
         return JsonResponse({'error': 'No drivers selected'}, status=400)
 
+    # Limit number of drivers to prevent DoS
+    if len(driver_ids) > 50:
+        return JsonResponse({'error': 'Maximum 50 drivers can be settled at once'}, status=400)
+
     wallet_service = WalletService()
     settled_drivers = []
     total_settled = 0
 
     for driver_id in driver_ids:
         try:
-            driver = fleet_models.Driver.objects.get(driver_id=driver_id)
-            cod_amount = driver.cod_in_hand
+            # Use transaction.atomic and select_for_update to prevent race conditions
+            with transaction.atomic():
+                driver = fleet_models.Driver.objects.select_for_update().get(driver_id=driver_id)
+                cod_amount = driver.cod_in_hand
 
-            if cod_amount > 0:
-                # Record COD deposit transaction with payment method
-                # Pass no delivery_ids so submit_cod_to_admin settles oldest tasks automatically
-                wallet_service.submit_cod_to_admin(
-                    driver=driver,
-                    amount=cod_amount,
-                    created_by=request.user,
-                    reference_number=reference,
-                    payment_method=payment_method,
-                    notes=f"COD settlement via {payment_method}"
-                )
-                settled_drivers.append({
-                    'name': driver.driver_name,
-                    'amount': float(cod_amount),
-                    'payment_method': payment_method
-                })
-                total_settled += cod_amount
+                if cod_amount > 0:
+                    # Record COD deposit transaction with payment method
+                    # Pass no delivery_ids so submit_cod_to_admin settles oldest tasks automatically
+                    wallet_service.submit_cod_to_admin(
+                        driver=driver,
+                        amount=cod_amount,
+                        created_by=request.user,
+                        reference_number=reference,
+                        payment_method=payment_method,
+                        notes=f"COD settlement via {payment_method}"
+                    )
+                    settled_drivers.append({
+                        'name': driver.driver_name,
+                        'amount': float(cod_amount),
+                        'payment_method': payment_method
+                    })
+                    total_settled += cod_amount
         except fleet_models.Driver.DoesNotExist:
             continue
 
@@ -3867,9 +3909,26 @@ def driver_document_detail(request, document_id):
             if expiry_date:
                 document.document_expiry_date = expiry_date
 
-            # Handle file upload
+            # Handle file upload with validation
             if 'document_file' in request.FILES:
-                document.document_file = request.FILES['document_file']
+                uploaded_file = request.FILES['document_file']
+                # Validate file extension
+                allowed_extensions = ['.jpg', '.jpeg', '.png', '.pdf', '.gif']
+                import os
+                ext = os.path.splitext(uploaded_file.name)[1].lower()
+                if ext not in allowed_extensions:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'
+                    }, status=400)
+                # Validate file size (max 10MB)
+                max_size = 10 * 1024 * 1024
+                if uploaded_file.size > max_size:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'File too large. Maximum size is 10MB'
+                    }, status=400)
+                document.document_file = uploaded_file
 
             document.save()
 
@@ -4797,6 +4856,11 @@ def driver_detail(request, driver_id):
             driver.driver_whatsapp = request.POST.get('driver_whatsapp', driver.driver_whatsapp)
             driver.driver_status = request.POST.get('driver_status', driver.driver_status)
             driver.driver_bio = request.POST.get('driver_bio', driver.driver_bio)
+            # Update wallet limit if provided
+            credit_limit = request.POST.get('credit_limit')
+            if credit_limit:
+                from decimal import Decimal
+                driver.credit_limit = Decimal(credit_limit)
             driver.save()
 
             return JsonResponse({
@@ -5064,11 +5128,18 @@ def delivery_task_edit(request, task_id):
 def bulk_print_tasks(request):
     """Generate printable view for selected tasks"""
     task_ids = request.GET.get('ids', '').split(',')
-    task_ids = [int(id) for id in task_ids if id.isdigit()]
+    task_ids = [int(id) for id in task_ids if id.isdigit() and len(id) <= 10][:100]  # Limit to 100 tasks
+
+    if not task_ids:
+        return render(request, 'workforce/parts/bulk_print_tasks.html', {
+            'page_title': 'Print Tasks',
+            'tasks': [],
+            'print_mode': True,
+        })
 
     tasks = delivery_models.DeliveryTask.objects.filter(
         id__in=task_ids
-    ).select_related('order', 'driver', 'business', 'pickup_location')
+    ).select_related('order', 'driver', 'driver__user', 'business', 'pickup_location')
 
     context = {
         'page_title': 'Print Tasks',
@@ -5215,16 +5286,35 @@ def bulk_update_status(request):
         }, status=400)
 
 
+def _sanitize_csv_value(value):
+    """Sanitize value to prevent CSV injection attacks"""
+    if value is None:
+        return ''
+    value = str(value)
+    # Prevent formula injection by prefixing dangerous characters
+    if value and value[0] in ('=', '+', '-', '@', '\t', '\r', '\n'):
+        return "'" + value
+    return value
+
+
 @login_required(login_url='/accounts/login/')
 @staff_required
 def bulk_export_tasks(request):
     """Export selected tasks to CSV"""
     task_ids = request.GET.get('ids', '').split(',')
-    task_ids = [int(id) for id in task_ids if id.isdigit()]
+    task_ids = [int(id) for id in task_ids if id.isdigit() and len(id) <= 10][:500]  # Limit to 500 tasks
+
+    if not task_ids:
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="delivery_tasks_export.csv"'
+        return response
 
     tasks = delivery_models.DeliveryTask.objects.filter(
         id__in=task_ids
-    ).select_related('order', 'driver', 'business', 'pickup_location')
+    ).select_related('order', 'driver', 'driver__user', 'business', 'pickup_location')
+
+    # Log export for audit
+    logger.info(f"CSV export by user {request.user.id}: {len(task_ids)} tasks")
 
     # Create CSV response
     response = HttpResponse(content_type='text/csv')
@@ -5239,17 +5329,17 @@ def bulk_export_tasks(request):
 
     for task in tasks:
         writer.writerow([
-            task.dl_task_number,
-            task.dl_task_date,
-            task.order.customer_name if task.order else '',
-            task.order.customer_phone if task.order else '',
-            task.order.customer_address if task.order else '',
-            str(task.driver) if task.driver else '',
-            task.get_dl_task_status_client_display() if hasattr(task, 'get_dl_task_status_client_display') else task.dl_task_status_client,
-            task.get_dl_task_status_dms_display() if hasattr(task, 'get_dl_task_status_dms_display') else task.dl_task_status_dms,
-            task.pickup_location.pickup_location_address if task.pickup_location else '',
-            task.order.cod_amount if task.order else '',
-            task.notes if hasattr(task, 'notes') else '',
+            _sanitize_csv_value(task.dl_task_number),
+            _sanitize_csv_value(task.dl_task_date),
+            _sanitize_csv_value(task.order.customer_name if task.order else ''),
+            _sanitize_csv_value(task.order.customer_phone if task.order else ''),
+            _sanitize_csv_value(task.order.customer_address if task.order else ''),
+            _sanitize_csv_value(str(task.driver) if task.driver else ''),
+            _sanitize_csv_value(task.get_dl_task_status_client_display() if hasattr(task, 'get_dl_task_status_client_display') else task.dl_task_status_client),
+            _sanitize_csv_value(task.get_dl_task_status_dms_display() if hasattr(task, 'get_dl_task_status_dms_display') else task.dl_task_status_dms),
+            _sanitize_csv_value(task.pickup_location.pickup_location_address if task.pickup_location else ''),
+            _sanitize_csv_value(task.order.cod_amount if task.order else ''),
+            _sanitize_csv_value(task.notes if hasattr(task, 'notes') else ''),
         ])
 
     return response
