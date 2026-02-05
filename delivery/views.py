@@ -45,6 +45,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db import transaction, IntegrityError
+from django.db.models import Q
 from decouple import config
 import geocoder
 import json
@@ -328,26 +329,27 @@ def accept_task(request):
             driver = fleet_models.Driver.objects.get(user_id=request.user.id)
 
             with transaction.atomic():
-                # Get task - either assigned to this driver or check AssignedDriver
-                task = delivery_models.DeliveryTask.objects.select_for_update().filter(
-                    Q(driver=driver) | Q(assigneddriver__driver=driver),
-                    id=task_id
-                ).first()
+                # Get task by ID
+                task = delivery_models.DeliveryTask.objects.select_for_update().get(id=task_id)
 
-                if not task:
-                    # Check if task exists at all
-                    task = delivery_models.DeliveryTask.objects.select_for_update().get(id=task_id)
-                    # Assign driver if not assigned
-                    if task.driver is None:
-                        task.driver = driver
-                        # Create AssignedDriver record if not exists
-                        if not delivery_models.AssignedDriver.objects.filter(dl_task=task, driver=driver).exists():
-                            delivery_models.AssignedDriver.objects.create(driver=driver, dl_task=task)
+                # Check if task is assigned to this driver
+                is_assigned = (task.driver == driver) or \
+                              delivery_models.AssignedDriver.objects.filter(dl_task=task, driver=driver).exists()
+
+                if not is_assigned and task.driver is not None:
+                    return JsonResponse({"success": False, "error": "Task is assigned to another driver"})
+
+                # Assign driver if not assigned
+                if task.driver is None:
+                    task.driver = driver
+                    # Create AssignedDriver record if not exists
+                    if not delivery_models.AssignedDriver.objects.filter(dl_task=task, driver=driver).exists():
+                        delivery_models.AssignedDriver.objects.create(driver=driver, dl_task=task)
 
                 # Update task status to accepted
                 task.dl_task_status = 'accepted'
                 task.dl_task_status_dms = '7'  # Accepted/Acknowledged in DMS
-                task.save(update_fields=['driver', 'dl_task_status', 'dl_task_status_dms'])
+                task.save()
                 logger.info(f"Task {task_id} accepted by driver {driver.driver_id}")
 
             return JsonResponse({"success": True})

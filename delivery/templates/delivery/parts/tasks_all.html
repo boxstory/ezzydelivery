@@ -131,13 +131,9 @@
             </button>
             {% endif %}
           {% elif current_tab == 'assigned' %}
-            {% if card.dl_task_status == 'assigned' %}
-            <button type="button" class="btn btn-sm btn-success accept-task-btn" data-task-id="{{ card.id }}" onclick="event.stopPropagation();">
+            {% if card.dl_task_status == 'assigned' or card.dl_task_status == 'accepted' %}
+            <button type="button" class="btn btn-sm btn-success mobile-accept-btn" data-task-id="{{ card.id }}">
               <i class="fa-solid fa-check me-1"></i>Accept
-            </button>
-            {% elif card.dl_task_status == 'accepted' %}
-            <button type="button" class="btn btn-sm btn-primary start-ride-btn" data-task-id="{{ card.id }}" onclick="event.stopPropagation();">
-              <i class="fa-solid fa-car me-1"></i>Start
             </button>
             {% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' or card.dl_task_status == 'start_ride' %}
             <a href="{% url 'delivery:task_navigation' card.id %}" class="btn btn-sm btn-info" onclick="event.stopPropagation();">
@@ -281,13 +277,9 @@
               <button type="button" class="pwa-btn pwa-btn--primary pwa-btn--block assign-driver-btn" data-task-id="{{ card.id }}">
                 <i class="fa-solid fa-check me-2"></i>Accept Task
               </button>
-              {% elif card.dl_task_status == 'assigned' %}
+              {% elif card.dl_task_status == 'assigned' or card.dl_task_status == 'accepted' %}
               <button type="button" class="pwa-btn pwa-btn--primary pwa-btn--block accept-task-btn" data-task-id="{{ card.id }}">
                 <i class="fa-solid fa-check me-2"></i>Accept Task
-              </button>
-              {% elif card.dl_task_status == 'accepted' %}
-              <button type="button" class="pwa-btn pwa-btn--primary pwa-btn--block start-ride-btn" data-task-id="{{ card.id }}">
-                <i class="fa-solid fa-car me-2"></i>Start Ride
               </button>
               {% else %}
               <a href="tel:{{ card.dl_to_address.mobile_no }}" class="pwa-btn pwa-btn--outline" style="flex: 1;">
@@ -495,13 +487,9 @@
                   <button class="btn btn-sm btn-success assign-driver-btn" data-task-id="{{ card.id }}">
                     <i class="fa-solid fa-plus me-1"></i>Accept Order
                   </button>
-                  {% elif card.dl_task_status == 'assigned' %}
+                  {% elif card.dl_task_status == 'assigned' or card.dl_task_status == 'accepted' %}
                   <button class="btn btn-sm btn-success accept-task-btn" data-task-id="{{ card.id }}">
                     <i class="fa-solid fa-check me-1"></i>Accept Task
-                  </button>
-                  {% elif card.dl_task_status == 'accepted' %}
-                  <button class="btn btn-sm btn-primary start-ride-btn" data-task-id="{{ card.id }}">
-                    <i class="fa-solid fa-car me-1"></i>Start Ride
                   </button>
                   {% elif card.dl_task_status == 'out_for_delivery' %}
                   <a href="{% url 'delivery:task_navigation' card.id %}" class="btn btn-sm btn-info">
@@ -559,10 +547,21 @@
     });
 
     // Accept assigned task button (Assigned Tasks tab - changes status to accepted)
-    $(".accept-task-btn").on("click", function () {
+    // Using event delegation for buttons in collapsed rows
+    $(document).on("click", ".accept-task-btn", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
       var taskId = $(this).data("task-id");
       var btn = $(this);
-      btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Accepting...');
+
+      console.log('Accept button clicked, task ID:', taskId);
+
+      if (!taskId) {
+        alert('Task ID not found');
+        return;
+      }
+
+      btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>...');
 
       $.ajax({
         type: "POST",
@@ -572,21 +571,78 @@
           csrfmiddlewaretoken: "{{ csrf_token }}",
         },
         success: function (response) {
-          btn.html('<i class="fa-solid fa-check me-1"></i>Accepted').removeClass('btn-success').addClass('btn-secondary');
-          $('.modal').modal('hide');
-          if (typeof showToast === 'function') {
-            showToast('Task accepted! You can now start the ride.', 'success');
+          console.log('Accept response:', response);
+          if (response.success) {
+            btn.html('<i class="fa-solid fa-check me-1"></i>Done').removeClass('btn-success').addClass('btn-secondary');
+            $('.modal').modal('hide');
+            if (typeof showToast === 'function') {
+              showToast('Task accepted!', 'success');
+            }
+            setTimeout(function() {
+              location.reload();
+            }, 1000);
+          } else {
+            btn.prop('disabled', false).html('<i class="fa-solid fa-check me-1"></i>Accept');
+            alert(response.error || 'Failed to accept task');
           }
-          setTimeout(function() {
-            location.reload();
-          }, 1500);
         },
-        error: function (xhr) {
+        error: function (xhr, status, error) {
+          console.log('Accept error:', xhr, status, error);
           btn.prop('disabled', false).html('<i class="fa-solid fa-check me-1"></i>Accept');
-          var errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Error accepting task';
+          var errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Error: ' + error;
           alert(errorMsg);
         },
       });
+    });
+
+    // Mobile Accept button - separate handler to prevent modal opening
+    $(document).on("click", ".mobile-accept-btn", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      var taskId = $(this).data("task-id");
+      var btn = $(this);
+
+      console.log('Mobile Accept clicked, task ID:', taskId);
+
+      if (!taskId) {
+        alert('Task ID not found');
+        return false;
+      }
+
+      btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+      $.ajax({
+        type: "POST",
+        url: "/delivery/delivery_task/accept_task/",
+        data: {
+          task_id: taskId,
+          csrfmiddlewaretoken: "{{ csrf_token }}",
+        },
+        success: function (response) {
+          console.log('Mobile Accept response:', response);
+          if (response.success) {
+            btn.html('<i class="fa-solid fa-check"></i>').removeClass('btn-success').addClass('btn-secondary');
+            if (typeof showToast === 'function') {
+              showToast('Task accepted!', 'success');
+            }
+            setTimeout(function() {
+              location.reload();
+            }, 800);
+          } else {
+            btn.prop('disabled', false).html('<i class="fa-solid fa-check me-1"></i>Accept');
+            alert(response.error || 'Failed');
+          }
+        },
+        error: function (xhr, status, error) {
+          console.log('Mobile Accept error:', error);
+          btn.prop('disabled', false).html('<i class="fa-solid fa-check me-1"></i>Accept');
+          alert('Error: ' + error);
+        },
+      });
+
+      return false;
     });
 
     // Start Ride button (Accepted Tasks tab)
