@@ -9,8 +9,8 @@
   <!-- Profile Header Card -->
   <div class="pwa-profile-header">
     <div class="pwa-profile-avatar">
-      {% if profile_picture and profile_picture.image %}
-        <img src="{{ profile_picture.image.url }}" alt="{{ profile.user.first_name }}" class="pwa-profile-avatar__img">
+      {% if profile_picture and profile_picture.profile_picture %}
+        <img src="{{ profile_picture.profile_picture.url }}" alt="{{ driver.user.first_name }}" class="pwa-profile-avatar__img">
       {% else %}
         <div class="pwa-profile-avatar__placeholder">
           <i class="fas fa-user"></i>
@@ -18,7 +18,7 @@
       {% endif %}
       <span class="pwa-profile-status pwa-profile-status--{{ driver.driver_status|lower|slugify }}"></span>
     </div>
-    <h1 class="pwa-profile-name">{{ profile.user.first_name }} {{ profile.user.last_name }}</h1>
+    <h1 class="pwa-profile-name">{{ driver.user.first_name }} {{ driver.user.last_name }}</h1>
     <p class="pwa-profile-code">Driver ID: {{ driver.driver_code|default:driver.driver_id }}</p>
 
     <!-- Rating -->
@@ -91,7 +91,7 @@
     <div class="pwa-info-card">
       <div class="pwa-info-row">
         <span class="pwa-info-label">Full Name</span>
-        <span class="pwa-info-value">{{ profile.user.first_name }} {{ profile.user.last_name }}</span>
+        <span class="pwa-info-value">{{ driver.user.first_name }} {{ driver.user.last_name }}</span>
       </div>
       <div class="pwa-info-row">
         <span class="pwa-info-label">Phone</span>
@@ -103,7 +103,7 @@
       </div>
       <div class="pwa-info-row">
         <span class="pwa-info-label">Email</span>
-        <span class="pwa-info-value">{{ profile.user.email }}</span>
+        <span class="pwa-info-value">{{ driver.user.email }}</span>
       </div>
       <div class="pwa-info-row">
         <span class="pwa-info-label">Languages</span>
@@ -205,13 +205,13 @@
     </h2>
     <div class="pwa-wallet-summary">
       <div class="pwa-wallet-row">
-        <span class="pwa-wallet-label">Wallet Balance</span>
-        <span class="pwa-wallet-value {% if driver.wallet_balance < 0 %}pwa-text-danger{% else %}pwa-text-success{% endif %}">
-          {{ driver.wallet_balance|floatformat:2 }} QR
+        <span class="pwa-wallet-label">Available Wallet</span>
+        <span class="pwa-wallet-value {% if driver.available_wallet < 0 %}pwa-text-danger{% else %}pwa-text-success{% endif %}">
+          {{ driver.available_wallet|floatformat:2 }} QR
         </span>
       </div>
       <div class="pwa-wallet-row">
-        <span class="pwa-wallet-label">Credit Limit</span>
+        <span class="pwa-wallet-label">Wallet Limit</span>
         <span class="pwa-wallet-value">{{ driver.credit_limit|floatformat:2 }} QR</span>
       </div>
       <div class="pwa-wallet-row">
@@ -223,10 +223,10 @@
         <span class="pwa-wallet-value pwa-text-navy">{{ driver.pending_earnings|floatformat:2 }} QR</span>
       </div>
 
-      <!-- Credit Usage Progress -->
+      <!-- Wallet Usage Progress -->
       <div class="pwa-credit-progress">
         <div class="pwa-credit-progress__header">
-          <span>Credit Usage</span>
+          <span>Wallet Usage</span>
           <span>{{ driver.wallet_usage_percentage|floatformat:0 }}%</span>
         </div>
         <div class="pwa-credit-progress__bar">
@@ -387,8 +387,8 @@
         <!-- Profile Card -->
         <div class="card mb-4">
           <div class="card-body text-center">
-            {% if profile_picture and profile_picture.image %}
-              <img src="{{ profile_picture.image.url }}" alt="{{ profile.user.first_name }}"
+            {% if profile_picture and profile_picture.profile_picture %}
+              <img src="{{ profile_picture.profile_picture.url }}" alt="{{ driver.user.first_name }}"
                    class="rounded-circle mb-3" style="width: 120px; height: 120px; object-fit: cover;">
             {% else %}
               <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3"
@@ -396,7 +396,7 @@
                 <i class="fas fa-user fa-3x text-white"></i>
               </div>
             {% endif %}
-            <h4>{{ profile.user.first_name }} {{ profile.user.last_name }}</h4>
+            <h4>{{ driver.user.first_name }} {{ driver.user.last_name }}</h4>
             <p class="text-muted">Driver ID: {{ driver.driver_code|default:driver.driver_id }}</p>
             <span class="badge bg-{{ driver.driver_status|lower|slugify }}">{{ driver.driver_status }}</span>
 
@@ -423,45 +423,49 @@
           <div class="card-body">
             <p><i class="fas fa-phone me-2"></i>{{ driver.driver_phone }}</p>
             <p><i class="fab fa-whatsapp me-2"></i>{{ driver.driver_whatsapp }}</p>
-            <p><i class="fas fa-envelope me-2"></i>{{ profile.user.email }}</p>
+            <p><i class="fas fa-envelope me-2"></i>{{ driver.user.email }}</p>
             <p><i class="fas fa-language me-2"></i>{{ driver.get_driver_languages_display }}</p>
           </div>
         </div>
       </div>
 
       <div class="col-md-8">
-        <!-- Stats Row -->
-        <div class="row mb-4">
+        <!-- Stats Row - Colorful Gradient Cards -->
+        <div class="row mb-4 g-3">
           <div class="col-md-3">
-            <div class="card text-center">
-              <div class="card-body">
-                <h3>{{ stats.total_deliveries|default:0 }}</h3>
-                <small class="text-muted">Deliveries</small>
+            <div style="background: linear-gradient(135deg, #001f3f 0%, #003d7a 100%); border-radius: 16px; padding: 20px; color: white; box-shadow: 0 4px 15px rgba(0,31,63,0.3); height: 100%;">
+              <div style="width: 45px; height: 45px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+                <i class="fas fa-truck fa-lg"></i>
               </div>
+              <div style="font-size: 32px; font-weight: 700; line-height: 1;">{{ stats.total_deliveries|default:0 }}</div>
+              <div style="font-size: 13px; opacity: 0.8; margin-top: 6px;">Deliveries</div>
             </div>
           </div>
           <div class="col-md-3">
-            <div class="card text-center">
-              <div class="card-body">
-                <h3>{{ stats.total_earnings|floatformat:0|default:0 }}</h3>
-                <small class="text-muted">Earnings (QR)</small>
+            <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 16px; padding: 20px; color: white; box-shadow: 0 4px 15px rgba(16,185,129,0.3); height: 100%;">
+              <div style="width: 45px; height: 45px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+                <i class="fas fa-coins fa-lg"></i>
               </div>
+              <div style="font-size: 32px; font-weight: 700; line-height: 1;">{{ stats.total_earnings|floatformat:0|default:0 }}</div>
+              <div style="font-size: 13px; opacity: 0.8; margin-top: 6px;">Earnings (QR)</div>
             </div>
           </div>
           <div class="col-md-3">
-            <div class="card text-center">
-              <div class="card-body">
-                <h3>{{ driver.wallet_balance|floatformat:0 }}</h3>
-                <small class="text-muted">Wallet (QR)</small>
+            <div style="background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%); border-radius: 16px; padding: 20px; color: white; box-shadow: 0 4px 15px rgba(245,158,11,0.3); height: 100%;">
+              <div style="width: 45px; height: 45px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+                <i class="fas fa-wallet fa-lg"></i>
               </div>
+              <div style="font-size: 32px; font-weight: 700; line-height: 1;">{{ driver.wallet_balance|floatformat:0 }}</div>
+              <div style="font-size: 13px; opacity: 0.8; margin-top: 6px;">Wallet (QR)</div>
             </div>
           </div>
           <div class="col-md-3">
-            <div class="card text-center">
-              <div class="card-body">
-                <h3>{{ driver.cod_in_hand|floatformat:0 }}</h3>
-                <small class="text-muted">COD in Hand (QR)</small>
+            <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); border-radius: 16px; padding: 20px; color: white; box-shadow: 0 4px 15px rgba(124,58,237,0.3); height: 100%;">
+              <div style="width: 45px; height: 45px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+                <i class="fas fa-hand-holding-usd fa-lg"></i>
               </div>
+              <div style="font-size: 32px; font-weight: 700; line-height: 1;">{{ driver.cod_in_hand|floatformat:0 }}</div>
+              <div style="font-size: 13px; opacity: 0.8; margin-top: 6px;">COD in Hand (QR)</div>
             </div>
           </div>
         </div>
@@ -521,18 +525,25 @@
             <div class="row">
               <div class="col-md-6">
                 <p><strong>Wallet Balance:</strong> {{ driver.wallet_balance|floatformat:2 }} QR</p>
-                <p><strong>Credit Limit:</strong> {{ driver.credit_limit|floatformat:2 }} QR</p>
+                <p><strong>Wallet Limit:</strong> {{ driver.credit_limit|floatformat:2 }} QR</p>
               </div>
               <div class="col-md-6">
                 <p><strong>COD in Hand:</strong> {{ driver.cod_in_hand|floatformat:2 }} QR</p>
                 <p><strong>Pending Earnings:</strong> {{ driver.pending_earnings|floatformat:2 }} QR</p>
               </div>
             </div>
-            <div class="progress mt-3" style="height: 25px;">
-              <div class="progress-bar {% if driver.wallet_usage_percentage >= 80 %}bg-warning{% elif driver.wallet_usage_percentage >= 100 %}bg-danger{% else %}bg-primary{% endif %}"
-                   role="progressbar"
-                   style="width: {{ driver.wallet_usage_percentage|floatformat:0 }}%;">
-                Credit Usage: {{ driver.wallet_usage_percentage|floatformat:0 }}%
+            <!-- Wallet Usage Progress -->
+            <div class="mt-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-semibold">Wallet Usage</span>
+                <span class="badge {% if driver.wallet_usage_percentage >= 100 %}bg-danger{% elif driver.wallet_usage_percentage >= 80 %}bg-warning text-dark{% else %}bg-primary{% endif %}">
+                  {{ driver.wallet_usage_percentage|floatformat:0 }}%
+                </span>
+              </div>
+              <div class="progress" style="height: 10px; border-radius: 5px; background: #e9ecef;">
+                <div class="progress-bar {% if driver.wallet_usage_percentage >= 100 %}bg-danger{% elif driver.wallet_usage_percentage >= 80 %}bg-warning{% else %}bg-primary{% endif %}"
+                     role="progressbar"
+                     style="width: {{ driver.wallet_usage_percentage|floatformat:0 }}%; border-radius: 5px;"></div>
               </div>
             </div>
           </div>

@@ -2,6 +2,27 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ CRITICAL RULE: Always Reload Server (No Permission Needed)
+
+**After making ANY code changes, IMMEDIATELY run this command to reload the production server - DO NOT ASK FOR PERMISSION:**
+
+```bash
+kill -HUP $(pgrep -f "gunicorn.*ezzydelivery" | head -1)
+```
+
+**RULES:**
+1. Do NOT ask "should I reload the server?" - JUST DO IT
+2. Do NOT wait for user to request reload - DO IT AUTOMATICALLY
+3. Reload IMMEDIATELY after every file edit - no exceptions
+4. This applies to ALL changes: Python, templates, CSS, JS, new files, bug fixes, features
+
+**For static files (CSS/JS), also run:**
+```bash
+python manage.py collectstatic --noinput
+```
+
+---
+
 ## Project Overview
 
 EzzyDelivery is a Django-based multi-tenant delivery and logistics management platform for Qatar. It handles order management, driver fleet operations, COD (Cash on Delivery) tracking, and integrations with e-commerce platforms (Shopify, WooCommerce) and delivery management systems (ShipDay).

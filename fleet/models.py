@@ -181,11 +181,16 @@ class Driver(models.Model):
         return f"Driver {self.driver_code or self.driver_id}"
 
     @property
+    def available_wallet(self):
+        """Calculate available wallet as wallet limit minus COD in hand"""
+        return self.credit_limit - self.cod_in_hand
+
+    @property
     def wallet_usage_percentage(self):
-        """Calculate wallet usage as percentage of credit limit"""
+        """Calculate wallet usage as percentage of wallet limit based on COD in hand"""
         if self.credit_limit <= 0:
             return 0
-        return (abs(self.wallet_balance) / self.credit_limit) * 100
+        return (self.cod_in_hand / self.credit_limit) * 100
 
     @property
     def is_wallet_warning(self):
