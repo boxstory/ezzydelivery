@@ -177,16 +177,16 @@ def all_delivery_tasks(request):
         dl_task_status__in=['delivered', 'cancelled', 'failed']
     ).order_by('-id')
 
-    # Assigned tasks: assigned to current driver but not yet accepted
+    # Assigned tasks: Active tasks assigned to driver (not yet completed)
     assigned_tasks = base_qs.filter(
         driver=driver,
-        dl_task_status='assigned'
+        dl_task_status__in=['assigned', 'accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable']
     ).order_by('-id')
 
-    # Accepted tasks: accepted by driver (all active statuses beyond assigned)
+    # Accepted/History tasks: Completed tasks (delivered, failed, cancelled)
     accepted_tasks = base_qs.filter(
         driver=driver,
-        dl_task_status__in=['accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable']
+        dl_task_status__in=['delivered', 'failed', 'cancelled']
     ).order_by('-id')
 
     # Apply area filter to all querysets
@@ -219,7 +219,22 @@ def all_delivery_tasks(request):
 
     # Apply status filter
     if status_filter and status_filter != 'all':
-        accepted_tasks = accepted_tasks.filter(dl_task_status=status_filter)
+        if status_filter == 'in_transit':
+            # Include related transit statuses (for assigned/active tasks)
+            assigned_tasks = assigned_tasks.filter(dl_task_status__in=['in_transit', 'out_for_delivery', 'start_ride'])
+        elif status_filter == 'failed':
+            # Include failed and cancelled (for history/accepted tasks)
+            accepted_tasks = accepted_tasks.filter(dl_task_status__in=['failed', 'cancelled'])
+        elif status_filter == 'delivered':
+            # Delivered tasks (for history/accepted tasks)
+            accepted_tasks = accepted_tasks.filter(dl_task_status='delivered')
+        elif status_filter == 'accepted':
+            # Accepted but not started (for assigned/active tasks)
+            assigned_tasks = assigned_tasks.filter(dl_task_status='accepted')
+        else:
+            # Generic filter for both
+            accepted_tasks = accepted_tasks.filter(dl_task_status=status_filter)
+            assigned_tasks = assigned_tasks.filter(dl_task_status=status_filter)
 
     # Get counts
     all_count = all_tasks.count()
@@ -294,6 +309,57 @@ def assign_driver(request):
             return JsonResponse({"success": False, "error": "Task already assigned"})
         except Exception as e:
             logger.error(f"Error assigning task {task_id} to driver: {e}")
+            return JsonResponse({"success": False, "error": str(e)})
+
+    return JsonResponse({"success": False, "error": "Invalid request"})
+
+
+@login_required(login_url='account_login')
+def accept_task(request):
+    """Accept an assigned task - update status from assigned to accepted"""
+    if request.method == "POST":
+        task_id = request.POST.get("task_id")
+
+        if not task_id:
+            return JsonResponse({"success": False, "error": "Task ID required"})
+
+        try:
+            # Verify user is a driver
+            driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+            with transaction.atomic():
+                # Get task - either assigned to this driver or check AssignedDriver
+                task = delivery_models.DeliveryTask.objects.select_for_update().filter(
+                    Q(driver=driver) | Q(assigneddriver__driver=driver),
+                    id=task_id
+                ).first()
+
+                if not task:
+                    # Check if task exists at all
+                    task = delivery_models.DeliveryTask.objects.select_for_update().get(id=task_id)
+                    # Assign driver if not assigned
+                    if task.driver is None:
+                        task.driver = driver
+                        # Create AssignedDriver record if not exists
+                        if not delivery_models.AssignedDriver.objects.filter(dl_task=task, driver=driver).exists():
+                            delivery_models.AssignedDriver.objects.create(driver=driver, dl_task=task)
+
+                # Update task status to accepted
+                task.dl_task_status = 'accepted'
+                task.dl_task_status_dms = '7'  # Accepted/Acknowledged in DMS
+                task.save(update_fields=['driver', 'dl_task_status', 'dl_task_status_dms'])
+                logger.info(f"Task {task_id} accepted by driver {driver.driver_id}")
+
+            return JsonResponse({"success": True})
+
+        except fleet_models.Driver.DoesNotExist:
+            logger.warning(f"User {request.user.id} is not a driver")
+            return JsonResponse({"success": False, "error": "Driver profile not found"})
+        except delivery_models.DeliveryTask.DoesNotExist:
+            logger.warning(f"Task {task_id} not found")
+            return JsonResponse({"success": False, "error": "Task not found"})
+        except Exception as e:
+            logger.error(f"Error accepting task {task_id}: {e}")
             return JsonResponse({"success": False, "error": str(e)})
 
     return JsonResponse({"success": False, "error": "Invalid request"})

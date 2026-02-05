@@ -9,7 +9,7 @@
     <div class="task-tabs task-tabs--three">
       <a href="?tab=all&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}"
          class="task-tab {% if current_tab == 'all' %}task-tab--active{% endif %}">
-        <span class="task-tab__label">All</span>
+        <span class="task-tab__label">New</span>
         <span class="task-tab__badge">{{ all_count }}</span>
       </a>
       <a href="?tab=assigned&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}"
@@ -37,22 +37,32 @@
          class="task-filter task-filter--xs {% if type_filter == 'public' %}task-filter--active{% endif %}">Public</a>
       <a href="?tab={{ current_tab }}&area={{ area_filter }}&type=pnd&status={{ status_filter }}"
          class="task-filter task-filter--xs {% if type_filter == 'pnd' %}task-filter--active{% endif %}">PnD</a>
-      {% if current_tab == 'accepted' %}
-      <span class="task-filter-divider">|</span>
+    </div>
+    {% if current_tab == 'assigned' %}
+    <!-- Status Filters for Active Tasks -->
+    <div class="task-filters task-filters--compact">
       <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all"
          class="task-filter task-filter--xs {% if status_filter == 'all' %}task-filter--active{% endif %}">All</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=picked_up"
-         class="task-filter task-filter--xs {% if status_filter == 'picked_up' %}task-filter--active{% endif %}">Picked</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=accepted"
+         class="task-filter task-filter--xs {% if status_filter == 'accepted' %}task-filter--active{% endif %}">Accepted</a>
       <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=in_transit"
-         class="task-filter task-filter--xs {% if status_filter == 'in_transit' %}task-filter--active{% endif %}">Transit</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=contacted"
-         class="task-filter task-filter--xs {% if status_filter == 'contacted' %}task-filter--active{% endif %}">Contacted</a>
-      {% endif %}
+         class="task-filter task-filter--xs {% if status_filter == 'in_transit' or status_filter == 'out_for_delivery' %}task-filter--active{% endif %}">Transit</a>
     </div>
+    {% elif current_tab == 'accepted' %}
+    <!-- Status Filters for History/Completed Tasks -->
+    <div class="task-filters task-filters--compact">
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all"
+         class="task-filter task-filter--xs {% if status_filter == 'all' %}task-filter--active{% endif %}">All</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=delivered"
+         class="task-filter task-filter--xs {% if status_filter == 'delivered' %}task-filter--active{% endif %}" style="{% if status_filter == 'delivered' %}background: var(--brand-success, #28a745); color: white;{% endif %}">Delivered</a>
+      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=failed"
+         class="task-filter task-filter--xs {% if status_filter == 'failed' or status_filter == 'cancelled' %}task-filter--active{% endif %}" style="{% if status_filter == 'failed' or status_filter == 'cancelled' %}background: var(--brand-danger, #dc3545); color: white;{% endif %}">Failed</a>
+    </div>
+    {% endif %}
 
     <!-- Task Count Header -->
     <div class="task-list-header">
-      <span>{{ cards|length }} {% if current_tab == 'all' %}available{% elif current_tab == 'assigned' %}assigned{% else %}accepted{% endif %} task{{ cards|length|pluralize }}</span>
+      <span>{{ cards|length }} {% if current_tab == 'all' %}new{% elif current_tab == 'assigned' %}assigned{% else %}accepted{% endif %} task{{ cards|length|pluralize }}</span>
     </div>
 
     {% if cards %}
@@ -121,9 +131,19 @@
             </button>
             {% endif %}
           {% elif current_tab == 'assigned' %}
+            {% if card.dl_task_status == 'assigned' %}
             <button type="button" class="btn btn-sm btn-success accept-task-btn" data-task-id="{{ card.id }}" onclick="event.stopPropagation();">
               <i class="fa-solid fa-check me-1"></i>Accept
             </button>
+            {% elif card.dl_task_status == 'accepted' %}
+            <button type="button" class="btn btn-sm btn-primary start-ride-btn" data-task-id="{{ card.id }}" onclick="event.stopPropagation();">
+              <i class="fa-solid fa-car me-1"></i>Start
+            </button>
+            {% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' or card.dl_task_status == 'start_ride' %}
+            <a href="{% url 'delivery:task_navigation' card.id %}" class="btn btn-sm btn-info" onclick="event.stopPropagation();">
+              <i class="fa-solid fa-map me-1"></i>Map
+            </a>
+            {% endif %}
           {% elif current_tab == 'accepted' %}
             {% if card.dl_task_status == 'accepted' %}
             <button type="button" class="btn btn-sm btn-primary start-ride-btn" data-task-id="{{ card.id }}" onclick="event.stopPropagation();">
@@ -289,20 +309,69 @@
       <div class="pwa-empty-state__icon">
         <i class="fa-solid fa-inbox"></i>
       </div>
-      <h4 class="pwa-empty-state__title">No Tasks Available</h4>
-      <p class="pwa-empty-state__text">You don't have any delivery tasks at the moment. Check back later!</p>
+      <h4 class="pwa-empty-state__title">No {% if current_tab == 'all' %}New{% elif current_tab == 'assigned' %}Assigned{% else %}Accepted{% endif %} Tasks</h4>
+      <p class="pwa-empty-state__text">
+        {% if current_tab == 'all' %}
+          No new tasks available right now. Check back later!
+        {% elif current_tab == 'assigned' %}
+          No tasks assigned to you. Check New tab to accept tasks.
+        {% else %}
+          You haven't accepted any tasks yet.
+        {% endif %}
+      </p>
+      {% if current_tab == 'assigned' %}
+      <a href="?tab=all" class="pwa-btn pwa-btn--primary">
+        <i class="fa-solid fa-list me-2"></i>View New Tasks
+      </a>
+      {% else %}
       <a href="{% url 'fleet:fleet_dashboard' %}" class="pwa-btn pwa-btn--primary">
         <i class="fa-solid fa-home me-2"></i>Go to Dashboard
       </a>
+      {% endif %}
     </div>
     {% endif %}
   </div>
 
   <!-- Desktop Table View (Hidden on Mobile) -->
   <div class="d-none d-md-block p-2" id="delivery_tasks_all_wrapper">
+    <!-- Tab Filters -->
+    <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+      <div class="btn-group">
+        <a href="?tab=all&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}" class="btn btn-sm {% if current_tab == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          New <span class="badge bg-light text-dark ms-1">{{ all_count }}</span>
+        </a>
+        <a href="?tab=assigned&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}" class="btn btn-sm {% if current_tab == 'assigned' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          Assigned <span class="badge bg-light text-dark ms-1">{{ assigned_count }}</span>
+        </a>
+        <a href="?tab=accepted&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}" class="btn btn-sm {% if current_tab == 'accepted' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          Accepted <span class="badge bg-light text-dark ms-1">{{ accepted_count }}</span>
+        </a>
+      </div>
+      <span class="text-muted">|</span>
+      <div class="btn-group">
+        <a href="?tab={{ current_tab }}&area=all&type={{ type_filter }}&status={{ status_filter }}" class="btn btn-sm {% if area_filter == 'all' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">All Areas</a>
+        <a href="?tab={{ current_tab }}&area=doha&type={{ type_filter }}&status={{ status_filter }}" class="btn btn-sm {% if area_filter == 'doha' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">Doha</a>
+        <a href="?tab={{ current_tab }}&area=my_zone&type={{ type_filter }}&status={{ status_filter }}" class="btn btn-sm {% if area_filter == 'my_zone' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">My Zone</a>
+      </div>
+      {% if current_tab == 'assigned' %}
+      <span class="text-muted">|</span>
+      <div class="btn-group">
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all" class="btn btn-sm {% if status_filter == 'all' %}btn-info{% else %}btn-outline-info{% endif %}">All</a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=accepted" class="btn btn-sm {% if status_filter == 'accepted' %}btn-info{% else %}btn-outline-info{% endif %}">Accepted</a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=in_transit" class="btn btn-sm {% if status_filter == 'in_transit' or status_filter == 'out_for_delivery' %}btn-info{% else %}btn-outline-info{% endif %}">In Transit</a>
+      </div>
+      {% elif current_tab == 'accepted' %}
+      <span class="text-muted">|</span>
+      <div class="btn-group">
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all" class="btn btn-sm {% if status_filter == 'all' %}btn-info{% else %}btn-outline-info{% endif %}">All</a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=delivered" class="btn btn-sm {% if status_filter == 'delivered' %}btn-success{% else %}btn-outline-success{% endif %}">Delivered</a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=failed" class="btn btn-sm {% if status_filter == 'failed' or status_filter == 'cancelled' %}btn-danger{% else %}btn-outline-danger{% endif %}">Failed</a>
+      </div>
+      {% endif %}
+    </div>
     <div class="listing-container" id="delivery_tasks_all_container">
       <div class="listing-header">
-        <h6 class="listing-title"><i class="fa-solid fa-list-check text-primary"></i>All Tasks</h6>
+        <h6 class="listing-title"><i class="fa-solid fa-list-check text-primary"></i>{% if current_tab == 'all' %}New{% elif current_tab == 'assigned' %}Assigned{% else %}Accepted{% endif %} Tasks</h6>
         <span class="text-muted">{{ cards|length }} task{{ cards|length|pluralize }}</span>
       </div>
       <table class="listing-table" id="delivery_tasks_all_table">
@@ -324,11 +393,13 @@
             </td>
             <td>
               <div>{{ card.order.business.business_name|default:"N/A" }}</div>
-              {% if card.order.cod_amount > 0 %}
-              <span class="listing-status warning">COD: {{ card.order.cod_amount }} QR</span>
-              {% else %}
-              <span class="text-muted" style="font-size: 0.75rem;">No COD</span>
-              {% endif %}
+              <div>
+                {% if card.order.cod_amount > 0 %}
+                <span class="badge bg-warning text-dark">COD: {{ card.order.cod_amount }} QR</span>
+                {% else %}
+                <small class="text-muted">No COD</small>
+                {% endif %}
+              </div>
             </td>
             <td>
               <div class="d-flex align-items-center mb-1">
@@ -495,15 +566,16 @@
 
       $.ajax({
         type: "POST",
-        url: "/api/driver/tasks/" + taskId + "/complete/",
-        contentType: "application/json",
-        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-        data: JSON.stringify({ status: 'accepted' }),
+        url: "/delivery/delivery_task/accept_task/",
+        data: {
+          task_id: taskId,
+          csrfmiddlewaretoken: "{{ csrf_token }}",
+        },
         success: function (response) {
           btn.html('<i class="fa-solid fa-check me-1"></i>Accepted').removeClass('btn-success').addClass('btn-secondary');
           $('.modal').modal('hide');
           if (typeof showToast === 'function') {
-            showToast('Task accepted! Go to Accepted tab to start ride.', 'success');
+            showToast('Task accepted! You can now start the ride.', 'success');
           }
           setTimeout(function() {
             location.reload();

@@ -38,6 +38,10 @@ urlpatterns = [
     path("delivery_task/assign_driver/",
          delivery_views.assign_driver, name="assign_driver"),
 
+    # Accept assigned task
+    path("delivery_task/accept_task/",
+         delivery_views.accept_task, name="accept_task"),
+
     # Start ride - update status to in_transit
     path("delivery_task/start_ride/",
          delivery_views.start_ride, name="start_ride"),

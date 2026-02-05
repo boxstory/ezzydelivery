@@ -21,40 +21,34 @@
         </div>
         <div class="multi-level collapse submenu" id="submenu-deliveries">
           <ul class="nav flex-column">
-            <li class="nav-item {% if request.resolver_match.url_name == 'all_delivery_tasks' %}active{% endif %}">
-              <a class="nav-link btn {% if request.resolver_match.url_name == 'all_delivery_tasks' %}active{% endif %}" href="{% url 'delivery:all_delivery_tasks' %}">
-                <i class="fa-solid fa-hourglass-half me-2"></i>
-                All Tasks List
+            <li class="nav-item {% if request.resolver_match.url_name == 'all_delivery_tasks' and request.GET.tab == 'all' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'all_delivery_tasks' and request.GET.tab == 'all' %}active{% endif %}" href="{% url 'delivery:all_delivery_tasks' %}?tab=all">
+                <i class="fa-solid fa-plus me-2"></i>
+                New Tasks
               </a>
             </li>
-            <li class="nav-item {% if request.resolver_match.url_name == 'assigned_tasks' %}active{% endif %}">
-              <a class="nav-link btn {% if request.resolver_match.url_name == 'assigned_tasks' %}active{% endif %}" href="{% url 'delivery:assigned_tasks' %}">
-                <i class="fa-solid fa-spinner me-2"></i>
-                Assigned Jobs
+            <li class="nav-item {% if request.resolver_match.url_name == 'all_delivery_tasks' and request.GET.tab == 'assigned' %}active{% endif %}">
+              <a class="nav-link btn {% if request.resolver_match.url_name == 'all_delivery_tasks' and request.GET.tab == 'assigned' %}active{% endif %}" href="{% url 'delivery:all_delivery_tasks' %}?tab=assigned">
+                <i class="fa-solid fa-list-check me-2"></i>
+                Assigned
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link btn" href="{% url 'delivery:assigned_tasks' %}">
-                <i class="fa-solid fa-check-double me-2"></i>
-                Accepted List
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link btn" href="{% url 'delivery:assigned_tasks' %}">
+            <li class="nav-item {% if request.GET.status == 'in_transit' or request.GET.status == 'out_for_delivery' %}active{% endif %}">
+              <a class="nav-link btn {% if request.GET.status == 'in_transit' or request.GET.status == 'out_for_delivery' %}active{% endif %}" href="{% url 'delivery:all_delivery_tasks' %}?tab=assigned&status=in_transit">
                 <i class="fa-solid fa-road me-2"></i>
-                InTransit
+                In Transit
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link btn" href="{% url 'delivery:assigned_tasks' %}">
+            <li class="nav-item {% if request.GET.status == 'delivered' %}active{% endif %}">
+              <a class="nav-link btn {% if request.GET.status == 'delivered' %}active{% endif %}" href="{% url 'delivery:all_delivery_tasks' %}?tab=assigned&status=delivered">
                 <i class="fa-solid fa-circle-check me-2"></i>
-                Successful
+                Delivered
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link btn" href="{% url 'delivery:assigned_tasks' %}">
+            <li class="nav-item {% if request.GET.status == 'failed' or request.GET.status == 'cancelled' %}active{% endif %}">
+              <a class="nav-link btn {% if request.GET.status == 'failed' or request.GET.status == 'cancelled' %}active{% endif %}" href="{% url 'delivery:all_delivery_tasks' %}?tab=assigned&status=failed">
                 <i class="fa-solid fa-circle-xmark me-2"></i>
-                Unsuccessful
+                Failed
               </a>
             </li>
           </ul>
