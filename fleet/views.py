@@ -1515,7 +1515,9 @@ def driver_profile(request, fleet_id):
 
     profile = core_models.Profile.objects.select_related('user').get(user_id=driver.user_id)
     # Get or create profile picture to avoid DoesNotExist error
-    profile_picture, _ = core_models.ProfilePicture.objects.get_or_create(user_id=driver.user_id)
+    profile_picture, _ = core_models.ProfilePicture.objects.get_or_create(
+        user_id=driver.user_id, defaults={'profile': profile}
+    )
     logger.debug(f'profile_picture={profile_picture}')
 
     driver_vehicle = driver.driver_vehicle.all()
@@ -1577,7 +1579,7 @@ def driver_profile_mobile(request):
 
         # Get profile picture
         profile_picture, _ = core_models.ProfilePicture.objects.get_or_create(
-            user_id=request.user.id
+            user_id=request.user.id, defaults={'profile': profile}
         )
 
         # Get driver vehicles
