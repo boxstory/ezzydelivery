@@ -226,7 +226,11 @@ def driver_documents_update(request, fleet_id, doc_id):
         return redirect('webpages:join_driver')
 
     logger.debug(f'driver_documents_update for driver_id={driver.driver_id}')
-    document = fleet_models.DriverDocument.objects.get(id=doc_id)
+    try:
+        document = fleet_models.DriverDocument.objects.get(id=doc_id, driver=driver)
+    except fleet_models.DriverDocument.DoesNotExist:
+        messages.error(request, 'Document not found.')
+        return redirect('/fleet/documents/')
     form = fleet_forms.DriverDocumentForm(
         request.POST or None, instance=document)
     if request.method == 'POST':
@@ -259,7 +263,7 @@ def driver_documents_delete(request, fleet_id, doc_id):
         return redirect('webpages:join_driver')
 
     logger.debug(f'driver_documents_delete for driver_id={driver.driver_id}')
-    document = fleet_models.DriverDocument.objects.filter(id=doc_id)
+    document = fleet_models.DriverDocument.objects.filter(id=doc_id, driver=driver)
     document.delete()
     return redirect('/fleet/documents/')
 
@@ -289,7 +293,11 @@ def vehicle_own(request):
 @driver_required
 def vehicle_add(request):
     logger.debug('vehicle_add')
-    driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found. Please create a driver profile first.')
+        return redirect('webpages:join_driver')
     form = fleet_forms.DriverVehicleForm(request.POST or None)
     if request.method == 'POST':
         if form.is_valid():
@@ -328,10 +336,18 @@ def vehicle_delete(request, fleet_id, vehicle_id):
 @login_required(login_url='/accounts/login/')
 @driver_required
 def vehicle_update(request, vehicle_id):
-    driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, 'Driver profile not found. Please create a driver profile first.')
+        return redirect('webpages:join_driver')
     logger.debug(f'vehicle_update for driver_id={driver.driver_id}')
 
-    driver_vehicle = fleet_models.DriverVehicle.objects.get(id=vehicle_id)
+    try:
+        driver_vehicle = fleet_models.DriverVehicle.objects.get(id=vehicle_id, driver=driver)
+    except fleet_models.DriverVehicle.DoesNotExist:
+        messages.error(request, 'Vehicle not found.')
+        return redirect('/fleet/vehicle_own/')
     logger.debug(f'vehicle_update for vehicle={driver_vehicle}')
     form = fleet_forms.DriverVehicleForm(
         request.POST or None, instance=driver_vehicle)
@@ -461,7 +477,11 @@ def cod_submission(request):
                     messages.success(request, f'Successfully submitted {amount} QR COD to admin.')
                     return redirect('fleet:cod_collection')
             except (ValueError, InvalidOperation) as e:
+<<<<<<< HEAD
                 messages.error(request, str(e))
+=======
+                messages.error(request, 'Please enter a valid amount.')
+>>>>>>> 1cf3775 (fix: Add hasattr guards and test environment detection)
             except Exception as e:
                 messages.error(request, f'Error processing submission: {str(e)}')
 
@@ -1018,7 +1038,10 @@ def driver_earnings(request):
                 messages.error(request, f'Error processing settlement: {str(e)}')
 
         # Get filter parameters
-        days = int(request.GET.get('days', 30))
+        try:
+            days = int(request.GET.get('days', 30))
+        except (ValueError, TypeError):
+            days = 30
         status_filter = request.GET.get('status', 'all')
         settlement_filter = request.GET.get('settlement', 'all')
 
@@ -1139,7 +1162,10 @@ def transaction_history(request):
 
         # Get filter parameters
         transaction_type = request.GET.get('type', 'all')
-        days = int(request.GET.get('days', 30))
+        try:
+            days = int(request.GET.get('days', 30))
+        except (ValueError, TypeError):
+            days = 30
 
         # Build query
         from datetime import timedelta
@@ -1286,7 +1312,11 @@ def driver_performance(request):
 
         # Get filter parameters
         period = request.GET.get('period', '30')  # days
-        days = int(period)
+        try:
+            days = int(period)
+        except (ValueError, TypeError):
+            days = 30
+            period = '30'
 
         # Get statistics for selected period
         stats = WalletService.get_driver_statistics(driver, days=days)
@@ -1516,7 +1546,12 @@ def driver_profile(request, fleet_id):
     profile = core_models.Profile.objects.select_related('user').get(user_id=driver.user_id)
     # Get or create profile picture to avoid DoesNotExist error
     profile_picture, _ = core_models.ProfilePicture.objects.get_or_create(
+<<<<<<< HEAD
         user_id=driver.user_id, defaults={'profile': profile}
+=======
+        user_id=driver.user_id,
+        defaults={'profile': profile}
+>>>>>>> 1cf3775 (fix: Add hasattr guards and test environment detection)
     )
     logger.debug(f'profile_picture={profile_picture}')
 
@@ -1579,7 +1614,12 @@ def driver_profile_mobile(request):
 
         # Get profile picture
         profile_picture, _ = core_models.ProfilePicture.objects.get_or_create(
+<<<<<<< HEAD
             user_id=request.user.id, defaults={'profile': profile}
+=======
+            user_id=request.user.id,
+            defaults={'profile': profile}
+>>>>>>> 1cf3775 (fix: Add hasattr guards and test environment detection)
         )
 
         # Get driver vehicles

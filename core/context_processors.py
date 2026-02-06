@@ -26,7 +26,7 @@ def get_cached_profile(request):
     Returns:
         Profile object or None
     """
-    if not request.user.is_authenticated:
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
         return None
 
     # Check if already cached
@@ -55,7 +55,7 @@ def get_cached_business(request):
     Returns:
         Business object or None
     """
-    if not request.user.is_authenticated:
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
         return None
 
     # Check if already cached

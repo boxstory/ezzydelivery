@@ -1,5 +1,6 @@
 
 import os
+import sys
 from pathlib import Path
 from decouple import config
 
@@ -201,8 +202,9 @@ MIDDLEWARE = [
     'core.middleware.QueryInspectorMiddleware',
 ]
 
-# Add debug toolbar only in DEBUG mode
-if DEBUG:
+# Add debug toolbar only in DEBUG mode (skip during tests as Django forces DEBUG=False)
+TESTING = 'test' in sys.argv
+if DEBUG and not TESTING:
     INSTALLED_APPS += ['debug_toolbar']
     MIDDLEWARE.insert(2, 'debug_toolbar.middleware.DebugToolbarMiddleware')
 
