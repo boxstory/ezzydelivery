@@ -477,7 +477,7 @@ def cod_submission(request):
                     messages.success(request, f'Successfully submitted {amount} QR COD to admin.')
                     return redirect('fleet:cod_collection')
             except (ValueError, InvalidOperation) as e:
-                messages.error(request, 'Please enter a valid amount.')
+                messages.error(request, str(e))
             except Exception as e:
                 messages.error(request, f'Error processing submission: {str(e)}')
 

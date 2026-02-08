@@ -546,7 +546,7 @@ class SearchOrdersTool(BaseTool):
     """
 
     name = 'search_orders'
-    allowed_roles = ['staff']
+    allowed_roles = ['staff', 'business']
     description = '''Search for orders using various filters.
 
     Can filter by:
@@ -590,6 +590,13 @@ class SearchOrdersTool(BaseTool):
         },
     }
 
+    def run(self, params, user=None, business=None):
+        """Override run to inject business scoping."""
+        if business:
+            params = dict(params)
+            params['_business'] = business
+        return super().run(params, user=user, business=business)
+
     def execute(
         self,
         customer_phone: Optional[str] = None,
@@ -597,12 +604,17 @@ class SearchOrdersTool(BaseTool):
         zone_number: Optional[int] = None,
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
-        limit: int = 20
+        limit: int = 20,
+        _business=None
     ) -> Dict[str, Any]:
         from orders.models import Order
         from datetime import datetime
 
         queryset = Order.objects.select_related('business')
+
+        # Business users can only see their own orders
+        if _business:
+            queryset = queryset.filter(business=_business)
 
         # Apply filters
         if customer_phone:

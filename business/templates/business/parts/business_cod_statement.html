@@ -4,6 +4,128 @@
 {% block title %}COD Statement{% endblock %}
 
 {% block content %}
+<!-- ==========================================
+     Mobile PWA View (visible < 768px only)
+     ========================================== -->
+<div class="d-md-none" id="cod_mobile_pwa_view">
+  <!-- Header -->
+  <div class="pwa-section-header" style="margin-top: 8px;">
+    <h2 class="pwa-section-header__title">COD Statement</h2>
+    <a href="{% url 'business:business_finance_dashboard' %}" class="pwa-section-header__link">
+      <i class="fas fa-arrow-left"></i> Finance
+    </a>
+  </div>
+
+  <!-- Period selector -->
+  <div class="pwa-period-select">
+    <form method="GET" style="width: 100%;">
+      <select name="days" onchange="this.form.submit()">
+        <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
+        <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
+        <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
+        <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
+      </select>
+    </form>
+  </div>
+
+  <!-- Stats grid (2x2) -->
+  <div class="pwa-stats-grid">
+    <div class="pwa-finance-stat">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--primary" style="margin: 0 auto 6px;">
+        <i class="fas fa-receipt"></i>
+      </div>
+      <p class="pwa-finance-stat__value">{{ stats.total|default:0 }}</p>
+      <p class="pwa-finance-stat__label">COD Orders</p>
+    </div>
+    <div class="pwa-finance-stat">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--warning" style="margin: 0 auto 6px;">
+        <i class="fas fa-hand-holding-dollar"></i>
+      </div>
+      <p class="pwa-finance-stat__value">{{ stats.total_cod|default:0|floatformat:0 }}</p>
+      <p class="pwa-finance-stat__label">Collected (QR)</p>
+    </div>
+    <div class="pwa-finance-stat">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--success" style="margin: 0 auto 6px;">
+        <i class="fas fa-handshake"></i>
+      </div>
+      <p class="pwa-finance-stat__value">{{ total_settled|floatformat:0 }}</p>
+      <p class="pwa-finance-stat__label">Settled (QR)</p>
+    </div>
+    <div class="pwa-finance-stat">
+      <div class="pwa-stat-card__icon pwa-stat-card__icon--danger" style="margin: 0 auto 6px;">
+        <i class="fas fa-clock"></i>
+      </div>
+      {% with pending=stats.total_cod|default:0 %}
+      <p class="pwa-finance-stat__value">{{ pending|floatformat:0 }}</p>
+      {% endwith %}
+      <p class="pwa-finance-stat__label">Pending (QR)</p>
+    </div>
+  </div>
+
+  <!-- Settlement history -->
+  {% if settlements %}
+  <div class="pwa-section-header">
+    <h3 class="pwa-section-header__title">Settlements</h3>
+    <span class="pwa-section-header__badge pwa-section-header__badge--success">{{ settlements|length }}</span>
+  </div>
+  <div class="pwa-txn-list">
+    {% for s in settlements %}
+    <div class="pwa-txn-item">
+      <div class="pwa-txn-item__icon pwa-txn-item__icon--settle">
+        <i class="fas fa-handshake"></i>
+      </div>
+      <div class="pwa-txn-item__info">
+        <p class="pwa-txn-item__type">{{ s.description|default:"COD Settlement"|truncatewords:5 }}</p>
+        <p class="pwa-txn-item__desc">By {{ s.created_by.first_name|default:"-" }}</p>
+      </div>
+      <div class="pwa-txn-item__right">
+        <p class="pwa-txn-item__amount pwa-txn-item__amount--positive">{{ s.amount|floatformat:0 }} QR</p>
+        <p class="pwa-txn-item__date">{{ s.created_at|date:"d M" }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- COD Deliveries list -->
+  <div class="pwa-section-header">
+    <h3 class="pwa-section-header__title">COD Deliveries</h3>
+    <span class="pwa-section-header__badge pwa-section-header__badge--warning">{{ cod_deliveries|length }}</span>
+  </div>
+  <div class="pwa-txn-list">
+    {% for task in cod_deliveries %}
+    <div class="pwa-txn-item">
+      <div class="pwa-txn-item__icon pwa-txn-item__icon--charge">
+        <i class="fas fa-money-bill"></i>
+      </div>
+      <div class="pwa-txn-item__info">
+        <p class="pwa-txn-item__type">#{{ task.dl_task_number }}</p>
+        <p class="pwa-txn-item__desc">
+          {% if task.driver %}{{ task.driver.user.first_name|default:"-" }}{% else %}-{% endif %}
+          &middot; {{ task.dl_task_date|date:"d M" }}
+        </p>
+      </div>
+      <div class="pwa-txn-item__right">
+        <p class="pwa-txn-item__amount pwa-txn-item__amount--negative">{{ task.cod_collected_amount|default:0|floatformat:0 }} QR</p>
+        <p class="pwa-txn-item__date">
+          {% if task.cod_collected %}<i class="fas fa-check text-success"></i>{% else %}<i class="fas fa-clock text-warning"></i>{% endif %}
+          {% if task.cod_settled %}<i class="fas fa-check text-success ms-1"></i>{% else %}<i class="fas fa-clock text-muted ms-1"></i>{% endif %}
+        </p>
+      </div>
+    </div>
+    {% empty %}
+    <div class="pwa-empty-state">
+      <i class="fas fa-money-bill"></i>
+      <p>No COD deliveries found</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ==========================================
+     Desktop View (visible >= 768px only)
+     ========================================== -->
+<div class="d-none d-md-block" id="cod_desktop_view">
 <div class="container-fluid py-4">
   <div class="row mb-4">
     <div class="col-12 d-flex justify-content-between align-items-center">
@@ -155,4 +277,5 @@
     </div>
   </div>
 </div>
+</div><!-- end desktop view -->
 {% endblock %}

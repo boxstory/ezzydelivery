@@ -4,6 +4,83 @@
 {% block title %}Transactions{% endblock %}
 
 {% block content %}
+<!-- ==========================================
+     Mobile PWA View (visible < 768px only)
+     ========================================== -->
+<div class="d-md-none" id="transactions_mobile_pwa_view">
+  <!-- Header -->
+  <div class="pwa-section-header" style="margin-top: 8px;">
+    <h2 class="pwa-section-header__title">Transactions</h2>
+    <a href="{% url 'business:business_finance_dashboard' %}" class="pwa-section-header__link">
+      <i class="fas fa-arrow-left"></i> Finance
+    </a>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="pwa-filter-panel" style="margin-top: 4px;">
+    <form method="GET">
+      <div class="row g-2">
+        <div class="col-5">
+          <label class="form-label">Type</label>
+          <select name="type" class="form-select">
+            <option value="all" {% if selected_type == 'all' %}selected{% endif %}>All Types</option>
+            {% for type_val, type_label in transaction_types %}
+            <option value="{{ type_val }}" {% if selected_type == type_val %}selected{% endif %}>{{ type_label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-4">
+          <label class="form-label">Period</label>
+          <select name="days" class="form-select">
+            <option value="7" {% if selected_days == 7 %}selected{% endif %}>7 Days</option>
+            <option value="30" {% if selected_days == 30 %}selected{% endif %}>30 Days</option>
+            <option value="90" {% if selected_days == 90 %}selected{% endif %}>90 Days</option>
+            <option value="365" {% if selected_days == 365 %}selected{% endif %}>1 Year</option>
+          </select>
+        </div>
+        <div class="col-3 d-flex align-items-end">
+          <button type="submit" class="pwa-add-btn w-100 justify-content-center">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Transaction list -->
+  <div class="pwa-txn-list">
+    {% for txn in transactions %}
+    <div class="pwa-txn-item">
+      <div class="pwa-txn-item__icon {% if txn.transaction_type == 'cod_client_settle' %}pwa-txn-item__icon--settle{% elif txn.transaction_type == 'delivery_charge' or txn.transaction_type == 'fulfillment_charge' %}pwa-txn-item__icon--charge{% elif txn.transaction_type == 'bills_payable' %}pwa-txn-item__icon--bill{% else %}pwa-txn-item__icon--default{% endif %}">
+        {% if txn.transaction_type == 'cod_client_settle' %}<i class="fas fa-handshake"></i>
+        {% elif txn.transaction_type == 'delivery_charge' %}<i class="fas fa-truck"></i>
+        {% elif txn.transaction_type == 'fulfillment_charge' %}<i class="fas fa-box"></i>
+        {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
+      </div>
+      <div class="pwa-txn-item__info">
+        <p class="pwa-txn-item__type">{{ txn.get_transaction_type_display }}</p>
+        <p class="pwa-txn-item__desc">{{ txn.description|default:"-"|truncatewords:6 }}</p>
+      </div>
+      <div class="pwa-txn-item__right">
+        <p class="pwa-txn-item__amount {% if txn.amount >= 0 %}pwa-txn-item__amount--positive{% else %}pwa-txn-item__amount--negative{% endif %}">
+          {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} QR
+        </p>
+        <p class="pwa-txn-item__date">{{ txn.created_at|date:"d M" }}</p>
+      </div>
+    </div>
+    {% empty %}
+    <div class="pwa-empty-state">
+      <i class="fas fa-receipt"></i>
+      <p>No transactions found</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ==========================================
+     Desktop View (visible >= 768px only)
+     ========================================== -->
+<div class="d-none d-md-block" id="transactions_desktop_view">
 <div class="container-fluid py-4">
   <div class="row mb-4">
     <div class="col-12">
@@ -105,4 +182,5 @@
     </div>
   </div>
 </div>
+</div><!-- end desktop view -->
 {% endblock %}
