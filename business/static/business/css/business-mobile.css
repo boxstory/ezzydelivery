@@ -1,0 +1,1036 @@
+/**
+ * Business Mobile PWA Styles
+ * Mobile-first design for business/client dashboard
+ * Extends fleet-mobile.css base classes with business-specific overrides
+ */
+
+/* ========================================
+   Base Mobile Layout
+   ======================================== */
+body.business-mobile {
+  background-color: var(--pwa-bg, #f5f7fa);
+  padding-bottom: calc(var(--bottom-nav-height, 64px) + env(safe-area-inset-bottom, 0px));
+  padding-top: var(--header-height, 56px);
+  min-height: 100vh;
+  overscroll-behavior-y: contain;
+  overflow-x: hidden;
+}
+
+/* ========================================
+   FAB (Floating Action Button) - Center Tab
+   ======================================== */
+.pwa-bottom-nav__item--fab {
+  position: relative;
+}
+
+.pwa-bottom-nav__fab {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--pwa-primary, #f7c000);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -24px;
+  box-shadow: 0 4px 12px rgba(247, 192, 0, 0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pwa-bottom-nav__fab i {
+  font-size: 22px;
+  color: var(--pwa-navy, #001f3f);
+}
+
+.pwa-bottom-nav__item--fab:active .pwa-bottom-nav__fab {
+  transform: scale(0.92);
+}
+
+.pwa-bottom-nav__item--fab span:last-child {
+  margin-top: 2px;
+}
+
+/* ========================================
+   Business Hero Card
+   ======================================== */
+.pwa-business-hero {
+  background: linear-gradient(135deg, var(--pwa-navy, #001f3f) 0%, var(--pwa-navy-light, #003366) 100%);
+  border-radius: var(--mobile-radius-lg, 16px);
+  padding: 20px 16px 16px;
+  margin: 8px 16px 12px;
+  color: #ffffff;
+  box-shadow: var(--pwa-shadow-md, 0 4px 6px rgba(0,0,0,0.1));
+}
+
+.pwa-business-hero__name {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: #ffffff;
+}
+
+.pwa-business-hero__subtitle {
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+  margin: 0 0 16px;
+}
+
+.pwa-business-hero__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.pwa-business-hero__stat {
+  text-align: center;
+  background: rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 10px 6px;
+}
+
+.pwa-business-hero__stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--pwa-primary, #f7c000);
+}
+
+.pwa-business-hero__stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255,255,255,0.7);
+  margin: 2px 0 0;
+}
+
+/* ========================================
+   Stats Grid (2x2)
+   ======================================== */
+.pwa-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 0 16px;
+  margin-bottom: 12px;
+}
+
+.pwa-stat-card {
+  background: var(--pwa-card-bg, #ffffff);
+  border-radius: var(--mobile-radius, 12px);
+  padding: 14px;
+  box-shadow: var(--pwa-shadow, 0 1px 3px rgba(0,0,0,0.08));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pwa-stat-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.pwa-stat-card__icon--primary {
+  background: rgba(247, 192, 0, 0.15);
+  color: #f7c000;
+}
+
+.pwa-stat-card__icon--success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.pwa-stat-card__icon--warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.pwa-stat-card__icon--danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.pwa-stat-card__value {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--pwa-text-primary, #1f1f1f);
+  line-height: 1.1;
+}
+
+.pwa-stat-card__label {
+  font-size: 11px;
+  color: var(--pwa-text-muted, #6c757d);
+  margin: 2px 0 0;
+}
+
+/* ========================================
+   Quick Actions Grid
+   ======================================== */
+.pwa-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.pwa-quick-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  gap: 6px;
+  padding: 12px 4px;
+  background: var(--pwa-card-bg, #ffffff);
+  border-radius: var(--mobile-radius, 12px);
+  box-shadow: var(--pwa-shadow, 0 1px 3px rgba(0,0,0,0.08));
+  transition: transform 0.15s ease;
+}
+
+.pwa-quick-action:active {
+  transform: scale(0.95);
+}
+
+.pwa-quick-action__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.pwa-quick-action__icon--yellow {
+  background: rgba(247, 192, 0, 0.15);
+  color: #f7c000;
+}
+
+.pwa-quick-action__icon--navy {
+  background: rgba(0, 31, 63, 0.1);
+  color: var(--pwa-navy, #001f3f);
+}
+
+.pwa-quick-action__icon--green {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.pwa-quick-action__icon--blue {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.pwa-quick-action__label {
+  font-size: 11px;
+  color: var(--pwa-text-secondary, #555);
+  font-weight: 500;
+  text-align: center;
+}
+
+/* ========================================
+   Section Header
+   ======================================== */
+.pwa-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  margin-bottom: 8px;
+}
+
+.pwa-section-header__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pwa-text-primary, #1f1f1f);
+  margin: 0;
+}
+
+.pwa-section-header__badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  color: #ffffff;
+}
+
+.pwa-section-header__badge--warning {
+  background: #f59e0b;
+}
+
+.pwa-section-header__badge--success {
+  background: #10b981;
+}
+
+.pwa-section-header__badge--danger {
+  background: #ef4444;
+}
+
+.pwa-section-header__link {
+  font-size: 12px;
+  color: var(--pwa-navy, #001f3f);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+/* ========================================
+   Order List Items
+   ======================================== */
+.pwa-order-list {
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.pwa-order-card {
+  background: var(--pwa-card-bg, #ffffff);
+  border-radius: var(--mobile-radius, 12px);
+  box-shadow: var(--pwa-shadow, 0 1px 3px rgba(0,0,0,0.08));
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.pwa-order-card__body {
+  padding: 0;
+}
+
+.pwa-order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--pwa-border, #dcdcdc);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+
+.pwa-order-item:last-child {
+  border-bottom: none;
+}
+
+.pwa-order-item:active {
+  background: var(--pwa-bg, #f5f7fa);
+}
+
+.pwa-order-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.pwa-order-item__number {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pwa-text-primary, #1f1f1f);
+}
+
+.pwa-order-item__customer {
+  font-size: 12px;
+  color: var(--pwa-text-muted, #6c757d);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.pwa-order-item__amount {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.pwa-order-item__amount--pending {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.pwa-order-item__amount--success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.pwa-order-item__amount--danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+/* ========================================
+   COD Overview Card
+   ======================================== */
+.pwa-cod-card {
+  background: var(--pwa-card-bg, #ffffff);
+  border-radius: var(--mobile-radius, 12px);
+  box-shadow: var(--pwa-shadow, 0 1px 3px rgba(0,0,0,0.08));
+  margin: 0 16px 16px;
+  padding: 14px;
+}
+
+.pwa-cod-card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.pwa-cod-card__row:not(:last-child) {
+  border-bottom: 1px solid var(--pwa-border, #dcdcdc);
+}
+
+.pwa-cod-card__label {
+  font-size: 13px;
+  color: var(--pwa-text-secondary, #555);
+}
+
+.pwa-cod-card__value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pwa-text-primary, #1f1f1f);
+}
+
+/* ========================================
+   Empty State
+   ======================================== */
+.pwa-empty-state {
+  text-align: center;
+  padding: 20px 16px;
+  color: var(--pwa-text-muted, #6c757d);
+}
+
+.pwa-empty-state i {
+  font-size: 28px;
+  margin-bottom: 6px;
+  opacity: 0.4;
+}
+
+.pwa-empty-state p {
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ========================================
+   Utility Classes
+   ======================================== */
+.pwa-text-yellow {
+  color: var(--pwa-primary, #f7c000);
+}
+
+.pwa-text-navy {
+  color: var(--pwa-navy, #001f3f);
+}
+
+.pwa-text-success {
+  color: var(--pwa-success, #10b981);
+}
+
+.pwa-text-danger {
+  color: var(--pwa-danger, #ef4444);
+}
+
+.pwa-text-muted {
+  color: var(--pwa-text-muted, #6c757d);
+}
+
+.pwa-font-bold {
+  font-weight: 700;
+}
+
+.pwa-font-semibold {
+  font-weight: 600;
+}
+
+.pwa-mb-sm {
+  margin-bottom: 8px;
+}
+
+.pwa-mb-md {
+  margin-bottom: 16px;
+}
+
+/* ========================================
+   Order Status Badges
+   ======================================== */
+.pwa-order-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.pwa-order-status-badge i {
+  font-size: 10px;
+}
+
+.pwa-order-status-badge--delivered {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.pwa-order-status-badge--assigned {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.pwa-order-status-badge--transit {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.pwa-order-status-badge--failed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.pwa-order-status-badge--cancelled {
+  background: rgba(108, 117, 125, 0.15);
+  color: #6c757d;
+}
+
+.pwa-order-status-badge--review {
+  background: rgba(252, 211, 77, 0.2);
+  color: #b45309;
+}
+
+.pwa-order-status-badge--ready {
+  background: rgba(20, 184, 166, 0.15);
+  color: #14b8a6;
+}
+
+.pwa-order-status-badge--pending {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
+
+/* ========================================
+   Filter Bar & Pills (Mobile)
+   ======================================== */
+.pwa-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.pwa-filter-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.pwa-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1.5px solid var(--pwa-border, #dcdcdc);
+  background: var(--pwa-card-bg, #ffffff);
+  color: var(--pwa-text-secondary, #555);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.pwa-filter-pill:active {
+  transform: scale(0.95);
+}
+
+.pwa-filter-pill--active,
+.pwa-filter-pill.active {
+  background: var(--pwa-navy, #001f3f);
+  color: #ffffff;
+  border-color: var(--pwa-navy, #001f3f);
+}
+
+.pwa-filter-pill i {
+  font-size: 11px;
+}
+
+.pwa-filter-pill__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pwa-card-bg, #ffffff);
+  border: 1.5px solid var(--pwa-border, #dcdcdc);
+  color: var(--pwa-text-secondary, #555);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ========================================
+   Mobile Order Card (Full - for orders list)
+   ======================================== */
+.pwa-order-card-full {
+  background: var(--pwa-card-bg, #ffffff);
+  border-radius: var(--mobile-radius, 12px);
+  box-shadow: var(--pwa-shadow, 0 1px 3px rgba(0,0,0,0.08));
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+
+.pwa-order-card-full:active {
+  background: var(--pwa-bg, #f5f7fa);
+}
+
+.pwa-order-card-full__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.pwa-order-card-full__number {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pwa-text-primary, #1f1f1f);
+}
+
+.pwa-order-card-full__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--pwa-text-muted, #6c757d);
+  margin-bottom: 3px;
+}
+
+.pwa-order-card-full__row i {
+  width: 14px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--pwa-text-muted, #6c757d);
+}
+
+.pwa-order-card-full__row span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pwa-order-card-full__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--pwa-border, #dcdcdc);
+}
+
+.pwa-order-card-full__cod {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ef4444;
+}
+
+.pwa-order-card-full__date {
+  font-size: 11px;
+  color: var(--pwa-text-muted, #6c757d);
+}
+
+/* ========================================
+   Product Item (Mobile)
+   ======================================== */
+.pwa-product-list {
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.pwa-product-item {
+  background: var(--pwa-card-bg, #ffffff);
+  border-radius: var(--mobile-radius, 12px);
+  box-shadow: var(--pwa-shadow, 0 1px 3px rgba(0,0,0,0.08));
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.pwa-product-item__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(247, 192, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #f7c000;
+  flex-shrink: 0;
+}
+
+.pwa-product-item__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pwa-product-item__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pwa-text-primary, #1f1f1f);
+  margin: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pwa-product-item__sku {
+  font-size: 11px;
+  color: var(--pwa-text-muted, #6c757d);
+  margin: 0;
+}
+
+.pwa-product-item__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.pwa-product-item__price {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pwa-text-primary, #1f1f1f);
+}
+
+.pwa-stock-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+.pwa-stock-badge--in-stock {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.pwa-stock-badge--low-stock {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.pwa-stock-badge--out-of-stock {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* ========================================
+   Finance Stat Card (Mobile)
+   ======================================== */
+.pwa-finance-stat {
+  background: var(--pwa-card-bg, #ffffff);
+  border-radius: var(--mobile-radius, 12px);
+  box-shadow: var(--pwa-shadow, 0 1px 3px rgba(0,0,0,0.08));
+  padding: 12px;
+  text-align: center;
+}
+
+.pwa-finance-stat__value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--pwa-text-primary, #1f1f1f);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.pwa-finance-stat__label {
+  font-size: 10px;
+  color: var(--pwa-text-muted, #6c757d);
+  margin: 2px 0 0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* ========================================
+   Transaction Item (Mobile)
+   ======================================== */
+.pwa-txn-list {
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.pwa-txn-item {
+  background: var(--pwa-card-bg, #ffffff);
+  border-radius: var(--mobile-radius, 12px);
+  box-shadow: var(--pwa-shadow, 0 1px 3px rgba(0,0,0,0.08));
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pwa-txn-item__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.pwa-txn-item__icon--settle {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.pwa-txn-item__icon--charge {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.pwa-txn-item__icon--bill {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.pwa-txn-item__icon--default {
+  background: rgba(108, 117, 125, 0.15);
+  color: #6c757d;
+}
+
+.pwa-txn-item__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pwa-txn-item__type {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pwa-text-primary, #1f1f1f);
+  margin: 0;
+}
+
+.pwa-txn-item__desc {
+  font-size: 11px;
+  color: var(--pwa-text-muted, #6c757d);
+  margin: 1px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pwa-txn-item__right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.pwa-txn-item__amount {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.pwa-txn-item__amount--positive {
+  color: #10b981;
+}
+
+.pwa-txn-item__amount--negative {
+  color: #ef4444;
+}
+
+.pwa-txn-item__date {
+  font-size: 10px;
+  color: var(--pwa-text-muted, #6c757d);
+  margin: 1px 0 0;
+}
+
+/* ========================================
+   Period Select (Mobile)
+   ======================================== */
+.pwa-period-select {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  margin-bottom: 12px;
+}
+
+.pwa-period-select select {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--mobile-radius, 12px);
+  border: 1.5px solid var(--pwa-border, #dcdcdc);
+  background: var(--pwa-card-bg, #ffffff);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pwa-text-primary, #1f1f1f);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236c757d' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+/* ========================================
+   Quick Link Buttons (Mobile)
+   ======================================== */
+.pwa-quick-links {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.pwa-quick-link {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--mobile-radius, 12px);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.15s ease;
+}
+
+.pwa-quick-link:active {
+  transform: scale(0.97);
+}
+
+.pwa-quick-link--primary {
+  background: var(--pwa-navy, #001f3f);
+  color: #ffffff;
+}
+
+.pwa-quick-link--outline {
+  background: var(--pwa-card-bg, #ffffff);
+  color: var(--pwa-navy, #001f3f);
+  border: 1.5px solid var(--pwa-border, #dcdcdc);
+}
+
+/* ========================================
+   Billing Summary Card (Mobile)
+   ======================================== */
+.pwa-billing-card {
+  background: var(--pwa-card-bg, #ffffff);
+  border-radius: var(--mobile-radius, 12px);
+  box-shadow: var(--pwa-shadow, 0 1px 3px rgba(0,0,0,0.08));
+  margin: 0 16px 16px;
+  padding: 14px;
+}
+
+.pwa-billing-card__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pwa-text-primary, #1f1f1f);
+  margin: 0 0 10px;
+}
+
+.pwa-billing-card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.pwa-billing-card__row:not(:last-child) {
+  border-bottom: 1px solid var(--pwa-border, #dcdcdc);
+}
+
+.pwa-billing-card__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--pwa-text-secondary, #555);
+}
+
+.pwa-billing-card__value {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* ========================================
+   Mobile Filter Panel
+   ======================================== */
+.pwa-filter-panel {
+  background: var(--pwa-card-bg, #ffffff);
+  border-radius: var(--mobile-radius, 12px);
+  box-shadow: var(--pwa-shadow, 0 1px 3px rgba(0,0,0,0.08));
+  margin: 0 16px 12px;
+  padding: 12px 14px;
+}
+
+.pwa-filter-panel .form-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--pwa-text-muted, #6c757d);
+  margin-bottom: 2px;
+}
+
+.pwa-filter-panel .form-control,
+.pwa-filter-panel .form-select {
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1.5px solid var(--pwa-border, #dcdcdc);
+}
+
+/* ========================================
+   PWA Add Button (Compact)
+   ======================================== */
+.pwa-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: var(--pwa-navy, #001f3f);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.15s ease;
+}
+
+.pwa-add-btn:active {
+  transform: scale(0.95);
+}
+
+.pwa-add-btn i {
+  font-size: 11px;
+}
+
+/* ========================================
+   Desktop Reset - Hide mobile PWA at >=768px
+   ======================================== */
+@media (min-width: 768px) {
+  body.business-mobile {
+    padding-top: 0;
+    padding-bottom: 0;
+    background-color: transparent;
+    overscroll-behavior-y: auto;
+  }
+}

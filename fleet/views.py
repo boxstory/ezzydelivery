@@ -477,11 +477,7 @@ def cod_submission(request):
                     messages.success(request, f'Successfully submitted {amount} QR COD to admin.')
                     return redirect('fleet:cod_collection')
             except (ValueError, InvalidOperation) as e:
-<<<<<<< HEAD
                 messages.error(request, str(e))
-=======
-                messages.error(request, 'Please enter a valid amount.')
->>>>>>> 1cf3775 (fix: Add hasattr guards and test environment detection)
             except Exception as e:
                 messages.error(request, f'Error processing submission: {str(e)}')
 
@@ -1546,12 +1542,7 @@ def driver_profile(request, fleet_id):
     profile = core_models.Profile.objects.select_related('user').get(user_id=driver.user_id)
     # Get or create profile picture to avoid DoesNotExist error
     profile_picture, _ = core_models.ProfilePicture.objects.get_or_create(
-<<<<<<< HEAD
         user_id=driver.user_id, defaults={'profile': profile}
-=======
-        user_id=driver.user_id,
-        defaults={'profile': profile}
->>>>>>> 1cf3775 (fix: Add hasattr guards and test environment detection)
     )
     logger.debug(f'profile_picture={profile_picture}')
 
@@ -1614,12 +1605,7 @@ def driver_profile_mobile(request):
 
         # Get profile picture
         profile_picture, _ = core_models.ProfilePicture.objects.get_or_create(
-<<<<<<< HEAD
             user_id=request.user.id, defaults={'profile': profile}
-=======
-            user_id=request.user.id,
-            defaults={'profile': profile}
->>>>>>> 1cf3775 (fix: Add hasattr guards and test environment detection)
         )
 
         # Get driver vehicles

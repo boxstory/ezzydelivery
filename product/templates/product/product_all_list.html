@@ -9,6 +9,63 @@ Products
 {% load crispy_forms_tags %}
 
 {% block content %}
+<!-- ==========================================
+     Mobile PWA View (visible < 768px only)
+     ========================================== -->
+<div class="d-md-none" id="product_mobile_pwa_view">
+  <!-- Header bar -->
+  <div class="pwa-section-header" style="margin-top: 8px;">
+    <h2 class="pwa-section-header__title">Products</h2>
+    <a href="{% url 'product:product_single_add' %}" class="pwa-add-btn">
+      <i class="fas fa-plus"></i> Add Product
+    </a>
+  </div>
+
+  <!-- Product cards list -->
+  <div class="pwa-product-list" id="product_mobile_card_list">
+    {% if products %}
+      {% for product in products %}
+      <div class="pwa-product-item" id="product_mobile_card_{{ product.id }}">
+        <div class="pwa-product-item__icon">
+          <i class="fas fa-tag"></i>
+        </div>
+        <div class="pwa-product-item__info">
+          <p class="pwa-product-item__name">{{ product.item_name }}</p>
+          <p class="pwa-product-item__sku">SKU: {{ product.item_sku }}</p>
+        </div>
+        <div class="pwa-product-item__right">
+          <span class="pwa-product-item__price">QAR {{ product.item_price }}</span>
+          {% if product.qty %}
+            {% if product.qty > 10 %}
+              <span class="pwa-stock-badge pwa-stock-badge--in-stock">In Stock</span>
+            {% elif product.qty > 0 %}
+              <span class="pwa-stock-badge pwa-stock-badge--low-stock">Low Stock</span>
+            {% else %}
+              <span class="pwa-stock-badge pwa-stock-badge--out-of-stock">Out of Stock</span>
+            {% endif %}
+          {% endif %}
+          <a href="{% url 'product:product_single_update' product_id=product.id %}" class="pwa-section-header__link">
+            <i class="fas fa-edit"></i> Edit
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="pwa-empty-state">
+        <i class="fas fa-box-open"></i>
+        <p>No products found</p>
+        <a href="{% url 'product:product_single_add' %}" class="pwa-add-btn" style="margin-top: 12px;">
+          <i class="fas fa-plus"></i> Add Your First Product
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ==========================================
+     Desktop View (visible >= 768px only)
+     ========================================== -->
+<div class="d-none d-md-block" id="product_desktop_view">
 <div class="products-container" id="product_list_container">
   <!-- Products Header -->
   <div class="products-header" id="product_list_header">
@@ -118,6 +175,7 @@ Products
   </div>
   {% endif %}
 </div>
+</div><!-- end desktop view -->
 
 <script>
 // Remember view preference using localStorage

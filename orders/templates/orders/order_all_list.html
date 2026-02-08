@@ -1,6 +1,8 @@
 {% extends "business_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% load custom_filters %}
+{% load business_pwa_tags %}
 <!-- extra css -->
 {% block extra_css %}
   <link href="{% static 'orders/css/orders.css' %}"
@@ -8,6 +10,164 @@
         type="text/css" />
 {% endblock extra_css %}
 {% block content %}
+  <!-- ==========================================
+       Mobile PWA View (visible < 768px only)
+       ========================================== -->
+  <div class="d-md-none" id="orders_mobile_pwa_view">
+    <!-- Header bar -->
+    <div class="pwa-section-header" style="margin-top: 8px;">
+      <h2 class="pwa-section-header__title">Orders ({{ len }})</h2>
+      <a href="{% url 'orders:add_order' %}" class="pwa-add-btn">
+        <i class="fas fa-plus"></i> Add
+      </a>
+    </div>
+
+    <!-- Filter pills -->
+    <div class="pwa-filter-bar" id="orders_mobile_filter_pills">
+      <button type="button" class="pwa-filter-pill pwa-mobile-quick-filter{% if filters.dateRange == 'today' %} active{% endif %}" data-filter="today">
+        <i class="fas fa-calendar-day"></i> Today
+      </button>
+      <button type="button" class="pwa-filter-pill pwa-mobile-quick-filter{% if filters.cStatus == 'to_review' %} active{% endif %}" data-filter="pending">
+        <i class="fas fa-clock"></i> Pending
+      </button>
+      <button type="button" class="pwa-filter-pill pwa-mobile-quick-filter{% if filters.codStatus == 'with_cod' %} active{% endif %}" data-filter="with_cod">
+        <i class="fas fa-money-bill"></i> COD
+      </button>
+      <button type="button" class="pwa-filter-pill pwa-mobile-quick-filter{% if filters.dlStatus == '2' %} active{% endif %}" data-filter="delivered">
+        <i class="fas fa-check-circle"></i> Delivered
+      </button>
+      <button type="button" class="pwa-filter-pill pwa-mobile-quick-filter{% if filters.dlStatus == '3' %} active{% endif %}" data-filter="failed">
+        <i class="fas fa-times-circle"></i> Failed
+      </button>
+      <button type="button" class="pwa-filter-pill__icon" id="orders_mobile_filter_toggle">
+        <i class="fas fa-sliders-h"></i>
+      </button>
+    </div>
+
+    <!-- Expandable filter panel -->
+    <div class="pwa-filter-panel" id="orders_mobile_filter_panel" style="display: none;">
+      <form id="mobileFilterForm" method="get">
+        <input type="hidden" name="sort" value="{{ sort_by }}">
+        <input type="hidden" name="dir" value="{{ sort_dir }}">
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Order #</label>
+            <input type="text" class="form-control" name="orderNumber" placeholder="Order #" value="{{ filters.orderNumber }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Mobile</label>
+            <input type="text" class="form-control" name="mobile" placeholder="Mobile" value="{{ filters.mobile }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Customer</label>
+            <input type="text" class="form-control" name="customerName" placeholder="Name" value="{{ filters.customerName }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Zone</label>
+            <input type="text" class="form-control" name="zone" placeholder="Zone" value="{{ filters.zone }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Status</label>
+            <select class="form-select" name="cStatus">
+              <option value="">All</option>
+              <option value="to_review" {% if filters.cStatus == 'to_review' %}selected{% endif %}>Review</option>
+              <option value="ready_to_pickup" {% if filters.cStatus == 'ready_to_pickup' %}selected{% endif %}>Ready</option>
+              <option value="publish" {% if filters.cStatus == 'publish' %}selected{% endif %}>Publish</option>
+              <option value="cancelled" {% if filters.cStatus == 'cancelled' %}selected{% endif %}>Cancel</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Delivery</label>
+            <select class="form-select" name="dlStatus">
+              <option value="">All</option>
+              <option value="2" {% if filters.dlStatus == '2' %}selected{% endif %}>Delivered</option>
+              <option value="0" {% if filters.dlStatus == '0' %}selected{% endif %}>Assigned</option>
+              <option value="1" {% if filters.dlStatus == '1' %}selected{% endif %}>Started</option>
+              <option value="3" {% if filters.dlStatus == '3' %}selected{% endif %}>Failed</option>
+              <option value="9" {% if filters.dlStatus == '9' %}selected{% endif %}>Cancelled</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">COD</label>
+            <select class="form-select" name="codStatus">
+              <option value="">All</option>
+              <option value="with_cod" {% if filters.codStatus == 'with_cod' %}selected{% endif %}>With COD</option>
+              <option value="no_cod" {% if filters.codStatus == 'no_cod' %}selected{% endif %}>No COD</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Date</label>
+            <select class="form-select" name="dateRange">
+              <option value="">All Time</option>
+              <option value="today" {% if filters.dateRange == 'today' %}selected{% endif %}>Today</option>
+              <option value="yesterday" {% if filters.dateRange == 'yesterday' %}selected{% endif %}>Yesterday</option>
+              <option value="week" {% if filters.dateRange == 'week' %}selected{% endif %}>This Week</option>
+              <option value="month" {% if filters.dateRange == 'month' %}selected{% endif %}>This Month</option>
+            </select>
+          </div>
+          <div class="col-12 d-flex gap-2 mt-1">
+            <button type="submit" class="pwa-add-btn flex-fill justify-content-center">
+              <i class="fas fa-search"></i> Search
+            </button>
+            <a href="{% url 'orders:order_all_list' %}" class="pwa-add-btn flex-fill justify-content-center" style="background: var(--pwa-border, #dcdcdc); color: var(--pwa-text-primary, #1f1f1f);">
+              <i class="fas fa-times"></i> Clear
+            </a>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Order cards list -->
+    <div class="pwa-order-list" id="orders_mobile_card_list">
+      {% if orders %}
+        {% for order in orders %}
+        <a href="{% url 'orders:order_update' order.id %}" class="pwa-order-card-full" id="orders_mobile_card_{{ order.id }}">
+          <div class="pwa-order-card-full__header">
+            <span class="pwa-order-card-full__number">#{{ order.order_number }}</span>
+            {% order_status_badge order %}
+          </div>
+          <div class="pwa-order-card-full__row">
+            <i class="fas fa-user"></i>
+            <span>{{ order.customer_name }}</span>
+          </div>
+          <div class="pwa-order-card-full__row">
+            <i class="fas fa-phone"></i>
+            <span>{{ order.customer_phone }}</span>
+          </div>
+          <div class="pwa-order-card-full__row">
+            <i class="fas fa-map-marker-alt"></i>
+            <span>{% get_zone_display order %}</span>
+          </div>
+          <div class="pwa-order-card-full__footer">
+            {% if order.cod_amount %}
+            <span class="pwa-order-card-full__cod">
+              <i class="fas fa-money-bill-wave"></i> QR {{ order.cod_amount }}
+            </span>
+            {% else %}
+            <span></span>
+            {% endif %}
+            <span class="pwa-order-card-full__date">{{ order.order_date|date:"d M" }}</span>
+          </div>
+        </a>
+        {% endfor %}
+      {% else %}
+        <div class="pwa-empty-state">
+          <i class="fas fa-box-open"></i>
+          <p>No orders found</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if orders %}
+      {% include "includes/components/_pagination.html" with page_obj=orders per_page=per_page %}
+    {% endif %}
+  </div>
+
+  <!-- ==========================================
+       Desktop View (visible >= 768px only)
+       ========================================== -->
+  <div class="d-none d-md-block" id="orders_desktop_view">
   <!-- orders_list_view.html -->
   <div class="col-12" id="orders_all_list_container_main">
     <section class="d-block" id="orders_all_list_section_main">
@@ -46,7 +206,9 @@
 
           <!-- Filter Section -->
           <div class="filter-section mb-2">
-            <form id="filterForm" method="get">
+            <form id="filterForm" method="get" hx-boost="false">
+              <input type="hidden" name="sort" id="sortField" value="{{ sort_by }}">
+              <input type="hidden" name="dir" id="sortDir" value="{{ sort_dir }}">
               <div class="filter-header" style="padding: 0.35rem 0.625rem; background: linear-gradient(135deg, var(--brand-grey-100) 0%, var(--brand-grey-200) 100%); border-radius: var(--brand-radius-sm); border-left: 3px solid var(--brand-primary);">
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                   <div class="d-flex align-items-center gap-2">
@@ -85,7 +247,7 @@
                 </div>
               </div>
               <!-- Search Filters -->
-              <div class="collapse" id="filterCollapse">
+              <div class="collapse{% if filters.orderNumber or filters.mobile or filters.customerName or filters.zone or filters.cStatus or filters.dateRange or filters.codStatus or filters.dlStatus or filters.deliveredRange %} show{% endif %}" id="filterCollapse">
                 <div style="padding: 0.5rem 0.625rem; background: var(--brand-grey-50); border: 1px solid var(--brand-grey-200); border-top: none; border-radius: 0 0 var(--brand-radius-sm) var(--brand-radius-sm);">
                   <div class="row g-2">
                     <div class="col-6 col-md-4 col-lg-2">
@@ -205,6 +367,7 @@
       </div>
     </section>
   </div>
+  </div><!-- end desktop view -->
 {% endblock content %}
 {% block extra_js %}
   <script type="text/javascript"
@@ -251,6 +414,47 @@
     if (dateRange) handleDateRange(dateRange);
     const deliveredRange = document.getElementById('deliveredRange');
     if (deliveredRange) handleDeliveredRange(deliveredRange);
+
+    // Mobile filter panel toggle
+    var filterToggle = document.getElementById('orders_mobile_filter_toggle');
+    var filterPanel = document.getElementById('orders_mobile_filter_panel');
+    if (filterToggle && filterPanel) {
+      filterToggle.addEventListener('click', function() {
+        filterPanel.style.display = filterPanel.style.display === 'none' ? 'block' : 'none';
+      });
+    }
+
+    // Mobile quick filter pills
+    document.querySelectorAll('.pwa-mobile-quick-filter').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var form = document.getElementById('mobileFilterForm');
+        // Reset all mobile form fields
+        form.querySelectorAll('input[type="text"]').forEach(function(el) { el.value = ''; });
+        form.querySelectorAll('select').forEach(function(el) {
+          if (el.name !== 'sort' && el.name !== 'dir') el.value = '';
+        });
+
+        var filterType = this.dataset.filter;
+        switch(filterType) {
+          case 'today':
+            form.querySelector('[name="dateRange"]').value = 'today';
+            break;
+          case 'pending':
+            form.querySelector('[name="cStatus"]').value = 'to_review';
+            break;
+          case 'with_cod':
+            form.querySelector('[name="codStatus"]').value = 'with_cod';
+            break;
+          case 'delivered':
+            form.querySelector('[name="dlStatus"]').value = '2';
+            break;
+          case 'failed':
+            form.querySelector('[name="dlStatus"]').value = '3';
+            break;
+        }
+        form.submit();
+      });
+    });
   });
 
   // Clear all filters
@@ -462,5 +666,21 @@
     if (filterKey === 'dateRange') handleDateRange(document.getElementById('dateRange'));
     document.getElementById('filterForm').submit();
   }
+
+  // Sort functionality for table headers
+  document.addEventListener('click', function(e) {
+    const header = e.target.closest('.sortable-header');
+    if (!header) return;
+    const sortField = header.getAttribute('data-sort');
+    const currentSort = document.getElementById('sortField').value;
+    const currentDir = document.getElementById('sortDir').value;
+    document.getElementById('sortField').value = sortField;
+    if (sortField === currentSort && currentDir === 'desc') {
+      document.getElementById('sortDir').value = 'asc';
+    } else {
+      document.getElementById('sortDir').value = 'desc';
+    }
+    document.getElementById('filterForm').submit();
+  });
   </script>
 {% endblock extra_js %}
