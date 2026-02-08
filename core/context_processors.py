@@ -68,11 +68,23 @@ def get_cached_business(request):
         request._cached_user_business = business
         return business
 
+    # Check if decorator already injected business
+    if hasattr(request, 'current_business') and request.current_business:
+        request._cached_user_business = request.current_business
+        return request.current_business
+
     from business.models import Business
     try:
         business = Business.objects.filter(user_id=request.user.id).first()
-        request._cached_user_business = business
-        return business
+        if business:
+            request._cached_user_business = business
+            return business
+
+        # Check if user is a team member (not just owner)
+        from business.decorators import get_user_business_access
+        team_business, access_type, team_profile = get_user_business_access(request.user, request)
+        request._cached_user_business = team_business
+        return team_business
     except Exception:
         request._cached_user_business = None
         return None

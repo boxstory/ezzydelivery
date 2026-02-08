@@ -1168,6 +1168,14 @@ def delete_order(request, order_id):
         order = orders_models.Order.objects.get(id=order_id, business=business)
 
         logger.info(f"User {request.user.id} deleting order {order_id}")
+
+        # Clean up related records that use on_delete=DO_NOTHING
+        # These FK constraints would block order deletion in PostgreSQL
+        from delivery import models as delivery_models
+        delivery_models.DeliveryTask.objects.filter(order=order).delete()
+        delivery_models.DlAddressUpdate.objects.filter(order=order).delete()
+        orders_models.OrderBarcode.objects.filter(order=order).delete()
+
         order.delete()
         logger.info(f"Order {order_id} deleted successfully")
         messages.success(request, "Order deleted successfully")
