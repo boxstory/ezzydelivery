@@ -18,12 +18,46 @@ TERMINAL_ORDER_STATUSES = ['delivered', 'fulfilled', 'cancelled']
 
 @receiver(pre_save, sender=DeliveryTask)
 def delivery_task_pre_save(sender, instance, **kwargs):
-    """Track old delivery task status for change detection in post_save"""
+    """Track old delivery task status for change detection in post_save.
+    Also block status changes when order is cancelled."""
     if instance.pk:
         try:
             old = DeliveryTask.objects.get(pk=instance.pk)
             instance._old_dl_task_status = old.dl_task_status
             instance._old_dl_task_status_dms = old.dl_task_status_dms
+
+            # Lock delivery statuses based on order state
+            if instance.order_id:
+                order = instance.order
+                # Block when order is cancelled (allow setting to cancelled only)
+                if order.order_status == 'cancelled':
+                    if instance.dl_task_status != 'cancelled' and instance.dl_task_status != old.dl_task_status:
+                        logger.warning(
+                            f"Blocked delivery status change '{old.dl_task_status}' -> '{instance.dl_task_status}' "
+                            f"for task {instance.dl_task_number}: order is cancelled"
+                        )
+                        instance.dl_task_status = old.dl_task_status
+                    if instance.dl_task_status_dms != '9' and instance.dl_task_status_dms != old.dl_task_status_dms:
+                        logger.warning(
+                            f"Blocked DMS status change '{old.dl_task_status_dms}' -> '{instance.dl_task_status_dms}' "
+                            f"for task {instance.dl_task_number}: order is cancelled"
+                        )
+                        instance.dl_task_status_dms = old.dl_task_status_dms
+
+                # Block when order is NOT verified (allow cancellation only)
+                elif order.verification_status != 'verified':
+                    if instance.dl_task_status != old.dl_task_status and instance.dl_task_status != 'cancelled':
+                        logger.warning(
+                            f"Blocked delivery status change '{old.dl_task_status}' -> '{instance.dl_task_status}' "
+                            f"for task {instance.dl_task_number}: order not verified (status={order.verification_status})"
+                        )
+                        instance.dl_task_status = old.dl_task_status
+                    if instance.dl_task_status_dms != old.dl_task_status_dms and instance.dl_task_status_dms != '9':
+                        logger.warning(
+                            f"Blocked DMS status change '{old.dl_task_status_dms}' -> '{instance.dl_task_status_dms}' "
+                            f"for task {instance.dl_task_number}: order not verified"
+                        )
+                        instance.dl_task_status_dms = old.dl_task_status_dms
         except DeliveryTask.DoesNotExist:
             pass
 
@@ -119,6 +153,25 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
                 logger.warning(f"Failed to push task {instance.dl_task_number} status update to DMS")
         except Exception as e:
             logger.exception(f"Error pushing task update to DMS in signal: {str(e)}")
+
+    # Log delivery task status changes to order status history
+    if not created and instance.order_id:
+        try:
+            from orders.signals import log_delivery_task_status_change
+            DL_STATUS_DISPLAY = dict(DeliveryTask.dl_task_status.field.choices)
+            DMS_STATUS_DISPLAY = dict(DeliveryTask.dl_task_status_dms.field.choices)
+
+            old_dl = getattr(instance, '_old_dl_task_status', None)
+            new_dl = instance.dl_task_status
+            if old_dl is not None and old_dl != new_dl:
+                log_delivery_task_status_change(instance, 'dl_task_status', old_dl, new_dl, DL_STATUS_DISPLAY)
+
+            old_dms = getattr(instance, '_old_dl_task_status_dms', None)
+            new_dms = instance.dl_task_status_dms
+            if old_dms is not None and old_dms != new_dms:
+                log_delivery_task_status_change(instance, 'dl_task_status_dms', old_dms, new_dms, DMS_STATUS_DISPLAY)
+        except Exception as e:
+            logger.error(f"Error logging delivery task status history: {e}")
 
     # Sync delivery task status → order status (for all non-creation saves)
     if not created:

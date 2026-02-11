@@ -1,39 +1,36 @@
 {% comment %}
-Tasks Table View Component
+Unified Tasks Table View Component
 Usage: {% include "workforce/parts/components/_tasks_table_view.html" with tasks=dl_tasks %}
 
 Required context:
 - tasks: Paginated queryset of delivery tasks (DeliveryTask objects)
 
-Each task should have:
-- dl_task_number, dl_task_date, dl_task_status_client, dl_task_status_dms
-- order (with customer_name, customer_phone)
-- driver, dl_task_publish
+Each task should have select_related: order, driver, business, pickup_location, order__business
 {% endcomment %}
 
-<div class="tasks-table-wrapper" id="tasksTableContainer">
+<div class="dl-table-wrapper" id="tasksTableContainer">
     <!-- Bulk Actions Bar -->
-    <div class="bulk-actions-bar" id="bulkActionsBar" style="display: none;">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 p-2 bg-primary text-white rounded-top">
-            <div class="d-flex align-items-center gap-2">
-                <span class="selected-count fw-bold"><span id="selectedCount">0</span> selected</span>
+    <div class="dl-bulk-bar" id="bulkActionsBar" style="display: none;">
+        <div class="dl-bulk-bar__inner">
+            <div class="dl-bulk-bar__left">
+                <span class="dl-bulk-bar__count"><span id="selectedCount">0</span> selected</span>
                 <button type="button" class="btn btn-sm btn-light" onclick="clearAllSelections()">
-                    <i class="fa-solid fa-times me-1"></i>Clear
+                    <i class="fa-solid fa-xmark me-1"></i>Clear
                 </button>
             </div>
-            <div class="d-flex gap-2 flex-wrap">
+            <div class="dl-bulk-bar__actions">
                 <button type="button" class="btn btn-sm btn-light" onclick="bulkAction('print')" title="Print Selected">
                     <i class="fa-solid fa-print me-1"></i>Print
                 </button>
                 <button type="button" class="btn btn-sm btn-light" onclick="bulkAction('publish_dms')" title="Publish to DMS">
-                    <i class="fa-solid fa-cloud-arrow-up me-1"></i>Publish DMS
+                    <i class="fa-solid fa-cloud-arrow-up me-1"></i>DMS
                 </button>
                 <button type="button" class="btn btn-sm btn-light" onclick="bulkAction('publish_app')" title="Publish to App">
-                    <i class="fa-solid fa-mobile-screen me-1"></i>To App
+                    <i class="fa-solid fa-mobile-screen me-1"></i>App
                 </button>
                 <div class="dropdown">
                     <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        <i class="fa-solid fa-sync me-1"></i>Change Status
+                        <i class="fa-solid fa-sync me-1"></i>Status
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="#" onclick="bulkAction('status_pending')">Pending</a></li>
@@ -45,7 +42,7 @@ Each task should have:
                         <li><a class="dropdown-item" href="#" onclick="bulkAction('status_cancelled')">Cancelled</a></li>
                     </ul>
                 </div>
-                <button type="button" class="btn btn-sm btn-warning" onclick="bulkAction('export')" title="Export Selected">
+                <button type="button" class="btn btn-sm btn-warning" onclick="bulkAction('export')" title="Export">
                     <i class="fa-solid fa-download me-1"></i>Export
                 </button>
             </div>
@@ -53,81 +50,160 @@ Each task should have:
     </div>
 
     <div class="table-responsive">
-        <table class="table table-sm table-hover tasks-table mb-0">
-            <thead class="table-light">
+        <table class="dl-table">
+            <thead>
                 <tr>
-                    <th class="th-checkbox">
+                    <th class="dl-table__th-check">
                         <input type="checkbox" class="form-check-input" id="selectAllTasks" onchange="toggleSelectAll(this)">
                     </th>
-                    <th class="sortable" data-sort="task_number" onclick="sortTable('task_number')">
-                        Task # <i class="fa-solid fa-sort sort-icon"></i>
+                    <th class="dl-table__th-id sortable" data-sort="task_number" onclick="sortTable('task_number')">
+                        Task / Order <i class="fa-solid fa-sort sort-icon"></i>
                     </th>
-                    <th class="sortable" data-sort="date" onclick="sortTable('date')">
+                    <th class="dl-table__th-date sortable" data-sort="date" onclick="sortTable('date')">
                         Date <i class="fa-solid fa-sort sort-icon"></i>
                     </th>
-                    <th class="sortable" data-sort="customer" onclick="sortTable('customer')">
+                    <th class="dl-table__th-seller sortable" data-sort="business" onclick="sortTable('business')">
+                        Seller <i class="fa-solid fa-sort sort-icon"></i>
+                    </th>
+                    <th class="dl-table__th-customer sortable" data-sort="customer" onclick="sortTable('customer')">
                         Customer <i class="fa-solid fa-sort sort-icon"></i>
                     </th>
-                    <th>Mobile</th>
-                    <th class="sortable" data-sort="driver" onclick="sortTable('driver')">
-                        Driver <i class="fa-solid fa-sort sort-icon"></i>
+                    <th class="dl-table__th-zone">Zone / Address</th>
+                    <th class="dl-table__th-cod sortable" data-sort="cod" onclick="sortTable('cod')">
+                        COD <i class="fa-solid fa-sort sort-icon"></i>
                     </th>
-                    <th class="sortable" data-sort="status" onclick="sortTable('status')">
-                        Status <i class="fa-solid fa-sort sort-icon"></i>
+                    <th class="dl-table__th-verify">Verify</th>
+                    <th class="dl-table__th-status sortable" data-sort="status" onclick="sortTable('status')">
+                        DL Status <i class="fa-solid fa-sort sort-icon"></i>
                     </th>
-                    <th class="sortable" data-sort="dms_status" onclick="sortTable('dms_status')">
+                    <th class="dl-table__th-dms sortable" data-sort="dms_status" onclick="sortTable('dms_status')">
                         DMS <i class="fa-solid fa-sort sort-icon"></i>
                     </th>
-                    <th class="text-center">Actions</th>
+                    <th class="dl-table__th-driver sortable" data-sort="driver" onclick="sortTable('driver')">
+                        Driver <i class="fa-solid fa-sort sort-icon"></i>
+                    </th>
+                    <th class="dl-table__th-actions">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for dl in tasks %}
-                <tr data-task-id="{{ dl.id }}">
-                    <td class="td-checkbox">
+                <tr class="dl-table__row" data-task-id="{{ dl.id }}" onclick="window.location.href='/workforce/delivery-task/{{ dl.id }}/'" style="cursor:pointer;">
+                    <td class="dl-table__td-check" onclick="event.stopPropagation();">
                         <input type="checkbox" class="form-check-input task-checkbox" value="{{ dl.id }}" onchange="updateBulkSelection()">
                     </td>
-                    <td class="fw-semibold">{{ dl.dl_task_number }}</td>
-                    <td>{{ dl.dl_task_date|date:"d M"|default:"N/A" }}</td>
-                    <td>{{ dl.order.customer_name|default:"N/A"|truncatechars:20 }}</td>
-                    <td>{{ dl.order.customer_phone|default:"N/A" }}</td>
-                    <td>{{ dl.driver|default:"-"|truncatechars:15 }}</td>
-                    <td>
-                        <div class="d-flex align-items-center gap-1">
-                            {% if dl.dl_task_status_client %}
-                            <span class="status-badge status-{{ dl.dl_task_status_client }}">
-                                {{ dl.get_dl_task_status_client_display }}
-                            </span>
-                            {% else %}-{% endif %}
-                            <button class="btn btn-link btn-sm p-0 ms-1 text-secondary" data-bs-toggle="modal" data-bs-target="#statusModal" data-task-id="{{ dl.id }}" data-task-number="{{ dl.dl_task_number }}" onclick="setStatusModalTask(this)" title="Update Status">
-                                <i class="fa-solid fa-pen-to-square"></i>
-                            </button>
+                    <!-- Task # + Order # stacked -->
+                    <td class="dl-table__td-id">
+                        <div class="dl-table__id-stack">
+                            <span class="dl-table__task-num">{{ dl.dl_task_number|default:"—" }}</span>
+                            <span class="dl-table__order-num" title="{{ dl.order.client_order_code }}">{{ dl.order.client_order_code|default:"—"|truncatechars:14 }}</span>
                         </div>
                     </td>
-                    <td>
-                        <div class="d-flex align-items-center gap-1">
-                            {% if dl.dl_task_status_dms %}
-                            <span class="status-badge status-{{ dl.dl_task_status_dms }}">
-                                {{ dl.get_dl_task_status_dms_display }}
-                            </span>
-                            {% else %}-{% endif %}
-                            <button class="btn btn-link btn-sm p-0 ms-1 text-secondary" data-bs-toggle="modal" data-bs-target="#statusModal" data-task-id="{{ dl.id }}" data-task-number="{{ dl.dl_task_number }}" data-status-type="dms" onclick="setStatusModalTask(this)" title="Update DMS Status">
-                                <i class="fa-solid fa-pen-to-square"></i>
-                            </button>
+                    <!-- Date -->
+                    <td class="dl-table__td-date">
+                        {{ dl.dl_task_date|date:"d M"|default:"—" }}
+                    </td>
+                    <!-- Seller -->
+                    <td class="dl-table__td-seller" title="{{ dl.order.business.business_name }}">
+                        {{ dl.order.business.business_name|default:"—"|truncatechars:16 }}
+                    </td>
+                    <!-- Customer (name + phone stacked) -->
+                    <td class="dl-table__td-customer">
+                        <div class="dl-table__customer-stack">
+                            <span class="dl-table__customer-name">{{ dl.order.customer_name|default:"—"|truncatechars:18 }}</span>
+                            <span class="dl-table__customer-phone">{{ dl.order.customer_phone|default:"—" }}</span>
                         </div>
                     </td>
-                    <td class="text-center">
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-info btn-sm" onclick="viewTaskDetail({{ dl.id }})" title="View Details">
+                    <!-- Zone / Address -->
+                    <td class="dl-table__td-zone">
+                        {% if dl.order.dl_zone %}
+                        <span class="dl-table__zone-badge">Z{{ dl.order.dl_zone }}</span>
+                        {% endif %}
+                        <span class="dl-table__address" title="{{ dl.order.customer_address }}">{{ dl.order.customer_address|default:"—"|truncatechars:20 }}</span>
+                    </td>
+                    <!-- COD -->
+                    <td class="dl-table__td-cod">
+                        {% if dl.order.cod_amount and dl.order.cod_amount > 0 %}
+                        <span class="dl-table__cod-amount{% if dl.cod_collected %} dl-table__cod-amount--collected{% endif %}">
+                            {{ dl.order.cod_amount }} QR
+                        </span>
+                        {% else %}
+                        <span class="dl-table__cod-none">—</span>
+                        {% endif %}
+                    </td>
+                    <!-- Verification -->
+                    <td class="dl-table__td-verify">
+                        {% if dl.order.verification_status == 'verified' %}
+                        <span class="dl-table__verify-icon dl-table__verify-icon--verified" title="Verified">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </span>
+                        {% elif dl.order.verification_status == 'rejected' %}
+                        <span class="dl-table__verify-icon dl-table__verify-icon--rejected" title="Rejected">
+                            <i class="fa-solid fa-circle-xmark"></i>
+                        </span>
+                        {% elif dl.order.verification_status == 'address_verified' %}
+                        <span class="dl-table__verify-icon dl-table__verify-icon--address" title="Address Verified">
+                            <i class="fa-solid fa-location-check"></i>
+                        </span>
+                        {% else %}
+                        <span class="dl-table__verify-icon dl-table__verify-icon--pending" title="Pending: {{ dl.order.get_verification_status_display }}">
+                            <i class="fa-solid fa-clock"></i>
+                        </span>
+                        {% endif %}
+                    </td>
+                    <!-- Status -->
+                    <td class="dl-table__td-status" onclick="event.stopPropagation();">
+                        {% if dl.dl_task_status %}
+                        <span class="dl-badge dl-badge--{{ dl.dl_task_status }}">
+                            {{ dl.get_dl_task_status_display }}
+                        </span>
+                        {% else %}—{% endif %}
+                        <button class="dl-table__edit-btn" data-bs-toggle="modal" data-bs-target="#statusModal"
+                            data-task-id="{{ dl.id }}"
+                            data-task-number="{{ dl.dl_task_number }}"
+                            data-current-status="{{ dl.dl_task_status }}"
+                            data-driver-id="{{ dl.driver_id|default:'' }}"
+                            data-driver-name="{{ dl.driver|default:'' }}"
+                            data-customer-name="{{ dl.order.customer_name|default:'' }}"
+                            onclick="setStatusModalTask(this)" title="Update Status">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                    </td>
+                    <!-- DMS Status -->
+                    <td class="dl-table__td-dms" onclick="event.stopPropagation();">
+                        {% if dl.dl_task_status_dms %}
+                        <span class="dl-badge dl-badge--dms-{{ dl.dl_task_status_dms }}">
+                            {{ dl.get_dl_task_status_dms_display }}
+                        </span>
+                        {% else %}—{% endif %}
+                        <button class="dl-table__edit-btn" data-bs-toggle="modal" data-bs-target="#statusModal"
+                            data-task-id="{{ dl.id }}"
+                            data-task-number="{{ dl.dl_task_number }}"
+                            data-status-type="dms"
+                            data-current-dms="{{ dl.dl_task_status_dms }}"
+                            data-driver-id="{{ dl.driver_id|default:'' }}"
+                            data-driver-name="{{ dl.driver|default:'' }}"
+                            onclick="setStatusModalTask(this)" title="Update DMS">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                    </td>
+                    <!-- Driver -->
+                    <td class="dl-table__td-driver">
+                        {% if dl.driver %}
+                        <span class="dl-table__driver-name">{{ dl.driver|truncatechars:12 }}</span>
+                        {% else %}
+                        <span class="dl-table__driver-none">—</span>
+                        {% endif %}
+                    </td>
+                    <!-- Actions -->
+                    <td class="dl-table__td-actions" onclick="event.stopPropagation();">
+                        <div class="dl-table__action-group">
+                            <a href="/workforce/delivery-task/{{ dl.id }}/" class="dl-table__action-btn dl-table__action-btn--view" title="View">
                                 <i class="fa-solid fa-eye"></i>
-                            </button>
-                            <button class="btn btn-outline-warning btn-sm" onclick="editTask({{ dl.id }})" title="Edit">
-                                <i class="fa-solid fa-edit"></i>
-                            </button>
-                            <a href="https://wa.me/{{ dl.order.customer_phone }}" target="_blank" class="btn btn-outline-success btn-sm" title="WhatsApp">
+                            </a>
+                            <a href="https://wa.me/{{ dl.order.customer_phone }}" target="_blank" class="dl-table__action-btn dl-table__action-btn--whatsapp" title="WhatsApp">
                                 <i class="fa-brands fa-whatsapp"></i>
                             </a>
-                            <button class="btn btn-outline-primary btn-sm" onclick="publishToDMS({{ dl.id }})" title="Publish DMS" {% if dl.dl_task_publish %}disabled{% endif %}>
+                            <button class="dl-table__action-btn dl-table__action-btn--publish" onclick="publishToDMS({{ dl.id }})" title="Publish DMS" {% if dl.dl_task_publish %}disabled{% endif %}>
                                 <i class="fa-solid fa-cloud-arrow-up"></i>
                             </button>
                         </div>
@@ -135,7 +211,7 @@ Each task should have:
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="9" class="text-center py-4 text-muted">
+                    <td colspan="12" class="dl-table__empty">
                         <i class="fa-solid fa-inbox me-2"></i>No tasks to display
                     </td>
                 </tr>

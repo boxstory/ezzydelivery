@@ -5,6 +5,7 @@
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
 <link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 {% endblock extra_css %}
 
 {% block content %}
@@ -13,7 +14,7 @@
     <div class="task-header">
         <div class="d-flex justify-content-between align-items-center">
             <div>
-                <h2><i class="fa-solid fa-clipboard-check me-2"></i>Delivery Task #{{ task.dl_task_code }}</h2>
+                <h2><i class="fa-solid fa-clipboard-check me-2"></i>Delivery Task #{{ task.dl_task_number }}</h2>
                 <p class="mb-0 opacity-75">Order: {{ task.order.client_order_code }}</p>
             </div>
             <div class="text-end">
@@ -69,66 +70,239 @@
                     <h3 class="info-card-title">
                         <i class="fa-solid fa-mobile-screen text-success"></i>
                         Driver App Updates
+                        {% if driver_status_updates or driver_documents %}
+                        <span class="badge bg-success rounded-pill ms-1">{{ driver_status_updates.count|add:driver_documents.count }}</span>
+                        {% endif %}
                     </h3>
-                    <small class="text-muted">Auto-refreshes every hour</small>
                 </div>
-                <div class="driver-updates-list">
-                    {% if driver_updates %}
-                    {% for update in driver_updates %}
-                    <div class="driver-update-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <div class="update-timestamp">
-                                    <i class="fa-solid fa-clock me-1"></i>
-                                    {{ update.timestamp|date:"M d, Y H:i" }}
-                                </div>
-                                <div class="update-content">
-                                    <strong>{{ update.update_type|title }}:</strong> {{ update.description }}
-                                </div>
-                                {% if update.location %}
-                                <div class="mt-2 text-muted small">
-                                    <i class="fa-solid fa-map-marker-alt me-1"></i>
-                                    Location: {{ update.location.latitude }}, {{ update.location.longitude }}
-                                </div>
+                <div class="driver-updates-list p-3">
+                    {% if driver_status_updates or driver_documents %}
+
+                    <!-- DMS / Driver Status Changes -->
+                    {% for entry in driver_status_updates %}
+                    <div class="d-flex align-items-start mb-3">
+                        <div class="me-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center {% if entry.field_name == 'dl_task_status_dms' %}bg-primary{% else %}bg-info{% endif %} bg-opacity-10" style="width:36px;height:36px;">
+                                {% if entry.field_name == 'dl_task_status_dms' %}
+                                <i class="fa-solid fa-satellite-dish text-primary small"></i>
+                                {% else %}
+                                <i class="fa-solid fa-truck-fast text-info small"></i>
                                 {% endif %}
                             </div>
-                            <span class="badge bg-{{ update.status_color }} ms-2">{{ update.status }}</span>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold small">{{ entry.get_field_name_display }}</div>
+                            <div class="small">
+                                {% if entry.old_display %}<span class="text-muted">{{ entry.old_display }}</span> <i class="fa-solid fa-arrow-right small text-muted mx-1"></i>{% endif %}
+                                <span class="fw-semibold {% if entry.new_value == 'delivered' or entry.new_value == '2' %}text-success{% elif entry.new_value == 'cancelled' or entry.new_value == '9' %}text-danger{% else %}text-primary{% endif %}">{{ entry.new_display }}</span>
+                            </div>
+                            <div class="text-muted small mt-1">
+                                <i class="fa-regular fa-clock me-1"></i>{{ entry.created_at|date:"d M Y, H:i" }}
+                                {% if entry.changed_by %}<span class="ms-2"><i class="fa-regular fa-user me-1"></i>{{ entry.changed_by.get_full_name|default:entry.changed_by.username }}</span>{% endif %}
+                            </div>
                         </div>
                     </div>
                     {% endfor %}
+
+                    <!-- Document Uploads -->
+                    {% for doc in driver_documents %}
+                    <div class="d-flex align-items-start mb-3">
+                        <div class="me-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center bg-success bg-opacity-10" style="width:36px;height:36px;">
+                                <i class="fa-solid fa-file-arrow-up text-success small"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold small">{{ doc.get_document_type_display }}</div>
+                            {% if doc.description %}<div class="small text-muted">{{ doc.description }}</div>{% endif %}
+                            {% if doc.document_file %}
+                            <a href="{{ doc.document_file.url }}" target="_blank" class="small text-primary mt-1 d-inline-block">
+                                <i class="fa-solid fa-paperclip me-1"></i>{{ doc.document_name|default:"View file" }}
+                            </a>
+                            {% endif %}
+                            <div class="text-muted small mt-1">
+                                <i class="fa-regular fa-clock me-1"></i>{{ doc.created_at|date:"d M Y, H:i" }}
+                                {% if doc.uploaded_by %}<span class="ms-2"><i class="fa-regular fa-user me-1"></i>{{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username }}</span>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+
                     {% else %}
-                    <div class="text-center py-4 text-muted">
-                        <i class="fa-solid fa-inbox fa-2x mb-3 opacity-50"></i>
-                        <p>No driver updates yet</p>
+                    <!-- No activity — show task summary -->
+                    <div class="mb-3">
+                        <div class="d-flex align-items-start mb-3">
+                            <div class="me-3">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center bg-secondary bg-opacity-10" style="width:36px;height:36px;">
+                                    <i class="fa-solid fa-plus text-secondary small"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold small">Task Created</div>
+                                <div class="text-muted small mt-1"><i class="fa-regular fa-clock me-1"></i>{{ task.created_at|date:"d M Y, H:i" }}</div>
+                            </div>
+                        </div>
+                        {% if task.driver %}
+                        <div class="d-flex align-items-start mb-3">
+                            <div class="me-3">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary bg-opacity-10" style="width:36px;height:36px;">
+                                    <i class="fa-solid fa-user-check text-primary small"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold small">Driver Assigned</div>
+                                <div class="small">{{ task.driver.driver_code }} — {{ task.driver.user.get_full_name|default:task.driver.driver_phone }}</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="d-flex align-items-start">
+                            <div class="me-3">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center {% if task.dl_task_status == 'delivered' %}bg-success{% elif task.dl_task_status == 'cancelled' %}bg-danger{% else %}bg-warning{% endif %} bg-opacity-10" style="width:36px;height:36px;">
+                                    {% if task.dl_task_status == 'delivered' %}<i class="fa-solid fa-check text-success small"></i>
+                                    {% elif task.dl_task_status == 'cancelled' %}<i class="fa-solid fa-xmark text-danger small"></i>
+                                    {% else %}<i class="fa-solid fa-clock text-warning small"></i>{% endif %}
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold small">Current Status</div>
+                                <div class="small">
+                                    <span class="badge bg-{% if task.dl_task_status == 'delivered' %}success{% elif task.dl_task_status == 'cancelled' %}danger{% elif task.dl_task_status == 'in_transit' or task.dl_task_status == 'out_for_delivery' %}primary{% else %}warning{% endif %}">{{ task.get_dl_task_status_display }}</span>
+                                    <span class="badge bg-secondary ms-1">DMS: {{ task.get_dl_task_status_dms_display }}</span>
+                                </div>
+                                <div class="text-muted small mt-1"><i class="fa-regular fa-clock me-1"></i>{{ task.updated_at|date:"d M Y, H:i" }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center pt-2 border-top">
+                        <small class="text-muted"><i class="fa-solid fa-info-circle me-1"></i>Status tracking started — future driver activity will appear here</small>
                     </div>
                     {% endif %}
                 </div>
             </div>
 
             <!-- Status Timeline -->
-            <div class="info-card">
-                <div class="info-card-header">
-                    <h3 class="info-card-title">
-                        <i class="fa-solid fa-timeline text-info"></i>
+            <div class="card tl-card">
+                <div class="card-header tl-header">
+                    <div class="tl-header__left">
+                        <i class="fa-solid fa-clock-rotate-left me-2"></i>
                         Status Timeline
-                    </h3>
-                </div>
-                <div class="status-timeline">
-                    {% if status_history %}
-                    {% for status in status_history %}
-                    <div class="timeline-item {% if forloop.first %}active{% endif %}">
-                        <div class="d-flex justify-content-between">
-                            <strong>{{ status.status|title }}</strong>
-                            <small class="text-muted">{{ status.created_at|date:"M d, H:i" }}</small>
-                        </div>
-                        {% if status.note %}
-                        <small class="text-muted d-block mt-1">{{ status.note }}</small>
-                        {% endif %}
                     </div>
-                    {% endfor %}
-                    {% else %}
-                    <p class="text-muted">No status updates yet</p>
-                    {% endif %}
+                    <span class="tl-header__count">{{ status_history.count|default:"0" }} event{{ status_history.count|pluralize }}</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="tl-wrap">
+                        <!-- Task Created -->
+                        <div class="tl-item tl-item--first">
+                            <div class="tl-track">
+                                <div class="tl-icon tl-icon--created"><i class="fa-solid fa-plus"></i></div>
+                            </div>
+                            <div class="tl-body">
+                                <div class="tl-card-inner tl-card-inner--created">
+                                    <div class="tl-row">
+                                        <span class="tl-title">Order Created</span>
+                                        <span class="tl-timestamp"><i class="fa-regular fa-clock"></i> {{ task.order.created_at|date:"d M Y, H:i" }}</span>
+                                    </div>
+                                    <div class="tl-detail">
+                                        <span class="tl-pill tl-pill--muted">{{ task.order.order_number }}</span>
+                                        <span class="tl-pill tl-pill--muted">{{ task.order.business.business_name }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% for entry in status_history %}
+                        <div class="tl-item">
+                            <div class="tl-track">
+                                <div class="tl-icon {% if entry.field_name == 'order_status' %}tl-icon--order{% elif entry.field_name == 'verification_status' %}tl-icon--verify{% elif entry.field_name == 'dl_task_status' %}tl-icon--task{% elif entry.field_name == 'dl_task_status_dms' %}tl-icon--dms{% elif entry.field_name == 'cod_status_by_staff' %}tl-icon--cod{% else %}tl-icon--default{% endif %}">
+                                    {% if entry.field_name == 'order_status' %}<i class="fa-solid fa-box"></i>
+                                    {% elif entry.field_name == 'verification_status' %}<i class="fa-solid fa-shield-halved"></i>
+                                    {% elif entry.field_name == 'dl_task_status' %}<i class="fa-solid fa-truck-fast"></i>
+                                    {% elif entry.field_name == 'dl_task_status_dms' %}<i class="fa-solid fa-satellite-dish"></i>
+                                    {% elif entry.field_name == 'cod_status_by_staff' %}<i class="fa-solid fa-money-bill-wave"></i>
+                                    {% elif entry.field_name == 'task_status' %}<i class="fa-solid fa-list-check"></i>
+                                    {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
+                                </div>
+                            </div>
+                            <div class="tl-body">
+                                <div class="tl-card-inner">
+                                    <div class="tl-row">
+                                        <span class="tl-title">{{ entry.get_field_name_display }}</span>
+                                        <span class="tl-timestamp"><i class="fa-regular fa-clock"></i> {{ entry.created_at|date:"d M Y, H:i" }}</span>
+                                    </div>
+                                    <div class="tl-transition">
+                                        {% if entry.old_display %}
+                                        <span class="tl-pill tl-pill--from">{{ entry.old_display }}</span>
+                                        <span class="tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
+                                        {% endif %}
+                                        <span class="tl-pill {% if entry.new_value == 'delivered' or entry.new_value == 'fulfilled' or entry.new_value == 'verified' or entry.new_value == '2' %}tl-pill--success{% elif entry.new_value == 'cancelled' or entry.new_value == 'rejected' or entry.new_value == 'failed' or entry.new_value == '3' or entry.new_value == '9' %}tl-pill--danger{% else %}tl-pill--to{% endif %}">{{ entry.new_display }}</span>
+                                    </div>
+                                    {% if entry.notes %}<div class="tl-note"><i class="fa-regular fa-message"></i> {{ entry.notes }}</div>{% endif %}
+                                    {% if entry.changed_by %}<div class="tl-meta"><i class="fa-regular fa-user"></i> {{ entry.changed_by.get_full_name|default:entry.changed_by.username }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        {% endfor %}
+
+                        {% if not status_history %}
+                        {% for log in verification_logs %}
+                        <div class="tl-item">
+                            <div class="tl-track">
+                                <div class="tl-icon tl-icon--verify"><i class="fa-solid fa-shield-halved"></i></div>
+                            </div>
+                            <div class="tl-body">
+                                <div class="tl-card-inner">
+                                    <div class="tl-row">
+                                        <span class="tl-title">{{ log.action }}</span>
+                                        <span class="tl-timestamp"><i class="fa-regular fa-clock"></i> {{ log.created_at|date:"d M Y, H:i" }}</span>
+                                    </div>
+                                    <div class="tl-transition">
+                                        {% if log.old_status %}
+                                        <span class="tl-pill tl-pill--from">{{ log.old_status }}</span>
+                                        <span class="tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
+                                        {% endif %}
+                                        <span class="tl-pill tl-pill--to">{{ log.new_status }}</span>
+                                    </div>
+                                    {% if log.verified_by %}<div class="tl-meta"><i class="fa-regular fa-user"></i> {{ log.verified_by.get_full_name|default:log.verified_by.username }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+
+                        <!-- Current State -->
+                        <div class="tl-item tl-item--last">
+                            <div class="tl-track">
+                                <div class="tl-icon tl-icon--now"><i class="fa-solid fa-location-dot"></i></div>
+                            </div>
+                            <div class="tl-body">
+                                <div class="tl-card-inner tl-card-inner--now">
+                                    <div class="tl-row">
+                                        <span class="tl-title">Current State</span>
+                                        <span class="tl-timestamp"><i class="fa-regular fa-clock"></i> {{ task.order.updated_at|date:"d M Y, H:i" }}</span>
+                                    </div>
+                                    <div class="tl-now-grid">
+                                        <div class="tl-now-cell">
+                                            <span class="tl-now-label">Order</span>
+                                            <span class="tl-pill tl-pill--live">{{ task.order.get_order_status_display }}</span>
+                                        </div>
+                                        <div class="tl-now-cell">
+                                            <span class="tl-now-label">Verification</span>
+                                            <span class="tl-pill {% if task.order.verification_status == 'verified' %}tl-pill--success{% elif task.order.verification_status == 'rejected' %}tl-pill--danger{% else %}tl-pill--live{% endif %}">{{ task.order.get_verification_status_display }}</span>
+                                        </div>
+                                        <div class="tl-now-cell">
+                                            <span class="tl-now-label">Delivery</span>
+                                            <span class="tl-pill tl-pill--live-alt">{{ task.get_dl_task_status_display }}</span>
+                                        </div>
+                                        <div class="tl-now-cell">
+                                            <span class="tl-now-label">DMS</span>
+                                            <span class="tl-pill tl-pill--live-dms">{{ task.get_dl_task_status_dms_display }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -173,7 +347,7 @@
                     </button>
                     {% endif %}
 
-                    <button class="btn btn-outline-primary" onclick="assignDriver({{ task.id }})">
+                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignDriverModal">
                         <i class="fa-solid fa-user-plus me-2"></i>Assign Driver
                     </button>
 
@@ -183,38 +357,58 @@
                 </div>
             </div>
 
+            <!-- Delivery Map -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <h3 class="info-card-title">
+                        <i class="fa-solid fa-map-location-dot text-danger"></i>
+                        Delivery Location
+                    </h3>
+                </div>
+                <div id="taskMapContainer" style="height: 260px; background: var(--brand-grey-100); position: relative;">
+                    <div id="taskMap" style="height: 100%; width: 100%; z-index: 1;"></div>
+                    <div id="mapLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--brand-grey-100);z-index:2;">
+                        <span style="font-size:0.75rem;color:var(--brand-grey-500);"><i class="fa-solid fa-spinner fa-spin me-1"></i>Loading map...</span>
+                    </div>
+                </div>
+                <div style="padding:0.5rem 0.75rem; font-size:0.6875rem; color:var(--brand-grey-600); border-top:1px solid var(--brand-grey-200);">
+                    <i class="fa-solid fa-location-dot text-danger me-1"></i>
+                    {% if task.order.dl_zone %}Zone {{ task.order.dl_zone }}{% endif %}{% if task.order.dl_street %}, St {{ task.order.dl_street }}{% endif %}{% if task.order.dl_building %}, Bldg {{ task.order.dl_building }}{% endif %}
+                    {% if task.order.customer_address %}<span class="ms-1 text-muted">{{ task.order.customer_address|truncatechars:50 }}</span>{% endif %}
+                    {% if task.pickup_location %}
+                    <br><i class="fa-solid fa-store text-primary me-1"></i>Pickup: {{ task.pickup_location.pickup_location_title|default:"Seller Location" }}
+                    {% endif %}
+                </div>
+            </div>
+
             <!-- Seller Comments -->
             <div class="info-card">
                 <div class="info-card-header">
-                    <h3 class="info-card-title comment-badge">
+                    <h3 class="info-card-title">
                         <i class="fa-solid fa-comments text-primary"></i>
                         Seller Comments
-                        {% if unread_seller_comments_count > 0 %}
-                        <span class="badge bg-danger rounded-pill">{{ unread_seller_comments_count }}</span>
+                        {% if seller_comments %}
+                        <span class="badge bg-primary rounded-pill ms-1">{{ seller_comments.count }}</span>
                         {% endif %}
                     </h3>
                 </div>
-                <div class="comments-list  d-flex flex-wrap-reverse" style="max-height: 300px; overflow-y: auto;">
+                <div class="comments-list" style="max-height: 300px; overflow-y: auto;">
                     {% if seller_comments %}
                     {% for comment in seller_comments %}
-                    <div class="mb-3 p-2 rounded {% if not comment.is_read %}bg-light border-start border-primary border-3{% else %}bg-white{% endif %}">
-                        <small class="text-muted d-block mb-1">
-                            <strong>{{ comment.seller.business_name }}</strong> - {{ comment.created_at|date:"M d, H:i" }}
-                            {% if not comment.is_read %}
-                            <span class="badge bg-primary ms-1">New</span>
-                            {% endif %}
-                        </small>
-                        <p class="mb-0 small">{{ comment.content }}</p>
+                    <div class="mb-2 p-2 rounded bg-light">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong class="small">{{ comment.name|default:"Seller" }}</strong>
+                            <small class="text-muted">{{ comment.created_at|date:"d M, H:i" }}</small>
+                        </div>
+                        <p class="mb-0 small">{{ comment.body }}</p>
                     </div>
                     {% endfor %}
                     {% else %}
-                    <p class="text-muted small text-center py-3">No seller comments yet</p>
+                    <div class="text-center py-4 text-muted">
+                        <i class="fa-solid fa-comments fa-2x mb-2 opacity-50"></i>
+                        <p class="mb-0 small">No seller comments yet</p>
+                    </div>
                     {% endif %}
-                </div>
-                <div class="mt-3">
-                    <button class="btn btn-sm btn-outline-primary w-100" onclick="markCommentsAsRead({{ task.id }})">
-                        <i class="fa-solid fa-check-double me-1"></i>Mark All as Read
-                    </button>
                 </div>
             </div>
 
@@ -255,25 +449,58 @@
         </a>
     </div>
 </div>
+
+<!-- Assign Driver Modal -->
+<div class="modal fade" id="assignDriverModal" tabindex="-1" aria-labelledby="assignDriverModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="assignDriverModalLabel">
+                    <i class="fa-solid fa-user-plus me-2"></i>Assign Driver
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="driverSelect" class="form-label fw-semibold">Select Driver</label>
+                    <select class="form-select" id="driverSelect">
+                        <option value="">-- Choose a driver --</option>
+                        {% for driver in approved_drivers %}
+                        <option value="{{ driver.driver_id }}" {% if task.driver_id == driver.driver_id %}selected{% endif %}>
+                            {{ driver.driver_code }} — {{ driver.user.get_full_name|default:driver.driver_phone }}
+                        </option>
+                        {% empty %}
+                        <option value="" disabled>No approved drivers available</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if task.driver %}
+                <div class="alert alert-info py-2 mb-0">
+                    <small><i class="fa-solid fa-info-circle me-1"></i>Currently assigned: <strong>{{ task.driver.driver_code }}</strong> — {{ task.driver.user.get_full_name|default:task.driver.driver_phone }}</small>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnConfirmAssignDriver" onclick="assignDriver({{ task.id }})">
+                    <i class="fa-solid fa-check me-1"></i>Assign
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
+    function getCSRFToken() {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) return meta.getAttribute('content');
+        var input = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (input) return input.value;
+        return null;
     }
-    const csrftoken = getCookie('csrftoken');
+    const csrftoken = getCSRFToken();
 
     // Publish to DMS
     function publishToDMS(taskId) {
@@ -327,32 +554,43 @@
         }
     }
 
-    // Assign Driver
+    // Assign Driver (from modal)
     function assignDriver(taskId) {
-        const driverId = prompt('Enter Driver ID:');
-        if (driverId) {
-            fetch(`/workforce/delivery-task/${taskId}/assign-driver/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                },
-                body: JSON.stringify({ driver_id: driverId })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Driver assigned successfully!');
-                    location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to assign driver'));
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred');
-            });
+        const select = document.getElementById('driverSelect');
+        const driverId = select.value;
+        if (!driverId) {
+            alert('Please select a driver');
+            return;
         }
+        const btn = document.getElementById('btnConfirmAssignDriver');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Assigning...';
+
+        fetch(`/workforce/delivery-task/${taskId}/assign-driver/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({ driver_id: driverId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Driver assigned successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to assign driver'));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Assign';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Assign';
+        });
     }
 
     // Update Task Status
@@ -411,5 +649,119 @@
     setInterval(function() {
         location.reload();
     }, 3600000); // 1 hour in milliseconds
+</script>
+
+<!-- Leaflet Map -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function() {
+    var mapEl = document.getElementById('taskMap');
+    var loadingEl = document.getElementById('mapLoading');
+    if (!mapEl) return;
+
+    // Qatar center as default
+    var defaultLat = 25.2854;
+    var defaultLng = 51.5310;
+    var defaultZoom = 13;
+
+    // Delivery address info
+    var zone = '{{ task.order.dl_zone|default:"" }}';
+    var street = '{{ task.order.dl_street|default:"" }}';
+    var building = '{{ task.order.dl_building|default:"" }}';
+    var address = '{{ task.order.customer_address|default:""|escapejs }}';
+
+    // Pickup location coords (if available)
+    var pickupLat = {{ task.pickup_location.pickup_lat|default:"null" }};
+    var pickupLon = {{ task.pickup_location.pickup_lon|default:"null" }};
+    var pickupTitle = '{{ task.pickup_location.pickup_location_title|default:"Pickup"|escapejs }}';
+
+    // Initialize map
+    var map = L.map('taskMap', { zoomControl: true, attributionControl: false }).setView([defaultLat, defaultLng], defaultZoom);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+    }).addTo(map);
+
+    // Custom icons
+    var deliveryIcon = L.divIcon({
+        className: '',
+        html: '<div style="background:#dc2626;color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><i class="fa-solid fa-location-dot"></i></div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+        popupAnchor: [0, -28]
+    });
+
+    var pickupIcon = L.divIcon({
+        className: '',
+        html: '<div style="background:#2563eb;color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><i class="fa-solid fa-store"></i></div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+        popupAnchor: [0, -28]
+    });
+
+    var markers = [];
+
+    // Add pickup marker if coords exist
+    if (pickupLat && pickupLon) {
+        var pm = L.marker([pickupLat, pickupLon], { icon: pickupIcon })
+            .addTo(map)
+            .bindPopup('<strong>Pickup:</strong> ' + pickupTitle);
+        markers.push(pm);
+    }
+
+    // Build geocode query for delivery address
+    var query = '';
+    if (zone) query += 'Zone ' + zone + ', ';
+    if (street) query += 'Street ' + street + ', ';
+    if (building) query += 'Building ' + building + ', ';
+    if (address && !address.startsWith('Zone')) query += address + ', ';
+    query += 'Qatar';
+
+    // Geocode delivery address using Nominatim
+    fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&countrycodes=qa&limit=1', {
+        headers: { 'Accept': 'application/json' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        loadingEl.style.display = 'none';
+        if (data && data.length > 0) {
+            var lat = parseFloat(data[0].lat);
+            var lng = parseFloat(data[0].lon);
+            var dm = L.marker([lat, lng], { icon: deliveryIcon })
+                .addTo(map)
+                .bindPopup('<strong>Delivery:</strong><br>' + address + (zone ? '<br>Zone ' + zone : ''));
+            markers.push(dm);
+            dm.openPopup();
+
+            // Fit map to all markers
+            if (markers.length > 1) {
+                var group = L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.3));
+            } else {
+                map.setView([lat, lng], 15);
+            }
+        } else {
+            // No geocode result — show Qatar centered with zone label
+            if (markers.length > 0) {
+                map.setView([pickupLat, pickupLon], 14);
+            }
+            // Add a note on map
+            var fallback = L.marker([defaultLat, defaultLng], { icon: deliveryIcon })
+                .addTo(map)
+                .bindPopup('<strong>Delivery area:</strong><br>' + (zone ? 'Zone ' + zone + ', ' : '') + 'Qatar<br><small>Exact location unavailable</small>');
+            fallback.openPopup();
+        }
+    })
+    .catch(function() {
+        loadingEl.style.display = 'none';
+        // Fallback: show Qatar
+        if (markers.length > 0) {
+            map.setView([pickupLat, pickupLon], 14);
+        }
+    });
+
+    // Fix map tile rendering in hidden tabs / late-loading
+    setTimeout(function() { map.invalidateSize(); }, 300);
+})();
 </script>
 {% endblock extra_js %}

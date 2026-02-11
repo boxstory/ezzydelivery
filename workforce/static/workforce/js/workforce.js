@@ -32,6 +32,13 @@
     }
 
     function getCSRFToken() {
+        // 1. Try meta tag
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) return meta.getAttribute('content');
+        // 2. Try hidden input from any form
+        var input = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (input) return input.value;
+        // 3. Fallback to cookie (works when CSRF_COOKIE_HTTPONLY=False)
         return getCookie('csrftoken');
     }
 
@@ -385,47 +392,154 @@
         },
 
         setStatusModalTask: function(btn) {
-            const taskId = btn.getAttribute('data-task-id');
-            const taskNumber = btn.getAttribute('data-task-number');
+            var taskId = btn.getAttribute('data-task-id');
+            var taskNumber = btn.getAttribute('data-task-number');
+            var statusType = btn.getAttribute('data-status-type') || 'task';
+            var currentStatus = btn.getAttribute('data-current-status') || '';
+            var currentDms = btn.getAttribute('data-current-dms') || '';
+            var driverId = btn.getAttribute('data-driver-id') || '';
+            var driverName = btn.getAttribute('data-driver-name') || '';
+            var customerName = btn.getAttribute('data-customer-name') || '';
+
             document.getElementById('statusModalTaskId').value = taskId;
+            document.getElementById('statusModalStatusType').value = statusType;
             document.getElementById('statusModalTaskNumber').textContent = taskNumber;
-            document.getElementById('statusSelect').value = '';
+
+            // Customer name
+            var custEl = document.getElementById('statusModalCustomer');
+            if (custEl) custEl.textContent = customerName || '—';
+
+            // Current status badge
+            var badgeEl = document.getElementById('statusModalCurrentBadge');
+            if (badgeEl) {
+                var display = currentStatus ? currentStatus.replace(/_/g, ' ') : currentDms;
+                badgeEl.textContent = display || '—';
+                badgeEl.className = 'dl-badge dl-badge--' + (currentStatus || 'dms-' + currentDms);
+            }
+
+            // Pre-select current status
+            var selectEl = document.getElementById('statusSelect');
+            selectEl.value = currentStatus || '';
+
+            // Set current time
+            var timeEl = document.getElementById('statusModalTime');
+            if (timeEl) {
+                var now = new Date();
+                var offset = now.getTimezoneOffset();
+                var local = new Date(now.getTime() - offset * 60000);
+                timeEl.value = local.toISOString().slice(0, 16);
+            }
+
+            // Clear notes
+            var notesEl = document.getElementById('statusModalNotes');
+            if (notesEl) notesEl.value = '';
+
+            // Driver info
+            var driverInfoEl = document.getElementById('statusModalDriverInfo');
+            var driverNameEl = document.getElementById('statusModalDriverName');
+            if (driverId && driverName) {
+                if (driverInfoEl) driverInfoEl.style.display = 'block';
+                if (driverNameEl) driverNameEl.textContent = driverName;
+            } else {
+                if (driverInfoEl) driverInfoEl.style.display = 'none';
+            }
+
+            // Load drivers list
+            this._loadDriversList(driverId);
+        },
+
+        _loadDriversList: function(currentDriverId) {
+            var driverSelect = document.getElementById('statusModalDriver');
+            if (!driverSelect) return;
+
+            // Reset to loading state
+            driverSelect.innerHTML = '<option value="">Loading drivers...</option>';
+            driverSelect.disabled = true;
+
+            fetch('/workforce/api/drivers-list/', {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                driverSelect.innerHTML = '<option value="">-- No Driver --</option>';
+                if (data.drivers && data.drivers.length) {
+                    data.drivers.forEach(function(d) {
+                        var opt = document.createElement('option');
+                        opt.value = d.id;
+                        opt.textContent = d.name;
+                        if (String(d.id) === String(currentDriverId)) {
+                            opt.selected = true;
+                        }
+                        driverSelect.appendChild(opt);
+                    });
+                }
+                driverSelect.disabled = false;
+            })
+            .catch(function() {
+                driverSelect.innerHTML = '<option value="">-- No Driver --</option>';
+                driverSelect.disabled = false;
+            });
         },
 
         submitStatusUpdate: function() {
-            const taskId = document.getElementById('statusModalTaskId').value;
-            const status = document.getElementById('statusSelect').value;
+            var taskId = document.getElementById('statusModalTaskId').value;
+            var status = document.getElementById('statusSelect').value;
+            var driverId = document.getElementById('statusModalDriver').value;
+            var time = document.getElementById('statusModalTime').value;
+            var notes = document.getElementById('statusModalNotes').value;
 
             if (!status) {
                 showToast('Please select a status', 'warning');
                 return;
             }
 
-            fetch(`/workforce/delivery-task/${taskId}/update-status/`, {
+            var submitBtn = document.getElementById('statusModalSubmitBtn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Updating...';
+            }
+
+            var payload = { status: status };
+            if (driverId) payload.driver_id = driverId;
+            if (time) payload.time = time;
+            if (notes) payload.notes = notes;
+
+            fetch('/workforce/delivery-task/' + taskId + '/update-status/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCSRFToken()
                 },
-                body: JSON.stringify({ status: status })
+                body: JSON.stringify(payload)
             })
-            .then(response => response.json())
-            .then(data => {
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Update Status';
+                }
                 if (data.success) {
-                    // Close modal
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
+                    var modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
                     modal.hide();
                     showToast('Task status updated successfully!', 'success');
-                    htmx.ajax('GET', window.location.href, {
-                        target: '#main-content',
-                        select: '#main-content',
-                        swap: 'outerHTML'
-                    });
+                    if (typeof htmx !== 'undefined') {
+                        htmx.ajax('GET', window.location.href, {
+                            target: '#main-content',
+                            select: '#main-content',
+                            swap: 'outerHTML'
+                        });
+                    } else {
+                        location.reload();
+                    }
                 } else {
                     showToast('Error: ' + (data.error || 'Failed to update status'), 'danger');
                 }
             })
-            .catch(error => {
+            .catch(function(error) {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Update Status';
+                }
                 console.error('Error:', error);
                 showToast('An error occurred while updating status', 'danger');
             });

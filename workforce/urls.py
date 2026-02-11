@@ -180,4 +180,7 @@ urlpatterns = [
     path('dispatch/partials/batch-monitor/', dispatch_views.batch_monitor_partial, name='dispatch_batch_monitor_partial'),
     path('dispatch/partials/shift-status/', dispatch_views.shift_status_partial, name='dispatch_shift_status_partial'),
 
+    # API endpoints
+    path('api/drivers-list/', workforce_views.api_drivers_list, name='api_drivers_list'),
+
 ]
