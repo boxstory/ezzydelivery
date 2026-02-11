@@ -477,9 +477,10 @@ class ClaudeService:
                         if current_tool:
                             try:
                                 import json
-                                current_tool['input'] = json.loads(current_tool['input'])
-                            except json.JSONDecodeError:
-                                pass
+                                parsed = json.loads(current_tool['input'])
+                                current_tool['input'] = parsed if isinstance(parsed, dict) else {}
+                            except (json.JSONDecodeError, TypeError):
+                                current_tool['input'] = {}
                             tool_calls.append(current_tool)
                             yield {'type': 'tool_end', 'tool': current_tool}
                             current_tool = None

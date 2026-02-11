@@ -56,6 +56,7 @@ Related:
 """
 
 from django.http import HttpResponse, JsonResponse
+from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 import csv
@@ -1323,7 +1324,7 @@ def order_detail(request, order_id):
     # Get related data with select_related to avoid N+1 queries
     order_items = orders_models.OrderItem.objects.filter(order=order)
     order_comments = orders_models.OrderComments.objects.filter(order=order).select_related('user').order_by('-created_at')
-    verification_logs = orders_models.OrderVerificationLog.objects.filter(order=order).select_related('verified_by', 'performed_by').order_by('-created_at')
+    verification_logs = orders_models.OrderVerificationLog.objects.filter(order=order).select_related('verified_by').order_by('-created_at')
 
     # Get delivery task if exists with related driver
     delivery_task = delivery_models.DeliveryTask.objects.select_related(
@@ -1676,7 +1677,7 @@ def update_order_status(request, order_id):
         from orders.models import OrderVerificationLog
         OrderVerificationLog.objects.create(
             order=order,
-            performed_by=request.user,
+            verified_by=request.user,
             action=f'{status_type}_status_updated',
             notes=f'{status_type.title()} status changed from {old_status} to {status} by {request.user.username}',
         )
@@ -5094,7 +5095,7 @@ def delivery_task_edit(request, task_id):
                 orders_models.OrderVerificationLog.objects.create(
                     order=order,
                     action='task_edited',
-                    performed_by=request.user,
+                    verified_by=request.user,
                     notes=f'Task and order edited by {request.user.username}'
                 )
 
@@ -5406,7 +5407,7 @@ def order_edit(request, order_id):
             orders_models.OrderVerificationLog.objects.create(
                 order=order,
                 action='order_edited',
-                performed_by=request.user,
+                verified_by=request.user,
                 notes=f'Order edited by {request.user.username}'
             )
 

@@ -1,14 +1,278 @@
 {% extends "business_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
-{% block head_title %}Order Details - {{ order.order_number }}{% endblock %}
+{% load business_pwa_tags %}
+{% load custom_filters %}
+{% block head_title %}Order #{{ order.order_number }}{% endblock %}
 {% block extra_css %}
   <link href="{% static 'orders/css/orders.css' %}"
         rel="stylesheet"
         type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-  <div class="col-12" id="order_details_container_main">
+
+  <!-- ==========================================
+       Mobile PWA Detail View (< 768px)
+       ========================================== -->
+  <div class="d-md-none" id="order_detail_mobile_view">
+
+    <!-- Sticky top bar with back + actions -->
+    <div class="pwa-detail-topbar">
+      <a href="{% url 'orders:orders_all_list' %}" class="pwa-detail-topbar__back">
+        <i class="fas fa-chevron-left"></i>
+      </a>
+      <span class="pwa-detail-topbar__title">Order #{{ order.order_number }}</span>
+      <div class="pwa-detail-topbar__actions">
+        {% if can_edit_order %}
+        <a href="{% url 'orders:order_update' order.id %}" class="pwa-detail-topbar__btn">
+          <i class="fas fa-edit"></i>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Status hero card -->
+    {% order_status_class order as st_class %}
+    <div class="pwa-detail-status pwa-detail-status--{{ st_class }}">
+      <div class="pwa-detail-status__badge-row">
+        {% order_status_badge order %}
+      </div>
+      <div class="pwa-detail-status__number">#{{ order.order_number }}</div>
+      {% if order.client_order_code %}
+      <div class="pwa-detail-status__ref">Ref: {{ order.client_order_code }}</div>
+      {% endif %}
+      <div class="pwa-detail-status__date">{{ order.order_date|date:"d M Y" }}</div>
+    </div>
+
+    <!-- Quick action buttons -->
+    <div class="pwa-detail-actions">
+      {% if order.customer_phone %}
+      <a href="tel:{{ order.customer_phone }}" class="pwa-detail-action" hx-boost="false">
+        <div class="pwa-detail-action__icon pwa-detail-action__icon--call">
+          <i class="fas fa-phone"></i>
+        </div>
+        <span>Call</span>
+      </a>
+      {% endif %}
+      {% if order.customer_whatsapp %}
+      <a href="https://wa.me/{{ order.customer_whatsapp }}" class="pwa-detail-action" hx-boost="false" target="_blank">
+        <div class="pwa-detail-action__icon pwa-detail-action__icon--whatsapp">
+          <i class="fab fa-whatsapp"></i>
+        </div>
+        <span>WhatsApp</span>
+      </a>
+      {% endif %}
+      {% if can_edit_order %}
+      <a href="{% url 'orders:order_update' order.id %}" class="pwa-detail-action">
+        <div class="pwa-detail-action__icon pwa-detail-action__icon--edit">
+          <i class="fas fa-edit"></i>
+        </div>
+        <span>Edit</span>
+      </a>
+      {% endif %}
+      {% if order.customer_address %}
+      <a href="https://maps.google.com/?q={{ order.customer_address|urlencode }}" class="pwa-detail-action" hx-boost="false" target="_blank">
+        <div class="pwa-detail-action__icon pwa-detail-action__icon--map">
+          <i class="fas fa-map-marker-alt"></i>
+        </div>
+        <span>Map</span>
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Customer section -->
+    <div class="pwa-detail-section">
+      <div class="pwa-detail-section__header">
+        <i class="fas fa-user"></i>
+        <span>Customer</span>
+      </div>
+      <div class="pwa-detail-section__body">
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Name</span>
+          <span class="pwa-detail-row__value">{{ order.customer_name|default:"-" }}</span>
+        </div>
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Phone</span>
+          <a href="tel:{{ order.customer_phone }}" class="pwa-detail-row__value pwa-detail-row__value--link" hx-boost="false">{{ order.customer_phone|default:"-" }}</a>
+        </div>
+        {% if order.customer_whatsapp %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">WhatsApp</span>
+          <span class="pwa-detail-row__value">{{ order.customer_whatsapp }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Delivery address section -->
+    <div class="pwa-detail-section">
+      <div class="pwa-detail-section__header">
+        <i class="fas fa-map-marker-alt"></i>
+        <span>Delivery Address</span>
+      </div>
+      <div class="pwa-detail-section__body">
+        {% if order.customer_address %}
+        <div class="pwa-detail-row pwa-detail-row--stacked">
+          <span class="pwa-detail-row__label">Address</span>
+          <span class="pwa-detail-row__value">{{ order.customer_address }}</span>
+        </div>
+        {% endif %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Zone</span>
+          <span class="pwa-detail-row__value">{% get_zone_display order %}</span>
+        </div>
+        {% if order.dl_building %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Building</span>
+          <span class="pwa-detail-row__value">{{ order.dl_building }}</span>
+        </div>
+        {% endif %}
+        {% if order.dl_street %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Street</span>
+          <span class="pwa-detail-row__value">{{ order.dl_street }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Payment / COD section -->
+    <div class="pwa-detail-section">
+      <div class="pwa-detail-section__header">
+        <i class="fas fa-money-bill-wave"></i>
+        <span>Payment</span>
+      </div>
+      <div class="pwa-detail-section__body">
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">COD Amount</span>
+          <span class="pwa-detail-row__value pwa-detail-row__value--bold{% if order.cod_amount %} pwa-detail-row__value--danger{% endif %}">
+            {% if order.cod_amount %}QAR {{ order.cod_amount }}{% else %}-{% endif %}
+          </span>
+        </div>
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Delivery Fee</span>
+          <span class="pwa-detail-row__value">{% if order.dl_amount %}QAR {{ order.dl_amount }}{% else %}-{% endif %}</span>
+        </div>
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Delivery Included</span>
+          <span class="pwa-detail-row__value">
+            {% if order.dl_included %}
+              <i class="fas fa-check-circle" style="color: #10b981;"></i> Yes
+            {% else %}
+              <i class="fas fa-times-circle" style="color: #9ca3af;"></i> No
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delivery task section -->
+    {% if delivery_task %}
+    <div class="pwa-detail-section">
+      <div class="pwa-detail-section__header">
+        <i class="fas fa-truck"></i>
+        <span>Delivery</span>
+      </div>
+      <div class="pwa-detail-section__body">
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Task #</span>
+          <span class="pwa-detail-row__value">{{ delivery_task.dl_task_number|default:"-" }}</span>
+        </div>
+        {% if delivery_task.driver %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Driver</span>
+          <span class="pwa-detail-row__value">{{ delivery_task.driver.user.get_full_name|default:delivery_task.driver.driver_code }}</span>
+        </div>
+        {% if delivery_task.driver.driver_phone %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Driver Phone</span>
+          <a href="tel:{{ delivery_task.driver.driver_phone }}" class="pwa-detail-row__value pwa-detail-row__value--link" hx-boost="false">{{ delivery_task.driver.driver_phone }}</a>
+        </div>
+        {% endif %}
+        {% endif %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Speed</span>
+          <span class="pwa-detail-row__value">{{ delivery_task.dl_speed|default:"Normal" }}</span>
+        </div>
+        {% if delivery_task.cod_collected %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">COD Collected</span>
+          <span class="pwa-detail-row__value pwa-detail-row__value--success">
+            <i class="fas fa-check-circle"></i> QAR {{ delivery_task.cod_collected_amount }}
+          </span>
+        </div>
+        {% endif %}
+        {% if delivery_task.completed_at %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Completed</span>
+          <span class="pwa-detail-row__value">{{ delivery_task.completed_at|date:"d M Y H:i" }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Order info section -->
+    <div class="pwa-detail-section">
+      <div class="pwa-detail-section__header">
+        <i class="fas fa-info-circle"></i>
+        <span>Order Info</span>
+      </div>
+      <div class="pwa-detail-section__body">
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Status</span>
+          <span class="pwa-detail-row__value">{{ order.get_order_status_display }}</span>
+        </div>
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Task Status</span>
+          <span class="pwa-detail-row__value">{{ order.get_task_status_display }}</span>
+        </div>
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Order Date</span>
+          <span class="pwa-detail-row__value">{{ order.order_date|date:"d M Y" }}</span>
+        </div>
+        {% if order.deadline_date %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Deadline</span>
+          <span class="pwa-detail-row__value">{{ order.deadline_date|date:"d M Y" }}</span>
+        </div>
+        {% endif %}
+        {% if order.delivered_at %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Delivered At</span>
+          <span class="pwa-detail-row__value">{{ order.delivered_at|date:"d M Y H:i" }}</span>
+        </div>
+        {% endif %}
+        {% if order.pickup_location %}
+        <div class="pwa-detail-row">
+          <span class="pwa-detail-row__label">Pickup</span>
+          <span class="pwa-detail-row__value">{{ order.pickup_location }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Notes section -->
+    {% if order.order_notes %}
+    <div class="pwa-detail-section">
+      <div class="pwa-detail-section__header">
+        <i class="fas fa-sticky-note"></i>
+        <span>Notes</span>
+      </div>
+      <div class="pwa-detail-section__body">
+        <div class="pwa-detail-notes">{{ order.order_notes }}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Bottom spacer for bottom nav -->
+    <div style="height: 16px;"></div>
+  </div>
+
+  <!-- ==========================================
+       Desktop View (>= 768px)
+       ========================================== -->
+  <div class="d-none d-md-block" id="order_details_container_main">
     <section class="d--block" id="order_details_section_main">
       <div class="col-12 pb-2">
         <div class="ms-3">
@@ -22,11 +286,13 @@
                  id="order_details_btn_back">
                 <i class="fa fa-arrow-left me-2"></i> Back to Orders
               </a>
+              {% if can_edit_order %}
               <a class="btn btn-dark pe-3 text-white"
                  href="{% url 'orders:order_update' order.id %}"
                  id="order_details_btn_edit">
                 <i class="fa fa-edit me-2"></i> Edit Order
               </a>
+              {% endif %}
             </div>
           </div>
           <!-- Order Info Card -->

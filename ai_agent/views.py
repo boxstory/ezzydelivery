@@ -52,6 +52,7 @@ from ai_agent.serializers import (
     SuggestDriverRequestSerializer,
     ConversationSerializer,
     WhatsAppWebhookSerializer,
+    ExtractOrderRequestSerializer,
 )
 from ai_agent.services.agent_service import get_agent_service
 
@@ -401,6 +402,126 @@ class WhatsAppWebhookAPIView(APIView):
             'phone': serializer.validated_data['phone'],
             'conversation_id': str(conversation.conversation_id),
         })
+
+
+class ExtractOrderAPIView(APIView):
+    """
+    Extract order fields from unstructured text using AI.
+
+    POST /api/ai-agent/tools/extract-order/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ExtractOrderRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {'success': False, 'errors': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        raw_text = serializer.validated_data['text']
+
+        from ai_agent.services.claude_service import get_claude_service
+        claude = get_claude_service()
+
+        available, msg = claude.is_available()
+        if not available:
+            return Response(
+                {'success': False, 'error': msg},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        system_prompt = (
+            "You are an order data extraction assistant for a delivery service in Qatar. "
+            "Extract structured fields from the raw text. Return ONLY valid JSON with these keys: "
+            "customer_name, customer_phone, dl_zone, dl_street, dl_building, "
+            "customer_address, cod_amount, order_notes, zone_name. "
+            "Rules: phone should be digits only (8 digits, no country code). "
+            "dl_zone/dl_street/dl_building should be numbers or empty string. "
+            "cod_amount should be a number or empty string. "
+            "zone_name should be the area/neighborhood name if mentioned (e.g. West Bay, Al Sadd, Pearl Qatar). "
+            "order_notes should capture any delivery instructions. "
+            "If a field is not found, use empty string. Return ONLY the JSON object, nothing else."
+        )
+
+        result = claude.chat(
+            messages=[{'role': 'user', 'content': f"Extract order fields from this text:\n\n{raw_text}"}],
+            system=system_prompt,
+            user_id=request.user.id,
+        )
+
+        if result.get('error'):
+            return Response(
+                {'success': False, 'error': result.get('message', 'AI extraction failed')},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # Parse the AI response JSON
+        try:
+            content = result.get('content', '').strip()
+            # Strip markdown code fences if present
+            if content.startswith('```'):
+                content = content.split('\n', 1)[1] if '\n' in content else content[3:]
+                if content.endswith('```'):
+                    content = content[:-3].strip()
+
+            data = json.loads(content)
+        except (json.JSONDecodeError, AttributeError):
+            return Response(
+                {'success': False, 'error': 'Could not parse AI response'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # Server-side zone resolution: if zone empty but zone_name given, look up via ZoneArea/ZoneName
+        zone_val = str(data.get('dl_zone', '')).strip()
+        zone_name_val = str(data.get('zone_name', '')).strip()
+        address_val = str(data.get('customer_address', '')).strip()
+
+        from delivery.models import ZoneArea, ZoneName
+
+        if not zone_val and zone_name_val:
+            # Try to find zone by area name
+            area = ZoneArea.objects.filter(
+                area_name__icontains=zone_name_val, is_active=True
+            ).select_related('zone').first()
+            if area:
+                data['dl_zone'] = str(area.zone.zone_number)
+                if not address_val:
+                    data['customer_address'] = zone_name_val
+            else:
+                # Try ZoneName directly
+                zone_obj = ZoneName.objects.filter(
+                    zone_name__icontains=zone_name_val, is_active=True
+                ).first()
+                if zone_obj:
+                    data['dl_zone'] = str(zone_obj.zone_number)
+                    if not address_val:
+                        data['customer_address'] = zone_name_val
+
+        # Reverse: if zone number given but no address, try to get zone name
+        if zone_val and not address_val:
+            try:
+                zone_num = int(zone_val)
+                zone_obj = ZoneName.objects.filter(zone_number=zone_num, is_active=True).first()
+                if zone_obj:
+                    data['customer_address'] = zone_obj.zone_name
+            except (ValueError, TypeError):
+                pass
+
+        # Also check address text for area names if zone still empty
+        zone_val = str(data.get('dl_zone', '')).strip()
+        if not zone_val and address_val:
+            area = ZoneArea.objects.filter(
+                area_name__icontains=address_val, is_active=True
+            ).select_related('zone').first()
+            if area:
+                data['dl_zone'] = str(area.zone.zone_number)
+
+        # Clean up: remove zone_name from response (not a form field)
+        data.pop('zone_name', None)
+
+        return Response({'success': True, 'data': data})
 
 
 class AgentStatusAPIView(APIView):

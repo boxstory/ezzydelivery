@@ -979,31 +979,11 @@ def driver_complete_task(request, task_id):
 
         task.save()
 
-        # Sync order status with delivery task status
-        if task.order:
-            order = task.order
-            order_changed = False
-
-            # Handle COD collection (only on successful delivery)
-            if status_value == 'delivered' and cod_collected and cod_amount_collected:
-                order.cod_status_by_staff = 'cod_with_driver'
-                order_changed = True
-
-            # Auto-update Order status based on delivery completion
-            if status_value == 'delivered':
-                if order.business and order.business.fulfillment_service_enabled:
-                    order.order_status = 'fulfilled'
-                    order.fulfilled_at = timezone.now()
-                else:
-                    order.order_status = 'delivered'
-                order.delivered_at = timezone.now()
-                order_changed = True
-            elif status_value in ('cancelled', 'failed'):
-                order.order_status = 'cancelled'
-                order_changed = True
-
-            if order_changed:
-                order.save()
+        # COD collection tracking (only on successful delivery)
+        # Note: order status sync is handled by delivery/signals.py post_save
+        if task.order and status_value == 'delivered' and cod_collected and cod_amount_collected:
+            task.order.cod_status_by_staff = 'cod_with_driver'
+            task.order.save(update_fields=['cod_status_by_staff'])
         
         # Upload documents
         documents_created = []

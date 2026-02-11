@@ -119,7 +119,6 @@ def business_dashboard(request):
             return redirect('core:main_dashboard')
         logger.info(f"User {request.user.id} accessed dashboard for business {business.business_id}")
 
-        # Fix: Use cached profile instead of extra query
         profile = get_cached_profile(request)
         if not profile:
             profile = core_models.Profile.objects.filter(user_id=business.user_id).first()
@@ -135,64 +134,62 @@ def business_dashboard(request):
 
         # Calculate real statistics
         all_orders = orders_models.Order.objects.filter(business=business.business_id)
+        from datetime import date
+        today = date.today()
 
         # Total orders count
         total_orders = all_orders.count()
 
-        # Get delivery tasks for this business
-        delivery_tasks = delivery_models.DeliveryTask.objects.filter(business=business.business_id)
-
-        # Delivered orders (status '2' = Delivered)
-        delivered_count = delivery_tasks.filter(dl_task_status_client='2').count()
+        # Delivered orders (order_status synced from delivery task via signal)
+        delivered_count = all_orders.filter(
+            order_status__in=['delivered', 'fulfilled']
+        ).count()
 
         # COD calculations
         cod_amount_total = all_orders.aggregate(total=Sum('cod_amount'))['total'] or 0
 
-        # COD collected (from delivered orders via delivery task status)
-        delivered_order_ids = delivery_tasks.filter(
-            dl_task_status_client='2'
-        ).values_list('order_id', flat=True)
+        # COD collected (from delivered/fulfilled orders)
         cod_collected = all_orders.filter(
-            id__in=delivered_order_ids
+            order_status__in=['delivered', 'fulfilled']
         ).aggregate(total=Sum('cod_amount'))['total'] or 0
 
-        # To be reconfirmed (customer confirmation pending or address needs update)
-        reconfirm_count = all_orders.filter(
-            Q(order_status='customer_confirmation_pending') |
-            Q(verification_status='address_needs_update')
+        # Pending orders (active orders not yet delivered or cancelled)
+        pending_count = all_orders.exclude(
+            order_status__in=['delivered', 'fulfilled', 'cancelled']
         ).count()
 
-        # Follow up required (rejected orders or orders needing attention)
+        # Get delivery tasks for this business
+        delivery_tasks = delivery_models.DeliveryTask.objects.filter(business=business.business_id)
+
+        # Follow up required (failed, rejected, or non-reachable delivery tasks)
         followup_count = delivery_tasks.filter(
-            Q(dl_task_status_client='rejected') |
-            Q(dl_task_status_client='customer_confirmation_pending')
+            Q(dl_task_status__in=['failed', 'rejected', 'non_reachable'])
+        ).exclude(
+            dl_task_status_client__in=['2', '9']
         ).count()
-
-        # Today's orders
-        from datetime import date
-        today = date.today()
 
         # Today's pending orders (latest 5)
         todays_pending_orders = all_orders.filter(
             order_date=today
         ).exclude(
-            task_status='delivered'
-        ).exclude(
-            order_status='cancelled'
+            order_status__in=['delivered', 'fulfilled', 'cancelled']
         ).select_related('pickup_location').order_by('-id')[:5]
 
         # Today's delivered orders (latest 5)
         todays_delivered_orders = all_orders.filter(
             order_date=today,
-            task_status='delivered'
+            order_status__in=['delivered', 'fulfilled']
         ).select_related('pickup_location').order_by('-id')[:5]
 
-        # Failed/Follow up orders (latest 5) - rejected or need follow up
+        # Failed/Follow up orders (latest 5) - via delivery tasks with bad status
+        followup_task_order_ids = delivery_tasks.filter(
+            dl_task_status__in=['failed', 'rejected', 'non_reachable']
+        ).exclude(
+            dl_task_status_client__in=['2', '9']
+        ).values_list('order_id', flat=True)[:5]
         followup_orders = all_orders.filter(
-            Q(task_status='rejected') |
-            Q(task_status='failed') |
-            Q(order_status='customer_confirmation_pending')
-        ).select_related('pickup_location').order_by('-id')[:5]
+            id__in=followup_task_order_ids
+        ).select_related('pickup_location').order_by('-id')
 
         # Team statistics - Fix: Use aggregates to reduce queries from 4 to 2
         from django.db.models import Count, Case, When, IntegerField
@@ -218,7 +215,6 @@ def business_dashboard(request):
         user_businesses = get_all_user_businesses(request.user)
         show_business_switcher = len(user_businesses) > 1
 
-        # Fix: Add is_business_owner for sidebar visibility
         is_business_owner = business.user_id == request.user.id if business.user_id else False
 
         context = {
@@ -232,7 +228,7 @@ def business_dashboard(request):
             'delivered_count': delivered_count,
             'cod_amount_total': cod_amount_total,
             'cod_collected': cod_collected,
-            'reconfirm_count': reconfirm_count,
+            'pending_count': pending_count,
             'followup_count': followup_count,
             # Today's orders lists
             'todays_pending_orders': todays_pending_orders,
@@ -701,7 +697,6 @@ def business_settings(request, business_id):
     stores = business_models.PickupLocation.objects.filter(business_id=business_id)
     logger.debug(f'Loading business settings for business_id={business_id}: apis={business_apis.count()}, teams={teams.count()}, stores={stores.count()}')
 
-    # Fix: Add is_business_owner for sidebar visibility
     is_business_owner = business.user_id == request.user.id if business and business.user_id else False
 
     context = {
@@ -928,13 +923,11 @@ def business_settings_api_test_result(request, business_id, api_id):
             )
 
             order_response = wcapi.get("orders")
-            # Fix: Convert header string to int safely
             order_count_str = order_response.headers.get('X-WP-Total', '0')
             order_count = int(order_count_str) if order_count_str else 0
             logger.debug(f'WooCommerce order_count={order_count}')
 
             product_response = wcapi.get("products", params={"per_page": 20})
-            # Fix: Convert header string to int safely
             product_count_str = product_response.headers.get('X-WP-Total', '0')
             product_count = int(product_count_str) if product_count_str else 0
             logger.debug(f'WooCommerce product_count={product_count}')
@@ -1664,7 +1657,7 @@ def business_finance_dashboard(request):
         dl_task_date__gte=start_date.date()
     )
 
-    cod_deliveries = all_deliveries.filter(has_cod=True)
+    cod_deliveries = all_deliveries.filter(cod_collected_amount__gt=0)
     cod_stats = cod_deliveries.aggregate(
         total_cod=Sum('cod_collected_amount'),
         collected_count=Count('id', filter=Q(cod_collected=True)),

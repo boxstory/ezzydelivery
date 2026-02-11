@@ -99,6 +99,8 @@ def product_all_list(request):
         'unit',              # FK: Product → UnitVariant
         'business',          # FK: Product → Business
         'product_category',  # FK: Product → ProductCategory
+    ).annotate(
+        qty=Sum('product_inventory__item_quantity')
     ).order_by('-created_at')
 
     logger.debug(f"Fetching {products.count()} products for business {business.business_id}")

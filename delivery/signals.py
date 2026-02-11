@@ -1,6 +1,7 @@
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
+from django.utils import timezone
 from orders import models as orders_models
 from delivery import models as delivery_models
 import uuid
@@ -10,6 +11,64 @@ import logging
 DeliveryTask = delivery_models.DeliveryTask
 
 logger = logging.getLogger(__name__)
+
+# Terminal order statuses — don't overwrite these
+TERMINAL_ORDER_STATUSES = ['delivered', 'fulfilled', 'cancelled']
+
+
+@receiver(pre_save, sender=DeliveryTask)
+def delivery_task_pre_save(sender, instance, **kwargs):
+    """Track old delivery task status for change detection in post_save"""
+    if instance.pk:
+        try:
+            old = DeliveryTask.objects.get(pk=instance.pk)
+            instance._old_dl_task_status = old.dl_task_status
+            instance._old_dl_task_status_dms = old.dl_task_status_dms
+        except DeliveryTask.DoesNotExist:
+            pass
+
+
+def _sync_order_status_from_task(task):
+    """
+    Sync order status based on delivery task status.
+    Called from post_save when dl_task_status changes.
+    """
+    try:
+        order = task.order
+        if not order:
+            return
+
+        # Don't overwrite terminal order statuses
+        if order.order_status in TERMINAL_ORDER_STATUSES:
+            logger.debug(f"Order {order.order_number} already in terminal status '{order.order_status}', skipping sync")
+            return
+
+        update_fields = []
+
+        if task.dl_task_status == 'delivered':
+            # Check if business uses fulfillment service
+            if order.business and order.business.fulfillment_service_enabled:
+                order.order_status = 'fulfilled'
+                order.fulfilled_at = timezone.now()
+                update_fields.extend(['order_status', 'fulfilled_at'])
+            else:
+                order.order_status = 'delivered'
+                update_fields.append('order_status')
+            order.delivered_at = timezone.now()
+            update_fields.append('delivered_at')
+            logger.info(f"Order {order.order_number} synced to '{order.order_status}' from delivery task {task.dl_task_number}")
+
+        elif task.dl_task_status == 'cancelled':
+            order.order_status = 'cancelled'
+            update_fields.append('order_status')
+            logger.info(f"Order {order.order_number} synced to 'cancelled' from delivery task {task.dl_task_number}")
+
+        if update_fields:
+            # Use update_fields to avoid triggering unrelated order signals
+            order.save(update_fields=update_fields)
+
+    except Exception as e:
+        logger.exception(f"Error syncing order status from task {task.id}: {e}")
 
 
 @receiver(post_save, sender=DeliveryTask)
@@ -60,3 +119,10 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
                 logger.warning(f"Failed to push task {instance.dl_task_number} status update to DMS")
         except Exception as e:
             logger.exception(f"Error pushing task update to DMS in signal: {str(e)}")
+
+    # Sync delivery task status → order status (for all non-creation saves)
+    if not created:
+        old_status = getattr(instance, '_old_dl_task_status', None)
+        new_status = instance.dl_task_status
+        if old_status is not None and old_status != new_status and instance.order_id:
+            _sync_order_status_from_task(instance)

@@ -558,18 +558,15 @@ def task_navigation(request, task_id):
 @login_required(login_url='account_login')
 def assigned_tasks(request):
     try:
-        # FIX: Get driver with select_related
         driver = fleet_models.Driver.objects.select_related('user').get(
             user_id=request.user.id
         )
         logger.info(f"Driver {driver.driver_id} viewing assigned tasks")
 
-        # FIX: Get task IDs (this is efficient - stays the same)
         assigned_tasks_ids = delivery_models.AssignedDriver.objects.filter(
             driver_id=driver.driver_id
         ).values_list('dl_task_id', flat=True)
 
-        # FIX: Optimize with select_related and prefetch_related
         assigned_tasks = delivery_models.DeliveryTask.objects.filter(
             id__in=assigned_tasks_ids
         ).select_related(

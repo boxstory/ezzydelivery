@@ -229,6 +229,8 @@ class AgentService:
         Process a message with streaming response.
 
         Yields chunks as they arrive from Claude.
+        When Claude requests tool use, executes the tools, sends results
+        back to Claude, and streams the final response.
         """
         # Store user message
         ConversationMessage.objects.create(
@@ -248,71 +250,112 @@ class AgentService:
         user_id = user.id if user else None
         business_id = conversation.business_id if conversation.business else None
 
-        full_response = ''
-        tool_calls = []
+        iterations = 0
 
-        for chunk in self.claude_service.chat_stream(
-            messages=messages,
-            system=system_prompt,
-            tools=tools,
-            conversation=conversation,
-            user_id=user_id,
-            business_id=business_id
-        ):
-            if chunk.get('type') == 'text':
-                full_response += chunk.get('text', '')
-                yield {
-                    'type': 'text',
-                    'content': chunk.get('text', ''),
-                }
+        while iterations < self.MAX_TOOL_ITERATIONS:
+            iterations += 1
+            full_response = ''
+            tool_calls = []
 
-            elif chunk.get('type') == 'tool_start':
-                yield {
-                    'type': 'tool_start',
-                    'tool_name': chunk.get('tool_name'),
-                }
-
-            elif chunk.get('type') == 'tool_end':
-                tool = chunk.get('tool')
-                if tool:
-                    tool_calls.append(tool)
-                    # Execute tool
-                    result = self._execute_tool(
-                        tool_call=tool,
-                        conversation=conversation,
-                        user=user
-                    )
+            for chunk in self.claude_service.chat_stream(
+                messages=messages,
+                system=system_prompt,
+                tools=tools,
+                conversation=conversation,
+                user_id=user_id,
+                business_id=business_id
+            ):
+                if chunk.get('type') == 'text':
+                    full_response += chunk.get('text', '')
                     yield {
-                        'type': 'tool_result',
-                        'tool_name': tool['name'],
-                        'result': result['result'],
+                        'type': 'text',
+                        'content': chunk.get('text', ''),
                     }
 
-            elif chunk.get('type') == 'error':
-                yield {
-                    'type': 'error',
-                    'error': chunk.get('message'),
-                }
+                elif chunk.get('type') == 'tool_start':
+                    yield {
+                        'type': 'tool_start',
+                        'tool_name': chunk.get('tool_name'),
+                    }
 
-            elif chunk.get('type') == 'complete':
-                # Store final response
+                elif chunk.get('type') == 'tool_end':
+                    tool = chunk.get('tool')
+                    if tool:
+                        tool_calls.append(tool)
+                        # Execute tool
+                        result = self._execute_tool(
+                            tool_call=tool,
+                            conversation=conversation,
+                            user=user
+                        )
+                        yield {
+                            'type': 'tool_result',
+                            'tool_name': tool['name'],
+                            'result': result['result'],
+                        }
+
+                elif chunk.get('type') == 'error':
+                    yield {
+                        'type': 'error',
+                        'error': chunk.get('message'),
+                    }
+
+            # If no tool calls, Claude gave a final text answer — we're done
+            if not tool_calls:
                 if full_response:
                     ConversationMessage.objects.create(
                         conversation=conversation,
                         role='assistant',
                         content=full_response,
-                        tokens_input=chunk.get('tokens_input', 0),
-                        tokens_output=chunk.get('tokens_output', 0)
                     )
-
                 yield {
                     'type': 'complete',
                     'conversation_id': str(conversation.conversation_id),
-                    'tokens_used': {
-                        'input': chunk.get('tokens_input', 0),
-                        'output': chunk.get('tokens_output', 0),
-                    }
+                    'tokens_used': {'input': 0, 'output': 0},
                 }
+                return
+
+            # Tool calls happened — send results back to Claude for next turn
+            # Build the assistant message with tool_use blocks
+            assistant_content = []
+            if full_response:
+                assistant_content.append({'type': 'text', 'text': full_response})
+            for tc in tool_calls:
+                assistant_content.append({
+                    'type': 'tool_use',
+                    'id': tc['id'],
+                    'name': tc['name'],
+                    'input': tc['input'],
+                })
+            messages.append({'role': 'assistant', 'content': assistant_content})
+
+            # Build tool_result messages for each tool call
+            tool_results_content = []
+            for tc in tool_calls:
+                # Fetch the stored result from conversation messages
+                tool_msg = ConversationMessage.objects.filter(
+                    conversation=conversation,
+                    role='tool',
+                    tool_name=tc['name'],
+                ).order_by('-created_at').first()
+                result_data = tool_msg.tool_output if tool_msg else {'error': 'Tool result not found'}
+                tool_results_content.append({
+                    'type': 'tool_result',
+                    'tool_use_id': tc['id'],
+                    'content': json.dumps(result_data),
+                })
+            messages.append({'role': 'user', 'content': tool_results_content})
+
+            # Reset full_response for next iteration — Claude will now
+            # respond with the formatted answer using tool data
+            full_response = ''
+
+        # Max iterations reached
+        yield {
+            'type': 'complete',
+            'conversation_id': str(conversation.conversation_id),
+            'tokens_used': {'input': 0, 'output': 0},
+        }
 
     def _build_message_history(
         self,

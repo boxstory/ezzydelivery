@@ -8,6 +8,18 @@ from webpages.sitemaps import BusinessSitemap
 from core.sitemaps import StaticViewSitemap, BusinessPagesSitemap, WorkforcePagesSitemap, SEOLandingPageSitemap, BlogPostSitemap, BlogCategorySitemap
 from core.views_seo import robots_txt, security_txt, humans_txt, llms_txt
 from django.views.generic import TemplateView
+from django.views.static import serve as static_serve
+from django.http import FileResponse
+import os
+
+
+def service_worker_view(request):
+    """Serve sw.js from root scope with Service-Worker-Allowed header."""
+    sw_path = os.path.join(settings.STATIC_ROOT, 'sw.js')
+    response = FileResponse(open(sw_path, 'rb'), content_type='application/javascript')
+    response['Service-Worker-Allowed'] = '/'
+    response['Cache-Control'] = 'no-cache'
+    return response
 
 
 # Combine all sitemaps for comprehensive SEO
@@ -37,6 +49,7 @@ urlpatterns = [
     path('.well-known/security.txt', security_txt, name='security_txt'),
     path('humans.txt', humans_txt, name='humans_txt'),
     path('llms.txt', llms_txt, name='llms_txt'),
+    path('sw.js', service_worker_view, name='service_worker'),
      
 
     path('accounts/', include('allauth.urls')),

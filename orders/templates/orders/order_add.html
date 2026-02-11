@@ -1,8 +1,141 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'business/css/business-mobile.css' %}">
+{% endblock extra_css %}
+
 {% block content %}
-<div class="order-add-page" id="orders_add_container_main">
+<!-- ==================== MOBILE PWA VIEW ==================== -->
+<div class="d-md-none" id="orders_add_mobile_container">
+  <!-- Top Bar -->
+  <div class="pwa-detail-topbar">
+    <a href="{% url 'orders:orders_all_list' %}" class="pwa-detail-topbar__back">
+      <i class="fas fa-arrow-left"></i>
+    </a>
+    <div class="pwa-detail-topbar__title">New Order</div>
+  </div>
+
+  <!-- AI Extract Card -->
+  <div class="pwa-ai-extract">
+    <p class="pwa-ai-extract__label">
+      <i class="fas fa-magic"></i> Paste order text
+    </p>
+    <textarea id="ai_extract_textarea" class="pwa-ai-extract__textarea" rows="4"
+      placeholder="e.g. Ahmed 55512345 zone 44 building 12 West Bay cod 150 leave at reception"></textarea>
+    <button type="button" id="ai_extract_btn" class="pwa-ai-extract__btn">
+      <span class="pwa-ai-extract__btn-text"><i class="fas fa-sparkles"></i> Extract Fields</span>
+      <span class="pwa-ai-extract__spinner"></span>
+    </button>
+    <div id="ai_extract_status" class="pwa-ai-extract__status"></div>
+  </div>
+
+  <!-- Mobile Form -->
+  <form method="POST" id="orders_add_form_mobile">
+    {% csrf_token %}
+    <!-- Hidden fields -->
+    <input type="hidden" name="order_status" value="to_review">
+    <input type="hidden" name="client_order_code" id="mobile_client_order_code" value="">
+    <input type="hidden" name="order_number_preview" value="">
+    <input type="hidden" name="cod_status_by_client" id="mobile_cod_status" value="no_cod">
+
+    <!-- Customer Section -->
+    <div class="pwa-form-section">
+      <div class="pwa-form-section__header">
+        <i class="fas fa-user"></i> Customer
+      </div>
+      <div class="pwa-form-group" id="fg_customer_name">
+        <label class="pwa-form-group__label">Name</label>
+        <input type="text" name="customer_name" id="mobile_customer_name"
+          class="pwa-form-group__input" placeholder="Customer name" required>
+      </div>
+      <div class="pwa-form-group" id="fg_customer_phone">
+        <label class="pwa-form-group__label">Phone</label>
+        <div class="pwa-form-group__phone-wrap">
+          <span class="pwa-form-group__phone-prefix">+974</span>
+          <input type="tel" name="customer_phone" id="mobile_customer_phone"
+            class="pwa-form-group__input pwa-form-group__input--phone" placeholder="XXXXXXXX" maxlength="8">
+        </div>
+      </div>
+      <input type="hidden" name="customer_whatsapp" id="mobile_customer_whatsapp" value="">
+    </div>
+
+    <!-- Delivery Section -->
+    <div class="pwa-form-section">
+      <div class="pwa-form-section__header">
+        <i class="fas fa-map-marker-alt"></i> Delivery
+      </div>
+      <div class="pwa-form-row-3">
+        <div class="pwa-form-group" id="fg_dl_zone">
+          <label class="pwa-form-group__label">Zone</label>
+          <input type="text" name="dl_zone" id="mobile_dl_zone"
+            class="pwa-form-group__input" placeholder="0" value="0">
+        </div>
+        <div class="pwa-form-group" id="fg_dl_street">
+          <label class="pwa-form-group__label">Street</label>
+          <input type="text" name="dl_street" id="mobile_dl_street"
+            class="pwa-form-group__input" placeholder="0" value="0">
+        </div>
+        <div class="pwa-form-group" id="fg_dl_building">
+          <label class="pwa-form-group__label">Building</label>
+          <input type="text" name="dl_building" id="mobile_dl_building"
+            class="pwa-form-group__input" placeholder="0" value="0">
+        </div>
+      </div>
+      <div class="pwa-form-group" id="fg_customer_address">
+        <label class="pwa-form-group__label">Address</label>
+        <input type="text" name="customer_address" id="mobile_customer_address"
+          class="pwa-form-group__input" placeholder="Full address or area name">
+      </div>
+    </div>
+
+    <!-- Payment Section -->
+    <div class="pwa-form-section">
+      <div class="pwa-form-section__header">
+        <i class="fas fa-money-bill-wave"></i> Payment
+      </div>
+      <div class="pwa-form-group" id="fg_cod_amount">
+        <label class="pwa-form-group__label">COD Amount (QAR)</label>
+        <input type="number" name="cod_amount" id="mobile_cod_amount"
+          class="pwa-form-group__input" placeholder="0.00" min="0" step="0.01" value="0">
+      </div>
+    </div>
+
+    <!-- Pickup & Notes Section -->
+    <div class="pwa-form-section">
+      <div class="pwa-form-section__header">
+        <i class="fas fa-store"></i> Pickup & Notes
+      </div>
+      <div class="pwa-form-group">
+        <label class="pwa-form-group__label">Pickup Location</label>
+        <select name="pickup_location" id="mobile_pickup_location" class="pwa-form-group__input">
+          {% for location in pickup_locations %}
+          <option value="{{ location.id }}">{{ location.pickup_location_title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="pwa-form-group" id="fg_order_notes">
+        <label class="pwa-form-group__label">Notes</label>
+        <textarea name="order_notes" id="mobile_order_notes"
+          class="pwa-form-group__input" placeholder="Delivery instructions" rows="2"></textarea>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="pwa-form-submit">
+      <button type="submit" class="pwa-form-submit__btn" id="mobile_submit_btn">
+        {% if business.fulfillment_service_enabled %}
+        <i class="fas fa-arrow-right"></i> Save & Add Products
+        {% else %}
+        <i class="fas fa-paper-plane"></i> Create Order
+        {% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- ==================== DESKTOP VIEW ==================== -->
+<div class="order-add-page d-none d-md-block" id="orders_add_container_main">
   <!-- Page Header -->
   <div class="order-add-header">
     <div class="order-add-header-content">
@@ -217,7 +350,11 @@
           <i class="fas fa-times me-2"></i>Cancel
         </button>
         <button type="submit" class="btn btn-primary btn-lg" id="orders_add_btn_submit">
+          {% if business.fulfillment_service_enabled %}
           <i class="fas fa-save me-2"></i>Save & Add Products
+          {% else %}
+          <i class="fas fa-save me-2"></i>Create Order
+          {% endif %}
         </button>
       </div>
     </form>
@@ -624,5 +761,112 @@
       });
     }
   });
+
+  // ========== MOBILE PWA LOGIC ==========
+  (function() {
+    const mobileContainer = document.getElementById('orders_add_mobile_container');
+    if (!mobileContainer || window.innerWidth >= 768) return;
+
+    const extractBtn = document.getElementById('ai_extract_btn');
+    const extractTextarea = document.getElementById('ai_extract_textarea');
+    const extractStatus = document.getElementById('ai_extract_status');
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    // Auto-generate client order code
+    const ts = Math.floor(Date.now() / 1000);
+    document.getElementById('mobile_client_order_code').value = 'ORD-' + ts;
+
+    // Phone → WhatsApp auto-copy
+    const phoneInput = document.getElementById('mobile_customer_phone');
+    const waInput = document.getElementById('mobile_customer_whatsapp');
+    phoneInput.addEventListener('input', function() {
+      waInput.value = '974' + this.value;
+    });
+
+    // COD amount → auto-set cod_status
+    const codAmountInput = document.getElementById('mobile_cod_amount');
+    const codStatusInput = document.getElementById('mobile_cod_status');
+    codAmountInput.addEventListener('input', function() {
+      const val = parseFloat(this.value) || 0;
+      codStatusInput.value = val > 0 ? 'include' : 'no_cod';
+    });
+
+    // AI Extract button
+    extractBtn.addEventListener('click', async function() {
+      const text = extractTextarea.value.trim();
+      if (!text) {
+        extractTextarea.focus();
+        return;
+      }
+
+      // Show loading state
+      extractBtn.classList.add('pwa-ai-extract__btn--loading');
+      extractBtn.disabled = true;
+      extractStatus.className = 'pwa-ai-extract__status';
+      extractStatus.style.display = 'none';
+
+      try {
+        const resp = await fetch('/api/ai-agent/tools/extract-order/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+          },
+          body: JSON.stringify({ text: text })
+        });
+
+        const result = await resp.json();
+
+        if (result.success && result.data) {
+          const d = result.data;
+          let filledCount = 0;
+
+          const fieldMap = {
+            'customer_name': 'mobile_customer_name',
+            'customer_phone': 'mobile_customer_phone',
+            'dl_zone': 'mobile_dl_zone',
+            'dl_street': 'mobile_dl_street',
+            'dl_building': 'mobile_dl_building',
+            'customer_address': 'mobile_customer_address',
+            'cod_amount': 'mobile_cod_amount',
+            'order_notes': 'mobile_order_notes'
+          };
+
+          for (const [key, elId] of Object.entries(fieldMap)) {
+            const val = String(d[key] || '').trim();
+            const el = document.getElementById(elId);
+            if (val && el) {
+              el.value = val;
+              // Add filled highlight
+              const fg = el.closest('.pwa-form-group') || el.closest('[id^="fg_"]');
+              if (fg) fg.classList.add('pwa-field--filled');
+              filledCount++;
+            }
+          }
+
+          // Auto-set WhatsApp from phone
+          if (d.customer_phone) {
+            waInput.value = '974' + d.customer_phone;
+          }
+
+          // Auto-set COD status
+          const codVal = parseFloat(d.cod_amount) || 0;
+          codStatusInput.value = codVal > 0 ? 'include' : 'no_cod';
+
+          extractStatus.innerHTML = '<i class="fas fa-check-circle"></i> Extracted ' + filledCount + ' fields';
+          extractStatus.className = 'pwa-ai-extract__status pwa-ai-extract__status--success';
+        } else {
+          extractStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + (result.error || 'Extraction failed');
+          extractStatus.className = 'pwa-ai-extract__status pwa-ai-extract__status--error';
+        }
+      } catch (err) {
+        extractStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> Network error';
+        extractStatus.className = 'pwa-ai-extract__status pwa-ai-extract__status--error';
+      } finally {
+        extractBtn.classList.remove('pwa-ai-extract__btn--loading');
+        extractBtn.disabled = false;
+      }
+    });
+  })();
 </script>
 {% endblock extra_js %}

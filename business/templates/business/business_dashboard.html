@@ -10,198 +10,524 @@
 
 {% block content %}
 <div class="flex-fill" id="client_dashboard_container_main">
-  <!-- Dashboard Header -->
-  <div class="dashboard-header d-none d-md-block" id="client_dashboard_header_main">
-    <h1 class="h3 text-center" id="client_dashboard_title_business">
-      {{ business.business_name }} - Dashboard
-    </h1>
-  </div>
 
-  <!-- Stats -->
-  <div class="db-stats">
-    <div class="db-stat">
-      <div class="db-stat-icon primary"><i class="fa-solid fa-box"></i></div>
-      <p class="db-stat-value">{{ total_orders|default:0 }}</p>
-      <p class="db-stat-label">Total Orders</p>
-    </div>
-    <div class="db-stat">
-      <div class="db-stat-icon success"><i class="fa-solid fa-check"></i></div>
-      <p class="db-stat-value">{{ delivered_count|default:0 }}</p>
-      <p class="db-stat-label">Delivered</p>
-    </div>
-    <div class="db-stat">
-      <div class="db-stat-icon info"><i class="fa-solid fa-money-bill"></i></div>
-      <p class="db-stat-value">{{ cod_amount_total|default:0 }}</p>
-      <p class="db-stat-label">COD Amount</p>
-    </div>
-    <div class="db-stat">
-      <div class="db-stat-icon success"><i class="fa-solid fa-hand-holding-dollar"></i></div>
-      <p class="db-stat-value">{{ cod_collected|default:0 }}</p>
-      <p class="db-stat-label">COD Collected</p>
-    </div>
-    <div class="db-stat">
-      <div class="db-stat-icon warning"><i class="fa-solid fa-clock"></i></div>
-      <p class="db-stat-value">{{ reconfirm_count|default:0 }}</p>
-      <p class="db-stat-label">To Reconfirm</p>
-    </div>
-    <div class="db-stat">
-      <div class="db-stat-icon danger"><i class="fa-solid fa-phone"></i></div>
-      <p class="db-stat-value">{{ followup_count|default:0 }}</p>
-      <p class="db-stat-label">Follow Up</p>
-    </div>
-  </div>
+  <!-- ============================================
+       MOBILE PWA VIEW (visible < 768px only)
+       ============================================ -->
+  <div class="d-md-none">
 
-  <!-- AI Assistant Chat -->
-  {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="client" %}
-
-  <!-- Today's Orders Lists -->
-  <div class="row g-3 px-2 mt-2">
-    <!-- Today's Pending Orders -->
-    <div class="col-md-4">
-      <div class="card">
-        <div class="card-header py-2 d-flex justify-content-between align-items-center">
-          <span><i class="fa-solid fa-clock text-warning me-2"></i>Today's Pending</span>
-          <span class="badge bg-warning text-dark">{{ todays_pending_orders|length }}</span>
+    <!-- Hero Card -->
+    <div class="pwa-business-hero">
+      <h2 class="pwa-business-hero__name">{{ business.business_name }}</h2>
+      <p class="pwa-business-hero__subtitle">Dashboard Overview</p>
+      <div class="pwa-business-hero__stats">
+        <div class="pwa-business-hero__stat">
+          <p class="pwa-business-hero__stat-value">{{ total_orders|default:0 }}</p>
+          <p class="pwa-business-hero__stat-label">Orders</p>
         </div>
-        <ul class="list-group list-group-flush">
-          {% for order in todays_pending_orders %}
-          <li class="list-group-item py-2 d-flex justify-content-between align-items-center">
-            <div>
-              <strong>#{{ order.order_number }}</strong>
-              <small class="text-muted ms-2">{{ order.customer_name|truncatechars:12 }}</small>
-            </div>
-            <div>
-              {% if order.cod_amount %}<span class="badge bg-info">{{ order.cod_amount }}</span>{% endif %}
-            </div>
-          </li>
-          {% empty %}
-          <li class="list-group-item py-2 text-muted text-center small">No pending orders</li>
-          {% endfor %}
-        </ul>
+        <div class="pwa-business-hero__stat">
+          <p class="pwa-business-hero__stat-value">{{ delivered_count|default:0 }}</p>
+          <p class="pwa-business-hero__stat-label">Delivered</p>
+        </div>
+        <div class="pwa-business-hero__stat">
+          <p class="pwa-business-hero__stat-value">{{ cod_collected|default:0 }}</p>
+          <p class="pwa-business-hero__stat-label">COD (QAR)</p>
+        </div>
       </div>
+    </div>
+
+    <!-- Stats Grid (2x2) -->
+    <div class="pwa-stats-grid">
+      <div class="pwa-stat-card">
+        <div class="pwa-stat-card__top">
+          <div class="pwa-stat-card__icon pwa-stat-card__icon--primary">
+            <i class="fa-solid fa-box"></i>
+          </div>
+          <p class="pwa-stat-card__value">{{ total_orders|default:0 }}</p>
+        </div>
+        <p class="pwa-stat-card__label">Total Orders</p>
+      </div>
+      <div class="pwa-stat-card">
+        <div class="pwa-stat-card__top">
+          <div class="pwa-stat-card__icon pwa-stat-card__icon--success">
+            <i class="fa-solid fa-check"></i>
+          </div>
+          <p class="pwa-stat-card__value">{{ delivered_count|default:0 }}</p>
+        </div>
+        <p class="pwa-stat-card__label">Delivered</p>
+      </div>
+      <div class="pwa-stat-card">
+        <div class="pwa-stat-card__top">
+          <div class="pwa-stat-card__icon pwa-stat-card__icon--warning">
+            <i class="fa-solid fa-clock"></i>
+          </div>
+          <p class="pwa-stat-card__value">{{ pending_count|default:0 }}</p>
+        </div>
+        <p class="pwa-stat-card__label">Pending</p>
+      </div>
+      <div class="pwa-stat-card">
+        <div class="pwa-stat-card__top">
+          <div class="pwa-stat-card__icon pwa-stat-card__icon--danger">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <p class="pwa-stat-card__value">{{ followup_count|default:0 }}</p>
+        </div>
+        <p class="pwa-stat-card__label">Follow Up</p>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="pwa-section-header">
+      <h3 class="pwa-section-header__title">Quick Actions</h3>
+    </div>
+    <div class="pwa-quick-actions">
+      <a href="{% url 'orders:add_order' %}" class="pwa-quick-action">
+        <div class="pwa-quick-action__icon pwa-quick-action__icon--yellow">
+          <i class="fa-solid fa-plus"></i>
+        </div>
+        <span class="pwa-quick-action__label">Add Order</span>
+      </a>
+      <a href="{% url 'orders:orders_all_list' %}" class="pwa-quick-action">
+        <div class="pwa-quick-action__icon pwa-quick-action__icon--navy">
+          <i class="fa-solid fa-list"></i>
+        </div>
+        <span class="pwa-quick-action__label">All Orders</span>
+      </a>
+      <a href="{% url 'product:product_inventory' %}" class="pwa-quick-action">
+        <div class="pwa-quick-action__icon pwa-quick-action__icon--green">
+          <i class="fa-solid fa-boxes-stacked"></i>
+        </div>
+        <span class="pwa-quick-action__label">Inventory</span>
+      </a>
+      <a href="{% url 'business:business_finance_dashboard' %}" class="pwa-quick-action">
+        <div class="pwa-quick-action__icon pwa-quick-action__icon--blue">
+          <i class="fa-solid fa-chart-pie"></i>
+        </div>
+        <span class="pwa-quick-action__label">Finance</span>
+      </a>
+    </div>
+
+    <!-- AI Assistant Chat (mobile instance) -->
+    {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="mobile" %}
+
+    <!-- Today's Pending Orders -->
+    <div class="pwa-section-header">
+      <h3 class="pwa-section-header__title">
+        <i class="fa-solid fa-clock pwa-text-yellow me-1"></i> Today's Pending
+      </h3>
+      <div class="pwa-section-header__right">
+        <span class="pwa-section-header__badge pwa-section-header__badge--warning">{{ todays_pending_orders|length }}</span>
+        <a href="{% url 'orders:orders_all_list' %}?dateRange=today&cStatus=pending" class="pwa-section-header__link">View All <i class="fas fa-chevron-right"></i></a>
+      </div>
+    </div>
+    <div class="pwa-dash-list">
+      {% for order in todays_pending_orders %}
+      <a href="{% url 'orders:order_details' order.id %}" class="pwa-dash-item">
+        <div class="pwa-dash-item__left">
+          <div class="pwa-dash-item__icon pwa-dash-item__icon--warning">
+            <i class="fa-solid fa-clock"></i>
+          </div>
+        </div>
+        <div class="pwa-dash-item__body">
+          <div class="pwa-dash-item__top">
+            <span class="pwa-dash-item__number">#{{ order.order_number|truncatechars:22 }}</span>
+            {% if order.cod_amount %}
+            <span class="pwa-dash-item__amount pwa-dash-item__amount--warning">{{ order.cod_amount }} QR</span>
+            {% endif %}
+          </div>
+          <div class="pwa-dash-item__bottom">
+            <span class="pwa-dash-item__customer">{{ order.customer_name|truncatechars:18 }}</span>
+            {% if order.dl_zone %}
+            <span class="pwa-dash-item__zone"><i class="fas fa-map-marker-alt"></i> Z{{ order.dl_zone }}</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="pwa-dash-item__chevron"><i class="fas fa-chevron-right"></i></div>
+      </a>
+      {% empty %}
+      <div class="pwa-dash-empty">
+        <i class="fa-solid fa-circle-check"></i>
+        <span>All clear! No pending orders today</span>
+      </div>
+      {% endfor %}
     </div>
 
     <!-- Today's Delivered Orders -->
-    <div class="col-md-4">
-      <div class="card">
-        <div class="card-header py-2 d-flex justify-content-between align-items-center">
-          <span><i class="fa-solid fa-check-circle text-success me-2"></i>Today's Delivered</span>
-          <span class="badge bg-success">{{ todays_delivered_orders|length }}</span>
-        </div>
-        <ul class="list-group list-group-flush">
-          {% for order in todays_delivered_orders %}
-          <li class="list-group-item py-2 d-flex justify-content-between align-items-center">
-            <div>
-              <strong>#{{ order.order_number }}</strong>
-              <small class="text-muted ms-2">{{ order.customer_name|truncatechars:12 }}</small>
-            </div>
-            <div>
-              {% if order.cod_amount %}<span class="badge bg-success">{{ order.cod_amount }}</span>{% endif %}
-            </div>
-          </li>
-          {% empty %}
-          <li class="list-group-item py-2 text-muted text-center small">No deliveries today</li>
-          {% endfor %}
-        </ul>
+    <div class="pwa-section-header">
+      <h3 class="pwa-section-header__title">
+        <i class="fa-solid fa-check-circle pwa-text-success me-1"></i> Today's Delivered
+      </h3>
+      <div class="pwa-section-header__right">
+        <span class="pwa-section-header__badge pwa-section-header__badge--success">{{ todays_delivered_orders|length }}</span>
+        <a href="{% url 'orders:orders_all_list' %}?dateRange=today&dlStatus=delivered" class="pwa-section-header__link">View All <i class="fas fa-chevron-right"></i></a>
       </div>
     </div>
-
-    <!-- Failed/Follow Up Orders -->
-    <div class="col-md-4">
-      <div class="card">
-        <div class="card-header py-2 d-flex justify-content-between align-items-center">
-          <span><i class="fa-solid fa-exclamation-triangle text-danger me-2"></i>Failed/Follow Up</span>
-          <span class="badge bg-danger">{{ followup_orders|length }}</span>
-        </div>
-        <ul class="list-group list-group-flush">
-          {% for order in followup_orders %}
-          <li class="list-group-item py-2 d-flex justify-content-between align-items-center">
-            <div>
-              <strong>#{{ order.order_number }}</strong>
-              <small class="text-muted ms-2">{{ order.customer_name|truncatechars:12 }}</small>
-            </div>
-            <div>
-              {% if order.cod_amount %}<span class="badge bg-danger">{{ order.cod_amount }}</span>{% endif %}
-            </div>
-          </li>
-          {% empty %}
-          <li class="list-group-item py-2 text-muted text-center small">No failed orders</li>
-          {% endfor %}
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- Team Members Section -->
-  <div class="row g-3 px-2 mt-3">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header py-2 d-flex justify-content-between align-items-center">
-          <span><i class="fa-solid fa-users text-primary me-2"></i>Team Members</span>
-          <div>
-            <span class="badge bg-success me-1">{{ active_team_members }} Active</span>
-            {% if pending_team_members > 0 %}
-            <span class="badge bg-warning text-dark me-1">{{ pending_team_members }} Pending</span>
-            {% endif %}
-            <a href="{% url 'business:business_teams' business.business_id %}" class="btn btn-sm btn-outline-primary ms-2">
-              View All ({{ total_team_members }})
-            </a>
+    <div class="pwa-dash-list">
+      {% for order in todays_delivered_orders %}
+      <a href="{% url 'orders:order_details' order.id %}" class="pwa-dash-item">
+        <div class="pwa-dash-item__left">
+          <div class="pwa-dash-item__icon pwa-dash-item__icon--success">
+            <i class="fa-solid fa-check"></i>
           </div>
         </div>
-        <div class="card-body p-2">
-          {% if recent_team_members %}
-          <div class="team-members-grid">
-            {% for member in recent_team_members %}
-            <div class="team-member-card">
-              <div class="d-flex align-items-center">
-                <div class="team-member-avatar me-3">
+        <div class="pwa-dash-item__body">
+          <div class="pwa-dash-item__top">
+            <span class="pwa-dash-item__number">#{{ order.order_number|truncatechars:22 }}</span>
+            {% if order.cod_amount %}
+            <span class="pwa-dash-item__amount pwa-dash-item__amount--success">{{ order.cod_amount }} QR</span>
+            {% endif %}
+          </div>
+          <div class="pwa-dash-item__bottom">
+            <span class="pwa-dash-item__customer">{{ order.customer_name|truncatechars:18 }}</span>
+            {% if order.dl_zone %}
+            <span class="pwa-dash-item__zone"><i class="fas fa-map-marker-alt"></i> Z{{ order.dl_zone }}</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="pwa-dash-item__chevron"><i class="fas fa-chevron-right"></i></div>
+      </a>
+      {% empty %}
+      <div class="pwa-dash-empty">
+        <i class="fa-solid fa-truck"></i>
+        <span>No deliveries today yet</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Needs Attention (Follow Up) -->
+    <div class="pwa-section-header">
+      <h3 class="pwa-section-header__title">
+        <i class="fa-solid fa-exclamation-triangle pwa-text-danger me-1"></i> Needs Attention
+      </h3>
+      <div class="pwa-section-header__right">
+        <span class="pwa-section-header__badge pwa-section-header__badge--danger">{{ followup_orders|length }}</span>
+      </div>
+    </div>
+    <div class="pwa-dash-list">
+      {% for order in followup_orders %}
+      <a href="{% url 'orders:order_details' order.id %}" class="pwa-dash-item pwa-dash-item--alert">
+        <div class="pwa-dash-item__left">
+          <div class="pwa-dash-item__icon pwa-dash-item__icon--danger">
+            <i class="fa-solid fa-exclamation"></i>
+          </div>
+        </div>
+        <div class="pwa-dash-item__body">
+          <div class="pwa-dash-item__top">
+            <span class="pwa-dash-item__number">#{{ order.order_number|truncatechars:22 }}</span>
+            {% if order.cod_amount %}
+            <span class="pwa-dash-item__amount pwa-dash-item__amount--danger">{{ order.cod_amount }} QR</span>
+            {% endif %}
+          </div>
+          <div class="pwa-dash-item__bottom">
+            <span class="pwa-dash-item__customer">{{ order.customer_name|truncatechars:18 }}</span>
+            {% if order.dl_zone %}
+            <span class="pwa-dash-item__zone"><i class="fas fa-map-marker-alt"></i> Z{{ order.dl_zone }}</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="pwa-dash-item__chevron"><i class="fas fa-chevron-right"></i></div>
+      </a>
+      {% empty %}
+      <div class="pwa-dash-empty">
+        <i class="fa-solid fa-shield-check"></i>
+        <span>No issues! All orders on track</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- COD Overview -->
+    <div class="pwa-section-header">
+      <h3 class="pwa-section-header__title">
+        <i class="fa-solid fa-money-bill pwa-text-navy me-1"></i> COD Overview
+      </h3>
+      <a href="{% url 'business:business_finance_dashboard' %}" class="pwa-section-header__link">Details <i class="fas fa-chevron-right"></i></a>
+    </div>
+    <div class="pwa-cod-card">
+      <div class="pwa-cod-card__row">
+        <span class="pwa-cod-card__label">Total COD</span>
+        <span class="pwa-cod-card__value">{{ cod_amount_total|default:0 }} QAR</span>
+      </div>
+      <div class="pwa-cod-card__row">
+        <span class="pwa-cod-card__label">Collected</span>
+        <span class="pwa-cod-card__value pwa-text-success">{{ cod_collected|default:0 }} QAR</span>
+      </div>
+    </div>
+
+    <!-- Team Overview (Mobile) -->
+    {% if total_team_members > 0 %}
+    <div class="pwa-section-header">
+      <h3 class="pwa-section-header__title">
+        <i class="fa-solid fa-users pwa-text-navy me-1"></i> Team
+      </h3>
+      <div class="pwa-section-header__right">
+        <span class="pwa-section-header__badge" style="background: var(--pwa-navy, #001f3f);">{{ active_team_members }} active</span>
+        <a href="{% url 'business:business_teams' business.business_id %}" class="pwa-section-header__link">All <i class="fas fa-chevron-right"></i></a>
+      </div>
+    </div>
+    <div class="pwa-dash-list">
+      {% for member in recent_team_members %}
+      <div class="pwa-dash-item pwa-dash-item--static">
+        <div class="pwa-dash-item__left">
+          <div class="pwa-dash-item__avatar">
+            {% if member.team_logo %}
+            <img src="{{ member.team_logo.url }}" alt="{{ member.team_name|default:member.user.username }}">
+            {% else %}
+            <i class="fa-solid fa-user"></i>
+            {% endif %}
+          </div>
+        </div>
+        <div class="pwa-dash-item__body">
+          <div class="pwa-dash-item__top">
+            <span class="pwa-dash-item__number">{{ member.team_name|default:member.user.username }}</span>
+            {% if member.team_status == 'active' %}
+            <span class="pwa-dash-item__tag pwa-dash-item__tag--success">Active</span>
+            {% elif member.team_status == 'pending' %}
+            <span class="pwa-dash-item__tag pwa-dash-item__tag--warning">Pending</span>
+            {% endif %}
+          </div>
+          <div class="pwa-dash-item__bottom">
+            <span class="pwa-dash-item__customer">{{ member.get_team_role_display|default:member.team_role }}</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+  <!-- END MOBILE PWA VIEW -->
+
+  <!-- ============================================
+       DESKTOP VIEW (visible >= 768px only)
+       ============================================ -->
+  <div class="d-none d-md-block">
+
+    <!-- Dashboard Header -->
+    <div class="dashboard-header" id="client_dashboard_header_main">
+      <h1 class="h3 text-center" id="client_dashboard_title_business">
+        {{ business.business_name }} - Dashboard
+      </h1>
+    </div>
+
+    <!-- Stats -->
+    <div class="db-stats">
+      <div class="db-stat">
+        <div class="db-stat-icon primary"><i class="fa-solid fa-box"></i></div>
+        <p class="db-stat-value">{{ total_orders|default:0 }}</p>
+        <p class="db-stat-label">Total Orders</p>
+      </div>
+      <div class="db-stat">
+        <div class="db-stat-icon success"><i class="fa-solid fa-check"></i></div>
+        <p class="db-stat-value">{{ delivered_count|default:0 }}</p>
+        <p class="db-stat-label">Delivered</p>
+      </div>
+      <div class="db-stat">
+        <div class="db-stat-icon info"><i class="fa-solid fa-money-bill"></i></div>
+        <p class="db-stat-value">{{ cod_amount_total|default:0 }} QAR</p>
+        <p class="db-stat-label">COD Amount</p>
+      </div>
+      <div class="db-stat">
+        <div class="db-stat-icon success"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+        <p class="db-stat-value">{{ cod_collected|default:0 }} QAR</p>
+        <p class="db-stat-label">COD Collected</p>
+      </div>
+      <div class="db-stat">
+        <div class="db-stat-icon warning"><i class="fa-solid fa-clock"></i></div>
+        <p class="db-stat-value">{{ pending_count|default:0 }}</p>
+        <p class="db-stat-label">Pending</p>
+      </div>
+      <div class="db-stat">
+        <div class="db-stat-icon danger"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <p class="db-stat-value">{{ followup_count|default:0 }}</p>
+        <p class="db-stat-label">Follow Up</p>
+      </div>
+    </div>
+
+    <!-- AI Assistant Chat -->
+    {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="client" %}
+
+    <!-- Today's Orders Lists -->
+    <div class="row g-3 px-2 mt-2">
+      <!-- Today's Pending Orders -->
+      <div class="col-md-4">
+        <div class="db-list-card">
+          <div class="db-list-card__header db-list-card__header--warning">
+            <div class="db-list-card__header-left">
+              <div class="db-list-card__icon db-list-card__icon--warning">
+                <i class="fa-solid fa-clock"></i>
+              </div>
+              <span class="db-list-card__title">Today's Pending</span>
+            </div>
+            <span class="db-list-card__count db-list-card__count--warning">{{ todays_pending_orders|length }}</span>
+          </div>
+          <div class="db-list-card__body">
+            {% for order in todays_pending_orders %}
+            <a href="{% url 'orders:order_details' order.id %}" class="db-list-card__item">
+              <div class="db-list-card__item-main">
+                <span class="db-list-card__item-number">#{{ order.order_number }}</span>
+                <span class="db-list-card__item-customer">{{ order.customer_name|truncatechars:16 }}</span>
+              </div>
+              <div class="db-list-card__item-right">
+                {% if order.dl_zone %}<span class="db-list-card__item-zone">Z{{ order.dl_zone }}</span>{% endif %}
+                {% if order.cod_amount %}<span class="db-list-card__item-amount db-list-card__item-amount--warning">{{ order.cod_amount }} QR</span>{% endif %}
+              </div>
+            </a>
+            {% empty %}
+            <div class="db-list-card__empty">
+              <i class="fa-solid fa-circle-check"></i>
+              <span>All clear! No pending orders</span>
+            </div>
+            {% endfor %}
+          </div>
+          <a href="{% url 'orders:orders_all_list' %}?dateRange=today&cStatus=pending" class="db-list-card__footer">
+            View All Pending <i class="fas fa-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+
+      <!-- Today's Delivered Orders -->
+      <div class="col-md-4">
+        <div class="db-list-card">
+          <div class="db-list-card__header db-list-card__header--success">
+            <div class="db-list-card__header-left">
+              <div class="db-list-card__icon db-list-card__icon--success">
+                <i class="fa-solid fa-check-circle"></i>
+              </div>
+              <span class="db-list-card__title">Today's Delivered</span>
+            </div>
+            <span class="db-list-card__count db-list-card__count--success">{{ todays_delivered_orders|length }}</span>
+          </div>
+          <div class="db-list-card__body">
+            {% for order in todays_delivered_orders %}
+            <a href="{% url 'orders:order_details' order.id %}" class="db-list-card__item">
+              <div class="db-list-card__item-main">
+                <span class="db-list-card__item-number">#{{ order.order_number }}</span>
+                <span class="db-list-card__item-customer">{{ order.customer_name|truncatechars:16 }}</span>
+              </div>
+              <div class="db-list-card__item-right">
+                {% if order.dl_zone %}<span class="db-list-card__item-zone">Z{{ order.dl_zone }}</span>{% endif %}
+                {% if order.cod_amount %}<span class="db-list-card__item-amount db-list-card__item-amount--success">{{ order.cod_amount }} QR</span>{% endif %}
+              </div>
+            </a>
+            {% empty %}
+            <div class="db-list-card__empty">
+              <i class="fa-solid fa-truck"></i>
+              <span>No deliveries today yet</span>
+            </div>
+            {% endfor %}
+          </div>
+          <a href="{% url 'orders:orders_all_list' %}?dateRange=today&dlStatus=delivered" class="db-list-card__footer">
+            View All Delivered <i class="fas fa-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+
+      <!-- Failed/Follow Up Orders -->
+      <div class="col-md-4">
+        <div class="db-list-card">
+          <div class="db-list-card__header db-list-card__header--danger">
+            <div class="db-list-card__header-left">
+              <div class="db-list-card__icon db-list-card__icon--danger">
+                <i class="fa-solid fa-exclamation-triangle"></i>
+              </div>
+              <span class="db-list-card__title">Failed / Follow Up</span>
+            </div>
+            <span class="db-list-card__count db-list-card__count--danger">{{ followup_orders|length }}</span>
+          </div>
+          <div class="db-list-card__body">
+            {% for order in followup_orders %}
+            <a href="{% url 'orders:order_details' order.id %}" class="db-list-card__item db-list-card__item--alert">
+              <div class="db-list-card__item-main">
+                <span class="db-list-card__item-number">#{{ order.order_number }}</span>
+                <span class="db-list-card__item-customer">{{ order.customer_name|truncatechars:16 }}</span>
+              </div>
+              <div class="db-list-card__item-right">
+                {% if order.dl_zone %}<span class="db-list-card__item-zone">Z{{ order.dl_zone }}</span>{% endif %}
+                {% if order.cod_amount %}<span class="db-list-card__item-amount db-list-card__item-amount--danger">{{ order.cod_amount }} QR</span>{% endif %}
+              </div>
+            </a>
+            {% empty %}
+            <div class="db-list-card__empty">
+              <i class="fa-solid fa-shield"></i>
+              <span>No issues! All orders on track</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Team Members Section -->
+    <div class="row g-3 px-2 mt-3">
+      <div class="col-12">
+        <div class="db-list-card">
+          <div class="db-list-card__header">
+            <div class="db-list-card__header-left">
+              <div class="db-list-card__icon db-list-card__icon--primary">
+                <i class="fa-solid fa-users"></i>
+              </div>
+              <span class="db-list-card__title">Team Members</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="db-list-card__count db-list-card__count--success">{{ active_team_members }} Active</span>
+              {% if pending_team_members > 0 %}
+              <span class="db-list-card__count db-list-card__count--warning">{{ pending_team_members }} Pending</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="db-list-card__body">
+            {% if recent_team_members %}
+            <div class="db-team-grid">
+              {% for member in recent_team_members %}
+              <div class="db-team-member">
+                <div class="db-team-member__avatar">
                   {% if member.team_logo %}
-                  <img src="{{ member.team_logo.url }}" alt="{{ member.team_name|default:member.user.username }}" class="rounded-circle" style="width: 48px; height: 48px; object-fit: cover;">
+                  <img src="{{ member.team_logo.url }}" alt="{{ member.team_name|default:member.user.username }}">
                   {% else %}
-                  <div class="avatar-placeholder">
+                  <div class="db-team-member__avatar-placeholder">
                     <i class="fa-solid fa-user"></i>
                   </div>
                   {% endif %}
                 </div>
-                <div class="flex-fill">
-                  <div class="fw-bold">{{ member.team_name|default:member.user.username }}</div>
-                  <small class="text-muted">
-                    {% if member.team_role == 'manager' %}
-                    <span class="badge bg-primary">Manager</span>
-                    {% elif member.team_role == 'staff' %}
-                    <span class="badge bg-info text-dark">Staff</span>
-                    {% elif member.team_role == 'viewer' %}
-                    <span class="badge bg-secondary">Viewer</span>
-                    {% endif %}
-                  </small>
+                <div class="db-team-member__info">
+                  <span class="db-team-member__name">{{ member.team_name|default:member.user.username }}</span>
+                  <span class="db-team-member__role">
+                    {% if member.team_role == 'manager' %}Manager
+                    {% elif member.team_role == 'staff' %}Staff
+                    {% elif member.team_role == 'viewer' %}Viewer
+                    {% else %}{{ member.team_role }}{% endif %}
+                  </span>
                 </div>
-                <div class="text-end">
+                <div class="db-team-member__status">
                   {% if member.team_status == 'active' %}
-                  <span class="badge bg-success">Active</span>
+                  <span class="db-team-member__badge db-team-member__badge--active"><i class="fa-solid fa-circle"></i> Active</span>
                   {% elif member.team_status == 'pending' %}
-                  <span class="badge bg-warning text-dark">Pending</span>
+                  <span class="db-team-member__badge db-team-member__badge--pending"><i class="fa-solid fa-circle"></i> Pending</span>
                   {% elif member.team_status == 'suspended' %}
-                  <span class="badge bg-danger">Suspended</span>
+                  <span class="db-team-member__badge db-team-member__badge--suspended"><i class="fa-solid fa-circle"></i> Suspended</span>
                   {% else %}
-                  <span class="badge bg-secondary">{{ member.team_status }}</span>
+                  <span class="db-team-member__badge">{{ member.team_status }}</span>
                   {% endif %}
                 </div>
               </div>
+              {% endfor %}
             </div>
-            {% endfor %}
+            {% else %}
+            <div class="db-list-card__empty">
+              <i class="fa-solid fa-user-plus"></i>
+              <span>No team members yet</span>
+            </div>
+            {% endif %}
           </div>
-          {% else %}
-          <div class="text-center py-4 text-muted">
-            <i class="fa-solid fa-users fa-3x mb-2 opacity-50"></i>
-            <p class="mb-2">No team members yet</p>
-            <a href="{% url 'business:business_teams_add' business.business_id %}" class="btn btn-sm btn-primary">
-              <i class="fa-solid fa-user-plus me-1"></i>Add Team Member
-            </a>
-          </div>
-          {% endif %}
+          <a href="{% url 'business:business_teams' business.business_id %}" class="db-list-card__footer">
+            Manage Team ({{ total_team_members }}) <i class="fas fa-arrow-right ms-1"></i>
+          </a>
         </div>
       </div>
     </div>
+
   </div>
+  <!-- END DESKTOP VIEW -->
+
 </div>
 {% endblock content %}

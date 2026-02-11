@@ -24,20 +24,24 @@
         </div>
         <div class="d-flex flex-wrap align-items-center gap-2">
           {% with delivery=order.delivery_task.first %}
-            {% if delivery and delivery.dl_task_status_dms == '2' %}
+            {% if delivery and delivery.dl_task_status == 'delivered' %}
               <span class="order-status-badge status-delivered">Delivered</span>
-            {% elif delivery and delivery.dl_task_status_dms == '0' %}
+            {% elif delivery and delivery.dl_task_status == 'assigned' %}
               <span class="order-status-badge status-created">Assigned</span>
-            {% elif delivery and delivery.dl_task_status_dms == '1' %}
-              <span class="order-status-badge status-pending">Started</span>
-            {% elif delivery and delivery.dl_task_status_dms == '3' %}
+            {% elif delivery and delivery.dl_task_status == 'accepted' %}
+              <span class="order-status-badge status-created">Accepted</span>
+            {% elif delivery and delivery.dl_task_status == 'picked_up' %}
+              <span class="order-status-badge status-pending">Picked Up</span>
+            {% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}
+              <span class="order-status-badge status-pending">In Transit</span>
+            {% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}
               <span class="order-status-badge status-cancelled">Failed</span>
-            {% elif delivery and delivery.dl_task_status_dms == '9' %}
+            {% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}
               <span class="order-status-badge status-cancelled">Cancelled</span>
             {% elif order.task_created %}
               <span class="order-status-badge status-created">Task Created</span>
             {% else %}
-              <span class="order-status-badge status-pending">Pending</span>
+              <span class="order-status-badge status-pending">{{ order.get_order_status_display }}</span>
             {% endif %}
           {% endwith %}
           <div class="order-date">

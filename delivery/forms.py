@@ -19,7 +19,6 @@ class DlAddressUpdateForm(forms.ModelForm):
     """
     class Meta:
         model = delivery_models.DlAddressUpdate
-        # Fix: Explicitly list allowed fields instead of __all__
         fields = [
             'full_name',
             'mobile_no',
@@ -35,7 +34,6 @@ class DlAddressUpdateForm(forms.ModelForm):
             'is_office',
             'time_slot',
         ]
-        # Fix: Correct attribute name from 'widget' to 'widgets'
         widgets = {
             'time_slot': forms.CheckboxSelectMultiple(choices=[
                 ('Morning', 'Morning'),
@@ -60,7 +58,6 @@ class DlAddressUpdateForm(forms.ModelForm):
             ('Evening', 'Evening'),
             ('Night', 'Night'),
         ])
-        # Fix: Use widget.attrs instead of field.attrs
         self.fields['time_slot'].widget.attrs.update({'class': 'd-flex flex-wrap'})
 
     def clean_mobile_no(self):
@@ -84,7 +81,6 @@ class DriverAssignForm(forms.ModelForm):
     """
     class Meta:
         model = delivery_models.AssignedDriver
-        # Fix: Explicitly list only the driver field
         fields = ['driver']
         # Exclude protected fields
         exclude = ['dl_task', 'created_at', 'updated_at']
