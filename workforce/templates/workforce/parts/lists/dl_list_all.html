@@ -1,20 +1,17 @@
 {% extends "wf_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
-<!-- extra css -->
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
 <!-- Page Header -->
 <header class="page-header">
     <div class="page-header-left">
-        <h2><i class="fa-solid fa-tasks me-1" aria-hidden="true"></i>All Delivery Tasks</h2>
-        <span class="page-header-subtitle">| Manage and track</span>
+        <h2><i class="fa-solid {{ page_icon|default:'fa-tasks' }} me-1" aria-hidden="true"></i>{{ page_title|default:"Delivery Tasks" }}</h2>
+        <span class="page-header-subtitle">| {{ page_subtitle|default:"Manage and track" }}</span>
     </div>
     <div class="page-header-right">
-        {% include "workforce/parts/components/_tasks_view_toggle.html" %}
         <div class="page-header-count" aria-label="Task count summary">
             <span class="count-value" aria-live="polite">{{ dl_tasks.paginator.count|default:"0" }}</span>
             <span class="count-label">tasks</span>
@@ -23,6 +20,7 @@
 </header>
 <div class="col-12 p-3" role="main" aria-label="Delivery Tasks List">
 
+    {% if show_filters %}
     <!-- Filter Section -->
     <div class="filter-section">
         <div class="filter-toggle" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
@@ -152,11 +150,8 @@
                             <button type="button" class="btn btn-outline-secondary px-4" id="clearFilter">
                                 <i class="fa fa-times me-2"></i>Clear All
                             </button>
-                            <button type="button" class="btn btn-outline-primary px-4" id="saveFilter" title="Save current filter as preset">
-                                <i class="fa fa-bookmark me-2"></i>Save Filter
-                            </button>
                             <div class="ms-auto d-flex align-items-center gap-2">
-                                <span class="text-muted small">Quick Filters:</span>
+                                <span class="text-muted small">Quick:</span>
                                 <button type="button" class="btn btn-sm btn-outline-info" onclick="quickFilter('today')">
                                     Today
                                 </button>
@@ -181,13 +176,10 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
-    <!-- Tasks Views -->
+    <!-- Tasks Table -->
     {% if dl_tasks %}
-    <!-- Card Views (List/Grid) -->
-    {% include "workforce/parts/components/_tasks_card_view.html" with tasks=dl_tasks %}
-
-    <!-- Table View -->
     {% include "workforce/parts/components/_tasks_table_view.html" with tasks=dl_tasks %}
 
     <!-- Pagination -->
@@ -200,13 +192,13 @@
         </div>
         <h4 class="text-muted mb-3">No Tasks Found</h4>
         <p class="text-muted mb-4">
-            {% if filters.dlCode or filters.cCode or filters.mobile or filters.cStatus or filters.dmsStatus or filters.business %}
+            {% if show_filters and filters.dlCode or filters.cCode or filters.mobile or filters.cStatus or filters.dmsStatus or filters.business %}
             No tasks match your current filters. Try adjusting your search criteria.
             {% else %}
-            There are no tasks in the system yet.
+            There are no tasks matching this view.
             {% endif %}
         </p>
-        {% if filters.dlCode or filters.cCode or filters.mobile or filters.cStatus or filters.dmsStatus or filters.business %}
+        {% if show_filters and filters.dlCode or filters.cCode or filters.mobile or filters.cStatus or filters.dmsStatus or filters.business %}
         <button type="button" class="btn btn-primary" id="clearFilterEmpty">
             <i class="fa fa-times me-2"></i>Clear All Filters
         </button>

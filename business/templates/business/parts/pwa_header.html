@@ -1,0 +1,19 @@
+{% load static %}
+<!-- PWA Mobile Header - Only visible on mobile (< 768px) -->
+<header class="pwa-header d-md-none">
+  <a href="{% url 'business:business_dashboard' %}" class="pwa-header__logo">
+    <img src="{% static 'webpages/img/ezzy-logo-long-white.png' %}" alt="Ezzy Delivery" class="pwa-header__logo-img">
+  </a>
+  <div class="pwa-header__actions">
+    <button class="pwa-header__btn" id="pwa-notifications-btn" title="Notifications">
+      <i class="fa-solid fa-bell"></i>
+    </button>
+    {% with biz=business|default:user_business %}
+    {% if biz and biz.business_id %}
+    <a href="{% url 'business:business_settings' biz.business_id %}" class="pwa-header__btn" title="Settings">
+      <i class="fa-solid fa-gear"></i>
+    </a>
+    {% endif %}
+    {% endwith %}
+  </div>
+</header>

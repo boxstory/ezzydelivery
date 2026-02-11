@@ -169,6 +169,14 @@ class UsageLogSerializer(serializers.ModelSerializer):
         ]
 
 
+class ExtractOrderRequestSerializer(serializers.Serializer):
+    """Serializer for AI order text extraction request."""
+    text = serializers.CharField(
+        max_length=2000,
+        help_text='Raw order text (WhatsApp message, SMS, notes)'
+    )
+
+
 class WhatsAppWebhookSerializer(serializers.Serializer):
     """Serializer for WhatsApp webhook (from n8n)."""
     phone = serializers.CharField(

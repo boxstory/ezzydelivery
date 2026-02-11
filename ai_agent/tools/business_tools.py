@@ -14,6 +14,15 @@ from typing import Any, Dict, List, Optional
 from django.db.models import Q, Count, Sum, Max, Min
 from django.utils import timezone
 
+import zoneinfo
+
+_QATAR_TZ = zoneinfo.ZoneInfo('Asia/Qatar')
+
+
+def _parse_date(date_str):
+    """Parse YYYY-MM-DD string to timezone-aware datetime."""
+    return datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=_QATAR_TZ)
+
 from ai_agent.tools.base import BaseTool, ToolError, register_tool
 
 logger = logging.getLogger(__name__)
@@ -70,14 +79,14 @@ class GetBusinessDashboardTool(BaseTool):
         # Apply date filters
         if date_from:
             try:
-                start_date = datetime.strptime(date_from, '%Y-%m-%d')
+                start_date = _parse_date(date_from)
                 queryset = queryset.filter(created_at__gte=start_date)
             except ValueError:
                 raise ToolError('Invalid date_from format. Use YYYY-MM-DD', 'INVALID_PARAM')
 
         if date_to:
             try:
-                end_date = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+                end_date = _parse_date(date_to) + timedelta(days=1)
                 queryset = queryset.filter(created_at__lt=end_date)
             except ValueError:
                 raise ToolError('Invalid date_to format. Use YYYY-MM-DD', 'INVALID_PARAM')
@@ -91,6 +100,9 @@ class GetBusinessDashboardTool(BaseTool):
         delivered = status_counts.get('delivered', 0) + status_counts.get('fulfilled', 0)
         cancelled = status_counts.get('cancelled', 0)
         pending = total_orders - delivered - cancelled
+
+        # Detailed status breakdown so AI knows exact statuses to search for
+        status_breakdown = {k: v for k, v in status_counts.items() if v > 0}
 
         # COD totals
         cod_stats = queryset.aggregate(
@@ -134,6 +146,7 @@ class GetBusinessDashboardTool(BaseTool):
                 'delivered': delivered,
                 'pending': pending,
                 'cancelled': cancelled,
+                'status_breakdown': status_breakdown,
             },
             'cod': {
                 'total_amount': total_cod,
@@ -169,7 +182,9 @@ class SearchBusinessOrdersTool(BaseTool):
     description = '''Search and list your business orders with filters.
 
     Can filter by:
-    - Order status (to_review, ready_to_pickup, publish, delivered, fulfilled, cancelled)
+    - Order status: to_review, ready_to_pickup, publish, delivered, fulfilled, cancelled
+      NOTE: There is NO "pending" status. Dashboard "pending" count = to_review + ready_to_pickup + publish.
+      To list pending orders, use order_status="pending" which will automatically include all non-delivered, non-cancelled orders.
     - Date range (date_from, date_to in YYYY-MM-DD)
     - Customer phone or name
     - Zone number
@@ -257,18 +272,22 @@ class SearchBusinessOrdersTool(BaseTool):
 
         # Apply filters
         if order_status:
-            queryset = queryset.filter(order_status=order_status)
+            if order_status == 'pending':
+                # "pending" is a virtual status = all non-delivered, non-cancelled
+                queryset = queryset.exclude(order_status__in=['delivered', 'fulfilled', 'cancelled'])
+            else:
+                queryset = queryset.filter(order_status=order_status)
 
         if date_from:
             try:
-                start_date = datetime.strptime(date_from, '%Y-%m-%d')
+                start_date = _parse_date(date_from)
                 queryset = queryset.filter(created_at__gte=start_date)
             except ValueError:
                 pass
 
         if date_to:
             try:
-                end_date = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+                end_date = _parse_date(date_to) + timedelta(days=1)
                 queryset = queryset.filter(created_at__lt=end_date)
             except ValueError:
                 pass
@@ -420,14 +439,14 @@ class GetBusinessDeliveriesTool(BaseTool):
 
         if date_from:
             try:
-                start_date = datetime.strptime(date_from, '%Y-%m-%d')
+                start_date = _parse_date(date_from)
                 queryset = queryset.filter(created_at__gte=start_date)
             except ValueError:
                 pass
 
         if date_to:
             try:
-                end_date = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+                end_date = _parse_date(date_to) + timedelta(days=1)
                 queryset = queryset.filter(created_at__lt=end_date)
             except ValueError:
                 pass
@@ -442,12 +461,12 @@ class GetBusinessDeliveriesTool(BaseTool):
         all_tasks = DeliveryTask.objects.filter(business=_business)
         if date_from:
             try:
-                all_tasks = all_tasks.filter(created_at__gte=datetime.strptime(date_from, '%Y-%m-%d'))
+                all_tasks = all_tasks.filter(created_at__gte=_parse_date(date_from))
             except ValueError:
                 pass
         if date_to:
             try:
-                all_tasks = all_tasks.filter(created_at__lt=datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
+                all_tasks = all_tasks.filter(created_at__lt=_parse_date(date_to) + timedelta(days=1))
             except ValueError:
                 pass
 
@@ -552,14 +571,14 @@ class GetBusinessCODSummaryTool(BaseTool):
 
         if date_from:
             try:
-                start_date = datetime.strptime(date_from, '%Y-%m-%d')
+                start_date = _parse_date(date_from)
                 queryset = queryset.filter(created_at__gte=start_date)
             except ValueError:
                 pass
 
         if date_to:
             try:
-                end_date = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+                end_date = _parse_date(date_to) + timedelta(days=1)
                 queryset = queryset.filter(created_at__lt=end_date)
             except ValueError:
                 pass

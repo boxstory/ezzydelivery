@@ -190,6 +190,125 @@
     </div>
     {% endif %}
 
+    <!-- Status Timeline -->
+    <div class="card mb-3 tl-card">
+        <div class="card-header tl-header">
+            <div class="tl-header__left">
+                <i class="fa-solid fa-clock-rotate-left me-2"></i>
+                Status Timeline
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="tl-wrap">
+                <!-- Order Created -->
+                <div class="tl-item tl-item--first">
+                    <div class="tl-track">
+                        <div class="tl-icon tl-icon--created"><i class="fa-solid fa-plus"></i></div>
+                    </div>
+                    <div class="tl-body">
+                        <div class="tl-card-inner tl-card-inner--created">
+                            <div class="tl-row">
+                                <span class="tl-title">Order Created</span>
+                                <span class="tl-timestamp">{{ order.created_at|date:"d/m H:i" }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% for entry in status_history %}
+                <div class="tl-item">
+                    <div class="tl-track">
+                        <div class="tl-icon {% if entry.field_name == 'order_status' %}tl-icon--order{% elif entry.field_name == 'verification_status' %}tl-icon--verify{% elif entry.field_name == 'dl_task_status' %}tl-icon--task{% elif entry.field_name == 'dl_task_status_dms' %}tl-icon--dms{% elif entry.field_name == 'cod_status_by_staff' %}tl-icon--cod{% else %}tl-icon--default{% endif %}">
+                            {% if entry.field_name == 'order_status' %}<i class="fa-solid fa-box"></i>
+                            {% elif entry.field_name == 'verification_status' %}<i class="fa-solid fa-shield-halved"></i>
+                            {% elif entry.field_name == 'dl_task_status' %}<i class="fa-solid fa-truck-fast"></i>
+                            {% elif entry.field_name == 'dl_task_status_dms' %}<i class="fa-solid fa-satellite-dish"></i>
+                            {% elif entry.field_name == 'cod_status_by_staff' %}<i class="fa-solid fa-money-bill-wave"></i>
+                            {% elif entry.field_name == 'task_status' %}<i class="fa-solid fa-list-check"></i>
+                            {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
+                        </div>
+                    </div>
+                    <div class="tl-body">
+                        <div class="tl-card-inner">
+                            <div class="tl-row">
+                                <span class="tl-title">{{ entry.get_field_name_display }}</span>
+                                <span class="tl-timestamp">{{ entry.created_at|date:"d/m H:i" }}</span>
+                            </div>
+                            <div class="tl-transition">
+                                {% if entry.old_display %}
+                                <span class="tl-pill tl-pill--from">{{ entry.old_display }}</span>
+                                <span class="tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
+                                {% endif %}
+                                <span class="tl-pill {% if entry.new_value == 'delivered' or entry.new_value == 'fulfilled' or entry.new_value == 'verified' or entry.new_value == '2' %}tl-pill--success{% elif entry.new_value == 'cancelled' or entry.new_value == 'rejected' or entry.new_value == 'failed' or entry.new_value == '3' or entry.new_value == '9' %}tl-pill--danger{% else %}tl-pill--to{% endif %}">{{ entry.new_display }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                {% endfor %}
+
+                {% if not status_history %}
+                {% for log in verification_logs %}
+                <div class="tl-item">
+                    <div class="tl-track">
+                        <div class="tl-icon tl-icon--verify"><i class="fa-solid fa-shield-halved"></i></div>
+                    </div>
+                    <div class="tl-body">
+                        <div class="tl-card-inner">
+                            <div class="tl-row">
+                                <span class="tl-title">{{ log.action }}</span>
+                                <span class="tl-timestamp">{{ log.created_at|date:"d/m H:i" }}</span>
+                            </div>
+                            <div class="tl-transition">
+                                {% if log.old_status %}
+                                <span class="tl-pill tl-pill--from">{{ log.old_status }}</span>
+                                <span class="tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
+                                {% endif %}
+                                <span class="tl-pill tl-pill--to">{{ log.new_status }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                <!-- Current State -->
+                <div class="tl-item tl-item--last">
+                    <div class="tl-track">
+                        <div class="tl-icon tl-icon--now"><i class="fa-solid fa-location-dot"></i></div>
+                    </div>
+                    <div class="tl-body">
+                        <div class="tl-card-inner tl-card-inner--now">
+                            <div class="tl-row">
+                                <span class="tl-title">Current State</span>
+                            </div>
+                            <div class="tl-now-grid">
+                                <div class="tl-now-cell">
+                                    <span class="tl-now-label">Order</span>
+                                    <span class="tl-pill tl-pill--live">{{ order.get_order_status_display }}</span>
+                                </div>
+                                <div class="tl-now-cell">
+                                    <span class="tl-now-label">Verification</span>
+                                    <span class="tl-pill {% if order.verification_status == 'verified' %}tl-pill--success{% elif order.verification_status == 'rejected' %}tl-pill--danger{% else %}tl-pill--live{% endif %}">{{ order.get_verification_status_display }}</span>
+                                </div>
+                                {% if delivery_task %}
+                                <div class="tl-now-cell">
+                                    <span class="tl-now-label">Delivery</span>
+                                    <span class="tl-pill tl-pill--live-alt">{{ delivery_task.get_dl_task_status_display }}</span>
+                                </div>
+                                <div class="tl-now-cell">
+                                    <span class="tl-now-label">DMS</span>
+                                    <span class="tl-pill tl-pill--live-dms">{{ delivery_task.get_dl_task_status_dms_display }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Action Buttons -->
     <div class="d-grid gap-2 mt-4">
         {% if order.verification_status == 'pending' %}

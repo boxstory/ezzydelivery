@@ -22,6 +22,7 @@ urlpatterns = [
     path('tools/cod-risk/', views.CODRiskAPIView.as_view(), name='cod_risk'),
     path('tools/estimate-delivery/', views.EstimateDeliveryAPIView.as_view(), name='estimate_delivery'),
     path('tools/suggest-driver/', views.SuggestDriverAPIView.as_view(), name='suggest_driver'),
+    path('tools/extract-order/', views.ExtractOrderAPIView.as_view(), name='extract_order'),
 
     # Webhooks
     path('webhooks/whatsapp/', views.WhatsAppWebhookAPIView.as_view(), name='whatsapp_webhook'),

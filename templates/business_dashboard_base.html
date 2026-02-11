@@ -7,6 +7,18 @@
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.3"></script>
 
+    <!-- Favicon -->
+    <link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'icons/favicon-32x32.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'icons/apple-touch-icon.png' %}">
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#001f3f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="EzzyBusiness">
+    <link rel="manifest" href="{% static 'manifest-business.json' %}">
+
     <!-- Dashboard CSS - Always loaded for HTMX compatibility -->
     <link rel="stylesheet" href="{% static 'business_dashboard_base.css' %}">
     <link rel="stylesheet" href="{% static 'webpages/css/sidebar-common.css' %}">
@@ -15,6 +27,10 @@
     <link rel="stylesheet" href="{% static 'product/css/product.css' %}">
     <link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}">
     <link rel="stylesheet" href="{% static 'business/css/business.css' %}">
+
+    <!-- Mobile PWA CSS -->
+    <link rel="stylesheet" href="{% static 'fleet/css/fleet-mobile.css' %}?v=20260208b">
+    <link rel="stylesheet" href="{% static 'business/css/business-mobile.css' %}?v=20260208p">
 
     <!-- AI Chat Widget CSS -->
     <link rel="stylesheet" href="{% static 'ai_agent/css/chat-widget.css' %}?v=20260201" type="text/css" />
@@ -26,15 +42,24 @@
       {% endblock title %}
     Ezzy Dashboard</title>
   </head>
-  <body class="business-dashboard d-flex flex-column min-vh-100" hx-boost="true">
+  <body class="business-dashboard business-mobile d-flex flex-column min-vh-100" hx-boost="true">
     <!-- Toast Notifications -->
     {% include "includes/toast_notifications.html" %}
 
-    {% include "includes/navbar.html" %}
-    <main class="col-12 ps-2 flex-grow-1">
-      {% include "business/parts/dashboard_sidebar_business_mob.html" %}
+    <!-- PWA Mobile Header (mobile only) -->
+    {% include "business/parts/pwa_header.html" %}
+
+    <!-- Desktop Navbar (hidden on mobile) -->
+    <div class="d-none d-md-block">
+      {% include "includes/navbar.html" %}
+    </div>
+    <main class="col-12 ps-md-2 flex-grow-1">
+      <!-- Desktop Mobile Sidebar Toggle (hidden on mobile) -->
+      <div class="d-none d-md-block">
+        {% include "business/parts/dashboard_sidebar_business_mob.html" %}
+      </div>
       <div class="col-12 d-flex">
-        <!-- sidebar -->
+        <!-- sidebar (desktop only) -->
         {% block sidebar %}
           {% include "business/parts/dashboard_sidebar_business.html" %}
         {% endblock sidebar %}
@@ -46,6 +71,10 @@
         </div>
       </div>
     </main>
+
+    <!-- PWA Mobile Bottom Navigation (mobile only) -->
+    {% include "business/parts/pwa_bottom_nav.html" %}
+
     <!-- extra js -->
     {% include "includes/scripts.html" %}
     <!-- dashboard js -->
@@ -104,6 +133,16 @@
         }
       });
 
+      // Handle HTMX errors - fall back to normal navigation
+      document.body.addEventListener('htmx:responseError', function(evt) {
+        var path = evt.detail.pathInfo && evt.detail.pathInfo.requestPath;
+        if (path) { window.location.href = path; }
+      });
+      document.body.addEventListener('htmx:sendError', function(evt) {
+        var path = evt.detail.pathInfo && evt.detail.pathInfo.requestPath;
+        if (path) { window.location.href = path; }
+      });
+
       // Update sidebar active states after HTMX swap
       document.body.addEventListener('htmx:afterSettle', function(evt) {
         updateSidebarActiveStates();
@@ -128,7 +167,6 @@
             sidebar.classList.toggle('collapsed');
             const nowCollapsed = sidebar.classList.contains('collapsed');
             localStorage.setItem('sidebarCollapsed', nowCollapsed);
-            console.log('Sidebar toggled:', nowCollapsed ? 'collapsed' : 'expanded');
           });
         }
       }
@@ -148,5 +186,14 @@
     {% block extra_js %}
       <!--  -->
     {% endblock extra_js %}
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .catch(function(err) {
+            console.log('SW registration failed:', err);
+          });
+      }
+    </script>
   </body>
 </html>

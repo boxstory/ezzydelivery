@@ -171,25 +171,34 @@ def all_delivery_tasks(request):
         'task_qrcode',
     )
 
-    # All tasks: published and available (not assigned to any driver)
+    # All tasks: published and available (not assigned to any driver) — only verified orders
     all_tasks = base_qs.filter(
         dl_task_publish=True,
         driver__isnull=True,
-        dl_task_status__in=['pending', 'for_review']
+        dl_task_status__in=['pending', 'for_review'],
+        order__verification_status='verified',
     ).exclude(
         dl_task_status__in=['delivered', 'cancelled', 'failed']
+    ).exclude(
+        order__order_status='cancelled'
     ).order_by('-id')
 
-    # Assigned tasks: Tasks assigned to driver but not yet accepted
+    # Assigned tasks: Tasks assigned to driver but not yet accepted — only verified orders
     assigned_tasks = base_qs.filter(
         driver=driver,
-        dl_task_status='assigned'
+        dl_task_status='assigned',
+        order__verification_status='verified',
+    ).exclude(
+        order__order_status='cancelled'
     ).order_by('-id')
 
-    # Accepted tasks: Active tasks driver has accepted (not yet completed)
+    # Accepted tasks: Active tasks driver has accepted (not yet completed) — only verified orders
     accepted_tasks = base_qs.filter(
         driver=driver,
-        dl_task_status__in=['accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable']
+        dl_task_status__in=['accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable'],
+        order__verification_status='verified',
+    ).exclude(
+        order__order_status='cancelled'
     ).order_by('-id')
 
     # History tasks: Completed tasks (delivered, failed, cancelled)
@@ -366,6 +375,14 @@ def assign_driver(request):
                     driver=driver, dl_task=task
                 )
 
+                # Block if order is cancelled
+                if task.order and task.order.order_status == 'cancelled':
+                    return JsonResponse({"success": False, "error": "Order is cancelled"})
+
+                # Block if order is not verified
+                if task.order and task.order.verification_status != 'verified':
+                    return JsonResponse({"success": False, "error": "Order not verified"})
+
                 # Update task: set driver and status to accepted
                 task.driver = driver
                 task.dl_task_status = 'accepted'
@@ -427,6 +444,15 @@ def accept_task(request):
                     delivery_models.AssignedDriver.objects.create(driver=driver, dl_task=task)
                 logger.info(f"Driver {driver.id} assigned to task {task_id}")
 
+            # Block if order is cancelled or not verified
+            if task.order_id:
+                order_vals = orders_models.Order.objects.filter(id=task.order_id).values_list('order_status', 'verification_status').first()
+                if order_vals:
+                    if order_vals[0] == 'cancelled':
+                        return JsonResponse({"success": False, "error": "Order is cancelled — cannot accept task"})
+                    if order_vals[1] != 'verified':
+                        return JsonResponse({"success": False, "error": "Order not verified — cannot accept task"})
+
             # Update task status to accepted
             task.dl_task_status = 'accepted'
             task.dl_task_status_dms = '7'  # Accepted/Acknowledged in DMS
@@ -469,7 +495,15 @@ def start_ride(request):
             if not assigned:
                 return JsonResponse({"success": False, "error": "Task not assigned to you"})
 
-            task = delivery_models.DeliveryTask.objects.get(id=task_id)
+            task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id)
+
+            # Block if order is cancelled
+            if task.order and task.order.order_status == 'cancelled':
+                return JsonResponse({"success": False, "error": "Order is cancelled — cannot start ride"})
+
+            # Block if order is not verified
+            if task.order and task.order.verification_status != 'verified':
+                return JsonResponse({"success": False, "error": "Order not verified — cannot start ride"})
 
             # Update status to out_for_delivery
             task.dl_task_status = 'out_for_delivery'
@@ -558,20 +592,20 @@ def task_navigation(request, task_id):
 @login_required(login_url='account_login')
 def assigned_tasks(request):
     try:
-        # FIX: Get driver with select_related
         driver = fleet_models.Driver.objects.select_related('user').get(
             user_id=request.user.id
         )
         logger.info(f"Driver {driver.driver_id} viewing assigned tasks")
 
-        # FIX: Get task IDs (this is efficient - stays the same)
         assigned_tasks_ids = delivery_models.AssignedDriver.objects.filter(
             driver_id=driver.driver_id
         ).values_list('dl_task_id', flat=True)
 
-        # FIX: Optimize with select_related and prefetch_related
         assigned_tasks = delivery_models.DeliveryTask.objects.filter(
-            id__in=assigned_tasks_ids
+            id__in=assigned_tasks_ids,
+            order__verification_status='verified',
+        ).exclude(
+            order__order_status='cancelled'
         ).select_related(
             'order',
             'order__business',

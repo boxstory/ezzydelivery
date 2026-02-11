@@ -176,7 +176,7 @@ function bulkPublishDMS(taskIds) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
             },
             body: JSON.stringify({ task_ids: taskIds })
         })
@@ -203,7 +203,7 @@ function bulkPublishApp(taskIds) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
             },
             body: JSON.stringify({ task_ids: taskIds })
         })
@@ -230,7 +230,7 @@ function bulkUpdateStatus(taskIds, status) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
             },
             body: JSON.stringify({ task_ids: taskIds, status: status })
         })
@@ -357,7 +357,7 @@ function publishToDMS(taskId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
             }
         })
         .then(response => response.json())
@@ -383,7 +383,7 @@ function publishToDriverApp(taskId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
             }
         })
         .then(response => response.json())

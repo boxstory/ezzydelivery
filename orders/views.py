@@ -172,20 +172,19 @@ def orders_all_list(request):
         delivered_from = start_of_month.isoformat()
         delivered_to = today.isoformat()
 
-    # FIX: Use select_related for ForeignKeys and prefetch_related for reverse relations
     items = orders_models.Order.objects.filter(
         business=business.business_id
     ).select_related(
-        'business',              # FK: Order → Business
-        'pickup_location',       # FK: Order → PickupLocation
-        'address_verified_by',   # FK: Order → User (address verifier)
-        'verified_by',           # FK: Order → User (order verifier)
+        'business',
+        'pickup_location',
+        'address_verified_by',
+        'verified_by',
     ).prefetch_related(
-        'order_items',                 # Reverse FK: Order ← OrderItem (related_name='order_items')
-        'order_items__product',        # Through: OrderItem → Product
-        'delivery_task',               # Reverse FK: Order ← DeliveryTask
-        'delivery_task__driver',       # Through: DeliveryTask → Driver
-        'delivery_task__business',     # Through: DeliveryTask → Business
+        'order_items',
+        'order_items__product',
+        'delivery_task',
+        'delivery_task__driver',
+        'delivery_task__business',
     )
 
     # Apply filters
@@ -197,7 +196,9 @@ def orders_all_list(request):
         items = items.filter(customer_name__icontains=customer_name)
     if zone:
         items = items.filter(dl_zone=zone)
-    if c_status:
+    if c_status == 'pending':
+        items = items.exclude(order_status__in=['delivered', 'fulfilled', 'cancelled'])
+    elif c_status:
         items = items.filter(order_status=c_status)
     if date_from:
         items = items.filter(order_date__gte=date_from)
@@ -208,11 +209,11 @@ def orders_all_list(request):
     elif cod_status == 'no_cod':
         items = items.filter(cod_amount=0)
 
-    # Delivery status filter
+    # Delivery status filter (uses dl_task_status text field, not dms numeric codes)
     if dl_status == 'no_task':
         items = items.filter(delivery_task__isnull=True)
     elif dl_status:
-        items = items.filter(delivery_task__dl_task_status_dms=dl_status)
+        items = items.filter(delivery_task__dl_task_status=dl_status)
 
     # Delivered date filter
     if delivered_from:
@@ -220,7 +221,27 @@ def orders_all_list(request):
     if delivered_to:
         items = items.filter(delivery_task__completed_at__date__lte=delivered_to)
 
-    items = items.order_by('-id')
+    # Sort handling
+    VALID_SORT_FIELDS = {
+        'id': 'id',
+        'order_number': 'order_number',
+        'order_date': 'order_date',
+        'customer_name': 'customer_name',
+        'customer_phone': 'customer_phone',
+        'dl_zone': 'dl_zone',
+        'cod_amount': 'cod_amount',
+    }
+    sort_by = request.GET.get('sort', '')
+    sort_dir = request.GET.get('dir', 'desc')
+    if sort_by in VALID_SORT_FIELDS:
+        order_field = VALID_SORT_FIELDS[sort_by]
+        if sort_dir == 'asc':
+            items = items.order_by(order_field)
+        else:
+            items = items.order_by(f'-{order_field}')
+    else:
+        sort_by = ''
+        items = items.order_by('-id')
 
     logger.debug(f"Fetching orders for business {business.business_id}")
 
@@ -255,6 +276,9 @@ def orders_all_list(request):
         'can_create_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_CREATE),
         'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
         'can_delete_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_DELETE),
+        # Sort values for template
+        'sort_by': sort_by,
+        'sort_dir': sort_dir,
         # Filter values for template
         'filters': {
             'orderNumber': order_number,
@@ -282,10 +306,12 @@ def orders_pending_list(request):
     business = request.current_business
     logger.info(f"User {request.user.id} accessing pending orders for business {business.business_id}")
 
-    # FIX: Optimize with select_related and prefetch_related
+    # Pending = has delivery task but not yet delivered/failed/cancelled
     orders = orders_models.Order.objects.filter(
-        delivery_task__dl_task_status_dms__in=['4', '5', '6'],
+        delivery_task__isnull=False,
         business=business.business_id
+    ).exclude(
+        delivery_task__dl_task_status__in=['delivered', 'failed', 'rejected', 'cancelled']
     ).select_related(
         'business',
         'pickup_location',
@@ -336,9 +362,8 @@ def orders_successfull_list(request):
     business = request.current_business
     logger.info(f"User {request.user.id} accessing successful orders for business {business.business_id}")
 
-    # FIX: Optimize with select_related and prefetch_related
     orders = orders_models.Order.objects.filter(
-        delivery_task__dl_task_status_dms='2',
+        delivery_task__dl_task_status='delivered',
         business=business.business_id
     ).select_related(
         'business',
@@ -391,9 +416,8 @@ def orders_unsuccessfull_list(request):
     business = request.current_business
     logger.info(f"User {request.user.id} accessing unsuccessful orders for business {business.business_id}")
 
-    # FIX: Optimize with select_related and prefetch_related
     orders = orders_models.Order.objects.filter(
-        delivery_task__dl_task_status_dms__in=['7', '8', '9'],
+        delivery_task__dl_task_status__in=['failed', 'rejected', 'cancelled', 'non_reachable'],
         business=business.business_id
     ).select_related(
         'business',
@@ -542,7 +566,6 @@ def order_upload_review_data(request):
             edited_data.append(edited_row)
             logger.debug(f"Row {i} edited data prepared")
 
-        # FIX: Process edited_data AFTER the loop (was inside, causing duplicates)
         for idx, edited_row in enumerate(edited_data):
             order_form = orders_forms.AddOrderForm(edited_row)
             if order_form.is_valid():
@@ -700,7 +723,12 @@ def add_order(request):
                 logger.debug(f"Order business_id: {order.business_id}")
                 order = form.save()
                 logger.info(f"Order created with id: {order.id}")
-                return redirect('orders:add_order_product', order_id=order.id)
+                # Only redirect to add products if fulfillment service is enabled
+                if business.fulfillment_service_enabled:
+                    return redirect('orders:add_order_product', order_id=order.id)
+                else:
+                    messages.success(request, 'Order created successfully.')
+                    return redirect('orders:orders_all_list')
         else:
             logger.debug("Loading add_order form")
             form = orders_forms.AddOrderForm(
@@ -1195,12 +1223,18 @@ def order_details(request, order_id):
         business = request.current_business
         order = orders_models.Order.objects.select_related(
             'business', 'pickup_location', 'address_verified_by', 'verified_by'
+        ).prefetch_related(
+            'delivery_task', 'delivery_task__driver'
         ).get(id=order_id, business=business)
 
         logger.info(f"User {request.user.id} viewing order details for order {order_id}")
 
+        # Get delivery task for mobile view
+        delivery_task = order.delivery_task.first()
+
         data = {
             'order': order,
+            'delivery_task': delivery_task,
             'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
             'can_delete_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_DELETE),
         }
@@ -1320,6 +1354,18 @@ def update_order_status(request, order_id=None):
         old_status = order.order_status
         order.order_status = status
         order.save()
+
+        # Reverse sync: cancel active delivery tasks when order is cancelled
+        if status == 'cancelled' and old_status != 'cancelled':
+            from delivery import models as delivery_models
+            delivery_models.DeliveryTask.objects.filter(
+                order=order
+            ).exclude(
+                dl_task_status__in=['delivered', 'cancelled', 'failed']
+            ).update(
+                dl_task_status='cancelled',
+                dl_task_status_dms='9'
+            )
 
         logger.debug(f'Order {order_id} status updated from {old_status} to {status}')
 

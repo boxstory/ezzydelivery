@@ -56,6 +56,7 @@ Related:
 """
 
 from django.http import HttpResponse, JsonResponse
+from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 import csv
@@ -1061,6 +1062,11 @@ def dl_list_all(request):
         'dl_tasks': dl_tasks,
         'businesses': businesses,
         'today': timezone.localtime().date(),
+        'page_title': 'All Delivery Tasks',
+        'page_subtitle': 'Manage and track',
+        'page_icon': 'fa-tasks',
+        'list_type': 'all',
+        'show_filters': True,
         'filters': {
             'dlCode': dl_code,
             'cCode': c_code,
@@ -1082,16 +1088,70 @@ def dl_list_incompleted_details(request):
     # Get incomplete delivery tasks (not delivered, not cancelled)
     dl_tasks = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).prefetch_related(
+        'order__order_items',
+    ).exclude(
+        dl_task_status__in=['delivered', 'cancelled']
     ).exclude(
         dl_task_status_dms__in=['2', '9']  # 2=Successful, 9=Cancel
     ).order_by('-created_at')
+
+    # Get filter parameters
+    dl_code = request.GET.get('dlCode', '')
+    c_code = request.GET.get('cCode', '')
+    mobile = request.GET.get('mobile', '')
+    driver_name = request.GET.get('driverName', '')
+    c_status = request.GET.get('cStatus', '')
+    dms_status = request.GET.get('dmsStatus', '')
+    date_from = request.GET.get('dateFrom', '')
+    date_to = request.GET.get('dateTo', '')
+    business_id = request.GET.get('business', '')
+
+    if dl_code:
+        dl_tasks = dl_tasks.filter(dl_task_number__icontains=dl_code)
+    if c_code:
+        dl_tasks = dl_tasks.filter(order__client_order_code__icontains=c_code)
+    if mobile:
+        dl_tasks = dl_tasks.filter(order__customer_phone__icontains=mobile)
+    if driver_name:
+        dl_tasks = dl_tasks.filter(
+            Q(driver__user__first_name__icontains=driver_name) |
+            Q(driver__user__last_name__icontains=driver_name) |
+            Q(driver__user__username__icontains=driver_name)
+        )
+    if c_status:
+        dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
+    if dms_status:
+        dl_tasks = dl_tasks.filter(dl_task_status_dms=dms_status)
+    if date_from:
+        dl_tasks = dl_tasks.filter(dl_task_date__gte=date_from)
+    if date_to:
+        dl_tasks = dl_tasks.filter(dl_task_date__lte=date_to)
+    if business_id:
+        dl_tasks = dl_tasks.filter(order__business_id=business_id)
+
+    businesses = business_models.Business.objects.filter(
+        business_status='active'
+    ).order_by('business_name')
+
     dl_tasks = paginate_queryset(request, dl_tasks)
 
     data = {
         'dl_tasks': dl_tasks,
+        'businesses': businesses,
         'today': timezone.localtime().date(),
+        'page_title': 'Incompleted Tasks',
+        'page_subtitle': 'Pending delivery tasks',
+        'page_icon': 'fa-clock-rotate-left',
+        'list_type': 'incompleted',
+        'show_filters': True,
+        'filters': {
+            'dlCode': dl_code, 'cCode': c_code, 'mobile': mobile,
+            'driverName': driver_name, 'cStatus': c_status, 'dmsStatus': dms_status,
+            'dateFrom': date_from, 'dateTo': date_to, 'business': business_id,
+        }
     }
-    return render(request, 'workforce/parts/lists/dl_list_incompleted.html', data)
+    return render(request, 'workforce/parts/lists/dl_list_all.html', data)
 
 
 @login_required(login_url='/accounts/login/')
@@ -1099,12 +1159,20 @@ def dl_list_incompleted_details(request):
 def dl_list_published_to_dms(request):
     dl_tasks = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).prefetch_related(
+        'order__order_items',
+    ).filter(
+        dl_task_publish=True
     ).order_by('-created_at')
     dl_tasks = paginate_queryset(request, dl_tasks)
 
     data = {
         'dl_tasks': dl_tasks,
         'today': timezone.localtime().date(),
+        'page_title': 'Published to DMS',
+        'page_subtitle': 'Tasks published to delivery management system',
+        'page_icon': 'fa-cloud-arrow-up',
+        'list_type': 'published',
     }
     return render(request, 'workforce/parts/lists/dl_list_all.html', data)
 
@@ -1115,6 +1183,8 @@ def dl_list_ready_to_published_to_dms(request):
     """List orders ready to be published to DMS (task_created=False)"""
     orders = orders_models.Order.objects.select_related(
         'business', 'pickup_location'
+    ).prefetch_related(
+        'delivery_task'
     ).filter(task_created=False).order_by('-created_at')
     orders = paginate_queryset(request, orders)
 
@@ -1323,12 +1393,17 @@ def order_detail(request, order_id):
     # Get related data with select_related to avoid N+1 queries
     order_items = orders_models.OrderItem.objects.filter(order=order)
     order_comments = orders_models.OrderComments.objects.filter(order=order).select_related('user').order_by('-created_at')
-    verification_logs = orders_models.OrderVerificationLog.objects.filter(order=order).select_related('verified_by', 'performed_by').order_by('-created_at')
+    verification_logs = orders_models.OrderVerificationLog.objects.filter(order=order).select_related('verified_by').order_by('-created_at')
 
     # Get delivery task if exists with related driver
     delivery_task = delivery_models.DeliveryTask.objects.select_related(
         'driver', 'driver__user', 'pickup_location'
     ).filter(order=order).first()
+
+    # Get status change timeline
+    status_history = orders_models.OrderStatusHistory.objects.filter(
+        order=order
+    ).select_related('changed_by').order_by('created_at')
 
     context = {
         'order': order,
@@ -1336,6 +1411,7 @@ def order_detail(request, order_id):
         'order_comments': order_comments,
         'verification_logs': verification_logs,
         'delivery_task': delivery_task,
+        'status_history': status_history,
     }
 
     # Check if this is being loaded in a panel (via HTMX)
@@ -1369,6 +1445,14 @@ def cancel_order(request, order_id):
         old_status = order.order_status
         order.order_status = 'cancelled'
         order.save()
+
+        # Cancel related delivery task
+        delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
+        if delivery_task and delivery_task.dl_task_status != 'cancelled':
+            delivery_task.dl_task_status = 'cancelled'
+            delivery_task.dl_task_status_dms = '9'  # Cancel in DMS
+            delivery_task.dl_task_status_client = '9'  # Cancel for client
+            delivery_task.save(update_fields=['dl_task_status', 'dl_task_status_dms', 'dl_task_status_client'])
 
         # Log the cancellation
         orders_models.OrderVerificationLog.objects.create(
@@ -1676,7 +1760,7 @@ def update_order_status(request, order_id):
         from orders.models import OrderVerificationLog
         OrderVerificationLog.objects.create(
             order=order,
-            performed_by=request.user,
+            verified_by=request.user,
             action=f'{status_type}_status_updated',
             notes=f'{status_type.title()} status changed from {old_status} to {status} by {request.user.username}',
         )
@@ -1753,23 +1837,50 @@ def delivery_task_detail(request, task_id):
         id=task_id
     )
 
-    # Get status history (if available - placeholder for now)
-    status_history = []
+    # Status timeline from OrderStatusHistory
+    status_history = orders_models.OrderStatusHistory.objects.filter(
+        order=task.order
+    ).select_related('changed_by').order_by('created_at')
 
-    # Get driver updates (placeholder - would come from driver app integration)
-    driver_updates = []
+    # Verification logs as fallback
+    verification_logs = orders_models.OrderVerificationLog.objects.filter(
+        order=task.order
+    ).select_related('verified_by').order_by('-created_at')
 
-    # Get seller comments (placeholder - would come from comments model)
-    seller_comments = []
-    unread_seller_comments_count = 0
+    # Driver / DMS activity: delivery-related status changes
+    driver_status_updates = orders_models.OrderStatusHistory.objects.filter(
+        order=task.order,
+        field_name__in=['dl_task_status', 'dl_task_status_dms']
+    ).select_related('changed_by').order_by('created_at')
+
+    # Driver uploads / documents
+    try:
+        from ezzy_api.models import TaskDocument
+        driver_documents = TaskDocument.objects.filter(
+            task=task
+        ).select_related('uploaded_by').order_by('-created_at')
+    except Exception:
+        driver_documents = []
+
+    # Seller / order comments
+    seller_comments = orders_models.OrderComments.objects.filter(
+        order=task.order
+    ).order_by('-created_at')
+
+    # Approved drivers for assignment modal
+    approved_drivers = fleet_models.Driver.objects.filter(
+        driver_status='Approved'
+    ).select_related('user').order_by('driver_code')
 
     context = {
         'page_title': f'Delivery Task #{task.dl_task_number}',
         'task': task,
         'status_history': status_history,
-        'driver_updates': driver_updates,
+        'verification_logs': verification_logs,
+        'driver_status_updates': driver_status_updates,
+        'driver_documents': driver_documents,
         'seller_comments': seller_comments,
-        'unread_seller_comments_count': unread_seller_comments_count,
+        'approved_drivers': approved_drivers,
     }
 
     return render(request, 'workforce/parts/delivery_task_detail.html', context)
@@ -1783,7 +1894,22 @@ def delivery_task_detail(request, task_id):
 def publish_task_to_dms(request, task_id):
     """AJAX endpoint to publish delivery task to DMS"""
     try:
-        task = get_object_or_404(delivery_models.DeliveryTask, id=task_id)
+        task = get_object_or_404(
+            delivery_models.DeliveryTask.objects.select_related('order'), id=task_id)
+
+        # Block if order is cancelled
+        if task.order and task.order.order_status == 'cancelled':
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot publish — order is cancelled'
+            }, status=400)
+
+        # Block if order is not verified
+        if task.order and task.order.verification_status != 'verified':
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot publish — order must be verified first'
+            }, status=400)
 
         # Update task status to publish to DMS
         task.dl_task_status = 'publish_to_dms'
@@ -1836,7 +1962,22 @@ def publish_task_to_driver_app(request, task_id):
 def assign_driver_to_task(request, task_id):
     """AJAX endpoint to assign driver to delivery task"""
     try:
-        task = get_object_or_404(delivery_models.DeliveryTask, id=task_id)
+        task = get_object_or_404(
+            delivery_models.DeliveryTask.objects.select_related('order'), id=task_id)
+
+        # Block if order is cancelled
+        if task.order and task.order.order_status == 'cancelled':
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot assign driver — order is cancelled'
+            }, status=400)
+
+        # Block if order is not verified
+        if task.order and task.order.verification_status != 'verified':
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot assign driver — order must be verified first'
+            }, status=400)
 
         # Parse JSON body
         data = json.loads(request.body)
@@ -1848,25 +1989,54 @@ def assign_driver_to_task(request, task_id):
                 'error': 'Driver ID is required'
             }, status=400)
 
-        # Get driver and assign
-        driver = get_object_or_404(fleet_models.Driver, id=driver_id)
+        # Get driver — must exist and be approved
+        try:
+            driver = fleet_models.Driver.objects.get(
+                driver_id=driver_id, driver_status='Approved')
+        except fleet_models.Driver.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'Driver {driver_id} not found or not approved'
+            }, status=400)
+
         task.driver = driver
         task.dl_task_status_dms = '0'  # Assigned
         task.save()
 
+        driver_name = driver.user.get_full_name() if driver.user else driver.driver_code
+
         return JsonResponse({
             'success': True,
-            'message': f'Task assigned to {driver} successfully',
+            'message': f'Driver {driver_name} assigned successfully',
             'task_id': task.id,
-            'driver_id': driver.id,
-            'driver_name': str(driver)
+            'driver_id': driver.driver_id,
+            'driver_name': driver_name
         })
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid request data'
+        }, status=400)
     except Exception as e:
         logger.exception("Error assigning driver to task %s: %s", task_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': 'An error occurred while assigning driver'
+            'error': f'An error occurred: {str(e)}'
         }, status=400)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def api_drivers_list(request):
+    """API endpoint to get active drivers for dropdowns"""
+    drivers = fleet_models.Driver.objects.select_related('user').filter(
+        driver_status='Approved'
+    ).order_by('user__first_name')
+    driver_list = []
+    for d in drivers:
+        name = d.user.get_full_name() or d.user.username
+        driver_list.append({'id': d.id, 'name': name})
+    return JsonResponse({'drivers': driver_list})
 
 
 @require_http_methods(["POST"])
@@ -1908,9 +2078,71 @@ def update_task_status(request, task_id):
                 'error': f'Invalid status: {status}'
             }, status=400)
 
-        # Update task status
+        # Map internal status to client-facing status
+        STATUS_TO_CLIENT = {
+            'for_review': 'for_review',
+            'pending': 'for_review',
+            'assigned': '0',
+            'accepted': '0',
+            'picked_up': '0',
+            'start_ride': '0',
+            'out_for_delivery': '0',
+            'in_transit': '0',
+            'contacted': '0',
+            'non_reachable': '0',
+            'delivered': '2',
+            'failed': 'rejected',
+            'rejected': 'rejected',
+            'cancelled': '9',
+        }
+
+        # Optional fields
+        driver_id = data.get('driver_id')
+        notes = data.get('notes', '')
+        time_str = data.get('time', '')
+
+        # Update both task status fields
         task.dl_task_status = status
-        task.save(update_fields=['dl_task_status'])
+        update_fields = ['dl_task_status']
+
+        client_status = STATUS_TO_CLIENT.get(status)
+        if client_status:
+            task.dl_task_status_client = client_status
+            update_fields.append('dl_task_status_client')
+
+        # Assign driver if provided
+        if driver_id:
+            try:
+                driver = fleet_models.Driver.objects.get(id=driver_id)
+                task.driver = driver
+                update_fields.append('driver')
+            except fleet_models.Driver.DoesNotExist:
+                pass
+        elif driver_id == '':
+            # Explicitly unassign driver
+            task.driver = None
+            update_fields.append('driver')
+
+        # Set completed_at timestamp for delivered status
+        if status == 'delivered' and not task.completed_at:
+            if time_str:
+                from django.utils.dateparse import parse_datetime
+                parsed = parse_datetime(time_str)
+                if parsed:
+                    if timezone.is_naive(parsed):
+                        parsed = timezone.make_aware(parsed)
+                    task.completed_at = parsed
+                    update_fields.append('completed_at')
+            else:
+                task.completed_at = timezone.now()
+                update_fields.append('completed_at')
+
+        # Save notes to the order if provided
+        if notes and task.order:
+            task.order.order_notes = notes
+            task.order.save(update_fields=['order_notes'])
+
+        task.save(update_fields=update_fields)
 
         return JsonResponse({
             'success': True,
@@ -2167,6 +2399,8 @@ def tasks_followup_list(request):
     """View for follow-up tasks list"""
     tasks_list = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).prefetch_related(
+        'order__order_items',
     ).filter(
         dl_task_status='pending'
     ).order_by('-created_at')
@@ -2174,8 +2408,11 @@ def tasks_followup_list(request):
     tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
 
     context = {
-        'delivery_tasks': tasks_with_pagination,
+        'dl_tasks': tasks_with_pagination,
         'page_title': 'Follow-Up Tasks',
+        'page_subtitle': 'Tasks requiring follow-up',
+        'page_icon': 'fa-flag',
+        'list_type': 'followup',
     }
     return render(request, 'workforce/parts/lists/dl_list_all.html', context)
 
@@ -2186,6 +2423,8 @@ def tasks_dms_updated(request):
     """View for DMS updated tasks list"""
     tasks_list = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).prefetch_related(
+        'order__order_items',
     ).filter(
         dl_task_status_dms__isnull=False
     ).order_by('-created_at')
@@ -2193,8 +2432,11 @@ def tasks_dms_updated(request):
     tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
 
     context = {
-        'delivery_tasks': tasks_with_pagination,
+        'dl_tasks': tasks_with_pagination,
         'page_title': 'DMS Updated Tasks',
+        'page_subtitle': 'Tasks with DMS status updates',
+        'page_icon': 'fa-cloud',
+        'list_type': 'dms_updated',
     }
     return render(request, 'workforce/parts/lists/dl_list_all.html', context)
 
@@ -2205,6 +2447,8 @@ def tasks_reported(request):
     """View for reported tasks list - showing rejected/cancelled tasks"""
     tasks_list = delivery_models.DeliveryTask.objects.select_related(
         'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).prefetch_related(
+        'order__order_items',
     ).filter(
         dl_task_status__in=['rejected', 'cancelled']
     ).order_by('-created_at')
@@ -2212,8 +2456,11 @@ def tasks_reported(request):
     tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
 
     context = {
-        'delivery_tasks': tasks_with_pagination,
+        'dl_tasks': tasks_with_pagination,
         'page_title': 'Reported Tasks',
+        'page_subtitle': 'Rejected and cancelled tasks',
+        'page_icon': 'fa-triangle-exclamation',
+        'list_type': 'reported',
     }
     return render(request, 'workforce/parts/lists/dl_list_all.html', context)
 
@@ -5094,7 +5341,7 @@ def delivery_task_edit(request, task_id):
                 orders_models.OrderVerificationLog.objects.create(
                     order=order,
                     action='task_edited',
-                    performed_by=request.user,
+                    verified_by=request.user,
                     notes=f'Task and order edited by {request.user.username}'
                 )
 
@@ -5110,9 +5357,9 @@ def delivery_task_edit(request, task_id):
             messages.error(request, 'An error occurred while updating the task')
 
     # Get available drivers for dropdown (approved drivers)
-    drivers = fleet_models.Driver.objects.filter(
+    drivers = fleet_models.Driver.objects.select_related('user').filter(
         driver_status='Approved'
-    ).order_by('driver_first_name')
+    ).order_by('user__first_name')
 
     context = {
         'page_title': f'Edit Task #{task.dl_task_number}',
@@ -5165,9 +5412,12 @@ def bulk_publish_dms(request):
                 'error': 'No tasks selected'
             }, status=400)
 
-        # Update all selected tasks
+        # Update all selected tasks (only verified, non-cancelled orders)
         updated = delivery_models.DeliveryTask.objects.filter(
-            id__in=task_ids
+            id__in=task_ids,
+            order__verification_status='verified',
+        ).exclude(
+            order__order_status='cancelled'
         ).update(
             dl_task_status='publish_to_dms',
             dl_task_publish=True
@@ -5406,7 +5656,7 @@ def order_edit(request, order_id):
             orders_models.OrderVerificationLog.objects.create(
                 order=order,
                 action='order_edited',
-                performed_by=request.user,
+                verified_by=request.user,
                 notes=f'Order edited by {request.user.username}'
             )
 

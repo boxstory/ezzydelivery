@@ -224,7 +224,6 @@ class AddOrderProductsForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        # Fix: Accept business_id for IDOR validation
         self.business_id = kwargs.pop('business_id', None)
         super().__init__(*args, **kwargs)
         self.fields['product'].widget.attrs.update({'class': 'form-control'})
@@ -294,7 +293,6 @@ class OrderFileUploadForm(forms.Form):
     View:
         orders.views.order_file_upload
     """
-    # Fix: Add file validation
     file = forms.FileField(
         help_text='Upload a CSV file with order data. Maximum file size: 5MB.',
         widget=forms.FileInput(attrs={'accept': '.csv'})

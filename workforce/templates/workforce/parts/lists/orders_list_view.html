@@ -365,16 +365,27 @@
                     <div class="orc-amount">{{ order.cod_amount|default:"0" }} <small>QAR</small></div>
                     <div class="orc-date">{{ order.order_date|date:"d/m" }}</div>
                     <div class="orc-status">
-                        {% if order.order_status == 'to_review' %}<span class="st st-warn">Review</span>
-                        {% elif order.order_status == 'to_publish' %}<span class="st st-info">Publish</span>
-                        {% elif order.order_status == 'published' %}<span class="st st-ok">Done</span>
-                        {% elif order.order_status == 'cancelled' %}<span class="st st-err">Cancel</span>
-                        {% else %}<span class="st">{{ order.order_status|truncatechars:8 }}</span>{% endif %}
-                        {% if order.verification_status == 'verified' %}<span class="st st-ok-o">V</span>{% endif %}
+                        <div class="orc-status-line">
+                            {% if order.order_status == 'to_review' %}<span class="st st-warn">To Review</span>
+                            {% elif order.order_status == 'to_publish' %}<span class="st st-info">To Publish</span>
+                            {% elif order.order_status == 'ready_to_pickup' %}<span class="st st-info">Ready</span>
+                            {% elif order.order_status == 'publish' %}<span class="st st-info">Publish</span>
+                            {% elif order.order_status == 'published' %}<span class="st st-ok">Published</span>
+                            {% elif order.order_status == 'delivered' %}<span class="st st-ok">Delivered</span>
+                            {% elif order.order_status == 'fulfilled' %}<span class="st st-ok">Fulfilled</span>
+                            {% elif order.order_status == 'cancelled' %}<span class="st st-err">Cancelled</span>
+                            {% else %}<span class="st">{{ order.order_status }}</span>{% endif %}
+                            {% if order.verification_status == 'verified' %}<span class="st st-ok-o">V</span>{% endif %}
+                        </div>
                         {% with task=order.delivery_task.all.0 %}
-                            {% if task and task.dl_task_status_dms %}
-                            <span class="st st-dms">{{ task.get_dl_task_status_dms_display|truncatechars:8 }}</span>
-                            {% endif %}
+                        {% if task %}
+                        <div class="orc-status-line">
+                            {% if task.dl_task_status_dms %}<span class="st st-dms">{{ task.get_dl_task_status_dms_display }}</span>{% endif %}
+                        </div>
+                        <div class="orc-status-line">
+                            <span class="st st-task">{{ task.get_dl_task_status_display }}</span>
+                        </div>
+                        {% endif %}
                         {% endwith %}
                     </div>
                     <div class="orc-actions">

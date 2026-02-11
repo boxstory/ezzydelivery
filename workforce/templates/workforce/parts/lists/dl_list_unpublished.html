@@ -4,101 +4,183 @@
 
 {% block extra_css %}
 <link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<div class="col-12 p-3">
-    <!-- Page Header -->
-    <header class="page-header">
-        <div class="page-header-left">
-            <h2><i class="fa-solid fa-paper-plane me-2"></i>Unpublished Orders</h2>
-            <span class="page-header-subtitle">| Ready to publish to DMS</span>
+<!-- Page Header -->
+<header class="page-header">
+    <div class="page-header-left">
+        <h2><i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i>Unpublished Orders</h2>
+        <span class="page-header-subtitle">| Ready to publish to DMS</span>
+    </div>
+    <div class="page-header-right">
+        <button type="button" class="btn btn-success btn-sm me-2" id="publishAllSelected" style="display: none;">
+            <i class="fa-solid fa-paper-plane me-1"></i>Publish Selected (<span id="bulkSelectedCount">0</span>)
+        </button>
+        <div class="page-header-count" aria-label="Order count">
+            <span class="count-value" id="pageOrderCount">{{ orders.paginator.count|default:"0" }}</span>
+            <span class="count-label">orders</span>
         </div>
-        <div class="page-header-right">
-            <button type="button" class="btn btn-success me-2" id="publishAllSelected" style="display: none;">
-                <i class="fa-solid fa-paper-plane me-1"></i>Publish Selected (<span id="selectedCount">0</span>)
-            </button>
-            <div class="page-header-count">
-                <span class="count-value">{{ orders.paginator.count|default:"0" }}</span>
-                <span class="count-label">orders</span>
-            </div>
-        </div>
-    </header>
+    </div>
+</header>
+<div class="col-12 p-3" role="main" aria-label="Unpublished Orders List">
 
-    <!-- Orders List -->
     {% if orders %}
-    <div class="orc-list" id="ordersListContainer">
-        <!-- Header Row -->
-        <div class="orc-row" style="background: var(--brand-grey-100); font-weight: 600; font-size: 0.75rem;">
-            <div class="orc-checkbox">
-                <input type="checkbox" id="selectAllOrders" title="Select all" onchange="toggleSelectAll(this)">
+    <div class="dl-table-wrapper">
+        <!-- Bulk Actions Bar -->
+        <div id="bulkActionsBar" style="display: none;">
+            <div class="dl-bulk-bar__inner">
+                <div class="dl-bulk-bar__left">
+                    <span class="dl-bulk-bar__count"><span id="selectedCount">0</span> selected</span>
+                    <button type="button" class="btn btn-sm btn-light" onclick="clearAllSelections()">
+                        <i class="fa-solid fa-xmark me-1"></i>Clear
+                    </button>
+                </div>
+                <div class="dl-bulk-bar__actions">
+                    <button type="button" class="btn btn-sm btn-success" id="bulkPublishBtn">
+                        <i class="fa-solid fa-paper-plane me-1"></i>Publish All Selected
+                    </button>
+                </div>
             </div>
-            <div class="orc-id">ORDER</div>
-            <div class="orc-customer">CUSTOMER</div>
-            <div class="orc-address">ADDRESS</div>
-            <div class="orc-amount">COD</div>
-            <div class="orc-date">DATE</div>
-            <div class="orc-status">STATUS</div>
-            <div class="orc-actions">ACTIONS</div>
         </div>
 
-        {% for order in orders %}
-        <div class="orc-row" data-order-id="{{ order.id }}" id="order-row-{{ order.id }}">
-            <div class="orc-checkbox">
-                <input type="checkbox" class="order-checkbox" data-order-id="{{ order.id }}" onchange="updateSelectedCount()">
-            </div>
-            <div class="orc-id">
-                <a href="{% url 'workforce:order_detail' order.id %}"
-                   hx-get="{% url 'workforce:order_detail' order.id %}"
-                   hx-target="#main-content"
-                   hx-select="#main-content"
-                   hx-swap="outerHTML"
-                   hx-push-url="true">{{ order.order_number|default:order.client_order_code }}</a>
-                <span class="orc-seller">{{ order.business.business_name|truncatechars:15 }}</span>
-            </div>
-            <div class="orc-customer">
-                <span class="orc-name">{{ order.customer_name|truncatechars:18 }}</span>
-                <span class="orc-phone">{{ order.customer_phone }}</span>
-            </div>
-            <div class="orc-address" title="{{ order.customer_address }}">
-                {% if order.dl_zone or order.dl_street or order.dl_building %}
-                <span class="orc-zone">Z{{ order.dl_zone|default:"-" }}/S{{ order.dl_street|default:"-" }}/B{{ order.dl_building|default:"-" }}</span>
-                {% endif %}
-                <span class="orc-addr-text">{{ order.customer_address|truncatechars:30 }}</span>
-            </div>
-            <div class="orc-amount">{{ order.cod_amount|default:"0" }} <small>QAR</small></div>
-            <div class="orc-date">{{ order.order_date|date:"d/m" }}</div>
-            <div class="orc-status">
-                {% if order.order_status == 'to_review' %}
-                <span class="st st-warn">Review</span>
-                {% elif order.order_status == 'to_publish' %}
-                <span class="st st-info">To Publish</span>
-                {% else %}
-                <span class="st">{{ order.order_status|truncatechars:10 }}</span>
-                {% endif %}
-                {% if order.verification_status == 'verified' %}
-                <span class="st st-ok-o">V</span>
-                {% elif order.verification_status == 'pending' %}
-                <span class="st st-warn">P</span>
-                {% endif %}
-            </div>
-            <div class="orc-actions">
-                <a href="{% url 'workforce:order_detail' order.id %}" class="orc-btn" title="View">
-                    <i class="fa-solid fa-eye"></i>
-                </a>
-                <a href="{% url 'workforce:order_edit' order.id %}" class="orc-btn orc-btn-edit" title="Edit">
-                    <i class="fa-solid fa-pen"></i>
-                </a>
-                <button type="button"
-                        class="orc-btn orc-btn-info publish-btn"
-                        title="Publish to DMS"
-                        onclick="publishOrder({{ order.id }}, this)">
-                    <i class="fa-solid fa-paper-plane"></i>
-                </button>
-            </div>
+        <div class="table-responsive">
+            <table class="dl-table">
+                <thead>
+                    <tr>
+                        <th class="dl-table__th-check">
+                            <input type="checkbox" class="form-check-input" id="selectAllOrders" onchange="toggleSelectAll(this)">
+                        </th>
+                        <th class="dl-table__th-id">Order</th>
+                        <th>Seller</th>
+                        <th>Date</th>
+                        <th>Customer</th>
+                        <th>Zone / Address</th>
+                        <th>COD</th>
+                        <th>Verify</th>
+                        <th>Order Status</th>
+                        <th class="dl-table__th-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr class="dl-table__row" data-order-id="{{ order.id }}" id="order-row-{{ order.id }}">
+                        <td class="dl-table__td-check" onclick="event.stopPropagation();">
+                            <input type="checkbox" class="form-check-input order-checkbox" data-order-id="{{ order.id }}" onchange="updateSelectedCount()">
+                        </td>
+                        <!-- Order # / Task # -->
+                        <td class="dl-table__td-id">
+                            <div class="dl-table__id-stack">
+                                {% with dl_task=order.delivery_task.all.0 %}
+                                {% if dl_task %}
+                                <a href="{% url 'workforce:delivery_task_detail' dl_task.id %}" class="dl-table__task-num">{{ dl_task.dl_task_number|default:order.client_order_code }}</a>
+                                <span class="dl-table__order-num" title="{{ order.client_order_code }}">{{ order.client_order_code|truncatechars:14 }}</span>
+                                {% else %}
+                                <a href="{% url 'workforce:order_detail' order.id %}" class="dl-table__task-num">{{ order.order_number|default:order.client_order_code }}</a>
+                                {% endif %}
+                                {% endwith %}
+                            </div>
+                        </td>
+                        <!-- Seller -->
+                        <td class="dl-table__td-seller" title="{{ order.business.business_name }}">
+                            {{ order.business.business_name|default:"—"|truncatechars:16 }}
+                        </td>
+                        <!-- Date -->
+                        <td class="dl-table__td-date">
+                            {{ order.order_date|date:"d M"|default:"—" }}
+                        </td>
+                        <!-- Customer -->
+                        <td class="dl-table__td-customer">
+                            <div class="dl-table__customer-stack">
+                                <span class="dl-table__customer-name">{{ order.customer_name|default:"—"|truncatechars:18 }}</span>
+                                <span class="dl-table__customer-phone">{{ order.customer_phone|default:"—" }}</span>
+                            </div>
+                        </td>
+                        <!-- Zone / Address -->
+                        <td class="dl-table__td-zone">
+                            {% if order.dl_zone %}
+                            <span class="dl-table__zone-badge">Z{{ order.dl_zone }}</span>
+                            {% endif %}
+                            <span class="dl-table__address" title="{{ order.customer_address }}">{{ order.customer_address|default:"—"|truncatechars:22 }}</span>
+                        </td>
+                        <!-- COD -->
+                        <td class="dl-table__td-cod">
+                            {% if order.cod_amount and order.cod_amount > 0 %}
+                            <span class="dl-table__cod-amount">{{ order.cod_amount }} QR</span>
+                            {% else %}
+                            <span class="dl-table__cod-none">—</span>
+                            {% endif %}
+                        </td>
+                        <!-- Verification -->
+                        <td class="dl-table__td-verify">
+                            {% if order.verification_status == 'verified' %}
+                            <span class="dl-table__verify-icon dl-table__verify-icon--verified" title="Verified">
+                                <i class="fa-solid fa-circle-check"></i>
+                            </span>
+                            {% elif order.verification_status == 'rejected' %}
+                            <span class="dl-table__verify-icon dl-table__verify-icon--rejected" title="Rejected">
+                                <i class="fa-solid fa-circle-xmark"></i>
+                            </span>
+                            {% elif order.verification_status == 'address_verified' %}
+                            <span class="dl-table__verify-icon dl-table__verify-icon--address" title="Address Verified">
+                                <i class="fa-solid fa-location-check"></i>
+                            </span>
+                            {% else %}
+                            <span class="dl-table__verify-icon dl-table__verify-icon--pending" title="{{ order.get_verification_status_display }}">
+                                <i class="fa-solid fa-clock"></i>
+                            </span>
+                            {% endif %}
+                        </td>
+                        <!-- Order Status -->
+                        <td class="dl-table__td-status">
+                            {% if order.order_status == 'to_review' %}
+                            <span class="dl-badge dl-badge--for_review">Review</span>
+                            {% elif order.order_status == 'ready_to_pickup' %}
+                            <span class="dl-badge dl-badge--0">Ready</span>
+                            {% elif order.order_status == 'publish' %}
+                            <span class="dl-badge dl-badge--dms-7">Publish</span>
+                            {% elif order.order_status == 'cancelled' %}
+                            <span class="dl-badge dl-badge--9">Cancelled</span>
+                            {% else %}
+                            <span class="dl-badge dl-badge--for_review">{{ order.order_status|truncatechars:10 }}</span>
+                            {% endif %}
+                        </td>
+                        <!-- Actions -->
+                        <td class="dl-table__td-actions" onclick="event.stopPropagation();">
+                            <div class="dl-table__action-group">
+                                {% with dl_task=order.delivery_task.all.0 %}
+                                {% if dl_task %}
+                                <a href="{% url 'workforce:delivery_task_detail' dl_task.id %}" class="dl-table__action-btn dl-table__action-btn--view" title="View Task">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                <a href="{% url 'workforce:delivery_task_edit' dl_task.id %}" class="dl-table__action-btn dl-table__action-btn--view" title="Edit Task" style="border-color:#fcd34d;color:#d97706;">
+                                    <i class="fa-solid fa-pen"></i>
+                                </a>
+                                {% else %}
+                                <a href="{% url 'workforce:order_detail' order.id %}" class="dl-table__action-btn dl-table__action-btn--view" title="View Order">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                {% endif %}
+                                {% endwith %}
+                                <button type="button"
+                                        class="dl-table__action-btn dl-table__action-btn--publish publish-btn"
+                                        title="Publish to DMS"
+                                        onclick="publishOrder({{ order.id }}, this)">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="dl-table__empty">
+                            <i class="fa-solid fa-inbox me-2"></i>No unpublished orders
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        {% endfor %}
     </div>
 
     <!-- Pagination -->
@@ -124,37 +206,36 @@
 
 {% block extra_js %}
 <script>
-// Get CSRF token
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
+function getCSRFToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta) return meta.getAttribute('content');
+    var input = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (input) return input.value;
+    return null;
 }
 
-// Toggle select all
 function toggleSelectAll(checkbox) {
     const checkboxes = document.querySelectorAll('.order-checkbox');
     checkboxes.forEach(cb => cb.checked = checkbox.checked);
     updateSelectedCount();
 }
 
-// Update selected count
+function clearAllSelections() {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+    const selectAll = document.getElementById('selectAllOrders');
+    if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
+    updateSelectedCount();
+}
+
 function updateSelectedCount() {
     const checked = document.querySelectorAll('.order-checkbox:checked');
     const count = checked.length;
     document.getElementById('selectedCount').textContent = count;
+    document.getElementById('bulkSelectedCount').textContent = count;
     document.getElementById('publishAllSelected').style.display = count > 0 ? 'inline-block' : 'none';
+    document.getElementById('bulkActionsBar').style.display = count > 0 ? 'block' : 'none';
 
-    // Update select all checkbox state
     const allCheckboxes = document.querySelectorAll('.order-checkbox');
     const selectAll = document.getElementById('selectAllOrders');
     if (selectAll) {
@@ -163,7 +244,6 @@ function updateSelectedCount() {
     }
 }
 
-// Publish single order
 function publishOrder(orderId, btn) {
     const originalHtml = btn.innerHTML;
     btn.disabled = true;
@@ -173,23 +253,17 @@ function publishOrder(orderId, btn) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
+            'X-CSRFToken': getCSRFToken()
         }
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Remove the row with animation
             const row = document.getElementById('order-row-' + orderId);
             row.style.transition = 'all 0.3s ease';
             row.style.opacity = '0';
             row.style.transform = 'translateX(20px)';
-            setTimeout(() => {
-                row.remove();
-                updatePageCount();
-            }, 300);
-
-            // Show success message
+            setTimeout(() => { row.remove(); updatePageCount(); }, 300);
             if (typeof showToast === 'function') {
                 showToast('Order published successfully!', 'success');
             }
@@ -206,11 +280,9 @@ function publishOrder(orderId, btn) {
     });
 }
 
-// Publish all selected orders
 document.getElementById('publishAllSelected').addEventListener('click', function() {
     const checked = document.querySelectorAll('.order-checkbox:checked');
     if (checked.length === 0) return;
-
     if (!confirm('Publish ' + checked.length + ' orders to DMS?')) return;
 
     const btn = this;
@@ -223,12 +295,11 @@ document.getElementById('publishAllSelected').addEventListener('click', function
 
     checked.forEach(checkbox => {
         const orderId = checkbox.dataset.orderId;
-
         fetch('/workforce/orders/' + orderId + '/publish/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCSRFToken()
             }
         })
         .then(response => response.json())
@@ -237,26 +308,21 @@ document.getElementById('publishAllSelected').addEventListener('click', function
             if (data.success) {
                 const row = document.getElementById('order-row-' + orderId);
                 if (row) row.remove();
-            } else {
-                failed++;
-            }
-
+            } else { failed++; }
             if (completed === checked.length) {
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
                 btn.style.display = 'none';
                 updatePageCount();
-
                 if (failed > 0) {
                     alert('Published ' + (completed - failed) + ' orders. ' + failed + ' failed.');
                 } else if (typeof showToast === 'function') {
-                    showToast('All ' + completed + ' orders published successfully!', 'success');
+                    showToast('All ' + completed + ' orders published!', 'success');
                 }
             }
         })
         .catch(() => {
-            completed++;
-            failed++;
+            completed++; failed++;
             if (completed === checked.length) {
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
@@ -266,18 +332,15 @@ document.getElementById('publishAllSelected').addEventListener('click', function
     });
 });
 
-// Update page count after removing rows
-function updatePageCount() {
-    const rows = document.querySelectorAll('.orc-row[data-order-id]');
-    const countEl = document.querySelector('.count-value');
-    if (countEl) {
-        countEl.textContent = rows.length;
-    }
+document.getElementById('bulkPublishBtn').addEventListener('click', function() {
+    document.getElementById('publishAllSelected').click();
+});
 
-    // If no rows left, show empty state
-    if (rows.length === 0) {
-        location.reload();
-    }
+function updatePageCount() {
+    const rows = document.querySelectorAll('.dl-table__row[data-order-id]');
+    const countEl = document.getElementById('pageOrderCount');
+    if (countEl) countEl.textContent = rows.length;
+    if (rows.length === 0) location.reload();
 }
 </script>
 {% endblock extra_js %}

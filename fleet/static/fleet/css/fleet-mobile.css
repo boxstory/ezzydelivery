@@ -68,6 +68,7 @@ body.fleet-mobile {
   min-height: 100vh;
   overscroll-behavior-y: contain;
   overflow-x: hidden;
+  color-scheme: light;
 }
 
 /* PWA Page Container */
@@ -225,8 +226,8 @@ body.fleet-mobile {
    Mobile Content Container
    ======================================== */
 .pwa-content {
-  padding: var(--mobile-padding);
-  padding-bottom: calc(var(--bottom-nav-height) + var(--mobile-padding) + var(--safe-area-bottom));
+  padding: 0;
+  padding-bottom: calc(var(--bottom-nav-height) + var(--safe-area-bottom));
 }
 
 /* ========================================
@@ -947,26 +948,45 @@ body.fleet-mobile {
   }
 
   .pwa-content {
-    padding-bottom: var(--mobile-padding);
+    padding-bottom: 0;
   }
 }
 
 /* ========================================
-   Dark Mode Support
+   Force Light Mode - Override device dark theme
    ======================================== */
 @media (prefers-color-scheme: dark) {
   :root {
-    --pwa-bg: #111827;
-    --pwa-card-bg: #1f2937;
-    --pwa-text-primary: #f9fafb;
-    --pwa-text-secondary: #d1d5db;
-    --pwa-text-muted: #9ca3af;
-    --pwa-border: #374151;
+    --pwa-bg: #f5f7fa;
+    --pwa-card-bg: #ffffff;
+    --pwa-text-primary: #1f1f1f;
+    --pwa-text-secondary: #555555;
+    --pwa-text-muted: #6c757d;
+    --pwa-border: #dcdcdc;
+  }
+
+  body.fleet-mobile {
+    background-color: #f5f7fa;
+    color: #1f1f1f;
+  }
+
+  body.fleet-mobile input,
+  body.fleet-mobile select,
+  body.fleet-mobile textarea {
+    background-color: #f9fafb;
+    color: #1f1f1f;
+    border-color: #e5e7eb;
+  }
+
+  body.fleet-mobile .card,
+  body.fleet-mobile .list-group-item {
+    background-color: #ffffff;
+    color: #1f1f1f;
   }
 
   .pwa-task-card__footer,
   .pwa-card__footer {
-    background: #1a2332;
+    background: #ffffff;
   }
 }
 
@@ -1258,9 +1278,9 @@ body.fleet-mobile {
 .pwa-profile-header {
   background: linear-gradient(135deg, #001f3f 0%, #003366 100%);
   color: white;
-  padding: 32px var(--mobile-padding);
+  padding: 32px 16px;
   text-align: center;
-  margin: calc(-1 * var(--mobile-padding));
+  margin: 0;
   margin-bottom: 0;
   position: relative;
 }
@@ -1386,8 +1406,8 @@ body.fleet-mobile {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  padding: var(--mobile-padding);
-  margin: -20px var(--mobile-padding) 0;
+  padding: 16px 0 0;
+  margin: -20px 0 0;
   position: relative;
   z-index: 1;
 }
@@ -1682,7 +1702,7 @@ body.fleet-mobile {
 /* Footer Info */
 .pwa-footer-info {
   text-align: center;
-  padding: 24px var(--mobile-padding);
+  padding: 24px 0;
   color: var(--pwa-text-muted);
   font-size: 12px;
 }
@@ -1694,7 +1714,7 @@ body.fleet-mobile {
 /* Empty State */
 .pwa-empty-state {
   text-align: center;
-  padding: 32px var(--mobile-padding);
+  padding: 32px 16px;
   background: white;
   border-radius: var(--mobile-radius);
   box-shadow: var(--pwa-shadow);
@@ -2036,7 +2056,7 @@ body.fleet-mobile {
 .pwa-stats-row {
   display: flex;
   gap: 8px;
-  padding: 0 var(--mobile-padding) 12px;
+  padding: 0 0 12px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -2066,7 +2086,7 @@ body.fleet-mobile {
 
 /* Page Header */
 .pwa-page-header {
-  padding: 12px var(--mobile-padding) 8px;
+  padding: 12px 0 8px;
   width: 100%;
   box-sizing: border-box;
 }

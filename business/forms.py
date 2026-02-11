@@ -113,7 +113,6 @@ class businessRegisterForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.Business
-        # Fix: Explicitly list allowed fields to prevent mass assignment
         fields = [
             'business_name',
             'business_phone',
@@ -248,7 +247,6 @@ class businessApiSettingsForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.BusinessApiSettings
-        # Fix: Explicitly list allowed fields to prevent mass assignment
         fields = [
             'api_type',
             'api_key',
@@ -379,7 +377,6 @@ class BusinessProfileForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.BusinessProfile
-        # Fix: Explicitly list allowed fields
         fields = [
             'business_description',
             'business_mision',
@@ -488,7 +485,6 @@ class BusinessLogoForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.BusinessLogo
-        # Fix: Explicitly list allowed fields
         fields = ['business_logo']
         exclude = ['business', 'updated_at', 'created_at']
             
@@ -528,7 +524,6 @@ class PickupLocationsAddForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.PickupLocation
-        # Fix: Explicitly list allowed fields
         fields = [
             'pickup_location_title',
             'locality',
@@ -559,7 +554,6 @@ class DriverDirectoryAddForm(forms.ModelForm):
     """
     class Meta:
         model = business_models.DriverDirectory
-        # Fix: Explicitly list allowed fields
         fields = ['driver']
         exclude = ['business', 'updated_at', 'created_at']
 

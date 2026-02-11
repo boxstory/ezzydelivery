@@ -14,48 +14,76 @@ Products
      ========================================== -->
 <div class="d-md-none" id="product_mobile_pwa_view">
   <!-- Header bar -->
-  <div class="pwa-section-header" style="margin-top: 8px;">
-    <h2 class="pwa-section-header__title">Products</h2>
+  <div class="pwa-section-header">
+    <h2 class="pwa-section-header__title">Inventory</h2>
     <a href="{% url 'product:product_single_add' %}" class="pwa-add-btn">
-      <i class="fas fa-plus"></i> Add Product
+      <i class="fas fa-plus"></i> Add Item
     </a>
   </div>
 
-  <!-- Product cards list -->
+  <!-- Results count -->
+  {% if products %}
+  <div class="pwa-results-bar">
+    <span class="pwa-results-bar__count">{{ products|length }} item{{ products|length|pluralize }}</span>
+  </div>
+  {% endif %}
+
+  <!-- Product inventory list -->
   <div class="pwa-product-list" id="product_mobile_card_list">
     {% if products %}
       {% for product in products %}
-      <div class="pwa-product-item" id="product_mobile_card_{{ product.id }}">
-        <div class="pwa-product-item__icon">
-          <i class="fas fa-tag"></i>
-        </div>
-        <div class="pwa-product-item__info">
-          <p class="pwa-product-item__name">{{ product.item_name }}</p>
-          <p class="pwa-product-item__sku">SKU: {{ product.item_sku }}</p>
-        </div>
-        <div class="pwa-product-item__right">
-          <span class="pwa-product-item__price">QAR {{ product.item_price }}</span>
-          {% if product.qty %}
-            {% if product.qty > 10 %}
-              <span class="pwa-stock-badge pwa-stock-badge--in-stock">In Stock</span>
-            {% elif product.qty > 0 %}
-              <span class="pwa-stock-badge pwa-stock-badge--low-stock">Low Stock</span>
+      <div class="pwa-inventory-item" id="product_mobile_card_{{ product.id }}">
+        <div class="pwa-inventory-item__top">
+          <div class="pwa-inventory-item__info">
+            <p class="pwa-inventory-item__name">{{ product.item_name }}</p>
+            <div class="pwa-inventory-item__meta">
+              <span class="pwa-inventory-item__sku">{{ product.item_sku }}</span>
+              {% if product.color %}
+              <span class="pwa-inventory-item__attr">{{ product.color }}</span>
+              {% endif %}
+              {% if product.size %}
+              <span class="pwa-inventory-item__attr">{{ product.size }}{% if product.unit %} {{ product.unit }}{% endif %}</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="pwa-inventory-item__stock">
+            {% if product.qty is not None %}
+              {% if product.qty > 10 %}
+                <span class="pwa-inventory-qty pwa-inventory-qty--ok">{{ product.qty }}</span>
+                <span class="pwa-inventory-label">in stock</span>
+              {% elif product.qty > 0 %}
+                <span class="pwa-inventory-qty pwa-inventory-qty--low">{{ product.qty }}</span>
+                <span class="pwa-inventory-label pwa-inventory-label--warn">low stock</span>
+              {% else %}
+                <span class="pwa-inventory-qty pwa-inventory-qty--out">0</span>
+                <span class="pwa-inventory-label pwa-inventory-label--danger">out of stock</span>
+              {% endif %}
             {% else %}
-              <span class="pwa-stock-badge pwa-stock-badge--out-of-stock">Out of Stock</span>
+              <span class="pwa-inventory-qty pwa-inventory-qty--na">-</span>
+              <span class="pwa-inventory-label">no data</span>
             {% endif %}
+          </div>
+        </div>
+        <div class="pwa-inventory-item__bottom">
+          <span class="pwa-inventory-item__price">QAR {{ product.item_price }}</span>
+          {% if product.product_category %}
+          <span class="pwa-inventory-item__category">{{ product.product_category }}</span>
           {% endif %}
-          <a href="{% url 'product:product_single_update' product_id=product.id %}" class="pwa-section-header__link">
-            <i class="fas fa-edit"></i> Edit
+          <a href="{% url 'product:product_single_update' product_id=product.id %}" class="pwa-inventory-item__action">
+            <i class="fas fa-pen"></i> Edit
           </a>
         </div>
       </div>
       {% endfor %}
     {% else %}
       <div class="pwa-empty-state">
-        <i class="fas fa-box-open"></i>
-        <p>No products found</p>
-        <a href="{% url 'product:product_single_add' %}" class="pwa-add-btn" style="margin-top: 12px;">
-          <i class="fas fa-plus"></i> Add Your First Product
+        <div class="pwa-empty-state__icon">
+          <i class="fas fa-boxes-stacked"></i>
+        </div>
+        <p class="pwa-empty-state__title">No Items in Inventory</p>
+        <p class="pwa-empty-state__subtitle">Add products to start tracking your stock</p>
+        <a href="{% url 'product:product_single_add' %}" class="pwa-add-btn">
+          <i class="fas fa-plus"></i> Add First Item
         </a>
       </div>
     {% endif %}

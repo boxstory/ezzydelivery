@@ -115,7 +115,6 @@ class CareersForm(forms.ModelForm):
     """
     class Meta:
         model = Careers
-        # Fix: Explicitly list allowed fields instead of __all__
         fields = [
             'full_name',
             'email',
@@ -129,7 +128,6 @@ class CareersForm(forms.ModelForm):
 
     def clean_qid(self):
         qid = self.cleaned_data.get('qid')
-        # Fix: Removed debug print statement
         qid = str(qid)
         # Check if qid is 11 digits and starts with 2 or 3
         if not (len(qid) == 11 and qid.isdigit() and (qid.startswith('2') or qid.startswith('3'))):
@@ -169,7 +167,6 @@ class PricingEnquiryForm(forms.ModelForm):
     View:
         webpages.views.delivery_inquiry
     """
-    # Fix: Override boolean fields with string choices for proper form handling
     is_personalized_product = forms.ChoiceField(choices=[('false', 'No'), ('true', 'Yes')])
     is_registered_company_in_qatar = forms.ChoiceField(choices=[('true', 'Yes'), ('false', 'No')])
     is_located_in_qatar = forms.ChoiceField(choices=[('true', 'Yes'), ('false', 'No')])
@@ -236,7 +233,6 @@ class PricingEnquiryForm(forms.ModelForm):
 
     class Meta:
         model = PricingEnquiry
-        # Fix: Explicitly list allowed fields instead of __all__
         fields = [
             'full_name',
             'business_name',

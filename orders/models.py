@@ -319,6 +319,40 @@ class OrderVerificationLog(models.Model):
         return f"{self.order.order_number} - {self.action}"
 
 
+class OrderStatusHistory(models.Model):
+    """Track all status changes across order lifecycle"""
+    STATUS_FIELD_CHOICES = [
+        ('order_status', 'Order Status'),
+        ('task_status', 'Task Status'),
+        ('verification_status', 'Verification Status'),
+        ('cod_status_by_staff', 'COD Status'),
+        ('dl_task_status', 'Delivery Task Status'),
+        ('dl_task_status_dms', 'DMS Status'),
+    ]
+
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name='status_history')
+    field_name = models.CharField(max_length=50, choices=STATUS_FIELD_CHOICES)
+    old_value = models.CharField(max_length=100, blank=True, null=True)
+    new_value = models.CharField(max_length=100)
+    old_display = models.CharField(max_length=100, blank=True, null=True)
+    new_display = models.CharField(max_length=100)
+    changed_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True)
+    notes = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name_plural = "Order Status History"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['order', '-created_at'], name='ord_status_hist_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.order.order_number} - {self.field_name}: {self.old_display} → {self.new_display}"
+
+
 class AddressVerification(models.Model):
     """Track address verification details"""
     VERIFICATION_RESULT = (

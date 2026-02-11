@@ -35,7 +35,6 @@ class AddItemsForm(forms.ModelForm):
         model = product_models.Product
         verbose_name = 'Product'
         verbose_name_plural = 'Products'
-        # Fix: Explicitly list allowed fields instead of __all__
         fields = [
             'brand_name',
             'item_name',

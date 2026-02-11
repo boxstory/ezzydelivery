@@ -12,13 +12,13 @@
   <table class="listing-table" id="orders_list_table_view">
     <thead>
       <tr>
-        <th>Order No.</th>
-        <th>Date</th>
-        <th>Customer</th>
-        <th>Phone</th>
-        <th>Zone</th>
+        <th class="sortable-header" data-sort="order_number">Order No. <i class="fa-solid fa-sort{% if sort_by == 'order_number' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}" style="font-size:0.6rem;opacity:0.6;"></i></th>
+        <th class="sortable-header" data-sort="order_date">Date <i class="fa-solid fa-sort{% if sort_by == 'order_date' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}" style="font-size:0.6rem;opacity:0.6;"></i></th>
+        <th class="sortable-header" data-sort="customer_name">Customer <i class="fa-solid fa-sort{% if sort_by == 'customer_name' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}" style="font-size:0.6rem;opacity:0.6;"></i></th>
+        <th class="sortable-header" data-sort="customer_phone">Phone <i class="fa-solid fa-sort{% if sort_by == 'customer_phone' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}" style="font-size:0.6rem;opacity:0.6;"></i></th>
+        <th class="sortable-header" data-sort="dl_zone">Zone <i class="fa-solid fa-sort{% if sort_by == 'dl_zone' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}" style="font-size:0.6rem;opacity:0.6;"></i></th>
         <th>Address</th>
-        <th>COD</th>
+        <th class="sortable-header" data-sort="cod_amount">COD <i class="fa-solid fa-sort{% if sort_by == 'cod_amount' %}{% if sort_dir == 'asc' %}-up{% else %}-down{% endif %}{% endif %}" style="font-size:0.6rem;opacity:0.6;"></i></th>
         <th>Status</th>
         <th class="text-center">Actions</th>
       </tr>
@@ -53,20 +53,24 @@
         </td>
         <td>
           {% with delivery=order.delivery_task.first %}
-            {% if delivery and delivery.dl_task_status_dms == '2' %}
+            {% if delivery and delivery.dl_task_status == 'delivered' %}
               <span class="listing-status success"><i class="fa-solid fa-check"></i></span> Delivered
-            {% elif delivery and delivery.dl_task_status_dms == '0' %}
+            {% elif delivery and delivery.dl_task_status == 'assigned' %}
               <span class="listing-status primary"><i class="fa-solid fa-user"></i></span> Assigned
-            {% elif delivery and delivery.dl_task_status_dms == '1' %}
-              <span class="listing-status warning"><i class="fa-solid fa-truck"></i></span> Started
-            {% elif delivery and delivery.dl_task_status_dms == '3' %}
+            {% elif delivery and delivery.dl_task_status == 'accepted' %}
+              <span class="listing-status primary"><i class="fa-solid fa-user-check"></i></span> Accepted
+            {% elif delivery and delivery.dl_task_status == 'picked_up' %}
+              <span class="listing-status warning"><i class="fa-solid fa-box-open"></i></span> Picked Up
+            {% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}
+              <span class="listing-status warning"><i class="fa-solid fa-truck"></i></span> In Transit
+            {% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}
               <span class="listing-status danger"><i class="fa-solid fa-times"></i></span> Failed
-            {% elif delivery and delivery.dl_task_status_dms == '9' %}
+            {% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}
               <span class="listing-status danger"><i class="fa-solid fa-ban"></i></span> Cancelled
             {% elif order.task_created %}
               <span class="listing-status info"><i class="fa-solid fa-clipboard-check"></i></span> Task Created
             {% else %}
-              <span class="listing-status warning"><i class="fa-solid fa-clock"></i></span> Pending
+              <span class="listing-status warning"><i class="fa-solid fa-clock"></i></span> {{ order.get_order_status_display }}
             {% endif %}
           {% endwith %}
         </td>

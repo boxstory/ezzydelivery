@@ -282,7 +282,6 @@ class ReceiveStockForm(forms.Form):
 
     def __init__(self, business, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Fix: Store business for validation
         self.business = business
 
         # Get warehouses linked to this business

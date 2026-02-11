@@ -1,0 +1,40 @@
+{% load static %}
+{% load business_pwa_tags %}
+<!-- PWA Mobile Bottom Navigation - Only visible on mobile (< 768px) -->
+<nav class="pwa-bottom-nav d-md-none">
+  <a href="{% url 'business:business_dashboard' %}"
+     class="pwa-bottom-nav__item {% if request.resolver_match.url_name == 'business_dashboard' %}active{% endif %}">
+    <i class="fa-solid fa-house"></i>
+    <span>Home</span>
+  </a>
+
+  <a href="{% url 'orders:orders_all_list' %}"
+     class="pwa-bottom-nav__item {% if request.resolver_match.url_name == 'orders_all_list' %}active{% endif %}">
+    <i class="fa-solid fa-clipboard-list"></i>
+    <span>Orders</span>
+    {% business_pending_count as biz_pending %}
+    {% if biz_pending %}
+    <span class="pwa-bottom-nav__badge">{{ biz_pending }}</span>
+    {% endif %}
+  </a>
+
+  <a href="{% url 'orders:add_order' %}"
+     class="pwa-bottom-nav__item pwa-bottom-nav__item--fab {% if request.resolver_match.url_name == 'add_order' %}active{% endif %}">
+    <span class="pwa-bottom-nav__fab">
+      <i class="fa-solid fa-plus"></i>
+    </span>
+    <span>Add</span>
+  </a>
+
+  <a href="{% url 'business:business_finance_dashboard' %}"
+     class="pwa-bottom-nav__item {% if request.resolver_match.url_name == 'business_finance_dashboard' %}active{% endif %}">
+    <i class="fa-solid fa-chart-pie"></i>
+    <span>Reports</span>
+  </a>
+
+  <a href="{% url 'product:product_inventory' %}"
+     class="pwa-bottom-nav__item {% if request.resolver_match.url_name == 'product_inventory' %}active{% endif %}">
+    <i class="fa-solid fa-boxes-stacked"></i>
+    <span>Inventory</span>
+  </a>
+</nav>

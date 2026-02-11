@@ -173,11 +173,26 @@ class ParseAddressTool(BaseTool):
                 if not result['zone_name']:
                     result['zone_name'] = zone_details.get('zone_name')
                     result['parse_notes'].append(f"Zone name: {zone_details.get('zone_name')}")
-                # Set coordinates if not already set
-                if not result['coordinates']['latitude'] and zone_details.get('latitude'):
-                    result['coordinates']['latitude'] = zone_details['latitude']
-                    result['coordinates']['longitude'] = zone_details['longitude']
-                    result['parse_notes'].append(f"Zone {result['zone_number']} coordinates found")
+
+            # Try QNAS API for precise building-level coordinates
+            if result['street_number']:
+                qnas_coords = self._lookup_qnas_building(
+                    result['zone_number'],
+                    result['street_number'],
+                    result.get('building_number')
+                )
+                if qnas_coords:
+                    result['coordinates']['latitude'] = qnas_coords['latitude']
+                    result['coordinates']['longitude'] = qnas_coords['longitude']
+                    result['confidence'] += 0.15
+                    src = f"building {result.get('building_number')}" if qnas_coords.get('exact_match') else "street"
+                    result['parse_notes'].append(f"QNAS precise coordinates from {src}")
+
+            # Fallback to zone center if no QNAS coordinates
+            if not result['coordinates']['latitude'] and zone_details and zone_details.get('latitude'):
+                result['coordinates']['latitude'] = zone_details['latitude']
+                result['coordinates']['longitude'] = zone_details['longitude']
+                result['parse_notes'].append(f"Zone {result['zone_number']} center coordinates (approximate)")
 
         # AI Search fallback if no zone found
         if not result['zone_number']:
@@ -314,6 +329,67 @@ class ParseAddressTool(BaseTool):
                     'latitude': float(zone_match.latitude) if zone_match.latitude else None,
                     'longitude': float(zone_match.longitude) if zone_match.longitude else None,
                 }
+
+        return None
+
+    def _lookup_qnas_building(
+        self,
+        zone_number: int,
+        street_number: int,
+        building_number: Optional[int] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Look up precise coordinates from QNAS API for zone/street/building."""
+        import requests
+        from decouple import config
+
+        token = config("QNAS_TOKEN", default="")
+        domain = config("QNAS_DOMAIN", default="ezzydelivery.qa")
+
+        if not token:
+            return None
+
+        headers = {
+            "X-Token": token,
+            "X-Domain": domain,
+            "Accept": "application/json",
+            "User-Agent": "EzzyDelivery/1.0",
+            "Referer": f"https://{domain}/",
+            "Origin": f"https://{domain}",
+        }
+
+        try:
+            url = f"https://qnas.qa/get_buildings/{zone_number}/{street_number}"
+            resp = requests.get(url, headers=headers, timeout=10)
+
+            if resp.status_code != 200:
+                return None
+
+            buildings = resp.json()
+            if not isinstance(buildings, list) or not buildings:
+                return None
+
+            # Try exact building match first
+            if building_number:
+                building_str = str(building_number)
+                for b in buildings:
+                    if str(b.get("building_number", "")) == building_str:
+                        return {
+                            'latitude': float(b["x"]),
+                            'longitude': float(b["y"]),
+                            'exact_match': True,
+                        }
+
+            # Fallback to first building on the street
+            first = buildings[0]
+            if first.get("x") and first.get("y"):
+                return {
+                    'latitude': float(first["x"]),
+                    'longitude': float(first["y"]),
+                    'exact_match': False,
+                }
+
+        except Exception as e:
+            logger.warning(f"QNAS lookup error for zone={zone_number}, street={street_number}: {e}")
 
         return None
 

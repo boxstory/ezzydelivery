@@ -79,11 +79,14 @@ def order_pre_save_receiver(sender, instance, *args, **kwargs):
             instance.client_order_code or 'ORD'
         )
 
-    # Store old verification status if instance exists
+    # Store old status values for change detection
     if instance.pk:
         try:
             old_instance = Order.objects.get(pk=instance.pk)
             instance._old_verification_status = old_instance.verification_status
+            instance._old_order_status = old_instance.order_status
+            instance._old_task_status = old_instance.task_status
+            instance._old_cod_status_by_staff = old_instance.cod_status_by_staff
         except Order.DoesNotExist:
             pass
 
@@ -176,7 +179,13 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
 
         # OrderItem entries should be created when products are added to the order
         # Not automatically on order creation
-    
+
+        # Log initial order creation in status history
+        try:
+            _log_order_created(instance)
+        except Exception as e:
+            logger.error(f"Error logging order creation: {e}")
+
     # Handle verification status changes
     if not created:
         old_status = getattr(instance, '_old_verification_status', '')
@@ -209,9 +218,13 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
                     # Legacy: direct task creation
                     _create_delivery_task_from_order(instance)
         
+        # Log all status field changes to OrderStatusHistory
+        _log_order_status_changes(instance)
+
         # Clean up stored old status from instance
-        if hasattr(instance, '_old_verification_status'):
-            del instance._old_verification_status
+        for attr in ('_old_verification_status', '_old_order_status', '_old_task_status', '_old_cod_status_by_staff'):
+            if hasattr(instance, attr):
+                delattr(instance, attr)
 
 
 def _resolve_zone_number(zone, area_name=None):
@@ -399,4 +412,71 @@ def _create_delivery_task_from_order(order):
         logger.error(f"Error creating delivery task for order {order.id}: {str(e)}", exc_info=True)
         return None
 
+
+# ---- Status history tracking helpers ----
+
+# Display name lookups for status fields
+_ORDER_STATUS_DISPLAY = dict(orders_models.ORDER_STATUS_BY_CLIENT)
+_TASK_STATUS_DISPLAY = dict(orders_models.TASK_STATUS_BY_STAFF)
+_VERIFICATION_DISPLAY = dict(orders_models.Order.VERIFICATION_STATUS)
+_COD_STATUS_DISPLAY = dict(orders_models.COD_STATUS_BY_STAFF)
+
+_STATUS_FIELDS = [
+    # (field_name, old_attr, display_dict)
+    ('order_status', '_old_order_status', _ORDER_STATUS_DISPLAY),
+    ('task_status', '_old_task_status', _TASK_STATUS_DISPLAY),
+    ('verification_status', '_old_verification_status', _VERIFICATION_DISPLAY),
+    ('cod_status_by_staff', '_old_cod_status_by_staff', _COD_STATUS_DISPLAY),
+]
+
+
+def _log_order_status_changes(instance):
+    """Log all changed status fields on an Order to OrderStatusHistory."""
+    OrderStatusHistory = orders_models.OrderStatusHistory
+    entries = []
+    for field_name, old_attr, display_dict in _STATUS_FIELDS:
+        old_val = getattr(instance, old_attr, None)
+        new_val = getattr(instance, field_name, None)
+        if old_val is not None and old_val != new_val:
+            entries.append(OrderStatusHistory(
+                order=instance,
+                field_name=field_name,
+                old_value=old_val or '',
+                new_value=new_val or '',
+                old_display=display_dict.get(old_val, old_val or ''),
+                new_display=display_dict.get(new_val, new_val or ''),
+                changed_by=getattr(instance, '_status_changed_by', None),
+            ))
+    if entries:
+        OrderStatusHistory.objects.bulk_create(entries)
+
+
+def _log_order_created(instance):
+    """Log initial status values when an order is first created."""
+    OrderStatusHistory = orders_models.OrderStatusHistory
+    OrderStatusHistory.objects.create(
+        order=instance,
+        field_name='order_status',
+        old_value='',
+        new_value=instance.order_status,
+        old_display='',
+        new_display=_ORDER_STATUS_DISPLAY.get(instance.order_status, instance.order_status),
+        notes='Order created',
+    )
+
+
+def log_delivery_task_status_change(task, field_name, old_val, new_val, display_dict):
+    """Log a delivery task status change to the order's status history."""
+    OrderStatusHistory = orders_models.OrderStatusHistory
+    try:
+        OrderStatusHistory.objects.create(
+            order=task.order,
+            field_name=field_name,
+            old_value=old_val or '',
+            new_value=new_val or '',
+            old_display=display_dict.get(old_val, old_val or ''),
+            new_display=display_dict.get(new_val, new_val or ''),
+        )
+    except Exception as e:
+        logger.error(f"Error logging delivery task status change: {e}")
    
