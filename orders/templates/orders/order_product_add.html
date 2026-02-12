@@ -118,7 +118,7 @@
                 <i class="fas fa-box me-1"></i>Product <span class="text-danger">*</span>
               </label>
               <select name="product_id[]" class="product-select" required>
-                <option value="">Type 3+ characters to search...</option>
+                <option value="">Select a product...</option>
               </select>
               <div class="product-info-display" style="display: none;">
                 <span class="sku-badge"></span>
@@ -168,7 +168,7 @@
                 <i class="fas fa-box me-1"></i>Product
               </label>
               <select name="product_id[]" class="product-select">
-                <option value="">Type 3+ characters to search...</option>
+                <option value="">Select a product...</option>
               </select>
               <div class="product-info-display" style="display: none;">
                 <span class="sku-badge"></span>
@@ -254,16 +254,16 @@ $(document).ready(function() {
   // Initialize Select2 for product dropdowns
   function initializeSelect2(selectElement) {
     $(selectElement).select2({
-      placeholder: 'Type 3+ characters to search...',
-      minimumInputLength: 3,
+      placeholder: 'Select a product...',
+      minimumInputLength: 0,
       allowClear: true,
       ajax: {
         url: '{% url "orders:product_search_api" %}',
         dataType: 'json',
-        delay: 300,
+        delay: 200,
         data: function(params) {
           return {
-            q: params.term
+            q: params.term || ''
           };
         },
         processResults: function(data) {
@@ -363,7 +363,7 @@ $(document).ready(function() {
 
   // Format selected product
   function formatProductSelection(product) {
-    return product.text || 'Type 3+ characters to search...';
+    return product.text || 'Select a product...';
   }
 
   // Calculate row total
@@ -431,7 +431,7 @@ $(document).ready(function() {
               <i class="fas fa-box me-1"></i>Product
             </label>
             <select name="product_id[]" class="product-select">
-              <option value="">Type 3+ characters to search...</option>
+              <option value="">Select a product...</option>
             </select>
             <div class="product-info-display" style="display: none;">
               <span class="sku-badge"></span>

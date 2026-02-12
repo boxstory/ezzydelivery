@@ -1,6 +1,5 @@
 {% load static %}
 {% load custom_filters %}
-<link rel="stylesheet" href="{% static 'orders/css/orders.css' %}">
 
 {% if not orders %}
 <div class="text-center py-5">
@@ -91,7 +90,7 @@
         <div class="detail-row">
           <span class="detail-label">Contact</span>
           <div class="detail-value">
-            <a class="contact-link" href="http://wa.me/{{ order.customer_whatsapp }}" target="_blank">
+            <a class="contact-link" href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank">
               <i class="fa-brands fa-whatsapp"></i>
               <span>{{ order.customer_phone }}</span>
             </a>
@@ -226,21 +225,25 @@
         <!-- Action Buttons -->
         <div class="detail-row order-actions-row">
           <div class="order-actions d-flex flex-wrap gap-2">
-            {% if order.order_status == 'publish' %}
-            <span class="contact-link disabled" title="Cannot edit published orders">
+            {% if order.order_status == 'publish' or order.order_status == 'delivered' or order.order_status == 'cancelled' %}
+            <span class="contact-link disabled" title="Cannot edit {{ order.get_order_status_display }} orders">
               <i class="fa fa-edit"></i>
               <span>Edit Order</span>
+            </span>
+            <span class="contact-link disabled" title="Cannot delete {{ order.get_order_status_display }} orders">
+              <i class="fa fa-trash"></i>
+              <span>Delete</span>
             </span>
             {% else %}
             <a href="{% url 'orders:order_update' order.id %}" class="contact-link">
               <i class="fa fa-edit"></i>
               <span>Edit Order</span>
             </a>
-            {% endif %}
             <a href="{% url 'orders:delete_order' order.id %}" class="contact-link delete-link">
               <i class="fa fa-trash"></i>
               <span>Delete</span>
             </a>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -285,6 +288,7 @@
       <div class="modal-body py-2">
         <p class="small text-muted mb-2">Order: <strong id="modalOrderNumber"></strong></p>
         <input type="hidden" id="modalOrderId">
+        {% csrf_token %}
         <div class="d-grid gap-1">
           <button type="button" class="btn btn-outline-warning btn-sm text-start" onclick="updateOrderStatus('to_review')">
             <i class="fa-solid fa-clock me-2"></i>Hold for Review

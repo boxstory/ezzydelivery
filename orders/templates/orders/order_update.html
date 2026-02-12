@@ -2,69 +2,339 @@
 {% load crispy_forms_tags %}
 {% load static %}
 
-{% block head_title %}Update Orders{% endblock %}
+{% block head_title %}Update Order #{{ order.order_number }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'orders/css/orders.css' %}">
+<link rel="stylesheet" href="{% static 'orders/css/orders.css' %}?v=20260212f">
 {% endblock %}
 
 {% block content %}
-<div class="p-3 col-12" id="orders_update_container_main">
-  <div class="row">
-    <div class="col-md-12 pb-3 d-flex justify-content-between">
-      <h2 class="my-2" id="orders_update_header_title">Update Order</h2>
-      <a class="text-decoration-none text-light" href="{% url 'business:business_dashboard' %}">
-        <div class="btn btn-dark my-2" id="orders_update_btn_back">Back</div>
+<div class="ou" id="orders_update_container_main">
+
+  <!-- Top Bar -->
+  <div class="ou__topbar">
+    <div class="ou__topbar-left">
+      <a class="ou__back-btn" href="{% url 'orders:orders_all_list' %}" id="orders_update_btn_back">
+        <i class="fa fa-arrow-left"></i>
       </a>
+      <div class="ou__title-group">
+        <h1 class="ou__title">Edit Order</h1>
+        <div class="ou__meta">
+          <code class="ou__order-num">{{ order.order_number }}</code>
+          <span class="ob ob--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
+          <span class="ou__date"><i class="fa-regular fa-calendar"></i> {{ order.order_date|date:"d M Y" }}</span>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="row">
-    <div class="col-md-12">
-      <form method="POST" id="orders_update_form_main">
-        {% csrf_token %}
-        {% if form.non_field_errors %}
-        <div class="alert alert-danger" role="alert">
-          {% for error in form.non_field_errors %}
-          <div class="invalid-feedback d-block">{{ error }}</div>
-          {% endfor %}
+
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger py-2 mb-2" role="alert">
+    {% for error in form.non_field_errors %}
+    <div class="small">{{ error }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="POST" id="orders_update_form_main">
+    {% csrf_token %}
+    <div class="ou__grid">
+
+      <!-- LEFT COLUMN: Form Fields -->
+      <div class="ou__col-form">
+
+        <!-- Customer Section -->
+        <div class="ou__section">
+          <div class="ou__section-head">
+            <i class="fa-solid fa-user"></i>
+            <span>Customer</span>
+          </div>
+          <div class="ou__field-grid ou__field-grid--2col">
+            <div class="ou__field">
+              <label class="ou__label" for="id_customer_name">Name</label>
+              {{ form.customer_name }}
+              {% if form.customer_name.errors %}<div class="ou__error">{{ form.customer_name.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="ou__field">
+              <label class="ou__label" for="id_customer_phone">Phone</label>
+              {{ form.customer_phone }}
+              {% if form.customer_phone.errors %}<div class="ou__error">{{ form.customer_phone.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="ou__field-grid ou__field-grid--2col">
+            <div class="ou__field">
+              <label class="ou__label" for="id_customer_whatsapp">WhatsApp</label>
+              {{ form.customer_whatsapp }}
+              {% if form.customer_whatsapp.errors %}<div class="ou__error">{{ form.customer_whatsapp.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="ou__field">
+              <label class="ou__label" for="id_pickup_location">Pickup Location</label>
+              {{ form.pickup_location }}
+              {% if form.pickup_location.errors %}<div class="ou__error">{{ form.pickup_location.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
         </div>
-        {% endif %}
-        {{ form | crispy }}
+
+        <!-- Address Section -->
+        <div class="ou__section">
+          <div class="ou__section-head">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>Delivery Address</span>
+          </div>
+          <div class="ou__field-grid ou__field-grid--3col">
+            <div class="ou__field">
+              <label class="ou__label" for="id_dl_zone">Zone</label>
+              {{ form.dl_zone }}
+              {% if form.dl_zone.errors %}<div class="ou__error">{{ form.dl_zone.errors.0 }}</div>{% endif %}
+            </div>
+            {% if form.dl_street %}
+            <div class="ou__field">
+              <label class="ou__label" for="id_dl_street">Street</label>
+              {{ form.dl_street }}
+            </div>
+            {% endif %}
+            {% if form.dl_building %}
+            <div class="ou__field">
+              <label class="ou__label" for="id_dl_building">Building</label>
+              {{ form.dl_building }}
+            </div>
+            {% endif %}
+          </div>
+          <div class="ou__field">
+            <label class="ou__label" for="id_customer_address">Full Address</label>
+            {{ form.customer_address }}
+            {% if form.customer_address.errors %}<div class="ou__error">{{ form.customer_address.errors.0 }}</div>{% endif %}
+          </div>
+        </div>
+
+        <!-- COD & Notes Section -->
+        <div class="ou__section">
+          <div class="ou__section-head">
+            <i class="fa-solid fa-money-bill-wave"></i>
+            <span>Payment & Notes</span>
+          </div>
+          <div class="ou__field-grid ou__field-grid--2col">
+            <div class="ou__field">
+              <label class="ou__label">COD Status</label>
+              <div class="ou__radio-group">
+                {% for radio in form.cod_status_by_client %}
+                <label class="ou__radio-pill">
+                  {{ radio.tag }}
+                  <span>{{ radio.choice_label }}</span>
+                </label>
+                {% endfor %}
+              </div>
+              {% if form.cod_status_by_client.errors %}<div class="ou__error">{{ form.cod_status_by_client.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="ou__field">
+              <label class="ou__label" for="id_cod_amount">COD Amount (QR)</label>
+              {{ form.cod_amount }}
+              {% if form.cod_amount.errors %}<div class="ou__error">{{ form.cod_amount.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="ou__field">
+            <label class="ou__label" for="id_order_notes">Order Notes</label>
+            {{ form.order_notes }}
+            {% if form.order_notes.errors %}<div class="ou__error">{{ form.order_notes.errors.0 }}</div>{% endif %}
+          </div>
+          {% if form.task_created %}
+          <div class="ou__field">
+            <label class="ou__checkbox-row">
+              {{ form.task_created }}
+              <span>Task Created (Staff only)</span>
+            </label>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Submit -->
         {% if order.order_status == 'publish' %}
-        <div class="submit my-3 text-center">
-          <button class="btn btn-success w-25 align-content-center" id="orders_update_btn_published" disabled>
-            <span class="m-0">Already Published</span>
-          </button>
-        </div>
+        <button class="ou__submit ou__submit--disabled" disabled>
+          <i class="fa-solid fa-lock me-1"></i> Already Published
+        </button>
         {% else %}
-        <div class="submit my-3 text-center">
-          <button type="submit" class="btn btn-dark btn-submit w-25 align-content-center" id="orders_update_btn_submit">
-            <span class="btn-text">Update Order</span>
-          </button>
-          <a href="{% url 'orders:add_order_product' order.id %}" class="btn btn-dark w-25 align-content-center me-2" id="orders_update_btn_add_product">
-            <i class="me-2 fa-solid fa-plus"></i>Product
-          </a>
-        </div>
+        <button type="submit" class="ou__submit" id="orders_update_btn_submit">
+          <i class="fa-solid fa-save me-1"></i>
+          <span class="btn-text">Save Changes</span>
+        </button>
         {% endif %}
-      </form>
+
+      </div>
+
+      <!-- RIGHT COLUMN: Items + Info -->
+      <div class="ou__col-sidebar">
+
+        <!-- Items Card -->
+        <div class="ou__card">
+          <div class="ou__card-head">
+            <span><i class="fa-solid fa-boxes-stacked me-1"></i> Items ({{ order_items.count }})</span>
+            {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+            <a href="{% url 'orders:add_order_product' order.id %}" class="ou__card-action" id="orders_update_btn_add_product">
+              <i class="fa-solid fa-plus"></i> Add
+            </a>
+            {% endif %}
+          </div>
+          {% if order_items %}
+          <div class="ou__items-list">
+            {% for item in order_items %}
+            <div class="ou__item" id="orders_update_item_row_{{ item.id }}">
+              <div class="ou__item-info">
+                {% if item.product %}
+                <div class="ou__item-name">{{ item.product.brand_name }} {{ item.product.item_name }}</div>
+                {% if item.product.item_sku %}
+                <div class="ou__item-sku">{{ item.product.item_sku }}</div>
+                {% endif %}
+                {% else %}
+                <div class="ou__item-name ou__item-name--muted">Unknown Product</div>
+                {% endif %}
+              </div>
+              <div class="ou__item-qty">x{{ item.quantity }}</div>
+              <div class="ou__item-price">
+                {% if item.total_price %}{{ item.total_price }} QR{% else %}-{% endif %}
+              </div>
+              {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+              <button type="button" class="ou__item-del orders-item-delete-btn" data-item-id="{{ item.id }}" title="Remove">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% if items_total %}
+          <div class="ou__items-total">
+            <span>Total</span>
+            <strong>{{ items_total|floatformat:2 }} QR</strong>
+          </div>
+          {% endif %}
+          {% else %}
+          <div class="ou__empty-items">
+            <i class="fa-solid fa-box-open"></i>
+            <span>No items yet</span>
+            {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+            <a href="{% url 'orders:add_order_product' order.id %}" class="ou__card-action">
+              <i class="fa-solid fa-plus"></i> Add Products
+            </a>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Order Info Card -->
+        <div class="ou__card">
+          <div class="ou__card-head">
+            <span><i class="fa-solid fa-circle-info me-1"></i> Order Info</span>
+          </div>
+          <div class="ou__info-body">
+            <div class="ou__info-row">
+              <span class="ou__info-label">Order #</span>
+              <code class="ou__info-code">{{ order.order_number }}</code>
+            </div>
+            {% if order.client_order_code %}
+            <div class="ou__info-row">
+              <span class="ou__info-label">Client Code</span>
+              <code class="ou__info-code">{{ order.client_order_code }}</code>
+            </div>
+            {% endif %}
+            <div class="ou__info-row">
+              <span class="ou__info-label">Status</span>
+              <span class="ob ob--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
+            </div>
+            <div class="ou__info-row">
+              <span class="ou__info-label">Date</span>
+              <span class="ou__info-val">{{ order.order_date|date:"d M Y" }}</span>
+            </div>
+            {% if order.cod_amount %}
+            <div class="ou__info-row">
+              <span class="ou__info-label">COD Amount</span>
+              <span class="ou__info-val ou__info-val--cod">{{ order.cod_amount }} QR</span>
+            </div>
+            {% endif %}
+            {% if order.dl_zone %}
+            <div class="ou__info-row">
+              <span class="ou__info-label">Zone</span>
+              <span class="ou__info-val">{{ order.dl_zone }}</span>
+            </div>
+            {% endif %}
+            {% if order.customer_name %}
+            <div class="ou__info-row">
+              <span class="ou__info-label">Customer</span>
+              <span class="ou__info-val">{{ order.customer_name }}</span>
+            </div>
+            {% endif %}
+            {% if order.customer_phone %}
+            <div class="ou__info-row">
+              <span class="ou__info-label">Phone</span>
+              <span class="ou__info-val">{{ order.customer_phone }}</span>
+            </div>
+            {% endif %}
+            <div class="ou__info-row">
+              <span class="ou__info-label">Created</span>
+              <span class="ou__info-val">{{ order.created_at|date:"d M Y H:i" }}</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
-  </div>
+  </form>
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  const form = document.getElementById('orders_update_form_main');
-  const submitBtn = document.getElementById('orders_update_btn_submit');
+  var form = document.getElementById('orders_update_form_main');
+  var submitBtn = document.getElementById('orders_update_btn_submit');
 
   if (form && submitBtn) {
     form.addEventListener('submit', function() {
-      // Add loading state to submit button
       submitBtn.classList.add('is-loading');
-      submitBtn.querySelector('.btn-text').textContent = 'Updating...';
+      submitBtn.querySelector('.btn-text').textContent = 'Saving...';
     });
   }
+
+  // Delete item buttons
+  document.querySelectorAll('.orders-item-delete-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var itemId = this.getAttribute('data-item-id');
+      if (!confirm('Remove this item from the order?')) return;
+
+      var row = document.getElementById('orders_update_item_row_' + itemId);
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+      fetch('/orders/update_order_product/{{ order.id }}/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ action: 'delete', item_id: parseInt(itemId) })
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data.success) {
+          row.style.opacity = '0';
+          row.style.transform = 'translateX(10px)';
+          setTimeout(function() {
+            row.remove();
+            var remaining = document.querySelectorAll('.ou__item').length;
+            document.querySelector('.ou__card-head span').innerHTML = '<i class="fa-solid fa-boxes-stacked me-1"></i> Items (' + remaining + ')';
+            if (remaining === 0) window.location.reload();
+          }, 200);
+        } else {
+          alert('Error: ' + (data.error || 'Failed to delete'));
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        }
+      })
+      .catch(function(err) {
+        alert('Network error: ' + err);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      });
+    });
+  });
 });
 </script>
 {% endblock %}

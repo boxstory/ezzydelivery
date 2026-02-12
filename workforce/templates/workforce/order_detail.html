@@ -1,5 +1,6 @@
 {% extends "workforce/wf_base_dashboard.html" %}
 {% load static %}
+{% load custom_filters %}
 
 {% block title %}Order {{ order.order_number }} - Workforce{% endblock %}
 
@@ -196,7 +197,7 @@
                             <label class="form-label text-muted small">WhatsApp</label>
                             <p class="mb-0">
                                 {% if order.customer_whatsapp %}
-                                <a href="https://wa.me/{{ order.customer_whatsapp }}" target="_blank" class="text-decoration-none text-success">
+                                <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="text-decoration-none text-success">
                                     <i class="fa-brands fa-whatsapp me-1"></i>{{ order.customer_whatsapp }}
                                 </a>
                                 {% else %}
@@ -1878,7 +1879,7 @@ async function aiSuggestDriverDetail(orderId, orderNumber) {
                                 <a href="tel:${escapeAttr(driver.phone)}" class="btn btn-sm btn-outline-secondary" title="Call">
                                     <i class="fa-solid fa-phone"></i>
                                 </a>
-                                <a href="https://wa.me/${escapeAttr(driver.phone)}" target="_blank" class="btn btn-sm btn-outline-success" title="WhatsApp">
+                                <a href="https://wa.me/${escapeAttr((driver.phone || '').replace(/[\s+\-()]/g, '').replace(/^(\d{8})$/, '974$1'))}" target="_blank" class="btn btn-sm btn-outline-success" title="WhatsApp">
                                     <i class="fa-brands fa-whatsapp"></i>
                                 </a>
                                 <button type="button" class="btn btn-sm btn-primary" onclick="assignDriverToOrder('${escapeAttr(orderId)}', ${parseInt(driver.driver_id) || 0}, '${escapeAttr(driver.name)}', this)" title="Assign Driver">

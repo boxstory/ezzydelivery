@@ -1,139 +1,150 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
-{% block title %}Business Licenses - Ezzy Delivery{% endblock title %}
+{% block title %}Businesses - Ezzy Delivery{% endblock title %}
 
 {% block extra_css %}
 <link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/biz-detail.css' %}" />
 {% endblock extra_css %}
 
 {% block content %}
 <div class="col-12 p-3">
-<!-- Page Title -->
-<h1 class="page-title">
-    <i class="fa-solid fa-certificate me-2"></i>Business Licenses
-</h1>
 
-<!-- Filter and View Toggle Section -->
-<div class="filter-section">
-    <div class="filter-row">
-        <div class="filter-search-group">
-            <label for="searchInput" class="filter-label">
-                <i class="fa-solid fa-search me-2"></i>Search Licenses
-            </label>
-            <input type="text" id="searchInput" class="filter-input" placeholder="Search by business name, code, QID..." value="{{ search_query }}">
-        </div>
-        <div class="filter-toggle-group">
-            <button type="button" class="view-toggle-btn {% if view_type == 'card' %}active{% endif %}" data-view="card" id="cardViewBtn" aria-pressed="{% if view_type == 'card' %}true{% else %}false{% endif %}">
-                <i class="fa-solid fa-grip" aria-hidden="true"></i>
-                Card
-            </button>
-            <button type="button" class="view-toggle-btn {% if view_type == 'table' %}active{% endif %}" data-view="table" id="tableViewBtn" aria-pressed="{% if view_type == 'table' %}true{% else %}false{% endif %}">
-                <i class="fa-solid fa-list" aria-hidden="true"></i>
-                Table
-            </button>
+<!-- Hero Header -->
+<div class="biz-hero" style="padding: 1.5rem 2rem; margin-bottom: 1.25rem;">
+    <div class="biz-hero__glow"></div>
+    <div style="position: relative; z-index: 1;">
+        <h1 style="color: var(--brand-white); font-size: 1.375rem; font-weight: 800; margin: 0 0 0.25rem; letter-spacing: -0.02em;">
+            <i class="fa-solid fa-building me-2" style="color: var(--brand-primary);"></i>All Businesses
+        </h1>
+        <p style="color: var(--brand-grey-400); font-size: 0.8125rem; margin: 0;">
+            {{ businesses.paginator.count }} registered business{{ businesses.paginator.count|pluralize:"es" }}
+        </p>
+    </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="biz-panel" style="margin-bottom: 1.25rem;">
+    <div class="biz-panel__body" style="padding: 1rem 1.25rem;">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+            <div class="flex-grow-1">
+                <div class="position-relative">
+                    <i class="fa-solid fa-search" style="position: absolute; left: 0.875rem; top: 50%; transform: translateY(-50%); color: var(--brand-grey-400); font-size: 0.875rem;"></i>
+                    <input type="text" id="searchInput" class="biz-form__input" style="padding-left: 2.5rem;" placeholder="Search by name, code, QID..." value="{{ search_query }}">
+                </div>
+            </div>
+            <div class="d-flex gap-1" style="background: var(--brand-grey-100); border-radius: var(--brand-radius-sm); padding: 0.25rem;">
+                <button type="button" class="biz-view-toggle {% if view_type == 'card' %}biz-view-toggle--active{% endif %}" data-view="card" id="cardViewBtn">
+                    <i class="fa-solid fa-grip"></i>
+                </button>
+                <button type="button" class="biz-view-toggle {% if view_type == 'table' %}biz-view-toggle--active{% endif %}" data-view="table" id="tableViewBtn">
+                    <i class="fa-solid fa-list"></i>
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
 <!-- Card View -->
-<div id="cardView" class="driver-grid {% if view_type != 'card' %}d-none{% endif %}">
+<div id="cardView" class="{% if view_type != 'card' %}d-none{% endif %}">
     {% if businesses %}
+    <div class="biz-card-grid">
         {% for business in businesses %}
-        <div class="driver-card" data-search-text="{{ business.business_name|lower }} {{ business.business_code|lower }} {{ business.business_qid|lower }}">
-            <div class="driver-card-header">
-                <div class="driver-icon">
-                    <i class="fa-solid fa-certificate"></i>
+        <a href="{% url 'workforce:business_license_detail' business.business_id %}" class="biz-card" data-search-text="{{ business.business_name|lower }} {{ business.business_code|lower }} {{ business.business_qid|lower }}">
+            <div class="biz-card__top">
+                <div class="biz-card__avatar">
+                    {{ business.business_name|default:"?"|truncatechars:1 }}
                 </div>
-                <div class="driver-info">
-                    <h3>{{ business.business_name|default:"Unknown Business" }}</h3>
-                    <p>{{ business.business_code|default:"N/A" }}</p>
-                </div>
+                <span class="biz-hero__badge biz-hero__badge--{{ business.business_status }}" style="font-size: 0.6875rem;">
+                    <i class="fa-solid fa-circle"></i> {{ business.business_status|title }}
+                </span>
             </div>
-            <div class="driver-details">
+            <h3 class="biz-card__name">{{ business.business_name|default:"Unknown" }}</h3>
+            <p class="biz-card__code">{{ business.business_code|default:"N/A" }}</p>
+            <div class="biz-card__details">
                 {% if business.business_qid %}
-                <div class="detail-row">
-                    <i class="fa-solid fa-id-card"></i>
-                    <span>QID: {{ business.business_qid }}</span>
+                <div class="biz-card__detail">
+                    <i class="fa-solid fa-id-card"></i> QID: {{ business.business_qid }}
                 </div>
                 {% endif %}
-                {% if business.business_since %}
-                <div class="detail-row">
-                    <i class="fa-solid fa-calendar"></i>
-                    <span>Since: {{ business.business_since|date:"d M Y" }}</span>
+                {% if business.business_product_category %}
+                <div class="biz-card__detail">
+                    <i class="fa-solid fa-tag"></i> {{ business.business_product_category|title }}
                 </div>
                 {% endif %}
-                <div class="detail-row">
-                    <i class="fa-solid fa-circle-info"></i>
-                    <span class="status-badge {% if business.business_status == 'active' %}status-active{% elif business.business_status == 'pending' %}status-pending{% elif business.business_status == 'suspended' %}status-failed{% else %}status-inactive{% endif %}">
-                        {{ business.business_status|title }}
-                    </span>
-                </div>
-                <div class="detail-row">
-                    <i class="fa-solid fa-clock"></i>
-                    <span>{{ business.created_at|date:"d M Y" }}</span>
+                <div class="biz-card__detail">
+                    <i class="fa-solid fa-calendar"></i> {{ business.created_at|date:"d M Y" }}
                 </div>
             </div>
-            <div class="driver-card-actions">
-                <a href="{% url 'workforce:business_license_detail' business.business_id %}" class="btn-view-details">
-                    <i class="fa-solid fa-eye"></i>
-                    View Details
-                </a>
+            <div class="biz-card__footer">
+                <span class="biz-card__action">View Details <i class="fa-solid fa-arrow-right"></i></span>
             </div>
-        </div>
+        </a>
         {% endfor %}
+    </div>
     {% else %}
-        <div class="empty-state full-width">
-            <i class="fa-solid fa-certificate"></i>
-            <h3>No Business Licenses Found</h3>
-            <p>{% if search_query %}No licenses match your search criteria.{% else %}There are no business licenses available.{% endif %}</p>
-        </div>
+    <div class="biz-empty">
+        <i class="fa-solid fa-building"></i>
+        <h3>No Businesses Found</h3>
+        <p>{% if search_query %}No businesses match your search.{% else %}No businesses registered yet.{% endif %}</p>
+    </div>
     {% endif %}
 </div>
 
 <!-- Table View -->
-<div id="tableView" class="orders-table-container {% if view_type != 'table' %}d-none{% endif %}">
+<div id="tableView" class="{% if view_type != 'table' %}d-none{% endif %}">
     {% if businesses %}
-    <table class="orders-table">
-        <thead>
-            <tr>
-                <th>Business Name</th>
-                <th>Business Code</th>
-                <th>QID</th>
-                <th>Since</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for business in businesses %}
-            <tr data-search-text="{{ business.business_name|lower }} {{ business.business_code|lower }} {{ business.business_qid|lower }}">
-                <td><strong>{{ business.business_name|default:"Unknown Business" }}</strong></td>
-                <td>{{ business.business_code|default:"N/A" }}</td>
-                <td>{{ business.business_qid|default:"N/A" }}</td>
-                <td>{{ business.business_since|date:"d M Y"|default:"N/A" }}</td>
-                <td>
-                    <span class="status-badge {% if business.business_status == 'active' %}status-active{% elif business.business_status == 'pending' %}status-pending{% elif business.business_status == 'suspended' %}status-failed{% else %}status-inactive{% endif %}">
-                        {{ business.business_status|title }}
-                    </span>
-                </td>
-                <td>{{ business.created_at|date:"d M Y" }}</td>
-                <td>
-                    <a href="{% url 'workforce:business_license_detail' business.business_id %}" class="btn-view-small">
-                        <i class="fa-solid fa-eye"></i>
-                        View
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="biz-panel">
+        <div class="biz-panel__body" style="padding: 0;">
+            <table class="biz-table">
+                <thead>
+                    <tr>
+                        <th>Business</th>
+                        <th>Code</th>
+                        <th>QID</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Registered</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for business in businesses %}
+                    <tr data-search-text="{{ business.business_name|lower }} {{ business.business_code|lower }} {{ business.business_qid|lower }}">
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="biz-card__avatar" style="width: 36px; height: 36px; font-size: 0.875rem;">
+                                    {{ business.business_name|default:"?"|truncatechars:1 }}
+                                </div>
+                                <strong>{{ business.business_name|default:"Unknown" }}</strong>
+                            </div>
+                        </td>
+                        <td><span class="biz-field__value--mono">{{ business.business_code|default:"N/A" }}</span></td>
+                        <td>{{ business.business_qid|default:"—" }}</td>
+                        <td>{{ business.business_product_category|default:"—"|title }}</td>
+                        <td>
+                            <span class="biz-hero__badge biz-hero__badge--{{ business.business_status }}" style="font-size: 0.6875rem;">
+                                <i class="fa-solid fa-circle"></i> {{ business.business_status|title }}
+                            </span>
+                        </td>
+                        <td style="color: var(--brand-grey-500); font-size: 0.8125rem;">{{ business.created_at|date:"d M Y" }}</td>
+                        <td>
+                            <a href="{% url 'workforce:business_license_detail' business.business_id %}" class="biz-btn biz-btn--ghost" style="padding: 0.375rem 0.75rem; font-size: 0.8125rem;">
+                                <i class="fa-solid fa-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
     {% else %}
-    <div class="empty-state">
-        <i class="fa-solid fa-certificate"></i>
-        <h3>No Business Licenses Found</h3>
-        <p>{% if search_query %}No licenses match your search criteria.{% else %}There are no business licenses available.{% endif %}</p>
+    <div class="biz-empty">
+        <i class="fa-solid fa-building"></i>
+        <h3>No Businesses Found</h3>
+        <p>{% if search_query %}No businesses match your search.{% else %}No businesses registered yet.{% endif %}</p>
     </div>
     {% endif %}
 </div>
@@ -147,34 +158,25 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    let searchTimeout;
-
-    // Search functionality
-    const searchInput = document.getElementById('searchInput');
+    var searchTimeout;
+    var searchInput = document.getElementById('searchInput');
     if (searchInput) {
         searchInput.addEventListener('input', function() {
             clearTimeout(searchTimeout);
-            const searchTerm = this.value;
-
+            var val = this.value;
             searchTimeout = setTimeout(function() {
-                const url = new URL(window.location);
-                if (searchTerm) {
-                    url.searchParams.set('search', searchTerm);
-                } else {
-                    url.searchParams.delete('search');
-                }
+                var url = new URL(window.location);
+                if (val) { url.searchParams.set('search', val); }
+                else { url.searchParams.delete('search'); }
                 url.searchParams.set('page', '1');
                 window.location.href = url.toString();
             }, 500);
         });
     }
-
-    // View toggle functionality via event delegation
-    document.querySelectorAll('.view-toggle-btn[data-view]').forEach(function(btn) {
+    document.querySelectorAll('.biz-view-toggle[data-view]').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            const viewType = this.dataset.view;
-            const url = new URL(window.location);
-            url.searchParams.set('view', viewType);
+            var url = new URL(window.location);
+            url.searchParams.set('view', this.dataset.view);
             url.searchParams.set('page', '1');
             window.location.href = url.toString();
         });

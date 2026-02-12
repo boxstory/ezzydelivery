@@ -49,6 +49,7 @@ Related:
     - delivery.models: DeliveryTask (created from verified orders)
 """
 
+import hmac
 import json
 import logging
 from django.shortcuts import get_object_or_404, redirect, render
@@ -182,6 +183,7 @@ def orders_all_list(request):
     ).prefetch_related(
         'order_items',
         'order_items__product',
+        'order_items__product__product_category',
         'delivery_task',
         'delivery_task__driver',
         'delivery_task__business',
@@ -197,7 +199,7 @@ def orders_all_list(request):
     if zone:
         items = items.filter(dl_zone=zone)
     if c_status == 'pending':
-        items = items.exclude(order_status__in=['delivered', 'fulfilled', 'cancelled'])
+        items = items.exclude(order_status__in=['delivered', 'cancelled'])
     elif c_status:
         items = items.filter(order_status=c_status)
     if date_from:
@@ -306,12 +308,11 @@ def orders_pending_list(request):
     business = request.current_business
     logger.info(f"User {request.user.id} accessing pending orders for business {business.business_id}")
 
-    # Pending = has delivery task but not yet delivered/failed/cancelled
-    orders = orders_models.Order.objects.filter(
-        delivery_task__isnull=False,
+    # Pending = all orders except published, delivered, cancelled
+    items = orders_models.Order.objects.filter(
         business=business.business_id
     ).exclude(
-        delivery_task__dl_task_status__in=['delivered', 'failed', 'rejected', 'cancelled']
+        order_status__in=['publish', 'delivered', 'cancelled']
     ).select_related(
         'business',
         'pickup_location',
@@ -319,16 +320,39 @@ def orders_pending_list(request):
         'verified_by',
     ).prefetch_related(
         'order_items',
+        'order_items__product',
+        'order_items__product__product_category',
         'delivery_task',
         'delivery_task__driver',
         'delivery_task__business',
-    ).order_by('-id')
+    )
+
+    # Sort handling
+    VALID_SORT_FIELDS = {
+        'id': 'id',
+        'order_number': 'order_number',
+        'order_date': 'order_date',
+        'customer_name': 'customer_name',
+        'customer_phone': 'customer_phone',
+        'dl_zone': 'dl_zone',
+        'cod_amount': 'cod_amount',
+    }
+    sort_by = request.GET.get('sort', '')
+    sort_dir = request.GET.get('dir', 'desc')
+    if sort_by in VALID_SORT_FIELDS:
+        order_field = VALID_SORT_FIELDS[sort_by]
+        if sort_dir == 'asc':
+            items = items.order_by(order_field)
+        else:
+            items = items.order_by(f'-{order_field}')
+    else:
+        sort_by = ''
+        items = items.order_by('-id')
 
     logger.debug(f"Fetching pending orders for business {business.business_id}")
 
     default_page = 1
     page = request.GET.get('page', default_page)
-    # Read per_page from request, with validation (valid: 10, 25, 50, 100)
     per_page = request.GET.get('per_page', '10')
     try:
         per_page = int(per_page)
@@ -336,7 +360,7 @@ def orders_pending_list(request):
             per_page = 10
     except (ValueError, TypeError):
         per_page = 10
-    paginator = Paginator(orders, per_page)
+    paginator = Paginator(items, per_page)
 
     try:
         orders = paginator.page(page)
@@ -351,7 +375,13 @@ def orders_pending_list(request):
     context = {
         'orders': orders,
         'business': business,
-        'per_page': str(per_page),  # String for template comparison
+        'len': paginator.count,
+        'per_page': str(per_page),
+        'can_create_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_CREATE),
+        'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
+        'can_delete_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_DELETE),
+        'sort_by': sort_by,
+        'sort_dir': sort_dir,
     }
     return render(request, 'orders/order_pending_list.html', context)
 
@@ -372,6 +402,8 @@ def orders_successfull_list(request):
         'verified_by',
     ).prefetch_related(
         'order_items',
+        'order_items__product',
+        'order_items__product__product_category',
         'delivery_task',
         'delivery_task__driver',
         'delivery_task__business',
@@ -426,6 +458,8 @@ def orders_unsuccessfull_list(request):
         'verified_by',
     ).prefetch_related(
         'order_items',
+        'order_items__product',
+        'order_items__product__product_category',
         'delivery_task',
         'delivery_task__driver',
         'delivery_task__business',
@@ -964,20 +998,22 @@ def product_search_api(request):
     try:
         search_term = request.GET.get('q', '').strip()
 
-        # Require minimum 3 characters
-        if len(search_term) < 3:
-            return JsonResponse({'results': [], 'pagination': {'more': False}})
-
         from product import models as product_models
 
-        # Search products by name, SKU, or brand
-        products = list(product_models.Product.objects.filter(
+        # Base queryset filtered by business
+        products_qs = product_models.Product.objects.filter(
             business=business
-        ).filter(
-            Q(item_name__icontains=search_term) |
-            Q(brand_name__icontains=search_term) |
-            Q(item_sku__icontains=search_term)
-        ).select_related('unit')[:20])  # Limit to 20 results
+        ).select_related('unit')
+
+        # Apply search filter if term provided
+        if search_term:
+            products_qs = products_qs.filter(
+                Q(item_name__icontains=search_term) |
+                Q(brand_name__icontains=search_term) |
+                Q(item_sku__icontains=search_term)
+            )
+
+        products = list(products_qs[:30])  # Limit to 30 results
 
         # Fetch all inventory at once to avoid N+1 queries
         inventory_map = {}
@@ -1152,6 +1188,12 @@ def order_update(request, order_id):
         # Check if user is staff (to show/hide task_created field)
         is_staff = hasattr(request.user, 'profile') and request.user.profile.is_staff
 
+        # Block editing published, delivered, or cancelled orders
+        if order.order_status in ('publish', 'delivered', 'cancelled'):
+            logger.warning(f"Cannot update order {order_id} - status is {order.order_status}")
+            messages.error(request, f'Cannot edit a {order.get_order_status_display()} order.')
+            return redirect('orders:orders_all_list')
+
         if request.method == 'POST':
             form = orders_forms.UpdateOrderForm(request.POST, instance=order, is_staff=is_staff)
 
@@ -1170,10 +1212,16 @@ def order_update(request, order_id):
         else:
             form = orders_forms.UpdateOrderForm(instance=order, is_staff=is_staff)
 
+        # Fetch existing order items for the products section
+        order_items = order.order_items.select_related('product').all()
+        items_total = sum(item.total_price or 0 for item in order_items)
+
         context = {
             'form': form,
             'order': order,
-            'order_id': order_id
+            'order_id': order_id,
+            'order_items': order_items,
+            'items_total': items_total,
         }
         return render(request, 'orders/order_update.html', context)
 
@@ -1196,6 +1244,12 @@ def delete_order(request, order_id):
         order = orders_models.Order.objects.get(id=order_id, business=business)
 
         logger.info(f"User {request.user.id} deleting order {order_id}")
+
+        # Block deleting published, delivered, or cancelled orders
+        if order.order_status in ('publish', 'delivered', 'cancelled'):
+            logger.warning(f"Cannot delete order {order_id} - status is {order.order_status}")
+            messages.error(request, f'Cannot delete a {order.get_order_status_display()} order.')
+            return redirect('orders:orders_all_list')
 
         # Clean up related records that use on_delete=DO_NOTHING
         # These FK constraints would block order deletion in PostgreSQL
@@ -1262,6 +1316,21 @@ def update_order_product(request, order_id):
     order_items = orders_models.OrderItem.objects.filter(order=order)
 
     if request.method == 'POST':
+            # Handle JSON delete request
+            if request.content_type == 'application/json':
+                data = json.loads(request.body)
+                action = data.get('action')
+                if action == 'delete':
+                    item_id = data.get('item_id')
+                    try:
+                        item = orders_models.OrderItem.objects.get(pk=item_id, order=order)
+                        item.delete()
+                        logger.info(f'Deleted order item {item_id} from order {order_id}')
+                        return JsonResponse({'success': True})
+                    except orders_models.OrderItem.DoesNotExist:
+                        return JsonResponse({'success': False, 'error': 'Item not found'}, status=404)
+                return JsonResponse({'success': False, 'error': 'Invalid action'}, status=400)
+
             logger.debug(f'POST form received in update_order_product for order {order_id}')
             form = orders_forms.AddOrderProductsForm(request.POST)
 
@@ -1351,6 +1420,17 @@ def update_order_status(request, order_id=None):
             if not user_business or user_business.business_id != order.business_id:
                 return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
 
+        # Published orders: only staff can revert to to_review
+        if order.order_status == 'publish':
+            if not request.user.is_staff:
+                return JsonResponse({'success': False, 'error': 'Published orders cannot be changed. Contact staff.'}, status=403)
+            if status != 'to_review':
+                return JsonResponse({'success': False, 'error': 'Published orders can only be reverted to Hold for Review.'}, status=400)
+
+        # Delivered/cancelled orders cannot be changed by business users
+        if order.order_status in ('delivered', 'cancelled') and not request.user.is_staff:
+            return JsonResponse({'success': False, 'error': 'This order status cannot be changed.'}, status=403)
+
         old_status = order.order_status
         order.order_status = status
         order.save()
@@ -1379,6 +1459,56 @@ def update_order_status(request, order_id=None):
         return JsonResponse({'success': False, 'error': 'Order not found'}, status=404)
     except Exception as e:
         logger.error(f'Error updating order status: {e}')
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@require_POST
+@login_required(login_url='/accounts/login/')
+def bulk_update_order_status(request):
+    """Bulk update order statuses - JSON POST with order_ids and status."""
+    try:
+        data = json.loads(request.body)
+        order_ids = data.get('order_ids', [])
+        status = data.get('status')
+
+        if not order_ids or not status:
+            return JsonResponse({'success': False, 'error': 'Missing order_ids or status'}, status=400)
+
+        ALLOWED_STATUSES = ['publish', 'ready_to_pickup', 'cancelled']
+        if status not in ALLOWED_STATUSES:
+            return JsonResponse({'success': False, 'error': 'Invalid status'}, status=400)
+
+        # Check business ownership
+        user_business = get_cached_business(request)
+        if not user_business and not request.user.is_staff:
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+        orders_qs = orders_models.Order.objects.filter(pk__in=order_ids)
+        if not request.user.is_staff:
+            orders_qs = orders_qs.filter(business=user_business)
+            # Business users cannot change published, delivered, or cancelled orders
+            orders_qs = orders_qs.exclude(order_status__in=['publish', 'delivered', 'cancelled'])
+
+        updated = orders_qs.update(order_status=status)
+
+        # Cancel active delivery tasks when bulk-cancelling
+        if status == 'cancelled':
+            from delivery import models as delivery_models
+            delivery_models.DeliveryTask.objects.filter(
+                order__in=order_ids,
+                order__business=user_business
+            ).exclude(
+                dl_task_status__in=['delivered', 'cancelled', 'failed']
+            ).update(
+                dl_task_status='cancelled',
+                dl_task_status_dms='9'
+            )
+
+        logger.info(f'Bulk status update: {updated} orders set to {status} by user {request.user.id}')
+        return JsonResponse({'success': True, 'updated': updated})
+
+    except Exception as e:
+        logger.error(f'Error in bulk status update: {e}')
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
@@ -1791,6 +1921,233 @@ def verify_location(request, token):
         return render(request, 'orders/verification_error.html', {
             'error': 'Invalid or expired verification link'
         })
+
+
+# =============================================================================
+# CUSTOMER SELF-SERVICE LOCATION UPDATE (Public)
+# =============================================================================
+
+def update_location(request):
+    """
+    Public view for customers to look up their order and update delivery location.
+    Step 1: Lookup by order_number + phone last 4 digits
+    Step 2: Show order details + map form for location update
+    Step 3: Success confirmation
+    """
+    from orders.models import AddressVerification
+    from delivery.models import DlAddressUpdate
+    from django.utils import timezone
+    from django.core.cache import cache
+
+    TERMINAL_STATUSES = ('delivered', 'cancelled')
+
+    # Rate limiting: 10 lookups per IP per hour
+    ip = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', ''))
+    if ',' in ip:
+        ip = ip.split(',')[0].strip()
+    rate_key = f'update_location_rate:{ip}'
+    attempts = cache.get(rate_key, 0)
+
+    from core.templatetags.custom_filters import generate_order_verify_key, verify_order_key
+
+    # Pre-fill order number from query param (e.g. ?order=EZ-123&key=abc123)
+    prefill_order = request.GET.get('order', '').strip()
+    prefill_key = request.GET.get('key', '').strip()
+    lookup_form = forms.OrderLookupForm(initial={'order_number': prefill_order} if prefill_order else None)
+    update_form = None
+    order = None
+    step = 'lookup'
+    error = None
+    success = False
+
+    # Auto-verify if both order and key are in URL (clicked from WhatsApp)
+    if request.method == 'GET' and prefill_order and prefill_key:
+        if attempts >= 10:
+            error = 'Too many attempts. Please try again later.'
+        else:
+            cache.set(rate_key, attempts + 1, 3600)
+            try:
+                order = orders_models.Order.objects.select_related('business').get(
+                    order_number__iexact=prefill_order
+                )
+                if not verify_order_key(order.order_number, order.customer_phone, prefill_key):
+                    order = None
+                    error = 'This link has expired. Please request a new link or enter your details manually.'
+                elif order.order_status in TERMINAL_STATUSES:
+                    error = 'This order has already been completed and cannot be updated.'
+                    order = None
+                else:
+                    step = 'update'
+                    update_form = forms.CustomerLocationUpdateForm(initial={
+                        'order_number': order.order_number,
+                        'phone_last4': 'link',
+                        'zone_number': order.dl_zone,
+                        'street_number': order.dl_street,
+                        'building_number': order.dl_building,
+                        'verified_address': order.customer_address,
+                    })
+            except orders_models.Order.DoesNotExist:
+                error = 'Order not found. Please check your WhatsApp message for the correct link.'
+
+    if request.method == 'POST':
+        post_step = request.POST.get('step', 'lookup')
+
+        if post_step == 'lookup':
+            # Rate limit check
+            if attempts >= 10:
+                error = 'Too many attempts. Please try again later.'
+            else:
+                lookup_form = forms.OrderLookupForm(request.POST)
+                if lookup_form.is_valid():
+                    order_number = lookup_form.cleaned_data['order_number'].strip()
+                    phone_last4 = lookup_form.cleaned_data['phone_last4']
+
+                    cache.set(rate_key, attempts + 1, 3600)
+
+                    try:
+                        order = orders_models.Order.objects.select_related('business').get(
+                            order_number__iexact=order_number
+                        )
+                        # Verify phone last 4 digits match
+                        customer_phone = order.customer_phone.replace(' ', '').replace('-', '').replace('+', '')
+                        if not customer_phone.endswith(phone_last4):
+                            order = None
+                            error = 'Order not found. Please check your order number and phone digits.'
+                        elif order.order_status in TERMINAL_STATUSES:
+                            error = 'This order has already been completed and cannot be updated.'
+                            step = 'lookup'
+                            order = None
+                        else:
+                            step = 'update'
+                            update_form = forms.CustomerLocationUpdateForm(initial={
+                                'order_number': order.order_number,
+                                'phone_last4': phone_last4,
+                                'zone_number': order.dl_zone,
+                                'street_number': order.dl_street,
+                                'building_number': order.dl_building,
+                                'verified_address': order.customer_address,
+                            })
+                    except orders_models.Order.DoesNotExist:
+                        error = 'Order not found. Please check your order number and phone digits.'
+
+        elif post_step == 'update':
+            update_form = forms.CustomerLocationUpdateForm(request.POST)
+            if update_form.is_valid():
+                order_number = update_form.cleaned_data['order_number']
+                phone_last4 = update_form.cleaned_data['phone_last4']
+
+                # Re-validate: accept either valid key or phone last4
+                try:
+                    order = orders_models.Order.objects.select_related('business').get(
+                        order_number__iexact=order_number
+                    )
+                    customer_phone = order.customer_phone.replace(' ', '').replace('-', '').replace('+', '')
+                    post_key = request.POST.get('verify_key', '')
+                    key_valid = (phone_last4 == 'link' and verify_order_key(order.order_number, order.customer_phone, post_key))
+                    phone_valid = (phone_last4 != 'link' and customer_phone.endswith(phone_last4))
+                    if not key_valid and not phone_valid:
+                        error = 'Verification failed. Please try again.'
+                        step = 'lookup'
+                        lookup_form = forms.OrderLookupForm()
+                        order = None
+                    elif order.order_status in TERMINAL_STATUSES:
+                        error = 'This order has already been completed and cannot be updated.'
+                        step = 'lookup'
+                        order = None
+                    else:
+                        # Apply updates
+                        latitude = update_form.cleaned_data.get('latitude')
+                        longitude = update_form.cleaned_data.get('longitude')
+                        verified_address = update_form.cleaned_data.get('verified_address')
+                        zone_number = update_form.cleaned_data.get('zone_number')
+                        street_number = update_form.cleaned_data.get('street_number')
+                        building_number = update_form.cleaned_data.get('building_number')
+                        notes = update_form.cleaned_data.get('notes')
+
+                        # Update Order
+                        if zone_number is not None:
+                            order.dl_zone = zone_number
+                        if street_number is not None:
+                            order.dl_street = street_number
+                        if building_number is not None:
+                            order.dl_building = building_number
+                        if verified_address:
+                            order.customer_address = verified_address[:100]
+                        order.verification_status = 'address_verified'
+                        order.address_verified = True
+                        order.address_verified_at = timezone.now()
+                        if notes:
+                            order.verification_notes = notes
+                        order.save()
+
+                        # Update or create AddressVerification
+                        addr_verify, _ = AddressVerification.objects.get_or_create(
+                            order=order,
+                            defaults={'original_address': order.customer_address or ''}
+                        )
+                        if latitude:
+                            addr_verify.latitude = latitude
+                        if longitude:
+                            addr_verify.longitude = longitude
+                        if zone_number is not None:
+                            addr_verify.zone_number = zone_number
+                        if street_number is not None:
+                            addr_verify.street_number = street_number
+                        if building_number is not None:
+                            addr_verify.building_number = building_number
+                        if verified_address:
+                            addr_verify.verified_address = verified_address
+                        if notes:
+                            addr_verify.notes = notes
+                        addr_verify.verification_result = 'address_verified'
+                        addr_verify.customer_verified_at = timezone.now()
+                        addr_verify.save()
+
+                        # Update DlAddressUpdate if exists
+                        dl_update_fields = {}
+                        if zone_number is not None:
+                            dl_update_fields['dl_zone'] = zone_number
+                        if street_number is not None:
+                            dl_update_fields['dl_street'] = street_number
+                        if building_number is not None:
+                            dl_update_fields['dl_building'] = building_number
+                        if latitude:
+                            dl_update_fields['dl_latitude'] = latitude
+                        if longitude:
+                            dl_update_fields['dl_longitude'] = longitude
+                        if dl_update_fields:
+                            DlAddressUpdate.objects.filter(order=order).update(**dl_update_fields)
+
+                        step = 'success'
+                        success = True
+
+                except orders_models.Order.DoesNotExist:
+                    error = 'Verification failed. Please try again.'
+                    step = 'lookup'
+                    lookup_form = forms.OrderLookupForm()
+            else:
+                # Form invalid - re-show update form; need to re-fetch order
+                order_number = request.POST.get('order_number', '')
+                phone_last4 = request.POST.get('phone_last4', '')
+                try:
+                    order = orders_models.Order.objects.select_related('business').get(
+                        order_number__iexact=order_number
+                    )
+                    step = 'update'
+                except orders_models.Order.DoesNotExist:
+                    step = 'lookup'
+                    error = 'Order not found. Please try again.'
+
+    context = {
+        'lookup_form': lookup_form,
+        'update_form': update_form,
+        'order': order,
+        'step': step,
+        'error': error,
+        'success': success,
+        'google_maps_api_key': config('GOOGLE_MAPS_API_KEY', default=''),
+    }
+    return render(request, 'orders/update_location.html', context)
 
 
 # =============================================================================

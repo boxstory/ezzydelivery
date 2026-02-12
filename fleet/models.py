@@ -199,13 +199,13 @@ class Driver(models.Model):
 
     @property
     def is_wallet_blocked(self):
-        """Check if wallet balance is exhausted (at or below zero)"""
-        return self.wallet_balance <= 0
+        """Check if COD in hand has reached or exceeded credit limit"""
+        return self.cod_in_hand >= self.credit_limit
 
     @property
     def available_credit(self):
-        """Calculate available credit for new COD orders"""
-        return self.credit_limit + self.wallet_balance  # wallet_balance is negative when in use
+        """Calculate available credit for new COD orders (credit_limit minus COD currently held)"""
+        return self.credit_limit - self.cod_in_hand
 
     class Meta:
         verbose_name_plural = "Drivers"

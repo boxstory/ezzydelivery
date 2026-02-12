@@ -8,6 +8,7 @@ Required context:
 Each task should have select_related: order, driver, business, pickup_location, order__business
 {% endcomment %}
 
+{% load custom_filters %}
 <div class="dl-table-wrapper" id="tasksTableContainer">
     <!-- Bulk Actions Bar -->
     <div class="dl-bulk-bar" id="bulkActionsBar" style="display: none;">
@@ -200,7 +201,7 @@ Each task should have select_related: order, driver, business, pickup_location, 
                             <a href="/workforce/delivery-task/{{ dl.id }}/" class="dl-table__action-btn dl-table__action-btn--view" title="View">
                                 <i class="fa-solid fa-eye"></i>
                             </a>
-                            <a href="https://wa.me/{{ dl.order.customer_phone }}" target="_blank" class="dl-table__action-btn dl-table__action-btn--whatsapp" title="WhatsApp">
+                            <a href="https://wa.me/{{ dl.order.customer_phone|whatsapp_number }}?text=Hi%20{{ dl.order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ dl.order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ dl.order.order_number|urlencode }}%26key={{ dl.order|verify_key }}" target="_blank" class="dl-table__action-btn dl-table__action-btn--whatsapp" title="WhatsApp">
                                 <i class="fa-brands fa-whatsapp"></i>
                             </a>
                             <button class="dl-table__action-btn dl-table__action-btn--publish" onclick="publishToDMS({{ dl.id }})" title="Publish DMS" {% if dl.dl_task_publish %}disabled{% endif %}>

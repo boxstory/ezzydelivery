@@ -1,5 +1,7 @@
 # core/templatetags/custom_filters.py
 from django import template
+import hmac
+import hashlib
 import os
 import re
 import logging
@@ -63,6 +65,23 @@ def safe_brand_logo_url(image_field):
     return safe_image_url(image_field, default='/media/business/product_images/brand_logo_default.jpg')
 
 
+@register.filter
+def whatsapp_number(value):
+    """
+    Clean phone number for wa.me links.
+    Strips +, spaces, dashes. Prepends 974 for local Qatar numbers (8 digits).
+    Usage: {{ order.customer_whatsapp|whatsapp_number }}
+    """
+    if not value:
+        return ''
+    # Remove +, spaces, dashes, parentheses
+    cleaned = re.sub(r'[\s+\-()]+', '', str(value))
+    # If 8 digits (Qatar local number), prepend 974
+    if len(cleaned) == 8 and cleaned.isdigit():
+        cleaned = '974' + cleaned
+    return cleaned
+
+
 @register.filter(is_safe=True)
 def get_zone_from_address(address):
     """
@@ -91,6 +110,44 @@ def get_zone_from_address(address):
     except Exception as e:
         logger.debug(f"Could not extract zone from address: {e}")
         return str(address)[:30]
+
+
+def _get_time_slot():
+    """Get current 4-hour time slot as integer (changes every 4 hours)."""
+    import time
+    return int(time.time()) // (4 * 3600)
+
+
+def generate_order_verify_key(order_number, customer_phone, time_slot=None):
+    """Generate a short HMAC key for order verification links. Valid for 4 hours."""
+    from django.conf import settings
+    if time_slot is None:
+        time_slot = _get_time_slot()
+    phone_clean = re.sub(r'[\s+\-()]+', '', str(customer_phone))
+    msg = f"{order_number}:{phone_clean}:{time_slot}".encode()
+    key = settings.SECRET_KEY.encode()
+    return hmac.new(key, msg, hashlib.sha256).hexdigest()[:12]
+
+
+def verify_order_key(order_number, customer_phone, provided_key):
+    """Verify a key, checking current and previous 4-hour window."""
+    current_slot = _get_time_slot()
+    for slot in (current_slot, current_slot - 1):
+        expected = generate_order_verify_key(order_number, customer_phone, time_slot=slot)
+        if hmac.compare_digest(provided_key, expected):
+            return True
+    return False
+
+
+@register.filter
+def verify_key(order):
+    """
+    Generate a short verification key for order WhatsApp links.
+    Usage: {{ order|verify_key }}
+    """
+    if not order or not hasattr(order, 'order_number') or not hasattr(order, 'customer_phone'):
+        return ''
+    return generate_order_verify_key(order.order_number, order.customer_phone)
 
 
 @register.simple_tag

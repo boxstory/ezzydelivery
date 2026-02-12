@@ -364,8 +364,13 @@ def send_location_verification_whatsapp(order, verification_token, phone_number)
     base_url = getattr(django_settings, 'BASE_URL', 'https://your-domain.com')
     verification_url = f"{base_url}{verification_path}"
 
-    message = f"""
-📍 *EZZY Delivery - Address Verification Required*
+    # Build self-service update URL (order-specific with secure key, valid 4hrs)
+    from urllib.parse import quote
+    from core.templatetags.custom_filters import generate_order_verify_key
+    verify_key = generate_order_verify_key(order.order_number, order.customer_phone)
+    update_location_url = f"{base_url}/orders/verify/?order={quote(order.order_number)}&key={verify_key}"
+
+    message = f"""📍 *EZZY Delivery - Address Verification Required*
 
 Hello {order.customer_name},
 
@@ -374,7 +379,7 @@ Your order *{order.order_number}* is ready for delivery!
 *Delivery Details:*
 📦 Items: {order.order_items.count()} item(s)
 💰 COD: {order.cod_amount} QR
-📍 Address: {order.dropoff_address}
+📍 Address: {order.customer_address}
 
 *🔴 ACTION REQUIRED:*
 Please verify your delivery location by clicking the link below:
@@ -388,10 +393,12 @@ This will open a map where you can:
 
 ⏰ This link will expire in 7 days.
 
+📌 You can also update your location anytime at:
+{update_location_url}
+
 If you have any questions, please contact us.
 
-Thank you for choosing EZZY Delivery! 🚚
-    """
+Thank you for choosing EZZY Delivery! 🚚"""
 
     payload = {
         'phone': phone_number,

@@ -405,14 +405,9 @@ class WalletService:
         if driver.is_wallet_blocked:
             return False, "Wallet balance exhausted. Please submit COD to admin."
 
-        available_credit = driver.available_credit
+        available_credit = driver.available_credit  # credit_limit - cod_in_hand
         if cod_amount > available_credit:
             return False, f"Insufficient credit. Available: {available_credit} QR, Required: {cod_amount} QR"
-
-        # Check if accepting would exceed limit
-        new_balance = driver.wallet_balance - cod_amount
-        if new_balance < 0 and abs(new_balance) > driver.credit_limit:
-            return False, f"This order would exceed your credit limit of {driver.credit_limit} QR"
 
         return True, "OK"
 

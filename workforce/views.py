@@ -4407,27 +4407,55 @@ def business_license_detail(request, business_id):
         business_profile = None
 
     if request.method == 'POST':
-        # Handle business license update
+        section = request.POST.get('section', 'all')
         try:
-            business.business_name = request.POST.get('business_name', business.business_name)
-            business.business_qid = request.POST.get('business_qid', business.business_qid)
-            business.business_status = request.POST.get('business_status', business.business_status)
+            if section == 'license':
+                business.business_name = request.POST.get('business_name', business.business_name)
+                business.business_qid = request.POST.get('business_qid', business.business_qid)
+                business.business_product_category = request.POST.get('business_product_category', business.business_product_category)
+                business_since = request.POST.get('business_since')
+                if business_since:
+                    business.business_since = business_since
+                business.save()
 
-            business_since = request.POST.get('business_since')
-            if business_since:
-                business.business_since = business_since
+            elif section == 'contact':
+                business.business_phone = request.POST.get('business_phone', business.business_phone)
+                business.business_email = request.POST.get('business_email', business.business_email)
+                business.business_whatsapp = request.POST.get('business_whatsapp', business.business_whatsapp)
+                business.business_facebook_page = request.POST.get('business_facebook_page', business.business_facebook_page)
+                business.business_instagram = request.POST.get('business_instagram', business.business_instagram)
+                business.save()
 
-            business.save()
+            elif section == 'address':
+                if business_profile:
+                    business_profile.business_address = request.POST.get('business_address', business_profile.business_address)
+                    business_profile.business_city = request.POST.get('business_city', business_profile.business_city)
+                    business_profile.business_country = request.POST.get('business_country', business_profile.business_country)
+                    business_profile.save()
 
-            # Update business profile if exists
-            if business_profile:
-                business_profile.business_address = request.POST.get('business_address', business_profile.business_address)
-                business_profile.business_city = request.POST.get('business_city', business_profile.business_city)
-                business_profile.save()
+            elif section == 'status':
+                business.business_status = request.POST.get('business_status', business.business_status)
+                business.fulfillment_service_status = request.POST.get('fulfillment_service_status', business.fulfillment_service_status)
+                business.save()
+
+            else:
+                # Legacy: save all fields
+                business.business_name = request.POST.get('business_name', business.business_name)
+                business.business_qid = request.POST.get('business_qid', business.business_qid)
+                business.business_status = request.POST.get('business_status', business.business_status)
+                business.fulfillment_service_status = request.POST.get('fulfillment_service_status', business.fulfillment_service_status)
+                business_since = request.POST.get('business_since')
+                if business_since:
+                    business.business_since = business_since
+                business.save()
+                if business_profile:
+                    business_profile.business_address = request.POST.get('business_address', business_profile.business_address)
+                    business_profile.business_city = request.POST.get('business_city', business_profile.business_city)
+                    business_profile.save()
 
             return JsonResponse({
                 'success': True,
-                'message': 'Business license updated successfully'
+                'message': f'{section.title()} updated successfully'
             })
         except Exception as e:
             logger.exception("Error updating business license %s: %s", business_id, str(e))
@@ -4436,10 +4464,18 @@ def business_license_detail(request, business_id):
                 'error': 'An error occurred while updating business license'
             }, status=400)
 
+    # Order stats
+    order_stats = orders_models.Order.objects.filter(business=business).aggregate(
+        total=Count('id'),
+        delivered=Count('id', filter=Q(order_status='delivered')),
+        pending=Count('id', filter=Q(order_status__in=['to_review', 'ready_to_pickup', 'publish'])),
+    )
+
     context = {
-        'page_title': 'Business License Detail',
+        'page_title': f'{business.business_name} - Business Detail',
         'business': business,
         'business_profile': business_profile,
+        'order_stats': order_stats,
     }
 
     return render(request, 'workforce/business_license_detail.html', context)
@@ -5148,48 +5184,62 @@ def driver_detail(request, driver_id):
 @staff_required
 def suppliers_list(request):
     """
-    List all businesses with fulfillment service enabled (Suppliers).
-    These are the sellers/clients using EzzyDelivery's fulfillment service.
+    List all businesses (sellers) with fulfillment service status sections.
+    Section 1: Active fulfillment service
+    Section 2: Requested and Non-active
     """
-    suppliers = business_models.Business.objects.filter(
-        fulfillment_service_enabled=True,
-        business_status='active'
-    ).order_by('-fulfillment_activated_at', 'business_name')
+    from django.db.models import Count, Q as DjangoQ
+
+    # Base queryset - all businesses
+    base_qs = business_models.Business.objects.all()
 
     # Search filter
-    search = request.GET.get('search', '')
+    search = request.GET.get('search', '').strip()
     if search:
-        suppliers = suppliers.filter(
+        base_qs = base_qs.filter(
             Q(business_name__icontains=search) |
             Q(business_code__icontains=search) |
             Q(business_email__icontains=search) |
             Q(business_phone__icontains=search)
         )
 
-    # Calculate stats for each supplier
-    from django.db.models import Count, Sum, Q as DjangoQ
-    suppliers = suppliers.annotate(
+    # Annotate with order stats
+    base_qs = base_qs.annotate(
         total_orders=Count('order'),
         fulfilled_orders=Count('order', filter=DjangoQ(order__order_status__in=['delivered', 'fulfilled'])),
         pending_orders=Count('order', filter=DjangoQ(order__order_status__in=['to_review', 'ready_to_pickup', 'publish']))
     )
 
-    # Paginate first to avoid duplicate count query
-    page_obj = paginate_queryset(request, suppliers, items_per_page=20)
+    # Section 1: Active fulfillment sellers
+    active_sellers = list(base_qs.filter(
+        fulfillment_service_status='active'
+    ).order_by('-fulfillment_activated_at', 'business_name'))
 
-    # Summary stats - reuse count from paginator to avoid duplicate query
-    total_suppliers = page_obj.paginator.count
-    total_fulfilled = orders_models.Order.objects.filter(
-        order_status__in=['delivered', 'fulfilled'],
-        business__fulfillment_service_enabled=True
-    ).count()
+    # Section 2: Requested and Non-active sellers
+    requested_sellers = list(base_qs.filter(
+        fulfillment_service_status='requested'
+    ).order_by('business_name'))
+
+    nonactive_sellers = list(base_qs.filter(
+        fulfillment_service_status='none'
+    ).order_by('business_name'))
+
+    # Summary stats
+    active_count = len(active_sellers)
+    requested_count = len(requested_sellers)
+    nonactive_count = len(nonactive_sellers)
+    total_sellers = active_count + requested_count + nonactive_count
 
     context = {
-        'page_title': 'Suppliers (Fulfillment Service)',
-        'page_obj': page_obj,
+        'page_title': 'Businesses - Fulfillment Service',
         'search': search,
-        'total_suppliers': total_suppliers,
-        'total_fulfilled': total_fulfilled,
+        'active_sellers': active_sellers,
+        'requested_sellers': requested_sellers,
+        'nonactive_sellers': nonactive_sellers,
+        'total_sellers': total_sellers,
+        'active_count': active_count,
+        'requested_count': requested_count,
+        'nonactive_count': nonactive_count,
     }
 
     return render(request, 'workforce/suppliers_list.html', context)
@@ -5682,4 +5732,111 @@ def order_edit(request, order_id):
 
     return render(request, 'workforce/order_edit.html', context)
 
+
+# =============================================================================
+# WAREHOUSE-BUSINESS LINK MANAGEMENT
+# =============================================================================
+
+
+@login_required
+@staff_required
+def warehouses_list(request):
+    """
+    List all warehouses with linked businesses and link/unlink controls.
+    """
+    from warehouse.models import Warehouse, SellerWarehouseLink
+
+    search = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', '')
+
+    warehouses = Warehouse.objects.prefetch_related(
+        'seller_links__business'
+    ).order_by('-is_default', 'name')
+
+    if search:
+        warehouses = warehouses.filter(
+            Q(name__icontains=search) | Q(code__icontains=search) |
+            Q(city__icontains=search)
+        )
+    if status_filter == 'active':
+        warehouses = warehouses.filter(is_active=True)
+    elif status_filter == 'inactive':
+        warehouses = warehouses.filter(is_active=False)
+
+    # Get fulfillment-enabled businesses for the link dropdown
+    linkable_businesses = business_models.Business.objects.filter(
+        fulfillment_service_enabled=True,
+        business_status='active',
+    ).order_by('business_name')
+
+    context = {
+        'page_title': 'Warehouse - Business Links',
+        'warehouses': warehouses,
+        'linkable_businesses': linkable_businesses,
+        'search': search,
+        'status_filter': status_filter,
+        'total_warehouses': Warehouse.objects.count(),
+        'active_warehouses': Warehouse.objects.filter(is_active=True).count(),
+        'total_links': SellerWarehouseLink.objects.filter(is_active=True).count(),
+    }
+
+    return render(request, 'workforce/warehouses_list.html', context)
+
+
+@login_required
+@staff_required
+@require_http_methods(["POST"])
+def warehouse_link_business(request):
+    """
+    Link a business to a warehouse. Creates SellerWarehouseLink which
+    triggers signal to auto-create PickupLocation.
+    """
+    from warehouse.models import Warehouse, SellerWarehouseLink
+
+    warehouse_id = request.POST.get('warehouse_id')
+    business_id = request.POST.get('business_id')
+
+    if not warehouse_id or not business_id:
+        return JsonResponse({'success': False, 'error': 'Missing warehouse or business ID'}, status=400)
+
+    warehouse = get_object_or_404(Warehouse, pk=warehouse_id)
+    business = get_object_or_404(business_models.Business, pk=business_id)
+
+    # Check if link already exists
+    if SellerWarehouseLink.objects.filter(business=business, warehouse=warehouse).exists():
+        return JsonResponse({'success': False, 'error': 'This business is already linked to this warehouse'}, status=400)
+
+    SellerWarehouseLink.objects.create(
+        business=business,
+        warehouse=warehouse,
+        is_active=True,
+        linked_by=request.user,
+    )
+
+    messages.success(request, f'{business.business_name} linked to {warehouse.name}')
+    return JsonResponse({'success': True, 'message': f'{business.business_name} linked to {warehouse.name}'})
+
+
+@login_required
+@staff_required
+@require_http_methods(["POST"])
+def warehouse_unlink_business(request):
+    """
+    Unlink a business from a warehouse. Deletes SellerWarehouseLink which
+    triggers signal to deactivate PickupLocation.
+    """
+    from warehouse.models import SellerWarehouseLink
+
+    link_id = request.POST.get('link_id')
+
+    if not link_id:
+        return JsonResponse({'success': False, 'error': 'Missing link ID'}, status=400)
+
+    link = get_object_or_404(SellerWarehouseLink, pk=link_id)
+    biz_name = link.business.business_name
+    wh_name = link.warehouse.name
+    link.delete()
+
+    messages.success(request, f'{biz_name} unlinked from {wh_name}')
+    return JsonResponse({'success': True, 'message': f'{biz_name} unlinked from {wh_name}'})
 

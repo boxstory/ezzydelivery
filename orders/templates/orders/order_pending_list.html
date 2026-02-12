@@ -1,33 +1,417 @@
 {% extends "business_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
+{% load custom_filters %}
+{% load business_pwa_tags %}
 <!-- extra css -->
 {% block extra_css %}
-  <link href="{% static 'orders/css/orders.css' %}"
+  <link href="{% static 'orders/css/orders.css' %}?v=20260212c"
         rel="stylesheet"
         type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-  <!-- orders_list_view.html -->
-  <div class="col-12" id="orders_pending_list_container_main">
-    <div class="d-none d-md-block " id="orders_pending_list_section_desktop">
-      <div class="flex-fill pb-2">
-        <div class="p-3 col-12">
-          <div class="col-md-12 d-flex flex-row justify-content-between pb-md-4"
-               id="orders_pending_list_header">
-            <h2 class="m-0" id="orders_pending_list_title">Orders Pending list</h2>
-            <a class="btn btn-dark pe-3 text-white"
-               href="{% url 'orders:add_order' %}"
-               id="orders_pending_list_btn_add_orders">
-              <i class="fa fa-plus me-3"></i> Add Orders
-            </a>
+  <!-- ==========================================
+       Mobile PWA View (visible < 768px only)
+       ========================================== -->
+  <div class="d-md-none" id="orders_pending_mobile_pwa_view">
+    <div class="pwa-section-header">
+      <h2 class="pwa-section-header__title">Pending Orders</h2>
+      <a href="{% url 'orders:add_order' %}" class="pwa-add-btn">
+        <i class="fas fa-plus"></i> New Order
+      </a>
+    </div>
+
+    {% if orders %}
+    <div class="pwa-results-bar">
+      <span class="pwa-results-bar__count">{{ orders.paginator.count }} order{{ orders.paginator.count|pluralize }}</span>
+      <span class="pwa-results-bar__count">Page {{ orders.number }} of {{ orders.paginator.num_pages }}</span>
+    </div>
+    {% endif %}
+
+    <div class="pwa-order-list" id="orders_pending_mobile_card_list">
+      {% if orders %}
+        {% for order in orders %}
+        {% order_status_class order as st_class %}
+        <div class="pwa-order-card-full pwa-order-card-full--{{ st_class }}" id="orders_pending_mobile_card_{{ order.id }}" data-order-id="{{ order.id }}" data-current-status="{{ order.order_status }}">
+          <a href="{% url 'orders:order_details' order.id %}" class="pwa-order-card-full__inner">
+            <div class="pwa-order-card-full__content">
+              <div class="pwa-order-card-full__header">
+                <span class="pwa-order-card-full__number">#{{ order.order_number }}</span>
+                {% order_status_badge order %}
+              </div>
+              <p class="pwa-order-card-full__customer">{{ order.customer_name }}</p>
+              <div class="pwa-order-card-full__meta">
+                <span class="pwa-order-card-full__meta-item">
+                  <i class="fas fa-phone"></i>
+                  <span>{{ order.customer_phone }}</span>
+                </span>
+                <span class="pwa-order-card-full__meta-item">
+                  <i class="fas fa-map-marker-alt"></i>
+                  <span>{% get_zone_display order %}</span>
+                </span>
+              </div>
+              <div class="pwa-order-card-full__footer">
+                {% if order.cod_amount %}
+                <span class="pwa-order-card-full__cod">
+                  <i class="fas fa-money-bill-wave"></i> QAR {{ order.cod_amount }}
+                </span>
+                {% else %}
+                <span class="pwa-order-card-full__date">{{ order.order_date|date:"d M Y" }}</span>
+                {% endif %}
+                {% if order.cod_amount %}
+                <span class="pwa-order-card-full__date">{{ order.order_date|date:"d M" }}</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="pwa-order-card-full__arrow">
+              <i class="fas fa-chevron-right pwa-order-card-full__chevron"></i>
+            </div>
+          </a>
+          {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+          <div class="pwa-card-actions">
+            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--review" data-status="to_review" title="Hold for Review">
+              <i class="fas fa-clock"></i>
+            </button>
+            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--confirmed" data-status="ready_to_pickup" title="Confirmed">
+              <i class="fas fa-clipboard-check"></i>
+            </button>
+            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--publish" data-status="publish" title="Publish">
+              <i class="fas fa-rocket"></i>
+            </button>
+            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--cancel" data-status="cancelled" title="Cancel">
+              <i class="fas fa-ban"></i>
+            </button>
           </div>
-          {% include "orders/parts/order_list_view.html" %}
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="pwa-empty-state">
+          <div class="pwa-empty-state__icon">
+            <i class="fas fa-clipboard-list"></i>
+          </div>
+          <p class="pwa-empty-state__title">No Pending Orders</p>
+          <p class="pwa-empty-state__subtitle">All orders have been processed</p>
+        </div>
+      {% endif %}
+    </div>
+
+    {% if orders %}
+    <div class="pwa-mobile-pagination">
+      <div class="pwa-mobile-pagination__pages">
+        {% for p in orders.paginator.page_range %}
+          {% if p >= orders.number|add:"-1" and p <= orders.number|add:"1" %}
+            {% if p == orders.number %}
+            <span class="pwa-mobile-pagination__page active">{{ p }}</span>
+            {% else %}
+            <a href="?page={{ p }}&per_page={{ per_page }}" class="pwa-mobile-pagination__page">{{ p }}</a>
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      </div>
+      <span class="pwa-mobile-pagination__sep"></span>
+      <div class="pwa-mobile-pagination__perpage">
+        <a href="?per_page=10" class="pwa-mobile-pagination__size{% if per_page == '10' %} active{% endif %}">10</a>
+        <a href="?per_page=25" class="pwa-mobile-pagination__size{% if per_page == '25' %} active{% endif %}">25</a>
+        <a href="?per_page=50" class="pwa-mobile-pagination__size{% if per_page == '50' %} active{% endif %}">50</a>
+      </div>
+      {% if orders.has_next %}
+      <a href="?page={{ orders.next_page_number }}&per_page={{ per_page }}" class="pwa-mobile-pagination__btn">
+        <i class="fas fa-chevron-right"></i>
+      </a>
+      {% else %}
+      <span class="pwa-mobile-pagination__btn pwa-mobile-pagination__btn--disabled">
+        <i class="fas fa-chevron-right"></i>
+      </span>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ==========================================
+       Desktop View (visible >= 768px only)
+       ========================================== -->
+  <div class="d-none d-md-block" id="orders_pending_desktop_view">
+  <div class="col-12" id="orders_pending_list_container_main">
+    <section class="d-block" id="orders_pending_list_section_main">
+      <div class="col-12 pb-2">
+        <div class="px-2 px-md-3">
+          <div class="col-12 pt-3 pt-md-4 d-flex flex-wrap justify-content-between pb-3 pb-md-4 gap-2" id="orders_pending_list_header">
+            <div class="d-flex align-items-center gap-3">
+              <div class="m-0 fs-5 fw-bolder" id="orders_pending_list_title">Pending Orders ({{ len }})</div>
+            </div>
+            <div class="d-flex flex-wrap gap-2" id="orders_pending_list_nav_actions">
+              <a class="btn btn-dark btn-sm text-white"
+                 href="{% url 'orders:add_order' %}"
+                 id="orders_pending_list_btn_add_orders">
+                <i class="fa fa-add me-1"></i> Add
+              </a>
+            </div>
+          </div>
+
+          <div id="orders_pending_table_view">
+            {% include "orders/parts/order_list_table_view.html" %}
+          </div>
+
+          <!-- Bulk Action Bar -->
+          <div class="bulk-action-bar" id="orders_pending_bulk_action_bar" style="display: none;">
+            <div class="bulk-action-bar__inner">
+              <span class="bulk-action-bar__count" id="orders_pending_bulk_count">0 selected</span>
+              <div class="bulk-action-bar__actions">
+                <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--confirmed" id="orders_pending_bulk_btn_confirmed">
+                  <i class="fa-solid fa-clipboard-check"></i> Confirmed
+                </button>
+                <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--publish" id="orders_pending_bulk_btn_publish">
+                  <i class="fa-solid fa-rocket"></i> Publish
+                </button>
+                <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--cancel" id="orders_pending_bulk_btn_cancel">
+                  <i class="fa-solid fa-ban"></i> Cancel
+                </button>
+              </div>
+              <a href="#" class="bulk-action-bar__deselect" id="orders_pending_bulk_deselect">Deselect All</a>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-    <section class="d-block d-md-none" id="orders_pending_list_section_mobile">
-      {% include "orders/parts/order_list_view_mob.html" %}
     </section>
   </div>
+  </div>
 {% endblock content %}
+{% block extra_js %}
+  <script>
+  // Sort functionality for table headers
+  document.addEventListener('click', function(e) {
+    var header = e.target.closest('.sortable-header');
+    if (!header) return;
+    var sortField = header.getAttribute('data-sort');
+    var currentSort = '{{ sort_by }}';
+    var currentDir = '{{ sort_dir }}';
+    var newDir = (sortField === currentSort && currentDir === 'desc') ? 'asc' : 'desc';
+    window.location.href = '?sort=' + sortField + '&dir=' + newDir + '&per_page={{ per_page }}';
+  });
+
+  // ===== Bulk Actions =====
+  (function() {
+    var bar = document.getElementById('orders_pending_bulk_action_bar');
+    var countEl = document.getElementById('orders_pending_bulk_count');
+    var selectAll = document.getElementById('orders_bulk_select_all');
+    if (!bar || !selectAll) return;
+
+    function getChecked() {
+      return document.querySelectorAll('.orders-bulk-checkbox:checked');
+    }
+
+    function updateBar() {
+      var checked = getChecked();
+      if (checked.length > 0) {
+        bar.style.display = 'flex';
+        countEl.textContent = checked.length + ' selected';
+      } else {
+        bar.style.display = 'none';
+      }
+      var total = document.querySelectorAll('.orders-bulk-checkbox');
+      selectAll.checked = total.length > 0 && checked.length === total.length;
+      selectAll.indeterminate = checked.length > 0 && checked.length < total.length;
+    }
+
+    selectAll.addEventListener('change', function() {
+      var boxes = document.querySelectorAll('.orders-bulk-checkbox');
+      boxes.forEach(function(cb) { cb.checked = selectAll.checked; });
+      updateBar();
+    });
+
+    document.addEventListener('change', function(e) {
+      if (e.target.classList.contains('orders-bulk-checkbox')) updateBar();
+    });
+
+    document.getElementById('orders_pending_bulk_deselect').addEventListener('click', function(e) {
+      e.preventDefault();
+      document.querySelectorAll('.orders-bulk-checkbox').forEach(function(cb) { cb.checked = false; });
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+      updateBar();
+    });
+
+    function bulkUpdate(status) {
+      var checked = getChecked();
+      if (checked.length === 0) return;
+      var ids = [];
+      checked.forEach(function(cb) { ids.push(parseInt(cb.value)); });
+
+      if (status === 'cancelled' && !confirm('Cancel ' + ids.length + ' order(s)? This cannot be undone.')) return;
+
+      bar.querySelectorAll('.bulk-action-bar__btn').forEach(function(b) { b.disabled = true; });
+      countEl.textContent = 'Updating ' + ids.length + ' orders...';
+
+      fetch('{% url "orders:bulk_update_order_status" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ order_ids: ids, status: status })
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data.success) {
+          countEl.textContent = data.updated + ' order(s) updated!';
+          setTimeout(function() { window.location.reload(); }, 800);
+        } else {
+          alert('Error: ' + (data.error || 'Unknown error'));
+          bar.querySelectorAll('.bulk-action-bar__btn').forEach(function(b) { b.disabled = false; });
+          updateBar();
+        }
+      })
+      .catch(function(err) {
+        alert('Network error: ' + err);
+        bar.querySelectorAll('.bulk-action-bar__btn').forEach(function(b) { b.disabled = false; });
+        updateBar();
+      });
+    }
+
+    document.getElementById('orders_pending_bulk_btn_confirmed').addEventListener('click', function() { bulkUpdate('ready_to_pickup'); });
+    document.getElementById('orders_pending_bulk_btn_publish').addEventListener('click', function() { bulkUpdate('publish'); });
+    document.getElementById('orders_pending_bulk_btn_cancel').addEventListener('click', function() { bulkUpdate('cancelled'); });
+  })();
+
+  // ===== Status Cell Inline Popup =====
+  (function() {
+    var activePopup = null;
+
+    function closeAll() {
+      if (activePopup) {
+        activePopup.style.display = 'none';
+        activePopup = null;
+      }
+    }
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.status-cell')) closeAll();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeAll();
+    });
+
+    document.addEventListener('click', function(e) {
+      var cell = e.target.closest('.status-cell');
+      if (!cell) return;
+      if (e.target.closest('.status-popup__option')) return;
+
+      var popup = cell.querySelector('.status-popup');
+      if (!popup) return;
+
+      if (activePopup && activePopup !== popup) {
+        activePopup.style.display = 'none';
+      }
+
+      if (popup.style.display === 'none') {
+        popup.style.display = 'block';
+        activePopup = popup;
+        var current = cell.getAttribute('data-current-status');
+        popup.querySelectorAll('.status-popup__option').forEach(function(opt) {
+          opt.classList.toggle('status-popup__option--active', opt.getAttribute('data-status') === current);
+        });
+      } else {
+        popup.style.display = 'none';
+        activePopup = null;
+      }
+    });
+
+    document.addEventListener('click', function(e) {
+      var option = e.target.closest('.status-popup__option');
+      if (!option) return;
+
+      var cell = option.closest('.status-cell');
+      var orderId = cell.getAttribute('data-order-id');
+      var newStatus = option.getAttribute('data-status');
+      var currentStatus = cell.getAttribute('data-current-status');
+
+      if (newStatus === currentStatus) { closeAll(); return; }
+      if (newStatus === 'cancelled' && !confirm('Cancel this order?')) { closeAll(); return; }
+
+      var popup = cell.querySelector('.status-popup');
+      popup.innerHTML = '<div class="status-popup__loading"><i class="fa-solid fa-spinner fa-spin"></i> Updating...</div>';
+
+      fetch('{% url "orders:update_order_status" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ order_id: parseInt(orderId), status: newStatus })
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert('Error: ' + (data.error || 'Unknown error'));
+          closeAll();
+        }
+      })
+      .catch(function(err) {
+        alert('Network error: ' + err);
+        closeAll();
+      });
+    });
+  })();
+
+  // ===== Mobile Card Status Actions =====
+  (function() {
+    function showToast(msg) {
+      var t = document.createElement('div');
+      t.className = 'pwa-status-toast';
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(function() { t.remove(); }, 2000);
+    }
+
+    document.querySelectorAll('.pwa-order-card-full[data-current-status]').forEach(function(card) {
+      var current = card.getAttribute('data-current-status');
+      var btn = card.querySelector('.pwa-card-actions__btn[data-status="' + current + '"]');
+      if (btn) btn.classList.add('pwa-card-actions__btn--active');
+    });
+
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.pwa-card-actions__btn');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      var card = btn.closest('.pwa-order-card-full');
+      var orderId = card.getAttribute('data-order-id');
+      var newStatus = btn.getAttribute('data-status');
+      var currentStatus = card.getAttribute('data-current-status');
+
+      if (newStatus === currentStatus) return;
+      if (newStatus === 'cancelled' && !confirm('Cancel this order?')) return;
+
+      card.querySelectorAll('.pwa-card-actions__btn').forEach(function(b) { b.disabled = true; });
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+      fetch('{% url "orders:update_order_status" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ order_id: parseInt(orderId), status: newStatus })
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data.success) {
+          showToast('Status updated!');
+          setTimeout(function() { window.location.reload(); }, 600);
+        } else {
+          alert('Error: ' + (data.error || 'Unknown error'));
+          window.location.reload();
+        }
+      })
+      .catch(function(err) {
+        alert('Network error: ' + err);
+        window.location.reload();
+      });
+    });
+  })();
+  </script>
+{% endblock extra_js %}
