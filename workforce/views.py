@@ -3001,9 +3001,25 @@ def fleet_cod_in_hand(request):
     }
     drivers = drivers.order_by(sort_options.get(sort_by, 'user__first_name'))
 
-    # Calculate totals
+    # Calculate totals and statistics
+    from django.db.models import Avg, Max, Count
+
     total_cod = drivers.aggregate(total=Sum('period_cod'))['total'] or 0
     pending_settlements = drivers.filter(period_cod__gt=0).count()
+
+    # Additional statistics
+    avg_cod = drivers.filter(period_cod__gt=0).aggregate(avg=Avg('period_cod'))['avg'] or 0
+    max_cod = drivers.aggregate(max=Max('period_cod'))['max'] or 0
+
+    # Count drivers by COD range
+    cod_ranges = {
+        'under_500': drivers.filter(period_cod__gt=0, period_cod__lt=500).count(),
+        'between_500_2000': drivers.filter(period_cod__gte=500, period_cod__lt=2000).count(),
+        'above_2000': drivers.filter(period_cod__gte=2000).count(),
+    }
+
+    # Total drivers in system (not just those with COD)
+    total_drivers = fleet_models.Driver.objects.filter(driver_status='Approved').count()
 
     # View mode (grid or list) - default to list
     view_mode = request.GET.get('view', 'list')
@@ -3022,6 +3038,10 @@ def fleet_cod_in_hand(request):
         'page_title': 'COD In Hand',
         'total_cod': total_cod,
         'pending_settlements': pending_settlements,
+        'avg_cod': avg_cod,
+        'max_cod': max_cod,
+        'cod_ranges': cod_ranges,
+        'total_drivers': total_drivers,
         'filter_params': filter_params.urlencode(),
         'per_page': get_per_page(request, default=20),
         'date_preset': date_preset,

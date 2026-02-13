@@ -50,7 +50,60 @@
         <div style="font-size: 2rem; font-weight: 800; color: #2196f3;">{{ pending_settlements|default:"0" }}</div>
         <div style="font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;">Drivers awaiting settlement</div>
     </div>
+
+    <div style="background: var(--brand-white); padding: 1.5rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #ff9800;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase;">Average COD</span>
+            <i class="fa-solid fa-chart-simple" style="font-size: 1.5rem; color: #ff9800; opacity: 0.3;"></i>
+        </div>
+        <div style="font-size: 2rem; font-weight: 800; color: #ff9800;">QAR {{ avg_cod|floatformat:2|default:"0.00" }}</div>
+        <div style="font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;">Per driver with COD</div>
+    </div>
+
+    <div style="background: var(--brand-white); padding: 1.5rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #dc3545;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase;">Highest COD</span>
+            <i class="fa-solid fa-arrow-trend-up" style="font-size: 1.5rem; color: #dc3545; opacity: 0.3;"></i>
+        </div>
+        <div style="font-size: 2rem; font-weight: 800; color: #dc3545;">QAR {{ max_cod|floatformat:2|default:"0.00" }}</div>
+        <div style="font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;">Maximum COD held by single driver</div>
+    </div>
+
+    <div style="background: var(--brand-white); padding: 1.5rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #6c757d;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase;">Fleet Coverage</span>
+            <i class="fa-solid fa-percentage" style="font-size: 1.5rem; color: #6c757d; opacity: 0.3;"></i>
+        </div>
+        <div style="font-size: 2rem; font-weight: 800; color: #6c757d;">{{ pending_settlements }} / {{ total_drivers }}</div>
+        <div style="font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;">Drivers with COD vs Total approved</div>
+    </div>
 </div>
+
+<!-- COD Distribution Breakdown -->
+{% if cod_ranges %}
+<div style="background: var(--brand-white); padding: 1.5rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); margin-bottom: 2rem;">
+    <h3 style="font-size: 1rem; font-weight: 600; color: var(--brand-grey-700); margin-bottom: 1rem;">
+        <i class="fa-solid fa-chart-pie me-2"></i>COD Distribution by Amount Range
+    </h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div style="padding: 1rem; background: #f8f9fa; border-radius: var(--brand-radius-sm); border-left: 3px solid #28a745;">
+            <div style="font-size: 0.75rem; color: var(--brand-grey-600); margin-bottom: 0.25rem;">Under QAR 500</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: var(--brand-grey-800);">{{ cod_ranges.under_500 }}</div>
+            <div style="font-size: 0.687rem; color: var(--brand-grey-500); margin-top: 0.25rem;">drivers</div>
+        </div>
+        <div style="padding: 1rem; background: #f8f9fa; border-radius: var(--brand-radius-sm); border-left: 3px solid #ff9800;">
+            <div style="font-size: 0.75rem; color: var(--brand-grey-600); margin-bottom: 0.25rem;">QAR 500 - 2,000</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: var(--brand-grey-800);">{{ cod_ranges.between_500_2000 }}</div>
+            <div style="font-size: 0.687rem; color: var(--brand-grey-500); margin-top: 0.25rem;">drivers</div>
+        </div>
+        <div style="padding: 1rem; background: #f8f9fa; border-radius: var(--brand-radius-sm); border-left: 3px solid #dc3545;">
+            <div style="font-size: 0.75rem; color: var(--brand-grey-600); margin-bottom: 0.25rem;">Above QAR 2,000</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: var(--brand-grey-800);">{{ cod_ranges.above_2000 }}</div>
+            <div style="font-size: 0.687rem; color: var(--brand-grey-500); margin-top: 0.25rem;">drivers (high risk)</div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- Filter Panel -->
 <div class="filter-panel">
