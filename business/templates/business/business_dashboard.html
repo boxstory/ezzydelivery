@@ -346,6 +346,37 @@
     <!-- AI Assistant Chat -->
     {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="client" %}
 
+    <!-- Analytics Charts Row -->
+    <div class="row g-3 px-2 mt-3">
+      <!-- Revenue Trend Chart -->
+      <div class="col-md-8">
+        <div class="card animate__animated animate__fadeIn" style="animation-delay: 0.1s;">
+          <div class="card-header" style="background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark)); color: var(--brand-black);">
+            <h5 class="mb-0" style="font-weight: 600;">
+              <i class="fa-solid fa-chart-line me-2"></i>Weekly Orders Trend
+            </h5>
+          </div>
+          <div class="card-body">
+            <div id="weeklyOrdersChart" style="min-height: 300px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Order Status Breakdown -->
+      <div class="col-md-4">
+        <div class="card animate__animated animate__fadeIn" style="animation-delay: 0.2s;">
+          <div class="card-header" style="background: linear-gradient(135deg, #001f3f, #003366); color: white;">
+            <h5 class="mb-0" style="font-weight: 600;">
+              <i class="fa-solid fa-chart-pie me-2"></i>Order Status
+            </h5>
+          </div>
+          <div class="card-body">
+            <div id="orderStatusChart" style="min-height: 300px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Today's Orders Lists -->
     <div class="row g-3 px-2 mt-2">
       <!-- Today's Pending Orders -->
@@ -531,3 +562,114 @@
 
 </div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+  // Initialize Dashboard Charts
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof ApexCharts !== 'undefined') {
+      initDashboardCharts();
+    }
+  });
+
+  function initDashboardCharts() {
+    // Weekly Orders Trend Chart
+    const weeklyOrdersData = {
+      series: [{
+        name: 'Orders',
+        data: [
+          {{ weekly_orders_data.0|default:0 }},
+          {{ weekly_orders_data.1|default:0 }},
+          {{ weekly_orders_data.2|default:0 }},
+          {{ weekly_orders_data.3|default:0 }},
+          {{ weekly_orders_data.4|default:0 }},
+          {{ weekly_orders_data.5|default:0 }},
+          {{ weekly_orders_data.6|default:0 }}
+        ]
+      }],
+      categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    };
+
+    if (document.getElementById('weeklyOrdersChart')) {
+      createAreaChart('weeklyOrdersChart', weeklyOrdersData, {
+        colors: ['#f7c000'],
+        height: 300,
+        yaxis: {
+          title: { text: 'Number of Orders' }
+        },
+        title: {
+          text: 'Last 7 Days',
+          align: 'left',
+          style: {
+            fontSize: '13px',
+            fontWeight: 500,
+            color: '#6c757d'
+          }
+        },
+        dataLabels: { enabled: false }
+      });
+    }
+
+    // Order Status Donut Chart
+    const deliveredCount = {{ delivered_count|default:0 }};
+    const pendingCount = {{ pending_count|default:0 }};
+    const inTransitCount = {{ in_transit_count|default:0 }};
+    const failedCount = {{ failed_count|default:0 }};
+    const cancelledCount = {{ cancelled_count|default:0 }};
+
+    const statusData = {
+      series: [deliveredCount, inTransitCount, pendingCount, failedCount, cancelledCount],
+      labels: ['Delivered', 'In Transit', 'Pending', 'Failed', 'Cancelled']
+    };
+
+    if (document.getElementById('orderStatusChart')) {
+      createDonutChart('orderStatusChart', statusData, {
+        colors: ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#6c757d'],
+        height: 300,
+        totalLabel: 'Total Orders',
+        legend: {
+          position: 'bottom',
+          fontSize: '12px'
+        },
+        plotOptions: {
+          pie: {
+            donut: {
+              size: '65%',
+              labels: {
+                show: true,
+                name: {
+                  fontSize: '14px',
+                  fontWeight: 600
+                },
+                value: {
+                  fontSize: '22px',
+                  fontWeight: 700,
+                  formatter: function(val) {
+                    return val;
+                  }
+                },
+                total: {
+                  show: true,
+                  label: 'Total',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  formatter: function(w) {
+                    return w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  // Reinitialize charts after HTMX swap
+  document.body.addEventListener('htmx:afterSettle', function(evt) {
+    if (typeof ApexCharts !== 'undefined') {
+      initDashboardCharts();
+    }
+  });
+</script>
+{% endblock extra_js %}
