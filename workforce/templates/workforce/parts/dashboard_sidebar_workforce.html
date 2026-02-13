@@ -27,7 +27,7 @@
           <span>Orders</span>
           <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
         </a>
-        <div class="collapse submenu {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_dms_updated,wf_orders_reported,wf_orders_add,wf_orders_bulk_import,wf_orders_api_guide,order_detail' %}show{% endif %}" id="submenu-orders">
+        <div class="collapse submenu {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_dms_updated,wf_orders_reported,wf_orders_add,wf_orders_bulk_import,wf_orders_api_guide,order_detail' %}show{% endif %}" id="submenu-orders">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a id="workforce_sidebar_link_wf_orders_add" class="nav-link btn submenu-link submenu-link-highlight {% if request.resolver_match.url_name == 'wf_orders_add' %}active{% endif %}"
@@ -75,6 +75,30 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-list me-2"></i>
                 All Orders List
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wf_orders_fulfilled_clients" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'wf_orders_fulfilled_clients' %}active{% endif %}"
+                 href="{% url 'workforce:wf_orders_fulfilled_clients' %}"
+                 hx-get="{% url 'workforce:wf_orders_fulfilled_clients' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-truck-ramp-box me-2"></i>
+                Fulfilled Clients
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_wf_orders_non_fulfilled_clients" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'wf_orders_non_fulfilled_clients' %}active{% endif %}"
+                 href="{% url 'workforce:wf_orders_non_fulfilled_clients' %}"
+                 hx-get="{% url 'workforce:wf_orders_non_fulfilled_clients' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-truck-fast me-2"></i>
+                Non-Fulfilled Clients
               </a>
             </li>
             <li class="nav-item">
@@ -149,7 +173,7 @@
           <span>Tasks</span>
           <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
         </a>
-        <div class="collapse submenu {% if request.resolver_match.url_name in 'dl_list_all,dl_list_ready_to_published_to_dms,dl_list_published_to_dms,dl_list_incompleted_details,tasks_followup_list,tasks_dms_updated,tasks_reported,delivery_task_detail' %}show{% endif %}" id="submenu-deliveries">
+        <div class="collapse submenu {% if request.resolver_match.url_name in 'dl_list_all,dl_list_fulfilled_clients,dl_list_non_fulfilled_clients,dl_list_ready_to_published_to_dms,dl_list_published_to_dms,dl_list_incompleted_details,tasks_followup_list,tasks_dms_updated,tasks_reported,delivery_task_detail' %}show{% endif %}" id="submenu-deliveries">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a id="workforce_sidebar_link_all_tasks" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'dl_list_all' or request.resolver_match.url_name == 'delivery_task_detail' %}active{% endif %}"
@@ -161,6 +185,30 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-list me-2"></i>
                 All Tasks List
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_tasks_fulfilled_clients" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'dl_list_fulfilled_clients' %}active{% endif %}"
+                 href="{% url 'workforce:dl_list_fulfilled_clients' %}"
+                 hx-get="{% url 'workforce:dl_list_fulfilled_clients' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-truck-ramp-box me-2"></i>
+                Fulfilled Clients
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_tasks_non_fulfilled_clients" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'dl_list_non_fulfilled_clients' %}active{% endif %}"
+                 href="{% url 'workforce:dl_list_non_fulfilled_clients' %}"
+                 hx-get="{% url 'workforce:dl_list_non_fulfilled_clients' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-truck-fast me-2"></i>
+                Non-Fulfilled Clients
               </a>
             </li>
             <li class="nav-item">

@@ -34,6 +34,8 @@ urlpatterns = [
     path('orders/api-guide/', workforce_views.orders_api_guide, name='wf_orders_api_guide'),
     path('orders/pickup-locations/<int:business_id>/', workforce_views.get_pickup_locations, name='get_pickup_locations'),
     path('orders/all/', workforce_views.all_orders, name='wf_orders_all'),
+    path('orders/fulfilled-clients/', workforce_views.fulfilled_clients_orders, name='wf_orders_fulfilled_clients'),
+    path('orders/non-fulfilled-clients/', workforce_views.non_fulfilled_clients_orders, name='wf_orders_non_fulfilled_clients'),
     path('orders/export/', workforce_views.export_orders_csv, name='export_orders_csv'),
     path('orders/by-seller/', workforce_views.orders_by_seller, name='wf_orders_by_seller'),
     path('orders/to_publish/', workforce_views.orders_to_publish, name='wf_orders_to_publish'),
@@ -59,6 +61,8 @@ urlpatterns = [
 
     #Deliveries sections urls ----------------------------------------------------------------
     path('tasks/dl_list_all/', workforce_views.dl_list_all, name='dl_list_all'),
+    path('tasks/fulfilled-clients/', workforce_views.fulfilled_clients_tasks, name='dl_list_fulfilled_clients'),
+    path('tasks/non-fulfilled-clients/', workforce_views.non_fulfilled_clients_tasks, name='dl_list_non_fulfilled_clients'),
     path('tasks/dl_list_unpublished/', workforce_views.dl_list_ready_to_published_to_dms, name='dl_list_ready_to_published_to_dms'),
     path('tasks/dl_list_published/', workforce_views.dl_list_published_to_dms, name='dl_list_published_to_dms'),
     path('tasks/dl_list_incompleted/', workforce_views.dl_list_incompleted_details, name='dl_list_incompleted_details'),

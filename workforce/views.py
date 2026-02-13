@@ -337,6 +337,126 @@ def all_orders(request):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+def fulfilled_clients_orders(request):
+    """Orders from businesses with fulfillment service enabled"""
+    from django.db.models import Count
+
+    # Filter orders from businesses with fulfillment service enabled
+    orders = orders_models.Order.objects.select_related(
+        'business', 'pickup_location'
+    ).prefetch_related('order_comments', 'delivery_task').filter(
+        business__fulfillment_service_enabled=True
+    )
+
+    # Apply filters based on GET parameters
+    dl_code = request.GET.get('dlCode', '').strip()
+    c_code = request.GET.get('cCode', '').strip()
+    mobile = request.GET.get('mobile', '').strip()
+    c_status = request.GET.get('cStatus', '').strip()
+    dms_status = request.GET.get('dmsStatus', '').strip()
+    business_id = request.GET.get('business', '').strip()
+
+    if business_id:
+        orders = orders.filter(business_id=business_id)
+    if dl_code:
+        orders = orders.filter(delivery_task__dl_task_number__icontains=dl_code)
+    if c_code:
+        orders = orders.filter(client_order_code__icontains=c_code)
+    if mobile:
+        orders = orders.filter(customer_phone__icontains=mobile)
+    if c_status:
+        orders = orders.filter(order_status=c_status)
+    if dms_status:
+        orders = orders.filter(delivery_task__dl_task_status_dms=dms_status)
+
+    # Annotate with comment count
+    orders = orders.annotate(unread_comments_count=Count('order_comments'))
+    orders = orders.order_by('-created_at')
+    orders = paginate_queryset(request, orders)
+
+    # Get all fulfillment-enabled businesses for filter
+    all_businesses = business_models.Business.objects.filter(
+        fulfillment_service_enabled=True
+    ).order_by('business_name')
+
+    data = {
+        'orders': orders,
+        'all_businesses': all_businesses,
+        'filters': {
+            'dlCode': dl_code,
+            'cCode': c_code,
+            'mobile': mobile,
+            'cStatus': c_status,
+            'dmsStatus': dms_status,
+            'business': business_id,
+        },
+        'page_title': 'Fulfilled Clients Orders',
+    }
+    return render(request, 'workforce/parts/lists/orders_list_view.html', data)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def non_fulfilled_clients_orders(request):
+    """Orders from businesses without fulfillment service"""
+    from django.db.models import Count
+
+    # Filter orders from businesses without fulfillment service
+    orders = orders_models.Order.objects.select_related(
+        'business', 'pickup_location'
+    ).prefetch_related('order_comments', 'delivery_task').filter(
+        business__fulfillment_service_enabled=False
+    )
+
+    # Apply filters based on GET parameters
+    dl_code = request.GET.get('dlCode', '').strip()
+    c_code = request.GET.get('cCode', '').strip()
+    mobile = request.GET.get('mobile', '').strip()
+    c_status = request.GET.get('cStatus', '').strip()
+    dms_status = request.GET.get('dmsStatus', '').strip()
+    business_id = request.GET.get('business', '').strip()
+
+    if business_id:
+        orders = orders.filter(business_id=business_id)
+    if dl_code:
+        orders = orders.filter(delivery_task__dl_task_number__icontains=dl_code)
+    if c_code:
+        orders = orders.filter(client_order_code__icontains=c_code)
+    if mobile:
+        orders = orders.filter(customer_phone__icontains=mobile)
+    if c_status:
+        orders = orders.filter(order_status=c_status)
+    if dms_status:
+        orders = orders.filter(delivery_task__dl_task_status_dms=dms_status)
+
+    # Annotate with comment count
+    orders = orders.annotate(unread_comments_count=Count('order_comments'))
+    orders = orders.order_by('-created_at')
+    orders = paginate_queryset(request, orders)
+
+    # Get all non-fulfillment businesses for filter
+    all_businesses = business_models.Business.objects.filter(
+        fulfillment_service_enabled=False
+    ).order_by('business_name')
+
+    data = {
+        'orders': orders,
+        'all_businesses': all_businesses,
+        'filters': {
+            'dlCode': dl_code,
+            'cCode': c_code,
+            'mobile': mobile,
+            'cStatus': c_status,
+            'dmsStatus': dms_status,
+            'business': business_id,
+        },
+        'page_title': 'Non-Fulfilled Clients Orders',
+    }
+    return render(request, 'workforce/parts/lists/orders_list_view.html', data)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
 def export_orders_csv(request):
     """
     Export orders to CSV file with applied filters
@@ -790,9 +910,10 @@ def add_order(request):
     if selected_business_id:
         try:
             selected_business = business_models.Business.objects.get(business_id=selected_business_id)
+            # Show fulfillment stores first when fulfillment service is enabled
             pickup_locations = business_models.PickupLocation.objects.filter(
                 business=selected_business
-            )
+            ).order_by('-is_fulfilment_center', 'pickup_location_title')
         except business_models.Business.DoesNotExist:
             pass
 
@@ -989,7 +1110,10 @@ def get_pickup_locations(request, business_id):
     """AJAX endpoint to get pickup locations for a business"""
     try:
         business = business_models.Business.objects.get(business_id=business_id)
-        locations = business_models.PickupLocation.objects.filter(business=business)
+        # Show fulfillment stores first when fulfillment service is enabled
+        locations = business_models.PickupLocation.objects.filter(
+            business=business
+        ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
         location_list = [{
             'id': loc.id,
@@ -1066,6 +1190,170 @@ def dl_list_all(request):
         'page_subtitle': 'Manage and track',
         'page_icon': 'fa-tasks',
         'list_type': 'all',
+        'show_filters': True,
+        'filters': {
+            'dlCode': dl_code,
+            'cCode': c_code,
+            'mobile': mobile,
+            'driverName': driver_name,
+            'cStatus': c_status,
+            'dmsStatus': dms_status,
+            'dateFrom': date_from,
+            'dateTo': date_to,
+            'business': business_id,
+        }
+    }
+    return render(request, 'workforce/parts/lists/dl_list_all.html', data)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def fulfilled_clients_tasks(request):
+    """Tasks from businesses with fulfillment service enabled"""
+    dl_tasks = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).prefetch_related(
+        'order__order_comments',
+        'order__order_items',
+        'order__order_items__product',
+        'task_qrcode',
+    ).filter(
+        order__business__fulfillment_service_enabled=True
+    ).order_by('-created_at')
+
+    # Get filter parameters
+    dl_code = request.GET.get('dlCode', '')
+    c_code = request.GET.get('cCode', '')
+    mobile = request.GET.get('mobile', '')
+    driver_name = request.GET.get('driverName', '')
+    c_status = request.GET.get('cStatus', '')
+    dms_status = request.GET.get('dmsStatus', '')
+    date_from = request.GET.get('dateFrom', '')
+    date_to = request.GET.get('dateTo', '')
+    business_id = request.GET.get('business', '')
+
+    # Apply filters
+    if dl_code:
+        dl_tasks = dl_tasks.filter(dl_task_number__icontains=dl_code)
+    if c_code:
+        dl_tasks = dl_tasks.filter(order__client_order_code__icontains=c_code)
+    if mobile:
+        dl_tasks = dl_tasks.filter(order__customer_phone__icontains=mobile)
+    if driver_name:
+        dl_tasks = dl_tasks.filter(
+            Q(driver__user__first_name__icontains=driver_name) |
+            Q(driver__user__last_name__icontains=driver_name) |
+            Q(driver__user__username__icontains=driver_name)
+        )
+    if c_status:
+        dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
+    if dms_status:
+        dl_tasks = dl_tasks.filter(dl_task_status_dms=dms_status)
+    if date_from:
+        dl_tasks = dl_tasks.filter(dl_task_date__gte=date_from)
+    if date_to:
+        dl_tasks = dl_tasks.filter(dl_task_date__lte=date_to)
+    if business_id:
+        dl_tasks = dl_tasks.filter(order__business_id=business_id)
+
+    # Get fulfillment-enabled businesses
+    businesses = business_models.Business.objects.filter(
+        business_status='active',
+        fulfillment_service_enabled=True
+    ).order_by('business_name')
+
+    dl_tasks = paginate_queryset(request, dl_tasks)
+
+    data = {
+        'dl_tasks': dl_tasks,
+        'businesses': businesses,
+        'today': timezone.localtime().date(),
+        'page_title': 'Fulfilled Clients Tasks',
+        'page_subtitle': 'Tasks from fulfillment-enabled businesses',
+        'page_icon': 'fa-truck-ramp-box',
+        'list_type': 'fulfilled',
+        'show_filters': True,
+        'filters': {
+            'dlCode': dl_code,
+            'cCode': c_code,
+            'mobile': mobile,
+            'driverName': driver_name,
+            'cStatus': c_status,
+            'dmsStatus': dms_status,
+            'dateFrom': date_from,
+            'dateTo': date_to,
+            'business': business_id,
+        }
+    }
+    return render(request, 'workforce/parts/lists/dl_list_all.html', data)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def non_fulfilled_clients_tasks(request):
+    """Tasks from businesses without fulfillment service"""
+    dl_tasks = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'driver', 'business', 'pickup_location', 'order__business'
+    ).prefetch_related(
+        'order__order_comments',
+        'order__order_items',
+        'order__order_items__product',
+        'task_qrcode',
+    ).filter(
+        order__business__fulfillment_service_enabled=False
+    ).order_by('-created_at')
+
+    # Get filter parameters
+    dl_code = request.GET.get('dlCode', '')
+    c_code = request.GET.get('cCode', '')
+    mobile = request.GET.get('mobile', '')
+    driver_name = request.GET.get('driverName', '')
+    c_status = request.GET.get('cStatus', '')
+    dms_status = request.GET.get('dmsStatus', '')
+    date_from = request.GET.get('dateFrom', '')
+    date_to = request.GET.get('dateTo', '')
+    business_id = request.GET.get('business', '')
+
+    # Apply filters
+    if dl_code:
+        dl_tasks = dl_tasks.filter(dl_task_number__icontains=dl_code)
+    if c_code:
+        dl_tasks = dl_tasks.filter(order__client_order_code__icontains=c_code)
+    if mobile:
+        dl_tasks = dl_tasks.filter(order__customer_phone__icontains=mobile)
+    if driver_name:
+        dl_tasks = dl_tasks.filter(
+            Q(driver__user__first_name__icontains=driver_name) |
+            Q(driver__user__last_name__icontains=driver_name) |
+            Q(driver__user__username__icontains=driver_name)
+        )
+    if c_status:
+        dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
+    if dms_status:
+        dl_tasks = dl_tasks.filter(dl_task_status_dms=dms_status)
+    if date_from:
+        dl_tasks = dl_tasks.filter(dl_task_date__gte=date_from)
+    if date_to:
+        dl_tasks = dl_tasks.filter(dl_task_date__lte=date_to)
+    if business_id:
+        dl_tasks = dl_tasks.filter(order__business_id=business_id)
+
+    # Get non-fulfillment businesses
+    businesses = business_models.Business.objects.filter(
+        business_status='active',
+        fulfillment_service_enabled=False
+    ).order_by('business_name')
+
+    dl_tasks = paginate_queryset(request, dl_tasks)
+
+    data = {
+        'dl_tasks': dl_tasks,
+        'businesses': businesses,
+        'today': timezone.localtime().date(),
+        'page_title': 'Non-Fulfilled Clients Tasks',
+        'page_subtitle': 'Tasks from standard delivery businesses',
+        'page_icon': 'fa-truck-fast',
+        'list_type': 'non_fulfilled',
         'show_filters': True,
         'filters': {
             'dlCode': dl_code,
@@ -5663,9 +5951,10 @@ def order_edit(request, order_id):
     )
 
     # Get pickup locations for the business
+    # Show fulfillment stores first when fulfillment service is enabled
     pickup_locations = business_models.PickupLocation.objects.filter(
         business=order.business
-    )
+    ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
     if request.method == 'POST':
         # Handle form submission

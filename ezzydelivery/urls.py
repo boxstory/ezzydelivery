@@ -9,13 +9,27 @@ from core.sitemaps import StaticViewSitemap, BusinessPagesSitemap, WorkforcePage
 from core.views_seo import robots_txt, security_txt, humans_txt, llms_txt
 from django.views.generic import TemplateView
 from django.views.static import serve as static_serve
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponseNotFound
+from django.contrib.staticfiles import finders
 import os
 
 
 def service_worker_view(request):
     """Serve sw.js from root scope with Service-Worker-Allowed header."""
-    sw_path = os.path.join(settings.STATIC_ROOT, 'sw.js')
+    # Try STATIC_ROOT first (production), then use staticfiles finders (development)
+    sw_path = None
+    if settings.STATIC_ROOT:
+        production_path = os.path.join(settings.STATIC_ROOT, 'sw.js')
+        if os.path.exists(production_path):
+            sw_path = production_path
+
+    # Fallback to staticfiles finder for development
+    if not sw_path:
+        sw_path = finders.find('sw.js')
+
+    if not sw_path or not os.path.exists(sw_path):
+        return HttpResponseNotFound('Service worker not found')
+
     response = FileResponse(open(sw_path, 'rb'), content_type='application/javascript')
     response['Service-Worker-Allowed'] = '/'
     response['Cache-Control'] = 'no-cache'
