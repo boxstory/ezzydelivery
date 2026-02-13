@@ -32,10 +32,12 @@ urlpatterns = [
     # Help Center
     path('help/', webpages_views.help_center, name='help_center'),
     path('help/client-faq/', webpages_views.client_faq, name='client_faq'),
+    path('help/100-faqs/', webpages_views.client_faq_100, name='client_faq_100'),
     path('help/driver-faq/', webpages_views.driver_faq, name='driver_faq'),
     path('help/guides/', webpages_views.help_guides, name='help_guides'),
     path('help/guides/client/', webpages_views.client_guide, name='client_guide'),
-    path('help/guides/driver/', webpages_views.driver_guide, name='driver_guide'),
+    path('help/guides/driver/', webpages_views.driver_guide, name='driver_guide')
+,
 
     # SEO Landing Pages (Based on Search Console Analysis)
     path('delivery-companies-in-qatar/', webpages_views.delivery_companies_qatar, name='delivery_companies_qatar'),

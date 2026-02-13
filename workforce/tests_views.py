@@ -76,9 +76,12 @@ class WorkforceTestMixin:
             business=business)
         return business
 
+    _driver_seq = 7000
+
     def create_driver(self, did=None, status='Approved', code='DRV001'):
         if did is None:
-            did = fleet_models.Driver.objects.count() + 1
+            WorkforceTestMixin._driver_seq += 1
+            did = WorkforceTestMixin._driver_seq
         drv_user = User.objects.create_user(
             username=f'drv{did}', password='Drv@123',
             email=f'drv{did}@test.com')
@@ -87,6 +90,7 @@ class WorkforceTestMixin:
             phone=40000000 + did, is_driver=True,
             verification_status='pending')
         driver = fleet_models.Driver.objects.create(
+            driver_id=did,
             user=drv_user, profile=drv_profile,
             driver_code=code, driver_phone=str(40000000 + did),
             driver_status=status)
@@ -532,6 +536,9 @@ class WfOrderDetailEditTest(WorkforceTestMixin, TestCase):
         self.biz = self.create_business()
         self.pickup = self.create_pickup_location(self.biz)
         self.order = self.create_order(self.biz, self.pickup, cod=100)
+        # Create a ZoneName for zone update tests
+        delivery_models.ZoneName.objects.create(
+            zone_number=5, zone_name='Al Sadd', is_active=True)
         self.staff_login()
 
     def test_order_detail_loads(self):
@@ -772,6 +779,9 @@ class WfDeliveryTaskTest(WorkforceTestMixin, TestCase):
         self.biz = self.create_business()
         self.pickup = self.create_pickup_location(self.biz)
         self.order = self.create_order(self.biz, self.pickup)
+        # Mark order as verified so publish/assign views don't block
+        self.order.verification_status = 'verified'
+        self.order.save(update_fields=['verification_status'])
         self.task = self.create_delivery_task(self.order)
         self.staff_login()
 
@@ -851,7 +861,7 @@ class WfDeliveryTaskTest(WorkforceTestMixin, TestCase):
         resp = self.client.post(
             reverse('workforce:assign_driver_to_task',
                     kwargs={'task_id': self.task.id}),
-            json.dumps({'driver_id': driver.id}),
+            json.dumps({'driver_id': driver.driver_id}),
             content_type='application/json')
         self.assertEqual(resp.status_code, 200)
         data = json.loads(resp.content)

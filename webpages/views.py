@@ -478,6 +478,22 @@ def client_faq(request):
     return render(request, 'webpages/client_faq.html', data)
 
 
+def client_faq_100(request):
+    """100 Marketing FAQs - Comprehensive FAQ page"""
+    meta = SEOMetadata.get_page_meta(
+        title="100 Marketing FAQs | Complete Ezzy Delivery Guide",  # 50 chars
+        description=(
+            "All 100 verified FAQs for Ezzy Delivery Qatar across 13 sections: services, "
+            "pricing, delivery speed, coverage, COD, packaging, returns & more."
+        ),  # 150 chars
+    )
+
+    data = {
+        'seo': meta,
+    }
+    return render(request, 'webpages/client_faq_100.html', data)
+
+
 def driver_faq(request):
     """Driver FAQ page"""
     meta = SEOMetadata.get_page_meta(

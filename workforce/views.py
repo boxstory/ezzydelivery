@@ -55,7 +55,7 @@ Related:
     - All app models: orders, delivery, fleet, business
 """
 
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -993,8 +993,8 @@ def get_pickup_locations(request, business_id):
 
         location_list = [{
             'id': loc.id,
-            'name': loc.location_name,
-            'address': loc.location_address or '',
+            'name': loc.pickup_location_title,
+            'address': loc.locality or '',
         } for loc in locations]
 
         return JsonResponse({'success': True, 'locations': location_list})
@@ -1473,6 +1473,8 @@ def cancel_order(request, order_id):
             'message': 'Order cancelled successfully',
             'order_id': order.id
         })
+    except Http404:
+        raise
     except Exception as e:
         logger.exception("Error cancelling order %s: %s", order_id, str(e))
         return JsonResponse({
@@ -1813,6 +1815,8 @@ def add_order_comment(request, order_id):
             'comment_text': comment.body,
             'created_at': comment.created_at.strftime('%B %d, %Y %H:%M')
         })
+    except Http404:
+        raise
     except Exception as e:
         logger.exception("Error adding comment to order %s: %s", order_id, str(e))
         return JsonResponse({
@@ -2271,6 +2275,8 @@ def update_verification_status(request, profile_id):
             'profile_id': profile.id,
             'new_status': new_status
         })
+    except Http404:
+        raise
     except Exception as e:
         logger.exception("Error updating verification status for profile %s: %s", profile_id, str(e))
         return JsonResponse({
@@ -5587,7 +5593,7 @@ def bulk_export_tasks(request):
             _sanitize_csv_value(str(task.driver) if task.driver else ''),
             _sanitize_csv_value(task.get_dl_task_status_client_display() if hasattr(task, 'get_dl_task_status_client_display') else task.dl_task_status_client),
             _sanitize_csv_value(task.get_dl_task_status_dms_display() if hasattr(task, 'get_dl_task_status_dms_display') else task.dl_task_status_dms),
-            _sanitize_csv_value(task.pickup_location.pickup_location_address if task.pickup_location else ''),
+            _sanitize_csv_value(task.pickup_location.pickup_location_title if task.pickup_location else ''),
             _sanitize_csv_value(task.order.cod_amount if task.order else ''),
             _sanitize_csv_value(task.notes if hasattr(task, 'notes') else ''),
         ])
