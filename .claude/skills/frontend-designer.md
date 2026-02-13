@@ -2,43 +2,67 @@
 
 Use this skill when designing UI components, creating landing pages, or building polished frontend interfaces with modern design principles.
 
+**Complements:** `frontend.md` skill (Bootstrap, HTMX, jQuery implementation)
+**Focus:** Visual design, brand consistency, modern UI patterns, aesthetics
+
+---
+
 ## Brand Identity
 
 ### EzzyDelivery Brand Kit
-**Location:** `static/webpages/css/brand-kit.css`
+**Location:** `webpages/static/webpages/css/brandkit.css` (imports all modules)
+
+**Module Files:**
+- `brandkit-tokens.css` - CSS Custom Properties (design tokens)
+- `brandkit-typography.css` - Font styles and heading variants
+- `brandkit-components.css` - Buttons, cards, alerts, badges, forms
+- `brandkit-utilities.css` - Helper classes for spacing, colors, display
+- `brandkit-overrides.css` - Bootstrap overrides (loads last)
 
 #### Core Brand Colors
 ```css
 /* Primary Brand Colors */
---brand-primary: #6366F1        /* Indigo - Main brand color */
---brand-primary-dark: #4F46E5   /* Darker indigo for hovers */
---brand-primary-light: #818CF8  /* Light indigo for highlights */
+--brand-primary: #f7c000         /* Ezzy Yellow - Main brand color */
+--brand-primary-dark: #f4c20d    /* Darker yellow for hovers */
+--brand-secondary: #fff7d6       /* Light yellow background */
+--brand-accent: #fef9e6          /* Accent yellow */
+--brand-navy: #001f3f            /* Navy blue for contrast */
+--brand-navy-light: #003366      /* Light navy */
+--brand-black: #000000           /* Pure black */
 
-/* Secondary Colors */
---brand-secondary: #EC4899      /* Pink accent */
---brand-success: #10B981        /* Green for success states */
---brand-warning: #F59E0B        /* Amber for warnings */
---brand-danger: #EF4444         /* Red for errors */
---brand-info: #3B82F6           /* Blue for information */
+/* Neutral Palette */
+--brand-grey-100: #fafafa        /* Lightest grey */
+--brand-grey-200: #f0f0f0
+--brand-grey-300: #dcdcdc
+--brand-grey-400: #b0b0b0
+--brand-grey-500: #6c757d        /* Medium grey (WCAG AA compliant) */
+--brand-grey-600: #555
+--brand-grey-700: #333
+--brand-grey-800: #1f1f1f        /* Dark grey */
+--brand-white: #ffffff           /* Pure white */
 
-/* Neutral Colors */
---brand-dark: #1E293B           /* Dark text/backgrounds */
---brand-gray: #64748B           /* Medium gray for secondary text */
---brand-light: #F1F5F9          /* Light backgrounds */
---brand-white: #FFFFFF          /* Pure white */
+/* Gradients */
+--brand-gradient-yellow-white: linear-gradient(135deg, var(--brand-primary), var(--brand-white));
+--brand-gradient-black-grey: linear-gradient(135deg, var(--brand-black), var(--brand-grey-700));
+--brand-gradient-black-navy: linear-gradient(135deg, var(--brand-black), var(--brand-navy-light));
+--brand-gradient-purple: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+--brand-gradient-navy: linear-gradient(135deg, var(--brand-navy), var(--brand-navy-light));
+--brand-gradient-yellow-dark: linear-gradient(135deg, var(--brand-primary), var(--brand-grey-800));
 ```
 
 #### Typography Scale
 ```css
 /* Font Families */
---font-primary: 'Inter', system-ui, -apple-system, sans-serif;
---font-heading: 'Plus Jakarta Sans', var(--font-primary);
---font-mono: 'Fira Code', 'Courier New', monospace;
+--brand-font-primary: "Inter", "Poppins", "Helvetica Neue", sans-serif;
 
 /* Font Sizes (rem-based) */
+--brand-font-size-base: 0.9375rem   /* 15px base */
+--brand-font-size-heading: 1.25rem  /* 20px headings */
+
+/* Standard scale */
 --text-xs: 0.75rem      /* 12px */
 --text-sm: 0.875rem     /* 14px */
---text-base: 1rem       /* 16px */
+--text-base: 0.9375rem  /* 15px (brand default) */
 --text-lg: 1.125rem     /* 18px */
 --text-xl: 1.25rem      /* 20px */
 --text-2xl: 1.5rem      /* 24px */
@@ -47,12 +71,8 @@ Use this skill when designing UI components, creating landing pages, or building
 --text-5xl: 3rem        /* 48px */
 
 /* Font Weights */
---font-light: 300
---font-normal: 400
---font-medium: 500
---font-semibold: 600
---font-bold: 700
---font-extrabold: 800
+--brand-font-weight-normal: 400
+--brand-font-weight-bold: 600
 ```
 
 #### Spacing System
@@ -63,26 +83,25 @@ Use this skill when designing UI components, creating landing pages, or building
 --spacing-md: 1rem       /* 16px */
 --spacing-lg: 1.5rem     /* 24px */
 --spacing-xl: 2rem       /* 32px */
---spacing-2xl: 3rem      /* 48px */
---spacing-3xl: 4rem      /* 64px */
 ```
 
 #### Border Radius
 ```css
---radius-sm: 0.375rem    /* 6px - subtle rounding */
---radius-md: 0.5rem      /* 8px - standard cards */
---radius-lg: 0.75rem     /* 12px - prominent cards */
---radius-xl: 1rem        /* 16px - hero sections */
---radius-full: 9999px    /* Fully rounded (pills, avatars) */
+--brand-radius-sm: 0.5rem      /* 8px - subtle rounding */
+--brand-radius-md: 0.75rem     /* 12px - standard cards */
+--brand-radius-lg: 1.125rem    /* 18px - prominent cards */
 ```
 
 #### Shadows
 ```css
---shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
---shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
---shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
---shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
---shadow-2xl: 0 25px 50px rgba(0, 0, 0, 0.25);
+--brand-shadow-sm: 0 0.0625rem 0.1875rem rgba(0,0,0,0.08);
+--brand-shadow-md: 0 0.25rem 0.5rem rgba(0,0,0,0.1);
+--brand-shadow-lg: 0 0.625rem 1.25rem rgba(0,0,0,0.12);
+```
+
+#### Transitions
+```css
+--brand-transition: all 0.3s ease;
 ```
 
 ## Design Principles
