@@ -151,6 +151,12 @@ class WalletService:
             cod_trans = None
             if delivery_task.has_cod and delivery_task.cod_collected:
                 cod_amount = delivery_task.cod_collected_amount or delivery_task.order.cod_amount
+
+                # Set cod_collected_at timestamp if not already set
+                if not delivery_task.cod_collected_at:
+                    delivery_task.cod_collected_at = timezone.now()
+                    delivery_task.save(update_fields=['cod_collected_at'])
+
                 cod_trans = WalletService.record_transaction(
                     driver=delivery_task.driver,
                     transaction_type='cod_collection',

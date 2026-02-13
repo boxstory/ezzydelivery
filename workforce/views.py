@@ -274,7 +274,7 @@ def all_orders(request):
     # Start with all orders, prefetch related data to avoid N+1 queries
     orders = orders_models.Order.objects.select_related(
         'business', 'pickup_location'
-    ).prefetch_related('order_comments', 'delivery_task')
+    ).prefetch_related('order_comments', 'delivery_task', 'order_items')
 
     # Apply filters based on GET parameters
     dl_code = request.GET.get('dlCode', '').strip()
@@ -344,7 +344,7 @@ def fulfilled_clients_orders(request):
     # Filter orders from businesses with fulfillment service enabled
     orders = orders_models.Order.objects.select_related(
         'business', 'pickup_location'
-    ).prefetch_related('order_comments', 'delivery_task').filter(
+    ).prefetch_related('order_comments', 'delivery_task', 'order_items').filter(
         business__fulfillment_service_enabled=True
     )
 
@@ -404,7 +404,7 @@ def non_fulfilled_clients_orders(request):
     # Filter orders from businesses without fulfillment service
     orders = orders_models.Order.objects.select_related(
         'business', 'pickup_location'
-    ).prefetch_related('order_comments', 'delivery_task').filter(
+    ).prefetch_related('order_comments', 'delivery_task', 'order_items').filter(
         business__fulfillment_service_enabled=False
     )
 
@@ -2938,17 +2938,17 @@ def fleet_cod_in_hand(request):
         # Get drivers with COD collected in the date range
         from django.db.models import OuterRef, Subquery
 
-        # Build subquery with date filter - use created_at__date for filtering
+        # Build subquery with date filter - use cod_collected_at for filtering
         cod_subquery = delivery_models.DeliveryTask.objects.filter(
             driver_id=OuterRef('driver_id'),
             cod_collected=True,
         )
 
-        # Apply date filters on created_at date
+        # Apply date filters on cod_collected_at date
         if date_from:
-            cod_subquery = cod_subquery.filter(created_at__date__gte=date_from)
+            cod_subquery = cod_subquery.filter(cod_collected_at__date__gte=date_from)
         if date_to:
-            cod_subquery = cod_subquery.filter(created_at__date__lte=date_to)
+            cod_subquery = cod_subquery.filter(cod_collected_at__date__lte=date_to)
 
         cod_subquery = cod_subquery.values('driver').annotate(
             total=Sum('cod_collected_amount')
@@ -2970,24 +2970,24 @@ def fleet_cod_in_hand(request):
             period_cod=F('cod_in_hand')
         )
 
-    # COD filter (yes/no/custom) - filters on actual cod_in_hand field
+    # COD filter (yes/no/custom) - filters on period_cod (which is either cod_in_hand or calculated from date range)
     cod_filter = request.GET.get('cod_filter', '')
     min_amount = request.GET.get('min_amount', '')
     max_amount = request.GET.get('max_amount', '')
 
     if cod_filter == 'yes':
-        # Filter drivers who currently have COD in hand
-        drivers = drivers.filter(cod_in_hand__gt=0)
+        # Filter drivers who have COD (using period_cod annotation)
+        drivers = drivers.filter(period_cod__gt=0)
     elif cod_filter == 'no':
-        # Filter drivers with no COD in hand
+        # Filter drivers with no COD
         from django.db.models import Q
-        drivers = drivers.filter(Q(cod_in_hand=0) | Q(cod_in_hand__isnull=True))
+        drivers = drivers.filter(Q(period_cod=0) | Q(period_cod__isnull=True))
     elif cod_filter == 'custom':
-        # Filter by custom amount range on cod_in_hand
+        # Filter by custom amount range on period_cod
         if min_amount:
-            drivers = drivers.filter(cod_in_hand__gte=min_amount)
+            drivers = drivers.filter(period_cod__gte=min_amount)
         if max_amount:
-            drivers = drivers.filter(cod_in_hand__lte=max_amount)
+            drivers = drivers.filter(period_cod__lte=max_amount)
 
     # Sorting
     sort_by = request.GET.get('sort', 'name_asc')

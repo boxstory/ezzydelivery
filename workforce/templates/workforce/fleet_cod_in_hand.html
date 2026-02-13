@@ -1,5 +1,6 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
+{% load humanize %}
 
 {% block title %}COD In Hand - Ezzy Delivery{% endblock title %}
 
@@ -28,7 +29,7 @@
             <span style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase;">Total COD</span>
             <i class="fa-solid fa-money-bills" style="font-size: 1.5rem; color: #28a745; opacity: 0.3;"></i>
         </div>
-        <div style="font-size: 2rem; font-weight: 800; color: #28a745;">QAR {{ total_cod|default:"0.00" }}</div>
+        <div style="font-size: 2rem; font-weight: 800; color: #28a745;">QAR {{ total_cod|floatformat:2|default:"0.00" }}</div>
         <div style="font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;">Across all drivers</div>
     </div>
 
@@ -177,7 +178,7 @@
         <div class="fleet-details">
             <div class="detail-row">
                 <span class="detail-label">{% if is_filtered_by_date %}COD Collected{% else %}COD In Hand{% endif %}</span>
-                <span class="detail-value amount {% if driver.period_cod > 0 %}amount-positive{% else %}amount-zero{% endif %}">QAR {{ driver.period_cod|default:"0.00" }}</span>
+                <span class="detail-value amount {% if driver.period_cod > 0 %}amount-positive{% else %}amount-zero{% endif %}">QAR {{ driver.period_cod|floatformat:2|default:"0.00" }}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Last Settled</span>
@@ -233,9 +234,9 @@
                 <td>{{ driver.driver_id }}</td>
                 <td>{{ driver.driver_phone }}</td>
                 <td class="{% if driver.period_cod > 0 %}amount-positive{% else %}amount-zero{% endif %}">
-                    QAR {{ driver.period_cod|default:"0.00" }}
+                    QAR {{ driver.period_cod|floatformat:2|default:"0.00" }}
                 </td>
-                <td>QAR {{ driver.wallet_balance|default:"0.00" }}</td>
+                <td>QAR {{ driver.wallet_balance|floatformat:2|default:"0.00" }}</td>
                 <td>{{ driver.last_settlement_date|date:"d M Y"|default:"Never" }}</td>
                 <td>
                     <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.driver_id }}" class="btn btn-sm btn-outline-primary">
