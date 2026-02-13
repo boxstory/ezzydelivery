@@ -139,6 +139,17 @@ class Business(models.Model):
         default=False,
         help_text="Enable fulfillment service (WMS integration) for this business"
     )
+    FULFILLMENT_STATUS_CHOICES = [
+        ('none', 'Not Requested'),
+        ('requested', 'Requested'),
+        ('active', 'Active'),
+    ]
+    fulfillment_service_status = models.CharField(
+        max_length=20,
+        choices=FULFILLMENT_STATUS_CHOICES,
+        default='none',
+        help_text="Fulfillment service status: none, requested, or active"
+    )
     fulfillment_activated_at = models.DateTimeField(
         blank=True, null=True,
         help_text="When the fulfillment service was activated"
@@ -632,6 +643,12 @@ class PickupLocation(models.Model):
     ]
     pickup_status = models.CharField(
         max_length=100, choices=status_choices, default='active')
+    is_fulfilment_center = models.BooleanField(default=False)
+    warehouse = models.ForeignKey(
+        'warehouse.Warehouse', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='linked_pickup_locations',
+        help_text="Linked warehouse (auto-set when business is connected to a warehouse)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

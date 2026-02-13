@@ -13,7 +13,7 @@ DeliveryTask = delivery_models.DeliveryTask
 logger = logging.getLogger(__name__)
 
 # Terminal order statuses — don't overwrite these
-TERMINAL_ORDER_STATUSES = ['delivered', 'fulfilled', 'cancelled']
+TERMINAL_ORDER_STATUSES = ['delivered', 'cancelled']
 
 
 @receiver(pre_save, sender=DeliveryTask)
@@ -80,14 +80,11 @@ def _sync_order_status_from_task(task):
         update_fields = []
 
         if task.dl_task_status == 'delivered':
-            # Check if business uses fulfillment service
+            order.order_status = 'delivered'
+            update_fields.append('order_status')
             if order.business and order.business.fulfillment_service_enabled:
-                order.order_status = 'fulfilled'
                 order.fulfilled_at = timezone.now()
-                update_fields.extend(['order_status', 'fulfilled_at'])
-            else:
-                order.order_status = 'delivered'
-                update_fields.append('order_status')
+                update_fields.append('fulfilled_at')
             order.delivered_at = timezone.now()
             update_fields.append('delivered_at')
             logger.info(f"Order {order.order_number} synced to '{order.order_status}' from delivery task {task.dl_task_number}")

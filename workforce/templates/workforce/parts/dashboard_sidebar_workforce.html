@@ -431,7 +431,7 @@
           <span>Fulfillment</span>
           <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
         </a>
-        <div class="collapse submenu {% if request.resolver_match.url_name in 'suppliers_list,fulfilled_orders_list' %}show{% endif %}" id="submenu-fulfillment">
+        <div class="collapse submenu {% if request.resolver_match.url_name in 'suppliers_list,fulfilled_orders_list,warehouses_list' %}show{% endif %}" id="submenu-fulfillment">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a id="workforce_sidebar_link_suppliers" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'suppliers_list' %}active{% endif %}"
@@ -455,6 +455,18 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-receipt me-2"></i>
                 Purchase Orders
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_warehouses_list" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'warehouses_list' %}active{% endif %}"
+                 href="{% url 'workforce:warehouses_list' %}"
+                 hx-get="{% url 'workforce:warehouses_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-warehouse me-2"></i>
+                WH-Business Links
               </a>
             </li>
           </ul>

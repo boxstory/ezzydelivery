@@ -1,6 +1,6 @@
 import logging
 from django.db import transaction
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 
@@ -287,3 +287,71 @@ def stock_level_post_save_handler(sender, instance, created, *args, **kwargs):
     Check for low stock after stock level changes.
     """
     check_and_create_low_stock_alert(instance)
+
+
+# =============================================================================
+# SELLER WAREHOUSE LINK SIGNALS
+# Auto-sync PickupLocation when a business is linked/unlinked to a warehouse
+# =============================================================================
+
+@receiver(post_save, sender='warehouse.SellerWarehouseLink')
+def seller_warehouse_link_post_save(sender, instance, created, **kwargs):
+    """
+    When a SellerWarehouseLink is created or updated, create/update a
+    PickupLocation for the business using the warehouse address.
+    """
+    from business.models import PickupLocation
+
+    warehouse = instance.warehouse
+    business = instance.business
+
+    pickup_status = 'active' if instance.is_active else 'inactive'
+
+    try:
+        pickup, was_created = PickupLocation.objects.update_or_create(
+            business=business,
+            warehouse=warehouse,
+            defaults={
+                'pickup_location_title': f"WH: {warehouse.name}",
+                'locality': warehouse.address or warehouse.city or '',
+                'pickup_lat': warehouse.latitude,
+                'pickup_lon': warehouse.longitude,
+                'is_fulfilment_center': True,
+                'pickup_status': pickup_status,
+            }
+        )
+        action = 'Created' if was_created else 'Updated'
+        logger.info(
+            f"{action} PickupLocation for {business.business_name} "
+            f"linked to warehouse {warehouse.code}"
+        )
+    except Exception as e:
+        logger.exception(
+            f"Error syncing PickupLocation for SellerWarehouseLink "
+            f"{business.business_name} → {warehouse.code}: {e}"
+        )
+
+
+@receiver(post_delete, sender='warehouse.SellerWarehouseLink')
+def seller_warehouse_link_post_delete(sender, instance, **kwargs):
+    """
+    When a SellerWarehouseLink is deleted, set the matching PickupLocation
+    to inactive.
+    """
+    from business.models import PickupLocation
+
+    try:
+        updated = PickupLocation.objects.filter(
+            business=instance.business,
+            warehouse=instance.warehouse,
+        ).update(pickup_status='inactive')
+
+        if updated:
+            logger.info(
+                f"Deactivated PickupLocation for {instance.business.business_name} "
+                f"unlinked from warehouse {instance.warehouse.code}"
+            )
+    except Exception as e:
+        logger.exception(
+            f"Error deactivating PickupLocation on SellerWarehouseLink delete: {e}"
+        )

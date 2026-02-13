@@ -153,6 +153,11 @@ urlpatterns = [
     path('suppliers/', workforce_views.suppliers_list, name='suppliers_list'),
     path('purchase-orders/', workforce_views.fulfilled_orders_list, name='fulfilled_orders_list'),
 
+    # Warehouse-Business Links
+    path('warehouses/', workforce_views.warehouses_list, name='warehouses_list'),
+    path('warehouses/link-business/', workforce_views.warehouse_link_business, name='warehouse_link_business'),
+    path('warehouses/unlink-business/', workforce_views.warehouse_unlink_business, name='warehouse_unlink_business'),
+
     # ==========================================
     # DISPATCH & BATCHING SECTION
     # ==========================================

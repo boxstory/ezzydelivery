@@ -706,6 +706,8 @@ AI_AGENT_WHATSAPP_ENABLED = config('AI_AGENT_WHATSAPP_ENABLED', default=True, ca
 
 # WhatsApp/n8n Integration
 N8N_AI_AGENT_WEBHOOK_URL = config('N8N_AI_AGENT_WEBHOOK_URL', default='')
+N8N_WHATSAPP_WEBHOOK_URL = config('N8N_WHATSAPP_WEBHOOK_URL', default='')
+N8N_WEBHOOK_SECRET_KEY = config('N8N_WEBHOOK_SECRET_KEY', default='')
 
 # ==========================================
 # END AI AGENT CONFIGURATION

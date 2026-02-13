@@ -1,3 +1,4 @@
+{% load custom_filters %}
 <div class="orc-row" data-order-id="{{ order.id }}">
     <div class="orc-id">
         <a href="{% url 'workforce:order_detail' order.id %}"
@@ -55,7 +56,7 @@
             <i class="fa-solid fa-times"></i>
         </button>
         {% endif %}
-        <a href="https://wa.me/{{ order.customer_phone }}" target="_blank" class="orc-btn orc-btn-wa" title="WhatsApp">
+        <a href="https://wa.me/{{ order.customer_phone|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="orc-btn orc-btn-wa" title="WhatsApp">
             <i class="fa-brands fa-whatsapp"></i>
         </a>
     </div>

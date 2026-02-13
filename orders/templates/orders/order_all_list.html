@@ -5,7 +5,7 @@
 {% load business_pwa_tags %}
 <!-- extra css -->
 {% block extra_css %}
-  <link href="{% static 'orders/css/orders.css' %}"
+  <link href="{% static 'orders/css/orders.css' %}?v=20260212c"
         rel="stylesheet"
         type="text/css" />
 {% endblock extra_css %}
@@ -130,8 +130,8 @@
       {% if orders %}
         {% for order in orders %}
         {% order_status_class order as st_class %}
-        <a href="{% url 'orders:order_details' order.id %}" class="pwa-order-card-full pwa-order-card-full--{{ st_class }}" id="orders_mobile_card_{{ order.id }}">
-          <div class="pwa-order-card-full__inner">
+        <div class="pwa-order-card-full pwa-order-card-full--{{ st_class }}" id="orders_mobile_card_{{ order.id }}" data-order-id="{{ order.id }}" data-current-status="{{ order.order_status }}">
+          <a href="{% url 'orders:order_details' order.id %}" class="pwa-order-card-full__inner">
             <div class="pwa-order-card-full__content">
               <div class="pwa-order-card-full__header">
                 <span class="pwa-order-card-full__number">#{{ order.order_number }}</span>
@@ -164,8 +164,24 @@
             <div class="pwa-order-card-full__arrow">
               <i class="fas fa-chevron-right pwa-order-card-full__chevron"></i>
             </div>
+          </a>
+          {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+          <div class="pwa-card-actions">
+            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--review" data-status="to_review" title="Hold for Review">
+              <i class="fas fa-clock"></i>
+            </button>
+            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--confirmed" data-status="ready_to_pickup" title="Confirmed">
+              <i class="fas fa-clipboard-check"></i>
+            </button>
+            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--publish" data-status="publish" title="Publish">
+              <i class="fas fa-rocket"></i>
+            </button>
+            <button type="button" class="pwa-card-actions__btn pwa-card-actions__btn--cancel" data-status="cancelled" title="Cancel">
+              <i class="fas fa-ban"></i>
+            </button>
           </div>
-        </a>
+          {% endif %}
+        </div>
         {% endfor %}
       {% else %}
         <div class="pwa-empty-state">
@@ -416,6 +432,25 @@
           </div>
           <div id="orders_table_view" class="orders-view-container" style="display: none;">
             {% include "orders/parts/order_list_table_view.html" %}
+          </div>
+
+          <!-- Bulk Action Bar (visible when checkboxes selected in table view) -->
+          <div class="bulk-action-bar" id="orders_bulk_action_bar" style="display: none;">
+            <div class="bulk-action-bar__inner">
+              <span class="bulk-action-bar__count" id="orders_bulk_count">0 selected</span>
+              <div class="bulk-action-bar__actions">
+                <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--confirmed" id="orders_bulk_btn_confirmed">
+                  <i class="fa-solid fa-clipboard-check"></i> Confirmed
+                </button>
+                <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--publish" id="orders_bulk_btn_publish">
+                  <i class="fa-solid fa-rocket"></i> Publish
+                </button>
+                <button type="button" class="bulk-action-bar__btn bulk-action-bar__btn--cancel" id="orders_bulk_btn_cancel">
+                  <i class="fa-solid fa-ban"></i> Cancel
+                </button>
+              </div>
+              <a href="#" class="bulk-action-bar__deselect" id="orders_bulk_deselect">Deselect All</a>
+            </div>
           </div>
         </div>
       </div>
@@ -782,5 +817,247 @@
     }
     document.getElementById('filterForm').submit();
   });
+
+  // ===== Bulk Actions =====
+  (function() {
+    var bar = document.getElementById('orders_bulk_action_bar');
+    var countEl = document.getElementById('orders_bulk_count');
+    var selectAll = document.getElementById('orders_bulk_select_all');
+    if (!bar || !selectAll) return;
+
+    function getChecked() {
+      return document.querySelectorAll('.orders-bulk-checkbox:checked');
+    }
+
+    function updateBar() {
+      var checked = getChecked();
+      if (checked.length > 0) {
+        bar.style.display = 'flex';
+        countEl.textContent = checked.length + ' selected';
+      } else {
+        bar.style.display = 'none';
+      }
+      // Sync select-all checkbox
+      var total = document.querySelectorAll('.orders-bulk-checkbox');
+      selectAll.checked = total.length > 0 && checked.length === total.length;
+      selectAll.indeterminate = checked.length > 0 && checked.length < total.length;
+    }
+
+    // Select all toggle
+    selectAll.addEventListener('change', function() {
+      var boxes = document.querySelectorAll('.orders-bulk-checkbox');
+      boxes.forEach(function(cb) { cb.checked = selectAll.checked; });
+      updateBar();
+    });
+
+    // Individual checkboxes
+    document.addEventListener('change', function(e) {
+      if (e.target.classList.contains('orders-bulk-checkbox')) updateBar();
+    });
+
+    // Deselect all
+    document.getElementById('orders_bulk_deselect').addEventListener('click', function(e) {
+      e.preventDefault();
+      document.querySelectorAll('.orders-bulk-checkbox').forEach(function(cb) { cb.checked = false; });
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+      updateBar();
+    });
+
+    // Bulk status update via AJAX
+    function bulkUpdate(status) {
+      var checked = getChecked();
+      if (checked.length === 0) return;
+      var ids = [];
+      checked.forEach(function(cb) { ids.push(parseInt(cb.value)); });
+
+      if (status === 'cancelled' && !confirm('Cancel ' + ids.length + ' order(s)? This cannot be undone.')) return;
+
+      var statusLabels = { 'publish': 'Publish', 'ready_to_pickup': 'Confirmed', 'cancelled': 'Cancel' };
+      bar.querySelectorAll('.bulk-action-bar__btn').forEach(function(b) { b.disabled = true; });
+      countEl.textContent = 'Updating ' + ids.length + ' orders...';
+
+      fetch('{% url "orders:bulk_update_order_status" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ order_ids: ids, status: status })
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data.success) {
+          countEl.textContent = data.updated + ' order(s) updated!';
+          setTimeout(function() { window.location.reload(); }, 800);
+        } else {
+          alert('Error: ' + (data.error || 'Unknown error'));
+          bar.querySelectorAll('.bulk-action-bar__btn').forEach(function(b) { b.disabled = false; });
+          updateBar();
+        }
+      })
+      .catch(function(err) {
+        alert('Network error: ' + err);
+        bar.querySelectorAll('.bulk-action-bar__btn').forEach(function(b) { b.disabled = false; });
+        updateBar();
+      });
+    }
+
+    document.getElementById('orders_bulk_btn_confirmed').addEventListener('click', function() { bulkUpdate('ready_to_pickup'); });
+    document.getElementById('orders_bulk_btn_publish').addEventListener('click', function() { bulkUpdate('publish'); });
+    document.getElementById('orders_bulk_btn_cancel').addEventListener('click', function() { bulkUpdate('cancelled'); });
+  })();
+
+  // ===== Status Cell Inline Popup =====
+  (function() {
+    var activePopup = null;
+
+    function closeAll() {
+      if (activePopup) {
+        activePopup.style.display = 'none';
+        activePopup = null;
+      }
+    }
+
+    // Close on outside click
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.status-cell')) closeAll();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeAll();
+    });
+
+    // Toggle popup on status cell click
+    document.addEventListener('click', function(e) {
+      var cell = e.target.closest('.status-cell');
+      if (!cell) return;
+
+      // If clicking on a popup option, don't toggle
+      if (e.target.closest('.status-popup__option')) return;
+
+      var popup = cell.querySelector('.status-popup');
+      if (!popup) return;
+
+      // Close any other open popup
+      if (activePopup && activePopup !== popup) {
+        activePopup.style.display = 'none';
+      }
+
+      // Toggle this popup
+      if (popup.style.display === 'none') {
+        popup.style.display = 'block';
+        activePopup = popup;
+
+        // Mark current status as active
+        var current = cell.getAttribute('data-current-status');
+        popup.querySelectorAll('.status-popup__option').forEach(function(opt) {
+          opt.classList.toggle('status-popup__option--active', opt.getAttribute('data-status') === current);
+        });
+      } else {
+        popup.style.display = 'none';
+        activePopup = null;
+      }
+    });
+
+    // Handle option click
+    document.addEventListener('click', function(e) {
+      var option = e.target.closest('.status-popup__option');
+      if (!option) return;
+
+      var cell = option.closest('.status-cell');
+      var orderId = cell.getAttribute('data-order-id');
+      var newStatus = option.getAttribute('data-status');
+      var currentStatus = cell.getAttribute('data-current-status');
+
+      if (newStatus === currentStatus) { closeAll(); return; }
+      if (newStatus === 'cancelled' && !confirm('Cancel this order?')) { closeAll(); return; }
+
+      // Show loading state
+      var popup = cell.querySelector('.status-popup');
+      popup.innerHTML = '<div class="status-popup__loading"><i class="fa-solid fa-spinner fa-spin"></i> Updating...</div>';
+
+      fetch('{% url "orders:update_order_status" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ order_id: parseInt(orderId), status: newStatus })
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert('Error: ' + (data.error || 'Unknown error'));
+          closeAll();
+        }
+      })
+      .catch(function(err) {
+        alert('Network error: ' + err);
+        closeAll();
+      });
+    });
+  })();
+
+  // ===== Mobile Card Status Actions =====
+  (function() {
+    function showToast(msg) {
+      var t = document.createElement('div');
+      t.className = 'pwa-status-toast';
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(function() { t.remove(); }, 2000);
+    }
+
+    // Highlight active status button on each card
+    document.querySelectorAll('.pwa-order-card-full[data-current-status]').forEach(function(card) {
+      var current = card.getAttribute('data-current-status');
+      var btn = card.querySelector('.pwa-card-actions__btn[data-status="' + current + '"]');
+      if (btn) btn.classList.add('pwa-card-actions__btn--active');
+    });
+
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.pwa-card-actions__btn');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      var card = btn.closest('.pwa-order-card-full');
+      var orderId = card.getAttribute('data-order-id');
+      var newStatus = btn.getAttribute('data-status');
+      var currentStatus = card.getAttribute('data-current-status');
+
+      if (newStatus === currentStatus) return;
+      if (newStatus === 'cancelled' && !confirm('Cancel this order?')) return;
+
+      // Disable all buttons on this card
+      card.querySelectorAll('.pwa-card-actions__btn').forEach(function(b) { b.disabled = true; });
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+      fetch('{% url "orders:update_order_status" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ order_id: parseInt(orderId), status: newStatus })
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data.success) {
+          showToast('Status updated!');
+          setTimeout(function() { window.location.reload(); }, 600);
+        } else {
+          alert('Error: ' + (data.error || 'Unknown error'));
+          window.location.reload();
+        }
+      })
+      .catch(function(err) {
+        alert('Network error: ' + err);
+        window.location.reload();
+      });
+    });
+  })();
   </script>
 {% endblock extra_js %}

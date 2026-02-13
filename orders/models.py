@@ -41,7 +41,6 @@ ORDER_STATUS_BY_CLIENT = [
         ('ready_to_pickup', 'Ready to pickup'),
         ('publish', 'Publish for start delivery'),
         ('delivered', 'Delivered'),
-        ('fulfilled', 'Fulfilled'),
         ('cancelled', 'Cancelled'),
     ]
 
@@ -182,6 +181,23 @@ class Order(models.Model):
         return dirty_fields
 
     
+    @property
+    def whatsapp_product_summary(self):
+        """Return a short product summary for WhatsApp messages."""
+        items = getattr(self, '_prefetched_objects_cache', {}).get('order_items')
+        if items is None:
+            items = self.order_items.select_related('product', 'product__product_category').all()[:5]
+        parts = []
+        for item in items[:5]:
+            if item.product:
+                cat = ''
+                if item.product.product_category:
+                    cat = f' ({item.product.product_category})'
+                parts.append(f'{item.product.item_name} x{item.quantity}{cat}')
+            elif item.notes:
+                parts.append(f'{item.notes} x{item.quantity}')
+        return ', '.join(parts) if parts else ''
+
     def __str__(self):
         return f'({self.business}-{self.order_number}-{self.client_order_code})'
 

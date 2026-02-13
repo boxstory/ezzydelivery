@@ -55,7 +55,7 @@
       </a>
       {% endif %}
       {% if order.customer_whatsapp %}
-      <a href="https://wa.me/{{ order.customer_whatsapp }}" class="pwa-detail-action" hx-boost="false" target="_blank">
+      <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" class="pwa-detail-action" hx-boost="false" target="_blank">
         <div class="pwa-detail-action__icon pwa-detail-action__icon--whatsapp">
           <i class="fab fa-whatsapp"></i>
         </div>

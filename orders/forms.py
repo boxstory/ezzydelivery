@@ -329,6 +329,97 @@ class OrderFileUploadForm(forms.Form):
         return uploaded_file
 
 
+class OrderLookupForm(forms.Form):
+    """Form for customers to look up their order by order number + phone verification."""
+    order_number = forms.CharField(
+        max_length=64,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter your order number',
+            'autofocus': True,
+        }),
+        label='Order Number',
+    )
+    phone_last4 = forms.CharField(
+        max_length=4,
+        min_length=4,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Last 4 digits of your phone',
+            'inputmode': 'numeric',
+            'pattern': '[0-9]{4}',
+        }),
+        label='Last 4 digits of phone number',
+    )
+
+    def clean_phone_last4(self):
+        value = self.cleaned_data['phone_last4']
+        if not value.isdigit():
+            raise forms.ValidationError('Please enter only digits.')
+        return value
+
+
+class CustomerLocationUpdateForm(forms.Form):
+    """Form for customers to update their delivery location."""
+    verified_address = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Enter or update your delivery address',
+        }),
+        label='Delivery Address',
+        required=False,
+    )
+    zone_number = forms.IntegerField(
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Zone number',
+        }),
+        label='Zone Number',
+        required=False,
+    )
+    street_number = forms.IntegerField(
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Street number',
+        }),
+        label='Street Number',
+        required=False,
+    )
+    building_number = forms.IntegerField(
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Building number',
+        }),
+        label='Building Number',
+        required=False,
+    )
+    notes = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'E.g., Gate code, floor number, landmarks, etc.',
+        }),
+        label='Delivery Instructions',
+        required=False,
+    )
+    latitude = forms.DecimalField(
+        widget=forms.HiddenInput(),
+        max_digits=19,
+        decimal_places=15,
+        required=False,
+    )
+    longitude = forms.DecimalField(
+        widget=forms.HiddenInput(),
+        max_digits=19,
+        decimal_places=15,
+        required=False,
+    )
+    # Hidden fields to re-validate on update POST
+    order_number = forms.CharField(widget=forms.HiddenInput())
+    phone_last4 = forms.CharField(widget=forms.HiddenInput())
+
+
 class UpdateOrderForm(forms.ModelForm):
     """
     Order update form.

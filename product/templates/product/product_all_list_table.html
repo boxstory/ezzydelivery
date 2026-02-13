@@ -2,33 +2,36 @@
 {% load static %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'product/css/product.css' %}">
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260212f">
 Products - Table View
 {% endblock extra_head %}
 
 {% block extra_css %}{% endblock extra_css %}
 
 {% block content %}
-<div class="products-container" id="product_table_container">
-    <!-- Products Header -->
-    <div class="products-header" id="product_table_header">
-        <h2 id="product_table_title">
-            <i class="fa-solid fa-box-open"></i>
-            All Products
-        </h2>
-        <div class="header-actions d-flex align-items-center gap-3">
-            <!-- View Toggle -->
-            <div class="view-toggle">
-                <a href="{% url 'product:product_all_list' %}" class="view-toggle-btn">
+<div class="products-container" id="product_table_container" style="max-width: 1200px; margin: 0 auto; padding: 16px 20px 32px;">
+    <!-- Futuristic Header -->
+    <div id="product_table_header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding: 14px 18px; background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #002b57 100%); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,31,63,0.18);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 32px; height: 32px; background: linear-gradient(135deg, var(--brand-primary, #f7c000), #ffe066); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--brand-navy, #001f3f); font-size: 0.8rem;">
+                <i class="fa-solid fa-boxes-stacked"></i>
+            </div>
+            <div>
+                <h2 style="font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0;" id="product_table_title">Products</h2>
+                <span style="font-size: 0.68rem; color: rgba(255,255,255,0.45);">{{ products.count }} item{{ products.count|pluralize }}</span>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div class="view-toggle" style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 3px; display: flex; gap: 2px;">
+                <a href="{% url 'product:product_all_list' %}" class="view-toggle-btn" style="padding: 5px 10px; border-radius: 6px; font-size: 0.7rem; color: rgba(255,255,255,0.6); text-decoration: none; transition: all 0.2s;">
                     <i class="fas fa-th-large"></i> Grid
                 </a>
-                <a href="{% url 'product:product_all_list_table' %}" class="view-toggle-btn active">
+                <a href="{% url 'product:product_all_list_table' %}" class="view-toggle-btn" style="padding: 5px 10px; border-radius: 6px; font-size: 0.7rem; background: rgba(255,255,255,0.15); color: #fff; text-decoration: none;">
                     <i class="fas fa-table"></i> Table
                 </a>
             </div>
-            <a href="{% url 'product:product_single_add' %}" class="add-product-btn" id="product_table_btn_add">
-                <i class="fa-solid fa-plus"></i>
-                Add Product
+            <a href="{% url 'product:product_single_add' %}" id="product_table_btn_add" style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 700; color: var(--brand-navy, #001f3f); background: linear-gradient(135deg, var(--brand-primary, #f7c000), #ffe066); padding: 7px 14px; border-radius: 8px; text-decoration: none; transition: all 0.2s; box-shadow: 0 2px 8px rgba(247,192,0,0.3);">
+                <i class="fa-solid fa-plus"></i> Add Product
             </a>
         </div>
     </div>
@@ -69,9 +72,7 @@ Products - Table View
                     <!-- Product ID (Non-editable) -->
                     <td>
                         {% if product.product_id %}
-                            <span class="badge bg-primary text-white" style="font-size: 0.7rem; font-family: monospace; letter-spacing: 0.5px;">
-                                {{ product.product_id }}
-                            </span>
+                            <code style="font-size: 0.66rem; background: rgba(0,31,63,0.06); color: var(--brand-navy, #001f3f); padding: 3px 7px; border-radius: 5px; font-family: 'SF Mono', monospace; border: 1px solid rgba(0,31,63,0.08);">{{ product.product_id }}</code>
                         {% else %}
                             <span class="text-muted">-</span>
                         {% endif %}
@@ -218,9 +219,9 @@ Products - Table View
     </div>
 
     <!-- Table Info -->
-    <div class="mt-3 text-muted small">
-        <i class="fas fa-info-circle me-1"></i>
-        Click on any cell to edit inline. Press Enter to save or Escape to cancel.
+    <div style="margin-top: 12px; padding: 8px 14px; background: rgba(247,192,0,0.04); border: 1px solid rgba(247,192,0,0.1); border-radius: 8px; font-size: 0.72rem; color: var(--brand-grey-500, #6c757d); display: flex; align-items: center; gap: 6px;">
+        <i class="fas fa-bolt" style="color: var(--brand-primary, #f7c000);"></i>
+        Click any cell to edit inline &middot; <strong>Enter</strong> to save &middot; <strong>Esc</strong> to cancel
     </div>
 
     {% else %}
@@ -310,7 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCSRFToken()
             },
             body: JSON.stringify({
                 field: field,
@@ -356,19 +357,20 @@ document.addEventListener('DOMContentLoaded', function() {
         input.value = originalValue;
     }
 
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
+    function getCSRFToken() {
+        // 1. Try meta tag (set in business_dashboard_base.html)
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) return meta.getAttribute('content');
+        // 2. Try hidden input
+        const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        if (input) return input.value;
+        // 3. Fallback to cookie
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'csrftoken') return decodeURIComponent(value);
         }
-        return cookieValue;
+        return '';
     }
 });
 </script>

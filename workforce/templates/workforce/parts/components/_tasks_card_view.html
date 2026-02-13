@@ -10,6 +10,7 @@ Each task should have:
 - order (with customer_name, customer_phone, customer_address)
 - driver, pickup_location, dl_task_publish
 {% endcomment %}
+{% load custom_filters %}
 
 <div class="tasks-list" id="tasksContainer" style="display: none;">
     {% for dl in tasks %}
@@ -101,7 +102,7 @@ Each task should have:
         <div class="quick-actions">
             <div class="row g-2">
                 <div class="col-md-6 col-lg-3">
-                    <a href="https://wa.me/{{ dl.order.customer_phone }}?text=Hello {{ dl.order.customer_name }}, this is regarding delivery task {{ dl.dl_task_number }}"
+                    <a href="https://wa.me/{{ dl.order.customer_phone|whatsapp_number }}?text=Hi%20{{ dl.order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ dl.order.order_number|urlencode }}%20(Task:%20{{ dl.dl_task_number|urlencode }}).%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ dl.order.order_number|urlencode }}%26key={{ dl.order|verify_key }}"
                        target="_blank" class="btn btn-success btn-sm w-100">
                         <i class="fa-brands fa-whatsapp me-1"></i>WhatsApp
                     </a>

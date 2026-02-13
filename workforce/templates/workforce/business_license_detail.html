@@ -1,191 +1,274 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
-{% block title %}Business License Detail - Ezzy Delivery{% endblock title %}
+{% block title %}{{ business.business_name }} - Business Detail{% endblock title %}
 
 {% block extra_css %}
 <link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/biz-detail.css' %}" />
 {% endblock extra_css %}
 
 {% block content %}
 <div class="col-12 p-3">
-<!-- Page Title -->
-<h1 class="page-title">
-    <i class="fa-solid fa-certificate me-2"></i>{{ business.business_name|default:"Business License Detail" }}
-</h1>
 
-<!-- Back Button -->
-<div style="margin-bottom: 1.5rem;">
-    <a href="{% url 'workforce:business_licenses_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--brand-grey-700); text-decoration: none; font-weight: 600;">
-        <i class="fa-solid fa-arrow-left"></i>
-        Back to Licenses
-    </a>
-</div>
+<!-- Back Navigation -->
+<a href="{% url 'workforce:business_licenses_list' %}" class="biz-back-link">
+    <i class="fa-solid fa-arrow-left"></i> All Businesses
+</a>
 
-<!-- License Information -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-circle-info"></i>
-        License Information
-    </div>
-    <div class="info-grid">
-        <div class="info-row">
-            <span class="info-label">Business Name</span>
-            <span class="info-value">{{ business.business_name|default:"N/A" }}</span>
+<!-- Hero Header -->
+<div class="biz-hero">
+    <div class="biz-hero__glow"></div>
+    <div class="biz-hero__content">
+        <div class="biz-hero__avatar">
+            <span>{{ business.business_name|default:"?"|truncatechars:1 }}</span>
         </div>
-        <div class="info-row">
-            <span class="info-label">Business Code</span>
-            <span class="info-value">{{ business.business_code|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">QID</span>
-            <span class="info-value">{{ business.business_qid|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Business Since</span>
-            <span class="info-value">{{ business.business_since|date:"d M Y"|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Category</span>
-            <span class="info-value">{{ business.business_product_category|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Status</span>
-            <span class="info-value">
-                <span class="status-badge {% if business.business_status == 'active' %}status-active{% elif business.business_status == 'pending' %}status-pending{% elif business.business_status == 'suspended' %}status-failed{% else %}status-inactive{% endif %}">
-                    {{ business.business_status|title }}
+        <div class="biz-hero__info">
+            <h1 class="biz-hero__name">{{ business.business_name|default:"Unknown Business" }}</h1>
+            <div class="biz-hero__meta">
+                <span class="biz-hero__code"><i class="fa-solid fa-fingerprint"></i> {{ business.business_code|default:"N/A" }}</span>
+                <span class="biz-hero__badge biz-hero__badge--{{ business.business_status }}">
+                    <i class="fa-solid fa-circle"></i> {{ business.business_status|title }}
                 </span>
-            </span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Created At</span>
-            <span class="info-value">{{ business.created_at|date:"d M Y, h:i A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Last Updated</span>
-            <span class="info-value">{{ business.updated_at|date:"d M Y, h:i A" }}</span>
+                <span class="biz-hero__badge biz-hero__badge--fulfillment-{{ business.fulfillment_service_status }}">
+                    <i class="fa-solid fa-boxes-stacked"></i> Fulfillment: {{ business.get_fulfillment_service_status_display }}
+                </span>
+            </div>
+            <div class="biz-hero__id">ID: {{ business.business_id }}</div>
         </div>
     </div>
 </div>
 
-<!-- Address Information -->
-{% if business_profile %}
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-location-dot"></i>
-        Business Address
-    </div>
-    <div class="info-grid">
-        <div class="info-row">
-            <span class="info-label">Full Address</span>
-            <span class="info-value">{{ business_profile.business_address|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">City</span>
-            <span class="info-value">{{ business_profile.business_city|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">State</span>
-            <span class="info-value">{{ business_profile.business_state|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Zip Code</span>
-            <span class="info-value">{{ business_profile.business_zip_code|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Country</span>
-            <span class="info-value">{{ business_profile.business_country|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Start Date</span>
-            <span class="info-value">{{ business_profile.business_start_date|date:"d M Y"|default:"N/A" }}</span>
+<!-- Stats Row -->
+<div class="biz-stats">
+    <div class="biz-stats__card">
+        <div class="biz-stats__icon biz-stats__icon--primary"><i class="fa-solid fa-box"></i></div>
+        <div class="biz-stats__data">
+            <div class="biz-stats__number">{{ order_stats.total|default:0 }}</div>
+            <div class="biz-stats__label">Total Orders</div>
         </div>
     </div>
-</div>
-{% endif %}
-
-<!-- Contact Information -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-address-book"></i>
-        Contact Information
+    <div class="biz-stats__card">
+        <div class="biz-stats__icon biz-stats__icon--success"><i class="fa-solid fa-circle-check"></i></div>
+        <div class="biz-stats__data">
+            <div class="biz-stats__number">{{ order_stats.delivered|default:0 }}</div>
+            <div class="biz-stats__label">Delivered</div>
+        </div>
     </div>
-    <div class="info-grid">
-        <div class="info-row">
-            <span class="info-label">Phone</span>
-            <span class="info-value">{{ business.business_phone|default:"N/A" }}</span>
+    <div class="biz-stats__card">
+        <div class="biz-stats__icon biz-stats__icon--warning"><i class="fa-solid fa-clock"></i></div>
+        <div class="biz-stats__data">
+            <div class="biz-stats__number">{{ order_stats.pending|default:0 }}</div>
+            <div class="biz-stats__label">Pending</div>
         </div>
-        <div class="info-row">
-            <span class="info-label">Email</span>
-            <span class="info-value">{{ business.business_email|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">WhatsApp</span>
-            <span class="info-value">{{ business.business_whatsapp|default:"N/A" }}</span>
+    </div>
+    <div class="biz-stats__card">
+        <div class="biz-stats__icon biz-stats__icon--info"><i class="fa-solid fa-calendar-days"></i></div>
+        <div class="biz-stats__data">
+            <div class="biz-stats__number">{{ business.created_at|date:"d M Y" }}</div>
+            <div class="biz-stats__label">Registered</div>
         </div>
     </div>
 </div>
 
-<!-- Edit Form -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-edit"></i>
-        Update License Information
-    </div>
+<!-- Main Grid -->
+<div class="biz-grid">
 
-    <form id="updateForm">
-        {% csrf_token %}
-        <div style="display: grid; gap: 1rem;">
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Business Name</label>
-                <input type="text" name="business_name" value="{{ business.business_name }}" class="filter-input" required>
-            </div>
+    <!-- Left Column -->
+    <div class="biz-grid__left">
 
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">QID</label>
-                <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="filter-input">
-            </div>
-
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Business Since</label>
-                <input type="date" name="business_since" value="{{ business.business_since|date:'Y-m-d' }}" class="filter-input">
-            </div>
-
-            {% if business_profile %}
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Business Address</label>
-                <input type="text" name="business_address" value="{{ business_profile.business_address|default:'' }}" class="filter-input">
-            </div>
-
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">City</label>
-                <input type="text" name="business_city" value="{{ business_profile.business_city|default:'' }}" class="filter-input">
-            </div>
-            {% endif %}
-
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Status</label>
-                <select name="business_status" class="filter-input">
-                    <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
-                    <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
-                    <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
-                    <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
-                </select>
-            </div>
-
-            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                <button type="submit" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
-                    <i class="fa-solid fa-save"></i>
-                    Save Changes
+        <!-- License Info Panel -->
+        <div class="biz-panel" data-panel="license">
+            <div class="biz-panel__header">
+                <i class="fa-solid fa-certificate"></i>
+                <h3>License Information</h3>
+                <button type="button" class="biz-panel__edit-btn" data-panel="license" title="Edit">
+                    <i class="fa-solid fa-pen"></i>
                 </button>
-                <a href="{% url 'workforce:business_licenses_list' %}" class="cancel-btn" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; color: var(--brand-grey-800); text-decoration: none; display: inline-block;">
-                    Cancel
-                </a>
+            </div>
+            <div class="biz-panel__body">
+                <form class="biz-form" data-section="license">
+                    {% csrf_token %}
+                    <div class="biz-form__group">
+                        <label class="biz-form__label">Business Name</label>
+                        <input type="text" name="business_name" value="{{ business.business_name|default:'' }}" class="biz-form__input" disabled required>
+                    </div>
+                    <div class="biz-form__row">
+                        <div class="biz-form__group">
+                            <label class="biz-form__label">Business Code</label>
+                            <input type="text" value="{{ business.business_code|default:'N/A' }}" class="biz-form__input biz-form__input--mono" disabled readonly>
+                        </div>
+                        <div class="biz-form__group">
+                            <label class="biz-form__label">QID</label>
+                            <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="biz-form__input biz-form__input--mono" disabled>
+                        </div>
+                    </div>
+                    <div class="biz-form__row">
+                        <div class="biz-form__group">
+                            <label class="biz-form__label">Category</label>
+                            <input type="text" name="business_product_category" value="{{ business.business_product_category|default:'' }}" class="biz-form__input" disabled>
+                        </div>
+                        <div class="biz-form__group">
+                            <label class="biz-form__label">Business Since</label>
+                            <input type="date" name="business_since" value="{{ business.business_since|date:'Y-m-d' }}" class="biz-form__input" disabled>
+                        </div>
+                    </div>
+                    <div class="biz-form__group">
+                        <label class="biz-form__label">Last Updated</label>
+                        <input type="text" value="{{ business.updated_at|date:'d M Y, h:i A' }}" class="biz-form__input" disabled readonly>
+                    </div>
+                    <div class="biz-form__actions biz-form__actions--hidden" data-panel="license">
+                        <button type="submit" class="biz-btn biz-btn--primary">
+                            <i class="fa-solid fa-save"></i> Save
+                        </button>
+                        <button type="button" class="biz-btn biz-btn--ghost biz-cancel-btn" data-panel="license">
+                            Cancel
+                        </button>
+                    </div>
+                    <div class="biz-toast biz-section-msg" data-panel="license"></div>
+                </form>
             </div>
         </div>
-    </form>
 
-    <div id="updateMessage" style="display: none; margin-top: 1rem; padding: 1rem; border-radius: var(--brand-radius-sm);"></div>
+        <!-- Contact Panel -->
+        <div class="biz-panel" data-panel="contact">
+            <div class="biz-panel__header">
+                <i class="fa-solid fa-address-book"></i>
+                <h3>Contact</h3>
+                <button type="button" class="biz-panel__edit-btn" data-panel="contact" title="Edit">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+            </div>
+            <div class="biz-panel__body">
+                <form class="biz-form" data-section="contact">
+                    {% csrf_token %}
+                    <div class="biz-form__row">
+                        <div class="biz-form__group">
+                            <label class="biz-form__label"><i class="fa-solid fa-phone"></i> Phone</label>
+                            <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="biz-form__input" disabled placeholder="—">
+                        </div>
+                        <div class="biz-form__group">
+                            <label class="biz-form__label"><i class="fa-brands fa-whatsapp"></i> WhatsApp</label>
+                            <input type="text" name="business_whatsapp" value="{{ business.business_whatsapp|default:'' }}" class="biz-form__input" disabled placeholder="—">
+                        </div>
+                    </div>
+                    <div class="biz-form__group">
+                        <label class="biz-form__label"><i class="fa-solid fa-envelope"></i> Email</label>
+                        <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="biz-form__input" disabled placeholder="—">
+                    </div>
+                    <div class="biz-form__row">
+                        <div class="biz-form__group">
+                            <label class="biz-form__label"><i class="fa-brands fa-facebook"></i> Facebook</label>
+                            <input type="url" name="business_facebook_page" value="{{ business.business_facebook_page|default:'' }}" class="biz-form__input" disabled placeholder="—">
+                        </div>
+                        <div class="biz-form__group">
+                            <label class="biz-form__label"><i class="fa-brands fa-instagram"></i> Instagram</label>
+                            <input type="url" name="business_instagram" value="{{ business.business_instagram|default:'' }}" class="biz-form__input" disabled placeholder="—">
+                        </div>
+                    </div>
+                    <div class="biz-form__actions biz-form__actions--hidden" data-panel="contact">
+                        <button type="submit" class="biz-btn biz-btn--primary">
+                            <i class="fa-solid fa-save"></i> Save
+                        </button>
+                        <button type="button" class="biz-btn biz-btn--ghost biz-cancel-btn" data-panel="contact">
+                            Cancel
+                        </button>
+                    </div>
+                    <div class="biz-toast biz-section-msg" data-panel="contact"></div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Right Column -->
+    <div class="biz-grid__right">
+
+        <!-- Address Panel -->
+        <div class="biz-panel" data-panel="address">
+            <div class="biz-panel__header">
+                <i class="fa-solid fa-location-dot"></i>
+                <h3>Address</h3>
+                <button type="button" class="biz-panel__edit-btn" data-panel="address" title="Edit">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+            </div>
+            <div class="biz-panel__body">
+                <form class="biz-form" data-section="address">
+                    {% csrf_token %}
+                    <div class="biz-form__group">
+                        <label class="biz-form__label">Full Address</label>
+                        <input type="text" name="business_address" value="{{ business_profile.business_address|default:'' }}" class="biz-form__input" disabled placeholder="—">
+                    </div>
+                    <div class="biz-form__row">
+                        <div class="biz-form__group">
+                            <label class="biz-form__label">City</label>
+                            <input type="text" name="business_city" value="{{ business_profile.business_city|default:'' }}" class="biz-form__input" disabled placeholder="—">
+                        </div>
+                        <div class="biz-form__group">
+                            <label class="biz-form__label">Country</label>
+                            <input type="text" name="business_country" value="{{ business_profile.business_country|default:'Qatar' }}" class="biz-form__input" disabled placeholder="—">
+                        </div>
+                    </div>
+                    <div class="biz-form__actions biz-form__actions--hidden" data-panel="address">
+                        <button type="submit" class="biz-btn biz-btn--primary">
+                            <i class="fa-solid fa-save"></i> Save
+                        </button>
+                        <button type="button" class="biz-btn biz-btn--ghost biz-cancel-btn" data-panel="address">
+                            Cancel
+                        </button>
+                    </div>
+                    <div class="biz-toast biz-section-msg" data-panel="address"></div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Status Panel -->
+        <div class="biz-panel" data-panel="status">
+            <div class="biz-panel__header">
+                <i class="fa-solid fa-shield-halved"></i>
+                <h3>Account Status</h3>
+                <button type="button" class="biz-panel__edit-btn" data-panel="status" title="Edit">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+            </div>
+            <div class="biz-panel__body">
+                <form class="biz-form" data-section="status">
+                    {% csrf_token %}
+                    <div class="biz-form__row">
+                        <div class="biz-form__group">
+                            <label class="biz-form__label">Account Status</label>
+                            <select name="business_status" class="biz-form__input" disabled>
+                                <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
+                                <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                                <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
+                            </select>
+                        </div>
+                        <div class="biz-form__group">
+                            <label class="biz-form__label">Fulfillment Service</label>
+                            <select name="fulfillment_service_status" class="biz-form__input" disabled>
+                                <option value="none" {% if business.fulfillment_service_status == 'none' %}selected{% endif %}>Not Requested</option>
+                                <option value="requested" {% if business.fulfillment_service_status == 'requested' %}selected{% endif %}>Requested</option>
+                                <option value="active" {% if business.fulfillment_service_status == 'active' %}selected{% endif %}>Active</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="biz-form__actions biz-form__actions--hidden" data-panel="status">
+                        <button type="submit" class="biz-btn biz-btn--primary">
+                            <i class="fa-solid fa-save"></i> Save
+                        </button>
+                        <button type="button" class="biz-btn biz-btn--ghost biz-cancel-btn" data-panel="status">
+                            Cancel
+                        </button>
+                    </div>
+                    <div class="biz-toast biz-section-msg" data-panel="status"></div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
 </div>
 
 </div>
@@ -193,62 +276,120 @@
 
 {% block extra_js %}
 <script>
-    // Safe message display helper (XSS-safe)
-    function showMessage(messageDiv, isSuccess, text) {
-        messageDiv.style.display = 'block';
-        messageDiv.style.background = isSuccess ? '#d4edda' : '#f8d7da';
-        messageDiv.style.color = isSuccess ? '#155724' : '#721c24';
-        // Use textContent for safe text insertion
-        messageDiv.textContent = '';
-        const icon = document.createElement('i');
-        icon.className = isSuccess ? 'fa-solid fa-check-circle' : 'fa-solid fa-exclamation-triangle';
-        icon.setAttribute('aria-hidden', 'true');
-        messageDiv.appendChild(icon);
-        messageDiv.appendChild(document.createTextNode(' ' + text));
+(function() {
+    var apiUrl = '{% url "workforce:business_license_detail" business.business_id %}';
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    // Store original values to restore on cancel
+    var originalValues = {};
+
+    function storeOriginals(panelName) {
+        var panel = document.querySelector('.biz-panel[data-panel="' + panelName + '"]');
+        var fields = panel.querySelectorAll('input[name], select[name]');
+        originalValues[panelName] = {};
+        fields.forEach(function(f) { originalValues[panelName][f.name] = f.value; });
     }
 
-    document.getElementById('updateForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        const formData = new FormData(this);
-        const messageDiv = document.getElementById('updateMessage');
-        const submitBtn = this.querySelector('button[type="submit"]');
-
-        // Disable submit button during request
-        submitBtn.disabled = true;
-        const originalText = submitBtn.textContent;
-        submitBtn.textContent = 'Saving...';
-
-        fetch('{% url 'workforce:business_license_detail' business.business_id %}', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    function restoreOriginals(panelName) {
+        var panel = document.querySelector('.biz-panel[data-panel="' + panelName + '"]');
+        var fields = panel.querySelectorAll('input[name], select[name]');
+        if (!originalValues[panelName]) return;
+        fields.forEach(function(f) {
+            if (originalValues[panelName].hasOwnProperty(f.name)) {
+                f.value = originalValues[panelName][f.name];
             }
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                showMessage(messageDiv, true, data.message || 'Business license updated successfully');
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
-            } else {
-                showMessage(messageDiv, false, data.error || 'Failed to update business license');
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalText;
-            }
-        })
-        .catch(error => {
-            showMessage(messageDiv, false, 'Error updating business license. Please try again.');
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
+        });
+    }
+
+    function togglePanel(panelName, editing) {
+        var panel = document.querySelector('.biz-panel[data-panel="' + panelName + '"]');
+        var btn = panel.querySelector('.biz-panel__edit-btn');
+        var actions = panel.querySelector('.biz-form__actions');
+        // Get only editable fields (those with a name attr, excluding readonly)
+        var fields = panel.querySelectorAll('input[name]:not([readonly]), select[name]');
+
+        if (editing) {
+            storeOriginals(panelName);
+            panel.classList.add('biz-panel--editing');
+            btn.classList.add('biz-panel__edit-btn--active');
+            actions.classList.remove('biz-form__actions--hidden');
+            fields.forEach(function(f) { f.disabled = false; });
+        } else {
+            panel.classList.remove('biz-panel--editing');
+            btn.classList.remove('biz-panel__edit-btn--active');
+            actions.classList.add('biz-form__actions--hidden');
+            fields.forEach(function(f) { f.disabled = true; });
+            restoreOriginals(panelName);
+            // Hide any toast
+            var msg = panel.querySelector('.biz-section-msg');
+            if (msg) msg.style.display = 'none';
+        }
+    }
+
+    function showSectionMsg(panelName, ok, text) {
+        var el = document.querySelector('.biz-section-msg[data-panel="' + panelName + '"]');
+        if (!el) return;
+        el.style.display = 'flex';
+        el.className = 'biz-toast biz-section-msg ' + (ok ? 'biz-toast--success' : 'biz-toast--error');
+        el.textContent = '';
+        var icon = document.createElement('i');
+        icon.className = ok ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation';
+        el.appendChild(icon);
+        el.appendChild(document.createTextNode(' ' + text));
+        if (ok) setTimeout(function() { el.style.display = 'none'; }, 3000);
+    }
+
+    // Edit buttons
+    document.querySelectorAll('.biz-panel__edit-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var panel = this.dataset.panel;
+            var isEditing = this.classList.contains('biz-panel__edit-btn--active');
+            togglePanel(panel, !isEditing);
         });
     });
+
+    // Cancel buttons
+    document.querySelectorAll('.biz-cancel-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            togglePanel(this.dataset.panel, false);
+        });
+    });
+
+    // Form submissions
+    document.querySelectorAll('.biz-form[data-section]').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var section = this.dataset.section;
+            var formData = new FormData(this);
+            formData.append('section', section);
+            var submitBtn = this.querySelector('button[type="submit"]');
+            var origHtml = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+            fetch(apiUrl, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            })
+            .then(function(r) { if (!r.ok) throw new Error('fail'); return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    showSectionMsg(section, true, data.message || 'Updated successfully');
+                    setTimeout(function() { window.location.reload(); }, 1200);
+                } else {
+                    showSectionMsg(section, false, data.error || 'Update failed');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = origHtml;
+                }
+            })
+            .catch(function() {
+                showSectionMsg(section, false, 'Network error. Please try again.');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = origHtml;
+            });
+        });
+    });
+})();
 </script>
 {% endblock extra_js %}

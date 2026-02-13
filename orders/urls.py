@@ -43,6 +43,8 @@ urlpatterns = [
     # operation links
     path('update_order_status/',
          orders_views.update_order_status, name='update_order_status'),
+    path('bulk-update-status/',
+         orders_views.bulk_update_order_status, name='bulk_update_order_status'),
     path('<int:order_id>/update-status/',
          orders_views.update_order_status, name='update_order_status_by_id'),
 
@@ -59,6 +61,9 @@ urlpatterns = [
 
      # Location Verification (Public URL)
      path('verify-location/<str:token>/', orders_views.verify_location, name='verify_location'),
+
+     # Customer Self-Service Location Update (Public URL)
+     path('verify/', orders_views.update_location, name='update_location'),
 
      # Bulk Import (Client Dashboard)
      path('bulk-import/', orders_views.bulk_import_orders, name='bulk_import_orders'),
