@@ -4,65 +4,7 @@
 {% block title %}Earnings Verification{% endblock %}
 
 {% block extra_css %}
-<style>
-  .earnings-input {
-    width: 80px;
-    text-align: right;
-    padding: 4px 8px;
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
-    font-weight: 600;
-  }
-  .earnings-input:focus {
-    border-color: #3b82f6;
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-  }
-  .earnings-input.modified {
-    background: #fef3c7;
-    border-color: #f59e0b;
-  }
-  .verification-badge {
-    font-size: 0.75rem;
-    padding: 4px 8px;
-    border-radius: 6px;
-  }
-  .verification-badge--pending {
-    background: #fef3c7;
-    color: #92400e;
-  }
-  .verification-badge--verified {
-    background: #dbeafe;
-    color: #1e40af;
-  }
-  .verification-badge--published {
-    background: #d1fae5;
-    color: #065f46;
-  }
-  .verification-badge--rejected {
-    background: #fee2e2;
-    color: #991b1b;
-  }
-  .bulk-action-bar {
-    position: sticky;
-    bottom: 0;
-    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-    padding: 16px;
-    border-radius: 12px 12px 0 0;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
-    display: none;
-    z-index: 100;
-  }
-  .bulk-action-bar.show {
-    display: block;
-  }
-  .stat-card-mini {
-    background: white;
-    border-radius: 12px;
-    padding: 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  }
-</style>
+<link rel="stylesheet" href="{% static 'workforce/css/workforce-earnings-verification.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -73,7 +15,10 @@
       <div class="d-flex justify-content-between align-items-center">
         <div>
           <h1 class="h3 mb-1">Earnings Verification</h1>
-          <p class="text-muted mb-0">Verify and publish driver earnings for completed deliveries</p>
+          <p class="text-muted mb-0">Verify and publish driver earnings for delivered orders with COD collected</p>
+          <small class="text-muted">
+            <i class="fas fa-info-circle"></i> Earnings Calculation: Pick & Drop = 80% of delivery price | Normal = QAR 10 flat rate
+          </small>
         </div>
         <div>
           <a href="{% url 'workforce:fleet_drivers_earnings' %}" class="btn btn-outline-primary">
@@ -87,25 +32,25 @@
   <!-- Stats Cards -->
   <div class="row mb-4">
     <div class="col-md-3 col-6 mb-3">
-      <div class="stat-card-mini border-start border-4 border-warning">
+      <div class="workforce_stat_card_mini border-start border-4 border-warning">
         <h6 class="text-muted mb-1">Pending</h6>
         <h3 class="mb-0 text-warning">{{ stats.pending_count }}</h3>
       </div>
     </div>
     <div class="col-md-3 col-6 mb-3">
-      <div class="stat-card-mini border-start border-4 border-primary">
+      <div class="workforce_stat_card_mini border-start border-4 border-primary">
         <h6 class="text-muted mb-1">Verified</h6>
         <h3 class="mb-0 text-primary">{{ stats.verified_count }}</h3>
       </div>
     </div>
     <div class="col-md-3 col-6 mb-3">
-      <div class="stat-card-mini border-start border-4 border-success">
+      <div class="workforce_stat_card_mini border-start border-4 border-success">
         <h6 class="text-muted mb-1">Published</h6>
         <h3 class="mb-0 text-success">{{ stats.published_count }}</h3>
       </div>
     </div>
     <div class="col-md-3 col-6 mb-3">
-      <div class="stat-card-mini border-start border-4 border-info">
+      <div class="workforce_stat_card_mini border-start border-4 border-info">
         <h6 class="text-muted mb-1">Pending Earnings</h6>
         <h3 class="mb-0 text-info">{{ stats.total_pending_earnings|floatformat:0 }} QR</h3>
       </div>
@@ -113,14 +58,14 @@
   </div>
 
   <!-- Filters -->
-  <div class="row mb-4">
+  <div class="row mb-3">
     <div class="col-12">
-      <div class="card border-0 shadow-sm">
-        <div class="card-body py-3">
-          <form method="GET" class="row g-2 align-items-end">
-            <div class="col-md-3">
-              <label class="form-label small fw-semibold">Driver</label>
-              <select name="driver" class="form-select" onchange="this.form.submit()">
+      <div class="card border-0 shadow-sm rounded">
+        <div class="card-body workforce_filter_card_body">
+          <form method="GET" class="row g-3 align-items-end" id="workforce_earnings_filter_form">
+            <div class="col-md-4 col-lg-3">
+              <label class="form-label fw-semibold text-muted">Driver</label>
+              <select name="driver" class="form-select" id="workforce_earnings_filter_driver">
                 <option value="">All Drivers</option>
                 {% for driver in drivers %}
                 <option value="{{ driver.driver_id }}" {% if selected_driver == driver.driver_id|stringformat:"s" %}selected{% endif %}>
@@ -129,9 +74,9 @@
                 {% endfor %}
               </select>
             </div>
-            <div class="col-md-2">
-              <label class="form-label small fw-semibold">Status</label>
-              <select name="status" class="form-select" onchange="this.form.submit()">
+            <div class="col-md-3 col-lg-2">
+              <label class="form-label fw-semibold text-muted">Status</label>
+              <select name="status" class="form-select" id="workforce_earnings_filter_status">
                 <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All Status</option>
                 <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
                 <option value="verified" {% if selected_status == 'verified' %}selected{% endif %}>Verified</option>
@@ -139,18 +84,18 @@
                 <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>Rejected</option>
               </select>
             </div>
-            <div class="col-md-2">
-              <label class="form-label small fw-semibold">Period</label>
-              <select name="days" class="form-select" onchange="this.form.submit()">
+            <div class="col-md-3 col-lg-2">
+              <label class="form-label fw-semibold text-muted">Period</label>
+              <select name="days" class="form-select" id="workforce_earnings_filter_days">
                 <option value="1" {% if selected_days == 1 %}selected{% endif %}>Today</option>
                 <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
                 <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
                 <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
               </select>
             </div>
-            <div class="col-md-2">
-              <button type="submit" class="btn btn-primary w-100">
-                <i class="fa-solid fa-filter me-1"></i> Filter
+            <div class="col-md-2 col-lg-2">
+              <button type="submit" class="btn btn-primary btn-sm w-100">
+                <i class="fa-solid fa-filter me-1"></i> Apply
               </button>
             </div>
           </form>
@@ -169,18 +114,18 @@
         </div>
         <div class="listing-selection-bar">
           <div class="d-flex align-items-center gap-3">
-            <input type="checkbox" class="form-check-input" id="select-all" style="cursor: pointer;">
+            <input type="checkbox" class="form-check-input" id="workforce_earnings_select_all">
             <span class="text-muted">Select All</span>
-            <span class="badge bg-secondary" id="selected-count">0 selected</span>
+            <span class="badge bg-secondary" id="workforce_earnings_selected_count">0 selected</span>
           </div>
           <div class="btn-group">
-            <button type="button" class="btn btn-sm btn-outline-primary" onclick="bulkAction('verify')" id="btn-verify" disabled>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="workforce_earnings_btn_verify" disabled>
               <i class="fa-solid fa-check me-1"></i> Verify
             </button>
-            <button type="button" class="btn btn-sm btn-outline-success" onclick="bulkAction('publish')" id="btn-publish" disabled>
+            <button type="button" class="btn btn-sm btn-outline-success" id="workforce_earnings_btn_publish" disabled>
               <i class="fa-solid fa-paper-plane me-1"></i> Publish
             </button>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="bulkAction('reject')" id="btn-reject" disabled>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="workforce_earnings_btn_reject" disabled>
               <i class="fa-solid fa-times me-1"></i> Reject
             </button>
           </div>
@@ -189,14 +134,12 @@
           <table class="listing-table">
             <thead>
               <tr>
-                <th style="width: 40px;"></th>
+                <th class="listing-table-checkbox-col"></th>
                 <th>Task</th>
                 <th>Driver</th>
                 <th>Business</th>
+                <th>Locations (Pickup → Drop)</th>
                 <th>Type</th>
-                <th>Zones</th>
-                <th>DL</th>
-                <th>COD</th>
                 <th>Calculated</th>
                 <th>Verified</th>
                 <th>Status</th>
@@ -205,69 +148,95 @@
             </thead>
             <tbody>
               {% for task in tasks %}
-              <tr data-task-id="{{ task.id }}">
+              <tr data-task-id="{{ task.id }}" {% if task.is_long_distance %}class="workforce_long_distance_row"{% endif %}>
                 <td>
-                  <input type="checkbox" class="form-check-input task-checkbox" value="{{ task.id }}"
-                         data-calculated="{{ task.calculated_earnings|default:task.driver_earnings|default:task.dl_price|default:0 }}">
+                  <input type="checkbox" class="form-check-input workforce_earnings_task_checkbox" value="{{ task.id }}"
+                         data-calculated="{{ task.calculate_driver_earnings }}">
                 </td>
                 <td>
                   <code>{{ task.dl_task_number }}</code>
-                  <div class="text-muted" style="font-size: 0.65rem;">{{ task.dl_task_date|date:"d M" }}</div>
+                  <div class="text-muted text-xs">{{ task.dl_task_date|date:"d M" }}</div>
                 </td>
                 <td>
                   {% if task.driver %}
                   {{ task.driver.user.first_name }}
-                  <div class="text-muted" style="font-size: 0.65rem;">{{ task.driver.driver_code }}</div>
-                  {% else %}-{% endif %}
+                  <div class="text-muted text-xs">{{ task.driver.driver_code }}</div>
+                  {% else %}<span class="text-muted">-</span>{% endif %}
                 </td>
-                <td class="text-2line" title="{{ task.order.business.business_name|default:'' }}">{{ task.order.business.business_name|default:"-" }}</td>
+                <td class="text-2line" title="{{ task.order.business.business_name|default:'' }}">
+                  {{ task.order.business.business_name|default:"-" }}
+                </td>
+                <td class="workforce_location_cell">
+                  <div class="workforce_location_row text-muted">
+                    <i class="fas fa-store text-primary"></i>
+                    <span>
+                      {% if task.pickup_location %}
+                        {{ task.pickup_location.pickup_location_title|truncatechars:28 }}
+                        <span class="badge bg-light text-dark text-xs">Z{{ task.pickup_location.pickup_zone_no|default:"-" }}</span>
+                      {% else %}
+                        <span class="text-warning">No pickup</span>
+                      {% endif %}
+                    </span>
+                  </div>
+                  <div class="workforce_location_row mt-1">
+                    <i class="fas fa-location-dot text-success"></i>
+                    <span>
+                      {% if task.dl_to_address %}
+                        {{ task.dl_to_address.area_name|default:"Unknown"|truncatechars:28 }}
+                        <span class="badge bg-light text-dark text-xs">Z{{ task.dl_to_address.dl_zone|default:"-" }}</span>
+                      {% else %}
+                        <span class="text-warning">No drop</span>
+                      {% endif %}
+                    </span>
+                  </div>
+                </td>
                 <td>
                   {% if task.order.order_type == 'pick_and_drop' %}
-                  <span class="listing-status" style="background: #ede9fe; color: #5b21b6;">P&D</span>
+                  <span class="listing-status listing-status--purple">P&D</span>
                   {% else %}
-                  <span class="listing-status primary">N</span>
+                  <span class="listing-status listing-status--primary">Normal</span>
                   {% endif %}
                 </td>
-                <td style="font-size: 0.65rem;">
-                  {% if task.pickup_location %}P:Z{{ task.pickup_location.pickup_zone_no|default:"-" }}{% endif %}
-                  D:Z{{ task.dl_to_address.dl_zone|default:"-" }}
+                <td class="text-muted">
+                  {{ task.calculate_driver_earnings|floatformat:0 }}
+                  {% if task.is_long_distance %}
+                    <i class="fas fa-exclamation-triangle text-warning ms-1" title="Long distance - may need adjustment"></i>
+                  {% endif %}
                 </td>
-                <td><span class="listing-status success"><i class="fas fa-check"></i></span></td>
                 <td>
-                  {% if task.order.cod_amount and task.order.cod_amount > 0 %}
-                    {% if task.cod_settled %}<span class="listing-status success"><i class="fas fa-check"></i></span>
-                    {% elif task.cod_collected %}<span class="listing-status primary"><i class="fas fa-hand-holding-dollar"></i></span>
-                    {% else %}<span class="listing-status warning"><i class="fas fa-clock"></i></span>{% endif %}
-                  {% else %}-{% endif %}
-                </td>
-                <td class="text-muted">{{ task.calculated_earnings|default:task.driver_earnings|default:task.dl_price|default:0|floatformat:0 }}</td>
-                <td>
-                  <input type="number" class="earnings-input"
-                         id="earnings-{{ task.id }}"
-                         value="{{ task.verified_earnings|default:task.calculated_earnings|default:task.driver_earnings|default:task.dl_price|default:0 }}"
-                         data-original="{{ task.verified_earnings|default:task.calculated_earnings|default:task.driver_earnings|default:task.dl_price|default:0 }}"
+                  <input type="number"
+                         class="workforce_earnings_input {% if task.is_long_distance %}border-warning{% endif %}"
+                         id="workforce_earnings_input_{{ task.id }}"
+                         value="{{ task.verified_earnings|default:task.calculate_driver_earnings }}"
+                         data-original="{{ task.verified_earnings|default:task.calculate_driver_earnings }}"
                          step="0.01" min="0"
-                         {% if task.earnings_verification_status == 'published' %}disabled{% endif %}>
+                         {% if task.earnings_verification_status == 'published' %}disabled{% endif %}
+                         {% if task.is_long_distance %}placeholder="Adjust for >20km"{% endif %}>
                 </td>
                 <td>
-                  <span class="verification-badge verification-badge--{{ task.earnings_verification_status }}">
-                    {% if task.earnings_verification_status == 'pending' %}<i class="fa-solid fa-clock"></i>
-                    {% elif task.earnings_verification_status == 'verified' %}<i class="fa-solid fa-check"></i>
-                    {% elif task.earnings_verification_status == 'published' %}<i class="fa-solid fa-paper-plane"></i>
-                    {% elif task.earnings_verification_status == 'rejected' %}<i class="fa-solid fa-times"></i>{% endif %}
+                  <span class="workforce_verification_badge workforce_verification_badge--{{ task.earnings_verification_status }}">
+                    {% if task.earnings_verification_status == 'pending' %}
+                      <i class="fa-solid fa-clock"></i> Pending
+                    {% elif task.earnings_verification_status == 'verified' %}
+                      <i class="fa-solid fa-check"></i> Verified
+                    {% elif task.earnings_verification_status == 'published' %}
+                      <i class="fa-solid fa-paper-plane"></i> Published
+                    {% elif task.earnings_verification_status == 'rejected' %}
+                      <i class="fa-solid fa-times"></i> Rejected
+                    {% endif %}
                   </span>
                 </td>
                 <td>
                   {% if task.earnings_verified_by %}
                   {{ task.earnings_verified_by.first_name|slice:":8" }}
-                  {% else %}-{% endif %}
+                  {% else %}<span class="text-muted">-</span>{% endif %}
                 </td>
               </tr>
               {% empty %}
               <tr>
-                <td colspan="12" class="listing-empty">
+                <td colspan="10" class="listing-empty">
                   <i class="fa-solid fa-inbox"></i>
-                  No deliveries found matching your filters
+                  No deliveries with collected COD found matching your filters
                 </td>
               </tr>
               {% endfor %}
@@ -275,7 +244,7 @@
           </table>
         </div>
         {% if tasks.has_other_pages %}
-        <div style="padding: 8px 12px; border-top: 1px solid var(--brand-grey-200);">
+        <div class="listing-footer">
           {% include "includes/components/_pagination.html" with page_obj=tasks %}
         </div>
         {% endif %}
@@ -284,17 +253,17 @@
   </div>
 
   <!-- Bulk Action Bar (Sticky Bottom) -->
-  <div class="bulk-action-bar" id="bulk-action-bar">
+  <div class="workforce_bulk_action_bar" id="workforce_earnings_bulk_action_bar">
     <div class="d-flex justify-content-between align-items-center text-white">
       <div>
-        <span class="fw-bold" id="bar-selected-count">0</span> tasks selected
-        <span class="ms-3">Total: <span class="fw-bold" id="bar-total-earnings">0</span> QR</span>
+        <span class="fw-bold" id="workforce_earnings_bar_selected_count">0</span> tasks selected
+        <span class="ms-3">Total: <span class="fw-bold" id="workforce_earnings_bar_total_earnings">0</span> QR</span>
       </div>
       <div class="btn-group">
-        <button type="button" class="btn btn-light" onclick="bulkAction('verify')">
+        <button type="button" class="btn btn-light" id="workforce_earnings_bar_btn_verify">
           <i class="fa-solid fa-check me-1"></i> Verify Selected
         </button>
-        <button type="button" class="btn btn-success" onclick="bulkAction('publish')">
+        <button type="button" class="btn btn-success" id="workforce_earnings_bar_btn_publish">
           <i class="fa-solid fa-paper-plane me-1"></i> Verify & Publish
         </button>
       </div>
@@ -305,114 +274,8 @@
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  const selectAll = document.getElementById('select-all');
-  const checkboxes = document.querySelectorAll('.task-checkbox');
-  const selectedCount = document.getElementById('selected-count');
-  const barSelectedCount = document.getElementById('bar-selected-count');
-  const barTotalEarnings = document.getElementById('bar-total-earnings');
-  const bulkActionBar = document.getElementById('bulk-action-bar');
-  const btnVerify = document.getElementById('btn-verify');
-  const btnPublish = document.getElementById('btn-publish');
-  const btnReject = document.getElementById('btn-reject');
-
-  function updateSelection() {
-    const checked = document.querySelectorAll('.task-checkbox:checked');
-    const count = checked.length;
-    let total = 0;
-
-    checked.forEach(function(cb) {
-      const input = document.getElementById('earnings-' + cb.value);
-      total += parseFloat(input.value) || 0;
-    });
-
-    selectedCount.textContent = count + ' selected';
-    barSelectedCount.textContent = count;
-    barTotalEarnings.textContent = total.toFixed(0);
-
-    // Show/hide bulk action bar
-    bulkActionBar.classList.toggle('show', count > 0);
-
-    // Enable/disable buttons
-    btnVerify.disabled = count === 0;
-    btnPublish.disabled = count === 0;
-    btnReject.disabled = count === 0;
-
-    // Update select all state
-    selectAll.checked = count === checkboxes.length && count > 0;
-    selectAll.indeterminate = count > 0 && count < checkboxes.length;
-  }
-
-  selectAll.addEventListener('change', function() {
-    checkboxes.forEach(function(cb) {
-      cb.checked = selectAll.checked;
-    });
-    updateSelection();
-  });
-
-  checkboxes.forEach(function(cb) {
-    cb.addEventListener('change', updateSelection);
-  });
-
-  // Track modified earnings inputs
-  document.querySelectorAll('.earnings-input').forEach(function(input) {
-    input.addEventListener('input', function() {
-      const original = parseFloat(this.dataset.original) || 0;
-      const current = parseFloat(this.value) || 0;
-      this.classList.toggle('modified', original !== current);
-      updateSelection();
-    });
-  });
-});
-
-function bulkAction(action) {
-  const checked = document.querySelectorAll('.task-checkbox:checked');
-  if (checked.length === 0) {
-    alert('Please select at least one task');
-    return;
-  }
-
-  const actionLabels = {
-    'verify': 'verify',
-    'publish': 'verify and publish',
-    'reject': 'reject'
-  };
-
-  if (!confirm(`Are you sure you want to ${actionLabels[action]} ${checked.length} task(s)?`)) {
-    return;
-  }
-
-  const taskIds = [];
-  const earningsUpdates = {};
-
-  checked.forEach(function(cb) {
-    taskIds.push(cb.value);
-    const input = document.getElementById('earnings-' + cb.value);
-    earningsUpdates[cb.value] = input.value;
-  });
-
-  const formData = new FormData();
-  formData.append('action', action);
-  taskIds.forEach(id => formData.append('task_ids[]', id));
-  formData.append('earnings_updates', JSON.stringify(earningsUpdates));
-  formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-
-  fetch('{% url "workforce:earnings_verification_action" %}', {
-    method: 'POST',
-    body: formData
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      alert(data.message);
-      location.reload();
-    } else {
-      alert('Error: ' + (data.error || 'Unknown error'));
-    }
-  })
-  .catch(error => {
-    alert('Error: ' + error.message);
-  });
-}
+  // Pass Django URL to JavaScript
+  const workforceEarningsVerificationActionUrl = "{% url 'workforce:earnings_verification_action' %}";
 </script>
+<script src="{% static 'workforce/js/earnings-verification.js' %}"></script>
 {% endblock %}

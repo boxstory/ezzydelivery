@@ -91,4 +91,8 @@ urlpatterns = [
     path('finance/transactions/', business_views.business_transactions, name='business_transactions'),
     path('finance/cod-statement/', business_views.business_cod_statement, name='business_cod_statement'),
 
+    # Product Requests (Fulfillment Service)
+    path('inbound-requests/', business_views.inbound_requests_list, name='inbound_requests_list'),
+    path('outbound-requests/', business_views.outbound_requests_list, name='outbound_requests_list'),
+
 ]

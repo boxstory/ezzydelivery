@@ -141,6 +141,10 @@ urlpatterns = [
     path('documents/stores/<int:business_id>/', workforce_views.store_document_detail, name='store_document_detail'),
     path('documents/business-licenses/', workforce_views.business_licenses_list, name='business_licenses_list'),
     path('documents/business-licenses/<int:business_id>/', workforce_views.business_license_detail, name='business_license_detail'),
+    path('documents/business-licenses/<int:business_id>/add-pickup-location/', workforce_views.workforce_pickup_location_add, name='workforce_pickup_location_add'),
+
+    # API endpoints
+    path('api/warehouse-locations/', workforce_views.api_warehouse_locations, name='api_warehouse_locations'),
 
     # Inventory URLs
     path('inventory/reports/', workforce_views.inventory_reports, name='inventory_reports'),
@@ -191,5 +195,10 @@ urlpatterns = [
 
     # API endpoints
     path('api/drivers-list/', workforce_views.api_drivers_list, name='api_drivers_list'),
+
+    # Product Request Management
+    path('product-requests/', workforce_views.product_requests_list, name='product_requests_list'),
+    path('product-requests/<int:request_id>/<str:request_type>/approve/', workforce_views.approve_product_request, name='approve_product_request'),
+    path('product-requests/<int:request_id>/<str:request_type>/complete/', workforce_views.complete_product_request, name='complete_product_request'),
 
 ]

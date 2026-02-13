@@ -10,12 +10,12 @@
     <i class="fas fa-chevron-left" id="sidebar_toggle_icon"></i>
   </button>
   <div class="text-center fw-bold sidebar-header" id="client_sidebar_header">
-    <a class="nav-link p-3 my-0 w-100"
+    <a class="nav-link dashboard-title p-3 my-0 w-100"
        href="{% url 'business:business_dashboard' %}"
        data-title="Dashboard"
        id="client_sidebar_link_dashboard">
-       <i class="fa-solid fa-gauge-high me-2"></i>
-       <span>Clients Dashboard</span>
+       <span>Bin Al Thani Point</span>
+       <span>Dashboard</span>
     </a>
   </div>
   <hr />
@@ -114,6 +114,25 @@
                 <span>Add Product</span>
               </a>
             </li>
+
+            <!-- Fulfillment Service Requests (conditional) -->
+            {% if user_business.fulfillment_service_enabled %}
+            <li class="nav-divider my-2"></li>
+            <li class="nav-item {% if current_url == 'inbound_requests_list' %}active{% endif %}">
+              <a class="nav-link d-flex align-items-center {% if current_url == 'inbound_requests_list' %}active{% endif %}"
+                 href="{% url 'business:inbound_requests_list' %}">
+                <i class="fa-solid fa-arrow-right-to-bracket me-2"></i>
+                <span>Inbound Requests</span>
+              </a>
+            </li>
+            <li class="nav-item {% if current_url == 'outbound_requests_list' %}active{% endif %}">
+              <a class="nav-link d-flex align-items-center {% if current_url == 'outbound_requests_list' %}active{% endif %}"
+                 href="{% url 'business:outbound_requests_list' %}">
+                <i class="fa-solid fa-arrow-right-from-bracket me-2"></i>
+                <span>Outbound Requests</span>
+              </a>
+            </li>
+            {% endif %}
           </ul>
         </div>
       </li>
@@ -166,7 +185,7 @@
              data-bs-target="#submenu-finance"
              data-title="Finance"
              aria-expanded="{% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}true{% else %}false{% endif %}">
-          <i class="fa-solid fa-chart-pie me-2"></i>
+          <i class="fa-solid fa-chart-line me-2"></i>
           <span class="flex-fill text-start">Finance</span>
           <i class="fa-solid fa-caret-down ms-auto"></i>
         </div>
@@ -177,22 +196,29 @@
             <li class="nav-item {% if current_url == 'business_finance_dashboard' %}active{% endif %}">
               <a class="nav-link d-flex align-items-center {% if current_url == 'business_finance_dashboard' %}active{% endif %}"
                  href="{% url 'business:business_finance_dashboard' %}">
-                <i class="fa-solid fa-gauge-high me-2"></i>
-                <span>Finance Dashboard</span>
+                <i class="fa-solid fa-chart-pie me-2"></i>
+                <span>Finance Overview</span>
               </a>
             </li>
             <li class="nav-item {% if current_url == 'business_transactions' %}active{% endif %}">
               <a class="nav-link d-flex align-items-center {% if current_url == 'business_transactions' %}active{% endif %}"
                  href="{% url 'business:business_transactions' %}">
-                <i class="fa-solid fa-receipt me-2"></i>
-                <span>Transactions</span>
+                <i class="fa-solid fa-clock-rotate-left me-2"></i>
+                <span>Recent Transactions</span>
               </a>
             </li>
             <li class="nav-item {% if current_url == 'business_cod_statement' %}active{% endif %}">
               <a class="nav-link d-flex align-items-center {% if current_url == 'business_cod_statement' %}active{% endif %}"
                  href="{% url 'business:business_cod_statement' %}">
-                <i class="fa-solid fa-money-bill me-2"></i>
-                <span>COD Statement</span>
+                <i class="fa-solid fa-file-invoice-dollar me-2"></i>
+                <span>Client COD Requests</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link d-flex align-items-center"
+                 href="{% url 'business:business_cod_statement' %}">
+                <i class="fa-solid fa-hand-holding-dollar me-2"></i>
+                <span>Driver COD Requests</span>
               </a>
             </li>
           </ul>

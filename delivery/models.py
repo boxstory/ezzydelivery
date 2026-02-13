@@ -297,6 +297,39 @@ class DeliveryTask(models.Model):
         """Check if this delivery involves COD collection"""
         return self.order and self.order.cod_amount and self.order.cod_amount > 0
 
+    def calculate_driver_earnings(self):
+        """
+        Calculate driver earnings based on order type and distance.
+
+        Rules:
+        - Pick & Drop orders: 80% of dl_price
+        - Normal orders: Fixed QAR 10
+        - Long distance (>20km): Requires manual adjustment by staff
+
+        Returns:
+            Decimal: Calculated earnings amount
+        """
+        from decimal import Decimal
+
+        # Pick & Drop orders: 80% of delivery price
+        if self.order and self.order.order_type == 'pick_and_drop':
+            delivery_charge = Decimal(str(self.dl_price or 0))
+            return delivery_charge * Decimal('0.80')
+
+        # Normal orders: Fixed QAR 10
+        return Decimal('10.00')
+
+    def is_long_distance(self):
+        """
+        Check if delivery distance exceeds 20km (requires manual earnings adjustment).
+
+        Returns:
+            bool: True if distance > 20km
+        """
+        # Distance field doesn't exist yet - always return False for now
+        # TODO: Add distance_km field to model and implement distance calculation
+        return False
+
     class Meta:
         verbose_name_plural = "Delivery Task"
 

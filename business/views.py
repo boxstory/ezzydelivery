@@ -1845,3 +1845,122 @@ def business_cod_statement(request):
     }
 
     return render(request, 'business/parts/business_cod_statement.html', context)
+
+
+# =============================================================================
+# PRODUCT REQUEST VIEWS (Fulfillment Service)
+# =============================================================================
+
+
+@login_required(login_url='/accounts/login/')
+@business_required
+def inbound_requests_list(request):
+    """
+    List all inbound product requests for current business.
+
+    Inbound requests are for sending products TO the warehouse.
+    Only available for businesses with fulfillment service enabled.
+    """
+    from business.decorators import business_permission_required
+    from business.permissions import BusinessPermissions
+    from warehouse.models import InboundProductRequest
+    from django.core.paginator import Paginator
+
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    # Check if fulfillment is enabled
+    if not business.fulfillment_service_enabled:
+        messages.warning(request, "Fulfillment service is not enabled for your business.")
+        return redirect('business:business_dashboard')
+
+    # Get requests for this business
+    requests_qs = InboundProductRequest.objects.filter(
+        business=business
+    ).select_related('warehouse', 'created_by', 'approved_by', 'completed_by').prefetch_related('items__product')
+
+    # Apply filters
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        requests_qs = requests_qs.filter(status=status_filter)
+
+    # Stats
+    stats = {
+        'pending': InboundProductRequest.objects.filter(business=business, status='pending').count(),
+        'approved': InboundProductRequest.objects.filter(business=business, status='approved').count(),
+        'completed': InboundProductRequest.objects.filter(business=business, status='completed').count(),
+        'total': InboundProductRequest.objects.filter(business=business).count(),
+    }
+
+    # Pagination
+    paginator = Paginator(requests_qs, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_title': 'Inbound Requests',
+        'business': business,
+        'page_obj': page_obj,
+        'stats': stats,
+        'status_filter': status_filter,
+    }
+    return render(request, 'business/inbound_requests_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@business_required
+def outbound_requests_list(request):
+    """
+    List all outbound product requests for current business.
+
+    Outbound requests are for receiving products FROM the warehouse.
+    Only available for businesses with fulfillment service enabled.
+    """
+    from business.decorators import business_permission_required
+    from business.permissions import BusinessPermissions
+    from warehouse.models import OutboundProductRequest
+    from django.core.paginator import Paginator
+
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    # Check if fulfillment is enabled
+    if not business.fulfillment_service_enabled:
+        messages.warning(request, "Fulfillment service is not enabled for your business.")
+        return redirect('business:business_dashboard')
+
+    # Get requests for this business
+    requests_qs = OutboundProductRequest.objects.filter(
+        business=business
+    ).select_related('warehouse', 'created_by', 'approved_by', 'completed_by').prefetch_related('items__product')
+
+    # Apply filters
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        requests_qs = requests_qs.filter(status=status_filter)
+
+    # Stats
+    stats = {
+        'pending': OutboundProductRequest.objects.filter(business=business, status='pending').count(),
+        'approved': OutboundProductRequest.objects.filter(business=business, status='approved').count(),
+        'completed': OutboundProductRequest.objects.filter(business=business, status='completed').count(),
+        'total': OutboundProductRequest.objects.filter(business=business).count(),
+    }
+
+    # Pagination
+    paginator = Paginator(requests_qs, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_title': 'Outbound Requests',
+        'business': business,
+        'page_obj': page_obj,
+        'stats': stats,
+        'status_filter': status_filter,
+    }
+    return render(request, 'business/outbound_requests_list.html', context)

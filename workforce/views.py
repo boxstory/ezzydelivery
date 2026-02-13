@@ -906,6 +906,7 @@ def add_order(request):
     selected_business_id = request.GET.get('business', '')
     selected_business = None
     pickup_locations = []
+    warehouse_products = []
 
     if selected_business_id:
         try:
@@ -914,6 +915,42 @@ def add_order(request):
             pickup_locations = business_models.PickupLocation.objects.filter(
                 business=selected_business
             ).order_by('-is_fulfilment_center', 'pickup_location_title')
+
+            # If fulfillment service is enabled, fetch warehouse inventory products
+            if selected_business.fulfillment_service_enabled:
+                from warehouse import models as warehouse_models
+                from django.db.models import Sum
+
+                # Get warehouse links for this business
+                warehouse_links = warehouse_models.SellerWarehouseLink.objects.filter(
+                    business=selected_business,
+                    is_active=True
+                ).select_related('warehouse', 'default_location')
+
+                # Get products from delivered orders (order items) for this business
+                if warehouse_links.exists():
+                    warehouse_ids = warehouse_links.values_list('warehouse_id', flat=True)
+
+                    # Get products from OrderItems where order status is delivered
+                    # and the product exists in warehouse stock
+                    delivered_order_products = orders_models.OrderItem.objects.filter(
+                        order__business=selected_business,
+                        order__order_status='delivered',
+                        product__isnull=False,
+                        product__is_active=True
+                    ).values('product_id').annotate(
+                        total_delivered=Sum('quantity')
+                    ).values_list('product_id', flat=True).distinct()
+
+                    # Get stock levels for these products from linked warehouses
+                    warehouse_products = warehouse_models.StockLevel.objects.filter(
+                        warehouse_id__in=warehouse_ids,
+                        product_id__in=delivered_order_products,
+                        available_quantity__gt=0,
+                        product__is_active=True
+                    ).select_related(
+                        'product', 'warehouse', 'storage_location'
+                    ).order_by('product__name')[:100]  # Limit to 100 products for performance
         except business_models.Business.DoesNotExist:
             pass
 
@@ -1078,6 +1115,8 @@ def add_order(request):
         'selected_business': selected_business,
         'selected_business_id': selected_business_id,
         'pickup_locations': pickup_locations,
+        'warehouse_products': warehouse_products,
+        'has_fulfillment': selected_business.fulfillment_service_enabled if selected_business else False,
         'today': date.today().isoformat(),
     }
     return render(request, 'workforce/orders_add.html', context)
@@ -1124,6 +1163,84 @@ def get_pickup_locations(request, business_id):
         return JsonResponse({'success': True, 'locations': location_list})
     except business_models.Business.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Business not found'}, status=404)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def workforce_pickup_location_add(request, business_id):
+    """Workforce view for products management - add products and view products list"""
+    try:
+        from product import models as product_models
+        from django.db.models import Sum, Q
+
+        business = business_models.Business.objects.get(business_id=business_id)
+
+        if request.method == 'POST':
+            action = request.POST.get('action')
+
+            if action == 'add_product':
+                try:
+                    # Create product
+                    product = product_models.Product.objects.create(
+                        business=business,
+                        brand_name=request.POST.get('brand_name'),
+                        item_name=request.POST.get('item_name'),
+                        item_sku=request.POST.get('item_sku'),
+                        barcode=request.POST.get('barcode') or None,
+                        item_price=int(request.POST.get('item_price', 0)),
+                        item_discription=request.POST.get('item_discription') or '',
+                    )
+
+                    # Create inventory record if quantity provided
+                    quantity = int(request.POST.get('quantity', 0))
+                    if quantity > 0:
+                        product_models.ProductInventory.objects.create(
+                            item_sku=product,
+                            item_quantity=quantity
+                        )
+
+                    logger.info(f"Workforce user {request.user.id} added product {product.item_sku} for business {business.business_id}")
+                    messages.success(request, f"Product '{product.item_name}' added successfully")
+
+                    # Return JSON for AJAX requests
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({'success': True, 'message': 'Product added successfully'})
+
+                    return redirect('workforce:workforce_pickup_location_add', business_id=business.business_id)
+                except Exception as e:
+                    logger.error(f"Error adding product: {str(e)}")
+                    messages.error(request, f"Error adding product: {str(e)}")
+
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+        # Get all products for this business with inventory
+        products = product_models.Product.objects.filter(
+            business=business
+        ).select_related(
+            'product_category', 'color', 'unit'
+        ).prefetch_related(
+            'product_inventory'
+        ).order_by('-created_at')
+
+        # Annotate with total stock quantity
+        products_with_stock = []
+        for product in products:
+            total_stock = product.product_inventory.aggregate(
+                total=Sum('item_quantity')
+            )['total'] or 0
+            product.stock_quantity = total_stock
+            products_with_stock.append(product)
+
+        context = {
+            'business': business,
+            'products': products_with_stock,
+        }
+        return render(request, 'workforce/workforce_pickup_location_add.html', context)
+    except business_models.Business.DoesNotExist:
+        logger.error(f"Business {business_id} not found")
+        messages.error(request, "Business not found")
+        return redirect('workforce:business_licenses_list')
 
 
 # Delivery Tasks section  ------------------------------------------------------------------------------------------------------
@@ -2831,6 +2948,17 @@ def workforce_finance_dashboard(request):
         transaction_type='cod_return'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
 
+    # Additional COD metrics
+    # COD in Bank (deposited by drivers)
+    cod_in_bank = abs(txns.filter(
+        transaction_type='cod_deposit'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+
+    # COD to Settle = Total collected - Driver settled - Client settled
+    cod_to_settle = cod_collected - cod_driver_settled - cod_client_settled
+    if cod_to_settle < 0:
+        cod_to_settle = Decimal('0')
+
     # Earnings & settlements
     earnings_total = txns.filter(
         transaction_type='earning'
@@ -2875,14 +3003,70 @@ def workforce_finance_dashboard(request):
         total=Sum('amount')
     ).order_by('-count')
 
+    # Performance metrics - Delivery statistics
+    from orders import models as orders_models
+
+    # Total completed deliveries in period
+    total_deliveries = orders_models.Order.objects.filter(
+        order_status__in=['delivered', 'fulfilled'],
+        delivered_at__gte=start_date
+    ).count()
+
+    # Failed deliveries in period
+    failed_deliveries = orders_models.Order.objects.filter(
+        order_status__in=['failed', 'cancelled'],
+        updated_at__gte=start_date
+    ).count()
+
+    # Total delivery fees collected
+    total_delivery_fees = orders_models.Order.objects.filter(
+        delivered_at__gte=start_date,
+        order_status__in=['delivered', 'fulfilled']
+    ).aggregate(total=Sum('dl_amount'))['total'] or Decimal('0')
+
+    # Average delivery value (COD + DL amount)
+    avg_delivery_stats = orders_models.Order.objects.filter(
+        delivered_at__gte=start_date,
+        order_status__in=['delivered', 'fulfilled']
+    ).aggregate(
+        total_cod=Sum('cod_amount'),
+        total_dl=Sum('dl_amount'),
+        count=Count('id')
+    )
+
+    avg_delivery_value = Decimal('0')
+    if avg_delivery_stats['count'] and avg_delivery_stats['count'] > 0:
+        total_value = (avg_delivery_stats['total_cod'] or Decimal('0')) + (avg_delivery_stats['total_dl'] or Decimal('0'))
+        avg_delivery_value = total_value / avg_delivery_stats['count']
+
+    # Active drivers (drivers with at least one delivery in period)
+    active_drivers = orders_models.Order.objects.filter(
+        delivered_at__gte=start_date,
+        order_status__in=['delivered', 'fulfilled']
+    ).values('delivery_task__driver').distinct().count()
+
+    # Success rate calculation
+    total_attempts = total_deliveries + failed_deliveries
+    success_rate = Decimal('0')
+    if total_attempts > 0:
+        success_rate = (Decimal(total_deliveries) / Decimal(total_attempts)) * 100
+
+    # COD with Fleet metrics
+    active_drivers_count = drivers.count()
+    drivers_with_cod_count = drivers.filter(cod_in_hand__gt=0).count()
+
     context = {
         'selected_days': days,
         'driver_totals': driver_totals,
         'driver_count': drivers.count(),
+        'active_drivers_count': active_drivers_count,
+        'drivers_with_cod_count': drivers_with_cod_count,
         'cod_collected': cod_collected,
         'cod_driver_settled': cod_driver_settled,
         'cod_client_settled': cod_client_settled,
         'cod_returned': cod_returned,
+        'cod_in_bank': cod_in_bank,
+        'cod_to_settle': cod_to_settle,
         'earnings_total': earnings_total,
         'settlements_total': settlements_total,
         'charges_summary': charges_summary,
@@ -2892,6 +3076,13 @@ def workforce_finance_dashboard(request):
         'top_cod_drivers': top_cod_drivers,
         'recent_transactions': recent_transactions,
         'type_breakdown': type_breakdown,
+        # Performance metrics
+        'total_deliveries': total_deliveries,
+        'failed_deliveries': failed_deliveries,
+        'total_delivery_fees': total_delivery_fees,
+        'avg_delivery_value': avg_delivery_value,
+        'active_drivers': active_drivers,
+        'success_rate': success_rate,
     }
 
     return render(request, 'workforce/workforce_finance_dashboard.html', context)
@@ -3098,10 +3289,11 @@ def earnings_verification(request):
 
     start_date = timezone.now() - timedelta(days=days)
 
-    # Base queryset - completed deliveries with COD delivered
+    # Base queryset - completed deliveries with COD collected
     tasks = delivery_models.DeliveryTask.objects.filter(
         dl_task_status='delivered',
-        dl_task_date__gte=start_date.date()
+        dl_task_date__gte=start_date.date(),
+        cod_collected=True  # Only show deliveries where COD has been collected
     ).select_related(
         'driver', 'driver__user', 'order', 'order__business',
         'pickup_location', 'dl_to_address', 'earnings_verified_by'
@@ -3205,9 +3397,9 @@ def earnings_verification_action(request):
                 task.earnings_verification_status = 'verified'
                 task.earnings_verified_by = request.user
                 task.earnings_verified_at = timezone.now()
-                # Set verified_earnings to calculated or driver_earnings if not already set
+                # Set verified_earnings to calculated amount if not already set
                 if not task.verified_earnings:
-                    task.verified_earnings = task.calculated_earnings or task.driver_earnings or task.dl_price or 0
+                    task.verified_earnings = task.calculate_driver_earnings()
                 task.save()
                 updated_count += 1
 
@@ -3224,7 +3416,7 @@ def earnings_verification_action(request):
                     task.earnings_verified_at = timezone.now()
 
                 # Update driver_earnings with verified amount
-                final_earnings = task.verified_earnings or task.calculated_earnings or task.driver_earnings or task.dl_price or 0
+                final_earnings = task.verified_earnings or task.calculate_driver_earnings()
                 task.driver_earnings = final_earnings
                 task.save()
 
@@ -4749,8 +4941,93 @@ def business_license_detail(request, business_id):
 
             elif section == 'status':
                 business.business_status = request.POST.get('business_status', business.business_status)
-                business.fulfillment_service_status = request.POST.get('fulfillment_service_status', business.fulfillment_service_status)
                 business.save()
+
+            elif section == 'fulfillment':
+                from warehouse import models as warehouse_models
+
+                fulfillment_status = request.POST.get('fulfillment_service_status', business.fulfillment_service_status)
+                warehouse_location_id = request.POST.get('warehouse_location_id', '').strip()
+
+                logger.info(f"Fulfillment update for business {business.business_id}: status={fulfillment_status}, warehouse_id={warehouse_location_id}")
+
+                # If activating fulfillment service, warehouse location is required
+                if fulfillment_status == 'active' and not warehouse_location_id:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Please select a warehouse location when activating fulfillment service'
+                    }, status=400)
+
+                # Update fulfillment status
+                try:
+                    business.fulfillment_service_status = fulfillment_status
+                    if fulfillment_status == 'active':
+                        business.fulfillment_service_enabled = True
+                        from django.utils import timezone
+                        if not business.fulfillment_activated_at:
+                            business.fulfillment_activated_at = timezone.now()
+                    business.save()
+                    logger.info(f"Business {business.business_id} fulfillment status updated to {fulfillment_status}")
+                except Exception as e:
+                    logger.exception(f"Error saving business fulfillment status: {e}")
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Error updating fulfillment status: {str(e)}'
+                    }, status=400)
+
+                # Link warehouse if provided
+                if warehouse_location_id and fulfillment_status == 'active':
+                    try:
+                        warehouse_location = warehouse_models.WarehouseLocation.objects.select_related('warehouse').get(id=warehouse_location_id)
+                        logger.info(f"Found warehouse location: {warehouse_location.warehouse.code}/{warehouse_location.code}")
+
+                        # Create or update warehouse link
+                        link, created = warehouse_models.SellerWarehouseLink.objects.get_or_create(
+                            business=business,
+                            warehouse=warehouse_location.warehouse,
+                            defaults={
+                                'default_location': warehouse_location,  # Correct field name
+                                'is_default': True,  # First warehouse becomes default
+                                'linked_by': request.user,
+                            }
+                        )
+
+                        if not created:
+                            link.default_location = warehouse_location  # Correct field name
+                            link.save()
+
+                        action = 'created' if created else 'updated'
+                        logger.info(f"Warehouse link {action} for business {business.business_id} -> {warehouse_location.warehouse.code}")
+
+                        # Create or update a PickupLocation for the warehouse fulfillment center
+                        from business import models as business_models
+                        pickup_location, pickup_created = business_models.PickupLocation.objects.update_or_create(
+                            business=business,
+                            warehouse=warehouse_location.warehouse,
+                            defaults={
+                                'pickup_location_title': f"{warehouse_location.warehouse.name} - Fulfillment",
+                                'locality': warehouse_location.address or warehouse_location.warehouse.city or 'Warehouse Location',
+                                'is_fulfilment_center': True,
+                                'pickup_status': 'active',
+                                'pickup_zone_no': warehouse_location.zone_number,
+                                'pickup_lat': warehouse_location.latitude,
+                                'pickup_lon': warehouse_location.longitude,
+                            }
+                        )
+                        pickup_action = 'created' if pickup_created else 'updated'
+                        logger.info(f"Fulfillment pickup location {pickup_action}: {pickup_location.pickup_location_title}")
+                    except warehouse_models.WarehouseLocation.DoesNotExist:
+                        logger.error(f"Warehouse location {warehouse_location_id} not found")
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'Selected warehouse location not found'
+                        }, status=400)
+                    except Exception as e:
+                        logger.exception(f"Error linking warehouse: {e}")
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'Error linking warehouse: {str(e)}'
+                        }, status=400)
 
             else:
                 # Legacy: save all fields
@@ -4785,14 +5062,55 @@ def business_license_detail(request, business_id):
         pending=Count('id', filter=Q(order_status__in=['to_review', 'ready_to_pickup', 'publish'])),
     )
 
+    # Get linked warehouse (if any)
+    from warehouse import models as warehouse_models
+    linked_warehouse = None
+    if business.fulfillment_service_status == 'active':
+        try:
+            linked_warehouse = warehouse_models.SellerWarehouseLink.objects.select_related(
+                'warehouse', 'default_location'
+            ).filter(business=business, is_active=True).first()
+        except Exception as e:
+            logger.warning(f"Error fetching linked warehouse for business {business.business_id}: {e}")
+
     context = {
         'page_title': f'{business.business_name} - Business Detail',
         'business': business,
         'business_profile': business_profile,
         'order_stats': order_stats,
+        'linked_warehouse': linked_warehouse,
     }
 
     return render(request, 'workforce/business_license_detail.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def api_warehouse_locations(request):
+    """API endpoint to get all active warehouse locations"""
+    from warehouse import models as warehouse_models
+
+    try:
+        locations = warehouse_models.WarehouseLocation.objects.select_related(
+            'warehouse'
+        ).filter(
+            is_active=True
+        ).order_by('warehouse__name', 'name')
+
+        location_list = [{
+            'id': loc.id,
+            'warehouse_name': loc.warehouse.name,
+            'name': loc.name,
+            'code': loc.code,
+            'warehouse_code': loc.warehouse.code,
+            'address': loc.address or '',
+            'city': loc.warehouse.city or '',
+        } for loc in locations]
+
+        return JsonResponse({'success': True, 'locations': location_list})
+    except Exception as e:
+        logger.exception("Error fetching warehouse locations: %s", str(e))
+        return JsonResponse({'success': False, 'error': 'Failed to load warehouse locations'}, status=500)
 
 
 # Sellers section  ------------------------------------------------------------------------------------------------------
@@ -6154,4 +6472,158 @@ def warehouse_unlink_business(request):
 
     messages.success(request, f'{biz_name} unlinked from {wh_name}')
     return JsonResponse({'success': True, 'message': f'{biz_name} unlinked from {wh_name}'})
+
+
+# =============================================================================
+# PRODUCT REQUEST MANAGEMENT VIEWS
+# =============================================================================
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def product_requests_list(request):
+    """
+    Staff view to manage all inbound and outbound product requests.
+
+    Shows combined list of requests from all businesses with filtering and stats.
+    Staff can view, approve, and complete requests from this interface.
+    """
+    from warehouse.models import InboundProductRequest, OutboundProductRequest
+    from django.core.paginator import Paginator
+
+    # Get both types of requests
+    inbound_qs = InboundProductRequest.objects.select_related(
+        'business', 'warehouse', 'created_by', 'approved_by', 'completed_by'
+    ).prefetch_related('items__product')
+
+    outbound_qs = OutboundProductRequest.objects.select_related(
+        'business', 'warehouse', 'created_by', 'approved_by', 'completed_by'
+    ).prefetch_related('items__product')
+
+    # Apply filters
+    request_type = request.GET.get('type', 'all')  # all, inbound, outbound
+    status_filter = request.GET.get('status', '')
+    business_id = request.GET.get('business', '')
+
+    if status_filter:
+        inbound_qs = inbound_qs.filter(status=status_filter)
+        outbound_qs = outbound_qs.filter(status=status_filter)
+
+    if business_id:
+        try:
+            business_id = int(business_id)
+            inbound_qs = inbound_qs.filter(business_id=business_id)
+            outbound_qs = outbound_qs.filter(business_id=business_id)
+        except (ValueError, TypeError):
+            pass
+
+    # Combine or filter by type
+    if request_type == 'inbound':
+        requests_list = list(inbound_qs)
+    elif request_type == 'outbound':
+        requests_list = list(outbound_qs)
+    else:
+        # Combine both types and sort by created_at
+        requests_list = sorted(
+            list(inbound_qs) + list(outbound_qs),
+            key=lambda x: x.created_at,
+            reverse=True
+        )
+
+    # Stats
+    stats = {
+        'total': len(requests_list),
+        'pending_inbound': InboundProductRequest.objects.filter(status='pending').count(),
+        'pending_outbound': OutboundProductRequest.objects.filter(status='pending').count(),
+        'approved': len([r for r in requests_list if r.status == 'approved']),
+        'completed': len([r for r in requests_list if r.status == 'completed']),
+    }
+
+    # Manual pagination since we combined querysets
+    paginator = Paginator(requests_list, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    # Get all businesses for filter dropdown
+    businesses = business_models.Business.objects.filter(
+        fulfillment_service_enabled=True
+    ).order_by('business_name')
+
+    context = {
+        'page_title': 'Product Requests',
+        'page_obj': page_obj,
+        'stats': stats,
+        'request_type': request_type,
+        'status_filter': status_filter,
+        'business_id': business_id,
+        'businesses': businesses,
+    }
+    return render(request, 'workforce/product_requests_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_http_methods(["POST"])
+def approve_product_request(request, request_id, request_type):
+    """
+    Approve an inbound or outbound product request.
+
+    Changes status from pending to approved and records who approved it.
+    """
+    from django.utils import timezone
+    from warehouse.models import InboundProductRequest, OutboundProductRequest
+
+    if request_type == 'inbound':
+        req = get_object_or_404(InboundProductRequest, id=request_id)
+    elif request_type == 'outbound':
+        req = get_object_or_404(OutboundProductRequest, id=request_id)
+    else:
+        messages.error(request, "Invalid request type")
+        return redirect('workforce:product_requests_list')
+
+    if req.status != 'pending':
+        messages.warning(request, "Only pending requests can be approved.")
+        return redirect('workforce:product_requests_list')
+
+    req.status = 'approved'
+    req.approved_by = request.user
+    req.approved_at = timezone.now()
+    req.save()
+
+    messages.success(request, f"Request {req.request_number} approved successfully.")
+    return redirect('workforce:product_requests_list')
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_http_methods(["POST"])
+def complete_product_request(request, request_id, request_type):
+    """
+    Mark a product request as completed.
+
+    Changes status from approved to completed and records who completed it.
+    Only approved requests can be marked as completed.
+    """
+    from django.utils import timezone
+    from warehouse.models import InboundProductRequest, OutboundProductRequest
+
+    if request_type == 'inbound':
+        req = get_object_or_404(InboundProductRequest, id=request_id)
+    elif request_type == 'outbound':
+        req = get_object_or_404(OutboundProductRequest, id=request_id)
+    else:
+        messages.error(request, "Invalid request type")
+        return redirect('workforce:product_requests_list')
+
+    if req.status != 'approved':
+        messages.warning(request, "Only approved requests can be marked as completed.")
+        return redirect('workforce:product_requests_list')
+
+    req.status = 'completed'
+    req.completed_by = request.user
+    req.completed_at = timezone.now()
+    req.save()
+
+    messages.success(request, f"Request {req.request_number} marked as completed.")
+    return redirect('workforce:product_requests_list')
 

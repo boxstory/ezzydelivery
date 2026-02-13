@@ -1019,3 +1019,198 @@ class LowStockAlert(models.Model):
 
     def __str__(self):
         return f"Alert: {self.product.item_sku} @ {self.warehouse.code} - {self.quantity_available} units"
+
+
+# =============================================================================
+# PRODUCT REQUEST MODELS
+# =============================================================================
+
+# Product Request Status and Type Choices
+PRODUCT_REQUEST_STATUS_CHOICES = [
+    ('pending', 'Pending Approval'),
+    ('approved', 'Approved'),
+    ('completed', 'Completed'),
+    ('cancelled', 'Cancelled'),
+]
+
+PRODUCT_REQUEST_TYPE_CHOICES = [
+    ('inbound', 'Inbound - To Warehouse'),
+    ('outbound', 'Outbound - From Warehouse'),
+]
+
+
+class ProductRequest(models.Model):
+    """
+    Abstract base model for product movement requests.
+
+    Businesses with fulfillment service enabled can request:
+    - Inbound: Send products to warehouse
+    - Outbound: Receive products from warehouse
+
+    Status workflow: pending → approved → completed
+    """
+    request_number = models.CharField(max_length=50, unique=True, editable=False, db_index=True)
+    request_type = models.CharField(max_length=10, choices=PRODUCT_REQUEST_TYPE_CHOICES)
+    business = models.ForeignKey(
+        business_models.Business,
+        on_delete=models.CASCADE,
+        related_name='%(class)s_requests'
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.CASCADE,
+        related_name='%(class)s_requests',
+        help_text="Target warehouse for this request"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=PRODUCT_REQUEST_STATUS_CHOICES,
+        default='pending',
+        db_index=True
+    )
+    notes = models.TextField(blank=True, help_text="Special instructions or notes")
+
+    # Workflow tracking
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='%(class)s_created'
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='%(class)s_approved'
+    )
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='%(class)s_completed'
+    )
+
+    approved_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', '-created_at'], name='wh_req_status_created_idx'),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.request_number:
+            prefix = 'INB' if self.request_type == 'inbound' else 'OUT'
+            self.request_number = f"{prefix}-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.request_number} - {self.business.business_name}"
+
+
+class InboundProductRequest(ProductRequest):
+    """
+    Requests to send products TO the warehouse for storage.
+
+    Businesses use this when they want to send inventory to the fulfillment center.
+    """
+    expected_delivery_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="When business plans to deliver products"
+    )
+
+    def save(self, *args, **kwargs):
+        self.request_type = 'inbound'
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = "Inbound Product Request"
+        verbose_name_plural = "Inbound Product Requests"
+        ordering = ['-created_at']
+
+
+class OutboundProductRequest(ProductRequest):
+    """
+    Requests to receive products FROM the warehouse for delivery/sale.
+
+    Businesses use this when they need products shipped out from fulfillment center.
+    """
+    priority = models.CharField(
+        max_length=10,
+        choices=[('normal', 'Normal'), ('urgent', 'Urgent')],
+        default='normal'
+    )
+
+    def save(self, *args, **kwargs):
+        self.request_type = 'outbound'
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = "Outbound Product Request"
+        verbose_name_plural = "Outbound Product Requests"
+        ordering = ['-created_at']
+
+
+class ProductRequestItem(models.Model):
+    """
+    Individual product line items within a request.
+
+    Each request can have multiple products with quantities.
+    Tracks requested vs fulfilled quantities for partial fulfillment.
+    """
+    inbound_request = models.ForeignKey(
+        InboundProductRequest,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='items'
+    )
+    outbound_request = models.ForeignKey(
+        OutboundProductRequest,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='items'
+    )
+    product = models.ForeignKey(
+        product_models.Product,
+        on_delete=models.CASCADE,
+        related_name='request_items'
+    )
+    quantity_requested = models.PositiveIntegerField(help_text="Quantity requested")
+    quantity_fulfilled = models.PositiveIntegerField(
+        default=0,
+        help_text="Quantity actually fulfilled (for partial fulfillment tracking)"
+    )
+    notes = models.TextField(blank=True, help_text="Item-specific notes")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Product Request Item"
+        verbose_name_plural = "Product Request Items"
+        ordering = ['id']
+
+    def __str__(self):
+        request = self.inbound_request or self.outbound_request
+        return f"{self.product.product_title} x{self.quantity_requested} ({request.request_number})"
+
+    @property
+    def is_fully_fulfilled(self):
+        """Check if item has been completely fulfilled"""
+        return self.quantity_fulfilled >= self.quantity_requested
+
+    @property
+    def remaining_quantity(self):
+        """Calculate remaining quantity to be fulfilled"""
+        return max(0, self.quantity_requested - self.quantity_fulfilled)

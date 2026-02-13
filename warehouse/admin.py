@@ -301,3 +301,95 @@ class LowStockAlertAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+# Product Request Models
+class ProductRequestItemInline(admin.TabularInline):
+    model = warehouse_models.ProductRequestItem
+    extra = 1
+    raw_id_fields = ('product',)
+    fields = ('product', 'quantity_requested', 'quantity_fulfilled', 'notes')
+
+
+@admin.register(warehouse_models.InboundProductRequest)
+class InboundProductRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        'request_number', 'business', 'warehouse', 'status',
+        'expected_delivery_date', 'created_at', 'approved_at'
+    )
+    list_filter = ('status', 'warehouse', 'created_at', 'approved_at')
+    search_fields = ('request_number', 'business__business_name', 'warehouse__name')
+    readonly_fields = ('request_number', 'created_at', 'updated_at')
+    raw_id_fields = ('business', 'warehouse', 'created_by', 'approved_by', 'completed_by')
+    date_hierarchy = 'created_at'
+    inlines = [ProductRequestItemInline]
+    fieldsets = (
+        ('Request Info', {
+            'fields': ('request_number', 'business', 'warehouse', 'status', 'expected_delivery_date')
+        }),
+        ('Notes', {
+            'fields': ('notes',)
+        }),
+        ('Workflow Tracking', {
+            'fields': (
+                'created_by', 'created_at',
+                'approved_by', 'approved_at',
+                'completed_by', 'completed_at',
+                'cancelled_at', 'updated_at'
+            ),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(warehouse_models.OutboundProductRequest)
+class OutboundProductRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        'request_number', 'business', 'warehouse', 'status',
+        'priority', 'created_at', 'approved_at'
+    )
+    list_filter = ('status', 'priority', 'warehouse', 'created_at', 'approved_at')
+    search_fields = ('request_number', 'business__business_name', 'warehouse__name')
+    readonly_fields = ('request_number', 'created_at', 'updated_at')
+    raw_id_fields = ('business', 'warehouse', 'created_by', 'approved_by', 'completed_by')
+    date_hierarchy = 'created_at'
+    inlines = [ProductRequestItemInline]
+    fieldsets = (
+        ('Request Info', {
+            'fields': ('request_number', 'business', 'warehouse', 'status', 'priority')
+        }),
+        ('Notes', {
+            'fields': ('notes',)
+        }),
+        ('Workflow Tracking', {
+            'fields': (
+                'created_by', 'created_at',
+                'approved_by', 'approved_at',
+                'completed_by', 'completed_at',
+                'cancelled_at', 'updated_at'
+            ),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(warehouse_models.ProductRequestItem)
+class ProductRequestItemAdmin(admin.ModelAdmin):
+    list_display = ('get_request_number', 'product', 'quantity_requested', 'quantity_fulfilled', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = (
+        'inbound_request__request_number',
+        'outbound_request__request_number',
+        'product__item_sku',
+        'product__item_name'
+    )
+    readonly_fields = ('created_at', 'updated_at')
+    raw_id_fields = ('inbound_request', 'outbound_request', 'product')
+
+    @admin.display(description='Request #')
+    def get_request_number(self, obj):
+        if obj.inbound_request:
+            return obj.inbound_request.request_number
+        elif obj.outbound_request:
+            return obj.outbound_request.request_number
+        return '-'
