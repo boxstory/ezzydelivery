@@ -630,9 +630,10 @@ def bulk_order_entry(request):
     business = request.current_business
     logger.info(f"User {request.user.id} accessing bulk order entry for business {business.business_id}")
 
+    # Show fulfillment stores first when fulfillment service is enabled
     pickup_locations = business_models.PickupLocation.objects.filter(
         business_id=business.business_id
-    ).all()
+    ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
     if not pickup_locations.exists():
         messages.warning(request, "Please add a pickup location first.")
@@ -738,8 +739,10 @@ def add_order(request):
     business = request.current_business
     logger.debug(f"User {request.user.id} adding order for business {business.business_id}")
 
+    # Show fulfillment stores first when fulfillment service is enabled
     pickup_locations = business_models.PickupLocation.objects.filter(
-        business_id=business.business_id).all()
+        business_id=business.business_id
+    ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
     if not pickup_locations:
         logger.debug("No pickup locations, redirecting to add")
@@ -1138,8 +1141,10 @@ def pick_from_here(request, pickup_id):
         messages.error(request, "Pickup location not found.")
         return redirect('business:pickup_location_list')
 
+    # Show fulfillment stores first when fulfillment service is enabled
     pickup_locations = business_models.PickupLocation.objects.filter(
-        business_id=business.business_id).all()
+        business_id=business.business_id
+    ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
     if request.method == 'POST':
         form = orders_forms.AddOrderForm(request.POST)

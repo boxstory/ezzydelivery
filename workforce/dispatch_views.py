@@ -64,10 +64,10 @@ def dispatch_dashboard(request):
         status='active'
     ).select_related('rider', 'pickup_location')
 
-    # Pickup locations with batching enabled
+    # Pickup locations with batching enabled - show fulfillment stores first
     locations = PickupLocation.objects.filter(
         pickup_status='active'
-    ).prefetch_related('dispatch_config')
+    ).prefetch_related('dispatch_config').order_by('-is_fulfilment_center', 'pickup_location_title')
 
     # Recent logs
     recent_logs = DispatchLog.objects.select_related(
@@ -120,7 +120,10 @@ def batch_list(request):
     batches = paginator.get_page(page)
 
     # Get locations for filter dropdown
-    locations = PickupLocation.objects.filter(pickup_status='active')
+    # Show fulfillment stores first when fulfillment service is enabled
+    locations = PickupLocation.objects.filter(
+        pickup_status='active'
+    ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
     context = {
         'batches': batches,
@@ -274,7 +277,10 @@ def shift_list(request):
     shifts = paginator.get_page(page)
 
     # Get data for filter dropdowns
-    locations = PickupLocation.objects.filter(pickup_status='active')
+    # Show fulfillment stores first when fulfillment service is enabled
+    locations = PickupLocation.objects.filter(
+        pickup_status='active'
+    ).order_by('-is_fulfilment_center', 'pickup_location_title')
     riders = Driver.objects.filter(driver_status='Approved').select_related('user')
 
     # Get today for template default value
@@ -375,7 +381,10 @@ def shift_create(request):
             messages.error(request, 'Invalid rider or location selected.')
 
     # GET request - show form
-    locations = PickupLocation.objects.filter(pickup_status='active')
+    # Show fulfillment stores first when fulfillment service is enabled
+    locations = PickupLocation.objects.filter(
+        pickup_status='active'
+    ).order_by('-is_fulfilment_center', 'pickup_location_title')
     riders = Driver.objects.filter(driver_status='Approved').select_related('user')
 
     context = {
@@ -479,7 +488,10 @@ def shift_edit(request, shift_id):
         messages.success(request, f'Shift {shift.shift_code} updated.')
         return redirect('workforce:dispatch_shift_detail', shift_id=shift_id)
 
-    locations = PickupLocation.objects.filter(pickup_status='active')
+    # Show fulfillment stores first when fulfillment service is enabled
+    locations = PickupLocation.objects.filter(
+        pickup_status='active'
+    ).order_by('-is_fulfilment_center', 'pickup_location_title')
     riders = Driver.objects.filter(driver_status='Approved').select_related('user')
 
     context = {
@@ -538,7 +550,10 @@ def kpi_dashboard(request):
     )
 
     # Get locations for filter dropdown
-    locations = PickupLocation.objects.filter(pickup_status='active')
+    # Show fulfillment stores first when fulfillment service is enabled
+    locations = PickupLocation.objects.filter(
+        pickup_status='active'
+    ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
     context = {
         'kpis': kpis,

@@ -705,6 +705,21 @@ static/
 - [ ] Performance optimized
 - [ ] Documented in component library
 
+## Font Size Standardization
+
+**Standard:** All UI text uses `.75rem` for consistent, compact typography
+
+**See:** `.claude/skills/css-font-standardization.md` for complete standardization process
+
+**Quick Reference:**
+- All text elements (p, span): `.75rem`
+- All form elements (label, input, select, textarea): `.75rem`
+- All tables (th, td): `.75rem`
+- All cards and buttons: `.75rem`
+- Headings and display text: 1rem+ (preserved)
+
+**Updated Files:** business.css, orders.css, fleet.css, core.css, workforce.css, warehouse.css, delivery.css
+
 ## Common Patterns Reference
 
 See existing implementations:

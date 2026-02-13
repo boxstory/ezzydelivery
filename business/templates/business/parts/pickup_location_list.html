@@ -25,9 +25,106 @@
 
   <!-- Locations Grid -->
   <section id="client_location_list_section_content">
+    {% if stores or warehouse_locations %}
+
+    <!-- Warehouse Locations (Fulfillment Centers) -->
+    {% if warehouse_locations %}
+    <div class="mb-4">
+      <h3 class="mb-3">
+        <i class="fa-solid fa-warehouse"></i>
+        Fulfillment Center Locations
+      </h3>
+      <div class="locations-grid" id="client_warehouse_locations_grid">
+        {% for wh_loc in warehouse_locations %}
+        <article class="location-card warehouse-location-card" id="client_warehouse_location_card_{{ wh_loc.id }}">
+          <!-- Card Header -->
+          <div class="location-card-header">
+            <h3>
+              <i class="fa-solid fa-warehouse"></i>
+              {{ wh_loc.warehouse.name }} - {{ wh_loc.name }}
+            </h3>
+            {% if wh_loc.is_active %}
+            <span class="status-badge status-active">
+              <i class="fa-solid fa-check-circle me-1"></i>Active
+            </span>
+            {% else %}
+            <span class="status-badge status-inactive">
+              <i class="fa-solid fa-times-circle me-1"></i>Inactive
+            </span>
+            {% endif %}
+            {% if wh_loc.is_default %}
+            <span class="status-badge" style="background-color: var(--brand-primary); color: white;">
+              <i class="fa-solid fa-star me-1"></i>Default
+            </span>
+            {% endif %}
+          </div>
+
+          <!-- Card Body -->
+          <div class="location-card-body">
+            <!-- Address -->
+            {% if wh_loc.address %}
+            <div class="mb-2">
+              <i class="fa-solid fa-map-location-dot"></i>
+              <strong>Address:</strong> {{ wh_loc.address }}
+            </div>
+            {% endif %}
+
+            <!-- Location Details -->
+            <div class="location-details">
+              <div class="detail-item">
+                <span class="detail-label">Warehouse Code</span>
+                <span class="detail-value">{{ wh_loc.warehouse.code }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Location Code</span>
+                <span class="detail-value">{{ wh_loc.code }}</span>
+              </div>
+              {% if wh_loc.zone_number %}
+              <div class="detail-item">
+                <span class="detail-label">Zone No</span>
+                <span class="detail-value">{{ wh_loc.zone_number }}</span>
+              </div>
+              {% endif %}
+              {% if wh_loc.operating_hours %}
+              <div class="detail-item">
+                <span class="detail-label">Operating Hours</span>
+                <span class="detail-value">{{ wh_loc.operating_hours }}</span>
+              </div>
+              {% endif %}
+            </div>
+
+            {% if wh_loc.notes %}
+            <div class="mt-2">
+              <small class="text-muted">
+                <i class="fa-solid fa-info-circle"></i>
+                {{ wh_loc.notes }}
+              </small>
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- Card Footer - View only for warehouse locations -->
+          <div class="location-card-footer">
+            <span class="text-muted small">
+              <i class="fa-solid fa-building"></i>
+              Managed by Warehouse Team
+            </span>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Business Pickup Locations -->
     {% if stores %}
-    <div class="locations-grid" id="client_location_list_grid">
-      {% for store in stores %}
+    <div class="mb-4">
+      <h3 class="mb-3">
+        <i class="fa-solid fa-store"></i>
+        Your Store Locations
+      </h3>
+      <div class="locations-grid" id="client_location_list_grid">
+        {% for store in stores %}
       <article class="location-card" id="client_location_list_card_{{ store.id }}">
         <!-- Card Header -->
         <div class="location-card-header">
@@ -103,8 +200,11 @@
           </a>
         </div>
       </article>
-      {% endfor %}
+        {% endfor %}
+      </div>
     </div>
+    {% endif %}
+
     {% else %}
     <!-- Empty State -->
     <div class="empty-state" id="client_location_list_empty">

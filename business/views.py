@@ -370,17 +370,43 @@ def pickup_location_list(request):
             logger.warning(f"User {request.user.id} has no associated business")
             messages.error(request, "No business associated with your account")
             return redirect('core:main_dashboard')
-        pickup_location = business_models.PickupLocation.objects.filter(
-            business_id=business.business_id).all()
 
-        if not pickup_location:
+        # Get business's own pickup locations - show fulfillment stores first
+        pickup_locations = business_models.PickupLocation.objects.filter(
+            business_id=business.business_id
+        ).order_by('-is_fulfilment_center', 'pickup_location_title')
+
+        # If fulfillment service is enabled, also get warehouse locations
+        warehouse_locations = []
+        if business.fulfillment_service_enabled:
+            from warehouse.models import SellerWarehouseLink, WarehouseLocation
+
+            # Get all warehouses linked to this business
+            warehouse_links = SellerWarehouseLink.objects.filter(
+                business=business
+            ).select_related('warehouse', 'default_location')
+
+            # Get all active warehouse locations from linked warehouses
+            for link in warehouse_links:
+                wh_locs = WarehouseLocation.objects.filter(
+                    warehouse=link.warehouse,
+                    is_active=True
+                ).select_related('warehouse')
+                warehouse_locations.extend(wh_locs)
+
+        # Combine locations: warehouse locations first, then regular pickup locations
+        all_locations = list(pickup_locations)
+
+        if not all_locations and not warehouse_locations:
             return redirect('business:pickup_location_add')
 
-        logger.info(f"User {request.user.id} viewing {len(pickup_location)} pickup locations for business {business.business_id}")
+        logger.info(f"User {request.user.id} viewing {len(all_locations)} pickup locations and {len(warehouse_locations)} warehouse locations for business {business.business_id}")
 
         context = {
-            'stores': pickup_location,
+            'stores': all_locations,
+            'warehouse_locations': warehouse_locations,
             'business': business,
+            'fulfillment_enabled': business.fulfillment_service_enabled,
         }
         return render(request, 'business/parts/pickup_location_list.html', context)
     except business_models.Business.DoesNotExist:

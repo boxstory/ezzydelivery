@@ -12,7 +12,7 @@
     </header>
 
     <!-- Stats Grid -->
-    <div id="workforce_dashboard_section_stats" class="stats-grid" role="region" aria-label="Dashboard Statistics">
+    <div id="workforce_dashboard_section_stats" class="stats-grid animate__animated animate__fadeIn" role="region" aria-label="Dashboard Statistics">
         <!-- Total Orders -->
         <a id="workforce_dashboard_card_total_orders"
            href="{% url 'workforce:wf_orders_all' %}"
@@ -293,37 +293,109 @@
     {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="workforce" %}
 
     <!-- Orders Trend Chart -->
-    <div id="workforce_dashboard_section_chart" class="recent-orders-section mb-4">
-        <div class="section-header">
-            <h4 class="section-title">
-                <i class="fa-solid fa-chart-line me-2" aria-hidden="true"></i>
-                Orders Trend (Last 7 Days)
-            </h4>
-        </div>
-        <div class="section-content">
-            <div id="workforce_dashboard_orders_chart" class="orders-trend-chart">
-                <div class="chart-bars d-flex align-items-end justify-content-between" style="height: 150px; gap: 0.5rem;">
-                    {% for day in orders_trend %}
-                    <div class="chart-bar-wrapper text-center flex-fill">
-                        <div class="chart-bar bg-primary"
-                             style="height: {% widthratio day.count max_orders 100 %}%; min-height: 10px; border-radius: var(--brand-radius-sm) var(--brand-radius-sm) 0 0;"
-                             title="{{ day.count }} orders">
-                        </div>
-                        <small class="chart-label d-block mt-1 text-muted">{{ day.date }}</small>
-                        <small class="chart-value d-block fw-bold">{{ day.count }}</small>
-                    </div>
-                    {% empty %}
-                    <div class="text-center text-muted py-4 w-100">
-                        <p class="mb-0">No data available</p>
-                    </div>
-                    {% endfor %}
-                </div>
+    <div id="workforce_dashboard_section_chart" class="recent-orders-section mb-4 animate__animated animate__fadeIn">
+        <div class="card">
+            <div class="card-header" style="background: linear-gradient(135deg, var(--brand-primary, #f7c000) 0%, var(--brand-navy, #001f3f) 100%); color: white;">
+                <h5 class="mb-0">
+                    <i class="fa-solid fa-chart-line me-2" aria-hidden="true"></i>
+                    Orders Trend (Last 7 Days)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="workforce_dashboard_orders_chart" style="min-height: 300px;"></div>
             </div>
         </div>
     </div>
 
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Prepare data from Django template
+        const categories = [{% for day in orders_trend %}'{{ day.date }}'{% if not forloop.last %}, {% endif %}{% endfor %}];
+        const data = [{% for day in orders_trend %}{{ day.count }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+
+        // ApexCharts configuration
+        const options = {
+            series: [{
+                name: 'Orders',
+                data: data
+            }],
+            chart: {
+                type: 'area',
+                height: 300,
+                toolbar: {
+                    show: false
+                },
+                animations: {
+                    enabled: true,
+                    easing: 'easeinout',
+                    speed: 800
+                }
+            },
+            dataLabels: {
+                enabled: false
+            },
+            stroke: {
+                curve: 'smooth',
+                width: 3
+            },
+            fill: {
+                type: 'gradient',
+                gradient: {
+                    shadeIntensity: 1,
+                    opacityFrom: 0.7,
+                    opacityTo: 0.2,
+                    stops: [0, 90, 100]
+                }
+            },
+            colors: ['#f7c000'],
+            xaxis: {
+                categories: categories,
+                labels: {
+                    style: {
+                        fontSize: '12px'
+                    }
+                }
+            },
+            yaxis: {
+                labels: {
+                    style: {
+                        fontSize: '12px'
+                    }
+                },
+                min: 0
+            },
+            grid: {
+                borderColor: '#e0e0e0',
+                strokeDashArray: 4
+            },
+            tooltip: {
+                y: {
+                    formatter: function(val) {
+                        return val + ' orders';
+                    }
+                }
+            }
+        };
+
+        const chart = new ApexCharts(document.querySelector("#workforce_dashboard_orders_chart"), options);
+        chart.render();
+
+        // Reinitialize on HTMX content swap
+        document.body.addEventListener('htmx:afterSettle', function(event) {
+            if (event.detail.target.id === 'main-content') {
+                const chartElement = document.querySelector("#workforce_dashboard_orders_chart");
+                if (chartElement && typeof ApexCharts !== 'undefined') {
+                    chart.destroy();
+                    const newChart = new ApexCharts(chartElement, options);
+                    newChart.render();
+                }
+            }
+        });
+    });
+    </script>
+
     <!-- Quick Actions Section -->
-    <div id="workforce_dashboard_section_quick_actions" class="recent-orders-section mb-4">
+    <div id="workforce_dashboard_section_quick_actions" class="recent-orders-section mb-4 animate__animated animate__fadeIn">
         <div class="section-header">
             <h4 class="section-title">
                 <i class="fa-solid fa-bolt me-2" aria-hidden="true"></i>
@@ -385,7 +457,7 @@
     </div>
 
     <!-- Latest Orders Section -->
-    <div id="workforce_dashboard_section_latest_orders" class="recent-orders-section">
+    <div id="workforce_dashboard_section_latest_orders" class="recent-orders-section animate__animated animate__fadeIn">
         <div id="workforce_dashboard_header_latest_orders" class="section-header d-flex justify-content-between align-items-center">
             <h4 id="workforce_dashboard_title_latest_orders" class="section-title mb-0">
                 <i class="fa-solid fa-clock-rotate-left me-2" aria-hidden="true"></i>

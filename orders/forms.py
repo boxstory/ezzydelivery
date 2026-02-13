@@ -163,9 +163,11 @@ class AddOrderForm(forms.ModelForm):
                 choices=COD_STATUS_BY_CLIENT, attrs={'checked': 'checked'})
 
         # Access the form data to filter pickup_location choices
+        # Show fulfillment stores first when fulfillment service is enabled
         if business_id is not None:
             self.fields['pickup_location'].queryset = business_models.PickupLocation.objects.filter(
-                business_id= business_id)
+                business_id=business_id
+            ).order_by('-is_fulfilment_center', 'pickup_location_title')
             
         
 
@@ -484,9 +486,11 @@ class UpdateOrderForm(forms.ModelForm):
             # @todo: need to specify business only products
 
 
+        # Show fulfillment stores first when fulfillment service is enabled
         if business_id is not None:
             self.fields['pickup_location'].queryset = business_models.PickupLocation.objects.filter(
-                business_id=business_id)
+                business_id=business_id
+            ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
 
 
