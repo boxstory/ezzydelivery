@@ -235,24 +235,14 @@
             <div class="biz-panel__body">
                 <form class="biz-form" data-section="status">
                     {% csrf_token %}
-                    <div class="biz-form__row">
-                        <div class="biz-form__group">
-                            <label class="biz-form__label">Account Status</label>
-                            <select name="business_status" class="biz-form__input" disabled>
-                                <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
-                                <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
-                                <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
-                                <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
-                            </select>
-                        </div>
-                        <div class="biz-form__group">
-                            <label class="biz-form__label">Fulfillment Service</label>
-                            <select name="fulfillment_service_status" class="biz-form__input" disabled>
-                                <option value="none" {% if business.fulfillment_service_status == 'none' %}selected{% endif %}>Not Requested</option>
-                                <option value="requested" {% if business.fulfillment_service_status == 'requested' %}selected{% endif %}>Requested</option>
-                                <option value="active" {% if business.fulfillment_service_status == 'active' %}selected{% endif %}>Active</option>
-                            </select>
-                        </div>
+                    <div class="biz-form__group">
+                        <label class="biz-form__label">Account Status</label>
+                        <select name="business_status" class="biz-form__input" disabled>
+                            <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
+                            <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                            <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
+                        </select>
                     </div>
                     <div class="biz-form__actions biz-form__actions--hidden" data-panel="status">
                         <button type="submit" class="biz-btn biz-btn--primary">
@@ -264,6 +254,122 @@
                     </div>
                     <div class="biz-toast biz-section-msg" data-panel="status"></div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Fulfillment Service Panel -->
+        <div class="biz-panel" data-panel="fulfillment">
+            <div class="biz-panel__header">
+                <i class="fa-solid fa-warehouse"></i>
+                <h3>Fulfillment Service</h3>
+                <button type="button" class="biz-panel__edit-btn" data-panel="fulfillment" title="Edit">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+            </div>
+            <div class="biz-panel__body">
+                <form class="biz-form" data-section="fulfillment">
+                    {% csrf_token %}
+                    <div class="biz-form__group">
+                        <label class="biz-form__label">Service Status</label>
+                        <select name="fulfillment_service_status" id="fulfillment_status_select" class="biz-form__input" disabled>
+                            <option value="none" {% if business.fulfillment_service_status == 'none' %}selected{% endif %}>Not Requested</option>
+                            <option value="requested" {% if business.fulfillment_service_status == 'requested' %}selected{% endif %}>Requested</option>
+                            <option value="active" {% if business.fulfillment_service_status == 'active' %}selected{% endif %}>Active</option>
+                        </select>
+                    </div>
+
+                    {% if linked_warehouse %}
+                    <div class="biz-form__group" id="linked_warehouse_display">
+                        <label class="biz-form__label">Linked Warehouse</label>
+                        <div style="background: var(--brand-grey-50); border: 1px solid var(--brand-grey-200); border-radius: var(--brand-radius-sm); padding: 0.75rem;">
+                            <div style="display: flex; align-items: start; gap: 0.75rem;">
+                                <div style="width: 32px; height: 32px; border-radius: var(--brand-radius-sm); background: var(--brand-primary); color: var(--brand-grey-800); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                    <i class="fa-solid fa-warehouse"></i>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; color: var(--brand-grey-800); margin-bottom: 0.25rem;">
+                                        {{ linked_warehouse.warehouse.name }}
+                                    </div>
+                                    <div style="font-size: 0.875rem; color: var(--brand-grey-600); margin-bottom: 0.5rem;">
+                                        <i class="fa-solid fa-location-dot"></i> {{ linked_warehouse.default_location.name }}
+                                    </div>
+                                    <div style="font-size: 0.8125rem; color: var(--brand-grey-500);">
+                                        <i class="fa-solid fa-fingerprint"></i> {{ linked_warehouse.warehouse.code }} / {{ linked_warehouse.default_location.code }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="biz-form__group" id="warehouse_select_group" style="display: none;">
+                        <label class="biz-form__label">Select Warehouse Location <span style="color: var(--brand-danger);">*</span></label>
+                        <select name="warehouse_location_id" id="warehouse_location_select" class="biz-form__input">
+                            <option value="">— Select Warehouse —</option>
+                        </select>
+                        <p style="font-size: 0.8125rem; color: var(--brand-grey-600); margin-top: 0.5rem;">
+                            <i class="fa-solid fa-info-circle"></i> Required when activating fulfillment service
+                        </p>
+                    </div>
+                    <div class="biz-form__actions biz-form__actions--hidden" data-panel="fulfillment">
+                        <button type="submit" class="biz-btn biz-btn--primary">
+                            <i class="fa-solid fa-save"></i> Save & Link Warehouse
+                        </button>
+                        <button type="button" class="biz-btn biz-btn--ghost biz-cancel-btn" data-panel="fulfillment">
+                            Cancel
+                        </button>
+                    </div>
+                    <div class="biz-toast biz-section-msg" data-panel="fulfillment"></div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Products Panel -->
+        <div class="biz-panel {% if business.fulfillment_service_status != 'active' %}biz-panel--disabled{% endif %}" data-panel="products">
+            <div class="biz-panel__header">
+                <i class="fa-solid fa-box-open"></i>
+                <h3>Products</h3>
+                {% if business.fulfillment_service_status == 'active' %}
+                <a href="{% url 'workforce:workforce_pickup_location_add' business.business_id %}" class="biz-panel__link-btn" title="Manage Products">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </a>
+                {% else %}
+                <span class="biz-panel__disabled-badge">
+                    <i class="fa-solid fa-lock"></i> Requires Fulfillment
+                </span>
+                {% endif %}
+            </div>
+            <div class="biz-panel__body">
+                {% if business.fulfillment_service_status == 'active' %}
+                <div class="biz-info-grid">
+                    <div class="biz-info-item">
+                        <label class="biz-info-label">Total Products</label>
+                        <div class="biz-info-value">{{ product_stats.total_products|default:0 }}</div>
+                    </div>
+                    <div class="biz-info-item">
+                        <label class="biz-info-label">Active SKUs</label>
+                        <div class="biz-info-value">{{ product_stats.active_skus|default:0 }}</div>
+                    </div>
+                    <div class="biz-info-item">
+                        <label class="biz-info-label">Total Stock</label>
+                        <div class="biz-info-value">{{ product_stats.total_stock|default:0 }} units</div>
+                    </div>
+                    <div class="biz-info-item">
+                        <label class="biz-info-label">Low Stock Items</label>
+                        <div class="biz-info-value biz-info-value--warning">{{ product_stats.low_stock_items|default:0 }}</div>
+                    </div>
+                </div>
+                <div class="biz-panel__note">
+                    <i class="fa-solid fa-info-circle"></i>
+                    Product management is available through the fulfillment service. Click the arrow to manage products.
+                </div>
+                {% else %}
+                <div class="biz-panel__empty-state">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                    <p>Activate fulfillment service to manage products</p>
+                    <small>Products section will be enabled once fulfillment service is active and a warehouse is linked.</small>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -314,6 +420,16 @@
             btn.classList.add('biz-panel__edit-btn--active');
             actions.classList.remove('biz-form__actions--hidden');
             fields.forEach(function(f) { f.disabled = false; });
+
+            // Load warehouses when editing fulfillment panel
+            if (panelName === 'fulfillment') {
+                // Hide linked warehouse display, show selector
+                var linkedDisplay = document.getElementById('linked_warehouse_display');
+                if (linkedDisplay) linkedDisplay.style.display = 'none';
+
+                loadWarehouseLocations();
+                checkFulfillmentStatus();
+            }
         } else {
             panel.classList.remove('biz-panel--editing');
             btn.classList.remove('biz-panel__edit-btn--active');
@@ -323,7 +439,79 @@
             // Hide any toast
             var msg = panel.querySelector('.biz-section-msg');
             if (msg) msg.style.display = 'none';
+
+            // Hide warehouse select when closing fulfillment panel
+            if (panelName === 'fulfillment') {
+                document.getElementById('warehouse_select_group').style.display = 'none';
+
+                // Show linked warehouse display again
+                var linkedDisplay = document.getElementById('linked_warehouse_display');
+                if (linkedDisplay) linkedDisplay.style.display = 'block';
+            }
         }
+    }
+
+    // Load warehouse locations via AJAX
+    function loadWarehouseLocations() {
+        var select = document.getElementById('warehouse_location_select');
+        console.log('Loading warehouse locations...');
+
+        // Show loading state
+        select.innerHTML = '<option value="">Loading warehouses...</option>';
+        select.disabled = true;
+
+        fetch('/workforce/api/warehouse-locations/')
+            .then(function(r) {
+                console.log('Response status:', r.status);
+                if (!r.ok) {
+                    throw new Error('HTTP ' + r.status);
+                }
+                return r.json();
+            })
+            .then(function(data) {
+                console.log('Warehouse data:', data);
+                if (data.success) {
+                    select.innerHTML = '<option value="">— Select Warehouse —</option>';
+                    data.locations.forEach(function(loc) {
+                        var option = document.createElement('option');
+                        option.value = loc.id;
+                        option.textContent = loc.warehouse_name + ' - ' + loc.name;
+                        select.appendChild(option);
+                    });
+                    select.disabled = false;
+                    console.log('Loaded', data.locations.length, 'warehouse locations');
+                } else {
+                    console.error('API returned success=false:', data.error || 'Unknown error');
+                    select.innerHTML = '<option value="">Error: ' + (data.error || 'Failed to load') + '</option>';
+                }
+            })
+            .catch(function(err) {
+                console.error('Failed to load warehouses:', err);
+                // Show error in select
+                select.innerHTML = '<option value="">Error loading warehouses</option>';
+                select.disabled = false;
+            });
+    }
+
+    // Check fulfillment status and show/hide warehouse select
+    function checkFulfillmentStatus() {
+        var statusSelect = document.getElementById('fulfillment_status_select');
+        var warehouseGroup = document.getElementById('warehouse_select_group');
+        var warehouseSelect = document.getElementById('warehouse_location_select');
+
+        if (statusSelect.value === 'active') {
+            warehouseGroup.style.display = 'block';
+            // Don't disable it so value can be submitted
+        } else {
+            warehouseGroup.style.display = 'none';
+            warehouseSelect.value = '';
+        }
+    }
+
+    // Listen for fulfillment status changes
+    var fulfillmentStatusSelect = document.getElementById('fulfillment_status_select');
+    if (fulfillmentStatusSelect) {
+        fulfillmentStatusSelect.addEventListener('change', checkFulfillmentStatus);
     }
 
     function showSectionMsg(panelName, ok, text) {
@@ -360,36 +548,122 @@
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             var section = this.dataset.section;
-            var formData = new FormData(this);
-            formData.append('section', section);
-            var submitBtn = this.querySelector('button[type="submit"]');
-            var origHtml = submitBtn.innerHTML;
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
 
-            fetch(apiUrl, {
-                method: 'POST',
-                body: formData,
-                headers: { 'X-CSRFToken': csrfToken }
-            })
-            .then(function(r) { if (!r.ok) throw new Error('fail'); return r.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    showSectionMsg(section, true, data.message || 'Updated successfully');
-                    setTimeout(function() { window.location.reload(); }, 1200);
-                } else {
-                    showSectionMsg(section, false, data.error || 'Update failed');
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = origHtml;
-                }
-            })
-            .catch(function() {
-                showSectionMsg(section, false, 'Network error. Please try again.');
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = origHtml;
-            });
+            // Special handling for fulfillment section
+            if (section === 'fulfillment') {
+                handleFulfillmentSubmit(this);
+                return;
+            }
+
+            // Standard form submission for other sections
+            submitStandardForm(this, section);
         });
     });
+
+    // Dedicated fulfillment form handler
+    function handleFulfillmentSubmit(form) {
+        var statusSelect = document.getElementById('fulfillment_status_select');
+        var warehouseSelect = document.getElementById('warehouse_location_select');
+        var submitBtn = form.querySelector('button[type="submit"]');
+        var origHtml = submitBtn.innerHTML;
+
+        console.log('Fulfillment validation:');
+        console.log('  Status:', statusSelect.value);
+        console.log('  Warehouse:', warehouseSelect.value);
+
+        // Client-side validation
+        if (statusSelect.value === 'active' && !warehouseSelect.value) {
+            showSectionMsg('fulfillment', false, 'Please select a warehouse location when activating fulfillment service');
+            return;
+        }
+
+        // Build form data
+        var formData = new FormData();
+        formData.append('section', 'fulfillment');
+        formData.append('fulfillment_service_status', statusSelect.value);
+        if (warehouseSelect.value) {
+            formData.append('warehouse_location_id', warehouseSelect.value);
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+        console.log('Submitting fulfillment form');
+        console.log('Form data:', Object.fromEntries(formData));
+
+        fetch(apiUrl, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': csrfToken }
+        })
+        .then(function(r) {
+            console.log('Response status:', r.status);
+            if (!r.ok) {
+                return r.json().then(function(data) {
+                    console.log('Error response data:', data);
+                    throw new Error(data.error || 'HTTP ' + r.status);
+                }).catch(function(err) {
+                    if (err.message && err.message !== 'HTTP ' + r.status) {
+                        throw err;
+                    }
+                    throw new Error('HTTP ' + r.status);
+                });
+            }
+            return r.json();
+        })
+        .then(function(data) {
+            console.log('Response data:', data);
+            if (data.success) {
+                showSectionMsg('fulfillment', true, data.message || 'Fulfillment service updated successfully');
+                setTimeout(function() { window.location.reload(); }, 1200);
+            } else {
+                showSectionMsg('fulfillment', false, data.error || 'Update failed');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = origHtml;
+            }
+        })
+        .catch(function(err) {
+            console.error('Form submission error:', err);
+            showSectionMsg('fulfillment', false, err.message || 'Network error. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = origHtml;
+        });
+    }
+
+    // Standard form submission handler for other sections
+    function submitStandardForm(form, section) {
+        var formData = new FormData(form);
+        formData.append('section', section);
+        var submitBtn = form.querySelector('button[type="submit"]');
+        var origHtml = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+        console.log('Submitting form for section:', section);
+        console.log('Form data:', Object.fromEntries(formData));
+
+        fetch(apiUrl, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': csrfToken }
+        })
+        .then(function(r) { if (!r.ok) throw new Error('fail'); return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showSectionMsg(section, true, data.message || 'Updated successfully');
+                setTimeout(function() { window.location.reload(); }, 1200);
+            } else {
+                showSectionMsg(section, false, data.error || 'Update failed');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = origHtml;
+            }
+        })
+        .catch(function() {
+            showSectionMsg(section, false, 'Network error. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = origHtml;
+        });
+    }
 })();
 </script>
 {% endblock extra_js %}

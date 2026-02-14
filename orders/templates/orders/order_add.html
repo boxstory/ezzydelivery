@@ -361,8 +361,8 @@
   </div>
 
     <!-- Table View (Excel-like) -->
-    <div class="row d-none" id="table_view_container">
-      <div class="col-12">
+    <div class="d-none" id="table_view_container">
+      <div>
         <div class="d-flex justify-content-between align-items-center mb-3">
           <div class="btn-group">
             <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_add_row">
@@ -438,6 +438,7 @@
     const btnTableView = document.getElementById('btn_table_view');
     const formViewContainer = document.getElementById('form_view_container');
     const tableViewContainer = document.getElementById('table_view_container');
+    const orderAddPage = document.getElementById('orders_add_container_main');
 
     // Toggle to Form View
     btnFormView.addEventListener('click', function() {
@@ -445,6 +446,7 @@
       btnTableView.classList.remove('active');
       formViewContainer.classList.remove('d-none');
       tableViewContainer.classList.add('d-none');
+      orderAddPage.classList.remove('table-view-active');
       localStorage.setItem('orderAddView', 'form');
     });
 
@@ -454,6 +456,7 @@
       btnFormView.classList.remove('active');
       tableViewContainer.classList.remove('d-none');
       formViewContainer.classList.add('d-none');
+      orderAddPage.classList.add('table-view-active');
       localStorage.setItem('orderAddView', 'table');
 
       // Initialize table if empty
@@ -548,15 +551,11 @@
     // Fulfillment service status
     const isFulfillmentEnabled = {{ business.fulfillment_service_enabled|yesno:"true,false" }};
 
-    // Pickup locations for dropdown
+    // Pickup locations for dropdown (show all locations regardless of fulfillment status)
     const pickupLocations = [
-      {% if business.fulfillment_service_enabled %}
-      { id: '{{ pickup_locations.first.id }}', name: 'Ezzy Fulfillment' },
-      {% else %}
       {% for location in pickup_locations %}
       { id: '{{ location.id }}', name: '{{ location.pickup_location_title }}' }{% if not forloop.last %},{% endif %}
       {% endfor %}
-      {% endif %}
     ];
 
     // Default pickup location (first one or fulfillment)

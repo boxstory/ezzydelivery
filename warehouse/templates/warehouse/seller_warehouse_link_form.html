@@ -3,7 +3,99 @@
 
 {% block title %}{% if is_create %}Add New Link{% else %}Edit Link{% endif %}{% endblock %}
 
-{% block extra_css %}
+
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Priority slider
+    const prioritySlider = document.getElementById('priority');
+    const priorityValue = document.getElementById('priority-value');
+
+    if (prioritySlider) {
+        prioritySlider.addEventListener('input', function() {
+            priorityValue.textContent = this.value;
+        });
+    }
+
+    // Load locations when warehouse is selected
+    const warehouseSelect = document.getElementById('warehouse');
+    const locationSelect = document.getElementById('default_location');
+
+    if (warehouseSelect && locationSelect) {
+        warehouseSelect.addEventListener('change', function() {
+            const warehouseId = this.value;
+
+            if (!warehouseId) {
+                locationSelect.innerHTML = '<option value="">-- Select warehouse first --</option>';
+                locationSelect.disabled = true;
+                return;
+            }
+
+            // Show loading state
+            locationSelect.innerHTML = '<option value="">Loading locations...</option>';
+            locationSelect.disabled = true;
+
+            // Fetch locations for selected warehouse
+            fetch(`/workforce/warehouse/api/warehouses/${warehouseId}/locations/`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    locationSelect.innerHTML = '<option value="">-- No Default Location --</option>';
+
+                    if (data.length === 0) {
+                        const option = document.createElement('option');
+                        option.value = '';
+                        option.textContent = 'No locations available for this warehouse';
+                        option.disabled = true;
+                        locationSelect.appendChild(option);
+                    } else {
+                        data.forEach(location => {
+                            const option = document.createElement('option');
+                            option.value = location.id;
+                            option.textContent = `${location.name} (${location.code})`;
+                            if (location.is_default) {
+                                option.textContent += ' - WH Default';
+                            }
+                            locationSelect.appendChild(option);
+                        });
+                    }
+
+                    locationSelect.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Error loading locations:', error);
+                    locationSelect.innerHTML = '<option value="">Error loading locations - check console</option>';
+                    locationSelect.disabled = true;
+                });
+        });
+    }
+
+    // Warn if setting non-default priority too high
+    const isDefaultCheckbox = document.getElementById('is_default');
+    if (isDefaultCheckbox && prioritySlider) {
+        function checkPriorityWarning() {
+            const priority = parseInt(prioritySlider.value);
+            const isDefault = isDefaultCheckbox.checked;
+
+            if (!isDefault && priority > 80) {
+                alert('Note: This is a high priority link but not marked as default. Consider marking it as default if it should be the primary warehouse.');
+            }
+        }
+
+        prioritySlider.addEventListener('change', checkPriorityWarning);
+        isDefaultCheckbox.addEventListener('change', checkPriorityWarning);
+    }
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<!-- CSS for HTMX compatibility - loaded inside content -->
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
 <style>
 .form-header {
@@ -115,98 +207,7 @@
     color: #e74c3c;
 }
 </style>
-{% endblock %}
 
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Priority slider
-    const prioritySlider = document.getElementById('priority');
-    const priorityValue = document.getElementById('priority-value');
-
-    if (prioritySlider) {
-        prioritySlider.addEventListener('input', function() {
-            priorityValue.textContent = this.value;
-        });
-    }
-
-    // Load locations when warehouse is selected
-    const warehouseSelect = document.getElementById('warehouse');
-    const locationSelect = document.getElementById('default_location');
-
-    if (warehouseSelect && locationSelect) {
-        warehouseSelect.addEventListener('change', function() {
-            const warehouseId = this.value;
-
-            if (!warehouseId) {
-                locationSelect.innerHTML = '<option value="">-- Select warehouse first --</option>';
-                locationSelect.disabled = true;
-                return;
-            }
-
-            // Show loading state
-            locationSelect.innerHTML = '<option value="">Loading locations...</option>';
-            locationSelect.disabled = true;
-
-            // Fetch locations for selected warehouse
-            fetch(`/workforce/warehouse/api/warehouses/${warehouseId}/locations/`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    locationSelect.innerHTML = '<option value="">-- No Default Location --</option>';
-
-                    if (data.length === 0) {
-                        const option = document.createElement('option');
-                        option.value = '';
-                        option.textContent = 'No locations available for this warehouse';
-                        option.disabled = true;
-                        locationSelect.appendChild(option);
-                    } else {
-                        data.forEach(location => {
-                            const option = document.createElement('option');
-                            option.value = location.id;
-                            option.textContent = `${location.name} (${location.code})`;
-                            if (location.is_default) {
-                                option.textContent += ' - WH Default';
-                            }
-                            locationSelect.appendChild(option);
-                        });
-                    }
-
-                    locationSelect.disabled = false;
-                })
-                .catch(error => {
-                    console.error('Error loading locations:', error);
-                    locationSelect.innerHTML = '<option value="">Error loading locations - check console</option>';
-                    locationSelect.disabled = true;
-                });
-        });
-    }
-
-    // Warn if setting non-default priority too high
-    const isDefaultCheckbox = document.getElementById('is_default');
-    if (isDefaultCheckbox && prioritySlider) {
-        function checkPriorityWarning() {
-            const priority = parseInt(prioritySlider.value);
-            const isDefault = isDefaultCheckbox.checked;
-
-            if (!isDefault && priority > 80) {
-                alert('Note: This is a high priority link but not marked as default. Consider marking it as default if it should be the primary warehouse.');
-            }
-        }
-
-        prioritySlider.addEventListener('change', checkPriorityWarning);
-        isDefaultCheckbox.addEventListener('change', checkPriorityWarning);
-    }
-});
-</script>
-{% endblock %}
-
-{% block content %}
 <div class="container-fluid py-4">
     <!-- Back Button -->
     <div class="mb-3">

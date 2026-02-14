@@ -770,7 +770,8 @@ def add_order(request):
             logger.debug("Loading add_order form")
             form = orders_forms.AddOrderForm(
                 business_id=business.business_id,
-                business_code=business.business_code
+                business_code=business.business_code,
+                business=business
             )
 
         # Prepare pickup locations data for JavaScript with lat/lon

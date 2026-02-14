@@ -111,14 +111,48 @@
 
                 <!-- Product Details -->
                 <h6 class="section-heading">Product Details</h6>
+
+                {% if has_fulfillment and warehouse_products %}
+                <!-- Warehouse Inventory Selection -->
+                <div class="alert alert-info mb-3">
+                    <i class="fa-solid fa-warehouse me-2"></i>
+                    <strong>Fulfillment Service Active:</strong> Select from available warehouse inventory below, or enter product details manually.
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <label class="form-label">
+                            <i class="fa-solid fa-box me-1"></i> Select from Warehouse Inventory
+                        </label>
+                        <select class="form-input" id="warehouse_product_select" onchange="fillProductFromWarehouse()">
+                            <option value="">-- Or Enter Product Manually Below --</option>
+                            {% for stock in warehouse_products %}
+                            <option
+                                value="{{ stock.product.id }}"
+                                data-name="{{ stock.product.name }}"
+                                data-sku="{{ stock.product.sku }}"
+                                data-available="{{ stock.available_quantity }}"
+                                data-warehouse="{{ stock.warehouse.name }}"
+                                data-location="{{ stock.storage_location.full_code|default:'-' }}">
+                                {{ stock.product.name }} (SKU: {{ stock.product.sku }}) - {{ stock.available_quantity }} available at {{ stock.warehouse.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Showing {{ warehouse_products|length }} product(s) with available stock</small>
+                    </div>
+                </div>
+                {% endif %}
+
                 <div class="row mb-4">
                     <div class="col-md-8 mb-3">
                         <label class="form-label" for="product_name">Product Name / Description</label>
                         <input type="text" class="form-input" id="product_name" name="product_name" placeholder="e.g., iPhone 15 Pro Max 256GB">
+                        <input type="hidden" id="warehouse_product_id" name="warehouse_product_id" value="">
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label" for="quantity">Quantity</label>
                         <input type="number" class="form-input" id="quantity" name="quantity" min="1" value="1">
+                        <small class="text-muted" id="quantity_hint"></small>
                     </div>
                 </div>
 
@@ -226,6 +260,51 @@ function toggleScheduledTime() {
         timeContainer.style.display = 'none';
         timeInput.required = false;
         timeInput.value = '';
+    }
+}
+
+// Fill product details from warehouse inventory selection
+function fillProductFromWarehouse() {
+    var select = document.getElementById('warehouse_product_select');
+    var selectedOption = select.options[select.selectedIndex];
+
+    if (selectedOption.value) {
+        // Fill product name and ID
+        document.getElementById('product_name').value = selectedOption.dataset.name;
+        document.getElementById('warehouse_product_id').value = selectedOption.value;
+
+        // Update quantity hint
+        var availableQty = selectedOption.dataset.available;
+        var quantityInput = document.getElementById('quantity');
+        var quantityHint = document.getElementById('quantity_hint');
+
+        quantityHint.textContent = availableQty + ' available in stock';
+        quantityHint.style.color = '#10b981';
+        quantityInput.max = availableQty;
+
+        // Show warehouse info in product name field (optional enhancement)
+        var warehouse = selectedOption.dataset.warehouse;
+        var location = selectedOption.dataset.location;
+        var sku = selectedOption.dataset.sku;
+
+        // Add SKU to internal notes if exists
+        var internalNotes = document.getElementById('internal_notes');
+        var note = 'Warehouse: ' + warehouse;
+        if (location && location !== '-') {
+            note += ' | Location: ' + location;
+        }
+        note += ' | SKU: ' + sku;
+
+        if (internalNotes.value) {
+            internalNotes.value += '\n' + note;
+        } else {
+            internalNotes.value = note;
+        }
+    } else {
+        // Clear warehouse product ID
+        document.getElementById('warehouse_product_id').value = '';
+        document.getElementById('quantity_hint').textContent = '';
+        document.getElementById('quantity').removeAttribute('max');
     }
 }
 

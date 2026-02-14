@@ -144,6 +144,7 @@ class AddOrderForm(forms.ModelForm):
     def __init__(self,  *args, **kwargs):
         business_id = kwargs.pop('business_id', None)
         business_code = kwargs.pop('business_code', None)
+        business = kwargs.pop('business', None)
 
         super().__init__(*args, **kwargs)
 
@@ -165,9 +166,17 @@ class AddOrderForm(forms.ModelForm):
         # Access the form data to filter pickup_location choices
         # Show fulfillment stores first when fulfillment service is enabled
         if business_id is not None:
-            self.fields['pickup_location'].queryset = business_models.PickupLocation.objects.filter(
+            pickup_locations = business_models.PickupLocation.objects.filter(
                 business_id=business_id
             ).order_by('-is_fulfilment_center', 'pickup_location_title')
+
+            self.fields['pickup_location'].queryset = pickup_locations
+
+            # If fulfillment is active, set fulfillment center as default
+            if business and business.fulfillment_service_status == 'active':
+                fulfillment_location = pickup_locations.filter(is_fulfilment_center=True).first()
+                if fulfillment_location:
+                    self.fields['pickup_location'].initial = fulfillment_location.id
             
         
 

@@ -1,0 +1,224 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Products - {{ business.business_name }}{% endblock title %}
+
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/biz-detail.css' %}" />
+<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce-products.css' %}" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3">
+    <!-- Back Navigation -->
+    <a href="{% url 'workforce:business_license_detail' business.business_id %}" class="biz-back-link">
+        <i class="fa-solid fa-arrow-left"></i> Back to {{ business.business_name }}
+    </a>
+
+    <!-- Header -->
+    <div class="products-header">
+        <div>
+            <h1>
+                <i class="fa-solid fa-box-open"></i>
+                Products Management
+            </h1>
+            <p class="products-header__subtitle">
+                Business: <strong>{{ business.business_name }}</strong> ({{ business.business_code }})
+            </p>
+        </div>
+    </div>
+
+    <div class="products-layout">
+        <!-- Left Column: Add Product Form -->
+        <div class="products-form-panel">
+            <div class="panel-card">
+                <div class="panel-card__header">
+                    <i class="fa-solid fa-plus-circle"></i>
+                    <h2>Add New Product</h2>
+                </div>
+                <div class="panel-card__body">
+                    <form method="POST" id="add_product_form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_product">
+
+                        <div class="form-group">
+                            <label class="form-label">Brand Name <span class="text-danger">*</span></label>
+                            <input type="text" name="brand_name" class="form-input" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Item Name <span class="text-danger">*</span></label>
+                            <input type="text" name="item_name" class="form-input" required>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">SKU <span class="text-danger">*</span></label>
+                                <input type="text" name="item_sku" class="form-input" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Barcode</label>
+                                <input type="text" name="barcode" class="form-input">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Price (QAR) <span class="text-danger">*</span></label>
+                                <input type="number" name="item_price" class="form-input" min="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Initial Quantity</label>
+                                <input type="number" name="quantity" class="form-input" min="0" value="0">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Description</label>
+                            <textarea name="item_discription" class="form-input" rows="3"></textarea>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="reset" class="btn-secondary">
+                                <i class="fa-solid fa-rotate-left"></i> Reset
+                            </button>
+                            <button type="submit" class="btn-primary">
+                                <i class="fa-solid fa-plus"></i> Add Product
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Products List -->
+        <div class="products-list-panel">
+            <div class="panel-card">
+                <div class="panel-card__header">
+                    <div>
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                        <h2>Products List</h2>
+                    </div>
+                    <div class="panel-card__actions">
+                        <input type="text" id="search_products" class="search-input" placeholder="Search products...">
+                    </div>
+                </div>
+                <div class="panel-card__body panel-card__body--no-padding">
+                    {% if products %}
+                    <div class="products-table-wrapper">
+                        <table class="products-table">
+                            <thead>
+                                <tr>
+                                    <th>Product ID</th>
+                                    <th>Brand / Name</th>
+                                    <th>SKU</th>
+                                    <th>Price</th>
+                                    <th>Stock</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for product in products %}
+                                <tr>
+                                    <td>
+                                        <span class="product-id-badge">{{ product.product_id|default:"—" }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="product-info">
+                                            <div class="product-brand">{{ product.brand_name }}</div>
+                                            <div class="product-name">{{ product.item_name }}</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <code class="product-sku">{{ product.item_sku }}</code>
+                                    </td>
+                                    <td>
+                                        <span class="product-price">{{ product.item_price }} QAR</span>
+                                    </td>
+                                    <td>
+                                        <span class="stock-badge {% if product.stock_quantity < 10 %}stock-badge--low{% endif %}">
+                                            {{ product.stock_quantity|default:0 }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <button class="btn-icon btn-icon--edit" title="Edit">
+                                                <i class="fa-solid fa-pen"></i>
+                                            </button>
+                                            <button class="btn-icon btn-icon--delete" title="Delete">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fa-solid fa-box-open"></i>
+                        <p>No products added yet</p>
+                        <small>Use the form on the left to add your first product</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+// Search functionality
+document.getElementById('search_products').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const rows = document.querySelectorAll('.products-table tbody tr');
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(searchTerm) ? '' : 'none';
+    });
+});
+
+// Form submission
+document.getElementById('add_product_form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const origHtml = submitBtn.innerHTML;
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding...';
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+        }
+    })
+    .then(r => r.json().catch(() => {
+        // If not JSON, reload page (successful form submission with redirect)
+        window.location.reload();
+    }))
+    .then(data => {
+        if (data && data.success) {
+            window.location.reload();
+        } else if (data && data.error) {
+            alert('Error: ' + data.error);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = origHtml;
+        }
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = origHtml;
+    });
+});
+</script>
+{% endblock extra_js %}

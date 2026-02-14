@@ -820,6 +820,56 @@ def warehouse_add(request):
 
 @login_required(login_url='account_login')
 @user_passes_test(is_superuser_only)
+def warehouse_edit(request, pk):
+    """Edit an existing warehouse (fulfillment center) - Superuser only"""
+    business, is_staff = get_business_filter(request)
+
+    # Only staff can edit fulfillment centers
+    if not is_staff:
+        messages.error(request, "Only staff can edit fulfillment centers")
+        return redirect('warehouse:warehouse_list')
+
+    warehouse = get_object_or_404(warehouse_models.Warehouse, pk=pk)
+
+    if request.method == 'POST':
+        try:
+            warehouse.name = request.POST.get('name')
+            warehouse.code = request.POST.get('code', '')
+            warehouse.address = request.POST.get('address', '')
+            warehouse.city = request.POST.get('city', '')
+            warehouse.state = request.POST.get('state', '')
+            warehouse.postal_code = request.POST.get('postal_code', '')
+            warehouse.country = request.POST.get('country', 'Bahrain')
+            warehouse.phone = request.POST.get('phone', '')
+            warehouse.email = request.POST.get('email', '')
+            warehouse.description = request.POST.get('description', '')
+
+            latitude = request.POST.get('latitude', '')
+            longitude = request.POST.get('longitude', '')
+            warehouse.latitude = float(latitude) if latitude else None
+            warehouse.longitude = float(longitude) if longitude else None
+
+            warehouse.is_active = request.POST.get('is_active') == 'on'
+            warehouse.is_default = request.POST.get('is_default') == 'on'
+
+            warehouse.save()
+
+            messages.success(request, f"Warehouse '{warehouse.name}' ({warehouse.code}) updated successfully")
+            return redirect('warehouse:warehouse_detail', pk=warehouse.pk)
+        except Exception as e:
+            logger.exception(f"Error updating warehouse: {str(e)}")
+            messages.error(request, f"Error updating warehouse: {str(e)}")
+
+    context = {
+        'warehouse': warehouse,
+        'is_staff': is_staff,
+        'is_edit': True,
+    }
+    return render(request, 'warehouse/warehouse_add.html', context)
+
+
+@login_required(login_url='account_login')
+@user_passes_test(is_superuser_only)
 def warehouse_detail(request, pk):
     """View warehouse details - Superuser only"""
     business, is_staff = get_business_filter(request)

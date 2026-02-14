@@ -3,158 +3,252 @@
 
 {% block title %}Inbound Product Requests{% endblock %}
 
+{% block extra_css %}
+<link type="text/css" rel="stylesheet" href="{% static 'business/css/business-inbound-requests.css' %}?v=20260214a" />
+{% endblock extra_css %}
+
 {% block content %}
-<div class="container-fluid py-4">
-  <!-- Header -->
-  <div class="row mb-4">
-    <div class="col-12">
-      <div class="d-flex justify-content-between align-items-center">
-        <div>
-          <h1 class="h3 mb-1"><i class="fa-solid fa-arrow-right-to-bracket me-2"></i>Inbound Requests</h1>
-          <p class="text-muted mb-0">Send products to warehouse for storage</p>
-        </div>
+<div class="inbound-requests-page">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-header__content">
+      <div class="page-header__text">
+        <h1 class="page-header__title">
+          <i class="fa-solid fa-arrow-right-to-bracket"></i>
+          Inbound Requests
+        </h1>
+        <p class="page-header__subtitle">Send products to warehouse for storage and fulfillment</p>
+      </div>
+      <div class="page-header__actions">
+        <a href="#" class="btn-action btn-action--primary">
+          <i class="fa-solid fa-plus"></i>
+          <span>New Request</span>
+        </a>
       </div>
     </div>
   </div>
 
-  <!-- Stats Cards -->
-  <div class="row mb-4">
-    <div class="col-md-3 col-6 mb-3">
-      <div class="card border-start border-4 border-warning">
-        <div class="card-body">
-          <h6 class="text-muted mb-1">Pending</h6>
-          <h3 class="mb-0 text-warning">{{ stats.pending }}</h3>
-        </div>
+  <!-- Stats Grid -->
+  <div class="stats-grid">
+    <div class="stat-card stat-card--warning">
+      <div class="stat-card__icon">
+        <i class="fa-solid fa-clock"></i>
+      </div>
+      <div class="stat-card__content">
+        <p class="stat-card__label">Pending Review</p>
+        <h3 class="stat-card__value">{{ stats.pending }}</h3>
       </div>
     </div>
-    <div class="col-md-3 col-6 mb-3">
-      <div class="card border-start border-4 border-primary">
-        <div class="card-body">
-          <h6 class="text-muted mb-1">Approved</h6>
-          <h3 class="mb-0 text-primary">{{ stats.approved }}</h3>
-        </div>
+
+    <div class="stat-card stat-card--info">
+      <div class="stat-card__icon">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <div class="stat-card__content">
+        <p class="stat-card__label">Approved</p>
+        <h3 class="stat-card__value">{{ stats.approved }}</h3>
       </div>
     </div>
-    <div class="col-md-3 col-6 mb-3">
-      <div class="card border-start border-4 border-success">
-        <div class="card-body">
-          <h6 class="text-muted mb-1">Completed</h6>
-          <h3 class="mb-0 text-success">{{ stats.completed }}</h3>
-        </div>
+
+    <div class="stat-card stat-card--success">
+      <div class="stat-card__icon">
+        <i class="fa-solid fa-box-check"></i>
+      </div>
+      <div class="stat-card__content">
+        <p class="stat-card__label">Completed</p>
+        <h3 class="stat-card__value">{{ stats.completed }}</h3>
       </div>
     </div>
-    <div class="col-md-3 col-6 mb-3">
-      <div class="card border-start border-4 border-info">
-        <div class="card-body">
-          <h6 class="text-muted mb-1">Total</h6>
-          <h3 class="mb-0 text-info">{{ stats.total }}</h3>
-        </div>
+
+    <div class="stat-card stat-card--neutral">
+      <div class="stat-card__icon">
+        <i class="fa-solid fa-boxes-stacked"></i>
+      </div>
+      <div class="stat-card__content">
+        <p class="stat-card__label">Total Requests</p>
+        <h3 class="stat-card__value">{{ stats.total }}</h3>
       </div>
     </div>
   </div>
 
-  <!-- Filters -->
-  <div class="row mb-3">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-body">
-          <form method="GET" class="row g-3">
-            <div class="col-md-4">
-              <label class="form-label">Status</label>
-              <select name="status" class="form-select">
-                <option value="">All Status</option>
-                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
-                <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
-                <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
-                <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
-              </select>
-            </div>
-            <div class="col-md-2 d-flex align-items-end">
-              <button type="submit" class="btn btn-primary w-100">
-                <i class="fa-solid fa-filter me-1"></i> Apply
-              </button>
-            </div>
-          </form>
+  <!-- Filters Section -->
+  <div class="filters-card">
+    <form method="GET" class="filters-form" id="business_inbound_requests_form_filter">
+      <div class="filters-form__row">
+        <div class="filters-form__group">
+          <label class="filters-form__label" for="business_inbound_requests_input_status">Filter by Status</label>
+          <select name="status" id="business_inbound_requests_input_status" class="filters-form__select">
+            <option value="">All Status</option>
+            <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending Review</option>
+            <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+            <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+            <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+          </select>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Requests Table -->
-  <div class="row">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-body">
-          <div class="table-responsive">
-            <table class="table table-hover">
-              <thead>
-                <tr>
-                  <th>Request #</th>
-                  <th>Warehouse</th>
-                  <th>Items</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Expected Delivery</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for request in page_obj %}
-                <tr>
-                  <td><code>{{ request.request_number }}</code></td>
-                  <td>{{ request.warehouse.name }}</td>
-                  <td>{{ request.items.count }} item(s)</td>
-                  <td>
-                    {% if request.status == 'pending' %}
-                    <span class="badge bg-warning text-dark">Pending</span>
-                    {% elif request.status == 'approved' %}
-                    <span class="badge bg-primary">Approved</span>
-                    {% elif request.status == 'completed' %}
-                    <span class="badge bg-success">Completed</span>
-                    {% else %}
-                    <span class="badge bg-secondary">{{ request.status|title }}</span>
-                    {% endif %}
-                  </td>
-                  <td>{{ request.created_at|date:"d M Y" }}</td>
-                  <td>
-                    {% if request.expected_delivery_date %}
-                    {{ request.expected_delivery_date|date:"d M Y" }}
-                    {% else %}-{% endif %}
-                  </td>
-                </tr>
-                {% empty %}
-                <tr>
-                  <td colspan="6" class="text-center text-muted py-4">
-                    <i class="fa-solid fa-inbox fa-3x mb-3 d-block"></i>
-                    No inbound requests found
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-
-          {% if page_obj.has_other_pages %}
-          <nav>
-            <ul class="pagination justify-content-center mb-0">
-              {% if page_obj.has_previous %}
-              <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}">Previous</a>
-              </li>
-              {% endif %}
-              <li class="page-item active">
-                <span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-              </li>
-              {% if page_obj.has_next %}
-              <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next</a>
-              </li>
-              {% endif %}
-            </ul>
-          </nav>
+        <div class="filters-form__actions">
+          <button type="submit" class="btn-filter">
+            <i class="fa-solid fa-filter"></i>
+            Apply Filters
+          </button>
+          {% if status_filter %}
+          <a href="{% url 'business:inbound_requests_list' %}" class="btn-filter btn-filter--clear">
+            <i class="fa-solid fa-xmark"></i>
+            Clear
+          </a>
           {% endif %}
         </div>
       </div>
+    </form>
+  </div>
+
+  <!-- Requests Table -->
+  <div class="requests-card">
+    <div class="requests-card__header">
+      <h2 class="requests-card__title">
+        <i class="fa-solid fa-list"></i>
+        Request History
+      </h2>
+      <div class="requests-card__meta">
+        Showing {{ page_obj.start_index|default:0 }}-{{ page_obj.end_index|default:0 }} of {{ page_obj.paginator.count|default:0 }}
+      </div>
     </div>
+    <div class="requests-card__body">
+      {% if page_obj %}
+      <div class="requests-table-wrapper">
+        <table class="requests-table" id="business_inbound_requests_table_main">
+          <thead>
+            <tr>
+              <th>Request Number</th>
+              <th>Warehouse</th>
+              <th>Items</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Expected Delivery</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for request in page_obj %}
+            <tr>
+              <td>
+                <code class="request-number">{{ request.request_number }}</code>
+              </td>
+              <td>
+                <div class="warehouse-info">
+                  <i class="fa-solid fa-warehouse"></i>
+                  <span>{{ request.warehouse.name }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="items-count">{{ request.items.count }} item{{ request.items.count|pluralize }}</span>
+              </td>
+              <td>
+                {% if request.status == 'pending' %}
+                <span class="status-badge status-badge--warning">
+                  <i class="fa-solid fa-clock"></i>
+                  Pending
+                </span>
+                {% elif request.status == 'approved' %}
+                <span class="status-badge status-badge--info">
+                  <i class="fa-solid fa-circle-check"></i>
+                  Approved
+                </span>
+                {% elif request.status == 'completed' %}
+                <span class="status-badge status-badge--success">
+                  <i class="fa-solid fa-box-check"></i>
+                  Completed
+                </span>
+                {% elif request.status == 'cancelled' %}
+                <span class="status-badge status-badge--danger">
+                  <i class="fa-solid fa-circle-xmark"></i>
+                  Cancelled
+                </span>
+                {% else %}
+                <span class="status-badge status-badge--neutral">
+                  {{ request.status|title }}
+                </span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="date-text">{{ request.created_at|date:"d M Y" }}</span>
+              </td>
+              <td>
+                {% if request.expected_delivery_date %}
+                <span class="date-text">{{ request.expected_delivery_date|date:"d M Y" }}</span>
+                {% else %}
+                <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="table-actions">
+                  <button class="btn-icon btn-icon--view" title="View Details">
+                    <i class="fa-solid fa-eye"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <i class="fa-solid fa-inbox"></i>
+        <p class="empty-state__title">No inbound requests found</p>
+        <p class="empty-state__text">Start by creating a new inbound request to send products to the warehouse</p>
+        <a href="#" class="btn-action btn-action--primary">
+          <i class="fa-solid fa-plus"></i>
+          Create First Request
+        </a>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="requests-card__footer">
+      <nav class="pagination-nav">
+        <ul class="pagination">
+          {% if page_obj.has_previous %}
+          <li class="pagination__item">
+            <a href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="pagination__link">
+              <i class="fa-solid fa-chevron-left"></i>
+              Previous
+            </a>
+          </li>
+          {% else %}
+          <li class="pagination__item pagination__item--disabled">
+            <span class="pagination__link">
+              <i class="fa-solid fa-chevron-left"></i>
+              Previous
+            </span>
+          </li>
+          {% endif %}
+
+          <li class="pagination__item pagination__item--active">
+            <span class="pagination__link">
+              Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            </span>
+          </li>
+
+          {% if page_obj.has_next %}
+          <li class="pagination__item">
+            <a href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="pagination__link">
+              Next
+              <i class="fa-solid fa-chevron-right"></i>
+            </a>
+          </li>
+          {% else %}
+          <li class="pagination__item pagination__item--disabled">
+            <span class="pagination__link">
+              Next
+              <i class="fa-solid fa-chevron-right"></i>
+            </span>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

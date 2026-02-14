@@ -1,0 +1,629 @@
+/**
+ * Warehouse - Seller-Warehouse Links Enhanced
+ * ============================================
+ * Modern UI for seller-warehouse link management page
+ * Uses EzzyDelivery brand kit variables and global utilities
+ *
+ * Dependencies:
+ * - Bootstrap 5.3.2
+ * - Brand Kit CSS variables (--brand-*)
+ * - Font Awesome 6.x icons
+ *
+ * @author Claude Code - Designer Mode
+ * @date 2026-02-14
+ */
+
+/* ===================================================================
+   PAGE HEADER
+   =================================================================== */
+
+.seller-links-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 2rem 1.5rem;
+    border-radius: 0 0 var(--brand-radius-lg, 0.75rem) var(--brand-radius-lg, 0.75rem);
+    border-left: 4px solid var(--brand-primary, #f0c14b);
+    margin-bottom: 2rem;
+}
+
+.seller-links-header h1,
+.seller-links-header h2 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--brand-grey-900, #212529);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.seller-links-header p {
+    font-size: 0.95rem;
+    color: var(--brand-grey-600, #6c757d);
+    margin: 0;
+}
+
+/* ===================================================================
+   STATISTICS CARDS
+   =================================================================== */
+
+.seller-links-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.seller-links-stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: var(--brand-radius-md, 0.5rem);
+    padding: 1.75rem 1.5rem;
+    box-shadow: var(--brand-shadow-md, 0 4px 6px rgba(0, 0, 0, 0.1));
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.seller-links-stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+}
+
+.seller-links-stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    line-height: 1;
+}
+
+.seller-links-stat-label {
+    font-size: 0.95rem;
+    opacity: 0.95;
+    font-weight: 500;
+    letter-spacing: 0.025em;
+}
+
+/* Stat card variants */
+.seller-links-stat-card--primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.seller-links-stat-card--success {
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+}
+
+.seller-links-stat-card--info {
+    background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+}
+
+/* ===================================================================
+   FILTER CARD
+   =================================================================== */
+
+.seller-links-filter-card {
+    background: var(--brand-white, #ffffff);
+    border-radius: var(--brand-radius-md, 0.5rem);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--brand-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.seller-links-filter-card .form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-grey-700, #495057);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.seller-links-filter-card .form-label i {
+    color: var(--brand-primary, #f0c14b);
+    font-size: 0.875rem;
+}
+
+.seller-links-filter-card .form-control,
+.seller-links-filter-card .form-select {
+    border: 1px solid var(--brand-grey-300, #dee2e6);
+    border-radius: var(--brand-radius-sm, 0.25rem);
+    padding: 0.625rem 0.875rem;
+    font-size: 0.9375rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.seller-links-filter-card .form-control:focus,
+.seller-links-filter-card .form-select:focus {
+    border-color: var(--brand-primary, #f0c14b);
+    box-shadow: 0 0 0 0.2rem rgba(240, 193, 75, 0.25);
+}
+
+.seller-links-filter-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* ===================================================================
+   LINK CARDS
+   =================================================================== */
+
+.seller-link-card {
+    background: var(--brand-white, #ffffff);
+    border-radius: var(--brand-radius-md, 0.5rem);
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: var(--brand-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+    transition: all 0.3s ease;
+    border: 1px solid var(--brand-grey-200, #e9ecef);
+}
+
+.seller-link-card:hover {
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
+    transform: translateY(-3px);
+    border-color: var(--brand-primary, #f0c14b);
+}
+
+/* Link Header */
+.seller-link-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.seller-link-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--brand-grey-900, #212529);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.seller-link-title span {
+    color: var(--brand-grey-900, #212529);
+}
+
+.seller-link-arrow {
+    color: #667eea;
+    font-size: 1.25rem;
+}
+
+/* Link Badges */
+.seller-link-badges {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.seller-link-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.375rem 0.875rem;
+    border-radius: 3.125rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.seller-link-badge--default {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.seller-link-badge--active {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.seller-link-badge--inactive {
+    background: var(--brand-grey-200, #e9ecef);
+    color: var(--brand-grey-600, #6c757d);
+}
+
+/* ===================================================================
+   LINK DETAILS GRID
+   =================================================================== */
+
+.seller-link-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.25rem;
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--brand-grey-200, #e9ecef);
+}
+
+.seller-link-detail-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.875rem;
+}
+
+.seller-link-detail-icon {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--brand-radius-sm, 0.25rem);
+    background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+    color: #667eea;
+    font-size: 1.125rem;
+}
+
+.seller-link-detail-content h6 {
+    font-size: 0.8125rem;
+    color: var(--brand-grey-600, #6c757d);
+    margin-bottom: 0.375rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.seller-link-detail-content p {
+    font-size: 1rem;
+    color: var(--brand-grey-900, #212529);
+    margin: 0;
+    font-weight: 500;
+}
+
+/* Priority Bar */
+.seller-link-priority-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--brand-grey-200, #e9ecef);
+    border-radius: 3.125rem;
+    overflow: hidden;
+    margin-top: 0.625rem;
+}
+
+.seller-link-priority-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.3s ease;
+    border-radius: 3.125rem;
+}
+
+/* ===================================================================
+   LINK NOTES
+   =================================================================== */
+
+.seller-link-notes {
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--brand-grey-200, #e9ecef);
+}
+
+.seller-link-notes h6 {
+    font-size: 0.8125rem;
+    color: var(--brand-grey-600, #6c757d);
+    margin-bottom: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.seller-link-notes p {
+    font-size: 0.9375rem;
+    color: var(--brand-grey-700, #495057);
+    margin: 0;
+    line-height: 1.6;
+}
+
+/* ===================================================================
+   ACTION BUTTONS
+   =================================================================== */
+
+.seller-link-actions {
+    margin-top: 1.25rem;
+    display: flex;
+    gap: 0.625rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.seller-link-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border-radius: var(--brand-radius-sm, 0.25rem);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    text-decoration: none;
+}
+
+.seller-link-action-btn--view {
+    background: transparent;
+    color: #667eea;
+    border-color: #667eea;
+}
+
+.seller-link-action-btn--view:hover {
+    background: #667eea;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.25);
+}
+
+.seller-link-action-btn--edit {
+    background: transparent;
+    color: var(--brand-grey-600, #6c757d);
+    border-color: var(--brand-grey-400, #ced4da);
+}
+
+.seller-link-action-btn--edit:hover {
+    background: var(--brand-grey-600, #6c757d);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(108, 117, 125, 0.25);
+}
+
+/* ===================================================================
+   EMPTY STATE
+   =================================================================== */
+
+.seller-links-empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: var(--brand-white, #ffffff);
+    border-radius: var(--brand-radius-md, 0.5rem);
+    box-shadow: var(--brand-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.seller-links-empty-icon {
+    font-size: 5rem;
+    color: var(--brand-grey-300, #dee2e6);
+    margin-bottom: 1.5rem;
+}
+
+.seller-links-empty-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--brand-grey-700, #495057);
+    margin-bottom: 1rem;
+}
+
+.seller-links-empty-text {
+    font-size: 1rem;
+    color: var(--brand-grey-600, #6c757d);
+    margin-bottom: 2rem;
+}
+
+/* ===================================================================
+   TIPS & WORKFLOW CARDS
+   =================================================================== */
+
+.seller-links-tips-card {
+    background: var(--brand-white, #ffffff);
+    border-radius: var(--brand-radius-md, 0.5rem);
+    box-shadow: var(--brand-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+    overflow: hidden;
+    margin-top: 2rem;
+}
+
+.seller-links-tips-header {
+    background: rgba(102, 126, 234, 0.1);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--brand-grey-200, #e9ecef);
+}
+
+.seller-links-tips-header h6 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #667eea;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.seller-links-tips-body {
+    padding: 1.5rem;
+}
+
+.seller-links-tip-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.seller-links-tip-item:last-child {
+    margin-bottom: 0;
+}
+
+.seller-links-tip-icon {
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+    color: #48bb78;
+    font-size: 1rem;
+}
+
+.seller-links-tip-text {
+    font-size: 0.9375rem;
+    color: var(--brand-grey-700, #495057);
+    line-height: 1.6;
+}
+
+.seller-links-tip-text strong {
+    color: var(--brand-grey-900, #212529);
+    font-weight: 600;
+}
+
+/* Workflow Steps */
+.seller-links-workflow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.seller-links-workflow-step:last-child {
+    margin-bottom: 0;
+}
+
+.seller-links-workflow-number {
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 50%;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.seller-links-workflow-content strong {
+    display: block;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--brand-grey-900, #212529);
+    margin-bottom: 0.25rem;
+}
+
+.seller-links-workflow-content small {
+    font-size: 0.875rem;
+    color: var(--brand-grey-600, #6c757d);
+    line-height: 1.5;
+}
+
+/* ===================================================================
+   PAGINATION
+   =================================================================== */
+
+.seller-links-pagination {
+    margin-top: 2rem;
+}
+
+.seller-links-pagination .pagination {
+    gap: 0.5rem;
+}
+
+.seller-links-pagination .page-link {
+    border-radius: var(--brand-radius-sm, 0.25rem);
+    border: 1px solid var(--brand-grey-300, #dee2e6);
+    color: var(--brand-grey-700, #495057);
+    padding: 0.5rem 0.875rem;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.seller-links-pagination .page-link:hover {
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+}
+
+.seller-links-pagination .page-item.active .page-link {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+    color: white;
+    font-weight: 600;
+}
+
+/* ===================================================================
+   RESPONSIVE DESIGN
+   =================================================================== */
+
+/* Tablets and below */
+@media (max-width: 991.98px) {
+    .seller-links-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .seller-link-title {
+        font-size: 1.125rem;
+    }
+
+    .seller-link-details {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Mobile devices */
+@media (max-width: 575.98px) {
+    .seller-links-header {
+        padding: 1.5rem 1rem;
+    }
+
+    .seller-links-header h1,
+    .seller-links-header h2 {
+        font-size: 1.5rem;
+    }
+
+    .seller-links-stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .seller-links-stat-number {
+        font-size: 2rem;
+    }
+
+    .seller-links-filter-row {
+        grid-template-columns: 1fr;
+    }
+
+    .seller-link-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .seller-link-title {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .seller-link-arrow {
+        transform: rotate(90deg);
+    }
+
+    .seller-link-actions {
+        width: 100%;
+    }
+
+    .seller-link-action-btn {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+/* ===================================================================
+   PRINT STYLES
+   =================================================================== */
+
+@media print {
+    .seller-links-header {
+        background: none;
+        border: none;
+    }
+
+    .seller-links-stat-card {
+        background: none;
+        border: 1px solid #ccc;
+        box-shadow: none;
+    }
+
+    .seller-link-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .seller-link-actions,
+    .seller-links-filter-card,
+    .seller-links-tips-card {
+        display: none;
+    }
+}

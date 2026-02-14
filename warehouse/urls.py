@@ -35,6 +35,7 @@ urlpatterns = [
     path('warehouses/', warehouse_views.warehouse_list, name='warehouse_list'),
     path('warehouses/add/', warehouse_views.warehouse_add, name='warehouse_add'),
     path('warehouses/<int:pk>/', warehouse_views.warehouse_detail, name='warehouse_detail'),
+    path('warehouses/<int:pk>/edit/', warehouse_views.warehouse_edit, name='warehouse_edit'),
     path('warehouses/<int:pk>/capacity/configure/', warehouse_views.warehouse_capacity_configure, name='warehouse_capacity_configure'),
     path('warehouses/<int:pk>/capacity/preview/', warehouse_views.warehouse_capacity_preview, name='warehouse_capacity_preview'),
     path('warehouses/<int:pk>/capacity/generate/', warehouse_views.warehouse_generate_locations, name='warehouse_generate_locations'),

@@ -73,7 +73,7 @@ This file tracks UI/CSS issues, alignment problems, and bugs discovered during p
 
 #### orders/templates/orders/verify_location.html
 - [x] Line 14: `style="font-size: 2rem;..."` - Created `.verify-title` class
-- [x] Line 20: `style="font-size: 1.25rem;..."` - Created `.verify-section-title` class
+- [x] Line 20: `style="..."` - Created `.verify-section-title` class
 - [x] Line 64: `style="grid-column: 1 / -1;"` - Created `.full-width-column` class
 
 #### workforce/templates/workforce/suppliers_list.html

@@ -40,9 +40,9 @@
                 </ol>
             </nav>
         </div>
-        <div class="btn-group">
+        <div class="d-flex flex-wrap gap-2">
             <a href="{% url 'workforce:order_edit' order.id %}"
-               class="btn btn-primary"
+               class="btn btn-primary btn-sm"
                hx-get="{% url 'workforce:order_edit' order.id %}"
                hx-target="#main-content"
                hx-select="#main-content"
@@ -52,7 +52,7 @@
             </a>
             {% if order.verification_status == 'pending' %}
             <button type="button"
-                    class="btn btn-success"
+                    class="btn btn-success btn-sm"
                     hx-post="{% url 'workforce:verify_order' order.id %}"
                     hx-confirm="Verify this order?">
                 <i class="fa-solid fa-check me-1"></i> Verify
@@ -60,7 +60,7 @@
             {% endif %}
             {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
             <button type="button"
-                    class="btn btn-info"
+                    class="btn btn-info btn-sm"
                     hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}"
                     hx-confirm="Publish this order?">
                 <i class="fa-solid fa-paper-plane me-1"></i> Publish
@@ -68,7 +68,7 @@
             {% endif %}
             {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
             <button type="button"
-                    class="btn btn-danger"
+                    class="btn btn-danger btn-sm"
                     hx-post="{% url 'workforce:cancel_order' order.id %}"
                     hx-confirm="Cancel this order?">
                 <i class="fa-solid fa-times me-1"></i> Cancel
@@ -99,8 +99,10 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label text-muted small">Business Name</label>
-                            <p class="fw-bold mb-0">{{ order.business.business_name }}</p>
+                            <p class="fw-bold mb-0 text-wrap">{{ order.business.business_name }}</p>
                         </div>
+                    </div>
+                    <div class="row g-3 mt-2">
                         <div class="col-md-4">
                             <label class="form-label text-muted small">Verification Status</label>
                             <p class="mb-0">
@@ -163,6 +165,8 @@
                                 {% endif %}
                             </p>
                         </div>
+                    </div>
+                    <div class="row g-3 mt-2">
                         <div class="col-md-4">
                             <label class="form-label text-muted small">Order Date</label>
                             <p class="mb-0">{{ order.order_date|date:"d M Y" }}</p>
@@ -170,6 +174,9 @@
                         <div class="col-md-4">
                             <label class="form-label text-muted small">Created At</label>
                             <p class="mb-0">{{ order.created_at|date:"d M Y H:i" }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <!-- Empty column for alignment -->
                         </div>
                     </div>
                 </div>

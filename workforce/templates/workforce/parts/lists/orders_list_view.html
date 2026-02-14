@@ -337,6 +337,7 @@
                     <div class="orc-id">ORDER</div>
                     <div class="orc-customer">CUSTOMER</div>
                     <div class="orc-address">ADDRESS</div>
+                    <div class="orc-products">PRODUCTS</div>
                     <div class="orc-amount">COD</div>
                     <div class="orc-date">DATE</div>
                     <div class="orc-status">STATUS</div>
@@ -362,6 +363,16 @@
                         <span class="orc-zone">Z{{ order.dl_zone|default:"-" }}/S{{ order.dl_street|default:"-" }}/B{{ order.dl_building|default:"-" }}</span>
                         {% endif %}
                         <span class="orc-addr-text">{{ order.customer_address|truncatechars:25 }}</span>
+                    </div>
+                    <div class="orc-products">
+                        {% for item in order.order_items.all %}
+                        <div class="orc-product-item">
+                            <span class="orc-product-name">{{ item.product_name|truncatechars:15 }}</span>
+                            <span class="orc-product-qty">×{{ item.product_quantity }}</span>
+                        </div>
+                        {% empty %}
+                        <span class="orc-product-item" style="color:#94a3b8;">No items</span>
+                        {% endfor %}
                     </div>
                     <div class="orc-amount">{{ order.cod_amount|default:"0" }} <small>QAR</small></div>
                     <div class="orc-date">{{ order.order_date|date:"d/m" }}</div>

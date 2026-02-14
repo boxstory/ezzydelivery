@@ -1,24 +1,30 @@
 {% extends 'wf_dashboard_base.html' %}
 {% load static %}
 
-{% block title %}Add Warehouse{% endblock %}
+{% block title %}{% if is_edit %}Edit Warehouse{% else %}Add Warehouse{% endif %}{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
-{% endblock %}
+
 
 {% block content %}
+<!-- CSS for HTMX compatibility - loaded inside content -->
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+
 <div class="container-fluid py-4">
     <div class="row mb-4">
         <div class="col-12">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{% url 'warehouse:warehouse_list' %}">Warehouses</a></li>
+                    {% if is_edit %}
+                    <li class="breadcrumb-item"><a href="{% url 'warehouse:warehouse_detail' warehouse.pk %}">{{ warehouse.name }}</a></li>
+                    <li class="breadcrumb-item active">Edit</li>
+                    {% else %}
                     <li class="breadcrumb-item active">Add New</li>
+                    {% endif %}
                 </ol>
             </nav>
-            <h1 class="h3 mb-0">Add Fulfillment Center</h1>
-            <p class="text-muted">Create a new fulfillment center (warehouse)</p>
+            <h1 class="h3 mb-0">{% if is_edit %}Edit{% else %}Add{% endif %} Fulfillment Center</h1>
+            <p class="text-muted">{% if is_edit %}Update warehouse details{% else %}Create a new fulfillment center (warehouse){% endif %}</p>
         </div>
     </div>
 
@@ -38,21 +44,23 @@
                         <div class="mb-3">
                             <label for="name" class="form-label">Warehouse Name <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="name" name="name" required
-                                   placeholder="e.g., Central Fulfillment Center">
+                                   placeholder="e.g., Central Fulfillment Center"
+                                   value="{% if warehouse %}{{ warehouse.name }}{% endif %}">
                             <small class="text-muted">Name of the fulfillment center</small>
                         </div>
 
                         <div class="mb-3">
                             <label for="code" class="form-label">Warehouse Code</label>
                             <input type="text" class="form-control" id="code" name="code"
-                                   placeholder="Auto-generated (e.g., WH-FC-XXXXXXXX)">
+                                   placeholder="Auto-generated (e.g., WH-FC-XXXXXXXX)"
+                                   value="{% if warehouse %}{{ warehouse.code }}{% endif %}">
                             <small class="text-muted">Leave empty to auto-generate code</small>
                         </div>
 
                         <div class="mb-3">
                             <label for="description" class="form-label">Description</label>
                             <textarea class="form-control" id="description" name="description" rows="2"
-                                      placeholder="Brief description of this fulfillment center"></textarea>
+                                      placeholder="Brief description of this fulfillment center">{% if warehouse %}{{ warehouse.description }}{% endif %}</textarea>
                         </div>
 
                         <hr class="my-4">
@@ -63,19 +71,21 @@
                         <div class="mb-3">
                             <label for="address" class="form-label">Address</label>
                             <textarea class="form-control" id="address" name="address" rows="2"
-                                      placeholder="Full street address"></textarea>
+                                      placeholder="Full street address">{% if warehouse %}{{ warehouse.address }}{% endif %}</textarea>
                         </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="city" class="form-label">City</label>
                                 <input type="text" class="form-control" id="city" name="city"
-                                       placeholder="e.g., Manama">
+                                       placeholder="e.g., Manama"
+                                       value="{% if warehouse %}{{ warehouse.city }}{% endif %}">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="state" class="form-label">State/Governorate</label>
                                 <input type="text" class="form-control" id="state" name="state"
-                                       placeholder="e.g., Capital Governorate">
+                                       placeholder="e.g., Capital Governorate"
+                                       value="{% if warehouse %}{{ warehouse.state }}{% endif %}">
                             </div>
                         </div>
 
@@ -83,12 +93,14 @@
                             <div class="col-md-6 mb-3">
                                 <label for="postal_code" class="form-label">Postal Code</label>
                                 <input type="text" class="form-control" id="postal_code" name="postal_code"
-                                       placeholder="e.g., 317">
+                                       placeholder="e.g., 317"
+                                       value="{% if warehouse %}{{ warehouse.postal_code }}{% endif %}">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="country" class="form-label">Country</label>
                                 <input type="text" class="form-control" id="country" name="country"
-                                       placeholder="e.g., Bahrain" value="Bahrain">
+                                       placeholder="e.g., Bahrain"
+                                       value="{% if warehouse %}{{ warehouse.country }}{% else %}Bahrain{% endif %}">
                             </div>
                         </div>
 
@@ -101,12 +113,14 @@
                             <div class="col-md-6 mb-3">
                                 <label for="phone" class="form-label">Phone</label>
                                 <input type="tel" class="form-control" id="phone" name="phone"
-                                       placeholder="e.g., +973 1234 5678">
+                                       placeholder="e.g., +973 1234 5678"
+                                       value="{% if warehouse %}{{ warehouse.phone }}{% endif %}">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="email" class="form-label">Email</label>
                                 <input type="email" class="form-control" id="email" name="email"
-                                       placeholder="e.g., warehouse@company.com">
+                                       placeholder="e.g., warehouse@company.com"
+                                       value="{% if warehouse %}{{ warehouse.email }}{% endif %}">
                             </div>
                         </div>
 
@@ -123,12 +137,14 @@
                             <div class="col-md-6 mb-3">
                                 <label for="latitude" class="form-label">Latitude</label>
                                 <input type="number" step="0.000001" class="form-control" id="latitude" name="latitude"
-                                       placeholder="e.g., 26.2285">
+                                       placeholder="e.g., 26.2285"
+                                       value="{% if warehouse and warehouse.latitude %}{{ warehouse.latitude }}{% endif %}">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="longitude" class="form-label">Longitude</label>
                                 <input type="number" step="0.000001" class="form-control" id="longitude" name="longitude"
-                                       placeholder="e.g., 50.5860">
+                                       placeholder="e.g., 50.5860"
+                                       value="{% if warehouse and warehouse.longitude %}{{ warehouse.longitude }}{% endif %}">
                             </div>
                         </div>
 
@@ -138,7 +154,8 @@
                         <h6 class="text-primary mb-3">Settings</h6>
 
                         <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="is_active" name="is_active" checked>
+                            <input class="form-check-input" type="checkbox" id="is_active" name="is_active"
+                                   {% if not warehouse or warehouse.is_active %}checked{% endif %}>
                             <label class="form-check-label" for="is_active">
                                 <strong>Active</strong>
                             </label>
@@ -146,7 +163,8 @@
                         </div>
 
                         <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="is_default" name="is_default">
+                            <input class="form-check-input" type="checkbox" id="is_default" name="is_default"
+                                   {% if warehouse and warehouse.is_default %}checked{% endif %}>
                             <label class="form-check-label" for="is_default">
                                 <strong>System Default</strong>
                             </label>
@@ -157,10 +175,15 @@
 
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">
+                                {% if is_edit %}
+                                <i class="fas fa-save me-1"></i>Update Warehouse
+                                {% else %}
                                 <i class="fas fa-plus me-1"></i>Create Fulfillment Center
+                                {% endif %}
                             </button>
-                            <a href="{% url 'warehouse:warehouse_list' %}" class="btn btn-outline-secondary"
-                               hx-get="{% url 'warehouse:warehouse_list' %}"
+                            <a href="{% if is_edit %}{% url 'warehouse:warehouse_detail' warehouse.pk %}{% else %}{% url 'warehouse:warehouse_list' %}{% endif %}"
+                               class="btn btn-outline-secondary"
+                               hx-get="{% if is_edit %}{% url 'warehouse:warehouse_detail' warehouse.pk %}{% else %}{% url 'warehouse:warehouse_list' %}{% endif %}"
                                hx-target="body"
                                hx-push-url="true">
                                 Cancel

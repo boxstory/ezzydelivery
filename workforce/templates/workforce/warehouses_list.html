@@ -1,235 +1,249 @@
-{% extends "wf_dashboard_base.html" %}
+{% extends "workforce/wf_base_dashboard.html" %}
 {% load static %}
 
-{% block title %}Warehouse - Business Links{% endblock title %}
+{% block title %}Warehouse Management - Business Links{% endblock %}
 
 {% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/biz-detail.css' %}" />
-{% endblock extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/workforce-warehouse-compact.css' %}?v=20260214c">
+{% endblock %}
 
 {% block content %}
-<div class="col-12 p-3">
-<!-- Page Title -->
-<h1 class="page-title">
-    <i class="fa-solid fa-warehouse me-2"></i>Warehouse - Business Links
-</h1>
+<div class="wh-compact-page">
 
-<!-- Summary Stats -->
-<div class="supplier-stats-grid">
-    <div class="supplier-stat-card stat-primary">
-        <div class="supplier-stat-label">Total Warehouses</div>
-        <div class="supplier-stat-value text-primary">{{ total_warehouses }}</div>
+  <!-- Page Header -->
+  <div class="wh-page-header">
+    <div>
+      <h1 class="wh-page-title">
+        <i class="fa-solid fa-warehouse"></i>
+        Warehouse-Business Links
+      </h1>
+      <p class="wh-page-subtitle">{{ total_warehouses }} Warehouses • {{ total_links }} Active Links</p>
     </div>
-    <div class="supplier-stat-card stat-success">
-        <div class="supplier-stat-label">Active Warehouses</div>
-        <div class="supplier-stat-value text-success">{{ active_warehouses }}</div>
-    </div>
-    <div class="supplier-stat-card" style="border-left-color: var(--brand-info, #17a2b8);">
-        <div class="supplier-stat-label">Active Links</div>
-        <div class="supplier-stat-value" style="color: var(--brand-info, #17a2b8);">{{ total_links }}</div>
-    </div>
-</div>
+  </div>
 
-<!-- Search & Filter Section -->
-<div class="filter-section">
-    <form method="get" class="row g-3"
-          hx-get="{% url 'workforce:warehouses_list' %}"
-          hx-target="#main-content"
-          hx-select="#main-content"
-          hx-swap="outerHTML"
-          hx-push-url="true">
-        <div class="col-md-7">
-            <label for="searchInput" class="filter-label">
-                <i class="fa-solid fa-search me-2"></i>Search Warehouses
-            </label>
-            <input type="text" id="searchInput" name="search" class="filter-input"
-                   placeholder="Search by name, code, city..." value="{{ search }}">
-        </div>
-        <div class="col-md-3">
-            <label for="statusFilter" class="filter-label">
-                <i class="fa-solid fa-filter me-2"></i>Status
-            </label>
-            <select id="statusFilter" name="status" class="filter-input">
-                <option value="">All</option>
-                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
-                <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
-            </select>
-        </div>
-        <div class="col-md-2 d-flex align-items-end gap-2">
-            <button type="submit" class="btn btn-primary flex-grow-1">
-                <i class="fa-solid fa-search me-1"></i>Search
-            </button>
-            {% if search or status_filter %}
-            <a href="{% url 'workforce:warehouses_list' %}" class="btn btn-outline-secondary" title="Clear">
-                <i class="fa-solid fa-xmark"></i>
-            </a>
-            {% endif %}
-        </div>
-    </form>
-</div>
+  <!-- Search & Filter Compact -->
+  <div class="wh-filters-compact">
+    <form method="GET" class="wh-filters-form" id="wh_links_form_filter">
+      <div class="wh-filters-row">
+        <input
+          type="text"
+          name="search"
+          class="wh-search-input"
+          placeholder="Search warehouses..."
+          value="{{ search }}">
 
-<!-- Warehouses List -->
-{% for warehouse in warehouses %}
-<div class="card mb-4 border-0 shadow-sm">
-    <div class="card-header d-flex align-items-center justify-content-between py-3"
-         style="background: linear-gradient(135deg, #f8f9fa, #e9ecef); border-left: 4px solid {% if warehouse.is_active %}var(--brand-primary, #0d6efd){% else %}var(--brand-grey-500, #6c757d){% endif %};">
-        <div class="d-flex align-items-center">
-            <i class="fa-solid fa-warehouse me-3 fa-lg" style="color: {% if warehouse.is_active %}var(--brand-primary, #0d6efd){% else %}var(--brand-grey-500, #6c757d){% endif %};"></i>
-            <div>
-                <h5 class="mb-0 fw-bold">{{ warehouse.name }}</h5>
-                <small class="text-muted">
-                    <span class="me-3"><i class="fa-solid fa-barcode me-1"></i>{{ warehouse.code }}</span>
-                    {% if warehouse.city %}<span class="me-3"><i class="fa-solid fa-location-dot me-1"></i>{{ warehouse.city }}</span>{% endif %}
-                    {% if warehouse.is_active %}
-                    <span class="badge bg-success">Active</span>
-                    {% else %}
-                    <span class="badge bg-secondary">Inactive</span>
-                    {% endif %}
-                    {% if warehouse.is_default %}<span class="badge bg-primary ms-1">Default</span>{% endif %}
-                </small>
-            </div>
-        </div>
-        <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse"
-                data-bs-target="#wh-link-form-{{ warehouse.pk }}" aria-expanded="false">
-            <i class="fa-solid fa-plus me-1"></i>Link Business
+        <select name="status" class="wh-filter-select" id="wh_links_select_status">
+          <option value="">All Status</option>
+          <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+          <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+        </select>
+
+        <button type="submit" class="wh-btn wh-btn--primary">
+          <i class="fa-solid fa-search"></i>
         </button>
+        {% if search or status_filter %}
+        <a href="{% url 'workforce:warehouses_list' %}" class="wh-btn wh-btn--clear" title="Clear">
+          <i class="fa-solid fa-xmark"></i>
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Warehouses Compact List -->
+  {% for warehouse in warehouses %}
+  <div class="wh-card" id="wh_card_{{ warehouse.pk }}">
+
+    <!-- Warehouse Header Row -->
+    <div class="wh-card-header" onclick="toggleLinks({{ warehouse.pk }})">
+      <div class="wh-info">
+        <div class="wh-name">
+          <i class="fa-solid fa-warehouse"></i>
+          {{ warehouse.name }}
+          {% if warehouse.is_default %}
+          <span class="wh-tag wh-tag--star"><i class="fa-solid fa-star"></i></span>
+          {% endif %}
+        </div>
+        <div class="wh-meta">
+          <span>{{ warehouse.code }}</span>
+          {% if warehouse.city %}<span>{{ warehouse.city }}</span>{% endif %}
+          <span class="wh-badge {% if warehouse.is_active %}wh-badge--active{% else %}wh-badge--inactive{% endif %}">
+            {{ warehouse.is_active|yesno:"Active,Inactive" }}
+          </span>
+        </div>
+      </div>
+
+      <div class="wh-actions">
+        <span class="wh-link-count">{{ warehouse.seller_links.count }} linked</span>
+        <button
+          type="button"
+          class="wh-btn wh-btn--link"
+          onclick="event.stopPropagation(); toggleForm({{ warehouse.pk }})"
+          title="Link Business">
+          <i class="fa-solid fa-plus"></i>
+          Link
+        </button>
+        <i class="fa-solid fa-chevron-down wh-expand-icon" id="wh_expand_icon_{{ warehouse.pk }}"></i>
+      </div>
     </div>
 
-    <!-- Inline Link Business Form (collapsed by default) -->
-    <div class="collapse" id="wh-link-form-{{ warehouse.pk }}">
-        <div class="card-body border-bottom" style="background: #f0f8ff;">
-            <form id="workforce_warehouses_form_link_{{ warehouse.pk }}"
-                  class="row g-2 align-items-end"
-                  onsubmit="return linkBusiness(event, {{ warehouse.pk }})">
-                {% csrf_token %}
-                <input type="hidden" name="warehouse_id" value="{{ warehouse.pk }}">
-                <div class="col-md-8">
-                    <label class="form-label fw-semibold small">Select Fulfillment-Enabled Business</label>
-                    <select name="business_id" class="form-select form-select-sm" required>
-                        <option value="">-- Choose a business --</option>
-                        {% for biz in linkable_businesses %}
-                        <option value="{{ biz.pk }}">{{ biz.business_name }} ({{ biz.business_code }})</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-success btn-sm w-100">
-                        <i class="fa-solid fa-link me-1"></i>Link to {{ warehouse.name }}
-                    </button>
-                </div>
-            </form>
-        </div>
+    <!-- Link Form (Hidden by default) -->
+    <div class="wh-link-form" id="wh_link_form_{{ warehouse.pk }}" style="display: none;">
+      <form onsubmit="return linkBusiness(event, {{ warehouse.pk }})">
+        {% csrf_token %}
+        <input type="hidden" name="warehouse_id" value="{{ warehouse.pk }}">
+        <select name="business_id" class="wh-form-select" required>
+          <option value="">-- Select Business --</option>
+          {% for biz in linkable_businesses %}
+          <option value="{{ biz.pk }}">{{ biz.business_name }} ({{ biz.business_code }})</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="wh-btn wh-btn--submit">
+          <i class="fa-solid fa-link"></i>
+          Link
+        </button>
+      </form>
     </div>
 
     <!-- Linked Businesses Table -->
-    <div class="card-body p-0">
-        {% with links=warehouse.seller_links.all %}
-        {% if links %}
-        <div class="orders-table-container">
-            <table class="orders-table mb-0">
-                <thead>
-                    <tr>
-                        <th>Business</th>
-                        <th>Code</th>
-                        <th>Link Status</th>
-                        <th>Default WH</th>
-                        <th>Linked On</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for link in links %}
-                    <tr id="workforce_warehouses_row_link_{{ link.pk }}">
-                        <td>
-                            <div class="d-flex align-items-center">
-                                <div class="supplier-icon me-2" style="width:32px;height:32px;font-size:0.75rem;">
-                                    <i class="fa-solid fa-store"></i>
-                                </div>
-                                <strong>{{ link.business.business_name }}</strong>
-                            </div>
-                        </td>
-                        <td><small class="text-muted">{{ link.business.business_code }}</small></td>
-                        <td>
-                            {% if link.is_active %}
-                            <span class="badge bg-success">Active</span>
-                            {% else %}
-                            <span class="badge bg-secondary">Inactive</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if link.is_default %}
-                            <span class="badge bg-primary">Default</span>
-                            {% else %}
-                            <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td><small>{{ link.linked_at|date:"d M Y" }}</small></td>
-                        <td>
-                            <div class="btn-group">
-                                <a href="{% url 'workforce:seller_detail' link.business.pk %}"
-                                   class="btn btn-sm btn-outline-primary" title="View Business">
-                                    <i class="fa-solid fa-eye"></i>
-                                </a>
-                                <button type="button" class="btn btn-sm btn-outline-danger"
-                                        title="Unlink Business"
-                                        onclick="unlinkBusiness({{ link.pk }}, '{{ link.business.business_name|escapejs }}', '{{ warehouse.name|escapejs }}')">
-                                    <i class="fa-solid fa-unlink"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="text-center py-4 text-muted">
-            <i class="fa-solid fa-link-slash fa-2x mb-2 d-block opacity-50"></i>
-            <small>No businesses linked to this warehouse yet.</small>
-        </div>
-        {% endif %}
-        {% endwith %}
+    <div class="wh-links-table" id="wh_links_{{ warehouse.pk }}" style="display: none;">
+      {% with links=warehouse.seller_links.all %}
+      {% if links %}
+      <table class="wh-table">
+        <tbody>
+          {% for link in links %}
+          <tr id="wh_link_row_{{ link.pk }}">
+            <td class="wh-table-business">
+              <i class="fa-solid fa-store"></i>
+              <div>
+                <div class="wh-business-name">{{ link.business.business_name }}</div>
+                <div class="wh-business-code">{{ link.business.business_code }}</div>
+              </div>
+            </td>
+            <td class="wh-table-status">
+              <span class="wh-badge {% if link.is_active %}wh-badge--active{% else %}wh-badge--inactive{% endif %}">
+                {{ link.is_active|yesno:"Active,Inactive" }}
+              </span>
+              {% if link.is_default %}
+              <span class="wh-tag wh-tag--default">Default</span>
+              {% endif %}
+            </td>
+            <td class="wh-table-date">{{ link.linked_at|date:"d M Y" }}</td>
+            <td class="wh-table-actions">
+              <a href="{% url 'workforce:business_license_detail' link.business.pk %}"
+                 class="wh-icon-btn wh-icon-btn--view"
+                 title="View">
+                <i class="fa-solid fa-eye"></i>
+              </a>
+              <button
+                type="button"
+                class="wh-icon-btn wh-icon-btn--unlink"
+                title="Unlink"
+                onclick="unlinkBusiness({{ link.pk }}, '{{ link.business.business_name|escapejs }}', '{{ warehouse.name|escapejs }}')">
+                <i class="fa-solid fa-unlink"></i>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="wh-no-links">
+        <i class="fa-solid fa-link-slash"></i>
+        <span>No businesses linked yet</span>
+      </div>
+      {% endif %}
+      {% endwith %}
     </div>
-</div>
-{% empty %}
-<div class="empty-state py-5 text-center">
-    <i class="fa-solid fa-warehouse fa-3x text-muted mb-3 d-block"></i>
-    <p class="text-muted">
-        {% if search or status_filter %}No warehouses match your search.{% else %}No warehouses have been created yet.{% endif %}
+
+  </div>
+  {% empty %}
+
+  <!-- Empty State -->
+  <div class="wh-empty-state">
+    <i class="fa-solid fa-warehouse"></i>
+    <p>
+      {% if search or status_filter %}
+      No warehouses match your filters
+      {% else %}
+      No warehouses found
+      {% endif %}
     </p>
-</div>
-{% endfor %}
+  </div>
+
+  {% endfor %}
 
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
 <script>
+// Toggle warehouse links visibility
+function toggleLinks(whId) {
+    const linksDiv = document.getElementById('wh_links_' + whId);
+    const icon = document.getElementById('wh_expand_icon_' + whId);
+
+    if (linksDiv.style.display === 'none') {
+        linksDiv.style.display = 'block';
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        linksDiv.style.display = 'none';
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
+
+// Toggle link form
+function toggleForm(whId) {
+    const formDiv = document.getElementById('wh_link_form_' + whId);
+    if (formDiv.style.display === 'none') {
+        formDiv.style.display = 'block';
+    } else {
+        formDiv.style.display = 'none';
+    }
+}
+
+// Link Business AJAX
 function linkBusiness(event, warehouseId) {
     event.preventDefault();
     const form = event.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalHTML = submitBtn.innerHTML;
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
     const formData = new FormData(form);
 
     fetch('{% url "workforce:warehouse_link_business" %}', {
         method: 'POST',
         body: formData,
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-        }
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            alert(data.message || 'Linked successfully!');
             location.reload();
         } else {
-            alert(data.error || 'Failed to link business');
+            alert(data.error || 'Failed to link');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalHTML;
         }
     })
-    .catch(() => alert('Network error. Please try again.'));
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Network error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalHTML;
+    });
 
     return false;
 }
 
+// Unlink Business AJAX
 function unlinkBusiness(linkId, bizName, whName) {
-    if (!confirm('Unlink ' + bizName + ' from ' + whName + '?\n\nThe warehouse pickup location for this business will be deactivated.')) {
+    if (!confirm(`Unlink "${bizName}" from "${whName}"?`)) {
         return;
     }
 
@@ -238,22 +252,29 @@ function unlinkBusiness(linkId, bizName, whName) {
     formData.append('link_id', linkId);
     formData.append('csrfmiddlewaretoken', csrfToken);
 
+    const row = document.getElementById('wh_link_row_' + linkId);
+    if (row) row.style.opacity = '0.5';
+
     fetch('{% url "workforce:warehouse_unlink_business" %}', {
         method: 'POST',
         body: formData,
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-        }
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            alert(data.message || 'Unlinked successfully!');
             location.reload();
         } else {
-            alert(data.error || 'Failed to unlink business');
+            alert(data.error || 'Failed to unlink');
+            if (row) row.style.opacity = '1';
         }
     })
-    .catch(() => alert('Network error. Please try again.'));
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Network error');
+        if (row) row.style.opacity = '1';
+    });
 }
 </script>
-{% endblock content %}
+{% endblock %}

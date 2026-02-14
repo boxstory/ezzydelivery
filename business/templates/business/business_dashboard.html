@@ -348,8 +348,8 @@
 
     <!-- Analytics Charts Row -->
     <div class="row g-3 px-2 mt-3">
-      <!-- Revenue Trend Chart -->
-      <div class="col-md-8">
+      <!-- Left Column: Weekly Orders Trend -->
+      <div class="col-md-5">
         <div class="card animate__animated animate__fadeIn" style="animation-delay: 0.1s;">
           <div class="card-header" style="background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark)); color: var(--brand-black);">
             <h5 class="mb-0" style="font-weight: 600;">
@@ -362,7 +362,7 @@
         </div>
       </div>
 
-      <!-- Order Status Breakdown -->
+      <!-- Middle Column: Order Status -->
       <div class="col-md-4">
         <div class="card animate__animated animate__fadeIn" style="animation-delay: 0.2s;">
           <div class="card-header" style="background: linear-gradient(135deg, #001f3f, #003366); color: white;">
@@ -370,8 +370,22 @@
               <i class="fa-solid fa-chart-pie me-2"></i>Order Status
             </h5>
           </div>
-          <div class="card-body">
+          <div class="card-body" style="padding: 1rem;">
             <div id="orderStatusChart" style="min-height: 300px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: COD Status -->
+      <div class="col-md-3">
+        <div class="card animate__animated animate__fadeIn" style="animation-delay: 0.3s;">
+          <div class="card-header" style="background: linear-gradient(135deg, #F59E0B, #D97706); color: var(--brand-black);">
+            <h5 class="mb-0" style="font-weight: 600;">
+              <i class="fa-solid fa-money-bill-wave me-2"></i>COD Status
+            </h5>
+          </div>
+          <div class="card-body" style="padding: 1rem;">
+            <div id="codStatusChart" style="min-height: 300px;"></div>
           </div>
         </div>
       </div>
@@ -629,36 +643,160 @@
         totalLabel: 'Total Orders',
         legend: {
           position: 'bottom',
-          fontSize: '12px'
+          horizontalAlign: 'center',
+          floating: false,
+          fontSize: '10px',
+          fontWeight: 500,
+          offsetY: 5,
+          itemMargin: {
+            horizontal: 12,
+            vertical: 4
+          },
+          markers: {
+            width: 8,
+            height: 8,
+            radius: 2,
+            offsetX: -2
+          }
         },
         plotOptions: {
           pie: {
             donut: {
-              size: '65%',
+              size: '70%',
               labels: {
                 show: true,
                 name: {
-                  fontSize: '14px',
-                  fontWeight: 600
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  offsetY: -5
                 },
                 value: {
-                  fontSize: '22px',
+                  fontSize: '24px',
                   fontWeight: 700,
+                  offsetY: 5,
                   formatter: function(val) {
                     return val;
                   }
                 },
                 total: {
                   show: true,
-                  label: 'Total',
-                  fontSize: '14px',
+                  label: 'TOTAL',
+                  fontSize: '12px',
                   fontWeight: 600,
+                  color: '#6c757d',
                   formatter: function(w) {
                     return w.globals.seriesTotals.reduce((a, b) => a + b, 0);
                   }
                 }
               }
             }
+          }
+        },
+        dataLabels: {
+          enabled: true,
+          formatter: function(val, opts) {
+            return opts.w.config.series[opts.seriesIndex];
+          },
+          style: {
+            fontSize: '11px',
+            fontWeight: 600
+          },
+          dropShadow: {
+            enabled: false
+          }
+        },
+        responsive: [{
+          breakpoint: 768,
+          options: {
+            legend: {
+              fontSize: '9px',
+              itemMargin: {
+                horizontal: 4
+              }
+            }
+          }
+        }]
+      });
+    }
+
+    // COD Status Donut Chart
+    const codPending = {{ pending_count|default:0 }};
+    const codCollected = {{ delivered_count|default:0 }};
+
+    const codData = {
+      series: [codCollected, codPending],
+      labels: ['Collected', 'Pending']
+    };
+
+    if (document.getElementById('codStatusChart')) {
+      createDonutChart('codStatusChart', codData, {
+        colors: ['#F59E0B', '#6c757d'],
+        height: 300,
+        totalLabel: 'Total COD',
+        legend: {
+          position: 'bottom',
+          horizontalAlign: 'center',
+          floating: false,
+          fontSize: '11px',
+          fontWeight: 500,
+          offsetY: 5,
+          itemMargin: {
+            horizontal: 15,
+            vertical: 4
+          },
+          markers: {
+            width: 8,
+            height: 8,
+            radius: 2
+          }
+        },
+        plotOptions: {
+          pie: {
+            donut: {
+              size: '70%',
+              labels: {
+                show: true,
+                name: {
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  offsetY: -5
+                },
+                value: {
+                  fontSize: '24px',
+                  fontWeight: 700,
+                  offsetY: 5,
+                  formatter: function(val) {
+                    return val;
+                  }
+                },
+                total: {
+                  show: true,
+                  label: 'TOTAL',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#6c757d',
+                  formatter: function(w) {
+                    return w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                  }
+                }
+              }
+            }
+          }
+        },
+        dataLabels: {
+          enabled: true,
+          formatter: function(val, opts) {
+            return opts.w.config.series[opts.seriesIndex];
+          },
+          style: {
+            fontSize: '12px',
+            fontWeight: 600,
+            colors: ['#fff']
+          },
+          dropShadow: {
+            enabled: true,
+            blur: 2,
+            opacity: 0.3
           }
         }
       });

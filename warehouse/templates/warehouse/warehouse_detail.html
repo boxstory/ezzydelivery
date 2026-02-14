@@ -3,209 +3,330 @@
 
 {% block title %}{{ warehouse.name }}{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
-{% endblock %}
+
 
 {% block content %}
+<!-- CSS for HTMX compatibility - loaded inside content -->
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse-detail-enhanced.css' %}" type="text/css" />
+
 <div class="container-fluid py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'warehouse:warehouse_list' %}">Warehouses</a></li>
-                    <li class="breadcrumb-item active">{{ warehouse.name }}</li>
-                </ol>
-            </nav>
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 class="h3 mb-0">{{ warehouse.name }}</h1>
-                    <p class="text-muted">{{ warehouse.code }}</p>
-                </div>
-                <div>
-                    {% if warehouse.is_active %}
-                    <span class="badge bg-success fs-6">Active</span>
-                    {% else %}
-                    <span class="badge bg-secondary fs-6">Inactive</span>
-                    {% endif %}
-                </div>
-            </div>
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'warehouse:warehouse_list' %}">
+          <i class="fa-solid fa-warehouse me-1"></i>
+          Warehouses
+        </a>
+      </li>
+      <li class="breadcrumb-item active">{{ warehouse.name }}</li>
+    </ol>
+  </nav>
+
+  <!-- Page Header -->
+  <div class="warehouse-detail-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div>
+        <h1>
+          <i class="fa-solid fa-warehouse me-2"></i>
+          {{ warehouse.name }}
+        </h1>
+        <p class="warehouse-detail-code mb-0">
+          <i class="fa-solid fa-barcode me-1"></i>
+          {{ warehouse.code }}
+        </p>
+      </div>
+      <div>
+        {% if warehouse.is_active %}
+        <span class="warehouse-status-badge warehouse-status-badge--active">
+          <i class="fa-solid fa-check-circle me-1"></i>
+          Active
+        </span>
+        {% else %}
+        <span class="warehouse-status-badge warehouse-status-badge--inactive">
+          <i class="fa-solid fa-circle me-1"></i>
+          Inactive
+        </span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Warehouse Rack Labeling Image -->
+  <div class="warehouse-rack-image-card">
+    <div class="warehouse-rack-image-header">
+      <h5>
+        <i class="fa-solid fa-tags me-2"></i>
+        Warehouse Rack Labeling System
+      </h5>
+    </div>
+    <div class="warehouse-rack-image-body">
+      <div class="warehouse-rack-image-wrapper" id="rackImageWrapper">
+        <img
+          src="{% static 'warehouse/img/What-is-warehouse-rack-labelling-writing.jpg' %}"
+          alt="Warehouse Rack Labeling"
+          class="warehouse-rack-image"
+          onerror="document.getElementById('rackImageWrapper').classList.add('warehouse-rack-image-wrapper-hidden')">
+      </div>
+      <p class="warehouse-rack-image-caption">
+        Professional rack labeling ensures efficient inventory tracking and quick location identification
+      </p>
+    </div>
+  </div>
+
+  <!-- Warehouse Info & Stats -->
+  <div class="row mb-4">
+
+    <!-- Warehouse Details Card -->
+    <div class="col-md-6 mb-4">
+      <div class="warehouse-info-card">
+        <div class="warehouse-info-card-header">
+          <h5>
+            <i class="fa-solid fa-circle-info"></i>
+            Warehouse Details
+          </h5>
         </div>
+        <div class="warehouse-info-card-body">
+          <div class="warehouse-detail-item">
+            <label class="warehouse-detail-label">
+              <i class="fa-solid fa-location-dot me-1"></i>
+              Address
+            </label>
+            <div class="warehouse-detail-value">
+              {{ warehouse.address|default:"Not specified" }}
+            </div>
+          </div>
+
+          <div class="warehouse-detail-item">
+            <label class="warehouse-detail-label">
+              <i class="fa-solid fa-calendar me-1"></i>
+              Created Date
+            </label>
+            <div class="warehouse-detail-value">
+              {{ warehouse.created_at|date:"d M Y H:i" }}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Warehouse Info & Stats -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Warehouse Details</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label class="text-muted d-block">Address</label>
-                        <strong>{{ warehouse.address|default:"Not specified" }}</strong>
-                    </div>
-                    <div class="mb-3">
-                        <label class="text-muted d-block">Created</label>
-                        <strong>{{ warehouse.created_at|date:"d M Y H:i" }}</strong>
-                    </div>
-                </div>
-            </div>
+    <!-- Stock Summary Card -->
+    <div class="col-md-6 mb-4">
+      <div class="warehouse-info-card">
+        <div class="warehouse-info-card-header">
+          <h5>
+            <i class="fa-solid fa-chart-line"></i>
+            Stock Summary
+          </h5>
         </div>
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Stock Summary</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-6">
-                            <div class="text-center p-3 bg-light rounded">
-                                <h3 class="mb-0">{{ stock_summary.total_on_hand|default:0 }}</h3>
-                                <small class="text-muted">Total On Hand</small>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="text-center p-3 bg-light rounded">
-                                <h3 class="mb-0">{{ stock_summary.total_reserved|default:0 }}</h3>
-                                <small class="text-muted">Reserved</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <div class="warehouse-info-card-body">
+          <div class="warehouse-stock-stats">
+            <div class="warehouse-stock-stat">
+              <div class="warehouse-stock-stat-value">
+                {{ stock_summary.total_on_hand|default:0 }}
+              </div>
+              <div class="warehouse-stock-stat-label">
+                <i class="fa-solid fa-boxes-stacked me-1"></i>
+                Total On Hand
+              </div>
             </div>
+
+            <div class="warehouse-stock-stat">
+              <div class="warehouse-stock-stat-value">
+                {{ stock_summary.total_reserved|default:0 }}
+              </div>
+              <div class="warehouse-stock-stat-label">
+                <i class="fa-solid fa-lock me-1"></i>
+                Reserved
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
 
-    <!-- Storage Locations -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Storage Locations ({{ locations|length }})</h5>
-                    <a href="{% url 'warehouse:location_add' %}?warehouse={{ warehouse.pk }}" class="btn btn-primary btn-sm">
-                        <i class="fas fa-plus me-1"></i>Add Location
-                    </a>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>Code</th>
-                                    <th>Name</th>
-                                    <th>Type</th>
-                                    <th>Parent</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for loc in locations %}
-                                <tr>
-                                    <td><code>{{ loc.code }}</code></td>
-                                    <td>{{ loc.name }}</td>
-                                    <td>{{ loc.get_location_type_display }}</td>
-                                    <td>{{ loc.parent.code|default:"-" }}</td>
-                                    <td>
-                                        {% if loc.is_active %}
-                                        <span class="badge bg-success">Active</span>
-                                        {% else %}
-                                        <span class="badge bg-secondary">Inactive</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted py-4">No storage locations defined</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+  </div>
 
-    <!-- Quick Tips & Workflow Help -->
-    <div class="row mt-4">
-        <div class="col-lg-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-info bg-opacity-10 border-0 py-3">
-                    <h6 class="mb-0 fw-semibold text-info">
-                        <i class="fas fa-lightbulb me-2"></i>Quick Tips
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <ul class="list-unstyled mb-0 small">
-                        <li class="mb-2 d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Storage Locations:</strong> Organize inventory by creating zones, aisles, racks, and bins</span>
-                        </li>
-                        <li class="mb-2 d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Location Types:</strong> Use hierarchical structure (Zone → Aisle → Rack → Bin) for better organization</span>
-                        </li>
-                        <li class="mb-2 d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Stock Summary:</strong> View total on-hand and reserved quantities across all locations</span>
-                        </li>
-                        <li class="d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Add Locations:</strong> Create locations before receiving stock for better tracking</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
+  <!-- Storage Locations -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="warehouse-locations-card">
+
+        <div class="warehouse-locations-header">
+          <h5 class="warehouse-locations-title">
+            <i class="fa-solid fa-map-location-dot me-2"></i>
+            Storage Locations
+            <span class="warehouse-locations-count">{{ locations|length }}</span>
+          </h5>
+          <a href="{% url 'warehouse:location_add' %}?warehouse={{ warehouse.pk }}"
+             class="btn btn-primary">
+            <i class="fa-solid fa-plus me-1"></i>Add Location
+          </a>
         </div>
 
-        <div class="col-lg-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-primary bg-opacity-10 border-0 py-3">
-                    <h6 class="mb-0 fw-semibold text-primary">
-                        <i class="fas fa-route me-2"></i>Warehouse Setup Workflow
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="workflow-step mb-3">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">1</span>
-                            <div>
-                                <strong class="d-block">Create Storage Locations</strong>
-                                <small class="text-muted">Set up zones, aisles, racks, and bins to organize inventory</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="workflow-step mb-3">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">2</span>
-                            <div>
-                                <strong class="d-block">Receive Stock</strong>
-                                <small class="text-muted">Add incoming inventory and assign to specific locations</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="workflow-step mb-3">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">3</span>
-                            <div>
-                                <strong class="d-block">Monitor Stock Levels</strong>
-                                <small class="text-muted">Track inventory levels and get low stock alerts</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="workflow-step">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">4</span>
-                            <div>
-                                <strong class="d-block">Perform Cycle Counts</strong>
-                                <small class="text-muted">Regular physical counts ensure inventory accuracy</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="table-responsive">
+          <table class="warehouse-locations-table">
+            <thead>
+              <tr>
+                <th>
+                  <i class="fa-solid fa-barcode me-1"></i>
+                  Code
+                </th>
+                <th>
+                  <i class="fa-solid fa-tag me-1"></i>
+                  Name
+                </th>
+                <th>
+                  <i class="fa-solid fa-layer-group me-1"></i>
+                  Type
+                </th>
+                <th>
+                  <i class="fa-solid fa-sitemap me-1"></i>
+                  Parent
+                </th>
+                <th>
+                  <i class="fa-solid fa-toggle-on me-1"></i>
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for loc in locations %}
+              <tr>
+                <td>
+                  <code>{{ loc.code }}</code>
+                </td>
+                <td>{{ loc.name }}</td>
+                <td>{{ loc.get_location_type_display }}</td>
+                <td>
+                  {% if loc.parent %}
+                  <code>{{ loc.parent.code }}</code>
+                  {% else %}
+                  <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if loc.is_active %}
+                  <span class="warehouse-status-badge warehouse-status-badge--success">
+                    <i class="fa-solid fa-check-circle me-1"></i>
+                    Active
+                  </span>
+                  {% else %}
+                  <span class="warehouse-status-badge warehouse-status-badge--secondary">
+                    <i class="fa-solid fa-circle me-1"></i>
+                    Inactive
+                  </span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="warehouse-locations-empty">
+                  <i class="fa-solid fa-map-location"></i>
+                  <p class="mb-0 mt-2">No storage locations defined yet</p>
+                  <small class="text-muted">Click "Add Location" to create your first storage location</small>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
+
+      </div>
     </div>
+  </div>
+
+  <!-- Quick Tips & Workflow -->
+  <div class="row">
+
+    <!-- Quick Tips -->
+    <div class="col-lg-6 mb-4">
+      <div class="warehouse-tips-card">
+        <div class="warehouse-tips-header warehouse-tips-header--info">
+          <h6>
+            <i class="fa-solid fa-lightbulb"></i>
+            Quick Tips
+          </h6>
+        </div>
+        <div class="warehouse-tips-body">
+          <div class="warehouse-tip-item">
+            <i class="fa-solid fa-check-circle warehouse-tip-icon"></i>
+            <span class="warehouse-tip-text">
+              <strong>Storage Locations:</strong> Organize inventory by creating zones, aisles, racks, and bins for better tracking
+            </span>
+          </div>
+
+          <div class="warehouse-tip-item">
+            <i class="fa-solid fa-check-circle warehouse-tip-icon"></i>
+            <span class="warehouse-tip-text">
+              <strong>Location Types:</strong> Use hierarchical structure (Zone → Aisle → Rack → Bin) for efficient organization
+            </span>
+          </div>
+
+          <div class="warehouse-tip-item">
+            <i class="fa-solid fa-check-circle warehouse-tip-icon"></i>
+            <span class="warehouse-tip-text">
+              <strong>Stock Summary:</strong> View total on-hand and reserved quantities across all storage locations
+            </span>
+          </div>
+
+          <div class="warehouse-tip-item">
+            <i class="fa-solid fa-check-circle warehouse-tip-icon"></i>
+            <span class="warehouse-tip-text">
+              <strong>Add Locations:</strong> Create locations before receiving stock to ensure proper inventory tracking
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workflow -->
+    <div class="col-lg-6 mb-4">
+      <div class="warehouse-tips-card">
+        <div class="warehouse-tips-header warehouse-tips-header--primary">
+          <h6>
+            <i class="fa-solid fa-route"></i>
+            Warehouse Setup Workflow
+          </h6>
+        </div>
+        <div class="warehouse-tips-body">
+          <div class="warehouse-workflow-step">
+            <span class="warehouse-workflow-number">1</span>
+            <div class="warehouse-workflow-content">
+              <strong>Create Storage Locations</strong>
+              <small>Set up zones, aisles, racks, and bins to organize inventory</small>
+            </div>
+          </div>
+
+          <div class="warehouse-workflow-step">
+            <span class="warehouse-workflow-number">2</span>
+            <div class="warehouse-workflow-content">
+              <strong>Receive Stock</strong>
+              <small>Add incoming inventory and assign to specific locations</small>
+            </div>
+          </div>
+
+          <div class="warehouse-workflow-step">
+            <span class="warehouse-workflow-number">3</span>
+            <div class="warehouse-workflow-content">
+              <strong>Monitor Stock Levels</strong>
+              <small>Track inventory levels and get low stock alerts</small>
+            </div>
+          </div>
+
+          <div class="warehouse-workflow-step">
+            <span class="warehouse-workflow-number">4</span>
+            <div class="warehouse-workflow-content">
+              <strong>Perform Cycle Counts</strong>
+              <small>Regular physical counts ensure inventory accuracy</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
 </div>
 {% endblock %}
