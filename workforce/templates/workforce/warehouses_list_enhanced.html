@@ -1,0 +1,463 @@
+{% extends "workforce/wf_base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Warehouse Management - Business Links{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/workforce-warehouse-enhanced.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <!-- Page Header -->
+  <div class="warehouse-header">
+    <h1>
+      <i class="fa-solid fa-warehouse me-2"></i>
+      Warehouse Management
+    </h1>
+    <p>
+      <i class="fa-solid fa-info-circle me-1"></i>
+      Manage warehouse-business links and fulfillment center connections
+    </p>
+  </div>
+
+  <!-- Summary Statistics -->
+  <div class="warehouse-stats-grid">
+    <div class="warehouse-stat-card">
+      <div class="warehouse-stat-icon warehouse-stat-icon--primary">
+        <i class="fa-solid fa-warehouse"></i>
+      </div>
+      <div class="warehouse-stat-label">Total Warehouses</div>
+      <div class="warehouse-stat-value">{{ total_warehouses }}</div>
+    </div>
+
+    <div class="warehouse-stat-card">
+      <div class="warehouse-stat-icon warehouse-stat-icon--success">
+        <i class="fa-solid fa-check-circle"></i>
+      </div>
+      <div class="warehouse-stat-label">Active Warehouses</div>
+      <div class="warehouse-stat-value text-success">{{ active_warehouses }}</div>
+    </div>
+
+    <div class="warehouse-stat-card">
+      <div class="warehouse-stat-icon warehouse-stat-icon--info">
+        <i class="fa-solid fa-link"></i>
+      </div>
+      <div class="warehouse-stat-label">Active Links</div>
+      <div class="warehouse-stat-value text-info">{{ total_links }}</div>
+    </div>
+  </div>
+
+  <!-- Search & Filter -->
+  <div class="warehouse-filter-card">
+    <form method="GET" class="row g-3">
+      <div class="col-md-7">
+        <label for="searchInput" class="form-label">
+          <i class="fa-solid fa-search"></i>
+          Search Warehouses
+        </label>
+        <input
+          type="text"
+          id="searchInput"
+          name="search"
+          class="form-control"
+          placeholder="Search by name, code, city..."
+          value="{{ search }}">
+      </div>
+
+      <div class="col-md-3">
+        <label for="statusFilter" class="form-label">
+          <i class="fa-solid fa-filter"></i>
+          Status
+        </label>
+        <select id="statusFilter" name="status" class="form-select">
+          <option value="">All Warehouses</option>
+          <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Only</option>
+          <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive Only</option>
+        </select>
+      </div>
+
+      <div class="col-md-2 d-flex align-items-end gap-2">
+        <button type="submit" class="btn btn-primary flex-grow-1">
+          <i class="fa-solid fa-search me-1"></i>
+          Search
+        </button>
+        {% if search or status_filter %}
+        <a href="{% url 'workforce:warehouses_list' %}"
+           class="btn btn-outline-secondary"
+           title="Clear filters">
+          <i class="fa-solid fa-xmark"></i>
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Warehouses List -->
+  {% for warehouse in warehouses %}
+  <div class="warehouse-card">
+
+    <!-- Card Header -->
+    <div class="warehouse-card-header {% if not warehouse.is_active %}inactive{% endif %} d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center flex-grow-1">
+        <div class="warehouse-icon {% if not warehouse.is_active %}inactive{% endif %}">
+          <i class="fa-solid fa-warehouse"></i>
+        </div>
+
+        <div>
+          <h2 class="warehouse-title">{{ warehouse.name }}</h2>
+          <div class="warehouse-meta">
+            <div class="warehouse-meta-item">
+              <i class="fa-solid fa-barcode"></i>
+              <span>{{ warehouse.code }}</span>
+            </div>
+            {% if warehouse.city %}
+            <div class="warehouse-meta-item">
+              <i class="fa-solid fa-location-dot"></i>
+              <span>{{ warehouse.city }}</span>
+            </div>
+            {% endif %}
+            <div class="warehouse-meta-item">
+              {% if warehouse.is_active %}
+              <span class="warehouse-badge warehouse-badge--active">
+                <i class="fa-solid fa-check-circle me-1"></i>
+                Active
+              </span>
+              {% else %}
+              <span class="warehouse-badge warehouse-badge--inactive">
+                <i class="fa-solid fa-circle me-1"></i>
+                Inactive
+              </span>
+              {% endif %}
+              {% if warehouse.is_default %}
+              <span class="warehouse-badge warehouse-badge--default">
+                <i class="fa-solid fa-star me-1"></i>
+                Default
+              </span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button
+        class="warehouse-link-btn"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#warehouse-link-form-{{ warehouse.pk }}"
+        aria-expanded="false">
+        <i class="fa-solid fa-plus"></i>
+        Link Business
+      </button>
+    </div>
+
+    <!-- Link Business Form (Collapsed) -->
+    <div class="collapse" id="warehouse-link-form-{{ warehouse.pk }}">
+      <div class="warehouse-link-form-wrapper">
+        <form
+          id="warehouse_link_form_{{ warehouse.pk }}"
+          class="row g-3 align-items-end"
+          onsubmit="return linkBusiness(event, {{ warehouse.pk }})">
+          {% csrf_token %}
+          <input type="hidden" name="warehouse_id" value="{{ warehouse.pk }}">
+
+          <div class="col-md-9">
+            <label class="form-label">
+              <i class="fa-solid fa-store me-1"></i>
+              Select Fulfillment-Enabled Business
+            </label>
+            <select name="business_id" class="form-select" required>
+              <option value="">-- Choose a business to link --</option>
+              {% for biz in linkable_businesses %}
+              <option value="{{ biz.pk }}">
+                {{ biz.business_name }} ({{ biz.business_code }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <button type="submit" class="warehouse-link-submit-btn w-100">
+              <i class="fa-solid fa-link"></i>
+              Link to {{ warehouse.name }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Linked Businesses Table -->
+    <div class="warehouse-links-container">
+      {% with links=warehouse.seller_links.all %}
+      {% if links %}
+      <table class="warehouse-links-table">
+        <thead>
+          <tr>
+            <th>Business</th>
+            <th>Code</th>
+            <th>Link Status</th>
+            <th>Default WH</th>
+            <th>Linked On</th>
+            <th style="width: 100px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for link in links %}
+          <tr id="warehouse_link_row_{{ link.pk }}">
+            <td>
+              <div class="business-cell">
+                <div class="business-icon">
+                  <i class="fa-solid fa-store"></i>
+                </div>
+                <div>
+                  <span class="business-name">{{ link.business.business_name }}</span>
+                  <span class="business-code">{{ link.business.business_code }}</span>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="text-muted fw-semibold">{{ link.business.business_code }}</span>
+            </td>
+            <td>
+              {% if link.is_active %}
+              <span class="warehouse-badge warehouse-badge--active">
+                <i class="fa-solid fa-check-circle me-1"></i>
+                Active
+              </span>
+              {% else %}
+              <span class="warehouse-badge warehouse-badge--inactive">
+                <i class="fa-solid fa-circle me-1"></i>
+                Inactive
+              </span>
+              {% endif %}
+            </td>
+            <td>
+              {% if link.is_default %}
+              <span class="warehouse-badge warehouse-badge--default">
+                <i class="fa-solid fa-star me-1"></i>
+                Default
+              </span>
+              {% else %}
+              <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="text-muted">{{ link.linked_at|date:"d M Y, g:i A" }}</span>
+            </td>
+            <td>
+              <div class="btn-group" role="group">
+                <a
+                  href="{% url 'workforce:seller_detail' link.business.pk %}"
+                  class="warehouse-action-btn warehouse-action-btn--view"
+                  title="View Business Details">
+                  <i class="fa-solid fa-eye"></i>
+                </a>
+                <button
+                  type="button"
+                  class="warehouse-action-btn warehouse-action-btn--unlink"
+                  title="Unlink Business from Warehouse"
+                  onclick="unlinkBusiness({{ link.pk }}, '{{ link.business.business_name|escapejs }}', '{{ warehouse.name|escapejs }}')">
+                  <i class="fa-solid fa-unlink"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="warehouse-no-links">
+        <i class="fa-solid fa-link-slash warehouse-no-links-icon"></i>
+        <p class="warehouse-no-links-text">
+          No businesses linked to this warehouse yet.
+          <br>
+          <small>Click "Link Business" above to create a connection.</small>
+        </p>
+      </div>
+      {% endif %}
+      {% endwith %}
+    </div>
+
+  </div>
+  {% empty %}
+
+  <!-- Empty State -->
+  <div class="warehouse-empty-state">
+    <i class="fa-solid fa-warehouse warehouse-empty-icon"></i>
+    <p class="warehouse-empty-text">
+      {% if search or status_filter %}
+        No warehouses match your search criteria.
+        <br>
+        <small>Try adjusting your filters or search terms.</small>
+      {% else %}
+        No warehouses have been created yet.
+        <br>
+        <small>Contact the administrator to set up warehouse locations.</small>
+      {% endif %}
+    </p>
+  </div>
+
+  {% endfor %}
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Link Business AJAX Handler
+function linkBusiness(event, warehouseId) {
+    event.preventDefault();
+    const form = event.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalHTML = submitBtn.innerHTML;
+
+    // Disable button and show loading
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Linking...';
+
+    const formData = new FormData(form);
+
+    fetch('{% url "workforce:warehouse_link_business" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            showToast('Success', data.message || 'Business linked successfully!', 'success');
+
+            // Reload after short delay
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            // Show error
+            showToast('Error', data.error || 'Failed to link business', 'danger');
+
+            // Re-enable button
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalHTML;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error', 'Network error. Please try again.', 'danger');
+
+        // Re-enable button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalHTML;
+    });
+
+    return false;
+}
+
+// Unlink Business AJAX Handler
+function unlinkBusiness(linkId, bizName, whName) {
+    if (!confirm(`Unlink "${bizName}" from "${whName}"?\n\nThe warehouse pickup location for this business will be deactivated.`)) {
+        return;
+    }
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const formData = new FormData();
+    formData.append('link_id', linkId);
+    formData.append('csrfmiddlewaretoken', csrfToken);
+
+    // Show loading state on row
+    const row = document.getElementById('warehouse_link_row_' + linkId);
+    if (row) {
+        row.style.opacity = '0.5';
+        row.style.pointerEvents = 'none';
+    }
+
+    fetch('{% url "workforce:warehouse_unlink_business" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Success', data.message || 'Business unlinked successfully!', 'success');
+
+            // Remove row with animation
+            if (row) {
+                row.style.transform = 'translateX(-100%)';
+                row.style.transition = 'all 0.3s ease';
+                setTimeout(() => {
+                    location.reload();
+                }, 300);
+            } else {
+                location.reload();
+            }
+        } else {
+            showToast('Error', data.error || 'Failed to unlink business', 'danger');
+
+            // Restore row
+            if (row) {
+                row.style.opacity = '1';
+                row.style.pointerEvents = 'auto';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error', 'Network error. Please try again.', 'danger');
+
+        // Restore row
+        if (row) {
+            row.style.opacity = '1';
+            row.style.pointerEvents = 'auto';
+        }
+    });
+}
+
+// Toast Notification Helper
+function showToast(title, message, type = 'info') {
+    // Check if Bootstrap toast container exists, create if not
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        toastContainer.className = 'position-fixed top-0 end-0 p-3';
+        toastContainer.style.zIndex = '11000';
+        document.body.appendChild(toastContainer);
+    }
+
+    // Create toast element
+    const toastId = 'toast-' + Date.now();
+    const bgClass = type === 'success' ? 'bg-success' : type === 'danger' ? 'bg-danger' : 'bg-info';
+
+    const toastHTML = `
+        <div id="${toastId}" class="toast align-items-center text-white ${bgClass} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <strong>${title}</strong><br>
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+
+    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+
+    // Initialize and show toast
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+    toast.show();
+
+    // Remove from DOM after hidden
+    toastElement.addEventListener('hidden.bs.toast', () => {
+        toastElement.remove();
+    });
+}
+</script>
+{% endblock %}
