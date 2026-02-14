@@ -2,6 +2,9 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% load zone_tags %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'delivery/css/delivery-tasks-mobile.css' %}?v=20260214a">
+{% endblock extra_css %}
 {% block content %}
   <!-- Mobile PWA Task List View -->
   <div class="pwa-content d-md-none">
@@ -31,100 +34,91 @@
     </div>
 
     <!-- Area & Type Filters - 3 buttons in one row -->
-    <div class="d-flex gap-2 px-2 mb-2" style="width: 100%;">
-      <a href="?tab={{ current_tab }}&area=all&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}"
-         class="btn {% if area_filter == 'all' and not zone_filter %}btn-dark{% else %}btn-outline-secondary{% endif %} flex-fill"
-         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">
-        <i class="fa-solid fa-globe me-1"></i>All
-      </a>
-      <a href="?tab={{ current_tab }}&area=my_zone&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}"
-         class="btn {% if area_filter == 'my_zone' and not zone_filter %}btn-dark{% else %}btn-outline-secondary{% endif %} flex-fill"
-         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">
-        My Zone
-      </a>
-      <!-- Zone Dropdown -->
-      <div class="dropdown flex-fill">
-        <button class="btn {% if zone_filter %}btn-primary{% else %}btn-outline-secondary{% endif %} dropdown-toggle w-100"
-                type="button" data-bs-toggle="dropdown"
-                style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">
-          <i class="fa-solid fa-map-marker-alt me-1"></i>{% if zone_filter %}Z{{ zone_filter }}{% else %}Zone{% endif %}
-        </button>
-        <ul class="dropdown-menu" style="max-height: 300px; overflow-y: auto; min-width: 140px;">
-          <li>
-            <a class="dropdown-item py-2 {% if not zone_filter %}active{% endif %}"
-               href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}"
-               style="font-size: 14px;">
-              <i class="fa-solid fa-globe me-2"></i>All Zones
-            </a>
-          </li>
-          <li><hr class="dropdown-divider my-1"></li>
-          {% for zone in available_zones %}
-          <li>
-            <a class="dropdown-item py-2 {% if zone_filter == zone.zone_number|stringformat:'d' %}active{% endif %}"
-               href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}&zone={{ zone.zone_number }}"
-               style="font-size: 14px;">
-              <i class="fa-solid fa-location-dot me-2 text-muted"></i>Zone {{ zone.zone_number }}{% if zone.active_groups %} - {{ zone.active_groups.0.name }}{% endif %}
-            </a>
-          </li>
-          {% endfor %}
-        </ul>
+    <div class="delivery-filters">
+      <div class="delivery-filters__row">
+        <a href="?tab={{ current_tab }}&area=all&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}"
+           class="filter-chip {% if area_filter == 'all' and not zone_filter %}filter-chip--active{% endif %}">
+          <i class="fa-solid fa-globe"></i>All
+        </a>
+        <a href="?tab={{ current_tab }}&area=my_zone&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}"
+           class="filter-chip {% if area_filter == 'my_zone' and not zone_filter %}filter-chip--active{% endif %}">
+          My Zone
+        </a>
+        <!-- Zone Dropdown -->
+        <div class="dropdown zone-dropdown">
+          <button class="filter-chip {% if zone_filter %}filter-chip--primary{% endif %} dropdown-toggle"
+                  type="button" data-bs-toggle="dropdown">
+            <i class="fa-solid fa-map-marker-alt"></i>{% if zone_filter %}Z{{ zone_filter }}{% else %}Zone{% endif %}
+          </button>
+          <ul class="dropdown-menu">
+            <li>
+              <a class="dropdown-item {% if not zone_filter %}active{% endif %}"
+                 href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}">
+                <i class="fa-solid fa-globe me-2"></i>All Zones
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            {% for zone in available_zones %}
+            <li>
+              <a class="dropdown-item {% if zone_filter == zone.zone_number|stringformat:'d' %}active{% endif %}"
+                 href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}&zone={{ zone.zone_number }}">
+                <i class="fa-solid fa-location-dot me-2"></i>Zone {{ zone.zone_number }}{% if zone.active_groups %} - {{ zone.active_groups.0.name }}{% endif %}
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
       </div>
     </div>
     {% if current_tab == 'accepted' %}
-    <!-- Status Filters for Active Tasks - Large buttons for drivers -->
-    <div class="d-flex flex-wrap gap-2 px-2 mb-2">
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all&sort={{ sort_by }}&zone={{ zone_filter }}"
-         class="btn {% if status_filter == 'all' %}btn-dark{% else %}btn-outline-secondary{% endif %}"
-         style="min-height: 44px; min-width: 50px; font-size: 14px; font-weight: 600; border-radius: 10px;">All</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=accepted&sort={{ sort_by }}&zone={{ zone_filter }}"
-         class="btn {% if status_filter == 'accepted' %}btn-info{% else %}btn-outline-secondary{% endif %}"
-         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Accepted</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=picked_up&sort={{ sort_by }}&zone={{ zone_filter }}"
-         class="btn {% if status_filter == 'picked_up' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Picked</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=in_transit&sort={{ sort_by }}&zone={{ zone_filter }}"
-         class="btn {% if status_filter == 'in_transit' or status_filter == 'out_for_delivery' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Transit</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=contacted&sort={{ sort_by }}&zone={{ zone_filter }}"
-         class="btn {% if status_filter == 'contacted' %}btn-secondary{% else %}btn-outline-secondary{% endif %}"
-         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Contacted</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=non_reachable&sort={{ sort_by }}&zone={{ zone_filter }}"
-         class="btn {% if status_filter == 'non_reachable' %}btn-warning{% else %}btn-outline-secondary{% endif %}"
-         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Non Reach</a>
+    <!-- Status Filters for Active Tasks -->
+    <div class="delivery-filters">
+      <div class="delivery-filters__row">
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all&sort={{ sort_by }}&zone={{ zone_filter }}"
+           class="filter-chip {% if status_filter == 'all' %}filter-chip--active{% endif %}">All</a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=accepted&sort={{ sort_by }}&zone={{ zone_filter }}"
+           class="filter-chip {% if status_filter == 'accepted' %}filter-chip--active{% endif %}">Accepted</a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=picked_up&sort={{ sort_by }}&zone={{ zone_filter }}"
+           class="filter-chip {% if status_filter == 'picked_up' %}filter-chip--active{% endif %}">Picked</a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=in_transit&sort={{ sort_by }}&zone={{ zone_filter }}"
+           class="filter-chip {% if status_filter == 'in_transit' or status_filter == 'out_for_delivery' %}filter-chip--active{% endif %}">Transit</a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=contacted&sort={{ sort_by }}&zone={{ zone_filter }}"
+           class="filter-chip {% if status_filter == 'contacted' %}filter-chip--active{% endif %}">Contacted</a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=non_reachable&sort={{ sort_by }}&zone={{ zone_filter }}"
+           class="filter-chip {% if status_filter == 'non_reachable' %}filter-chip--active{% endif %}">Non Reach</a>
+      </div>
     </div>
     {% elif current_tab == 'history' %}
-    <!-- Status Filters for History/Completed Tasks - Large buttons for drivers -->
-    <div class="d-flex flex-wrap gap-2 px-2 mb-2">
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all&sort={{ sort_by }}&zone={{ zone_filter }}"
-         class="btn {% if status_filter == 'all' %}btn-dark{% else %}btn-outline-secondary{% endif %}"
-         style="min-height: 44px; min-width: 50px; font-size: 14px; font-weight: 600; border-radius: 10px;">All</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=delivered&sort={{ sort_by }}&zone={{ zone_filter }}"
-         class="btn {% if status_filter == 'delivered' %}btn-success{% else %}btn-outline-success{% endif %}"
-         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Delivered</a>
-      <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=failed&sort={{ sort_by }}&zone={{ zone_filter }}"
-         class="btn {% if status_filter == 'failed' or status_filter == 'cancelled' %}btn-danger{% else %}btn-outline-danger{% endif %}"
-         style="min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px;">Failed</a>
+    <!-- Status Filters for History/Completed Tasks -->
+    <div class="delivery-filters">
+      <div class="delivery-filters__row">
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all&sort={{ sort_by }}&zone={{ zone_filter }}"
+           class="filter-chip {% if status_filter == 'all' %}filter-chip--active{% endif %}">All</a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=delivered&sort={{ sort_by }}&zone={{ zone_filter }}"
+           class="filter-chip {% if status_filter == 'delivered' %}filter-chip--active{% endif %}">Delivered</a>
+        <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=failed&sort={{ sort_by }}&zone={{ zone_filter }}"
+           class="filter-chip {% if status_filter == 'failed' or status_filter == 'cancelled' %}filter-chip--active{% endif %}">Failed</a>
+      </div>
     </div>
     {% endif %}
 
     <!-- Task Count Header with Sort Options -->
-    <div class="d-flex justify-content-between align-items-center px-2 mb-2">
-      <span class="fw-bold" style="font-size: 16px;">{{ cards|length }} {% if current_tab == 'all' %}new{% elif current_tab == 'assigned' %}assigned{% elif current_tab == 'accepted' %}active{% else %}completed{% endif %} task{{ cards|length|pluralize }}</span>
-      <div class="d-flex gap-2 align-items-center">
-        <span class="text-muted" style="font-size: 12px;">Sort:</span>
+    <div class="delivery-sort">
+      <span class="delivery-sort__count">{{ cards|length }} {% if current_tab == 'all' %}new{% elif current_tab == 'assigned' %}assigned{% elif current_tab == 'accepted' %}active{% else %}completed{% endif %} task{{ cards|length|pluralize }}</span>
+      <div class="delivery-sort__controls">
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort=date&zone={{ zone_filter }}"
-           class="btn {% if sort_by == 'date' or not sort_by %}btn-dark{% else %}btn-outline-secondary{% endif %}"
-           style="min-height: 40px; min-width: 40px; font-size: 16px; border-radius: 10px; padding: 8px;">
+           class="sort-btn {% if sort_by == 'date' or not sort_by %}sort-btn--active{% endif %}"
+           title="Sort by date">
           <i class="fa-solid fa-calendar"></i>
         </a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort=zone&zone={{ zone_filter }}"
-           class="btn {% if sort_by == 'zone' %}btn-dark{% else %}btn-outline-secondary{% endif %}"
-           style="min-height: 40px; min-width: 40px; font-size: 16px; border-radius: 10px; padding: 8px;">
+           class="sort-btn {% if sort_by == 'zone' %}sort-btn--active{% endif %}"
+           title="Sort by zone">
           <i class="fa-solid fa-location-dot"></i>
         </a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort=status&zone={{ zone_filter }}"
-           class="btn {% if sort_by == 'status' %}btn-dark{% else %}btn-outline-secondary{% endif %}"
-           style="min-height: 40px; min-width: 40px; font-size: 16px; border-radius: 10px; padding: 8px;">
+           class="sort-btn {% if sort_by == 'status' %}sort-btn--active{% endif %}"
+           title="Sort by status">
           <i class="fa-solid fa-circle-check"></i>
         </a>
       </div>

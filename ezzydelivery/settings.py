@@ -34,7 +34,7 @@ SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=False, cast=bool)
 # Content Security
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True  # Legacy, but still useful for older browsers
-X_FRAME_OPTIONS = 'DENY'  # Prevent clickjacking
+X_FRAME_OPTIONS = 'SAMEORIGIN'  # Allow framing from same origin (for dev tools)
 
 # Cookie Security
 CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=False, cast=bool)  # True in production with HTTPS

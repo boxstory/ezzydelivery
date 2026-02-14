@@ -1,0 +1,786 @@
+/**
+ * Delivery Tasks - Mobile View Enhancement
+ * Modern, touch-optimized design for drivers
+ * Brand colors: Yellow (#f7c000) + Navy (#001f3f)
+ */
+
+/* ========================================
+   CSS Variables - Enhanced Mobile
+   ======================================== */
+:root {
+  /* Touch targets */
+  --touch-min: 44px;
+  --touch-comfortable: 48px;
+
+  /* Brand Colors */
+  --delivery-primary: #f7c000;
+  --delivery-primary-dark: #e5b000;
+  --delivery-primary-light: #fff7d6;
+  --delivery-navy: #001f3f;
+  --delivery-navy-light: #003366;
+
+  /* Status Colors */
+  --status-pending: #f59e0b;
+  --status-accepted: #06b6d4;
+  --status-transit: #3b82f6;
+  --status-delivered: #10b981;
+  --status-failed: #ef4444;
+  --status-cancelled: #dc2626;
+
+  /* Neutral Colors */
+  --bg-page: #f5f7fa;
+  --bg-card: #ffffff;
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --border-light: #e5e7eb;
+  --border-medium: #d1d5db;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+  --shadow-xl: 0 20px 25px rgba(0,0,0,0.15);
+}
+
+/* ========================================
+   1. TASK TABS - Modern Segmented Control
+   ======================================== */
+.task-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-md) 0;
+  background: var(--bg-page);
+  position: sticky;
+  top: 56px;
+  z-index: 100;
+  padding-bottom: var(--space-md);
+}
+
+.task-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md) var(--space-sm);
+  background: var(--bg-card);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 13px;
+  min-height: 64px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.task-tab__label {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+  z-index: 1;
+}
+
+.task-tab__badge {
+  font-size: 16px;
+  font-weight: 700;
+  z-index: 1;
+  line-height: 1;
+}
+
+.task-tab--active {
+  background: linear-gradient(135deg, var(--delivery-navy) 0%, var(--delivery-navy-light) 100%);
+  border-color: var(--delivery-navy);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.task-tab--active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--delivery-primary);
+}
+
+.task-tab:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ========================================
+   2. FILTERS - Compact Chips
+   ======================================== */
+.delivery-filters {
+  padding: 0 var(--space-md) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.delivery-filters__row {
+  display: flex;
+  gap: var(--space-sm);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.delivery-filters__row::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-card);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+  white-space: nowrap;
+  min-height: var(--touch-min);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.filter-chip i {
+  font-size: 16px;
+}
+
+.filter-chip--active {
+  background: var(--delivery-navy);
+  border-color: var(--delivery-navy);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+}
+
+.filter-chip--primary {
+  background: var(--delivery-primary);
+  border-color: var(--delivery-primary);
+  color: var(--text-primary);
+}
+
+.filter-chip:active {
+  transform: scale(0.96);
+}
+
+/* ========================================
+   3. TASK CARDS - Enhanced Design
+   ======================================== */
+.pwa-task-list {
+  padding: 0 var(--space-md) var(--space-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.pwa-task-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.pwa-task-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--delivery-primary);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.pwa-task-card:active {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.pwa-task-card:active::before {
+  opacity: 1;
+}
+
+/* Card Header */
+.pwa-task-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+  gap: var(--space-md);
+}
+
+.pwa-task-card__id {
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--delivery-navy);
+  background: var(--delivery-primary-light);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-sm);
+  letter-spacing: -0.3px;
+}
+
+.pwa-task-card__status {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.pwa-task-card__status--pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+}
+
+.pwa-task-card__status--assigned,
+.pwa-task-card__status--accepted {
+  background: rgba(6, 182, 212, 0.15);
+  color: #0e7490;
+}
+
+.pwa-task-card__status--transit {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1e40af;
+}
+
+.pwa-task-card__status--delivered {
+  background: rgba(16, 185, 129, 0.15);
+  color: #065f46;
+}
+
+.pwa-task-card__status--cancelled,
+.pwa-task-card__status--failed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #991b1b;
+}
+
+/* Card Body */
+.pwa-task-card__body {
+  margin-bottom: var(--space-md);
+}
+
+.pwa-task-card__business {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.pwa-task-card__business i {
+  color: var(--delivery-primary);
+  font-size: 14px;
+}
+
+/* Route Display */
+.pwa-task-card__route {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.pwa-task-card__route-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  padding: var(--space-xs) 0;
+}
+
+.pwa-task-card__route-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--status-delivered);
+  border: 3px solid rgba(16, 185, 129, 0.2);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+}
+
+.pwa-task-card__route-dot--end {
+  background: var(--delivery-navy);
+  border-color: rgba(0, 31, 63, 0.2);
+  box-shadow: 0 0 0 4px rgba(0, 31, 63, 0.1);
+}
+
+.pwa-task-card__route-connector {
+  width: 2px;
+  flex: 1;
+  background: linear-gradient(180deg,
+    rgba(16, 185, 129, 0.3) 0%,
+    rgba(0, 31, 63, 0.3) 100%
+  );
+  margin: var(--space-xs) 0;
+  min-height: 40px;
+}
+
+.pwa-task-card__route-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-xs) 0;
+}
+
+.pwa-task-card__location-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: var(--space-xs);
+}
+
+.pwa-task-card__location-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+/* Card Footer */
+.pwa-task-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-light);
+}
+
+.pwa-task-card__meta {
+  display: flex;
+  gap: var(--space-lg);
+  flex: 1;
+}
+
+.pwa-task-card__meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.pwa-task-card__meta-item i {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.pwa-task-card__cod {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--delivery-primary-dark);
+  background: var(--delivery-primary-light);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-sm);
+}
+
+.pwa-task-card__cod i {
+  color: var(--delivery-primary-dark);
+}
+
+/* ========================================
+   4. EMPTY STATE - Friendly Design
+   ======================================== */
+.pwa-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  text-align: center;
+  min-height: 400px;
+}
+
+.pwa-empty-state__icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--delivery-primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-xl);
+}
+
+.pwa-empty-state__icon i {
+  font-size: 36px;
+  color: var(--delivery-primary-dark);
+}
+
+.pwa-empty-state__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.pwa-empty-state__text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: var(--space-xl);
+  max-width: 280px;
+}
+
+/* ========================================
+   5. ANIMATIONS - Smooth Micro-interactions
+   ======================================== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pwa-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 0;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.pwa-slide-in-right {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.pwa-skeleton {
+  background: linear-gradient(90deg,
+    #f0f0f0 0px,
+    #f8f8f8 40px,
+    #f0f0f0 80px
+  );
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ========================================
+   6. BUTTONS - Touch Optimized
+   ======================================== */
+.pwa-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-xl);
+  min-height: var(--touch-comfortable);
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.pwa-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.pwa-btn:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+.pwa-btn--primary {
+  background: var(--delivery-navy);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+}
+
+.pwa-btn--primary:active {
+  transform: scale(0.97);
+  box-shadow: var(--shadow-sm);
+}
+
+.pwa-btn--secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 2px solid var(--border-medium);
+}
+
+.pwa-btn--success {
+  background: var(--status-delivered);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+}
+
+.pwa-btn--block {
+  width: 100%;
+}
+
+/* ========================================
+   7. MODAL ENHANCEMENTS
+   ======================================== */
+.modal-fullscreen-sm-down {
+  margin: 0;
+}
+
+.modal-fullscreen-sm-down .modal-content {
+  min-height: 100vh;
+  border-radius: 0 !important;
+}
+
+@media (max-width: 575.98px) {
+  .modal-dialog-centered {
+    min-height: calc(100% - 3.5rem);
+  }
+}
+
+.pwa-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+}
+
+.pwa-card__body {
+  padding: var(--space-lg);
+}
+
+.pwa-stat-card {
+  background: linear-gradient(135deg,
+    rgba(247, 192, 0, 0.1) 0%,
+    rgba(0, 31, 63, 0.05) 100%
+  );
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  text-align: center;
+}
+
+.pwa-stat-card__label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+.pwa-stat-card__value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.pwa-text-success {
+  color: var(--status-delivered) !important;
+}
+
+/* ========================================
+   8. SORT CONTROLS - Compact
+   ======================================== */
+.delivery-sort {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 var(--space-lg) var(--space-md);
+}
+
+.delivery-sort__count {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.delivery-sort__controls {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.sort-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 2px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.sort-btn--active {
+  background: var(--delivery-navy);
+  border-color: var(--delivery-navy);
+  color: #ffffff;
+}
+
+.sort-btn:active {
+  transform: scale(0.95);
+}
+
+/* ========================================
+   9. ZONE DROPDOWN - Enhanced
+   ======================================== */
+.zone-dropdown {
+  position: relative;
+}
+
+.zone-dropdown .dropdown-menu {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-xl);
+  padding: var(--space-sm);
+  max-height: 320px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.zone-dropdown .dropdown-item {
+  border-radius: var(--radius-sm);
+  padding: var(--space-md);
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: var(--space-xs);
+  transition: all 0.2s ease;
+}
+
+.zone-dropdown .dropdown-item:active {
+  background: var(--delivery-primary-light);
+  color: var(--text-primary);
+}
+
+.zone-dropdown .dropdown-item.active {
+  background: var(--delivery-navy);
+  color: #ffffff;
+}
+
+/* ========================================
+   10. PERFORMANCE OPTIMIZATIONS
+   ======================================== */
+.pwa-task-card,
+.task-tab,
+.filter-chip,
+.pwa-btn,
+.sort-btn {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ========================================
+   11. SAFE AREA PADDING
+   ======================================== */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .pwa-task-list {
+    padding-bottom: calc(var(--space-2xl) + env(safe-area-inset-bottom));
+  }
+}
+
+/* ========================================
+   12. LOADING STATES
+   ======================================== */
+.pwa-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.pwa-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-light);
+  border-top-color: var(--delivery-navy);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
