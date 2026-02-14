@@ -2444,7 +2444,7 @@ def api_drivers_list(request):
     driver_list = []
     for d in drivers:
         name = d.user.get_full_name() or d.user.username
-        driver_list.append({'id': d.id, 'name': name})
+        driver_list.append({'id': d.pk, 'name': name})  # Use d.pk instead of d.id (driver_id is PK)
     return JsonResponse({'drivers': driver_list})
 
 
@@ -5064,6 +5064,9 @@ def business_license_detail(request, business_id):
 
     # Get linked warehouse (if any)
     from warehouse import models as warehouse_models
+    from product import models as product_models
+    from django.db.models import Sum
+
     linked_warehouse = None
     if business.fulfillment_service_status == 'active':
         try:
@@ -5073,12 +5076,42 @@ def business_license_detail(request, business_id):
         except Exception as e:
             logger.warning(f"Error fetching linked warehouse for business {business.business_id}: {e}")
 
+    # Get product statistics for fulfillment businesses
+    product_stats = {
+        'total_products': 0,
+        'active_skus': 0,
+        'total_stock': 0,
+        'low_stock_items': 0,
+    }
+    if business.fulfillment_service_status == 'active':
+        try:
+            products = product_models.Product.objects.filter(business=business)
+            product_stats['total_products'] = products.count()
+            product_stats['active_skus'] = products.count()  # All products are considered active SKUs
+
+            # Get total stock from inventory
+            total_stock_result = product_models.ProductInventory.objects.filter(
+                item_sku__business=business
+            ).aggregate(total=Sum('item_quantity'))
+            product_stats['total_stock'] = total_stock_result['total'] or 0
+
+            # Count low stock items (less than 10 units)
+            for product in products:
+                stock = product_models.ProductInventory.objects.filter(
+                    item_sku=product
+                ).aggregate(total=Sum('item_quantity'))['total'] or 0
+                if stock < 10:
+                    product_stats['low_stock_items'] += 1
+        except Exception as e:
+            logger.warning(f"Error fetching product stats for business {business.business_id}: {e}")
+
     context = {
         'page_title': f'{business.business_name} - Business Detail',
         'business': business,
         'business_profile': business_profile,
         'order_stats': order_stats,
         'linked_warehouse': linked_warehouse,
+        'product_stats': product_stats,
     }
 
     return render(request, 'workforce/business_license_detail.html', context)

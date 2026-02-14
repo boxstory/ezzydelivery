@@ -158,15 +158,17 @@ Each task should have select_related: order, driver, business, pickup_location, 
                             {{ dl.get_dl_task_status_display }}
                         </span>
                         {% else %}—{% endif %}
-                        <button class="dl-table__edit-btn" data-bs-toggle="modal" data-bs-target="#statusModal"
+                        <button class="dl-table__edit-btn dl-table__edit-btn--status status-modal-trigger"
+                            data-bs-toggle="modal" data-bs-target="#statusModal"
                             data-task-id="{{ dl.id }}"
                             data-task-number="{{ dl.dl_task_number }}"
+                            data-status-type="task"
                             data-current-status="{{ dl.dl_task_status }}"
                             data-driver-id="{{ dl.driver_id|default:'' }}"
                             data-driver-name="{{ dl.driver|default:'' }}"
                             data-customer-name="{{ dl.order.customer_name|default:'' }}"
-                            onclick="setStatusModalTask(this)" title="Update Status">
-                            <i class="fa-solid fa-pen-to-square"></i>
+                            title="Update Task Status">
+                            <i class="fa-solid fa-circle-dot"></i>
                         </button>
                     </td>
                     <!-- DMS Status -->
@@ -176,15 +178,17 @@ Each task should have select_related: order, driver, business, pickup_location, 
                             {{ dl.get_dl_task_status_dms_display }}
                         </span>
                         {% else %}—{% endif %}
-                        <button class="dl-table__edit-btn" data-bs-toggle="modal" data-bs-target="#statusModal"
+                        <button class="dl-table__edit-btn dl-table__edit-btn--dms status-modal-trigger"
+                            data-bs-toggle="modal" data-bs-target="#statusModal"
                             data-task-id="{{ dl.id }}"
                             data-task-number="{{ dl.dl_task_number }}"
                             data-status-type="dms"
                             data-current-dms="{{ dl.dl_task_status_dms }}"
                             data-driver-id="{{ dl.driver_id|default:'' }}"
                             data-driver-name="{{ dl.driver|default:'' }}"
-                            onclick="setStatusModalTask(this)" title="Update DMS">
-                            <i class="fa-solid fa-pen-to-square"></i>
+                            data-customer-name="{{ dl.order.customer_name|default:'' }}"
+                            title="Update DMS Status">
+                            <i class="fa-solid fa-satellite-dish"></i>
                         </button>
                     </td>
                     <!-- Driver -->

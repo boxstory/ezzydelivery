@@ -406,11 +406,175 @@ function publishToDriverApp(taskId) {
 function setStatusModalTask(button) {
     const taskId = button.getAttribute('data-task-id');
     const taskNumber = button.getAttribute('data-task-number');
-    const modal = document.getElementById('statusModal');
-    if (modal) {
-        modal.querySelector('#statusModalTaskId')?.setAttribute('value', taskId);
-        modal.querySelector('#statusModalTaskNumber')?.textContent = taskNumber;
+    const statusType = button.getAttribute('data-status-type') || 'task';
+    const currentStatus = button.getAttribute('data-current-status') || '';
+    const currentDms = button.getAttribute('data-current-dms') || '';
+    const driverId = button.getAttribute('data-driver-id') || '';
+    const driverName = button.getAttribute('data-driver-name') || '';
+    const customerName = button.getAttribute('data-customer-name') || '';
+
+    console.log('=== Modal Opening ===');
+    console.log('Type:', statusType, '| Task Status:', currentStatus, '| DMS:', currentDms);
+
+    // Set task ID, type and number
+    document.getElementById('statusModalTaskId').value = taskId;
+    document.getElementById('statusModalStatusType').value = statusType;
+    document.getElementById('statusModalTaskNumber').textContent = taskNumber;
+
+    // Update modal title based on status type
+    const modalTitle = document.getElementById('statusModalLabel');
+    if (modalTitle) {
+        if (statusType === 'dms') {
+            modalTitle.innerHTML = '<i class="fa-solid fa-satellite-dish me-2"></i>Update DMS Task Status';
+        } else {
+            modalTitle.innerHTML = '<i class="fa-solid fa-circle-dot me-2"></i>Update Task Status';
+        }
     }
+
+    // Set customer name
+    const custEl = document.getElementById('statusModalCustomer');
+    if (custEl) custEl.textContent = customerName || '—';
+
+    // Set current status badge
+    const badgeEl = document.getElementById('statusModalCurrentBadge');
+    if (badgeEl) {
+        let display = '';
+        if (statusType === 'dms') {
+            display = getDmsStatusDisplay(currentDms);
+            badgeEl.className = 'dl-badge dl-badge--dms-' + (currentDms || 'default');
+        } else {
+            display = currentStatus ? currentStatus.replace(/_/g, ' ') : '—';
+            badgeEl.className = 'dl-badge dl-badge--' + (currentStatus || 'default');
+        }
+        badgeEl.textContent = display;
+    }
+
+    // Populate status dropdown based on type
+    const statusSelect = document.getElementById('statusSelect');
+    if (statusSelect) {
+        if (statusType === 'dms') {
+            // DMS status options - build with selected attribute
+            const dmsOptions = ['0', '1', '2', '3', '4', '6', '7', '8', '9', '10'];
+            const dmsLabels = {
+                '0': 'Assigned', '1': 'Started', '2': 'Successful', '3': 'Failed',
+                '4': 'InProgress/Arrived', '6': 'Unassigned', '7': 'Accepted/Acknowledged',
+                '8': 'Decline', '9': 'Cancel', '10': 'Deleted'
+            };
+
+            let optionsHtml = '<option value="">-- Select DMS Status --</option>';
+            dmsOptions.forEach(val => {
+                const selected = (val === currentDms) ? ' selected' : '';
+                optionsHtml += `<option value="${val}"${selected}>${val} - ${dmsLabels[val]}</option>`;
+            });
+            statusSelect.innerHTML = optionsHtml;
+            console.log('DMS Status - currentDms:', currentDms, 'Type:', typeof currentDms);
+        } else {
+            // Task status options - build with selected attribute
+            const taskStatuses = [
+                {value: 'for_review', label: 'For Review'},
+                {value: 'pending', label: 'Pending'},
+                {value: 'assigned', label: 'Assigned'},
+                {value: 'accepted', label: 'Accepted'},
+                {value: 'picked_up', label: 'Picked Up'},
+                {value: 'start_ride', label: 'Start Ride'},
+                {value: 'out_for_delivery', label: 'Out for Delivery'},
+                {value: 'in_transit', label: 'In Transit'},
+                {value: 'contacted', label: 'Contacted & Confirmed'},
+                {value: 'non_reachable', label: 'Non Reachable'},
+                {value: 'delivered', label: 'Delivered'},
+                {value: 'failed', label: 'Failed'},
+                {value: 'rejected', label: 'Rejected'},
+                {value: 'cancelled', label: 'Cancelled'}
+            ];
+
+            let optionsHtml = '<option value="">-- Select Status --</option>';
+            taskStatuses.forEach(status => {
+                const selected = (status.value === currentStatus) ? ' selected' : '';
+                optionsHtml += `<option value="${status.value}"${selected}>${status.label}</option>`;
+            });
+            statusSelect.innerHTML = optionsHtml;
+            console.log('Task Status - currentStatus:', currentStatus, 'Type:', typeof currentStatus);
+        }
+        // Log final selected value
+        console.log('Status select value after setting:', statusSelect.value, 'Options count:', statusSelect.options.length);
+    }
+
+    // Set current time
+    const timeEl = document.getElementById('statusModalTime');
+    if (timeEl) {
+        const now = new Date();
+        const offset = now.getTimezoneOffset();
+        const local = new Date(now.getTime() - offset * 60000);
+        timeEl.value = local.toISOString().slice(0, 16);
+    }
+
+    // Clear notes
+    const notesEl = document.getElementById('statusModalNotes');
+    if (notesEl) notesEl.value = '';
+
+    // Show driver info if assigned
+    const driverInfoEl = document.getElementById('statusModalDriverInfo');
+    const driverNameEl = document.getElementById('statusModalDriverName');
+    if (driverId && driverName) {
+        if (driverInfoEl) driverInfoEl.style.display = 'block';
+        if (driverNameEl) driverNameEl.textContent = driverName;
+    } else {
+        if (driverInfoEl) driverInfoEl.style.display = 'none';
+    }
+
+    // Load drivers list and pre-select current driver
+    loadDriversList(driverId);
+}
+
+// Get DMS status display text
+function getDmsStatusDisplay(dmsStatus) {
+    const dmsLabels = {
+        '0': 'Assigned',
+        '1': 'Started',
+        '2': 'Successful',
+        '3': 'Failed',
+        '4': 'InProgress/Arrived',
+        '6': 'Unassigned',
+        '7': 'Accepted/Acknowledged',
+        '8': 'Decline',
+        '9': 'Cancel',
+        '10': 'Deleted'
+    };
+    return dmsLabels[dmsStatus] || dmsStatus || '—';
+}
+
+// Load drivers list for dropdown
+function loadDriversList(currentDriverId) {
+    const driverSelect = document.getElementById('statusModalDriver');
+    if (!driverSelect) return;
+
+    // Set loading state
+    driverSelect.innerHTML = '<option value="">Loading drivers...</option>';
+    driverSelect.disabled = true;
+
+    fetch('/workforce/api/drivers-list/', {
+        headers: { 'Accept': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        driverSelect.innerHTML = '<option value="">-- No Driver --</option>';
+        if (data.drivers && data.drivers.length) {
+            data.drivers.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = d.name;
+                if (String(d.id) === String(currentDriverId)) {
+                    opt.selected = true;
+                }
+                driverSelect.appendChild(opt);
+            });
+        }
+        driverSelect.disabled = false;
+    })
+    .catch(() => {
+        driverSelect.innerHTML = '<option value="">-- No Driver --</option>';
+        driverSelect.disabled = false;
+    });
 }
 
 // ============================================
@@ -441,4 +605,18 @@ function showToast(message, type) {
         alert(message);
     }
 }
+
+// Initialize modal event listener when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    const statusModal = document.getElementById('statusModal');
+    if (statusModal) {
+        statusModal.addEventListener('show.bs.modal', function(event) {
+            // Get the button that triggered the modal
+            const button = event.relatedTarget;
+            if (button && button.classList.contains('status-modal-trigger')) {
+                setStatusModalTask(button);
+            }
+        });
+    }
+});
 </script>
