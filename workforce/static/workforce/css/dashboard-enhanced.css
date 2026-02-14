@@ -10,8 +10,8 @@
     padding: 1.5rem;
 }
 
-/* ---------- PAGE HEADER ---------- */
-.page-header {
+/* ---------- PAGE TITLE HEADER ---------- */
+h3.page-title {
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
     border-radius: 1rem;
     padding: 2rem;
@@ -19,39 +19,68 @@
     box-shadow: 0 0.5rem 1.5rem rgba(30, 41, 59, 0.15);
     position: relative;
     overflow: hidden;
+    color: #fff !important;
+    font-size: 1.75rem !important;
+    font-weight: 700 !important;
+    margin-top: 0;
 }
 
-.page-header::before {
+h3.page-title::before {
     content: '';
     position: absolute;
-    top: -50%;
-    right: -10%;
-    width: 20rem;
-    height: 20rem;
+    top: 50%;
+    right: 0;
+    width: 12rem;
+    height: 12rem;
+    transform: translate(20%, -50%);
     background: radial-gradient(circle, rgba(247, 192, 0, 0.15) 0%, transparent 70%);
     border-radius: 50%;
+    pointer-events: none;
+    z-index: -1;
 }
 
-.page-header h3 {
-    color: #fff;
-    font-size: 1.75rem;
-    font-weight: 700;
-    margin: 0;
+h3.page-title i {
+    color: var(--brand-primary) !important;
+    filter: drop-shadow(0 0 0.5rem rgba(247, 192, 0, 0.5));
     position: relative;
     z-index: 1;
-}
-
-.page-header h3 i {
-    color: var(--brand-primary);
-    filter: drop-shadow(0 0 0.5rem rgba(247, 192, 0, 0.5));
 }
 
 /* ---------- ENHANCED STATS GRID ---------- */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: 0.75rem; /* Reduced for mobile */
     margin-bottom: 2.5rem;
+}
+
+/* Responsive grid breakpoints */
+@media (min-width: 576px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+}
+
+@media (min-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.25rem;
+    }
+}
+
+@media (min-width: 992px) {
+    .stats-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.25rem;
+    }
+}
+
+@media (min-width: 1400px) {
+    .stats-grid {
+        grid-template-columns: repeat(5, 1fr);
+        gap: 1.5rem;
+    }
 }
 
 /* ---------- MODERN STAT CARDS ---------- */
@@ -394,13 +423,10 @@
         padding: 1rem;
     }
 
-    .page-header {
-        padding: 1.5rem;
-        border-radius: 0.75rem;
-    }
-
-    .page-header h3 {
-        
+    h3.page-title {
+        padding: 1.5rem !important;
+        border-radius: 0.75rem !important;
+        font-size: 1.5rem !important;
     }
 
     .stats-grid {
@@ -440,126 +466,72 @@
     }
 }
 
-/* ---------- DASHBOARD GLOBAL TYPOGRAPHY (.75rem) ---------- */
-/* Comprehensive font-size rules for ALL dashboard text elements */
+/* ---------- DASHBOARD GLOBAL TYPOGRAPHY ---------- */
+/* Refined font-size rules for readability and accessibility */
 
-/* Base text elements */
-#workforce_dashboard_wrapper_main p,
-#workforce_dashboard_wrapper_main span,
-#workforce_dashboard_wrapper_main div,
-#workforce_dashboard_wrapper_main li,
-#workforce_dashboard_wrapper_main a {
-    font-size: .75rem !important;
+/* Base content text - slightly larger for better readability */
+#workforce_dashboard_wrapper_main {
+    font-size: 0.875rem; /* 14px base - more readable than 12px */
 }
 
-/* Form elements */
-#workforce_dashboard_wrapper_main label,
-#workforce_dashboard_wrapper_main .form-label,
-#workforce_dashboard_wrapper_main input,
-#workforce_dashboard_wrapper_main select,
-#workforce_dashboard_wrapper_main textarea,
+/* Table elements - maintain compact but readable */
+#workforce_dashboard_wrapper_main table td,
+#workforce_dashboard_wrapper_main tbody td,
+#workforce_dashboard_wrapper_main tbody th {
+    font-size: 0.8125rem; /* 13px */
+}
+
+/* Table headers - clear visual hierarchy */
+#workforce_dashboard_wrapper_main thead th,
+#workforce_dashboard_wrapper_main table th {
+    font-size: 0.875rem; /* 14px */
+    font-weight: 600;
+}
+
+/* Buttons - comfortable tap targets */
+#workforce_dashboard_wrapper_main .btn:not(.btn-sm):not(.btn-lg) {
+    font-size: 0.875rem; /* 14px */
+}
+
+#workforce_dashboard_wrapper_main .btn-sm {
+    font-size: 0.8125rem; /* 13px */
+}
+
+/* Form elements - readable input text */
 #workforce_dashboard_wrapper_main .form-control,
 #workforce_dashboard_wrapper_main .form-select,
-#workforce_dashboard_wrapper_main .form-check-label,
-#workforce_dashboard_wrapper_main .form-text {
-    font-size: .75rem !important;
+#workforce_dashboard_wrapper_main .form-label {
+    font-size: 0.875rem; /* 14px */
 }
 
-/* Buttons */
-#workforce_dashboard_wrapper_main button,
-#workforce_dashboard_wrapper_main .btn {
-    font-size: .75rem !important;
-}
-
-/* Table elements */
-#workforce_dashboard_wrapper_main table,
-#workforce_dashboard_wrapper_main table td,
-#workforce_dashboard_wrapper_main table th,
-#workforce_dashboard_wrapper_main tbody,
-#workforce_dashboard_wrapper_main tbody td,
-#workforce_dashboard_wrapper_main tbody th,
-#workforce_dashboard_wrapper_main thead,
-#workforce_dashboard_wrapper_main thead td,
-#workforce_dashboard_wrapper_main thead th {
-    font-size: .75rem !important;
-}
-
-/* Card elements */
-#workforce_dashboard_wrapper_main .card-body,
-#workforce_dashboard_wrapper_main .card-body p,
-#workforce_dashboard_wrapper_main .card-body span,
-#workforce_dashboard_wrapper_main .card-body div,
-#workforce_dashboard_wrapper_main .card-text,
-#workforce_dashboard_wrapper_main .card-subtitle {
-    font-size: .75rem !important;
-}
-
-/* List elements */
-#workforce_dashboard_wrapper_main ul,
-#workforce_dashboard_wrapper_main ol,
-#workforce_dashboard_wrapper_main li,
-#workforce_dashboard_wrapper_main dl,
-#workforce_dashboard_wrapper_main dt,
-#workforce_dashboard_wrapper_main dd {
-    font-size: .75rem !important;
-}
-
-/* Badges and small text */
+/* Badges and small text - compact */
 #workforce_dashboard_wrapper_main .badge,
 #workforce_dashboard_wrapper_main small,
-#workforce_dashboard_wrapper_main .small,
-#workforce_dashboard_wrapper_main .text-muted,
-#workforce_dashboard_wrapper_main .text-secondary {
-    font-size: .75rem !important;
+#workforce_dashboard_wrapper_main .small {
+    font-size: 0.75rem; /* 12px */
 }
 
-/* Navigation */
-#workforce_dashboard_wrapper_main .nav-link,
-#workforce_dashboard_wrapper_main .navbar-text,
-#workforce_dashboard_wrapper_main .dropdown-item {
-    font-size: .75rem !important;
+/* Breadcrumb - subtle navigation */
+#workforce_dashboard_wrapper_main .breadcrumb-item {
+    font-size: 0.8125rem; /* 13px */
 }
 
-/* Alerts and notifications */
-#workforce_dashboard_wrapper_main .alert,
-#workforce_dashboard_wrapper_main .alert p,
-#workforce_dashboard_wrapper_main .alert span {
-    font-size: .75rem !important;
-}
-
-/* Modal elements */
-#workforce_dashboard_wrapper_main .modal-body,
-#workforce_dashboard_wrapper_main .modal-body p,
-#workforce_dashboard_wrapper_main .modal-body span,
-#workforce_dashboard_wrapper_main .modal-footer {
-    font-size: .75rem !important;
-}
-
-/* Breadcrumb and pagination */
-#workforce_dashboard_wrapper_main .breadcrumb,
-#workforce_dashboard_wrapper_main .breadcrumb-item,
-#workforce_dashboard_wrapper_main .pagination,
-#workforce_dashboard_wrapper_main .page-link {
-    font-size: .75rem !important;
-}
-
-/* EXCEPTIONS - Preserve heading sizes */
+/* Preserve heading hierarchy - no overrides needed */
 #workforce_dashboard_wrapper_main h1,
 #workforce_dashboard_wrapper_main h2,
 #workforce_dashboard_wrapper_main h3,
 #workforce_dashboard_wrapper_main h4,
 #workforce_dashboard_wrapper_main h5,
 #workforce_dashboard_wrapper_main h6,
-#workforce_dashboard_wrapper_main .h1,
-#workforce_dashboard_wrapper_main .h2,
-#workforce_dashboard_wrapper_main .h3,
-#workforce_dashboard_wrapper_main .h4,
-#workforce_dashboard_wrapper_main .h5,
-#workforce_dashboard_wrapper_main .h6,
 #workforce_dashboard_wrapper_main .stat-card-value,
-#workforce_dashboard_wrapper_main .section-title,
-#workforce_dashboard_wrapper_main .page-title {
-    /* No font-size override - preserve heading hierarchy */
+#workforce_dashboard_wrapper_main .section-title {
+    /* Inherits from Bootstrap/brand-kit */
+}
+
+/* Page title always takes full width */
+h3.page-title {
+    display: block;
+    width: 100%;
 }
 
 /* ---------- PRINT STYLES ---------- */

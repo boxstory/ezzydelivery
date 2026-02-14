@@ -49,6 +49,32 @@
     max-width: 100% !important;
 }
 
+/* ---------- ORDER DETAIL ALIGNMENT FIXES ---------- */
+/* Ensure proper text wrapping for long business names */
+.text-wrap {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+}
+
+/* Ensure consistent spacing in 3-column layout */
+.card-body .row.g-3 > [class*="col-"] {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Ensure badges don't break layout */
+.badge {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+/* Fix alignment of form labels */
+.form-label.small {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
 /* ---------- BREADCRUMB STYLES ---------- */
 .breadcrumb {
     display: flex;
@@ -131,12 +157,14 @@
 .mobile-sidebar-menu {
     background: var(--brand-white);
     max-height: 0;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     transition: max-height 0.3s ease-out;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
 .mobile-sidebar-menu.show {
-    max-height: 125rem;
+    max-height: calc(100vh - 60px); /* Viewport height minus header */
     transition: max-height 0.5s ease-in;
 }
 
@@ -1081,7 +1109,7 @@
   right: 0;
   bottom: 0;
   background: rgba(255, 255, 255, 0.85);
-  z-index: 9999;
+  z-index: 1050; /* Bootstrap modal backdrop is 1040, modals are 1055 */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3039,7 +3067,6 @@
 .form-input,
 .form-select {
     width: 100%;
-    padding: 0.75rem 1rem;
     border: 0.125rem solid var(--brand-grey-300);
     border-radius: var(--brand-radius-sm);
     transition: var(--brand-transition);
@@ -6028,7 +6055,6 @@
 
 .form-input {
     width: 100%;
-    padding: 0.625rem 0.75rem;
     border: 1px solid var(--brand-grey-200);
     border-radius: 0.375rem;
     color: var(--brand-grey-800);
@@ -6790,7 +6816,7 @@
 .orc-row:hover{background:#f8fafc;border-color:#cbd5e1}
 .orc-checkbox{width:24px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
 .orc-checkbox input[type="checkbox"]{width:16px;height:16px;cursor:pointer}
-.orc-id{width:220px;flex-shrink:0}
+.orc-id{width:176px;flex-shrink:0}
 .orc-id a{color:#2563eb;text-decoration:none;font-weight:600;font-size:11px;word-break:break-all}
 .orc-id a:hover{text-decoration:underline}
 .orc-seller{display:block;color:#64748b;font-size:10px;word-wrap:break-word;white-space:normal}
@@ -6800,6 +6826,10 @@
 .orc-address{flex:1;min-width:120px}
 .orc-zone{display:block;font-weight:500;font-size:10px;color:#dc2626}
 .orc-addr-text{color:#64748b;font-size:14px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orc-products{width:140px;flex-shrink:0;display:flex;flex-direction:column;gap:2px}
+.orc-product-item{font-size:10px;color:#475569;line-height:1.3}
+.orc-product-name{font-weight:500;color:#334155}
+.orc-product-qty{color:#64748b;font-size:9px;margin-left:4px}
 .orc-amount{width:70px;flex-shrink:0;text-align:right;font-weight:600;color:#16a34a;font-size:12px}
 .orc-amount small{font-weight:400;color:#64748b;font-size:9px}
 .orc-date{width:45px;flex-shrink:0;color:#64748b;font-size:10px;text-align:center}
@@ -6829,10 +6859,10 @@
 .orc-btn-wa:hover{background:#dcfce7}
 .orc-btn-edit{border-color:#fcd34d;color:#d97706}
 .orc-btn-edit:hover{background:#fef3c7}
-@media(max-width:992px){.orc-address{display:none}}
+@media(max-width:992px){.orc-address{display:none}.orc-products{display:none}}
 @media(max-width:768px){.orc-row{gap:6px;padding:5px 8px}.orc-status{min-width:50px}}
 /* Header row styling */
-.orc-row:first-child .orc-id,.orc-row:first-child .orc-customer,.orc-row:first-child .orc-address,.orc-row:first-child .orc-amount,.orc-row:first-child .orc-date,.orc-row:first-child .orc-status,.orc-row:first-child .orc-actions{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#64748b}
+.orc-row:first-child .orc-id,.orc-row:first-child .orc-customer,.orc-row:first-child .orc-address,.orc-row:first-child .orc-products,.orc-row:first-child .orc-amount,.orc-row:first-child .orc-date,.orc-row:first-child .orc-status,.orc-row:first-child .orc-actions{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#64748b}
 
 /* ---------- STATUS TIMELINE ---------- */
 .tl-card{border:none;border-radius:12px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.07),0 1px 3px rgba(0,0,0,0.04)}
@@ -8471,7 +8501,49 @@
     0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
     40% { transform: scale(1); opacity: 1; }
 }
-/* Global tbody and card-body font size */
-tbody, tbody td, tbody th { font-size: .75rem !important; }
-.card-body, .card-body p, .card-body span, .card-body div { font-size: .75rem !important; }
+
+/* ---------- MOBILE RESPONSIVE UTILITIES ---------- */
+/* Button wrapping for mobile devices */
+@media (max-width: 767px) {
+    .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .btn-group > .btn {
+        flex: 1 1 auto;
+        min-width: calc(50% - 0.25rem); /* 2 buttons per row on mobile */
+    }
+
+    /* Action button containers */
+    .d-flex.gap-2,
+    .d-flex.gap-3 {
+        flex-wrap: wrap !important;
+    }
+
+    /* Reduce button padding on mobile */
+    .btn:not(.btn-sm):not(.btn-lg) {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8125rem;
+    }
+
+    /* Header action buttons */
+    .page-header .btn-group,
+    .page-header .d-flex {
+        width: 100%;
+        margin-top: 0.75rem;
+    }
+
+    /* Table action buttons */
+    .table .btn-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .table .btn-group > .btn {
+        width: 100%;
+        margin-bottom: 0.25rem;
+    }
+}
 
