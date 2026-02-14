@@ -1,0 +1,557 @@
+/**
+ * Profile Page - Mobile Enhancement
+ * Modern, card-based design with EzzyDelivery branding
+ * Brand colors: Yellow (#f7c000) + Navy (#001f3f)
+ */
+
+/* ========================================
+   CSS Variables
+   ======================================== */
+:root {
+  /* Brand Colors */
+  --profile-primary: #f7c000;
+  --profile-primary-dark: #e5b000;
+  --profile-primary-light: #fff7d6;
+  --profile-navy: #001f3f;
+  --profile-navy-light: #003366;
+
+  /* Neutral Colors */
+  --profile-bg: #f5f7fa;
+  --profile-card: #ffffff;
+  --profile-text: #1f2937;
+  --profile-text-muted: #6b7280;
+  --profile-border: #e5e7eb;
+
+  /* Spacing */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.5rem;
+  --space-2xl: 2rem;
+
+  /* Radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-full: 50%;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+  --shadow-xl: 0 20px 25px rgba(0,0,0,0.15);
+}
+
+/* ========================================
+   1. PROFILE SECTION - Modern Layout
+   ======================================== */
+#core_profile_section_main {
+  background: var(--profile-bg);
+  min-height: 100vh;
+  padding-bottom: var(--space-2xl);
+}
+
+#core_profile_section_main .p-3 {
+  padding: var(--space-lg) !important;
+}
+
+/* ========================================
+   2. PROFILE SIDEBAR - Enhanced Card
+   ======================================== */
+#core_dashboard_sidebar_profile_card {
+  border-radius: var(--radius-lg);
+  border: none;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+#core_dashboard_sidebar_profile_card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Profile Header Section */
+#core_dashboard_sidebar_profile_card .card-body:first-child {
+  background: linear-gradient(135deg,
+    var(--profile-navy) 0%,
+    var(--profile-navy-light) 100%
+  );
+  color: #ffffff;
+  padding: var(--space-2xl) var(--space-lg) !important;
+  position: relative;
+}
+
+/* Verification Badge */
+#core_dashboard_sidebar_profile_card .position-absolute.badge {
+  top: var(--space-lg) !important;
+  right: var(--space-lg) !important;
+  background: rgba(16, 185, 129, 0.2) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+  color: #ffffff !important;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Profile Picture Wrapper */
+.profile-picture-wrapper {
+  position: relative;
+  margin-bottom: var(--space-xl) !important;
+}
+
+.profile-picture-wrapper img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border: 4px solid rgba(255,255,255,0.3) !important;
+  box-shadow: var(--shadow-xl);
+  transition: transform 0.3s ease;
+}
+
+.profile-picture-wrapper img:hover {
+  transform: scale(1.05);
+}
+
+.profile-picture-wrapper .bg-primary {
+  background: var(--profile-primary) !important;
+  width: 44px !important;
+  height: 44px !important;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.2s ease;
+}
+
+.profile-picture-wrapper .bg-primary:hover {
+  transform: scale(1.1);
+}
+
+.profile-picture-wrapper .bg-primary i {
+  color: var(--profile-navy) !important;
+  font-size: 1.125rem;
+}
+
+/* User Name */
+#core_dashboard_sidebar_profile_card h5 {
+  color: #ffffff !important;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: var(--space-lg) !important;
+  margin-bottom: var(--space-md) !important;
+}
+
+/* User Number Badge */
+#core_dashboard_sidebar_profile_card .badge.bg-secondary-subtle {
+  background: rgba(247, 192, 0, 0.2) !important;
+  color: var(--profile-primary) !important;
+  border-color: rgba(247, 192, 0, 0.3) !important;
+  padding: var(--space-sm) var(--space-lg);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* Location Info */
+#core_dashboard_sidebar_profile_card .text-muted.small {
+  color: rgba(255,255,255,0.8) !important;
+  font-size: 0.875rem;
+}
+
+/* ========================================
+   3. PROFILE STATUS SECTION
+   ======================================== */
+#core_dashboard_sidebar_profile_card .card-body.border-bottom {
+  padding: var(--space-xl) var(--space-lg) !important;
+}
+
+#core_dashboard_sidebar_profile_card h6.text-uppercase {
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  color: var(--profile-text-muted) !important;
+  margin-bottom: var(--space-lg) !important;
+}
+
+#core_dashboard_sidebar_profile_card h6.text-uppercase i {
+  color: var(--profile-primary);
+}
+
+/* Update Badge */
+#core_dashboard_sidebar_profile_card .badge.bg-primary {
+  background: var(--profile-primary) !important;
+  color: var(--profile-navy) !important;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+#core_dashboard_sidebar_profile_card .badge.bg-primary:hover {
+  background: var(--profile-primary-dark) !important;
+  transform: translateY(-1px);
+}
+
+/* Progress Bar */
+.progress {
+  background: var(--profile-border);
+  border-radius: var(--radius-md) !important;
+  overflow: hidden;
+}
+
+.progress-bar.bg-primary {
+  background: linear-gradient(90deg,
+    var(--profile-primary) 0%,
+    var(--profile-primary-dark) 100%
+  ) !important;
+  transition: width 0.6s ease;
+}
+
+/* Status Items */
+.status-item {
+  background: var(--profile-bg) !important;
+  border-radius: var(--radius-md) !important;
+  border: 1px solid var(--profile-border) !important;
+  padding: var(--space-lg) !important;
+  margin-bottom: var(--space-md) !important;
+  transition: all 0.2s ease;
+}
+
+.status-item:hover {
+  background: #ffffff !important;
+  box-shadow: var(--shadow-sm);
+  transform: translateX(2px);
+}
+
+.status-item .badge {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  font-size: 0.75rem;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-sm);
+}
+
+.status-item .badge.bg-success-subtle {
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #065f46 !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+.status-item .badge.bg-warning-subtle {
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #b45309 !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+/* ========================================
+   4. ROLE BADGES
+   ======================================== */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg) !important;
+  margin: var(--space-xs) !important;
+  background: var(--profile-bg) !important;
+  color: var(--profile-text) !important;
+  border: 1px solid var(--profile-border) !important;
+  border-radius: var(--radius-md) !important;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.role-badge:hover {
+  background: var(--profile-primary-light) !important;
+  border-color: var(--profile-primary) !important;
+  color: var(--profile-navy) !important;
+}
+
+.role-badge i {
+  font-size: 1rem;
+}
+
+/* ========================================
+   5. ACTION BUTTONS - Modern Design
+   ======================================== */
+#core_dashboard_sidebar_profile_card .btn {
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  padding: var(--space-md) var(--space-lg);
+  font-size: 0.9375rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+#core_dashboard_sidebar_profile_card .btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+#core_dashboard_sidebar_profile_card .btn:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+#core_dashboard_sidebar_profile_card .btn-warning {
+  background: var(--profile-primary) !important;
+  border-color: var(--profile-primary) !important;
+  color: var(--profile-navy) !important;
+  box-shadow: var(--shadow-md);
+}
+
+#core_dashboard_sidebar_profile_card .btn-warning:hover {
+  background: var(--profile-primary-dark) !important;
+  border-color: var(--profile-primary-dark) !important;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+#core_dashboard_sidebar_profile_card .btn-outline-warning {
+  border: 2px solid var(--profile-primary) !important;
+  color: var(--profile-navy) !important;
+  background: transparent !important;
+}
+
+#core_dashboard_sidebar_profile_card .btn-outline-warning:hover {
+  background: var(--profile-primary-light) !important;
+  border-color: var(--profile-primary) !important;
+  color: var(--profile-navy) !important;
+}
+
+/* ========================================
+   6. SOCIAL ICONS - Enhanced
+   ======================================== */
+.social-icon {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: var(--radius-full) !important;
+  border: 2px solid var(--profile-border) !important;
+  transition: all 0.3s ease;
+  background: #ffffff !important;
+}
+
+.social-icon:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: var(--shadow-md);
+}
+
+.social-icon.whatsapp:hover {
+  background: #25D366 !important;
+  border-color: #25D366 !important;
+  color: #ffffff !important;
+}
+
+.social-icon.instagram:hover {
+  background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%) !important;
+  border-color: #bc1888 !important;
+  color: #ffffff !important;
+}
+
+/* ========================================
+   7. PROFILE INFO CARD - Modern List
+   ======================================== */
+#core_profile_card_info {
+  border-radius: var(--radius-lg);
+  border: none;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+#core_profile_card_info .card-body {
+  padding: var(--space-2xl) var(--space-xl);
+}
+
+#core_profile_card_info .row {
+  margin-bottom: var(--space-md);
+  padding: var(--space-lg) 0;
+  transition: background 0.2s ease;
+  border-radius: var(--radius-sm);
+}
+
+#core_profile_card_info .row:hover {
+  background: var(--profile-bg);
+  padding-left: var(--space-md);
+  padding-right: var(--space-md);
+}
+
+#core_profile_card_info .col-sm-3 p {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--profile-text-muted);
+  text-transform: capitalize;
+  margin-bottom: 0;
+}
+
+#core_profile_card_info .col-sm-3 p::after {
+  content: ':';
+  margin-left: var(--space-xs);
+}
+
+#core_profile_card_info .text-muted {
+  color: var(--profile-text) !important;
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+#core_profile_card_info hr {
+  border-color: var(--profile-border);
+  opacity: 0.5;
+  margin: var(--space-md) 0;
+}
+
+/* Edit Profile Button */
+#core_profile_card_info .btn-warning {
+  background: var(--profile-primary) !important;
+  border-color: var(--profile-primary) !important;
+  color: var(--profile-navy) !important;
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  font-size: 1rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+  min-height: 56px;
+}
+
+#core_profile_card_info .btn-warning:hover {
+  background: var(--profile-primary-dark) !important;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ========================================
+   8. MOBILE OPTIMIZATIONS
+   ======================================== */
+@media (max-width: 991.98px) {
+  #core_profile_section_main .p-3 {
+    padding: var(--space-md) !important;
+  }
+
+  #core_dashboard_sidebar_profile_card {
+    margin-bottom: var(--space-xl);
+  }
+
+  .profile-picture-wrapper img {
+    width: 100px;
+    height: 100px;
+  }
+
+  .profile-picture-wrapper .bg-primary {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  #core_dashboard_sidebar_profile_card h5 {
+    font-size: 1.25rem;
+  }
+
+  #core_profile_card_info .row {
+    padding: var(--space-md) 0;
+  }
+
+  #core_profile_card_info .col-sm-3,
+  #core_profile_card_info .col-sm-9,
+  #core_profile_card_info .col-sm-4,
+  #core_profile_card_info .col-sm-5 {
+    padding-bottom: var(--space-xs);
+  }
+}
+
+@media (max-width: 575.98px) {
+  .profile-picture-wrapper img {
+    width: 90px;
+    height: 90px;
+  }
+
+  .profile-picture-wrapper .bg-primary {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .profile-picture-wrapper .bg-primary i {
+    font-size: 1rem;
+  }
+
+  #core_dashboard_sidebar_profile_card h5 {
+    font-size: 1.125rem;
+  }
+
+  #core_dashboard_sidebar_profile_card .card-body {
+    padding: var(--space-lg) !important;
+  }
+
+  #core_profile_card_info .card-body {
+    padding: var(--space-xl) var(--space-lg);
+  }
+
+  .role-badge {
+    font-size: 0.8125rem;
+    padding: var(--space-sm) var(--space-md) !important;
+  }
+
+  .social-icon {
+    width: 44px !important;
+    height: 44px !important;
+  }
+}
+
+/* ========================================
+   9. ANIMATIONS
+   ======================================== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#core_dashboard_sidebar_profile_card,
+#core_profile_card_info {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+#core_profile_card_info {
+  animation-delay: 0.1s;
+}
+
+/* ========================================
+   10. ACCESSIBILITY
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus States */
+#core_dashboard_sidebar_profile_card .btn:focus,
+.social-icon:focus {
+  outline: 2px solid var(--profile-primary);
+  outline-offset: 2px;
+}
+
+/* ========================================
+   11. DARK MODE SUPPORT (Future)
+   ======================================== */
+@media (prefers-color-scheme: dark) {
+  /* Reserved for future dark mode implementation */
+}
