@@ -5,7 +5,8 @@
 {% block title %}Verify Delivery Location | EzzyDelivery{% endblock %}
 
 {% block extra_css %}
-<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'orders/css/orders.css' %}?v=20260215f" rel="stylesheet" type="text/css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 {% endblock %}
 
 {% block content %}
@@ -52,70 +53,60 @@
 
     {% elif step == 'update' and order %}
     {# ============ STEP 2: UPDATE FORM WITH MAP ============ #}
-    <div class="verification-card" id="orders_update_location_card_update">
-        <div class="verification-header">
-            <i class="fa-solid fa-map-location-dot verify-title"></i>
-            <h1>Update Your Delivery Location</h1>
-            <p>Order #{{ order.order_number }}</p>
+    <div class="ulv" id="orders_update_location_card_update">
+        {# --- Hero Banner --- #}
+        <div class="ulv__hero">
+            <div class="ulv__hero-icon">
+                <i class="fa-solid fa-map-location-dot"></i>
+            </div>
+            <h1 class="ulv__hero-title">Update Your Delivery Location</h1>
+            <span class="ulv__hero-order">
+                <i class="fa-solid fa-hashtag"></i> {{ order.order_number }}
+            </span>
         </div>
 
-        <div class="order-info" id="orders_update_location_section_order_info">
-            <h2 class="verify-section-title">Order Details</h2>
-            <div class="info-grid">
-                <div class="info-item">
-                    <div class="info-icon"><i class="fa-solid fa-user"></i></div>
-                    <div class="info-content">
-                        <h3>Customer Name</h3>
-                        <p>{{ order.customer_name }}</p>
-                    </div>
+        {# --- Order Summary Strip --- #}
+        <div class="ulv__summary" id="orders_update_location_section_order_info">
+            <div class="ulv__summary-row">
+                <div class="ulv__summary-item">
+                    <span class="ulv__summary-label">Customer</span>
+                    <span class="ulv__summary-value">{{ order.customer_name }}</span>
                 </div>
-                <div class="info-item">
-                    <div class="info-icon"><i class="fa-solid fa-phone"></i></div>
-                    <div class="info-content">
-                        <h3>Phone Number</h3>
-                        <p>{{ order.customer_phone }}</p>
-                    </div>
+                <div class="ulv__summary-item">
+                    <span class="ulv__summary-label">Phone</span>
+                    <span class="ulv__summary-value">{{ order.customer_phone }}</span>
                 </div>
-                <div class="info-item">
-                    <div class="info-icon"><i class="fa-solid fa-box"></i></div>
-                    <div class="info-content">
-                        <h3>Items</h3>
-                        <p>{{ order.order_items.count }} item(s)</p>
-                    </div>
-                </div>
-                <div class="info-item">
-                    <div class="info-icon"><i class="fa-solid fa-money-bill-wave"></i></div>
-                    <div class="info-content">
-                        <h3>COD Amount</h3>
-                        <p>{{ order.cod_amount }} QR</p>
-                    </div>
-                </div>
-                <div class="info-item full-width-column">
-                    <div class="info-icon"><i class="fa-solid fa-location-dot"></i></div>
-                    <div class="info-content">
-                        <h3>Current Address</h3>
-                        <p>{{ order.customer_address|default:"Not provided" }}</p>
-                    </div>
+                <div class="ulv__summary-item">
+                    <span class="ulv__summary-label">Store</span>
+                    <span class="ulv__summary-value">{{ order.business.business_name }}</span>
                 </div>
             </div>
+
+            {# --- Order Items --- #}
+            <div class="ulv__items">
+                <div class="ulv__items-head">
+                    <i class="fa-solid fa-box"></i> {{ order.order_items.count }} Item{{ order.order_items.count|pluralize }}
+                    {% if order.business %}<span class="ulv__items-store">{{ order.business.business_name }}</span>{% endif %}
+                </div>
+                {% if ai_order_summary %}
+                <div class="ulv__items-summary">
+                    <i class="fa-solid fa-sparkles"></i> {{ ai_order_summary }}
+                </div>
+                {% endif %}
+                {% for item in order.order_items.all %}
+                <div class="ulv__item-row">
+                    <div class="ulv__item-info">
+                        <span class="ulv__item-name">{{ item.product.item_name|default:"Item" }}</span>
+                    </div>
+                    <span class="ulv__item-qty">x{{ item.quantity }}</span>
+                </div>
+                {% endfor %}
+            </div>
+
         </div>
 
-        <div class="map-section" id="orders_update_location_section_map">
-            <div class="instructions" id="orders_update_location_card_instructions">
-                <h3><i class="fa-solid fa-circle-info"></i> How to update your location:</h3>
-                <ul>
-                    <li><i class="fa-solid fa-check"></i><span>Drag the marker to your exact delivery location</span></li>
-                    <li><i class="fa-solid fa-check"></i><span>Update your address details if needed</span></li>
-                    <li><i class="fa-solid fa-check"></i><span>Add any special delivery instructions</span></li>
-                    <li><i class="fa-solid fa-check"></i><span>Click "Confirm Location" to save</span></li>
-                </ul>
-            </div>
-            <div class="map-container">
-                <div id="map"></div>
-            </div>
-        </div>
-
-        <form method="post" id="orders_update_location_form_main" class="form-section">
+        {# --- Form Section --- #}
+        <form method="post" id="orders_update_location_form_main" class="ulv__form">
             {% csrf_token %}
             <input type="hidden" name="step" value="update">
             <input type="hidden" name="order_number" value="{{ order.order_number }}">
@@ -124,48 +115,132 @@
             <input type="hidden" name="latitude" id="latitude">
             <input type="hidden" name="longitude" id="longitude">
 
-            <div class="form-group">
-                <label class="form-label" for="verified_address">
-                    <i class="fa-solid fa-location-dot"></i> Delivery Address
-                </label>
-                <textarea class="form-control" id="verified_address" name="verified_address" rows="3"
+            {# Address with inline edit #}
+            <div class="ulv__addr-display" id="ulv_addr_display" onclick="toggleAddressEdit()">
+                <i class="fa-solid fa-location-dot ulv__addr-display__icon"></i>
+                <span class="ulv__addr-display__text" id="ulv_addr_text">{{ order.customer_address|default:"No address provided" }}</span>
+                <i class="fa-solid fa-pen ulv__addr-display__edit"></i>
+            </div>
+            <div class="ulv__addr-edit" id="ulv_addr_edit" style="display:none;">
+                <textarea class="ulv__input" id="verified_address" name="verified_address" rows="2"
                     placeholder="Enter or update your delivery address">{{ update_form.verified_address.value|default:'' }}</textarea>
             </div>
 
-            <div class="address-inputs">
-                <div class="form-group">
-                    <label class="form-label" for="zone_number">
-                        <i class="fa-solid fa-map"></i> Zone Number
-                    </label>
-                    <input type="number" class="form-control" id="zone_number" name="zone_number"
-                        placeholder="Zone" value="{{ update_form.zone_number.value|default:'' }}">
+            {# Zone / Street / Building - one row #}
+            <div class="ulv__address-inline">
+                <div class="ulv__field-group">
+                    <label class="ulv__field-label" for="zone_number">Zone</label>
+                    <input type="number" class="ulv__input" id="zone_number" name="zone_number"
+                        placeholder="46" value="{{ update_form.zone_number.value|default:'' }}">
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="street_number">
-                        <i class="fa-solid fa-road"></i> Street Number
-                    </label>
-                    <input type="number" class="form-control" id="street_number" name="street_number"
-                        placeholder="Street" value="{{ update_form.street_number.value|default:'' }}">
+                <div class="ulv__field-group">
+                    <label class="ulv__field-label" for="street_number">Street</label>
+                    <input type="number" class="ulv__input" id="street_number" name="street_number"
+                        placeholder="9" value="{{ update_form.street_number.value|default:'' }}">
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="building_number">
-                        <i class="fa-solid fa-building"></i> Building Number
-                    </label>
-                    <input type="number" class="form-control" id="building_number" name="building_number"
-                        placeholder="Building" value="{{ update_form.building_number.value|default:'' }}">
+                <div class="ulv__field-group">
+                    <label class="ulv__field-label" for="building_number">Building</label>
+                    <input type="number" class="ulv__input" id="building_number" name="building_number"
+                        placeholder="18" value="{{ update_form.building_number.value|default:'' }}">
                 </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="notes">
-                    <i class="fa-solid fa-comment"></i> Delivery Instructions (Optional)
+        {# --- Map Section --- #}
+        <div class="ulv__map-wrap" id="orders_update_location_section_map">
+            <div class="ulv__section-head">
+                <i class="fa-solid fa-map-pin"></i> Pin Your Location
+            </div>
+            <div class="ulv__map-container">
+                <div id="map"></div>
+            </div>
+            <button type="button" class="ulv__btn-locate" id="orders_update_location_btn_geolocation" onclick="getMyLocation()">
+                <i class="fa-solid fa-crosshairs"></i>
+                <span>Get My Location</span>
+            </button>
+            <div class="ulv__tips" id="orders_update_location_card_instructions">
+                <div class="ulv__tips-head">
+                    <i class="fa-solid fa-lightbulb"></i> Quick Tips
+                </div>
+                <div class="ulv__tips-list">
+                    <span class="ulv__tip"><i class="fa-solid fa-hand-pointer"></i> Tap or drag the pin on map</span>
+                    <span class="ulv__tip"><i class="fa-solid fa-pen"></i> Edit address details below</span>
+                    <span class="ulv__tip"><i class="fa-solid fa-check-circle"></i> Hit confirm when ready</span>
+                </div>
+            </div>
+        </div>
+
+            {# --- COD & Amount --- #}
+            <div class="ulv__cod-row">
+                <div class="ulv__cod-badge">
+                    <i class="fa-solid fa-money-bill-wave"></i>
+                    <span class="ulv__cod-label">Cash on Delivery</span>
+                </div>
+                <span class="ulv__cod-amount">{{ order.cod_amount }} <small>QR</small></span>
+            </div>
+
+            {# Payment Method #}
+            <div class="ulv__section-head">
+                <i class="fa-solid fa-wallet"></i> Payment Method
+            </div>
+            <div class="ulv__time-slots ulv__time-slots--inline">
+                <label class="ulv__time-opt">
+                    <input type="radio" name="payment_method" value="cash" checked>
+                    <span class="ulv__time-pill">
+                        <i class="fa-solid fa-money-bill"></i>
+                        <span>Cash</span>
+                    </span>
                 </label>
-                <textarea class="form-control" id="notes" name="notes" rows="3"
-                    placeholder="E.g., Gate code, floor number, landmarks, etc.">{{ update_form.notes.value|default:'' }}</textarea>
+                <label class="ulv__time-opt">
+                    <input type="radio" name="payment_method" value="fawran">
+                    <span class="ulv__time-pill">
+                        <i class="fa-solid fa-mobile-screen"></i>
+                        <span>Fawran</span>
+                    </span>
+                </label>
             </div>
 
-            <button type="submit" class="btn-verify" id="orders_update_location_btn_submit">
-                <i class="fa-solid fa-check-circle me-2"></i> Confirm Location
+            {# Preferred Time Slots #}
+            <div class="ulv__section-head">
+                <i class="fa-solid fa-clock"></i> Preferred Time
+            </div>
+            <div class="ulv__time-slots" id="orders_update_location_time_slots">
+                <label class="ulv__time-opt">
+                    <input type="checkbox" name="preferred_time" value="10am-2pm">
+                    <span class="ulv__time-pill">
+                        <i class="fa-solid fa-sun"></i>
+                        <span>10 AM – 2 PM</span>
+                    </span>
+                </label>
+                <label class="ulv__time-opt">
+                    <input type="checkbox" name="preferred_time" value="2pm-6pm">
+                    <span class="ulv__time-pill">
+                        <i class="fa-solid fa-cloud-sun"></i>
+                        <span>2 PM – 6 PM</span>
+                    </span>
+                </label>
+                <label class="ulv__time-opt">
+                    <input type="checkbox" name="preferred_time" value="6pm-10pm">
+                    <span class="ulv__time-pill">
+                        <i class="fa-solid fa-moon"></i>
+                        <span>6 PM – 10 PM</span>
+                    </span>
+                </label>
+            </div>
+
+            {# Notes #}
+            <div class="ulv__section-head">
+                <i class="fa-solid fa-comment"></i> Delivery Instructions
+                <span class="ulv__optional-tag">Optional</span>
+            </div>
+            <div class="ulv__field-group">
+                <textarea class="ulv__input" id="notes" name="notes" rows="2"
+                    placeholder="Gate code, floor number, landmarks...">{{ update_form.notes.value|default:'' }}</textarea>
+            </div>
+
+            {# Submit #}
+            <button type="submit" class="ulv__btn-confirm" id="orders_update_location_btn_submit">
+                <i class="fa-solid fa-check-circle"></i>
+                <span>Confirm Location</span>
             </button>
         </form>
     </div>
@@ -220,82 +295,87 @@
 </div>
 
 {% if step == 'update' and order %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
-let map;
-let marker;
-let geocoder;
+var map, marker;
 
-function initMap() {
-    const defaultLocation = { lat: 25.2854, lng: 51.5310 };
-    geocoder = new google.maps.Geocoder();
+(function initMap() {
+    var defaultLocation = [25.2854, 51.5310];
 
-    map = new google.maps.Map(document.getElementById('map'), {
+    map = L.map('map', {
         center: defaultLocation,
         zoom: 13,
-        mapTypeControl: true,
-        streetViewControl: false,
-        fullscreenControl: true
+        zoomControl: true
     });
 
-    marker = new google.maps.Marker({
-        position: defaultLocation,
-        map: map,
-        draggable: true,
-        animation: google.maps.Animation.DROP,
-        title: 'Drag me to your delivery location'
-    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19
+    }).addTo(map);
 
-    // Try to geocode the current address
-    const currentAddress = "{{ order.customer_address|escapejs }}";
+    marker = L.marker(defaultLocation, { draggable: true }).addTo(map);
+
+    // Geocode using AI-extracted location name
+    var currentAddress = "{{ geocode_location|escapejs }}";
     if (currentAddress) {
+        marker.bindPopup('<b>' + currentAddress + '</b>').openPopup();
         geocodeAddress(currentAddress);
     } else if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
-                map.setCenter(pos);
-                marker.setPosition(pos);
-                updateLatLng(pos.lat, pos.lng);
+            function(position) {
+                var pos = [position.coords.latitude, position.coords.longitude];
+                map.setView(pos, 15);
+                marker.setLatLng(pos);
+                updateLatLng(pos[0], pos[1]);
             },
-            () => { updateLatLng(defaultLocation.lat, defaultLocation.lng); }
+            function() { updateLatLng(defaultLocation[0], defaultLocation[1]); }
         );
     } else {
-        updateLatLng(defaultLocation.lat, defaultLocation.lng);
+        updateLatLng(defaultLocation[0], defaultLocation[1]);
     }
 
-    marker.addListener('dragend', (event) => {
-        const position = marker.getPosition();
-        updateLatLng(position.lat(), position.lng());
-        reverseGeocode(position.lat(), position.lng());
+    // Marker drag
+    marker.on('dragend', function() {
+        var pos = marker.getLatLng();
+        updateLatLng(pos.lat, pos.lng);
+        reverseGeocode(pos.lat, pos.lng);
     });
 
-    map.addListener('click', (event) => {
-        marker.setPosition(event.latLng);
-        updateLatLng(event.latLng.lat(), event.latLng.lng());
-        reverseGeocode(event.latLng.lat(), event.latLng.lng());
+    // Click to place
+    map.on('click', function(e) {
+        marker.setLatLng(e.latlng);
+        updateLatLng(e.latlng.lat, e.latlng.lng);
+        reverseGeocode(e.latlng.lat, e.latlng.lng);
     });
-}
+})();
 
 function geocodeAddress(address) {
-    geocoder.geocode({ address: address + ', Qatar' }, (results, status) => {
-        if (status === 'OK') {
-            const location = results[0].geometry.location;
-            map.setCenter(location);
-            marker.setPosition(location);
-            updateLatLng(location.lat(), location.lng());
-        } else {
-            updateLatLng(25.2854, 51.5310);
-        }
-    });
+    fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(address) + '&limit=1&countrycodes=qa')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.length > 0) {
+                var lat = parseFloat(data[0].lat);
+                var lng = parseFloat(data[0].lon);
+                map.setView([lat, lng], 15);
+                marker.setLatLng([lat, lng]);
+                updateLatLng(lat, lng);
+            } else {
+                updateLatLng(25.2854, 51.5310);
+            }
+        })
+        .catch(function() { updateLatLng(25.2854, 51.5310); });
 }
 
 function reverseGeocode(lat, lng) {
-    const latlng = { lat: parseFloat(lat), lng: parseFloat(lng) };
-    geocoder.geocode({ location: latlng }, (results, status) => {
-        if (status === 'OK' && results[0]) {
-            document.getElementById('verified_address').value = results[0].formatted_address;
-        }
-    });
+    fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data && data.display_name) {
+                document.getElementById('verified_address').value = data.display_name;
+                document.getElementById('ulv_addr_text').textContent = data.display_name;
+            }
+        })
+        .catch(function(err) { console.error('Reverse geocode error:', err); });
 }
 
 function updateLatLng(lat, lng) {
@@ -303,21 +383,64 @@ function updateLatLng(lat, lng) {
     document.getElementById('longitude').value = lng;
 }
 
+function getMyLocation() {
+    var btn = document.getElementById('orders_update_location_btn_geolocation');
+    if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser.');
+        return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Locating...</span>';
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            var pos = [position.coords.latitude, position.coords.longitude];
+            map.setView(pos, 16);
+            marker.setLatLng(pos);
+            updateLatLng(pos[0], pos[1]);
+            reverseGeocode(pos[0], pos[1]);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-crosshairs"></i><span>Get My Location</span>';
+        },
+        function(error) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-crosshairs"></i><span>Get My Location</span>';
+            if (error.code === error.PERMISSION_DENIED) {
+                alert('Location access denied. Please allow location access in your browser settings.');
+            } else {
+                alert('Unable to get your location. Please drag the marker manually.');
+            }
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
+
+function toggleAddressEdit() {
+    var display = document.getElementById('ulv_addr_display');
+    var edit = document.getElementById('ulv_addr_edit');
+    if (edit.style.display === 'none') {
+        edit.style.display = 'block';
+        display.classList.add('ulv__addr-display--active');
+        document.getElementById('verified_address').focus();
+    } else {
+        edit.style.display = 'none';
+        display.classList.remove('ulv__addr-display--active');
+        var newVal = document.getElementById('verified_address').value;
+        if (newVal) document.getElementById('ulv_addr_text').textContent = newVal;
+    }
+}
+
 document.getElementById('orders_update_location_form_main').addEventListener('submit', function(e) {
-    const lat = document.getElementById('latitude').value;
-    const lng = document.getElementById('longitude').value;
+    var lat = document.getElementById('latitude').value;
+    var lng = document.getElementById('longitude').value;
     if (!lat || !lng) {
         e.preventDefault();
         alert('Please select your location on the map by dragging the marker.');
         return false;
     }
-    const submitBtn = document.getElementById('orders_update_location_btn_submit');
+    var submitBtn = document.getElementById('orders_update_location_btn_submit');
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Updating...';
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Updating...</span>';
 });
-</script>
-<script async defer
-    src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap&libraries=places">
 </script>
 {% endif %}
 {% endblock %}

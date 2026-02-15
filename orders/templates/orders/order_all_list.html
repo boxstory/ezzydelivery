@@ -5,7 +5,7 @@
 {% load business_pwa_tags %}
 <!-- extra css -->
 {% block extra_css %}
-  <link href="{% static 'orders/css/orders.css' %}?v=20260212c"
+  <link href="{% static 'orders/css/orders.css' %}?v=20260215e"
         rel="stylesheet"
         type="text/css" />
 {% endblock extra_css %}
@@ -49,24 +49,24 @@
         <input type="hidden" name="dir" value="{{ sort_dir }}">
         <div class="row g-2">
           <div class="col-6">
-            <label class="form-label">Order #</label>
-            <input type="text" class="form-control" name="orderNumber" placeholder="Search order..." value="{{ filters.orderNumber }}">
+            <label class="form-label" for="mob_orderNumber">Order #</label>
+            <input type="text" class="form-control" name="orderNumber" id="mob_orderNumber" placeholder="Search order..." value="{{ filters.orderNumber }}">
           </div>
           <div class="col-6">
-            <label class="form-label">Mobile</label>
-            <input type="tel" class="form-control" name="mobile" placeholder="Phone number" value="{{ filters.mobile }}">
+            <label class="form-label" for="mob_mobile">Mobile</label>
+            <input type="tel" class="form-control" name="mobile" id="mob_mobile" placeholder="Phone number" value="{{ filters.mobile }}">
           </div>
           <div class="col-6">
-            <label class="form-label">Customer</label>
-            <input type="text" class="form-control" name="customerName" placeholder="Customer name" value="{{ filters.customerName }}">
+            <label class="form-label" for="mob_customerName">Customer</label>
+            <input type="text" class="form-control" name="customerName" id="mob_customerName" placeholder="Customer name" value="{{ filters.customerName }}">
           </div>
           <div class="col-6">
-            <label class="form-label">Zone</label>
-            <input type="text" class="form-control" name="zone" placeholder="Delivery zone" value="{{ filters.zone }}">
+            <label class="form-label" for="mob_zone">Zone</label>
+            <input type="text" class="form-control" name="zone" id="mob_zone" placeholder="Delivery zone" value="{{ filters.zone }}">
           </div>
           <div class="col-6">
-            <label class="form-label">Status</label>
-            <select class="form-select" name="cStatus">
+            <label class="form-label" for="mob_cStatus">Status</label>
+            <select class="form-select" name="cStatus" id="mob_cStatus">
               <option value="">All Statuses</option>
               <option value="pending" {% if filters.cStatus == 'pending' %}selected{% endif %}>Pending (All Active)</option>
               <option value="to_review" {% if filters.cStatus == 'to_review' %}selected{% endif %}>Review</option>
@@ -76,8 +76,8 @@
             </select>
           </div>
           <div class="col-6">
-            <label class="form-label">Delivery</label>
-            <select class="form-select" name="dlStatus">
+            <label class="form-label" for="mob_dlStatus">Delivery</label>
+            <select class="form-select" name="dlStatus" id="mob_dlStatus">
               <option value="">All Delivery</option>
               <option value="delivered" {% if filters.dlStatus == 'delivered' %}selected{% endif %}>Delivered</option>
               <option value="assigned" {% if filters.dlStatus == 'assigned' %}selected{% endif %}>Assigned</option>
@@ -88,16 +88,16 @@
             </select>
           </div>
           <div class="col-6">
-            <label class="form-label">COD</label>
-            <select class="form-select" name="codStatus">
+            <label class="form-label" for="mob_codStatus">COD</label>
+            <select class="form-select" name="codStatus" id="mob_codStatus">
               <option value="">All Orders</option>
               <option value="with_cod" {% if filters.codStatus == 'with_cod' %}selected{% endif %}>With COD</option>
               <option value="no_cod" {% if filters.codStatus == 'no_cod' %}selected{% endif %}>No COD</option>
             </select>
           </div>
           <div class="col-6">
-            <label class="form-label">Period</label>
-            <select class="form-select" name="dateRange">
+            <label class="form-label" for="mob_dateRange">Period</label>
+            <select class="form-select" name="dateRange" id="mob_dateRange">
               <option value="">All Time</option>
               <option value="today" {% if filters.dateRange == 'today' %}selected{% endif %}>Today</option>
               <option value="yesterday" {% if filters.dateRange == 'yesterday' %}selected{% endif %}>Yesterday</option>
@@ -109,7 +109,7 @@
             <button type="submit" class="pwa-add-btn flex-fill justify-content-center">
               <i class="fas fa-search"></i> Apply Filters
             </button>
-            <a href="{% url 'orders:orders_all_list' %}" class="pwa-add-btn flex-fill justify-content-center" style="background: #f3f4f6; color: var(--pwa-text-primary, #1f1f1f); box-shadow: none;">
+            <a href="{% url 'orders:orders_all_list' %}" class="pwa-add-btn pwa-add-btn--secondary flex-fill justify-content-center">
               <i class="fas fa-times"></i> Clear
             </a>
           </div>
@@ -131,7 +131,7 @@
         {% for order in orders %}
         {% order_status_class order as st_class %}
         <div class="pwa-order-card-full pwa-order-card-full--{{ st_class }}" id="orders_mobile_card_{{ order.id }}" data-order-id="{{ order.id }}" data-current-status="{{ order.order_status }}">
-          <a href="{% url 'orders:order_details' order.id %}" class="pwa-order-card-full__inner">
+          <a href="javascript:void(0)" onclick="openOrderDetailPanel({{ order.id }})" class="pwa-order-card-full__inner">
             <div class="pwa-order-card-full__content">
               <div class="pwa-order-card-full__header">
                 <span class="pwa-order-card-full__number">#{{ order.order_number }}</span>
@@ -245,9 +245,13 @@
     <section class="d-block" id="orders_all_list_section_main">
       <div class="col-12 pb-2">
         <div class="px-2 px-md-3">
-          <div class="col-12 pt-3 pt-md-4 d-flex flex-wrap justify-content-between pb-3 pb-md-4 gap-2" id="orders_all_list_header">
-            <div class="d-flex align-items-center gap-3">
-              <div class="m-0 fs-5 fw-bolder" id="orders_all_list_title">Orders ({{ len }})</div>
+          <div class="oal-header" id="orders_all_list_header">
+            <div class="oal-header__left">
+              <h1 class="oal-header__title" id="orders_all_list_title">
+                <i class="fa-solid fa-basket-shopping"></i>
+                Orders
+                <span class="oal-header__count">{{ len }}</span>
+              </h1>
               <div class="view-toggle-group" id="orders_all_list_view_toggle">
                 <button type="button" class="view-toggle-btn active" data-view="grid" title="Grid View">
                   <i class="fa-solid fa-grip"></i>
@@ -257,21 +261,21 @@
                 </button>
               </div>
             </div>
-            <div class="d-flex flex-wrap gap-2" id="orders_all_list_nav_actions">
-              <a class="btn btn-dark btn-sm text-white"
+            <div class="oal-header__actions" id="orders_all_list_nav_actions">
+              <a class="oal-btn oal-btn--outline"
                  href="{% url 'orders:get_order_by_api' %}"
                  id="orders_all_list_btn_api_upload">
-                <i class="fa fa-add me-1"></i> API
+                <i class="fa-solid fa-code"></i> API
               </a>
-              <a class="btn btn-dark btn-sm text-white"
+              <a class="oal-btn oal-btn--outline"
                  href="{% url 'orders:order_upload_file' %}"
                  id="orders_all_list_btn_upload_bulk">
-                <i class="fa fa-add me-1"></i> Bulk
+                <i class="fa-solid fa-file-import"></i> Bulk
               </a>
-              <a class="btn btn-dark btn-sm text-white"
+              <a class="oal-btn oal-btn--primary"
                  href="{% url 'orders:add_order' %}"
                  id="orders_all_list_btn_add_orders">
-                <i class="fa fa-add me-1"></i> Add
+                <i class="fa-solid fa-plus"></i> Add Order
               </a>
             </div>
           </div>
@@ -291,27 +295,27 @@
                       <i class="fa-solid fa-chevron-down"></i>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                      <button type="submit" class="btn btn-dark btn-sm">
-                        <i class="fa fa-search me-1"></i> Search
+                      <button type="submit" class="oal-filter-btn oal-filter-btn--search">
+                        <i class="fa-solid fa-search"></i> Search
                       </button>
-                      <button type="button" class="btn btn-danger btn-sm" id="clearFilter">
-                        <i class="fa fa-times me-1"></i> Clear
+                      <button type="button" class="oal-filter-btn oal-filter-btn--clear" id="clearFilter">
+                        <i class="fa-solid fa-times"></i> Clear
                       </button>
-                      <button type="button" class="btn btn-primary btn-sm" id="saveFilter" title="Save Filter">
-                        <i class="fa fa-bookmark me-1"></i> Save
+                      <button type="button" class="oal-filter-btn oal-filter-btn--save" id="saveFilter" title="Save Filter">
+                        <i class="fa-solid fa-bookmark"></i> Save
                       </button>
                       <div class="dropdown" id="savedFiltersDropdown" style="display: none;">
-                        <button class="btn btn-outline-dark btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" title="Load Saved Filter">
-                          <i class="fa fa-folder-open me-1"></i> Load
+                        <button class="oal-filter-btn oal-filter-btn--load dropdown-toggle" type="button" data-bs-toggle="dropdown" title="Load Saved Filter">
+                          <i class="fa-solid fa-folder-open"></i> Load
                         </button>
                         <ul class="dropdown-menu" id="savedFiltersList"></ul>
                       </div>
                     </div>
                   </div>
                   <div class="filter-bar__pills">
-                    <button type="button" class="btn btn-outline-dark btn-sm btn-quick-filter" data-filter="today">Today</button>
-                    <button type="button" class="btn btn-outline-dark btn-sm btn-quick-filter" data-filter="pending">Pending</button>
-                    <button type="button" class="btn btn-outline-dark btn-sm btn-quick-filter" data-filter="with_cod">COD</button>
+                    <button type="button" class="oal-quick-pill btn-quick-filter" data-filter="today">Today</button>
+                    <button type="button" class="oal-quick-pill btn-quick-filter" data-filter="pending">Pending</button>
+                    <button type="button" class="oal-quick-pill btn-quick-filter" data-filter="with_cod">COD</button>
                   </div>
                 </div>
               </div>
@@ -457,6 +461,24 @@
     </section>
   </div>
   </div><!-- end desktop view -->
+
+  <!-- Order Detail Slide-in Panel -->
+  <div class="order-detail-panel" id="orderDetailPanel">
+    <div class="order-detail-panel-overlay" onclick="closeOrderDetailPanel()"></div>
+    <div class="order-detail-panel-content">
+      <div class="order-detail-panel-header">
+        <h5><i class="fa-solid fa-file-lines me-2"></i>Order Details</h5>
+        <button type="button" class="btn-close" onclick="closeOrderDetailPanel()"></button>
+      </div>
+      <div class="order-detail-panel-body" id="orderDetailContent">
+        <div class="text-center py-5 text-muted">
+          <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
+          <p class="mt-2">Loading order details...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
 {% endblock content %}
 {% block extra_js %}
   <script type="text/javascript"
@@ -999,6 +1021,51 @@
       });
     });
   })();
+
+  // ===== Order Detail Panel =====
+  function openOrderDetailPanel(orderId) {
+    var panel = document.getElementById('orderDetailPanel');
+    var content = document.getElementById('orderDetailContent');
+    content.innerHTML = '<div class="text-center py-5 text-muted"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p class="mt-2">Loading order details...</p></div>';
+    panel.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    fetch('/orders/order_details/' + orderId + '/', {
+      headers: {
+        'HX-Request': 'true',
+        'HX-Target': 'orderDetailContent'
+      }
+    })
+    .then(function(resp) {
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      return resp.text();
+    })
+    .then(function(html) {
+      if (html.indexOf('<!DOCTYPE') !== -1 || html.indexOf('<html') !== -1) {
+        window.location.href = '/orders/order_details/' + orderId + '/';
+        return;
+      }
+      content.innerHTML = html;
+    })
+    .catch(function(err) {
+      content.innerHTML = '<div class="text-center py-5 text-danger"><i class="fa-solid fa-exclamation-triangle fa-2x"></i><p class="mt-2">Failed to load details. <a href="/orders/order_details/' + orderId + '/">Open full page</a></p></div>';
+    });
+  }
+
+  function closeOrderDetailPanel() {
+    var panel = document.getElementById('orderDetailPanel');
+    panel.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var panel = document.getElementById('orderDetailPanel');
+      if (panel && panel.classList.contains('active')) {
+        closeOrderDetailPanel();
+      }
+    }
+  });
 
   // ===== Mobile Card Status Actions =====
   (function() {

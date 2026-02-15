@@ -5,7 +5,7 @@
 {% load business_pwa_tags %}
 <!-- extra css -->
 {% block extra_css %}
-  <link href="{% static 'orders/css/orders.css' %}?v=20260212c"
+  <link href="{% static 'orders/css/orders.css' %}?v=20260215e"
         rel="stylesheet"
         type="text/css" />
   <link href="{% static 'orders/css/orders-wizard.css' %}"
@@ -191,6 +191,24 @@
     </section>
   </div>
   </div>
+
+  <!-- Order Detail Slide-in Panel -->
+  <div class="order-detail-panel" id="orderDetailPanel">
+    <div class="order-detail-panel-overlay" onclick="closeOrderDetailPanel()"></div>
+    <div class="order-detail-panel-content">
+      <div class="order-detail-panel-header">
+        <h5><i class="fa-solid fa-file-lines me-2"></i>Order Details</h5>
+        <button type="button" class="btn-close" onclick="closeOrderDetailPanel()"></button>
+      </div>
+      <div class="order-detail-panel-body" id="orderDetailContent">
+        <div class="text-center py-5 text-muted">
+          <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
+          <p class="mt-2">Loading order details...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
 {% endblock content %}
 {% block extra_js %}
   <script>
@@ -433,5 +451,43 @@
   <script>
     // Set the order status update URL for kanban
     window.orderStatusUpdateUrl = '{% url "orders:update_order_status" %}';
+  </script>
+
+  <!-- Order Detail Panel Functions -->
+  <script>
+  function openOrderDetailPanel(orderId) {
+    var panel = document.getElementById('orderDetailPanel');
+    var content = document.getElementById('orderDetailContent');
+    content.innerHTML = '<div class="text-center py-5 text-muted"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p class="mt-2">Loading order details...</p></div>';
+    panel.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    fetch('/orders/order_details/' + orderId + '/', {
+      headers: {
+        'HX-Request': 'true',
+        'HX-Target': 'orderDetailContent'
+      }
+    })
+    .then(function(resp) { return resp.text(); })
+    .then(function(html) { content.innerHTML = html; })
+    .catch(function(err) {
+      content.innerHTML = '<div class="text-center py-5 text-danger"><i class="fa-solid fa-exclamation-triangle fa-2x"></i><p class="mt-2">Failed to load order details</p></div>';
+    });
+  }
+
+  function closeOrderDetailPanel() {
+    var panel = document.getElementById('orderDetailPanel');
+    panel.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var panel = document.getElementById('orderDetailPanel');
+      if (panel && panel.classList.contains('active')) {
+        closeOrderDetailPanel();
+      }
+    }
+  });
   </script>
 {% endblock extra_js %}

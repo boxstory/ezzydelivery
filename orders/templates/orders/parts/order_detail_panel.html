@@ -1,0 +1,222 @@
+{% load custom_filters %}
+<!-- Order Detail Panel Content - Partial template for slide-in panel -->
+<div class="odp">
+  <!-- Hero Banner -->
+  <div class="odp__hero">
+    <div class="odp__hero-main">
+      <span class="odp__order-num">#{{ order.order_number }}</span>
+      <span class="ob ob--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
+    </div>
+    <div class="odp__hero-meta">
+      <span class="odp__meta-item">
+        <i class="fa-regular fa-calendar"></i> {{ order.order_date|date:"d M Y" }}
+      </span>
+      {% if order.client_order_code %}
+      <span class="odp__meta-item">
+        <i class="fa-solid fa-hashtag"></i> {{ order.client_order_code }}
+      </span>
+      {% endif %}
+      <span class="odp__meta-item">
+        {% if order.verification_status == 'verified' %}
+        <i class="fa-solid fa-circle-check odp__icon--verified"></i> Verified
+        {% elif order.verification_status == 'pending' %}
+        <i class="fa-solid fa-clock odp__icon--pending"></i> Pending
+        {% else %}
+        <i class="fa-solid fa-circle-info odp__icon--muted"></i> {{ order.get_verification_status_display|default:order.verification_status }}
+        {% endif %}
+      </span>
+    </div>
+  </div>
+
+  <!-- Customer Section -->
+  <div class="odp__section">
+    <div class="odp__section-head">
+      <i class="fa-solid fa-user"></i>
+      <span>Customer</span>
+    </div>
+    <div class="odp__customer">
+      <div class="odp__customer-name">{{ order.customer_name }}</div>
+      <div class="odp__contact-row">
+        <a href="tel:{{ order.customer_phone }}" class="odp__contact-btn odp__contact-btn--phone">
+          <i class="fa-solid fa-phone"></i> {{ order.customer_phone }}
+        </a>
+        {% if order.customer_whatsapp %}
+        <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="odp__contact-btn odp__contact-btn--whatsapp">
+          <i class="fa-brands fa-whatsapp"></i> WhatsApp
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Route Section -->
+  <div class="odp__section">
+    <div class="odp__section-head">
+      <i class="fa-solid fa-route"></i>
+      <span>Route</span>
+    </div>
+    <div class="odp__route">
+      {% if order.pickup_location %}
+      <div class="odp__route-stop">
+        <div class="odp__route-icon odp__route-icon--pickup">
+          <i class="fa-solid fa-arrow-up"></i>
+        </div>
+        <div class="odp__route-info">
+          <span class="odp__route-label">Pickup</span>
+          <span class="odp__route-value">{{ order.pickup_location.pickup_name }}</span>
+          {% if order.pickup_location.pickup_address %}
+          <span class="odp__route-addr">{{ order.pickup_location.pickup_address }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="odp__route-line"></div>
+      {% endif %}
+      <div class="odp__route-stop">
+        <div class="odp__route-icon odp__route-icon--dropoff">
+          <i class="fa-solid fa-arrow-down"></i>
+        </div>
+        <div class="odp__route-info">
+          <span class="odp__route-label">Drop-off</span>
+          <span class="odp__route-value">
+            {% if order.dl_zone %}Zone {{ order.dl_zone }}{% endif %}
+            {% if order.dl_street %}, Street {{ order.dl_street }}{% endif %}
+            {% if order.dl_building %}, Bldg {{ order.dl_building }}{% endif %}
+          </span>
+          {% if order.customer_address %}
+          <span class="odp__route-addr">{{ order.customer_address }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COD Section -->
+  {% if order.cod_amount %}
+  <div class="odp__section">
+    <div class="odp__section-head">
+      <i class="fa-solid fa-money-bill-wave"></i>
+      <span>Payment</span>
+    </div>
+    <div class="odp__cod">
+      <div class="odp__cod-amount">
+        <span class="odp__cod-currency">QAR</span>
+        <span class="odp__cod-value">{{ order.cod_amount }}</span>
+      </div>
+      <div class="odp__cod-status">
+        <span class="ob ob--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
+          <i class="fa-solid {% if order.cod_status_by_staff == 'fully_paid' %}fa-check{% elif order.cod_status_by_staff == 'partially_collected' %}fa-adjust{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}fa-handshake{% else %}fa-hourglass-half{% endif %}"></i>
+          {% if order.cod_status_by_staff == 'fully_paid' %}Collected{% elif order.cod_status_by_staff == 'partially_collected' %}Partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}Settled{% else %}Pending{% endif %}
+        </span>
+        {% if order.dl_amount %}
+        <span class="odp__cod-fee">
+          <i class="fa-solid fa-truck"></i> Delivery: {{ order.dl_amount }} QR
+        </span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Order Items -->
+  {% if order_items %}
+  <div class="odp__section">
+    <div class="odp__section-head">
+      <i class="fa-solid fa-box-open"></i>
+      <span>Items ({{ order_items|length }})</span>
+    </div>
+    <div class="odp__items">
+      {% for item in order_items %}
+      <div class="odp__item">
+        <div class="odp__item-info">
+          <span class="odp__item-name">{{ item.product|default:item.notes|truncatechars:40 }}</span>
+          <span class="odp__item-qty">x{{ item.quantity }}</span>
+        </div>
+        <span class="odp__item-price">{{ item.total_price|default:"0.00" }} QR</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Delivery Task -->
+  {% if delivery_task %}
+  <div class="odp__section">
+    <div class="odp__section-head">
+      <i class="fa-solid fa-truck-fast"></i>
+      <span>Delivery</span>
+    </div>
+    <div class="odp__delivery">
+      <div class="odp__dl-status-row">
+        <span class="ob ob--dl-{{ delivery_task.dl_task_status }}">
+          <i class="fa-solid {% if delivery_task.dl_task_status == 'delivered' %}fa-check{% elif delivery_task.dl_task_status == 'assigned' %}fa-user{% elif delivery_task.dl_task_status == 'accepted' %}fa-user-check{% elif delivery_task.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery_task.dl_task_status == 'out_for_delivery' or delivery_task.dl_task_status == 'in_transit' or delivery_task.dl_task_status == 'start_ride' %}fa-truck{% elif delivery_task.dl_task_status == 'failed' or delivery_task.dl_task_status == 'non_reachable' %}fa-times{% elif delivery_task.dl_task_status == 'cancelled' or delivery_task.dl_task_status == 'rejected' %}fa-ban{% else %}fa-clock{% endif %}"></i>
+          {{ delivery_task.get_dl_task_status_display }}
+        </span>
+        {% if delivery_task.dl_task_number %}
+        <span class="odp__dl-task-num">{{ delivery_task.dl_task_number }}</span>
+        {% endif %}
+      </div>
+      {% if delivery_task.driver %}
+      <div class="odp__dl-driver">
+        <div class="odp__dl-driver-avatar">
+          <i class="fa-solid fa-user-helmet-safety"></i>
+        </div>
+        <div class="odp__dl-driver-info">
+          <span class="odp__dl-driver-name">{{ delivery_task.driver }}</span>
+          {% if delivery_task.driver.driver_phone %}
+          <a href="tel:{{ delivery_task.driver.driver_phone }}" class="odp__dl-driver-phone">
+            <i class="fa-solid fa-phone"></i> {{ delivery_task.driver.driver_phone }}
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% if delivery_task.completed_at %}
+      <div class="odp__dl-completed">
+        <i class="fa-regular fa-circle-check"></i>
+        Delivered {{ delivery_task.completed_at|date:"d M Y, H:i" }}
+      </div>
+      {% endif %}
+      {% if delivery_task.dl_task_description %}
+      <div class="odp__dl-notes">
+        <i class="fa-solid fa-note-sticky"></i>
+        {{ delivery_task.dl_task_description }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Notes -->
+  {% if order.order_notes %}
+  <div class="odp__section">
+    <div class="odp__section-head">
+      <i class="fa-solid fa-note-sticky"></i>
+      <span>Notes</span>
+    </div>
+    <div class="odp__notes">{{ order.order_notes }}</div>
+  </div>
+  {% endif %}
+
+  <!-- Verification Notes -->
+  {% if order.verification_notes %}
+  <div class="odp__section">
+    <div class="odp__section-head">
+      <i class="fa-solid fa-clipboard-check"></i>
+      <span>Verification Notes</span>
+    </div>
+    <div class="odp__notes">{{ order.verification_notes }}</div>
+  </div>
+  {% endif %}
+
+  <!-- Action Buttons -->
+  <div class="odp__actions">
+    <a href="{% url 'orders:order_details' order.id %}" class="odp__action-btn odp__action-btn--primary">
+      <i class="fa-solid fa-expand"></i> Full Details
+    </a>
+    {% if can_edit_order and order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+    <a href="{% url 'orders:order_update' order.id %}" class="odp__action-btn odp__action-btn--secondary">
+      <i class="fa-solid fa-pen"></i> Edit
+    </a>
+    {% endif %}
+  </div>
+</div>

@@ -249,6 +249,26 @@ class DeliveryTask(models.Model):
         help_text="Whether earnings have been added to driver's wallet"
     )
 
+    PREFERRED_TIME_CHOICES = [
+        ('10am-2pm', '10 AM – 2 PM'),
+        ('2pm-6pm', '2 PM – 6 PM'),
+        ('6pm-10pm', '6 PM – 10 PM'),
+    ]
+    preferred_time = models.CharField(
+        max_length=50, blank=True, default='',
+        help_text="Customer preferred delivery time slots (comma-separated)"
+    )
+
+    PAYMENT_METHOD_CHOICES = [
+        ('cash', 'Cash'),
+        ('fawran', 'Fawran'),
+    ]
+    payment_method = models.CharField(
+        max_length=20, blank=True, default='',
+        choices=PAYMENT_METHOD_CHOICES,
+        help_text="Customer preferred payment method"
+    )
+
     # Earnings Verification Fields (for staff approval)
     EARNINGS_VERIFICATION_STATUS = [
         ('pending', 'Pending Verification'),

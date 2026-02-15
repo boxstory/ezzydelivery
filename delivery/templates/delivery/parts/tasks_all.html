@@ -3,7 +3,6 @@
 {% load crispy_forms_tags %}
 {% load zone_tags %}
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'brand-kit-pro.css' %}">
 <link rel="stylesheet" href="{% static 'delivery/css/delivery-tasks-mobile.css' %}?v=20260214a">
 <link rel="stylesheet" href="{% static 'delivery/css/delivery-tasks-pro.css' %}">
 {% endblock extra_css %}
@@ -331,6 +330,30 @@
                 <div class="pwa-stat-card__value pwa-text-success" style="font-size: 28px;">{{ card.order.cod_amount|default:0 }} QR</div>
               </div>
 
+              <!-- Payment Method & Preferred Time -->
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <div class="pwa-card" style="background: {% if card.payment_method %}linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%){% else %}#f8f9fa{% endif %}; border: 1px solid {% if card.payment_method %}#bfdbfe{% else %}#e9ecef{% endif %};">
+                    <div class="pwa-card__body py-2 text-center">
+                      <small class="text-muted d-block" style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em;">Payment</small>
+                      <span class="fw-bold" style="font-size: 0.9rem; {% if not card.payment_method %}color: #b0b0b0;{% endif %}">
+                        {% if card.payment_method == 'cash' %}<i class="fa-solid fa-money-bill me-1" style="color: #16a34a;"></i>Cash{% elif card.payment_method == 'fawran' %}<i class="fa-solid fa-mobile-screen me-1" style="color: #2563eb;"></i>Fawran{% else %}<i class="fa-solid fa-wallet me-1"></i>Not set{% endif %}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="pwa-card" style="background: {% if card.preferred_time %}linear-gradient(135deg, #fefce8 0%, #fef3c7 100%){% else %}#f8f9fa{% endif %}; border: 1px solid {% if card.preferred_time %}#fde68a{% else %}#e9ecef{% endif %};">
+                    <div class="pwa-card__body py-2 text-center">
+                      <small class="text-muted d-block" style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em;">Preferred Time</small>
+                      <span class="fw-bold" style="font-size: 0.8rem; {% if not card.preferred_time %}color: #b0b0b0;{% endif %}">
+                        {% if card.preferred_time %}<i class="fa-solid fa-clock me-1" style="color: #d97706;"></i>{{ card.preferred_time }}{% else %}<i class="fa-solid fa-clock me-1"></i>Not set{% endif %}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Additional Info -->
               <div class="row g-2 mb-3">
                 <div class="col-4">
@@ -625,7 +648,9 @@
                       <div class="mb-1"><span class="text-muted">Delivery Fee:</span> {{ card.dl_price }} QR</div>
                       {% endif %}
                       <div class="mb-1"><span class="text-muted">Weight:</span> {{ card.dl_waight|default:"-" }}</div>
-                      <div><span class="text-muted">Status:</span> {{ card.get_dl_task_status_display }}</div>
+                      <div class="mb-1"><span class="text-muted">Status:</span> {{ card.get_dl_task_status_display }}</div>
+                      <div class="mb-1"><span class="text-muted">Payment:</span> {% if card.payment_method %}<strong>{% if card.payment_method == 'cash' %}<i class="fa-solid fa-money-bill me-1 text-success"></i>Cash{% elif card.payment_method == 'fawran' %}<i class="fa-solid fa-mobile-screen me-1 text-primary"></i>Fawran{% else %}{{ card.get_payment_method_display }}{% endif %}</strong>{% else %}<span style="color: #b0b0b0;">Not set</span>{% endif %}</div>
+                      <div><span class="text-muted">Pref. Time:</span> {% if card.preferred_time %}<strong><i class="fa-solid fa-clock me-1 text-warning"></i>{{ card.preferred_time }}</strong>{% else %}<span style="color: #b0b0b0;">Not set</span>{% endif %}</div>
                     </div>
                   </div>
                 </div>

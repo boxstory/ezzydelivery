@@ -1291,13 +1291,23 @@ def order_details(request, order_id):
 
         # Get delivery task for mobile view
         delivery_task = order.delivery_task.first()
+        order_items = orders_models.OrderItem.objects.filter(order=order)
 
         data = {
             'order': order,
             'delivery_task': delivery_task,
+            'order_items': order_items,
             'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
             'can_delete_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_DELETE),
         }
+
+        # Check if this is being loaded in a slide-in panel (via HTMX or query param)
+        is_panel = request.GET.get('panel') == '1'
+        is_htmx = request.headers.get('HX-Request') == 'true'
+        hx_target = request.headers.get('HX-Target', '')
+        if is_panel or (is_htmx and hx_target == 'orderDetailContent'):
+            return render(request, 'orders/parts/order_detail_panel.html', data)
+
         return render(request, 'orders/order_details.html', data)
 
     except orders_models.Order.DoesNotExist:
@@ -1933,6 +1943,105 @@ def verify_location(request, token):
 # CUSTOMER SELF-SERVICE LOCATION UPDATE (Public)
 # =============================================================================
 
+def _ai_extract_location(address):
+    """
+    Use AI (Claude Haiku) to extract a geocodable location/area name
+    from a Qatar delivery address. Cached for 24 hours per address.
+    Falls back to simple parsing if AI fails.
+    """
+    from django.core.cache import cache
+    import anthropic
+    from decouple import config as env_config
+
+    cache_key = f'geocode_loc:{hash(address)}'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    api_key = env_config('ANTHROPIC_API_KEY', default='')
+    if not api_key:
+        return address
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model='claude-3-haiku-20240307',
+            max_tokens=50,
+            messages=[{
+                'role': 'user',
+                'content': (
+                    f'Extract the area/neighborhood name from this Qatar delivery address '
+                    f'that would work best for map geocoding. Return ONLY the location name '
+                    f'and "Qatar", nothing else. No zone numbers, street numbers, or building numbers.\n\n'
+                    f'Address: {address}\n\n'
+                    f'Example: "Al Thumama, Doha, Qatar" or "West Bay, Doha, Qatar"'
+                )
+            }]
+        )
+        location = response.content[0].text.strip().strip('"').strip("'")
+        if location:
+            cache.set(cache_key, location, 86400)  # cache 24h
+            return location
+    except Exception:
+        pass
+
+    return address
+
+
+def _ai_order_items_summary(order):
+    """
+    Use AI to generate a short, clear summary of order items.
+    Cached for 24 hours per order.
+    """
+    from django.core.cache import cache
+    import anthropic
+    from decouple import config as env_config
+
+    items = order.order_items.select_related('product').all()
+    if not items.exists():
+        return ''
+
+    cache_key = f'order_summary:{order.pk}'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    # Build items text
+    items_text = []
+    for item in items:
+        name = item.product.item_name if item.product else 'Item'
+        desc = item.product.item_discription if item.product and item.product.item_discription else ''
+        items_text.append(f'{name} (qty: {item.quantity}){" - " + desc if desc else ""}')
+
+    api_key = env_config('ANTHROPIC_API_KEY', default='')
+    if not api_key:
+        return ', '.join(items_text)
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model='claude-3-haiku-20240307',
+            max_tokens=80,
+            messages=[{
+                'role': 'user',
+                'content': (
+                    f'Summarize these order items in one short line (max 15 words). '
+                    f'Be clear and concise. No quotes.\n\n'
+                    f'Store: {order.business.business_name}\n'
+                    f'Items: {"; ".join(items_text)}'
+                )
+            }]
+        )
+        summary = response.content[0].text.strip().strip('"').strip("'")
+        if summary:
+            cache.set(cache_key, summary, 86400)
+            return summary
+    except Exception:
+        pass
+
+    return ', '.join(items_text)
+
+
 def update_location(request):
     """
     Public view for customers to look up their order and update delivery location.
@@ -2124,6 +2233,16 @@ def update_location(request):
                         if dl_update_fields:
                             DlAddressUpdate.objects.filter(order=order).update(**dl_update_fields)
 
+                        # Save preferred delivery time to DeliveryTask
+                        preferred_times = request.POST.getlist('preferred_time')
+                        if preferred_times:
+                            order.delivery_task.all().update(preferred_time=','.join(preferred_times))
+
+                        # Save payment method to DeliveryTask
+                        payment_method = request.POST.get('payment_method', '')
+                        if payment_method:
+                            order.delivery_task.all().update(payment_method=payment_method)
+
                         step = 'success'
                         success = True
 
@@ -2144,6 +2263,14 @@ def update_location(request):
                     step = 'lookup'
                     error = 'Order not found. Please try again.'
 
+    # AI-powered location extraction for geocoding
+    geocode_location = ''
+    ai_order_summary = ''
+    if order and step == 'update':
+        if order.customer_address:
+            geocode_location = _ai_extract_location(order.customer_address)
+        ai_order_summary = _ai_order_items_summary(order)
+
     context = {
         'lookup_form': lookup_form,
         'update_form': update_form,
@@ -2151,7 +2278,8 @@ def update_location(request):
         'step': step,
         'error': error,
         'success': success,
-        'google_maps_api_key': config('GOOGLE_MAPS_API_KEY', default=''),
+        'geocode_location': geocode_location,
+        'ai_order_summary': ai_order_summary,
     }
     return render(request, 'orders/update_location.html', context)
 

@@ -3,7 +3,6 @@
 {% load crispy_forms_tags %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'brand-kit-pro.css' %}">
 <link rel="stylesheet" href="{% static 'business/css/business-dashboard-pro.css' %}">
 <!-- Dashboard styles now in business-dashboard-pro.css for HTMX compatibility -->
 {% endblock extra_css %}
@@ -348,7 +347,7 @@
     <!-- AI Assistant Chat -->
     {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="client" %}
 
-    <!-- Analytics Charts Row -->
+    <!-- Analytics Charts Row: Weekly Trend + COD -->
     <div class="business-dashboard__chart-grid">
       <!-- Left Column: Weekly Orders Trend -->
       <div class="business-dashboard__chart-card business-dashboard__chart-card--large">
@@ -362,18 +361,6 @@
         </div>
       </div>
 
-      <!-- Middle Column: Order Status -->
-      <div class="business-dashboard__chart-card business-dashboard__chart-card--medium">
-        <div class="business-dashboard__chart-header business-dashboard__chart-header--navy">
-          <h5 class="business-dashboard__chart-title">
-            <i class="fa-solid fa-chart-pie"></i>Order Status
-          </h5>
-        </div>
-        <div class="business-dashboard__chart-body">
-          <div id="orderStatusChart"></div>
-        </div>
-      </div>
-
       <!-- Right Column: COD Status -->
       <div class="business-dashboard__chart-card business-dashboard__chart-card--small">
         <div class="business-dashboard__chart-header business-dashboard__chart-header--warning">
@@ -383,6 +370,20 @@
         </div>
         <div class="business-dashboard__chart-body">
           <div id="codStatusChart"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Status (Separate Section) -->
+    <div class="business-dashboard__chart-grid business-dashboard__chart-grid--single">
+      <div class="business-dashboard__chart-card business-dashboard__chart-card--full">
+        <div class="business-dashboard__chart-header business-dashboard__chart-header--navy">
+          <h5 class="business-dashboard__chart-title">
+            <i class="fa-solid fa-chart-pie"></i>Order Status
+          </h5>
+        </div>
+        <div class="business-dashboard__chart-body">
+          <div id="orderStatusChart"></div>
         </div>
       </div>
     </div>

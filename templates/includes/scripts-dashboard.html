@@ -22,7 +22,7 @@
 
 <!-- Dashboard Custom Scripts -->
 <script src="{% static 'webpages/js/dashboard-notifications.js' %}"></script>
-<script src="{% static 'webpages/js/dashboard-tables.js' %}"></script>
+<script src="{% static 'webpages/js/dashboard-tables.js' %}?v=20260215a"></script>
 <script src="{% static 'webpages/js/dashboard-charts.js' %}"></script>
 <script src="{% static 'webpages/js/dashboard-utils.js' %}"></script>
 
@@ -58,6 +58,7 @@
     if ($.fn.DataTable) {
       $('.data-table').each(function() {
         const $table = $(this);
+        if ($.fn.DataTable.isDataTable($table)) return;
         const exportButtons = $table.data('export') !== false;
 
         $table.DataTable({

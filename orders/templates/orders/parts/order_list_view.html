@@ -2,10 +2,10 @@
 {% load custom_filters %}
 
 {% if not orders %}
-<div class="text-center py-5">
-  <i class="fa-solid fa-box-open fa-3x mb-3" style="color: var(--brand-grey-400);"></i>
-  <h4 class="text-muted">No orders found</h4>
-  <p class="text-muted">Start by adding your first order</p>
+<div class="oal-empty">
+  <div class="oal-empty__icon"><i class="fa-solid fa-box-open"></i></div>
+  <p class="oal-empty__title">No orders found</p>
+  <p class="oal-empty__subtitle">Start by adding your first order</p>
 </div>
 {% endif %}
 
@@ -16,7 +16,7 @@
       <div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
         <div class="order-number">
           <i class="fa-solid fa-receipt"></i>
-          <span>{{ order.order_number }}</span>
+          <span class="td-order-number" onclick="event.stopPropagation(); openOrderDetailPanel({{ order.id }});">{{ order.order_number }}</span>
           <span class="expand-toggle">
             <i class="fa-solid fa-chevron-down"></i>
           </span>
@@ -72,7 +72,7 @@
       {% if order.cod_amount %}
       <div class="summary-item">
         <i class="fa-solid fa-money-bill-wave"></i>
-        <strong style="color: #ff6b6b;">Qr {{ order.cod_amount }}</strong>
+        <strong class="oal-cod-amount">Qr {{ order.cod_amount }}</strong>
       </div>
       {% endif %}
     </div>
@@ -256,7 +256,7 @@
         </div>
 
         <div class="text-center py-3" id="product-placeholder-{{ order.id }}">
-          <p class="mb-3" style="color: var(--brand-grey-600);">Click to load products</p>
+          <p class="mb-3 oal-muted">Click to load products</p>
           <button class="load-products-btn"
                   onclick="loadProducts({{ order.id }}, event)"
                   hx-get="{% url 'orders:order_product_list' order.id %}"
@@ -320,7 +320,7 @@ function loadProducts(orderId, event) {
   const content = document.getElementById('product-content-' + orderId);
 
   // Show loading state
-  placeholder.innerHTML = '<div class="text-center py-3"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--brand-primary);"></i><p class="mt-2" style="color: var(--brand-grey-600);">Loading products...</p></div>';
+  placeholder.innerHTML = '<div class="text-center py-3"><i class="fa-solid fa-spinner fa-spin oal-spinner"></i><p class="mt-2 oal-muted">Loading products...</p></div>';
 
   // After HTMX loads, hide placeholder and show content
   document.body.addEventListener('htmx:afterSwap', function handler(evt) {
@@ -385,4 +385,4 @@ function updateOrderStatus(newStatus) {
   });
 }
 </script>
-{% include "includes/components/_pagination.html" with page_obj=orders per_page=per_page %}
+{% include "includes/components/_pagination.html" with page_obj=orders per_page=per_page pagination_id="grid" %}

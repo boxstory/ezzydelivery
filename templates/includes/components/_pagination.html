@@ -99,7 +99,7 @@ Parameters:
     {% if show_per_page != 'false' %}
     <!-- Per Page Selector -->
     <div class="pagination-per-page">
-        <select id="pagination-per-page-select"
+        <select id="pagination-per-page-select-{{ pagination_id|default:'default' }}"
                 {% if htmx_target %}
                 hx-get=""
                 hx-target="{{ htmx_target|default:'#main-content' }}"
@@ -122,9 +122,9 @@ Parameters:
     {% if show_goto != 'false' %}
     <!-- Go To Page -->
     <div class="pagination-goto">
-        <label for="pagination-goto-input">Go to</label>
+        <label for="pagination-goto-input-{{ pagination_id|default:'default' }}">Go to</label>
         <input type="number"
-               id="pagination-goto-input"
+               id="pagination-goto-input-{{ pagination_id|default:'default' }}"
                min="1"
                max="{{ page_obj.paginator.num_pages }}"
                value="{{ page_obj.number }}"
@@ -140,7 +140,7 @@ Parameters:
                onkeypress="if(event.key==='Enter'){var p=Math.min(Math.max(1,this.value),{{ page_obj.paginator.num_pages }});window.location.href='?page='+p+'&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}';}"
                {% endif %}
                aria-label="Go to page number">
-        <label>Page</label>
+        <span class="pagination-goto-suffix">Page</span>
     </div>
     {% endif %}
 

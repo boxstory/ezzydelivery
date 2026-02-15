@@ -97,7 +97,7 @@ const TABLE_PRESETS = {
  * Initialize Orders Table
  */
 function initOrdersTable() {
-  if ($('#ordersTable').length) {
+  if ($('#ordersTable').length && !$.fn.DataTable.isDataTable('#ordersTable')) {
     $('#ordersTable').DataTable({
       ...TABLE_PRESETS.export,
       order: [[0, 'desc']], // Sort by order ID descending
@@ -123,7 +123,7 @@ function initOrdersTable() {
  * Initialize Drivers Table
  */
 function initDriversTable() {
-  if ($('#driversTable').length) {
+  if ($('#driversTable').length && !$.fn.DataTable.isDataTable('#driversTable')) {
     $('#driversTable').DataTable({
       ...TABLE_PRESETS.standard,
       order: [[1, 'asc']], // Sort by driver name
@@ -149,7 +149,7 @@ function initDriversTable() {
  * Initialize Tasks Table
  */
 function initTasksTable() {
-  if ($('#tasksTable').length) {
+  if ($('#tasksTable').length && !$.fn.DataTable.isDataTable('#tasksTable')) {
     $('#tasksTable').DataTable({
       ...TABLE_PRESETS.export,
       order: [[2, 'desc']], // Sort by created date
@@ -175,7 +175,7 @@ function initTasksTable() {
  * Initialize COD Transactions Table
  */
 function initCODTable() {
-  if ($('#codTable').length) {
+  if ($('#codTable').length && !$.fn.DataTable.isDataTable('#codTable')) {
     $('#codTable').DataTable({
       ...TABLE_PRESETS.export,
       order: [[0, 'desc']],

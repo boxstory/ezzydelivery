@@ -1,237 +1,272 @@
-# Designer Command
+# Designer Command - Premium UI Mode
 
-**Purpose:** Activate comprehensive frontend designer mode for creating polished, modern UI with professional HTML structure and CSS styling using EzzyDelivery branding.
+**You are a senior UI/UX designer. Your output must look like a polished SaaS product, NOT a Bootstrap tutorial.**
 
-## When to Use
+## CRITICAL: Design Quality Bar
 
-- Designing new landing pages
-- Creating UI components (cards, buttons, forms)
-- Building hero sections or feature grids
-- Implementing responsive layouts
-- Optimizing HTML structure and Bootstrap grid
-- Styling with brand consistency
-- Improving page layouts and component organization
+Every element you create MUST pass this checklist:
+- [ ] Would this look at home on Linear, Notion, or Stripe's dashboard?
+- [ ] Does every interactive element have a hover/active state?
+- [ ] Are labels uppercase + letter-spaced + small + muted? (section headers)
+- [ ] Are values bold + dark + properly sized? (data display)
+- [ ] Is there visual hierarchy? (hero > sections > fields > muted metadata)
+- [ ] Does the spacing feel airy, not cramped? (min 0.875rem between sections)
+- [ ] Are status indicators color-coded with semantic light backgrounds?
 
-## Activation
+If any answer is NO, redesign before shipping.
 
-```
-/designer
-```
+## Design Vocabulary (Use These Patterns)
 
-## What This Does
-
-When you use `/designer`, Claude will provide **BOTH HTML structure improvements AND CSS styling**:
-
-### 1. **HTML Structure Optimization**
-   - **Bootstrap Grid System**: Proper use of `.row`, `.col-*`, responsive breakpoints
-   - **Semantic HTML5**: `<section>`, `<article>`, `<header>`, `<footer>`, proper heading hierarchy
-   - **Flexbox & Grid**: `d-flex`, `justify-content-*`, `align-items-*`, gap utilities
-   - **Responsive Classes**: `.d-none`, `.d-lg-block`, `.col-12`, `.col-md-6`, `.col-lg-4`
-   - **Spacing Utilities**: `.p-*`, `.m-*`, `.g-*` (gutters), proper padding/margin
-   - **Accessibility**: Proper ARIA labels, semantic tags, keyboard navigation
-   - **Component Structure**: Card headers, bodies, footers; proper nesting
-   - **Icon Integration**: Font Awesome icons with proper sizing and colors
-
-### 2. **CSS Styling Excellence**
-   - **Brand Kit Variables**: Use all CSS variables from `brand-kit.css`
-   - **Color Palette**: Consistent use of primary, secondary, accent colors
-   - **Typography Scale**: Font sizes, weights, line-heights from design system
-   - **Spacing System**: Consistent spacing using CSS variables
-   - **Modern Effects**: Gradients, shadows, glassmorphism, animations
-   - **Hover States**: Interactive feedback on all clickable elements
-   - **Transitions**: Smooth animations with cubic-bezier easing
-   - **Mobile-First**: Responsive breakpoints with proper media queries
-
-### 3. **Bootstrap Best Practices**
-   - Use utility classes: `.mb-3`, `.text-center`, `.fw-bold`, `.text-muted`
-   - Grid breakpoints: `.col-12 .col-sm-6 .col-md-4 .col-lg-3`
-   - Flexbox utilities: `.d-flex`, `.justify-content-between`, `.align-items-center`
-   - Spacing: `.p-4`, `.px-3`, `.py-2`, `.m-auto`, `.g-3` (gap)
-   - Display: `.d-none`, `.d-md-block`, `.d-lg-inline-flex`
-   - Text alignment: `.text-start`, `.text-center`, `.text-end`, `.text-sm-start`
-
-### 4. **EzzyDelivery Code Patterns**
-   - No inline styles or `<style>` tags - use external CSS files
-   - Link CSS in `{% block extra_css %}`
-   - ID naming: `{app}_{section}_{element}_{descriptor}`
-   - CSS file location: `{app}/static/{app}/css/{filename}.css`
-   - Version cache busting: `?v=YYYYMMDD{letter}`
-
-### 5. **Performance & Accessibility**
-   - CSS transforms over layout properties (transform, opacity)
-   - Proper focus states for keyboard navigation
-   - ARIA attributes where needed
-   - Semantic HTML for screen readers
-   - Reduced motion support: `@media (prefers-reduced-motion: reduce)`
-
-## Example Usage
-
-```
-/designer
-
-Make the profile page look professional with better layout
+### 1. Section Headers (uppercase label style)
+```css
+.xyz__section-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+    padding-bottom: 0.375rem;
+    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+.xyz__section-head i {
+    color: var(--brand-primary, #f7c000);  /* Yellow icon accent */
+}
 ```
 
-**Claude will analyze and improve:**
+### 2. Data Fields (label-value pairs)
+```css
+.xyz__field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4375rem 0;
+    gap: 0.75rem;
+}
+.xyz__field:not(:last-child) {
+    border-bottom: 1px solid var(--brand-grey-100, #fafafa);
+}
+.xyz__field__label {
+    font-size: 0.75rem;
+    color: var(--brand-grey-500);
+}
+.xyz__field__value {
+    font-size: 0.8125rem;
+    color: var(--brand-grey-800, #1f1f1f);
+    font-weight: 500;
+}
+```
 
-1. **HTML Structure**:
-   ```html
-   <!-- Before: Simple row -->
-   <div class="row">
-     <div class="col-sm-3"><p>Email</p></div>
-     <div class="col-sm-9"><p>{{ email }}</p></div>
-   </div>
+### 3. Hero Banners (navy gradient)
+```css
+background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, var(--brand-navy-light, #003366) 100%);
+color: #fff;
+padding: 1rem 1.25rem;
+border-radius: var(--brand-radius-sm, 0.5rem);
+```
 
-   <!-- After: Professional structure -->
-   <div class="row align-items-center py-3 px-2">
-     <div class="col-12 col-sm-4 col-lg-3">
-       <p class="mb-2 mb-sm-0 fw-semibold">Email Address</p>
-     </div>
-     <div class="col-12 col-sm-8 col-lg-9">
-       <p class="text-muted mb-0 d-flex align-items-center gap-2">
-         <i class="fas fa-envelope text-secondary"></i>
-         <span>{{ email|default:"—" }}</span>
-       </p>
-     </div>
-   </div>
-   ```
+### 4. COD/Amount Highlights (amber gradient)
+```css
+background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+border: 1px solid #fde68a;
+border-radius: var(--brand-radius-sm);
+/* Large amount: 1.375rem-1.75rem, font-weight: 700 */
+/* Currency label: 0.65rem, uppercase, grey */
+```
 
-2. **CSS Styling**:
-   ```css
-   /* Hover effects, gradients, animations */
-   .row:hover {
-     background: linear-gradient(90deg, rgba(247, 192, 0, 0.05) 0%, transparent 100%);
-     transform: translateX(4px);
-   }
-   ```
+### 5. Contact Pill Buttons
+```css
+border-radius: 2rem;  /* Full pill */
+padding: 0.35rem 0.75rem;
+font-size: 0.75rem;
+/* Phone: grey-100 bg, grey border -> navy on hover */
+/* WhatsApp: #dcfce7 bg, #bbf7d0 border -> #22c55e on hover */
+```
 
-**Claude will generate:**
-- ✅ Improved HTML with proper Bootstrap classes
-- ✅ Responsive grid layout (mobile, tablet, desktop)
-- ✅ Icon integration with Font Awesome
-- ✅ Professional CSS with animations
-- ✅ Hover states and transitions
-- ✅ Accessibility improvements
-- ✅ Mobile-first responsive design
+### 6. Status Badges (semantic colors)
+```css
+/* Always: light bg + matching dark text + inline-flex + gap + pill radius */
+--success: bg #dcfce7, color #15803d;
+--warning: bg #fef3c7, color #92400e;
+--danger:  bg #fef2f2, color #dc2626;
+--info:    bg #eff6ff, color #2563eb;
+--muted:   bg var(--brand-grey-200), color var(--brand-grey-600);
+```
 
-## Designer Workflow
+### 7. Cards (modern, not Bootstrap default)
+```css
+.xyz__card {
+    background: #fff;
+    border-radius: var(--brand-radius-md, 0.75rem);
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    overflow: hidden;
+}
+.xyz__card__header {
+    padding: 0.625rem 1rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500);
+    border-bottom: 1px solid var(--brand-grey-200);
+    background: var(--brand-grey-100, #fafafa);
+}
+.xyz__card__header i {
+    color: var(--brand-primary);
+}
+/* NO bg-dark, bg-primary, bg-info Bootstrap headers! */
+```
 
-When you invoke `/designer`, Claude will follow this comprehensive process:
+### 8. Driver/Person Cards (avatar style)
+```css
+/* Navy circle avatar with yellow icon */
+.avatar {
+    width: 2.25rem; height: 2.25rem;
+    border-radius: 50%;
+    background: var(--brand-navy);
+    color: var(--brand-primary);
+    display: flex; align-items: center; justify-content: center;
+}
+```
 
-### Step 1: Analyze Current Code
-- Read existing HTML template
-- Review current CSS file
-- Identify layout issues (alignment, spacing, grid problems)
-- Check Bootstrap usage and responsive design
-- Note accessibility gaps
+### 9. Notes/Callouts (left accent border)
+```css
+background: var(--brand-grey-100);
+border-radius: 0.375rem;
+border-left: 3px solid var(--brand-primary);
+padding: 0.5rem 0.75rem;
+```
 
-### Step 2: Improve HTML Structure
-- Optimize Bootstrap grid (proper `.row`, `.col-*` usage)
-- Add proper alignment classes (`.align-items-center`, `.justify-content-between`)
-- Include responsive utilities (`.d-none .d-md-block`)
-- Add semantic HTML5 tags (`<section>`, `<header>`, `<article>`)
-- Integrate icons with proper sizing
-- Improve spacing with utility classes (`.p-*`, `.m-*`, `.g-*`)
+### 10. Route Visualization (pickup -> dropoff)
+```css
+/* Blue circle for pickup, pink circle for dropoff */
+/* Dashed line connector using repeating-linear-gradient */
+/* Labels: uppercase, 0.65rem, grey-400, letter-spacing 0.04em */
+```
 
-### Step 3: Enhance CSS Styling
-- Use CSS variables from brand kit
-- Add modern effects (gradients, shadows, animations)
-- Create hover states and transitions
-- Implement responsive breakpoints
-- Add accessibility features (focus states, reduced motion)
+### 11. Action Buttons
+```css
+/* Primary: navy bg, white text -> navy-light on hover + translateY(-1px) + shadow */
+/* Secondary: grey-100 bg, grey border -> yellow bg on hover */
+/* Both: 0.75rem font, 600 weight, flex:1 for equal width */
+```
 
-### Step 4: Deploy Changes
-- Collect static files: `python manage.py collectstatic --noinput`
-- Reload server: `kill -HUP $(pgrep -f "gunicorn.*ezzydelivery")`
-- Update CSS version cache busting parameter
+### 12. Hover/Interaction Effects
+```css
+/* Cards: box-shadow upgrade on hover */
+/* Buttons: translateY(-1px) + shadow on hover */
+/* Links: color transition (navy -> yellow) */
+/* Mobile: scale(0.95) on :active for tap feedback */
+/* Timing: 0.2s ease for controls, 0.15s for quick feedback */
+```
 
-## Skills Applied
+## Brand Kit Tokens (ACTUAL file: `brandkit-tokens.css`)
 
-This command activates **comprehensive frontend design** with focus on:
-- ✅ **HTML Structure**: Bootstrap grid, semantic tags, proper alignment
-- ✅ **CSS Styling**: Brand consistency, modern design patterns
-- ✅ **Responsive Design**: Mobile-first, breakpoints, utility classes
-- ✅ **Accessibility**: WCAG 2.1, ARIA labels, keyboard navigation
-- ✅ **Performance**: CSS transforms, optimized animations
-- ✅ **Component Reusability**: DRY principles, modular design
-
-## Related Commands
-
-- `/frontend` - General frontend development
-- `/css-fix` - Fix existing CSS issues
-- `/component` - Create specific UI components
-- `/page` - Create complete pages
-
-## Design System Reference
-
-### Brand Kit
-**Location:** `static/webpages/css/brand-kit.css`
-
-**Key Variables:**
 ```css
 /* Colors */
---brand-primary: #f7c000;    /* Yellow */
---brand-secondary: #001f3f;  /* Navy */
---brand-accent: #ffd54f;     /* Light Yellow */
+--brand-primary: #f7c000;
+--brand-navy: #001f3f;
+--brand-navy-light: #003366;
 
-/* Typography */
---font-base: 0.875rem;       /* 14px */
---font-lg: 1rem;             /* 16px */
---font-xl: 1.125rem;         /* 18px */
-
-/* Spacing */
---spacing-sm: 0.5rem;        /* 8px */
---spacing-md: 1rem;          /* 16px */
---spacing-lg: 1.5rem;        /* 24px */
-
-/* Radius */
---radius-sm: 0.5rem;         /* 8px */
---radius-md: 0.75rem;        /* 12px */
---radius-lg: 1rem;           /* 16px */
+/* Greys */
+--brand-grey-100: #fafafa;  /* Backgrounds, alternating rows */
+--brand-grey-200: #f0f0f0;  /* Borders, dividers */
+--brand-grey-300: #dcdcdc;  /* Input borders */
+--brand-grey-400: #b0b0b0;  /* Placeholder text, icons */
+--brand-grey-500: #6c757d;  /* Labels, section headers */
+--brand-grey-600: #555;     /* Secondary text */
+--brand-grey-700: #333;     /* Primary text */
+--brand-grey-800: #1f1f1f;  /* Headings, bold values */
 
 /* Shadows */
---shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
---shadow-md: 0 4px 6px rgba(0,0,0,0.07);
---shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+--brand-shadow-sm: 0 0.0625rem 0.1875rem rgba(0,0,0,0.08);
+--brand-shadow-md: 0 0.25rem 0.5rem rgba(0,0,0,0.1);
+
+/* Radius */
+--brand-radius-sm: 0.5rem;   /* 8px - buttons, small cards */
+--brand-radius-md: 0.75rem;  /* 12px - cards */
+--brand-radius-lg: 1.125rem; /* 18px - hero sections */
+
+/* Spacing */
+--spacing-xs: 0.25rem;
+--spacing-sm: 0.5rem;
+--spacing-md: 1rem;
+--spacing-lg: 1.5rem;
+--spacing-xl: 2rem;
 ```
 
-### Bootstrap Utilities Quick Reference
+## Typography Rules
 
-**Grid System:**
-- `.container`, `.container-fluid`
-- `.row`, `.g-*` (gutters)
-- `.col-*`, `.col-sm-*`, `.col-md-*`, `.col-lg-*`, `.col-xl-*`
+| Element | Size | Weight | Color | Extra |
+|---------|------|--------|-------|-------|
+| Page title | 1.375rem | 700 | grey-800 | — |
+| Section header | 0.7rem | 600-700 | grey-500 | uppercase, letter-spacing: 0.06em |
+| Field label | 0.75rem | 400 | grey-500 | — |
+| Field value | 0.8125rem | 500-600 | grey-800 | — |
+| Muted metadata | 0.75rem | 400 | grey-400 | — |
+| Badge text | 0.7rem | 600 | semantic color | uppercase optional |
+| Code/IDs | 0.8125rem+ | 700 | grey-800 | font-family: monospace |
+| Large amount | 1.375-1.75rem | 700 | grey-800 | — |
+| Currency label | 0.65rem | 600 | grey-500 | uppercase |
 
-**Flexbox:**
-- `.d-flex`, `.d-inline-flex`
-- `.justify-content-*` (start, center, end, between, around)
-- `.align-items-*` (start, center, end, stretch)
-- `.flex-row`, `.flex-column`
-- `.gap-*` (1-5)
+## BEM Class Naming
 
-**Spacing:**
-- `.p-*`, `.px-*`, `.py-*`, `.pt-*`, `.pb-*` (padding)
-- `.m-*`, `.mx-*`, `.my-*`, `.mt-*`, `.mb-*` (margin)
-- Values: 0, 1 (0.25rem), 2 (0.5rem), 3 (1rem), 4 (1.5rem), 5 (3rem)
+Use short 2-4 letter prefixes per page/component:
+- `odp__` = Order Detail Panel (slide-in)
+- `odt-` = Order DeTails page (full page)
+- `pwa-` = PWA mobile components
+- Block: `.odp` / Element: `.odp__hero` / Modifier: `.odp__btn--primary`
 
-**Typography:**
-- `.fw-*` (normal, bold, semibold, light)
-- `.text-*` (start, center, end, muted, primary, secondary)
-- `.small`, `.lead`
+## What NOT to Do
 
-**Display:**
-- `.d-none`, `.d-block`, `.d-inline`, `.d-inline-block`
-- `.d-sm-*`, `.d-md-*`, `.d-lg-*`, `.d-xl-*`
+- **NO** `bg-dark`, `bg-primary`, `bg-info`, `bg-success` card headers (looks 2015)
+- **NO** `<table class="table table-borderless">` for data display (use flex label-value pairs)
+- **NO** Bootstrap `.badge bg-*` for statuses (use custom semantic badges)
+- **NO** plain `<h5 class="mb-0">Section Title</h5>` headers (use uppercase + letter-spaced + icon)
+- **NO** inline styles (`style="color: red;"`)
+- **NO** `<style>` tags in templates
+- **NO** generic Bootstrap cards without custom styling
+- **NO** heavy colored headers (bg-primary text-white on card-header)
+- **NO** table-based layouts for non-tabular data
+- **NO** cramped spacing (always add breathing room between sections)
 
-**Component Examples:**
-- Profile: `core/templates/core/profile.html`
-- Delivery Tasks: `delivery/templates/delivery/delivery_tasks.html`
-- Dashboard: `business/templates/business/dashboard.html`
+## What TO Do
 
-## Important Notes
+- **YES** navy gradient hero banners for identity sections
+- **YES** uppercase + letter-spaced + small + grey section headers with yellow icon
+- **YES** flex-based label-value pairs with subtle bottom borders
+- **YES** semantic light-background status badges
+- **YES** amber gradient for monetary/COD highlights
+- **YES** pill-shaped contact buttons with hover color transitions
+- **YES** navy circular avatars with yellow icons for people
+- **YES** yellow left-border callouts for notes
+- **YES** monospace font for order numbers, task IDs, codes
+- **YES** 2-column card layouts (col-sm-6) with vertical divider border
+- **YES** dashed line connectors for route/timeline visualization
+- **YES** translateY(-1px) + shadow hover effects on buttons
+- **YES** alternating row backgrounds (nth-child) for lists
 
-⚠️ **Always improve BOTH HTML and CSS** - don't just focus on styling!
-⚠️ **Use Bootstrap utilities** - don't reinvent the wheel with custom CSS
-⚠️ **Mobile-first** - start with mobile layout, then add breakpoints
-⚠️ **No inline styles** - all styles in external CSS files
-⚠️ **Test responsive** - verify layout works on mobile, tablet, desktop
+## Reference Files (Best Designs)
+
+| Pattern | File |
+|---------|------|
+| Panel slide-in | `orders/parts/order_detail_panel.html` + CSS `.odp__*` |
+| Full detail page | `orders/order_details.html` + CSS `.odt-*` |
+| Mobile PWA | `business/static/business/css/business-mobile.css` `.pwa-*` |
+| Brand tokens | `webpages/static/webpages/css/brandkit-tokens.css` |
+| Components | `webpages/static/webpages/css/brandkit-components.css` |
+| Status badges | `orders/static/orders/css/orders.css` `.ob--*` classes |
+
+## Workflow
+
+1. **Read** the current template and its CSS file
+2. **Identify** what looks "basic" (Bootstrap defaults, table layouts, plain cards)
+3. **Redesign** using the patterns above (BEM classes, flex layouts, brand tokens)
+4. **Write** CSS in the app's CSS file (never inline, never `<style>`)
+5. **Update** cache-busting version: `?v=YYYYMMDDx`
+6. **Collect** static: `python manage.py collectstatic --noinput`
+7. **Reload** server: `kill -HUP $(pgrep -f "gunicorn.*ezzydelivery" | head -1)`
+
+ARGUMENTS: $ARGUMENTS
