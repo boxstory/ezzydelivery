@@ -1,0 +1,788 @@
+/**
+ * ORDERS APP - PROFESSIONAL WIZARD & ENHANCED UI
+ * Design System v2.0 - Using brand-kit-pro variables
+ *
+ * Purpose: Multi-step order wizard, kanban views, timeline tracking
+ * Brand Colors: var(--ez-primary-500) #f7c000, var(--ez-navy-500) #001f3f
+ * Architecture: Mobile-First, WCAG 2.1 AA Accessible
+ */
+
+/* ============================================================================
+   WIZARD - MULTI-STEP ORDER FORM
+   ============================================================================ */
+
+/* Wizard Container */
+.orders-wizard {
+  background: var(--ez-white);
+  border-radius: var(--ez-radius-xl);
+  box-shadow: var(--ez-shadow-lg);
+  overflow: hidden;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* Wizard Header - Step Indicators */
+.wizard-header {
+  background: linear-gradient(135deg, var(--ez-navy-500) 0%, var(--ez-navy-700) 100%);
+  padding: var(--ez-space-6) var(--ez-space-4);
+  position: relative;
+  overflow: hidden;
+}
+
+.wizard-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--ez-gradient-radial-glow);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.wizard-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 0 var(--ez-space-4);
+}
+
+/* Progress Bar Background */
+.wizard-steps::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: var(--ez-space-8);
+  right: var(--ez-space-8);
+  height: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-50%);
+  z-index: 0;
+}
+
+/* Active Progress Bar */
+.wizard-steps::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: var(--ez-space-8);
+  height: 3px;
+  background: var(--ez-primary-500);
+  transform: translateY(-50%);
+  transition: width var(--ez-transition-slow);
+  z-index: 1;
+  box-shadow: 0 0 10px rgba(247, 192, 0, 0.5);
+}
+
+.wizard-steps[data-current="1"]::after { width: 0%; }
+.wizard-steps[data-current="2"]::after { width: 25%; }
+.wizard-steps[data-current="3"]::after { width: 50%; }
+.wizard-steps[data-current="4"]::after { width: 75%; }
+.wizard-steps[data-current="5"]::after { width: 100%; }
+
+/* Individual Step */
+.wizard-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ez-space-2);
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  max-width: 120px;
+}
+
+/* Step Circle */
+.wizard-step__circle {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--ez-radius-full);
+  background: rgba(255, 255, 255, 0.15);
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: var(--ez-font-lg);
+  font-weight: var(--ez-font-weight-bold);
+  transition: all var(--ez-transition-base);
+  position: relative;
+}
+
+/* Step Label */
+.wizard-step__label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: var(--ez-font-xs);
+  font-weight: var(--ez-font-weight-medium);
+  text-align: center;
+  transition: all var(--ez-transition-base);
+  line-height: 1.2;
+}
+
+/* Active Step */
+.wizard-step.active .wizard-step__circle {
+  background: var(--ez-primary-500);
+  border-color: var(--ez-primary-500);
+  color: var(--ez-navy-500);
+  box-shadow: 0 0 20px rgba(247, 192, 0, 0.6);
+  transform: scale(1.1);
+}
+
+.wizard-step.active .wizard-step__label {
+  color: var(--ez-white);
+  font-weight: var(--ez-font-weight-semibold);
+}
+
+/* Completed Step */
+.wizard-step.completed .wizard-step__circle {
+  background: var(--ez-success);
+  border-color: var(--ez-success);
+  color: var(--ez-white);
+}
+
+.wizard-step.completed .wizard-step__label {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.wizard-step.completed .wizard-step__circle::before {
+  content: '\f00c';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  position: absolute;
+  font-size: var(--ez-font-base);
+}
+
+/* Wizard Body - Form Content */
+.wizard-body {
+  padding: var(--ez-space-8) var(--ez-space-6);
+  min-height: 400px;
+}
+
+/* Wizard Pane */
+.wizard-pane {
+  display: none;
+  animation: wizardFadeIn var(--ez-transition-base);
+}
+
+.wizard-pane.active {
+  display: block;
+}
+
+@keyframes wizardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Wizard Pane Header */
+.wizard-pane__header {
+  margin-bottom: var(--ez-space-6);
+  padding-bottom: var(--ez-space-4);
+  border-bottom: 2px solid var(--ez-grey-200);
+}
+
+.wizard-pane__title {
+  font-size: var(--ez-font-2xl);
+  font-weight: var(--ez-font-weight-bold);
+  color: var(--ez-navy-500);
+  margin-bottom: var(--ez-space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-3);
+}
+
+.wizard-pane__title i {
+  color: var(--ez-primary-500);
+  font-size: var(--ez-font-xl);
+}
+
+.wizard-pane__subtitle {
+  font-size: var(--ez-font-sm);
+  color: var(--ez-grey-600);
+  margin: 0;
+}
+
+/* Form Group in Wizard */
+.wizard-form-group {
+  margin-bottom: var(--ez-space-6);
+}
+
+.wizard-form-group__label {
+  display: block;
+  font-weight: var(--ez-font-weight-semibold);
+  color: var(--ez-grey-700);
+  margin-bottom: var(--ez-space-2);
+  font-size: var(--ez-font-sm);
+}
+
+.wizard-form-group__label i {
+  color: var(--ez-primary-500);
+  margin-right: var(--ez-space-1);
+  font-size: var(--ez-font-sm);
+}
+
+.wizard-form-group__label .required {
+  color: var(--ez-error);
+  margin-left: var(--ez-space-1);
+}
+
+.wizard-form-group__input {
+  width: 100%;
+  padding: var(--ez-space-3) var(--ez-space-4);
+  border: 2px solid var(--ez-grey-300);
+  border-radius: var(--ez-radius-lg);
+  font-size: var(--ez-font-base);
+  transition: all var(--ez-transition-fast);
+  background: var(--ez-white);
+}
+
+.wizard-form-group__input:focus {
+  outline: none;
+  border-color: var(--ez-primary-500);
+  box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.1);
+}
+
+.wizard-form-group__input:disabled {
+  background: var(--ez-grey-100);
+  cursor: not-allowed;
+}
+
+.wizard-form-group__help {
+  font-size: var(--ez-font-xs);
+  color: var(--ez-grey-500);
+  margin-top: var(--ez-space-1);
+  display: block;
+}
+
+/* Input with Icon */
+.wizard-input-group {
+  position: relative;
+}
+
+.wizard-input-group__icon {
+  position: absolute;
+  left: var(--ez-space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ez-grey-400);
+  pointer-events: none;
+}
+
+.wizard-input-group__icon + .wizard-form-group__input {
+  padding-left: var(--ez-space-10);
+}
+
+.wizard-input-group__prefix {
+  position: absolute;
+  left: var(--ez-space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: var(--ez-font-weight-semibold);
+  color: var(--ez-grey-600);
+  pointer-events: none;
+}
+
+.wizard-input-group__prefix + .wizard-form-group__input {
+  padding-left: 3.5rem;
+}
+
+/* Grid Layout in Wizard */
+.wizard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--ez-space-4);
+}
+
+.wizard-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--ez-space-4);
+}
+
+@media (max-width: 768px) {
+  .wizard-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Wizard Footer - Navigation Buttons */
+.wizard-footer {
+  padding: var(--ez-space-6);
+  background: var(--ez-grey-50);
+  border-top: 1px solid var(--ez-grey-200);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--ez-space-4);
+}
+
+.wizard-nav {
+  display: flex;
+  gap: var(--ez-space-3);
+}
+
+.wizard-btn {
+  padding: var(--ez-space-3) var(--ez-space-6);
+  border-radius: var(--ez-radius-lg);
+  font-weight: var(--ez-font-weight-semibold);
+  font-size: var(--ez-font-base);
+  border: none;
+  cursor: pointer;
+  transition: all var(--ez-transition-base);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ez-space-2);
+  min-height: var(--ez-tap-target-min);
+}
+
+.wizard-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wizard-btn--primary {
+  background: var(--ez-primary-500);
+  color: var(--ez-navy-500);
+  box-shadow: var(--ez-shadow-md);
+}
+
+.wizard-btn--primary:hover:not(:disabled) {
+  background: var(--ez-primary-600);
+  box-shadow: var(--ez-shadow-lg);
+  transform: translateY(-2px);
+}
+
+.wizard-btn--secondary {
+  background: var(--ez-grey-200);
+  color: var(--ez-grey-700);
+}
+
+.wizard-btn--secondary:hover:not(:disabled) {
+  background: var(--ez-grey-300);
+}
+
+.wizard-btn--success {
+  background: var(--ez-success);
+  color: var(--ez-white);
+  box-shadow: var(--ez-shadow-md);
+}
+
+.wizard-btn--success:hover:not(:disabled) {
+  background: var(--ez-success-dark);
+  box-shadow: var(--ez-shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* Preview Card in Wizard */
+.wizard-preview {
+  background: var(--ez-grey-50);
+  border: 2px solid var(--ez-grey-200);
+  border-radius: var(--ez-radius-lg);
+  padding: var(--ez-space-6);
+  margin-top: var(--ez-space-6);
+}
+
+.wizard-preview__title {
+  font-size: var(--ez-font-lg);
+  font-weight: var(--ez-font-weight-bold);
+  color: var(--ez-navy-500);
+  margin-bottom: var(--ez-space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-2);
+}
+
+.wizard-preview__row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--ez-space-3) 0;
+  border-bottom: 1px solid var(--ez-grey-200);
+}
+
+.wizard-preview__row:last-child {
+  border-bottom: none;
+}
+
+.wizard-preview__label {
+  font-weight: var(--ez-font-weight-medium);
+  color: var(--ez-grey-600);
+  font-size: var(--ez-font-sm);
+}
+
+.wizard-preview__value {
+  font-weight: var(--ez-font-weight-semibold);
+  color: var(--ez-grey-800);
+  font-size: var(--ez-font-sm);
+  text-align: right;
+}
+
+.wizard-preview__value--highlight {
+  color: var(--ez-primary-600);
+  font-size: var(--ez-font-base);
+}
+
+/* ============================================================================
+   KANBAN BOARD VIEW
+   ============================================================================ */
+
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--ez-space-4);
+  padding: var(--ez-space-4);
+  overflow-x: auto;
+}
+
+@media (min-width: 1200px) {
+  .kanban-board {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Kanban Column */
+.kanban-column {
+  background: var(--ez-grey-100);
+  border-radius: var(--ez-radius-xl);
+  padding: var(--ez-space-4);
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-column__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--ez-space-4);
+  padding-bottom: var(--ez-space-3);
+  border-bottom: 2px solid var(--ez-grey-300);
+}
+
+.kanban-column__title {
+  font-size: var(--ez-font-lg);
+  font-weight: var(--ez-font-weight-bold);
+  color: var(--ez-grey-800);
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-2);
+}
+
+.kanban-column__count {
+  background: var(--ez-navy-500);
+  color: var(--ez-white);
+  border-radius: var(--ez-radius-full);
+  padding: var(--ez-space-1) var(--ez-space-3);
+  font-size: var(--ez-font-sm);
+  font-weight: var(--ez-font-weight-bold);
+  min-width: 28px;
+  text-align: center;
+}
+
+/* Kanban Column Color Variations */
+.kanban-column--review {
+  border-top: 4px solid var(--ez-warning);
+}
+
+.kanban-column--confirmed {
+  border-top: 4px solid var(--ez-info);
+}
+
+.kanban-column--published {
+  border-top: 4px solid var(--ez-success);
+}
+
+.kanban-column--cancelled {
+  border-top: 4px solid var(--ez-error);
+}
+
+/* Kanban Card Container */
+.kanban-cards {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-3);
+}
+
+/* Kanban Card */
+.kanban-card {
+  background: var(--ez-white);
+  border-radius: var(--ez-radius-lg);
+  padding: var(--ez-space-4);
+  box-shadow: var(--ez-shadow-sm);
+  cursor: grab;
+  transition: all var(--ez-transition-fast);
+  border-left: 4px solid var(--ez-grey-300);
+}
+
+.kanban-card:hover {
+  box-shadow: var(--ez-shadow-md);
+  transform: translateY(-2px);
+}
+
+.kanban-card:active {
+  cursor: grabbing;
+}
+
+.kanban-card--dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.kanban-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--ez-space-3);
+}
+
+.kanban-card__number {
+  font-weight: var(--ez-font-weight-bold);
+  color: var(--ez-navy-500);
+  font-size: var(--ez-font-base);
+}
+
+.kanban-card__badge {
+  padding: var(--ez-space-1) var(--ez-space-2);
+  border-radius: var(--ez-radius-sm);
+  font-size: var(--ez-font-xs);
+  font-weight: var(--ez-font-weight-semibold);
+  background: var(--ez-grey-200);
+  color: var(--ez-grey-700);
+}
+
+.kanban-card__customer {
+  font-size: var(--ez-font-base);
+  font-weight: var(--ez-font-weight-semibold);
+  color: var(--ez-grey-800);
+  margin-bottom: var(--ez-space-2);
+}
+
+.kanban-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-1);
+  margin-bottom: var(--ez-space-3);
+}
+
+.kanban-card__meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-2);
+  font-size: var(--ez-font-sm);
+  color: var(--ez-grey-600);
+}
+
+.kanban-card__meta-item i {
+  color: var(--ez-grey-400);
+  width: 16px;
+  text-align: center;
+}
+
+.kanban-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: var(--ez-space-3);
+  border-top: 1px solid var(--ez-grey-200);
+}
+
+.kanban-card__cod {
+  font-weight: var(--ez-font-weight-bold);
+  color: var(--ez-error);
+  font-size: var(--ez-font-base);
+}
+
+.kanban-card__date {
+  font-size: var(--ez-font-xs);
+  color: var(--ez-grey-500);
+}
+
+/* ============================================================================
+   ORDER TIMELINE
+   ============================================================================ */
+
+.order-timeline {
+  position: relative;
+  padding: var(--ez-space-6) 0;
+}
+
+.order-timeline::before {
+  content: '';
+  position: absolute;
+  left: 24px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--ez-grey-200);
+}
+
+.timeline-item {
+  position: relative;
+  padding-left: var(--ez-space-16);
+  padding-bottom: var(--ez-space-6);
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-item__icon {
+  position: absolute;
+  left: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--ez-radius-full);
+  background: var(--ez-white);
+  border: 3px solid var(--ez-grey-300);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ez-grey-500);
+  font-size: var(--ez-font-lg);
+  z-index: 1;
+}
+
+.timeline-item--active .timeline-item__icon {
+  background: var(--ez-primary-500);
+  border-color: var(--ez-primary-500);
+  color: var(--ez-navy-500);
+  box-shadow: var(--ez-shadow-glow-yellow);
+}
+
+.timeline-item--completed .timeline-item__icon {
+  background: var(--ez-success);
+  border-color: var(--ez-success);
+  color: var(--ez-white);
+}
+
+.timeline-item__content {
+  background: var(--ez-white);
+  border-radius: var(--ez-radius-lg);
+  padding: var(--ez-space-4);
+  box-shadow: var(--ez-shadow-sm);
+  border: 1px solid var(--ez-grey-200);
+}
+
+.timeline-item__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--ez-space-2);
+}
+
+.timeline-item__title {
+  font-weight: var(--ez-font-weight-bold);
+  color: var(--ez-grey-800);
+  font-size: var(--ez-font-base);
+}
+
+.timeline-item__time {
+  font-size: var(--ez-font-xs);
+  color: var(--ez-grey-500);
+  white-space: nowrap;
+}
+
+.timeline-item__description {
+  font-size: var(--ez-font-sm);
+  color: var(--ez-grey-600);
+  line-height: var(--ez-line-height-relaxed);
+}
+
+/* ============================================================================
+   MOBILE RESPONSIVE
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .wizard-steps {
+    padding: 0;
+  }
+
+  .wizard-step__label {
+    display: none;
+  }
+
+  .wizard-step.active .wizard-step__label {
+    display: block;
+    position: absolute;
+    bottom: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+
+  .wizard-body {
+    padding: var(--ez-space-6) var(--ez-space-4);
+  }
+
+  .wizard-pane__title {
+    font-size: var(--ez-font-xl);
+  }
+
+  .kanban-board {
+    grid-template-columns: 1fr;
+  }
+
+  .kanban-column {
+    min-height: auto;
+  }
+
+  .wizard-footer {
+    flex-direction: column;
+    gap: var(--ez-space-2);
+  }
+
+  .wizard-nav {
+    width: 100%;
+  }
+
+  .wizard-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* ============================================================================
+   ACCESSIBILITY ENHANCEMENTS
+   ============================================================================ */
+
+/* Focus Visible for Keyboard Navigation */
+.wizard-btn:focus-visible,
+.wizard-form-group__input:focus-visible {
+  outline: 3px solid var(--ez-primary-500);
+  outline-offset: 2px;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  .wizard-step__circle {
+    border-width: 4px;
+  }
+
+  .kanban-card {
+    border-width: 2px;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .wizard-step__circle,
+  .kanban-card,
+  .wizard-btn {
+    transform: none !important;
+  }
+}

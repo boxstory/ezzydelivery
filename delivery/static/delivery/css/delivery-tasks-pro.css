@@ -1,0 +1,587 @@
+/**
+ * Delivery Tasks - Professional Enhancement
+ * Using brand-kit-pro.css variables
+ * Features: Card layout, zone filtering, priority indicators, route optimization
+ *
+ * Brand: Ezzy Delivery - Yellow (#f7c000) + Navy (#001f3f)
+ */
+
+/* ========================================
+   TASK TABS - SEGMENTED CONTROL
+   ======================================== */
+.task-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--ez-space-2);
+  padding: var(--ez-space-4) var(--ez-space-4) var(--ez-space-3);
+  background: var(--ez-grey-50);
+  position: sticky;
+  top: 56px;
+  z-index: 100;
+}
+
+.task-tabs--four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.task-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ez-space-3) var(--ez-space-2);
+  background: var(--ez-white);
+  border: 2px solid var(--ez-grey-300);
+  border-radius: var(--ez-radius-xl);
+  text-decoration: none;
+  color: var(--ez-grey-700);
+  font-weight: var(--ez-font-weight-semibold);
+  font-size: var(--ez-font-sm);
+  min-height: 64px;
+  transition: all 0.2s ease;
+  position: relative;
+  box-shadow: var(--ez-shadow-xs);
+}
+
+.task-tab:active {
+  transform: scale(0.95);
+}
+
+.task-tab--active {
+  background: var(--ez-gradient-primary);
+  border-color: var(--ez-primary-600);
+  color: var(--ez-grey-900);
+  box-shadow: var(--ez-shadow-md);
+}
+
+.task-tab__label {
+  display: block;
+  margin-bottom: var(--ez-space-1);
+  font-size: var(--ez-font-sm);
+}
+
+.task-tab__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--ez-space-2);
+  background: var(--ez-grey-200);
+  color: var(--ez-grey-800);
+  border-radius: var(--ez-radius-full);
+  font-size: var(--ez-font-xs);
+  font-weight: var(--ez-font-weight-bold);
+}
+
+.task-tab--active .task-tab__badge {
+  background: var(--ez-navy-500);
+  color: var(--ez-white);
+}
+
+/* ========================================
+   DELIVERY FILTERS - CHIPS
+   ======================================== */
+.delivery-filters {
+  padding: 0 var(--ez-space-4) var(--ez-space-3);
+  background: var(--ez-grey-50);
+  position: sticky;
+  top: 140px;
+  z-index: 99;
+}
+
+.delivery-filters__row {
+  display: flex;
+  gap: var(--ez-space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: var(--ez-space-1);
+}
+
+.delivery-filters__row::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-chip {
+  flex-shrink: 0;
+  padding: var(--ez-space-2) var(--ez-space-4);
+  background: var(--ez-white);
+  border: 2px solid var(--ez-grey-300);
+  border-radius: var(--ez-radius-full);
+  font-size: var(--ez-font-sm);
+  font-weight: var(--ez-font-weight-semibold);
+  color: var(--ez-grey-700);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ez-space-1);
+}
+
+.filter-chip:active {
+  transform: scale(0.95);
+}
+
+.filter-chip--active {
+  background: var(--ez-navy-500);
+  border-color: var(--ez-navy-600);
+  color: var(--ez-white);
+  box-shadow: var(--ez-shadow-md);
+}
+
+.filter-chip--primary {
+  background: var(--ez-primary-500);
+  border-color: var(--ez-primary-600);
+  color: var(--ez-grey-900);
+  box-shadow: var(--ez-shadow-md);
+}
+
+/* Zone Dropdown Integration */
+.zone-dropdown {
+  position: relative;
+}
+
+.zone-dropdown .dropdown-menu {
+  border-radius: var(--ez-radius-lg);
+  box-shadow: var(--ez-shadow-xl);
+  border: 1px solid var(--ez-grey-300);
+  padding: var(--ez-space-2);
+  min-width: 200px;
+}
+
+.zone-dropdown .dropdown-item {
+  border-radius: var(--ez-radius-md);
+  padding: var(--ez-space-2) var(--ez-space-3);
+  font-size: var(--ez-font-sm);
+  font-weight: var(--ez-font-weight-medium);
+  transition: all 0.2s ease;
+}
+
+.zone-dropdown .dropdown-item:hover {
+  background: var(--ez-grey-100);
+}
+
+.zone-dropdown .dropdown-item.active {
+  background: var(--ez-primary-100);
+  color: var(--ez-primary-800);
+}
+
+/* ========================================
+   DELIVERY SORT CONTROLS
+   ======================================== */
+.delivery-sort {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--ez-space-3) var(--ez-space-4);
+  background: var(--ez-white);
+  border-bottom: 1px solid var(--ez-grey-200);
+  position: sticky;
+  top: 200px;
+  z-index: 98;
+}
+
+.delivery-sort__count {
+  font-size: var(--ez-font-sm);
+  color: var(--ez-grey-700);
+  font-weight: var(--ez-font-weight-semibold);
+}
+
+.delivery-sort__controls {
+  display: flex;
+  gap: var(--ez-space-2);
+}
+
+.sort-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ez-white);
+  border: 2px solid var(--ez-grey-300);
+  border-radius: var(--ez-radius-lg);
+  color: var(--ez-grey-600);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-size: var(--ez-font-base);
+}
+
+.sort-btn:active {
+  transform: scale(0.9);
+}
+
+.sort-btn--active {
+  background: var(--ez-primary-500);
+  border-color: var(--ez-primary-600);
+  color: var(--ez-grey-900);
+  box-shadow: var(--ez-shadow-sm);
+}
+
+/* ========================================
+   TASK CARD LIST - MODERN CARD DESIGN
+   ======================================== */
+.pwa-task-list {
+  padding: var(--ez-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-3);
+  background: var(--ez-grey-50);
+}
+
+.pwa-task-card {
+  background: var(--ez-white);
+  border-radius: var(--ez-radius-xl);
+  box-shadow: var(--ez-shadow-md);
+  border: 1px solid var(--ez-grey-200);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.pwa-task-card:active {
+  transform: scale(0.98);
+  box-shadow: var(--ez-shadow-sm);
+}
+
+.pwa-task-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--ez-space-3) var(--ez-space-4);
+  background: var(--ez-grey-50);
+  border-bottom: 1px solid var(--ez-grey-200);
+}
+
+.pwa-task-card__id {
+  font-family: var(--ez-font-family-mono);
+  font-size: var(--ez-font-sm);
+  font-weight: var(--ez-font-weight-bold);
+  color: var(--ez-navy-600);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+}
+
+.pwa-task-card__status {
+  padding: var(--ez-space-1) var(--ez-space-3);
+  border-radius: var(--ez-radius-full);
+  font-size: var(--ez-font-xs);
+  font-weight: var(--ez-font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pwa-task-card__status--pending {
+  background: var(--ez-warning-light);
+  color: var(--ez-warning-dark);
+}
+
+.pwa-task-card__status--accepted {
+  background: var(--ez-info-light);
+  color: var(--ez-info-dark);
+}
+
+.pwa-task-card__status--transit {
+  background: var(--ez-primary-100);
+  color: var(--ez-primary-800);
+}
+
+.pwa-task-card__status--delivered {
+  background: var(--ez-success-light);
+  color: var(--ez-success-dark);
+}
+
+.pwa-task-card__status--cancelled {
+  background: var(--ez-error-light);
+  color: var(--ez-error-dark);
+}
+
+.pwa-task-card__body {
+  padding: var(--ez-space-4);
+}
+
+.pwa-task-card__business {
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-2);
+  font-size: var(--ez-font-sm);
+  color: var(--ez-grey-700);
+  font-weight: var(--ez-font-weight-semibold);
+  margin-bottom: var(--ez-space-3);
+}
+
+.pwa-task-card__business i {
+  color: var(--ez-primary-600);
+}
+
+/* ========================================
+   ROUTE VISUALIZATION
+   ======================================== */
+.pwa-task-card__route {
+  display: flex;
+  gap: var(--ez-space-3);
+  margin-bottom: var(--ez-space-3);
+}
+
+.pwa-task-card__route-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.pwa-task-card__route-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ez-success);
+  border: 3px solid var(--ez-success-light);
+  box-shadow: 0 0 0 2px var(--ez-white);
+}
+
+.pwa-task-card__route-dot--end {
+  background: var(--ez-error);
+  border-color: var(--ez-error-light);
+}
+
+.pwa-task-card__route-connector {
+  width: 2px;
+  flex: 1;
+  background: linear-gradient(180deg, var(--ez-success) 0%, var(--ez-grey-300) 50%, var(--ez-error) 100%);
+  margin: var(--ez-space-1) 0;
+  min-height: 40px;
+}
+
+.pwa-task-card__route-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.pwa-task-card__location {
+  padding: var(--ez-space-2) 0;
+}
+
+.pwa-task-card__location-label {
+  font-size: var(--ez-font-xs);
+  color: var(--ez-grey-500);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: var(--ez-font-weight-semibold);
+  margin-bottom: var(--ez-space-1);
+}
+
+.pwa-task-card__location-value {
+  font-size: var(--ez-font-sm);
+  color: var(--ez-grey-900);
+  font-weight: var(--ez-font-weight-medium);
+  line-height: var(--ez-line-height-tight);
+}
+
+/* ========================================
+   TASK CARD FOOTER - META & ACTIONS
+   ======================================== */
+.pwa-task-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--ez-space-3) var(--ez-space-4);
+  background: var(--ez-grey-50);
+  border-top: 1px solid var(--ez-grey-200);
+}
+
+.pwa-task-card__meta {
+  display: flex;
+  gap: var(--ez-space-3);
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.pwa-task-card__meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-1);
+  font-size: var(--ez-font-xs);
+  color: var(--ez-grey-600);
+}
+
+.pwa-task-card__meta-item i {
+  color: var(--ez-grey-500);
+}
+
+.pwa-task-card__cod {
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-1);
+  padding: var(--ez-space-1) var(--ez-space-2);
+  background: var(--ez-warning-light);
+  color: var(--ez-warning-dark);
+  border-radius: var(--ez-radius-md);
+  font-size: var(--ez-font-xs);
+  font-weight: var(--ez-font-weight-bold);
+}
+
+/* ========================================
+   BUTTONS - TOUCH-OPTIMIZED
+   ======================================== */
+.pwa-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ez-space-3) var(--ez-space-5);
+  font-size: var(--ez-font-base);
+  font-weight: var(--ez-font-weight-semibold);
+  border-radius: var(--ez-radius-lg);
+  border: none;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.pwa-btn--primary {
+  background: var(--ez-gradient-primary);
+  color: var(--ez-grey-900);
+  box-shadow: var(--ez-shadow-md);
+}
+
+.pwa-btn--primary:active {
+  transform: scale(0.95);
+  box-shadow: var(--ez-shadow-sm);
+}
+
+.pwa-btn--block {
+  width: 100%;
+}
+
+.pwa-btn--compact {
+  padding: var(--ez-space-2) var(--ez-space-4);
+  font-size: var(--ez-font-sm);
+  min-height: 36px;
+}
+
+/* ========================================
+   PRIORITY INDICATORS
+   ======================================== */
+.pwa-task-card--urgent {
+  border-left: 4px solid var(--ez-error);
+}
+
+.pwa-task-card--high {
+  border-left: 4px solid var(--ez-warning);
+}
+
+.pwa-task-card--normal {
+  border-left: 4px solid var(--ez-info);
+}
+
+.pwa-task-card--low {
+  border-left: 4px solid var(--ez-grey-400);
+}
+
+/* ========================================
+   ANIMATIONS
+   ======================================== */
+.pwa-fade-in {
+  animation: fadeInTask 0.3s ease-out backwards;
+}
+
+@keyframes fadeInTask {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================
+   EMPTY STATE
+   ======================================== */
+.pwa-empty-state {
+  text-align: center;
+  padding: var(--ez-space-16) var(--ez-space-4);
+  background: var(--ez-white);
+  border-radius: var(--ez-radius-2xl);
+  margin: var(--ez-space-4);
+  box-shadow: var(--ez-shadow-sm);
+}
+
+.pwa-empty-state__icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto var(--ez-space-4);
+  border-radius: 50%;
+  background: var(--ez-grey-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--ez-font-4xl);
+  color: var(--ez-grey-400);
+}
+
+.pwa-empty-state__title {
+  font-size: var(--ez-font-xl);
+  font-weight: var(--ez-font-weight-bold);
+  color: var(--ez-grey-900);
+  margin-bottom: var(--ez-space-2);
+}
+
+.pwa-empty-state__text {
+  font-size: var(--ez-font-base);
+  color: var(--ez-grey-600);
+  margin-bottom: var(--ez-space-6);
+  max-width: 300px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: var(--ez-line-height-relaxed);
+}
+
+/* ========================================
+   RESPONSIVE - DESKTOP VIEW
+   ======================================== */
+@media (min-width: 768px) {
+  .delivery-filters,
+  .delivery-sort,
+  .task-tabs {
+    position: static;
+  }
+
+  .pwa-task-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: var(--ez-space-4);
+  }
+}
+
+/* ========================================
+   ACCESSIBILITY
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+  .pwa-task-card,
+  .task-tab,
+  .filter-chip,
+  .sort-btn,
+  .pwa-btn {
+    transition: none;
+  }
+
+  .pwa-fade-in {
+    animation: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .pwa-task-card,
+  .task-tab,
+  .filter-chip {
+    border-width: 2px;
+  }
+}

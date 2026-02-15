@@ -3,7 +3,9 @@
 {% load crispy_forms_tags %}
 
 {% block extra_css %}
-<!-- Dashboard styles now in business.css for HTMX compatibility -->
+<link rel="stylesheet" href="{% static 'brand-kit-pro.css' %}">
+<link rel="stylesheet" href="{% static 'business/css/business-dashboard-pro.css' %}">
+<!-- Dashboard styles now in business-dashboard-pro.css for HTMX compatibility -->
 {% endblock extra_css %}
 
 {% block title %}BUSINESS DASHBOARD{% endblock title %}
@@ -347,46 +349,40 @@
     {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="client" %}
 
     <!-- Analytics Charts Row -->
-    <div class="row g-3 px-2 mt-3">
+    <div class="business-dashboard__chart-grid">
       <!-- Left Column: Weekly Orders Trend -->
-      <div class="col-md-5">
-        <div class="card animate__animated animate__fadeIn" style="animation-delay: 0.1s;">
-          <div class="card-header" style="background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark)); color: var(--brand-black);">
-            <h5 class="mb-0" style="font-weight: 600;">
-              <i class="fa-solid fa-chart-line me-2"></i>Weekly Orders Trend
-            </h5>
-          </div>
-          <div class="card-body">
-            <div id="weeklyOrdersChart" style="min-height: 300px;"></div>
-          </div>
+      <div class="business-dashboard__chart-card business-dashboard__chart-card--large">
+        <div class="business-dashboard__chart-header business-dashboard__chart-header--primary">
+          <h5 class="business-dashboard__chart-title">
+            <i class="fa-solid fa-chart-line"></i>Weekly Orders Trend
+          </h5>
+        </div>
+        <div class="business-dashboard__chart-body">
+          <div id="weeklyOrdersChart"></div>
         </div>
       </div>
 
       <!-- Middle Column: Order Status -->
-      <div class="col-md-4">
-        <div class="card animate__animated animate__fadeIn" style="animation-delay: 0.2s;">
-          <div class="card-header" style="background: linear-gradient(135deg, #001f3f, #003366); color: white;">
-            <h5 class="mb-0" style="font-weight: 600;">
-              <i class="fa-solid fa-chart-pie me-2"></i>Order Status
-            </h5>
-          </div>
-          <div class="card-body" style="padding: 1rem;">
-            <div id="orderStatusChart" style="min-height: 300px;"></div>
-          </div>
+      <div class="business-dashboard__chart-card business-dashboard__chart-card--medium">
+        <div class="business-dashboard__chart-header business-dashboard__chart-header--navy">
+          <h5 class="business-dashboard__chart-title">
+            <i class="fa-solid fa-chart-pie"></i>Order Status
+          </h5>
+        </div>
+        <div class="business-dashboard__chart-body">
+          <div id="orderStatusChart"></div>
         </div>
       </div>
 
       <!-- Right Column: COD Status -->
-      <div class="col-md-3">
-        <div class="card animate__animated animate__fadeIn" style="animation-delay: 0.3s;">
-          <div class="card-header" style="background: linear-gradient(135deg, #F59E0B, #D97706); color: var(--brand-black);">
-            <h5 class="mb-0" style="font-weight: 600;">
-              <i class="fa-solid fa-money-bill-wave me-2"></i>COD Status
-            </h5>
-          </div>
-          <div class="card-body" style="padding: 1rem;">
-            <div id="codStatusChart" style="min-height: 300px;"></div>
-          </div>
+      <div class="business-dashboard__chart-card business-dashboard__chart-card--small">
+        <div class="business-dashboard__chart-header business-dashboard__chart-header--warning">
+          <h5 class="business-dashboard__chart-title">
+            <i class="fa-solid fa-money-bill-wave"></i>COD Status
+          </h5>
+        </div>
+        <div class="business-dashboard__chart-body">
+          <div id="codStatusChart"></div>
         </div>
       </div>
     </div>

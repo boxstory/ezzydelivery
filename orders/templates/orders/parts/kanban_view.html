@@ -1,0 +1,177 @@
+{% load business_pwa_tags %}
+{% load custom_filters %}
+
+<!-- Kanban Board View -->
+<div id="orders-kanban-view" class="d-none">
+  <div class="kanban-board">
+
+    <!-- Column 1: To Review -->
+    <div class="kanban-column kanban-column--review" id="kanban-column-review" data-status="to_review">
+      <div class="kanban-column__header">
+        <div class="kanban-column__title">
+          <i class="fas fa-clock"></i>
+          <span>To Review</span>
+        </div>
+        <div class="kanban-column__count">{{ review_count|default:0 }}</div>
+      </div>
+      <div class="kanban-cards">
+        {% for order in orders %}
+          {% if order.order_status == 'to_review' %}
+          <div class="kanban-card" data-order-id="{{ order.id }}" data-status="to_review" onclick="window.location.href='{% url 'orders:order_details' order.id %}'">
+            <div class="kanban-card__header">
+              <div class="kanban-card__number">#{{ order.order_number }}</div>
+              <div class="kanban-card__badge">To Review</div>
+            </div>
+            <div class="kanban-card__customer">{{ order.customer_name }}</div>
+            <div class="kanban-card__meta">
+              <div class="kanban-card__meta-item">
+                <i class="fas fa-phone"></i>
+                <span>{{ order.customer_phone }}</span>
+              </div>
+              <div class="kanban-card__meta-item">
+                <i class="fas fa-map-marker-alt"></i>
+                <span>{% get_zone_display order %}</span>
+              </div>
+            </div>
+            <div class="kanban-card__footer">
+              {% if order.cod_amount %}
+              <div class="kanban-card__cod">
+                <i class="fas fa-money-bill-wave"></i> QAR {{ order.cod_amount }}
+              </div>
+              {% endif %}
+              <div class="kanban-card__date">{{ order.order_date|date:"d M" }}</div>
+            </div>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Column 2: Confirmed -->
+    <div class="kanban-column kanban-column--confirmed" id="kanban-column-confirmed" data-status="ready_to_pickup">
+      <div class="kanban-column__header">
+        <div class="kanban-column__title">
+          <i class="fas fa-clipboard-check"></i>
+          <span>Confirmed</span>
+        </div>
+        <div class="kanban-column__count">{{ confirmed_count|default:0 }}</div>
+      </div>
+      <div class="kanban-cards">
+        {% for order in orders %}
+          {% if order.order_status == 'ready_to_pickup' %}
+          <div class="kanban-card" data-order-id="{{ order.id }}" data-status="ready_to_pickup" onclick="window.location.href='{% url 'orders:order_details' order.id %}'">
+            <div class="kanban-card__header">
+              <div class="kanban-card__number">#{{ order.order_number }}</div>
+              <div class="kanban-card__badge">Confirmed</div>
+            </div>
+            <div class="kanban-card__customer">{{ order.customer_name }}</div>
+            <div class="kanban-card__meta">
+              <div class="kanban-card__meta-item">
+                <i class="fas fa-phone"></i>
+                <span>{{ order.customer_phone }}</span>
+              </div>
+              <div class="kanban-card__meta-item">
+                <i class="fas fa-map-marker-alt"></i>
+                <span>{% get_zone_display order %}</span>
+              </div>
+            </div>
+            <div class="kanban-card__footer">
+              {% if order.cod_amount %}
+              <div class="kanban-card__cod">
+                <i class="fas fa-money-bill-wave"></i> QAR {{ order.cod_amount }}
+              </div>
+              {% endif %}
+              <div class="kanban-card__date">{{ order.order_date|date:"d M" }}</div>
+            </div>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Column 3: Published -->
+    <div class="kanban-column kanban-column--published" id="kanban-column-published" data-status="publish">
+      <div class="kanban-column__header">
+        <div class="kanban-column__title">
+          <i class="fas fa-rocket"></i>
+          <span>Published</span>
+        </div>
+        <div class="kanban-column__count">{{ published_count|default:0 }}</div>
+      </div>
+      <div class="kanban-cards">
+        {% for order in orders %}
+          {% if order.order_status == 'publish' %}
+          <div class="kanban-card" data-order-id="{{ order.id }}" data-status="publish" onclick="window.location.href='{% url 'orders:order_details' order.id %}'">
+            <div class="kanban-card__header">
+              <div class="kanban-card__number">#{{ order.order_number }}</div>
+              <div class="kanban-card__badge">Published</div>
+            </div>
+            <div class="kanban-card__customer">{{ order.customer_name }}</div>
+            <div class="kanban-card__meta">
+              <div class="kanban-card__meta-item">
+                <i class="fas fa-phone"></i>
+                <span>{{ order.customer_phone }}</span>
+              </div>
+              <div class="kanban-card__meta-item">
+                <i class="fas fa-map-marker-alt"></i>
+                <span>{% get_zone_display order %}</span>
+              </div>
+            </div>
+            <div class="kanban-card__footer">
+              {% if order.cod_amount %}
+              <div class="kanban-card__cod">
+                <i class="fas fa-money-bill-wave"></i> QAR {{ order.cod_amount }}
+              </div>
+              {% endif %}
+              <div class="kanban-card__date">{{ order.order_date|date:"d M" }}</div>
+            </div>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Column 4: Cancelled -->
+    <div class="kanban-column kanban-column--cancelled" id="kanban-column-cancelled" data-status="cancelled">
+      <div class="kanban-column__header">
+        <div class="kanban-column__title">
+          <i class="fas fa-ban"></i>
+          <span>Cancelled</span>
+        </div>
+        <div class="kanban-column__count">{{ cancelled_count|default:0 }}</div>
+      </div>
+      <div class="kanban-cards">
+        {% for order in orders %}
+          {% if order.order_status == 'cancelled' %}
+          <div class="kanban-card" data-order-id="{{ order.id }}" data-status="cancelled" onclick="window.location.href='{% url 'orders:order_details' order.id %}'">
+            <div class="kanban-card__header">
+              <div class="kanban-card__number">#{{ order.order_number }}</div>
+              <div class="kanban-card__badge">Cancelled</div>
+            </div>
+            <div class="kanban-card__customer">{{ order.customer_name }}</div>
+            <div class="kanban-card__meta">
+              <div class="kanban-card__meta-item">
+                <i class="fas fa-phone"></i>
+                <span>{{ order.customer_phone }}</span>
+              </div>
+              <div class="kanban-card__meta-item">
+                <i class="fas fa-map-marker-alt"></i>
+                <span>{% get_zone_display order %}</span>
+              </div>
+            </div>
+            <div class="kanban-card__footer">
+              {% if order.cod_amount %}
+              <div class="kanban-card__cod">
+                <i class="fas fa-money-bill-wave"></i> QAR {{ order.cod_amount }}
+              </div>
+              {% endif %}
+              <div class="kanban-card__date">{{ order.order_date|date:"d M" }}</div>
+            </div>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+</div>

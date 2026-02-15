@@ -8,6 +8,9 @@
   <link href="{% static 'orders/css/orders.css' %}?v=20260212c"
         rel="stylesheet"
         type="text/css" />
+  <link href="{% static 'orders/css/orders-wizard.css' %}"
+        rel="stylesheet"
+        type="text/css" />
 {% endblock extra_css %}
 {% block content %}
   <!-- ==========================================
@@ -140,7 +143,16 @@
             <div class="d-flex align-items-center gap-3">
               <div class="m-0 fs-5 fw-bolder" id="orders_pending_list_title">Pending Orders ({{ len }})</div>
             </div>
-            <div class="d-flex flex-wrap gap-2" id="orders_pending_list_nav_actions">
+            <div class="d-flex flex-wrap gap-2 align-items-center" id="orders_pending_list_nav_actions">
+              <!-- View Toggle -->
+              <div class="btn-group" role="group" aria-label="View toggle">
+                <button type="button" class="btn btn-outline-secondary btn-sm active" id="view-toggle-table">
+                  <i class="fas fa-table me-1"></i> Table
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="view-toggle-kanban">
+                  <i class="fas fa-columns me-1"></i> Kanban
+                </button>
+              </div>
               <a class="btn btn-dark btn-sm text-white"
                  href="{% url 'orders:add_order' %}"
                  id="orders_pending_list_btn_add_orders">
@@ -149,9 +161,12 @@
             </div>
           </div>
 
-          <div id="orders_pending_table_view">
+          <div id="orders-table-view">
             {% include "orders/parts/order_list_table_view.html" %}
           </div>
+
+          <!-- Kanban View -->
+          {% include "orders/parts/kanban_view.html" %}
 
           <!-- Bulk Action Bar -->
           <div class="bulk-action-bar" id="orders_pending_bulk_action_bar" style="display: none;">
@@ -413,5 +428,10 @@
       });
     });
   })();
+  </script>
+  <script src="{% static 'orders/js/orders-kanban.js' %}"></script>
+  <script>
+    // Set the order status update URL for kanban
+    window.orderStatusUpdateUrl = '{% url "orders:update_order_status" %}';
   </script>
 {% endblock extra_js %}

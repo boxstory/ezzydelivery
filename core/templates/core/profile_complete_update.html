@@ -5,49 +5,67 @@
 
 {% block extra_css %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/account-forms.css' %}?v=20260214a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<div class="auth-container" id="core_profile_complete_container_main">
-    <div class="auth-card" id="core_profile_complete_card_main">
-        <!-- Header with Progress Circle -->
-        <div class="auth-header" id="core_profile_complete_header">
-            <div class="completion-circle-container">
-                <svg class="completion-circle" width="120" height="120" viewBox="0 0 120 120">
-                    <circle class="circle-bg" cx="60" cy="60" r="52"></circle>
-                    <circle class="circle-progress" cx="60" cy="60" r="52"
-                            stroke-dasharray="326.73"
-                            style="stroke-dashoffset: calc(326.73 - (326.73 * {{ completion_percentage }} / 100));">
-                    </circle>
-                </svg>
-                <div class="completion-text">{{ completion_percentage }}%</div>
-            </div>
-            <h1 id="core_profile_complete_title_main">Complete Your Profile</h1>
-            <p id="core_profile_complete_subtitle">Fill in all required fields to proceed with registration</p>
-        </div>
+<section id="core_profile_complete_section_main">
+    <div class="container-fluid py-4 px-3">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-10 col-xl-8">
+                <div class="card border-0 shadow-lg" id="core_profile_complete_card_main">
+                    <!-- Header with Progress Circle -->
+                    <div class="card-header bg-transparent border-0 text-center pt-5 pb-4" id="core_profile_complete_header">
+                        <div class="d-flex justify-content-center mb-4">
+                            <div class="position-relative" id="core_profile_complete_progress_wrapper">
+                                <svg class="completion-circle" width="140" height="140" viewBox="0 0 140 140">
+                                    <defs>
+                                        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#f7c000;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#ffd54f;stop-opacity:1" />
+                                        </linearGradient>
+                                    </defs>
+                                    <circle class="circle-bg" cx="70" cy="70" r="60"></circle>
+                                    <circle class="circle-progress" cx="70" cy="70" r="60"
+                                            stroke="url(#progressGradient)"
+                                            stroke-dasharray="376.99"
+                                            stroke-dashoffset="calc(376.99 - (376.99 * {{ completion_percentage }} / 100))">
+                                    </circle>
+                                </svg>
+                                <div class="position-absolute top-50 start-50 translate-middle text-center">
+                                    <div class="fw-bold" id="core_profile_complete_percentage">{{ completion_percentage }}%</div>
+                                    <div class="small text-muted">Complete</div>
+                                </div>
+                            </div>
+                        </div>
+                        <h1 class="h2 fw-bold mb-2" id="core_profile_complete_title_main">Complete Your Profile</h1>
+                        <p class="text-muted mb-0" id="core_profile_complete_subtitle">Fill in all required fields to proceed with registration</p>
+                    </div>
 
-        <!-- Form Body -->
-        <div class="auth-body" id="core_profile_complete_section_body">
-            {% if completion_percentage < 100 %}
-            <div class="info-alert">
-                <i class="fa-solid fa-circle-info me-2"></i>
-                <div>
-                    <strong>Profile Incomplete:</strong> Please fill in all required fields to unlock the registration buttons.
-                </div>
-            </div>
-            {% else %}
-            <div class="warning-alert">
-                <i class="fa-solid fa-check-circle me-2"></i>
-                <div>
-                    <strong>Profile Complete!</strong> Choose your role below to continue with registration.
-                </div>
-            </div>
-            {% endif %}
+                    <!-- Form Body -->
+                    <div class="card-body px-4 px-lg-5 py-4" id="core_profile_complete_section_body">
+                        {% if completion_percentage < 100 %}
+                        <div class="alert alert-info d-flex align-items-start gap-3 border-0 shadow-sm mb-4" role="alert">
+                            <i class="fa-solid fa-circle-info fs-5 mt-1"></i>
+                            <div>
+                                <strong class="d-block mb-1">Profile Incomplete</strong>
+                                <span class="small">Please fill in all required fields to unlock the registration buttons.</span>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-success d-flex align-items-start gap-3 border-0 shadow-sm mb-4" role="alert">
+                            <i class="fa-solid fa-check-circle fs-5 mt-1"></i>
+                            <div>
+                                <strong class="d-block mb-1">Profile Complete!</strong>
+                                <span class="small">Choose your role below to continue with registration.</span>
+                            </div>
+                        </div>
+                        {% endif %}
 
-            <form id="core_profile_complete_form_main" method="post">
-                {% csrf_token %}
+                        <form id="core_profile_complete_form_main" method="post" class="needs-validation" novalidate>
+                            {% csrf_token %}
 
-                <div class="row g-3">
+                            <div class="row g-4">
                     <div class="col-md-6">
                         <div class="form-group">
                             <label class="form-label" for="{{ form.username.id_for_label }}">
@@ -192,35 +210,50 @@
                     </div>
                 </div>
 
-                <!-- Action Buttons -->
-                <div class="d-flex justify-content-between align-items-center mt-4" style="gap: 1rem;">
-                    <button id="core_profile_complete_btn_save" type="submit" name="action" value="save" class="btn-action btn-save">
-                        <i class="fa-solid fa-floppy-disk"></i>Save Progress
-                    </button>
+                            </div>
 
-                    <div class="role-selection">
-                        <button id="core_profile_complete_btn_register_business" type="submit" name="action" value="register_business"
-                                class="btn-action btn-register"
-                                {% if completion_percentage < 100 %}disabled{% endif %}>
-                            <i class="fa-solid fa-building"></i>Register as Business
-                        </button>
+                            <!-- Action Buttons -->
+                            <div class="mt-5 pt-4 border-top">
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-4">
+                                        <button id="core_profile_complete_btn_save" type="submit" name="action" value="save"
+                                                class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center gap-2 py-3">
+                                            <i class="fa-solid fa-floppy-disk"></i>
+                                            <span>Save Progress</span>
+                                        </button>
+                                    </div>
 
-                        <button id="core_profile_complete_btn_join_driver" type="submit" name="action" value="join_driver"
-                                class="btn-action btn-register"
-                                {% if completion_percentage < 100 %}disabled{% endif %}>
-                            <i class="fa-solid fa-car"></i>Join as Driver
-                        </button>
+                                    <div class="col-12 col-md-4">
+                                        <button id="core_profile_complete_btn_register_business" type="submit" name="action" value="register_business"
+                                                class="btn btn-warning w-100 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold"
+                                                {% if completion_percentage < 100 %}disabled{% endif %}>
+                                            <i class="fa-solid fa-building"></i>
+                                            <span>Register as Business</span>
+                                        </button>
+                                    </div>
+
+                                    <div class="col-12 col-md-4">
+                                        <button id="core_profile_complete_btn_join_driver" type="submit" name="action" value="join_driver"
+                                                class="btn btn-warning w-100 d-flex align-items-center justify-content-center gap-2 py-3 fw-bold"
+                                                {% if completion_percentage < 100 %}disabled{% endif %}>
+                                            <i class="fa-solid fa-car"></i>
+                                            <span>Join as Driver</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {% if completion_percentage < 100 %}
+                                <p class="text-muted small text-center mt-4 mb-0">
+                                    <i class="fa-solid fa-info-circle me-2"></i>
+                                    Complete all required fields to enable role selection
+                                </p>
+                                {% endif %}
+                            </div>
+                        </form>
                     </div>
                 </div>
-
-                {% if completion_percentage < 100 %}
-                <p class="text-muted small text-center mt-3 mb-0">
-                    <i class="fa-solid fa-info-circle me-1"></i>
-                    Complete all required fields to enable role selection
-                </p>
-                {% endif %}
-            </form>
+            </div>
         </div>
     </div>
-</div>
+</section>
 {% endblock content %}

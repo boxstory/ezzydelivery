@@ -3,7 +3,9 @@
 {% load crispy_forms_tags %}
 {% load zone_tags %}
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'brand-kit-pro.css' %}">
 <link rel="stylesheet" href="{% static 'delivery/css/delivery-tasks-mobile.css' %}?v=20260214a">
+<link rel="stylesheet" href="{% static 'delivery/css/delivery-tasks-pro.css' %}">
 {% endblock extra_css %}
 {% block content %}
   <!-- Mobile PWA Task List View -->
@@ -269,9 +271,15 @@
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
                       <small class="text-muted d-block">Customer</small>
+                      {% if card.dl_to_address %}
                       <span class="fw-bold">{{ card.dl_to_address.full_name|default:"N/A" }}</span>
                     </div>
                     <span class="text-muted small">{{ card.dl_to_address.mobile_no|default:"N/A" }}</span>
+                      {% else %}
+                      <span class="fw-bold">{{ card.order.customer_name|default:"N/A" }}</span>
+                    </div>
+                    <span class="text-muted small">{{ card.order.customer_phone|default:"N/A" }}</span>
+                      {% endif %}
                   </div>
                 </div>
               </div>
@@ -469,11 +477,11 @@
         {% endif %}
       </p>
       {% if current_tab == 'assigned' or current_tab == 'accepted' %}
-      <a href="?tab=all" class="pwa-btn pwa-btn--primary">
+      <a href="?tab=all" class="pwa-btn pwa-btn--primary pwa-btn--compact">
         <i class="fa-solid fa-list me-2"></i>View New Tasks
       </a>
       {% else %}
-      <a href="{% url 'fleet:fleet_dashboard' %}" class="pwa-btn pwa-btn--primary">
+      <a href="{% url 'fleet:fleet_dashboard' %}" class="pwa-btn pwa-btn--primary pwa-btn--compact">
         <i class="fa-solid fa-home me-2"></i>Go to Dashboard
       </a>
       {% endif %}
@@ -560,7 +568,11 @@
               </div>
               <div class="d-flex align-items-center">
                 <i class="fa-solid fa-circle text-danger me-2" style="font-size: 6px;"></i>
+                {% if card.dl_to_address %}
                 <span>Zone {{ card.dl_to_address.dl_zone|default:"-" }}{% with zg=zone_group_map|get_zone_group:card.dl_to_address.dl_zone %}{% if zg %} - {{ zg }}{% endif %}{% endwith %}, {{ card.dl_to_address.area_name|default:"N/A" }}</span>
+                {% else %}
+                <span class="text-muted">No delivery address</span>
+                {% endif %}
               </div>
             </td>
             <td>
@@ -592,9 +604,15 @@
                   <div class="col-12 col-md-4">
                     <div class="fw-bold text-danger mb-2"><i class="fa-solid fa-location-dot me-1"></i>To</div>
                     <div class="small">
+                      {% if card.dl_to_address %}
                       <div class="mb-1"><span class="text-muted">Zone & Place:</span> {{ card.dl_to_address.dl_zone|default:"-" }}{% with zg=zone_group_map|get_zone_group:card.dl_to_address.dl_zone %}{% if zg %} ({{ zg }}){% endif %}{% endwith %} - {{ card.dl_to_address.area_name|default:"N/A" }}</div>
                       <div class="mb-1"><span class="text-muted">St & Bld:</span> {{ card.dl_to_address.dl_street|default:"-" }} - {{ card.dl_to_address.dl_building|default:"-" }}</div>
                       <div class="mb-1"><span class="text-muted">Customer:</span> {{ card.dl_to_address.full_name|default:"N/A" }}</div>
+                      {% else %}
+                      <div class="mb-1"><span class="text-muted">Zone & Place:</span> {{ card.order.dl_zone|default:"-" }} - {{ card.order.area_name|default:"N/A" }}</div>
+                      <div class="mb-1"><span class="text-muted">St & Bld:</span> {{ card.order.dl_street|default:"-" }} - {{ card.order.dl_building|default:"-" }}</div>
+                      <div class="mb-1"><span class="text-muted">Customer:</span> {{ card.order.customer_name|default:"N/A" }}</div>
+                      {% endif %}
                       <div><span class="text-muted">Notes:</span> {{ card.dl_task_description|default:"-" }}</div>
                     </div>
                   </div>

@@ -1,0 +1,448 @@
+/**
+ * Account Forms - Professional Design
+ * Unified styling for profile complete, profile add, and account pages
+ * Brand colors: Yellow (#f7c000) + Navy (#001f3f)
+ */
+
+/* ========================================
+   CSS Variables
+   ======================================== */
+:root {
+  /* Typography Scale */
+  --account-font-xs: 0.6875rem;    /* 11px */
+  --account-font-sm: 0.75rem;      /* 12px */
+  --account-font-base: 0.875rem;   /* 14px */
+  --account-font-md: 0.9375rem;    /* 15px */
+  --account-font-lg: 1rem;         /* 16px */
+  --account-font-xl: 1.125rem;     /* 18px */
+  --account-font-2xl: 1.25rem;     /* 20px */
+  --account-font-3xl: 1.5rem;      /* 24px */
+
+  /* Brand Colors */
+  --account-primary: #f7c000;
+  --account-primary-dark: #e5b000;
+  --account-primary-light: #fff7d6;
+  --account-navy: #001f3f;
+  --account-navy-light: #003366;
+
+  /* Neutral Colors */
+  --account-bg: #f5f7fa;
+  --account-card: #ffffff;
+  --account-text: #1f2937;
+  --account-text-muted: #6b7280;
+  --account-border: #e5e7eb;
+  --account-input-border: #d1d5db;
+  --account-input-focus: #f7c000;
+
+  /* Spacing */
+  --account-space-xs: 0.25rem;
+  --account-space-sm: 0.5rem;
+  --account-space-md: 0.75rem;
+  --account-space-lg: 1rem;
+  --account-space-xl: 1.5rem;
+  --account-space-2xl: 2rem;
+
+  /* Radius */
+  --account-radius-sm: 0.5rem;
+  --account-radius-md: 0.75rem;
+  --account-radius-lg: 1rem;
+  --account-radius-xl: 1.25rem;
+
+  /* Shadows */
+  --account-shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --account-shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+  --account-shadow-lg: 0 10px 20px rgba(0,0,0,0.1);
+  --account-shadow-xl: 0 20px 40px rgba(0,0,0,0.12);
+}
+
+/* ========================================
+   1. MAIN SECTION - Background & Layout
+   ======================================== */
+#core_profile_complete_section_main {
+  background: linear-gradient(135deg,
+    rgba(0, 31, 63, 0.02) 0%,
+    rgba(247, 192, 0, 0.02) 100%
+  );
+  min-height: 100vh;
+  padding: var(--account-space-2xl) 0;
+}
+
+/* ========================================
+   2. CARD - Professional Container
+   ======================================== */
+#core_profile_complete_card_main {
+  border-radius: var(--account-radius-xl);
+  overflow: hidden;
+  box-shadow: var(--account-shadow-xl);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+}
+
+#core_profile_complete_card_main::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg,
+    var(--account-primary) 0%,
+    var(--account-navy) 100%
+  );
+}
+
+/* ========================================
+   3. CARD HEADER - Progress Circle Section
+   ======================================== */
+#core_profile_complete_header {
+  background: linear-gradient(to bottom,
+    rgba(247, 192, 0, 0.02) 0%,
+    transparent 100%
+  );
+}
+
+#core_profile_complete_progress_wrapper {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Progress Circle SVG */
+.completion-circle {
+  transform: rotate(-90deg);
+  filter: drop-shadow(0 4px 12px rgba(247, 192, 0, 0.3));
+}
+
+.circle-bg {
+  fill: none;
+  stroke: var(--account-border);
+  stroke-width: 8;
+}
+
+.circle-progress {
+  fill: none;
+  stroke: url(#progressGradient);
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s ease;
+}
+
+/* Add gradient definition via inline SVG */
+svg {
+  --progress-color-start: #f7c000;
+  --progress-color-end: #ffd54f;
+}
+
+/* Progress Percentage Text */
+#core_profile_complete_percentage {
+  font-size: var(--account-font-3xl);
+  font-weight: 700;
+  color: var(--account-navy);
+  letter-spacing: -0.5px;
+}
+
+#core_profile_complete_title_main {
+  color: var(--account-navy);
+  letter-spacing: -0.5px;
+}
+
+#core_profile_complete_subtitle {
+  font-size: var(--account-font-md);
+}
+
+/* ========================================
+   4. ALERTS - Modern Design
+   ======================================== */
+.alert {
+  border-radius: var(--account-radius-md);
+  padding: var(--account-space-lg);
+  font-size: var(--account-font-base);
+}
+
+.alert-info {
+  background: linear-gradient(135deg,
+    rgba(59, 130, 246, 0.08) 0%,
+    rgba(59, 130, 246, 0.02) 100%
+  );
+  border-left: 4px solid #3b82f6 !important;
+}
+
+.alert-success {
+  background: linear-gradient(135deg,
+    rgba(16, 185, 129, 0.08) 0%,
+    rgba(16, 185, 129, 0.02) 100%
+  );
+  border-left: 4px solid #10b981 !important;
+}
+
+/* ========================================
+   5. FORM GROUPS - Enhanced Layout
+   ======================================== */
+.form-group {
+  margin-bottom: 0;
+}
+
+.form-label {
+  font-size: var(--account-font-base);
+  font-weight: 600;
+  color: var(--account-navy);
+  margin-bottom: var(--account-space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--account-space-sm);
+}
+
+.form-label i {
+  color: var(--account-primary);
+  font-size: var(--account-font-lg);
+}
+
+.form-label .text-danger {
+  color: #dc2626 !important;
+}
+
+.form-label .text-muted {
+  font-weight: 400;
+  color: var(--account-text-muted) !important;
+}
+
+/* ========================================
+   6. FORM CONTROLS - Professional Inputs
+   ======================================== */
+#core_profile_complete_form_main input[type="text"],
+#core_profile_complete_form_main input[type="email"],
+#core_profile_complete_form_main input[type="date"],
+#core_profile_complete_form_main input[type="tel"],
+#core_profile_complete_form_main select,
+#core_profile_complete_form_main textarea {
+  width: 100%;
+  padding: var(--account-space-md) var(--account-space-lg);
+  border: 2px solid var(--account-input-border);
+  border-radius: var(--account-radius-md);
+  font-size: var(--account-font-base);
+  transition: all 0.3s ease;
+  background: #ffffff;
+}
+
+#core_profile_complete_form_main input:focus,
+#core_profile_complete_form_main select:focus,
+#core_profile_complete_form_main textarea:focus {
+  outline: none;
+  border-color: var(--account-input-focus);
+  box-shadow: 0 0 0 4px rgba(247, 192, 0, 0.1);
+}
+
+#core_profile_complete_form_main input:hover,
+#core_profile_complete_form_main select:hover,
+#core_profile_complete_form_main textarea:hover {
+  border-color: var(--account-primary);
+}
+
+/* Date Input Styling */
+input[type="date"] {
+  color-scheme: light;
+}
+
+/* Textarea Specific */
+textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+/* Error State */
+#core_profile_complete_form_main .is-invalid,
+#core_profile_complete_form_main input.is-invalid {
+  border-color: #dc2626 !important;
+}
+
+.text-danger {
+  color: #dc2626;
+  font-size: var(--account-font-sm);
+  margin-top: var(--account-space-xs);
+}
+
+/* ========================================
+   7. BUTTONS - Modern Action Buttons
+   ======================================== */
+#core_profile_complete_btn_save {
+  background: transparent;
+  border: 2px solid var(--account-primary);
+  color: var(--account-navy);
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+#core_profile_complete_btn_save:hover {
+  background: var(--account-primary-light);
+  border-color: var(--account-primary-dark);
+  transform: translateY(-2px);
+  box-shadow: var(--account-shadow-md);
+}
+
+#core_profile_complete_btn_register_business,
+#core_profile_complete_btn_join_driver {
+  background: linear-gradient(135deg,
+    var(--account-primary) 0%,
+    #ffd54f 100%
+  );
+  border: none;
+  color: var(--account-navy);
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+#core_profile_complete_btn_register_business::before,
+#core_profile_complete_btn_join_driver::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transition: left 0.5s ease;
+}
+
+#core_profile_complete_btn_register_business:hover::before,
+#core_profile_complete_btn_join_driver:hover::before {
+  left: 100%;
+}
+
+#core_profile_complete_btn_register_business:hover,
+#core_profile_complete_btn_join_driver:hover {
+  background: linear-gradient(135deg,
+    #ffd54f 0%,
+    var(--account-primary) 100%
+  );
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(247, 192, 0, 0.4);
+}
+
+#core_profile_complete_btn_register_business:active,
+#core_profile_complete_btn_join_driver:active {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
+}
+
+/* Disabled State */
+#core_profile_complete_btn_register_business:disabled,
+#core_profile_complete_btn_join_driver:disabled {
+  background: var(--account-border);
+  color: var(--account-text-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+#core_profile_complete_btn_register_business:disabled:hover,
+#core_profile_complete_btn_join_driver:disabled:hover {
+  transform: none;
+}
+
+/* ========================================
+   8. RESPONSIVE DESIGN
+   ======================================== */
+@media (max-width: 991.98px) {
+  #core_profile_complete_section_main {
+    padding: var(--account-space-xl) 0;
+  }
+
+  #core_profile_complete_header {
+    padding-top: var(--account-space-2xl) !important;
+  }
+
+  .completion-circle {
+    width: 120px;
+    height: 120px;
+  }
+
+  #core_profile_complete_percentage {
+    font-size: var(--account-font-2xl);
+  }
+}
+
+@media (max-width: 767.98px) {
+  #core_profile_complete_card_main .card-body {
+    padding: var(--account-space-xl) !important;
+  }
+
+  .completion-circle {
+    width: 100px;
+    height: 100px;
+  }
+
+  #core_profile_complete_percentage {
+    font-size: var(--account-font-xl);
+  }
+
+  #core_profile_complete_title_main {
+    font-size: var(--account-font-xl);
+  }
+}
+
+/* ========================================
+   9. ANIMATIONS
+   ======================================== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#core_profile_complete_card_main {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* ========================================
+   10. ACCESSIBILITY
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus States */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--account-primary);
+  outline-offset: 2px;
+}
+
+/* ========================================
+   11. PRINT STYLES
+   ======================================== */
+@media print {
+  #core_profile_complete_section_main {
+    background: none;
+  }
+
+  #core_profile_complete_card_main {
+    box-shadow: none;
+    border: 1px solid var(--account-border);
+  }
+}

@@ -1,0 +1,509 @@
+/**
+ * BULK ORDER ENTRY - Professional Excel-like Interface
+ * Design System v2.0 - Using brand-kit-pro variables
+ */
+
+/* Bulk Entry Container */
+.bulk-entry-container {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: var(--ez-space-4);
+}
+
+/* Header Actions */
+.bulk-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--ez-space-6);
+  padding: var(--ez-space-4);
+  background: linear-gradient(135deg, var(--ez-grey-50) 0%, var(--ez-white) 100%);
+  border-radius: var(--ez-radius-lg);
+  border-left: 4px solid var(--ez-primary-500);
+}
+
+.bulk-entry-header__title {
+  font-size: var(--ez-font-2xl);
+  font-weight: var(--ez-font-weight-bold);
+  color: var(--ez-navy-500);
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-3);
+  margin: 0;
+}
+
+.bulk-entry-header__title i {
+  color: var(--ez-primary-500);
+}
+
+.bulk-entry-header__actions {
+  display: flex;
+  gap: var(--ez-space-2);
+  flex-wrap: wrap;
+}
+
+/* Drag & Drop Upload Zone */
+.bulk-upload-zone {
+  border: 3px dashed var(--ez-grey-300);
+  border-radius: var(--ez-radius-xl);
+  padding: var(--ez-space-12);
+  text-align: center;
+  background: var(--ez-grey-50);
+  cursor: pointer;
+  transition: all var(--ez-transition-base);
+  margin-bottom: var(--ez-space-6);
+}
+
+.bulk-upload-zone:hover {
+  border-color: var(--ez-primary-500);
+  background: var(--ez-primary-50);
+}
+
+.bulk-upload-zone--active {
+  border-color: var(--ez-primary-500);
+  background: var(--ez-primary-50);
+  box-shadow: var(--ez-shadow-glow-yellow);
+}
+
+.bulk-upload-zone__icon {
+  font-size: 4rem;
+  color: var(--ez-grey-400);
+  margin-bottom: var(--ez-space-4);
+  transition: all var(--ez-transition-base);
+}
+
+.bulk-upload-zone:hover .bulk-upload-zone__icon {
+  color: var(--ez-primary-500);
+  transform: scale(1.1);
+}
+
+.bulk-upload-zone__title {
+  font-size: var(--ez-font-xl);
+  font-weight: var(--ez-font-weight-bold);
+  color: var(--ez-grey-800);
+  margin-bottom: var(--ez-space-2);
+}
+
+.bulk-upload-zone__subtitle {
+  font-size: var(--ez-font-sm);
+  color: var(--ez-grey-600);
+  margin-bottom: var(--ez-space-4);
+}
+
+.bulk-upload-zone__formats {
+  display: flex;
+  justify-content: center;
+  gap: var(--ez-space-3);
+  flex-wrap: wrap;
+}
+
+.format-badge {
+  padding: var(--ez-space-1) var(--ez-space-3);
+  background: var(--ez-white);
+  border: 1px solid var(--ez-grey-300);
+  border-radius: var(--ez-radius-sm);
+  font-size: var(--ez-font-xs);
+  font-weight: var(--ez-font-weight-semibold);
+  color: var(--ez-grey-700);
+}
+
+/* Excel Table Wrapper */
+.excel-table-wrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 600px;
+  border: 1px solid var(--ez-grey-300);
+  border-radius: var(--ez-radius-lg);
+  box-shadow: var(--ez-shadow-md);
+  background: var(--ez-white);
+  margin-bottom: var(--ez-space-4);
+}
+
+.excel-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--ez-font-sm);
+  background: var(--ez-white);
+}
+
+/* Table Header */
+.excel-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.excel-table thead tr {
+  background: linear-gradient(135deg, var(--ez-navy-500) 0%, var(--ez-navy-700) 100%);
+}
+
+.excel-table thead th {
+  padding: var(--ez-space-3);
+  font-weight: var(--ez-font-weight-semibold);
+  color: var(--ez-white);
+  text-align: left;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+  font-size: var(--ez-font-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.excel-table thead th:first-child {
+  border-top-left-radius: var(--ez-radius-lg);
+}
+
+.excel-table thead th:last-child {
+  border-top-right-radius: var(--ez-radius-lg);
+  border-right: none;
+}
+
+/* Column Widths */
+.col-checkbox { width: 40px; text-align: center; }
+.col-no { width: 50px; text-align: center; }
+.col-order-id { min-width: 120px; }
+.col-date { min-width: 120px; }
+.col-customer-name { min-width: 180px; }
+.col-address { min-width: 200px; }
+.col-city { min-width: 150px; }
+.col-building { min-width: 100px; }
+.col-street { min-width: 100px; }
+.col-zone { min-width: 80px; }
+.col-phone1 { min-width: 120px; }
+.col-phone2 { min-width: 120px; }
+.col-sku { min-width: 100px; }
+.col-product { min-width: 180px; }
+.col-qty { min-width: 70px; }
+.col-price { min-width: 90px; }
+.col-note { min-width: 150px; }
+.col-stock { min-width: 100px; }
+.col-deadline { min-width: 120px; }
+
+/* Table Body */
+.excel-table tbody tr {
+  border-bottom: 1px solid var(--ez-grey-200);
+  transition: all var(--ez-transition-fast);
+}
+
+.excel-table tbody tr:hover {
+  background: var(--ez-grey-50);
+}
+
+.excel-table tbody tr.selected {
+  background: var(--ez-primary-50);
+  border-left: 3px solid var(--ez-primary-500);
+}
+
+.excel-table tbody td {
+  padding: var(--ez-space-2);
+  border-right: 1px solid var(--ez-grey-200);
+  vertical-align: middle;
+}
+
+.excel-table tbody td:last-child {
+  border-right: none;
+}
+
+/* Row Number Column */
+.row-number {
+  text-align: center;
+  font-weight: var(--ez-font-weight-semibold);
+  color: var(--ez-grey-600);
+  background: var(--ez-grey-50);
+}
+
+/* Form Controls in Table */
+.excel-table input[type="text"],
+.excel-table input[type="tel"],
+.excel-table input[type="number"],
+.excel-table input[type="date"],
+.excel-table select,
+.excel-table textarea {
+  width: 100%;
+  padding: var(--ez-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--ez-radius-sm);
+  font-size: var(--ez-font-sm);
+  background: transparent;
+  transition: all var(--ez-transition-fast);
+}
+
+.excel-table input:focus,
+.excel-table select:focus,
+.excel-table textarea:focus {
+  outline: none;
+  border-color: var(--ez-primary-500);
+  background: var(--ez-white);
+  box-shadow: 0 0 0 3px rgba(247, 192, 0, 0.1);
+}
+
+.excel-table input:hover,
+.excel-table select:hover {
+  background: var(--ez-white);
+  border-color: var(--ez-grey-300);
+}
+
+/* Checkbox Styling */
+.excel-table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--ez-primary-500);
+}
+
+/* Product Select Dropdown */
+.product-select {
+  font-size: var(--ez-font-xs);
+  padding: var(--ez-space-1-5);
+}
+
+/* Action Buttons */
+.bulk-action-btn {
+  padding: var(--ez-space-2) var(--ez-space-4);
+  border-radius: var(--ez-radius-md);
+  font-weight: var(--ez-font-weight-semibold);
+  font-size: var(--ez-font-sm);
+  border: none;
+  cursor: pointer;
+  transition: all var(--ez-transition-base);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ez-space-2);
+  box-shadow: var(--ez-shadow-sm);
+}
+
+.bulk-action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ez-shadow-md);
+}
+
+.bulk-action-btn--primary {
+  background: var(--ez-primary-500);
+  color: var(--ez-navy-500);
+}
+
+.bulk-action-btn--secondary {
+  background: var(--ez-grey-600);
+  color: var(--ez-white);
+}
+
+.bulk-action-btn--danger {
+  background: var(--ez-error);
+  color: var(--ez-white);
+}
+
+.bulk-action-btn--info {
+  background: var(--ez-info);
+  color: var(--ez-white);
+}
+
+.bulk-action-btn--success {
+  background: var(--ez-success);
+  color: var(--ez-white);
+}
+
+/* Footer Stats */
+.bulk-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--ez-space-4);
+  background: var(--ez-grey-50);
+  border-radius: var(--ez-radius-lg);
+  margin-top: var(--ez-space-4);
+}
+
+.bulk-footer__stats {
+  display: flex;
+  gap: var(--ez-space-4);
+  flex-wrap: wrap;
+}
+
+.bulk-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-2);
+  padding: var(--ez-space-2) var(--ez-space-4);
+  background: var(--ez-white);
+  border-radius: var(--ez-radius-md);
+  box-shadow: var(--ez-shadow-sm);
+}
+
+.bulk-stat__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ez-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--ez-font-base);
+}
+
+.bulk-stat__icon--rows {
+  background: var(--ez-info-light);
+  color: var(--ez-info);
+}
+
+.bulk-stat__icon--filled {
+  background: var(--ez-success-light);
+  color: var(--ez-success);
+}
+
+.bulk-stat__icon--errors {
+  background: var(--ez-error-light);
+  color: var(--ez-error);
+}
+
+.bulk-stat__content {
+  display: flex;
+  flex-direction: column;
+}
+
+.bulk-stat__label {
+  font-size: var(--ez-font-xs);
+  color: var(--ez-grey-600);
+  font-weight: var(--ez-font-weight-medium);
+}
+
+.bulk-stat__value {
+  font-size: var(--ez-font-lg);
+  font-weight: var(--ez-font-weight-bold);
+  color: var(--ez-grey-800);
+}
+
+/* Row Status Indicators */
+.status-delivered {
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.status-pending {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.status-cancelled {
+  background: rgba(239, 68, 68, 0.05);
+}
+
+/* Template Download Link */
+.template-download {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ez-space-2);
+  padding: var(--ez-space-3) var(--ez-space-5);
+  background: var(--ez-white);
+  border: 2px dashed var(--ez-primary-500);
+  border-radius: var(--ez-radius-lg);
+  color: var(--ez-primary-600);
+  text-decoration: none;
+  font-weight: var(--ez-font-weight-semibold);
+  transition: all var(--ez-transition-base);
+}
+
+.template-download:hover {
+  background: var(--ez-primary-50);
+  border-style: solid;
+  transform: translateY(-2px);
+  box-shadow: var(--ez-shadow-md);
+  color: var(--ez-primary-700);
+}
+
+.template-download i {
+  font-size: var(--ez-font-lg);
+}
+
+/* Help Text */
+.bulk-help-text {
+  font-size: var(--ez-font-sm);
+  color: var(--ez-grey-600);
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-2);
+  padding: var(--ez-space-3) var(--ez-space-4);
+  background: var(--ez-info-light);
+  border-left: 3px solid var(--ez-info);
+  border-radius: var(--ez-radius-md);
+  margin-bottom: var(--ez-space-4);
+}
+
+.bulk-help-text i {
+  color: var(--ez-info);
+  font-size: var(--ez-font-base);
+}
+
+/* Loading Overlay */
+.bulk-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--ez-z-modal);
+}
+
+.bulk-loading-content {
+  background: var(--ez-white);
+  padding: var(--ez-space-8);
+  border-radius: var(--ez-radius-xl);
+  text-align: center;
+  box-shadow: var(--ez-shadow-2xl);
+}
+
+.bulk-loading-spinner {
+  width: 64px;
+  height: 64px;
+  border: 6px solid var(--ez-grey-200);
+  border-top-color: var(--ez-primary-500);
+  border-radius: var(--ez-radius-full);
+  animation: spin 1s linear infinite;
+  margin: 0 auto var(--ez-space-4);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.bulk-loading-text {
+  font-size: var(--ez-font-lg);
+  font-weight: var(--ez-font-weight-semibold);
+  color: var(--ez-grey-800);
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .bulk-entry-header {
+    flex-direction: column;
+    gap: var(--ez-space-3);
+  }
+
+  .bulk-entry-header__actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .bulk-action-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .excel-table {
+    font-size: var(--ez-font-xs);
+  }
+
+  .bulk-footer {
+    flex-direction: column;
+    gap: var(--ez-space-3);
+  }
+
+  .bulk-footer__stats {
+    width: 100%;
+  }
+
+  .bulk-stat {
+    flex: 1;
+  }
+}
