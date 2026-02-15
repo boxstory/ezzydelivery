@@ -8,9 +8,9 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('business', '0028_add_fulfillment_service_status'),
-        ('product', '0005_remove_image_defaults'),
-        ('warehouse', '0003_warehouse_bin_naming_pattern_and_more'),
+        ('business', '0008_pickuplocation_warehouse'),
+        ('product', '0002_product_product_id_alter_product_brand_logo_and_more'),
+        ('warehouse', '0003_sellerwarehouselink_warehouselocation_and_more'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
