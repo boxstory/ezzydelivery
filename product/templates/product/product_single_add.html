@@ -1,92 +1,73 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
-<!-- extra title -->
-{% block extra_head %}
-  Products
-{% endblock extra_head %}
-<!-- extra css -->
 {% load crispy_forms_tags %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260215a">
+Products - Add
+{% endblock extra_head %}
+
 {% block content %}
-  <section class="container-fluid pt-4 px-4" id="product_add_section">
-    <div class="row">
-      <div class="col-md-12 pb-3 d-flex justify-content-between" id="product_add_header">
-        <h2 id="product_add_title">Add Product</h2>
-        <a class="text-decoration-none text-light" href="">
-          <div class="btn btn-dark my-2" id="product_add_btn_back">Back</div>
-        </a>
+<div class="psa" id="product_add_section">
+  <!-- Page Header -->
+  <div class="psa__header">
+    <div class="psa__header-left">
+      <a href="{% url 'product:product_all_list' %}" class="psa__back" title="Back to Products">
+        <i class="fa-solid fa-arrow-left"></i>
+      </a>
+      <div class="psa__header-icon">
+        <i class="fa-solid fa-box-open"></i>
+      </div>
+      <div>
+        <h1 class="psa__title">Add Product</h1>
+        <p class="psa__subtitle">Add a new product to your inventory</p>
       </div>
     </div>
-    <div class="container-fluid" id="product_add_form_container">
-      <div class="col-12 col-xl-10 mx-auto" id="product_add_form_wrapper">
-        <form method="POST" enctype="multipart/form-data" id="product_add_form_main">
-          {% csrf_token %}
-          {% if form.non_field_errors %}
-          <div class="alert alert-danger" role="alert">
-            {% for error in form.non_field_errors %}
-            <div>{{ error }}</div>
-            {% endfor %}
-          </div>
-          {% endif %}
-          {{ form | crispy }}
-          <div class="submit my-3 text-center" id="product_add_submit_wrapper">
-            <button type="submit" value="submit" class="btn btn-primary-fill" id="product_add_btn_submit">Submit</button>
-          </div>
-        </form>
-      </div>
+  </div>
+
+  <!-- Form Card -->
+  <div class="psa__card" id="product_add_form_container">
+    <div class="psa__card-header">
+      <i class="fa-solid fa-edit"></i>
+      <span>Product Details</span>
     </div>
-  </section>
+    <div class="psa__card-body">
+      <form method="POST" enctype="multipart/form-data" id="product_add_form_main">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="psa__alert psa__alert--error">
+          {% for error in form.non_field_errors %}
+          <div><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {{ form | crispy }}
+        <div class="psa__submit-wrap" id="product_add_submit_wrapper">
+          <a href="{% url 'product:product_all_list' %}" class="ofu__back-btn">
+            <i class="fa-solid fa-times"></i> Cancel
+          </a>
+          <button type="submit" class="ofu__submit" id="product_add_btn_submit">
+            <i class="fa-solid fa-save"></i> Save Product
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 {% endblock %}
+
 {% block extra_js %}
-  <!-- extra js -->
-  <script>
-        $(document).ready(function() {
-            // Debug: Check if elements exist
-            console.log('Color field:', $('#id_color').length);
-            console.log('Unit field:', $('#id_unit').length);
-            console.log('Category field:', $('#id_product_category').length);
-
-            // Initialize Select2
-            $("#id_color").select2({
-                placeholder: "Select a color",
-                allowClear: true
-            });
-            $("#id_unit").select2({
-                placeholder: "Select a unit",
-                allowClear: true
-            });
-            $("#id_product_category").select2({
-                placeholder: "Select a category",
-                allowClear: true,
-                width: '100%',
-                dropdownAutoWidth: true
-            });
-
-            // Debug: Check options count
-            console.log('Category options count:', $('#id_product_category option').length);
-        });
-  </script>
-  <style>
-    /* Make select2 dropdowns wider and show more options */
-    .select2-container {
-        width: 100% !important;
-    }
-    .select2-dropdown {
-        min-width: 300px;
-    }
-    .select2-results {
-        max-height: 400px !important;
-    }
-    /* Style the form fields */
-    #product_add_form_main .form-control,
-    #product_add_form_main .select2-selection {
-        min-height: 45px;
-        font-size: 1rem;
-    }
-    /* Make form wider on larger screens */
-    @media (min-width: 1200px) {
-        #product_add_form_wrapper {
-            max-width: 900px;
-        }
-    }
-  </style>
+<script>
+  $(document).ready(function() {
+    // Initialize Select2
+    $("#id_color").select2({ placeholder: "Select a color", allowClear: true });
+    $("#id_unit").select2({ placeholder: "Select a unit", allowClear: true });
+    $("#id_product_category").select2({
+      placeholder: "Select a category",
+      allowClear: true,
+      width: '100%',
+      dropdownAutoWidth: true
+    });
+  });
+</script>
 {% endblock extra_js %}

@@ -3,131 +3,146 @@
 
 {% block title %}Pick List {{ pick_list.pick_number }}{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260215a" type="text/css" />
 
-<div class="container-fluid py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'warehouse:pick_list_list' %}">Pick Lists</a></li>
-                    <li class="breadcrumb-item active">{{ pick_list.pick_number }}</li>
-                </ol>
-            </nav>
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 class="h3 mb-0">{{ pick_list.pick_number }}</h1>
-                    <p class="text-muted">{{ pick_list.warehouse.name }}</p>
-                </div>
-                <div>
-                    <span class="badge fs-6 {% if pick_list.status == 'completed' %}bg-success{% elif pick_list.status == 'in_progress' %}bg-primary{% elif pick_list.status == 'assigned' %}bg-info{% else %}bg-warning text-dark{% endif %}">
-                        {{ pick_list.get_status_display }}
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="wh">
+  <!-- Breadcrumb -->
+  <div class="wh__breadcrumb">
+    <a href="{% url 'warehouse:pick_list_list' %}">Pick Lists</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <span class="wh__breadcrumb-active">{{ pick_list.pick_number }}</span>
+  </div>
 
-    <!-- Pick List Info -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Warehouse</span>
-                        <strong>{{ pick_list.warehouse.name }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Created</span>
-                        <strong>{{ pick_list.created_at|date:"d M Y H:i" }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Assigned To</span>
-                        <strong>{{ pick_list.assigned_to.username|default:"Unassigned" }}</strong>
-                    </div>
-                    {% if pick_list.assigned_at %}
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Assigned At</span>
-                        <strong>{{ pick_list.assigned_at|date:"d M Y H:i" }}</strong>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-center">
-                    {% if pick_list.status == 'pending' %}
-                    <form method="POST" action="{% url 'warehouse:assign_pick_list' pick_list.pk %}">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="fas fa-user-plus me-2"></i>Assign to Me
-                        </button>
-                    </form>
-                    {% elif pick_list.status == 'assigned' and pick_list.assigned_to == request.user %}
-                    <p class="text-success"><i class="fas fa-check-circle me-2"></i>Assigned to you</p>
-                    <button class="btn btn-success btn-lg">
-                        <i class="fas fa-play me-2"></i>Start Picking
-                    </button>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+  <!-- Header -->
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon">
+        <i class="fas fa-clipboard-check"></i>
+      </div>
+      <div>
+        <h1 class="wh__title">{{ pick_list.pick_number }}</h1>
+        <p class="wh__subtitle">{{ pick_list.warehouse.name }}</p>
+      </div>
     </div>
+    <span class="wh__badge
+      {% if pick_list.status == 'completed' %}wh__badge--success
+      {% elif pick_list.status == 'in_progress' %}wh__badge--primary
+      {% elif pick_list.status == 'assigned' %}wh__badge--info
+      {% else %}wh__badge--warning{% endif %}"
+      style="font-size: 0.8125rem; padding: 0.35rem 0.75rem;">
+      {{ pick_list.get_status_display }}
+    </span>
+  </div>
 
-    <!-- Pick Items -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Items to Pick ({{ items|length }})</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>Location</th>
-                                    <th>Product</th>
-                                    <th>Order #</th>
-                                    <th class="text-center">Qty to Pick</th>
-                                    <th class="text-center">Picked</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in items %}
-                                <tr>
-                                    <td><code>{{ item.location.code|default:"-" }}</code></td>
-                                    <td>{{ item.product.item_name }}</td>
-                                    <td>{{ item.order.order_number|default:"-" }}</td>
-                                    <td class="text-center"><strong>{{ item.quantity_to_pick }}</strong></td>
-                                    <td class="text-center">{{ item.quantity_picked }}</td>
-                                    <td>
-                                        {% if item.quantity_picked >= item.quantity_to_pick %}
-                                        <span class="badge bg-success">Complete</span>
-                                        {% elif item.quantity_picked > 0 %}
-                                        <span class="badge bg-warning text-dark">Partial</span>
-                                        {% else %}
-                                        <span class="badge bg-secondary">Pending</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">No items in this pick list</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+  <!-- Info Cards -->
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="wh__card">
+        <div class="wh__card-header">
+          <div class="wh__card-header-left">
+            <i class="fas fa-info-circle"></i>
+            <span>Details</span>
+          </div>
         </div>
+        <div class="wh__card-body">
+          <div class="d-flex justify-content-between py-1 border-bottom" style="border-color: var(--brand-grey-100) !important;">
+            <span class="wh__meta">Warehouse</span>
+            <strong>{{ pick_list.warehouse.name }}</strong>
+          </div>
+          <div class="d-flex justify-content-between py-1 border-bottom" style="border-color: var(--brand-grey-100) !important;">
+            <span class="wh__meta">Created</span>
+            <strong>{{ pick_list.created_at|date:"d M Y H:i" }}</strong>
+          </div>
+          <div class="d-flex justify-content-between py-1 border-bottom" style="border-color: var(--brand-grey-100) !important;">
+            <span class="wh__meta">Assigned To</span>
+            <strong>{{ pick_list.assigned_to.username|default:"Unassigned" }}</strong>
+          </div>
+          {% if pick_list.assigned_at %}
+          <div class="d-flex justify-content-between py-1">
+            <span class="wh__meta">Assigned At</span>
+            <strong>{{ pick_list.assigned_at|date:"d M Y H:i" }}</strong>
+          </div>
+          {% endif %}
+        </div>
+      </div>
     </div>
+    <div class="col-md-6">
+      <div class="wh__card">
+        <div class="wh__card-header">
+          <div class="wh__card-header-left">
+            <i class="fas fa-hand-pointer"></i>
+            <span>Actions</span>
+          </div>
+        </div>
+        <div class="wh__card-body" style="text-align: center; padding: 1.5rem;">
+          {% if pick_list.status == 'pending' %}
+          <form method="POST" action="{% url 'warehouse:assign_pick_list' pick_list.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="wh__btn wh__btn--primary" style="font-size: 0.875rem; padding: 0.5rem 1.25rem;">
+              <i class="fas fa-user-plus"></i> Assign to Me
+            </button>
+          </form>
+          {% elif pick_list.status == 'assigned' and pick_list.assigned_to == request.user %}
+          <p class="wh__badge wh__badge--success" style="font-size: 0.8125rem; padding: 0.35rem 0.75rem; margin-bottom: 0.75rem;"><i class="fas fa-check-circle"></i> Assigned to you</p>
+          <button class="wh__btn wh__btn--primary" style="font-size: 0.875rem; padding: 0.5rem 1.25rem; background: #15803d; border-color: #15803d;">
+            <i class="fas fa-play"></i> Start Picking
+          </button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pick Items Table -->
+  <div class="wh__card">
+    <div class="wh__card-header">
+      <div class="wh__card-header-left">
+        <i class="fas fa-box-open"></i>
+        <span>Items to Pick</span>
+      </div>
+      <span class="wh__count-badge">{{ items|length }} items</span>
+    </div>
+    <div class="wh__table-wrap">
+      <table class="wh__table">
+        <thead>
+          <tr>
+            <th class="wh__th">Location</th>
+            <th class="wh__th">Product</th>
+            <th class="wh__th">Order #</th>
+            <th class="wh__th wh__th--center">Qty to Pick</th>
+            <th class="wh__th wh__th--center">Picked</th>
+            <th class="wh__th">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td class="wh__td"><code class="wh__code">{{ item.location.code|default:"-" }}</code></td>
+            <td class="wh__td">{{ item.product.item_name }}</td>
+            <td class="wh__td">{{ item.order.order_number|default:"-" }}</td>
+            <td class="wh__td wh__td--center"><strong>{{ item.quantity_to_pick }}</strong></td>
+            <td class="wh__td wh__td--center">{{ item.quantity_picked }}</td>
+            <td class="wh__td">
+              {% if item.quantity_picked >= item.quantity_to_pick %}
+              <span class="wh__badge wh__badge--success">Complete</span>
+              {% elif item.quantity_picked > 0 %}
+              <span class="wh__badge wh__badge--warning">Partial</span>
+              {% else %}
+              <span class="wh__badge wh__badge--muted">Pending</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="wh__empty">
+              <p>No items in this pick list</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {% endblock %}

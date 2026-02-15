@@ -3,180 +3,142 @@
 
 {% block title %}Cycle Counts{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260215a" type="text/css" />
 
-<div class="container-fluid py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h1 class="h3 mb-0">Cycle Counts</h1>
-            <p class="text-muted">Manage inventory cycle counting</p>
-        </div>
+<div class="wh">
+  <!-- Header -->
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon">
+        <i class="fas fa-sync-alt"></i>
+      </div>
+      <div>
+        <h1 class="wh__title">Cycle Counts</h1>
+        <p class="wh__subtitle">Manage inventory cycle counting</p>
+      </div>
     </div>
+    <a href="{% url 'warehouse:create_cycle_count' %}" class="wh__btn wh__btn--primary">
+      <i class="fas fa-plus"></i> Create Cycle Count
+    </a>
+  </div>
 
-    <!-- Filter -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <form method="GET" class="d-flex gap-2">
-                <select name="status" class="form-select" style="max-width: 200px;">
-                    <option value="">All Statuses</option>
-                    {% for status_val, status_label in status_choices %}
-                    <option value="{{ status_val }}" {% if selected_status == status_val %}selected{% endif %}>{{ status_label }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn btn-primary">Filter</button>
-            </form>
-        </div>
+  <!-- Filter -->
+  <div class="wh__filter-bar">
+    <form method="GET" class="wh__filter-form">
+      <div class="wh__filter-group">
+        <label class="wh__filter-label">Status</label>
+        <select name="status" class="wh__filter-select">
+          <option value="">All Statuses</option>
+          {% for status_val, status_label in status_choices %}
+          <option value="{{ status_val }}" {% if selected_status == status_val %}selected{% endif %}>{{ status_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="wh__filter-group--sm">
+        <button type="submit" class="wh__filter-btn">
+          <i class="fas fa-filter"></i> Filter
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Table Card -->
+  <div class="wh__card">
+    <div class="wh__card-header">
+      <div class="wh__card-header-left">
+        <i class="fas fa-list"></i>
+        <span>All Cycle Counts</span>
+      </div>
     </div>
-
-    <!-- Cycle Counts Table -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">All Cycle Counts</h5>
-                    <a href="{% url 'warehouse:create_cycle_count' %}" class="btn btn-primary btn-sm">
-                        <i class="fas fa-plus me-1"></i>Create Cycle Count
-                    </a>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>Count #</th>
-                                    <th>Warehouse</th>
-                                    <th>Location</th>
-                                    <th>Status</th>
-                                    <th>Assigned To</th>
-                                    <th>Scheduled</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for cc in cycle_counts %}
-                                <tr>
-                                    <td><strong>{{ cc.count_number }}</strong></td>
-                                    <td>{{ cc.warehouse.name }}</td>
-                                    <td>{{ cc.location.code|default:"All" }}</td>
-                                    <td>
-                                        <span class="badge
-                                            {% if cc.status == 'completed' %}bg-success
-                                            {% elif cc.status == 'in_progress' %}bg-primary
-                                            {% elif cc.status == 'scheduled' %}bg-info
-                                            {% else %}bg-secondary{% endif %}">
-                                            {{ cc.get_status_display }}
-                                        </span>
-                                    </td>
-                                    <td>{{ cc.assigned_to.username|default:"-" }}</td>
-                                    <td>{{ cc.scheduled_date|date:"d M Y" }}</td>
-                                    <td>
-                                        <a href="{% url 'warehouse:cycle_count_detail' cc.pk %}" class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="7" class="text-center text-muted py-5">
-                                        <i class="fas fa-calculator fa-3x mb-3 d-block"></i>
-                                        No cycle counts found
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Pagination -->
-                {% include "includes/components/_pagination.html" with page_obj=cycle_counts filter_params=filter_params %}
-            </div>
-        </div>
+    <div class="wh__table-wrap">
+      <table class="wh__table">
+        <thead>
+          <tr>
+            <th class="wh__th">Count #</th>
+            <th class="wh__th">Warehouse</th>
+            <th class="wh__th">Location</th>
+            <th class="wh__th">Status</th>
+            <th class="wh__th">Assigned To</th>
+            <th class="wh__th">Scheduled</th>
+            <th class="wh__th wh__th--center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cc in cycle_counts %}
+          <tr>
+            <td class="wh__td"><strong>{{ cc.count_number }}</strong></td>
+            <td class="wh__td">{{ cc.warehouse.name }}</td>
+            <td class="wh__td"><code class="wh__code">{{ cc.location.code|default:"All" }}</code></td>
+            <td class="wh__td">
+              <span class="wh__badge
+                {% if cc.status == 'completed' %}wh__badge--success
+                {% elif cc.status == 'in_progress' %}wh__badge--primary
+                {% elif cc.status == 'scheduled' %}wh__badge--info
+                {% else %}wh__badge--muted{% endif %}">
+                {{ cc.get_status_display }}
+              </span>
+            </td>
+            <td class="wh__td">{{ cc.assigned_to.username|default:"-" }}</td>
+            <td class="wh__td"><span class="wh__meta">{{ cc.scheduled_date|date:"d M Y" }}</span></td>
+            <td class="wh__td wh__td--center">
+              <a href="{% url 'warehouse:cycle_count_detail' cc.pk %}" class="wh__action-btn" title="View">
+                <i class="fas fa-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="wh__empty">
+              <i class="fas fa-calculator"></i>
+              <p>No cycle counts found</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-
-    <!-- Quick Tips & Workflow Help -->
-    <div class="row mt-4">
-        <div class="col-lg-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-info bg-opacity-10 border-0 py-3">
-                    <h6 class="mb-0 fw-semibold text-info">
-                        <i class="fas fa-lightbulb me-2"></i>Quick Tips
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <ul class="list-unstyled mb-0 small">
-                        <li class="mb-2 d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Cycle Counting:</strong> Regular physical counts to verify system accuracy without full inventory</span>
-                        </li>
-                        <li class="mb-2 d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Discrepancies:</strong> System creates adjustment transactions automatically when physical count differs</span>
-                        </li>
-                        <li class="mb-2 d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Assignment:</strong> Assign counts to staff members for accountability and tracking</span>
-                        </li>
-                        <li class="d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Schedule:</strong> Plan regular counts (daily/weekly) to maintain inventory accuracy</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-primary bg-opacity-10 border-0 py-3">
-                    <h6 class="mb-0 fw-semibold text-primary">
-                        <i class="fas fa-route me-2"></i>Cycle Count Workflow
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="workflow-step mb-3">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">1</span>
-                            <div>
-                                <strong class="d-block">Create Cycle Count</strong>
-                                <small class="text-muted">Select products/locations to count, assign to staff</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="workflow-step mb-3">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">2</span>
-                            <div>
-                                <strong class="d-block">Physical Count</strong>
-                                <small class="text-muted">Staff counts actual items, records findings</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="workflow-step mb-3">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">3</span>
-                            <div>
-                                <strong class="d-block">Review Discrepancies</strong>
-                                <small class="text-muted">Compare physical count with system quantity</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="workflow-step">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-success rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-check fa-xs"></i></span>
-                            <div>
-                                <strong class="d-block">Complete & Adjust</strong>
-                                <small class="text-muted">System updates stock levels, creates adjustment transactions</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="wh__card-footer">
+      {% include "includes/components/_pagination.html" with page_obj=cycle_counts filter_params=filter_params %}
     </div>
+  </div>
+
+  <!-- Tips & Workflow -->
+  <div class="wh__help-grid">
+    <div class="wh__help-card">
+      <div class="wh__help-header wh__help-header--tips">
+        <i class="fas fa-lightbulb"></i> Quick Tips
+      </div>
+      <div class="wh__help-body">
+        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Cycle Counting:</strong> Regular physical counts to verify system accuracy without full inventory</span></div>
+        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Discrepancies:</strong> System creates adjustment transactions automatically when physical count differs</span></div>
+        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Assignment:</strong> Assign counts to staff members for accountability and tracking</span></div>
+        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Schedule:</strong> Plan regular counts (daily/weekly) to maintain inventory accuracy</span></div>
+      </div>
+    </div>
+    <div class="wh__help-card">
+      <div class="wh__help-header wh__help-header--workflow">
+        <i class="fas fa-route"></i> Cycle Count Workflow
+      </div>
+      <div class="wh__help-body">
+        <div class="wh__step">
+          <div class="wh__step-number">1</div>
+          <div><div class="wh__step-title">Create Cycle Count</div><div class="wh__step-desc">Select products/locations to count, assign to staff</div></div>
+        </div>
+        <div class="wh__step">
+          <div class="wh__step-number">2</div>
+          <div><div class="wh__step-title">Physical Count</div><div class="wh__step-desc">Staff counts actual items, records findings</div></div>
+        </div>
+        <div class="wh__step">
+          <div class="wh__step-number">3</div>
+          <div><div class="wh__step-title">Review Discrepancies</div><div class="wh__step-desc">Compare physical count with system quantity</div></div>
+        </div>
+        <div class="wh__step">
+          <div class="wh__step-number wh__step-number--success"><i class="fas fa-check fa-xs"></i></div>
+          <div><div class="wh__step-title">Complete & Adjust</div><div class="wh__step-desc">System updates stock levels, creates adjustment transactions</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

@@ -3,374 +3,271 @@
 
 {% block title %}Inventory List{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260215a" type="text/css" />
 
-<div class="container-fluid py-4">
-    <!-- Page Header with Breadcrumb -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-2">
-                    <li class="breadcrumb-item"><a href="{% url 'workforce:wf_dashboard' %}" class="text-decoration-none">Workforce</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'warehouse:dashboard' %}" class="text-decoration-none">Warehouse</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Inventory</li>
-                </ol>
-            </nav>
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <div>
-                    <h1 class="h3 mb-1 fw-bold">
-                        <i class="fas fa-boxes-stacked text-success me-2"></i>Inventory
-                    </h1>
-                    <p class="text-muted mb-0">View and manage stock levels across warehouses</p>
-                </div>
-                <a href="{% url 'warehouse:receive_stock' %}" class="btn btn-primary"
-                   hx-get="{% url 'warehouse:receive_stock' %}"
-                   hx-target="#main-content"
-                   hx-select="#main-content"
-                   hx-swap="outerHTML"
-                   hx-push-url="true">
-                    <i class="fas fa-plus me-1"></i>Receive Stock
-                </a>
-            </div>
-        </div>
+<div class="wh">
+  <!-- Breadcrumb -->
+  <div class="wh__breadcrumb">
+    <a href="{% url 'workforce:wf_dashboard' %}">Workforce</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <a href="{% url 'warehouse:dashboard' %}">Warehouse</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <span class="wh__breadcrumb-active">Inventory</span>
+  </div>
+
+  <!-- Header -->
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon">
+        <i class="fas fa-boxes-stacked"></i>
+      </div>
+      <div>
+        <h1 class="wh__title">Inventory</h1>
+        <p class="wh__subtitle">View and manage stock levels across warehouses</p>
+      </div>
     </div>
+    <a href="{% url 'warehouse:receive_stock' %}" class="wh__btn wh__btn--primary"
+       hx-get="{% url 'warehouse:receive_stock' %}"
+       hx-target="#main-content"
+       hx-select="#main-content"
+       hx-swap="outerHTML"
+       hx-push-url="true">
+      <i class="fas fa-plus"></i> Receive Stock
+    </a>
+  </div>
 
-    <!-- Summary Stats -->
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm bg-primary bg-gradient text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-white-50 mb-1">Total Items</h6>
-                            <h3 class="mb-0 fw-bold">{{ stock_levels.paginator.count|default:0 }}</h3>
-                        </div>
-                        <div class="bg-white bg-opacity-25 rounded p-3">
-                            <i class="fas fa-boxes fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm bg-success bg-gradient text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-white-50 mb-1">Total Value</h6>
-                            <h3 class="mb-0 fw-bold">QAR {{ total_value|floatformat:2 }}</h3>
-                        </div>
-                        <div class="bg-white bg-opacity-25 rounded p-3">
-                            <i class="fas fa-dollar-sign fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm bg-info bg-gradient text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="text-white-50 mb-1">Warehouses</h6>
-                            <h3 class="mb-0 fw-bold">{{ warehouses.count }}</h3>
-                        </div>
-                        <div class="bg-white bg-opacity-25 rounded p-3">
-                            <i class="fas fa-warehouse fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Stats -->
+  <div class="wh__stats">
+    <div class="wh__stat">
+      <div class="wh__stat-icon wh__stat-icon--primary">
+        <i class="fas fa-boxes"></i>
+      </div>
+      <div>
+        <div class="wh__stat-value">{{ stock_levels.paginator.count|default:0 }}</div>
+        <div class="wh__stat-label">Total Items</div>
+      </div>
     </div>
-
-    <!-- Filters Card -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body py-3">
-                    <form method="GET" class="row g-3 align-items-end">
-                        <div class="col-md-2">
-                            <label for="warehouse" class="form-label small fw-semibold text-muted">
-                                <i class="fas fa-warehouse me-1"></i>Warehouse
-                            </label>
-                            <select name="warehouse" id="warehouse" class="form-select">
-                                <option value="">All Warehouses</option>
-                                {% for wh in warehouses %}
-                                <option value="{{ wh.id }}" {% if selected_warehouse == wh.id|stringformat:'s' %}selected{% endif %}>{{ wh.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label for="category" class="form-label small fw-semibold text-muted">
-                                <i class="fas fa-tags me-1"></i>Category
-                            </label>
-                            <select name="category" id="category" class="form-select">
-                                <option value="">All Categories</option>
-                                {% for cat in categories %}
-                                <option value="{{ cat.id }}" {% if selected_category == cat.id|stringformat:'s' %}selected{% endif %}>{{ cat.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="search" class="form-label small fw-semibold text-muted">
-                                <i class="fas fa-search me-1"></i>Search
-                            </label>
-                            <input type="text" class="form-control" id="search" name="search" value="{{ search }}" placeholder="Name, SKU, Barcode, Product ID...">
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-check mt-4">
-                                <input class="form-check-input" type="checkbox" name="low_stock" id="low_stock" value="1" {% if low_stock_only %}checked{% endif %}>
-                                <label class="form-check-label" for="low_stock">
-                                    <span class="badge bg-warning text-dark"><i class="fas fa-exclamation-triangle me-1"></i>Low Stock Only</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-filter me-1"></i>Filter
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+    <div class="wh__stat">
+      <div class="wh__stat-icon wh__stat-icon--success">
+        <i class="fas fa-dollar-sign"></i>
+      </div>
+      <div>
+        <div class="wh__stat-value">{{ total_value|floatformat:2 }}</div>
+        <div class="wh__stat-label">Total Value (QAR)</div>
+      </div>
     </div>
-
-    <!-- Inventory Table -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-semibold"><i class="fas fa-list-ul text-secondary me-2"></i>Stock Levels</h5>
-                    <span class="badge bg-secondary">{{ stock_levels.paginator.count|default:0 }} items</span>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="ps-3" style="min-width: 80px;">Image</th>
-                                    <th style="min-width: 200px;">Product Details</th>
-                                    <th>Brand</th>
-                                    <th>SKU / Barcode</th>
-                                    <th>Category</th>
-                                    <th>Warehouse</th>
-                                    <th>Location</th>
-                                    <th class="text-center">Price</th>
-                                    <th class="text-center">On Hand</th>
-                                    <th class="text-center">Reserved</th>
-                                    <th class="text-center">Available</th>
-                                    <th class="text-center">Value</th>
-                                    <th class="text-center">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for stock in stock_levels %}
-                                <tr class="{% if stock.quantity_on_hand <= stock.reorder_point %}table-warning{% endif %}">
-                                    <td class="ps-3">
-                                        {% if stock.product.product_image %}
-                                        <img src="{{ stock.product.product_image.url }}"
-                                             alt="{{ stock.product.item_name }}"
-                                             class="rounded"
-                                             style="width: 50px; height: 50px; object-fit: cover;">
-                                        {% else %}
-                                        <div class="bg-secondary bg-opacity-10 rounded d-flex align-items-center justify-content-center"
-                                             style="width: 50px; height: 50px;">
-                                            <i class="fas fa-image text-muted"></i>
-                                        </div>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div>
-                                            <div class="fw-medium text-dark">{{ stock.product.item_name }}</div>
-                                            <div class="small text-muted">
-                                                ID: <code class="text-primary">{{ stock.product.product_id|default:"-" }}</code>
-                                                {% if stock.product.size %}
-                                                <span class="mx-1">|</span>
-                                                Size: {{ stock.product.size }}
-                                                {% endif %}
-                                                {% if stock.product.color %}
-                                                <span class="mx-1">|</span>
-                                                <span class="badge badge-sm" style="background-color: {{ stock.product.color.color_code }}20; color: {{ stock.product.color.color_code }};">
-                                                    {{ stock.product.color.color_name }}
-                                                </span>
-                                                {% endif %}
-                                            </div>
-                                            {% if stock.quantity_on_hand <= stock.reorder_point %}
-                                            <span class="badge bg-warning text-dark mt-1"><i class="fas fa-exclamation-triangle me-1"></i>Low Stock</span>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            {% if stock.product.brand_logo %}
-                                            <img src="{{ stock.product.brand_logo.url }}"
-                                                 alt="{{ stock.product.brand_name }}"
-                                                 class="rounded me-2"
-                                                 style="width: 30px; height: 30px; object-fit: contain;">
-                                            {% endif %}
-                                            <span class="text-muted">{{ stock.product.brand_name|default:"-" }}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div>
-                                            <code class="bg-light px-2 py-1 rounded d-block mb-1">{{ stock.product.item_sku|default:"-" }}</code>
-                                            {% if stock.product.barcode %}
-                                            <small class="text-muted"><i class="fas fa-barcode me-1"></i>{{ stock.product.barcode }}</small>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        {% if stock.product.product_category %}
-                                        <span class="badge bg-info">{{ stock.product.product_category.name }}</span>
-                                        {% else %}
-                                        <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td><span class="text-muted">{{ stock.warehouse.name }}</span></td>
-                                    <td><span class="badge bg-secondary">{{ stock.location.code|default:"Default" }}</span></td>
-                                    <td class="text-center">
-                                        <span class="fw-medium text-success">{{ stock.product.item_price|default:0 }} QAR</span>
-                                        {% if stock.product.unit %}
-                                        <div class="small text-muted">/{{ stock.product.unit.name }}</div>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="fw-bold {% if stock.quantity_on_hand <= stock.reorder_point %}text-warning{% else %}text-success{% endif %}">
-                                            {{ stock.quantity_on_hand }}
-                                        </span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="text-muted">{{ stock.quantity_reserved }}</span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-primary fs-6">{{ stock.quantity_on_hand|add:stock.quantity_reserved|default:stock.quantity_on_hand }}</span>
-                                    </td>
-                                    <td class="text-center">
-                                        {% widthratio stock.quantity_on_hand 1 stock.product.item_price as item_value %}
-                                        <span class="fw-bold text-success">{{ item_value|floatformat:2 }} QAR</span>
-                                    </td>
-                                    <td class="text-center">
-                                        <a href="{% url 'warehouse:stock_card' stock.product.id %}"
-                                           class="btn btn-sm btn-outline-primary rounded-pill"
-                                           title="View Stock Card"
-                                           hx-get="{% url 'warehouse:stock_card' stock.product.id %}"
-                                           hx-target="#main-content"
-                                           hx-select="#main-content"
-                                           hx-swap="outerHTML"
-                                           hx-push-url="true">
-                                            <i class="fas fa-chart-line me-1"></i>Details
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="13" class="text-center text-muted py-5">
-                                        <i class="fas fa-boxes fa-3x mb-3 d-block opacity-50"></i>
-                                        <p class="mb-2 fw-medium">No inventory items found</p>
-                                        <p class="small text-muted mb-3">Start by receiving stock into your warehouse</p>
-                                        <a href="{% url 'warehouse:receive_stock' %}" class="btn btn-primary">
-                                            <i class="fas fa-plus me-1"></i>Receive Stock
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="card-footer bg-white border-top">
-                    {% include "includes/components/_pagination.html" with page_obj=stock_levels filter_params=filter_params %}
-                </div>
-            </div>
-        </div>
+    <div class="wh__stat">
+      <div class="wh__stat-icon wh__stat-icon--info">
+        <i class="fas fa-warehouse"></i>
+      </div>
+      <div>
+        <div class="wh__stat-value">{{ warehouses.count }}</div>
+        <div class="wh__stat-label">Warehouses</div>
+      </div>
     </div>
+  </div>
 
-    <!-- Quick Tips & Workflow Help -->
-    <div class="row mt-4">
-        <div class="col-lg-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-info bg-opacity-10 border-0 py-3">
-                    <h6 class="mb-0 fw-semibold text-info">
-                        <i class="fas fa-lightbulb me-2"></i>Quick Tips
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <ul class="list-unstyled mb-0 small">
-                        <li class="mb-2 d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Stock Indicators:</strong> Yellow highlighted rows = low stock (at or below reorder point)</span>
-                        </li>
-                        <li class="mb-2 d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Available Quantity:</strong> "On Hand" minus "Reserved" = Available for new orders</span>
-                        </li>
-                        <li class="mb-2 d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Stock Card:</strong> Click "Details" to see full transaction history for any product</span>
-                        </li>
-                        <li class="d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Filter Options:</strong> Use filters to view specific warehouses, locations, or low stock items only</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
+  <!-- Filter -->
+  <div class="wh__filter-bar">
+    <form method="GET" class="wh__filter-form">
+      <div class="wh__filter-group">
+        <label class="wh__filter-label">Warehouse</label>
+        <select name="warehouse" id="warehouse" class="wh__filter-select">
+          <option value="">All Warehouses</option>
+          {% for wh in warehouses %}
+          <option value="{{ wh.id }}" {% if selected_warehouse == wh.id|stringformat:'s' %}selected{% endif %}>{{ wh.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="wh__filter-group">
+        <label class="wh__filter-label">Category</label>
+        <select name="category" id="category" class="wh__filter-select">
+          <option value="">All Categories</option>
+          {% for cat in categories %}
+          <option value="{{ cat.id }}" {% if selected_category == cat.id|stringformat:'s' %}selected{% endif %}>{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="wh__filter-group wh__filter-group--lg">
+        <label class="wh__filter-label">Search</label>
+        <input type="text" class="wh__filter-input" id="search" name="search" value="{{ search }}" placeholder="Name, SKU, Barcode, Product ID...">
+      </div>
+      <div class="wh__filter-group--sm">
+        <div class="wh__filter-check">
+          <input type="checkbox" name="low_stock" id="low_stock" value="1" {% if low_stock_only %}checked{% endif %}>
+          <label for="low_stock"><span class="wh__badge wh__badge--warning"><i class="fas fa-exclamation-triangle"></i> Low Stock</span></label>
         </div>
+      </div>
+      <div class="wh__filter-group--sm">
+        <button type="submit" class="wh__filter-btn">
+          <i class="fas fa-filter"></i> Filter
+        </button>
+      </div>
+    </form>
+  </div>
 
-        <div class="col-lg-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-primary bg-opacity-10 border-0 py-3">
-                    <h6 class="mb-0 fw-semibold text-primary">
-                        <i class="fas fa-route me-2"></i>Inventory Management Workflow
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="workflow-step mb-3">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">1</span>
-                            <div>
-                                <strong class="d-block">Receive Stock</strong>
-                                <small class="text-muted">Add incoming inventory to increase stock levels</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="workflow-step mb-3">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">2</span>
-                            <div>
-                                <strong class="d-block">Monitor Levels</strong>
-                                <small class="text-muted">Check this page regularly for low stock warnings</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="workflow-step mb-3">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">3</span>
-                            <div>
-                                <strong class="d-block">Process Orders</strong>
-                                <small class="text-muted">As orders ship, stock levels automatically decrease</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="workflow-step">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">4</span>
-                            <div>
-                                <strong class="d-block">Cycle Counts</strong>
-                                <small class="text-muted">Perform regular physical counts to ensure accuracy</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Table Card -->
+  <div class="wh__card">
+    <div class="wh__card-header">
+      <div class="wh__card-header-left">
+        <i class="fas fa-list"></i>
+        <span>Stock Levels</span>
+      </div>
+      <span class="wh__count-badge">{{ stock_levels.paginator.count|default:0 }} items</span>
     </div>
+    <div class="wh__table-wrap">
+      <table class="wh__table">
+        <thead>
+          <tr>
+            <th class="wh__th">Image</th>
+            <th class="wh__th">Product Details</th>
+            <th class="wh__th">Brand</th>
+            <th class="wh__th">SKU / Barcode</th>
+            <th class="wh__th">Category</th>
+            <th class="wh__th">Warehouse</th>
+            <th class="wh__th">Location</th>
+            <th class="wh__th wh__th--center">Price</th>
+            <th class="wh__th wh__th--center">On Hand</th>
+            <th class="wh__th wh__th--center">Reserved</th>
+            <th class="wh__th wh__th--center">Available</th>
+            <th class="wh__th wh__th--center">Value</th>
+            <th class="wh__th wh__th--center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for stock in stock_levels %}
+          <tr class="{% if stock.quantity_on_hand <= stock.reorder_point %}wh__row--warning{% endif %}">
+            <td class="wh__td">
+              {% if stock.product.product_image %}
+              <img src="{{ stock.product.product_image.url }}" alt="{{ stock.product.item_name }}" class="wh__product-img">
+              {% else %}
+              <div class="wh__product-img-placeholder"><i class="fas fa-image"></i></div>
+              {% endif %}
+            </td>
+            <td class="wh__td">
+              <span class="wh__product-name">{{ stock.product.item_name }}</span>
+              <div class="wh__meta">
+                ID: <code class="wh__code">{{ stock.product.product_id|default:"-" }}</code>
+                {% if stock.product.size %} | Size: {{ stock.product.size }}{% endif %}
+                {% if stock.product.color %} | {{ stock.product.color.color_name }}{% endif %}
+              </div>
+              {% if stock.quantity_on_hand <= stock.reorder_point %}
+              <span class="wh__badge wh__badge--warning"><i class="fas fa-exclamation-triangle"></i> Low Stock</span>
+              {% endif %}
+            </td>
+            <td class="wh__td">
+              {% if stock.product.brand_logo %}
+              <div class="d-flex align-items-center gap-2">
+                <img src="{{ stock.product.brand_logo.url }}" alt="{{ stock.product.brand_name }}" class="wh__product-img" style="width:30px;height:30px;">
+                <span class="wh__muted">{{ stock.product.brand_name|default:"-" }}</span>
+              </div>
+              {% else %}
+              <span class="wh__muted">{{ stock.product.brand_name|default:"-" }}</span>
+              {% endif %}
+            </td>
+            <td class="wh__td">
+              <code class="wh__code">{{ stock.product.item_sku|default:"-" }}</code>
+              {% if stock.product.barcode %}
+              <div class="wh__meta"><i class="fas fa-barcode"></i> {{ stock.product.barcode }}</div>
+              {% endif %}
+            </td>
+            <td class="wh__td">
+              {% if stock.product.product_category %}
+              <span class="wh__badge wh__badge--info">{{ stock.product.product_category.name }}</span>
+              {% else %}
+              <span class="wh__muted">-</span>
+              {% endif %}
+            </td>
+            <td class="wh__td"><span class="wh__muted">{{ stock.warehouse.name }}</span></td>
+            <td class="wh__td"><span class="wh__badge wh__badge--muted">{{ stock.location.code|default:"Default" }}</span></td>
+            <td class="wh__td wh__td--center">
+              <span class="wh__amount--success">{{ stock.product.item_price|default:0 }} QAR</span>
+              {% if stock.product.unit %}
+              <div class="wh__meta">/{{ stock.product.unit.name }}</div>
+              {% endif %}
+            </td>
+            <td class="wh__td wh__td--center">
+              <strong class="{% if stock.quantity_on_hand <= stock.reorder_point %}wh__amount--negative{% else %}wh__amount--positive{% endif %}">
+                {{ stock.quantity_on_hand }}
+              </strong>
+            </td>
+            <td class="wh__td wh__td--center"><span class="wh__muted">{{ stock.quantity_reserved }}</span></td>
+            <td class="wh__td wh__td--center">
+              <span class="wh__badge wh__badge--primary">{{ stock.quantity_on_hand|add:stock.quantity_reserved|default:stock.quantity_on_hand }}</span>
+            </td>
+            <td class="wh__td wh__td--center">
+              {% widthratio stock.quantity_on_hand 1 stock.product.item_price as item_value %}
+              <strong class="wh__amount--success">{{ item_value|floatformat:2 }} QAR</strong>
+            </td>
+            <td class="wh__td wh__td--center">
+              <a href="{% url 'warehouse:stock_card' stock.product.id %}" class="wh__action-btn wh__action-btn--pill"
+                 title="View Stock Card"
+                 hx-get="{% url 'warehouse:stock_card' stock.product.id %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fas fa-chart-line"></i> Details
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="13" class="wh__empty">
+              <i class="fas fa-boxes"></i>
+              <p>No inventory items found</p>
+              <p class="wh__meta">Start by receiving stock into your warehouse</p>
+              <a href="{% url 'warehouse:receive_stock' %}" class="wh__btn wh__btn--primary mt-2">
+                <i class="fas fa-plus"></i> Receive Stock
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="wh__card-footer">
+      {% include "includes/components/_pagination.html" with page_obj=stock_levels filter_params=filter_params %}
+    </div>
+  </div>
+
+  <!-- Tips & Workflow -->
+  <div class="wh__help-grid">
+    <div class="wh__help-card">
+      <div class="wh__help-header wh__help-header--tips">
+        <i class="fas fa-lightbulb"></i> Quick Tips
+      </div>
+      <div class="wh__help-body">
+        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Stock Indicators:</strong> Yellow highlighted rows = low stock (at or below reorder point)</span></div>
+        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Available Quantity:</strong> "On Hand" minus "Reserved" = Available for new orders</span></div>
+        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Stock Card:</strong> Click "Details" to see full transaction history for any product</span></div>
+        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Filter Options:</strong> Use filters to view specific warehouses, locations, or low stock items only</span></div>
+      </div>
+    </div>
+    <div class="wh__help-card">
+      <div class="wh__help-header wh__help-header--workflow">
+        <i class="fas fa-route"></i> Inventory Management Workflow
+      </div>
+      <div class="wh__help-body">
+        <div class="wh__step">
+          <div class="wh__step-number">1</div>
+          <div><div class="wh__step-title">Receive Stock</div><div class="wh__step-desc">Add incoming inventory to increase stock levels</div></div>
+        </div>
+        <div class="wh__step">
+          <div class="wh__step-number">2</div>
+          <div><div class="wh__step-title">Monitor Levels</div><div class="wh__step-desc">Check this page regularly for low stock warnings</div></div>
+        </div>
+        <div class="wh__step">
+          <div class="wh__step-number">3</div>
+          <div><div class="wh__step-title">Process Orders</div><div class="wh__step-desc">As orders ship, stock levels automatically decrease</div></div>
+        </div>
+        <div class="wh__step">
+          <div class="wh__step-number wh__step-number--success"><i class="fas fa-check fa-xs"></i></div>
+          <div><div class="wh__step-title">Cycle Counts</div><div class="wh__step-desc">Perform regular physical counts to ensure accuracy</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

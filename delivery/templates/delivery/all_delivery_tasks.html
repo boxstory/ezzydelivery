@@ -2,122 +2,180 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block extra_css %}
-  <!-- extra css -->
   <link type="text/css"
         rel="stylesheet"
         href="{% static 'fleet/css/fleet.css' %}" />
+  <link type="text/css"
+        rel="stylesheet"
+        href="{% static 'delivery/css/delivery.css' %}?v=20260215a" />
 {% endblock extra_css %}
 {% block content %}
-  <div class="p-2" id="delivery_all_tasks_wrapper">
-    <div class="listing-container" id="delivery_all_tasks_container">
-      <div class="listing-header">
-        <h6 class="listing-title"><i class="fa-solid fa-truck text-primary"></i>Delivery Tasks</h6>
-        <a class="btn btn-sm btn-outline-dark" href="{% url 'fleet:fleets' %}" id="delivery_all_tasks_btn_drivers">
-          <i class="fa fa-user me-1"></i>Drivers
-        </a>
+  <div class="adt" id="delivery_all_tasks_wrapper">
+    <!-- Page Header -->
+    <div class="adt__header">
+      <div class="adt__header-left">
+        <div class="adt__header-icon">
+          <i class="fa-solid fa-truck"></i>
+        </div>
+        <div>
+          <h1 class="adt__title">Delivery Tasks</h1>
+          <p class="adt__subtitle">All delivery assignments</p>
+        </div>
       </div>
-      <table class="listing-table" id="delivery_all_tasks_table">
-        <thead id="delivery_all_tasks_thead">
-        <tr>
-          <th>Date / DL No</th>
-          <th>Business / Pickup</th>
-          <th>Delivery Zone</th>
-          <th>Status</th>
-          <th>Action</th>
-        </tr>
-        </thead>
-        <tbody id="delivery_all_tasks_tbody">
-        {% for card in cards %}
-          <tr style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#collapse-{{ card.id }}">
-            <td>
-              <code class="text-primary">#{{ card.dl_task_number }}</code>
-              <br><span class="text-muted" style="font-size: 0.75rem;">{{ card.dl_task_date|date:"M d, Y" }}</span>
-              <br><span class="text-muted" style="font-size: 0.7rem;">{{ card.dl_speed }} - {{ card.dl_to_address.time_slot|default:"-" }}</span>
-            </td>
-            <td>
-              <div>{{ card.business.business_name|default:"N/A" }}</div>
-              <span class="text-muted" style="font-size: 0.75rem;">{{ card.pickup_location.pickup_location_title|default:"-" }}</span>
-            </td>
-            <td>{{ card.dl_to_address.zone_name|default:"N/A" }}</td>
-            <td>
-              <span class="listing-status {% if card.dl_task_status == 'delivered' %}success{% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' %}primary{% elif card.dl_task_status == 'cancelled' or card.dl_task_status == 'failed' %}danger{% elif card.dl_task_status == 'accepted' or card.dl_task_status == 'picked_up' %}info{% else %}{% endif %}">
-                {{ card.get_dl_task_status_display|default:card.dl_task_status }}
-              </span>
-            </td>
-            <td>
-              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation();" data-bs-toggle="collapse" data-bs-target="#collapse-{{ card.id }}">
-                <i class="fa-solid fa-chevron-down"></i>
-              </button>
-            </td>
+      <a class="adt__back-btn" href="{% url 'fleet:fleets' %}" id="delivery_all_tasks_btn_drivers">
+        <i class="fa fa-user"></i> Drivers
+      </a>
+    </div>
+
+    <!-- Table Card -->
+    <div class="adt__card">
+      <div class="adt__card-header">
+        <i class="fa-solid fa-list"></i>
+        <span>Tasks</span>
+      </div>
+      <div class="adt__table-wrap">
+        <table class="adt__table" id="delivery_all_tasks_table">
+          <thead id="delivery_all_tasks_thead">
+          <tr>
+            <th class="adt__th">Date / DL No</th>
+            <th class="adt__th">Business / Pickup</th>
+            <th class="adt__th">Delivery Zone</th>
+            <th class="adt__th">Status</th>
+            <th class="adt__th">Action</th>
           </tr>
-          <tr class="collapse" id="collapse-{{ card.id }}">
-            <td colspan="5" class="p-0">
-              <div class="bg-light p-3">
-                <div class="row g-3">
-                  <!-- From Section -->
-                  <div class="col-12 col-md-4">
-                    <div class="fw-bold text-primary mb-2"><i class="fa-solid fa-store me-1"></i>From</div>
-                    <div class="small">
-                      <div class="mb-1"><span class="text-muted">Pickup:</span> {{ card.order.business.pickup_location|default:"N/A" }}</div>
-                      <div class="mb-1"><span class="text-muted">Business:</span> {{ card.order.business.business_name }}</div>
-                      <div><span class="text-muted">Task ID:</span> <code>{{ card.dl_task_number }}</code></div>
+          </thead>
+          <tbody id="delivery_all_tasks_tbody">
+          {% for card in cards %}
+            <tr class="adt__row" data-bs-toggle="collapse" data-bs-target="#collapse-{{ card.id }}">
+              <td class="adt__td">
+                <code class="adt__task-code">#{{ card.dl_task_number }}</code>
+                <div class="adt__meta">{{ card.dl_task_date|date:"M d, Y" }}</div>
+                <div class="adt__meta adt__meta--sm">{{ card.dl_speed }} - {{ card.dl_to_address.time_slot|default:"-" }}</div>
+              </td>
+              <td class="adt__td">
+                <span class="adt__biz-name">{{ card.business.business_name|default:"N/A" }}</span>
+                <div class="adt__meta">{{ card.pickup_location.pickup_location_title|default:"-" }}</div>
+              </td>
+              <td class="adt__td">{{ card.dl_to_address.zone_name|default:"N/A" }}</td>
+              <td class="adt__td">
+                <span class="adt__badge
+                  {% if card.dl_task_status == 'delivered' %}adt__badge--success
+                  {% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' %}adt__badge--primary
+                  {% elif card.dl_task_status == 'cancelled' or card.dl_task_status == 'failed' %}adt__badge--danger
+                  {% elif card.dl_task_status == 'accepted' or card.dl_task_status == 'picked_up' %}adt__badge--info
+                  {% else %}adt__badge--muted{% endif %}">
+                  {{ card.get_dl_task_status_display|default:card.dl_task_status }}
+                </span>
+              </td>
+              <td class="adt__td">
+                <button type="button" class="adt__expand-btn" onclick="event.stopPropagation();" data-bs-toggle="collapse" data-bs-target="#collapse-{{ card.id }}">
+                  <i class="fa-solid fa-chevron-down"></i>
+                </button>
+              </td>
+            </tr>
+            <tr class="collapse" id="collapse-{{ card.id }}">
+              <td colspan="5" class="p-0">
+                <div class="adt__detail-panel">
+                  <div class="row g-3">
+                    <!-- From Section -->
+                    <div class="col-12 col-md-4">
+                      <div class="adt__section-head">
+                        <i class="fa-solid fa-store"></i> From
+                      </div>
+                      <div class="adt__fields">
+                        <div class="adt__field">
+                          <span class="adt__field-label">Pickup</span>
+                          <span class="adt__field-value">{{ card.order.business.pickup_location|default:"N/A" }}</span>
+                        </div>
+                        <div class="adt__field">
+                          <span class="adt__field-label">Business</span>
+                          <span class="adt__field-value">{{ card.order.business.business_name }}</span>
+                        </div>
+                        <div class="adt__field">
+                          <span class="adt__field-label">Task ID</span>
+                          <code class="adt__task-code">{{ card.dl_task_number }}</code>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- To Section -->
+                    <div class="col-12 col-md-4">
+                      <div class="adt__section-head adt__section-head--dest">
+                        <i class="fa-solid fa-location-dot"></i> To
+                      </div>
+                      <div class="adt__fields">
+                        <div class="adt__field">
+                          <span class="adt__field-label">Zone & Place</span>
+                          <span class="adt__field-value">{{ card.dl_to_address.zone_number|default:"-" }} - {{ card.dl_to_address.zone_name|default:"N/A" }}</span>
+                        </div>
+                        <div class="adt__field">
+                          <span class="adt__field-label">St & Bld</span>
+                          <span class="adt__field-value">{{ card.dl_to_address.street_no|default:"-" }} - {{ card.dl_to_address.building_no|default:"-" }}</span>
+                        </div>
+                        <div class="adt__field">
+                          <span class="adt__field-label">Notes</span>
+                          <span class="adt__field-value">{{ card.dl_task_description|default:"-" }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Details Section -->
+                    <div class="col-12 col-md-4">
+                      <div class="adt__section-head adt__section-head--info">
+                        <i class="fa-solid fa-info-circle"></i> Details
+                      </div>
+                      <div class="adt__fields">
+                        <div class="adt__field">
+                          <span class="adt__field-label">COD</span>
+                          <span class="adt__field-value adt__field-value--bold">{{ card.order.cod_amount|default:0 }} QR</span>
+                        </div>
+                        <div class="adt__field">
+                          <span class="adt__field-label">Delivery Fee</span>
+                          <span class="adt__field-value">{{ card.dl_price|default:0 }} QR</span>
+                        </div>
+                        <div class="adt__field">
+                          <span class="adt__field-label">Weight</span>
+                          <span class="adt__field-value">{{ card.dl_waight|default:"-" }}</span>
+                        </div>
+                        <div class="adt__field">
+                          <span class="adt__field-label">Status</span>
+                          <span class="adt__field-value">{{ card.get_dl_task_status_display|default:card.dl_task_status }}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <!-- To Section -->
-                  <div class="col-12 col-md-4">
-                    <div class="fw-bold text-danger mb-2"><i class="fa-solid fa-location-dot me-1"></i>To</div>
-                    <div class="small">
-                      <div class="mb-1"><span class="text-muted">Zone & Place:</span> {{ card.dl_to_address.zone_number|default:"-" }} - {{ card.dl_to_address.zone_name|default:"N/A" }}</div>
-                      <div class="mb-1"><span class="text-muted">St & Bld:</span> {{ card.dl_to_address.street_no|default:"-" }} - {{ card.dl_to_address.building_no|default:"-" }}</div>
-                      <div><span class="text-muted">Notes:</span> {{ card.dl_task_description|default:"-" }}</div>
-                    </div>
-                  </div>
-                  <!-- Details Section -->
-                  <div class="col-12 col-md-4">
-                    <div class="fw-bold text-info mb-2"><i class="fa-solid fa-info-circle me-1"></i>Details</div>
-                    <div class="small">
-                      <div class="mb-1"><span class="text-muted">COD:</span> <strong>{{ card.order.cod_amount|default:0 }} QR</strong></div>
-                      <div class="mb-1"><span class="text-muted">Delivery Fee:</span> {{ card.dl_price|default:0 }} QR</div>
-                      <div class="mb-1"><span class="text-muted">Weight:</span> {{ card.dl_waight|default:"-" }}</div>
-                      <div><span class="text-muted">Status:</span> {{ card.get_dl_task_status_display|default:card.dl_task_status }}</div>
-                    </div>
+                  <!-- Action Buttons -->
+                  <div class="adt__detail-actions">
+                    <a href="{% url 'fleet:fleets' %}" class="adt__btn adt__btn--secondary">
+                      <i class="fa-solid fa-chevron-left"></i> Back
+                    </a>
+                    {% if card.dl_task_status_dms == '2' and card.order.cod_status_by_staff == 'cod_settled_with_business' %}
+                    <span class="adt__badge adt__badge--muted"><i class="fa-solid fa-lock"></i> Locked</span>
+                    {% else %}
+                    <a href="{% url 'core:main_dashboard' %}" class="adt__btn adt__btn--success">
+                      <i class="fa-solid fa-check"></i> Accept
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'core:main_dashboard' %}" class="adt__btn adt__btn--primary">
+                      <i class="fa-solid fa-chart-line"></i> Dashboard
+                    </a>
                   </div>
                 </div>
-                <!-- Action Buttons -->
-                <div class="mt-3 pt-3 border-top d-flex gap-2 justify-content-end">
-                  <a href="{% url 'fleet:fleets' %}" class="btn btn-sm btn-outline-secondary">
-                    <i class="fa-solid fa-chevron-left me-1"></i>Back
-                  </a>
-                  {% if card.dl_task_status_dms == '2' and card.order.cod_status_by_staff == 'cod_settled_with_business' %}
-                  <span class="listing-status"><i class="fa-solid fa-lock me-1"></i>Locked</span>
-                  {% else %}
-                  <a href="{% url 'core:main_dashboard' %}" class="btn btn-sm btn-success">
-                    <i class="fa-solid fa-check me-1"></i>Accept
-                  </a>
-                  {% endif %}
-                  <a href="{% url 'core:main_dashboard' %}" class="btn btn-sm btn-outline-primary">
-                    <i class="fa-solid fa-chart-line me-1"></i>Dashboard
-                  </a>
-                </div>
-              </div>
+              </td>
+            </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="adt__empty">
+              <i class="fa-solid fa-inbox"></i>
+              <p>No delivery tasks available</p>
             </td>
           </tr>
-        {% empty %}
-        <tr>
-          <td colspan="5" class="listing-empty">
-            <i class="fa-solid fa-inbox"></i>
-            No delivery tasks available
-          </td>
-        </tr>
-        {% endfor %}
-        </tbody>
-      </table>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 {% endblock content %}
 {% block extra_js %}
-  <!-- extra js -->
-
   <script type="text/javascript"
           language="JavaScript"
           charset="UTF-8"

@@ -3,118 +3,124 @@
 
 {% block title %}Stock Card - {{ product.item_name }}{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260215a" type="text/css" />
 
-<div class="container-fluid py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'warehouse:inventory_list' %}">Inventory</a></li>
-                    <li class="breadcrumb-item active">{{ product.item_name }}</li>
-                </ol>
-            </nav>
-            <h1 class="h3 mb-0">Stock Card</h1>
-            <p class="text-muted">{{ product.item_name }} - {{ product.item_sku|default:"No SKU" }}</p>
-        </div>
-    </div>
+<div class="wh">
+  <!-- Breadcrumb -->
+  <div class="wh__breadcrumb">
+    <a href="{% url 'warehouse:inventory_list' %}">Inventory</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <span class="wh__breadcrumb-active">{{ product.item_name }}</span>
+  </div>
 
-    <!-- Stock Levels by Warehouse -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Stock Levels by Warehouse</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>Warehouse</th>
-                                    <th>Location</th>
-                                    <th class="text-end">On Hand</th>
-                                    <th class="text-end">Reserved</th>
-                                    <th class="text-end">Reorder Point</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for stock in stock_levels %}
-                                <tr {% if stock.quantity_on_hand <= stock.reorder_point %}class="table-warning"{% endif %}>
-                                    <td>{{ stock.warehouse.name }}</td>
-                                    <td>{{ stock.location.code|default:"-" }}</td>
-                                    <td class="text-end">{{ stock.quantity_on_hand }}</td>
-                                    <td class="text-end">{{ stock.quantity_reserved }}</td>
-                                    <td class="text-end">{{ stock.reorder_point }}</td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted py-4">No stock records found</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Header -->
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon">
+        <i class="fas fa-chart-line"></i>
+      </div>
+      <div>
+        <h1 class="wh__title">Stock Card</h1>
+        <p class="wh__subtitle">{{ product.item_name }} - {{ product.item_sku|default:"No SKU" }}</p>
+      </div>
     </div>
+  </div>
 
-    <!-- Transaction History -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Transaction History</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Transaction #</th>
-                                    <th>Type</th>
-                                    <th>Warehouse</th>
-                                    <th class="text-end">Qty</th>
-                                    <th class="text-end">Before</th>
-                                    <th class="text-end">After</th>
-                                    <th>By</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for txn in transactions %}
-                                <tr>
-                                    <td>{{ txn.created_at|date:"d M Y H:i" }}</td>
-                                    <td><code>{{ txn.transaction_number|truncatechars:12 }}</code></td>
-                                    <td>
-                                        <span class="badge {% if 'receive' in txn.transaction_type %}bg-success{% elif 'ship' in txn.transaction_type %}bg-primary{% elif 'adjust' in txn.transaction_type %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                                            {{ txn.get_transaction_type_display }}
-                                        </span>
-                                    </td>
-                                    <td>{{ txn.warehouse.name }}</td>
-                                    <td class="text-end">
-                                        {% if txn.quantity > 0 %}<span class="text-success">+{{ txn.quantity }}</span>{% else %}<span class="text-danger">{{ txn.quantity }}</span>{% endif %}
-                                    </td>
-                                    <td class="text-end">{{ txn.quantity_before }}</td>
-                                    <td class="text-end">{{ txn.quantity_after }}</td>
-                                    <td>{{ txn.created_by.username|default:"-" }}</td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">No transactions found</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Stock Levels -->
+  <div class="wh__card">
+    <div class="wh__card-header">
+      <div class="wh__card-header-left">
+        <i class="fas fa-boxes-stacked"></i>
+        <span>Stock Levels by Warehouse</span>
+      </div>
     </div>
+    <div class="wh__table-wrap">
+      <table class="wh__table">
+        <thead>
+          <tr>
+            <th class="wh__th">Warehouse</th>
+            <th class="wh__th">Location</th>
+            <th class="wh__th wh__th--end">On Hand</th>
+            <th class="wh__th wh__th--end">Reserved</th>
+            <th class="wh__th wh__th--end">Reorder Point</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for stock in stock_levels %}
+          <tr class="{% if stock.quantity_on_hand <= stock.reorder_point %}wh__row--warning{% endif %}">
+            <td class="wh__td">{{ stock.warehouse.name }}</td>
+            <td class="wh__td"><code class="wh__code">{{ stock.location.code|default:"-" }}</code></td>
+            <td class="wh__td wh__td--end"><strong>{{ stock.quantity_on_hand }}</strong></td>
+            <td class="wh__td wh__td--end"><span class="wh__muted">{{ stock.quantity_reserved }}</span></td>
+            <td class="wh__td wh__td--end">{{ stock.reorder_point }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="wh__empty">
+              <p>No stock records found</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Transaction History -->
+  <div class="wh__card">
+    <div class="wh__card-header">
+      <div class="wh__card-header-left">
+        <i class="fas fa-history"></i>
+        <span>Transaction History</span>
+      </div>
+    </div>
+    <div class="wh__table-wrap">
+      <table class="wh__table">
+        <thead>
+          <tr>
+            <th class="wh__th">Date</th>
+            <th class="wh__th">Transaction #</th>
+            <th class="wh__th">Type</th>
+            <th class="wh__th">Warehouse</th>
+            <th class="wh__th wh__th--end">Qty</th>
+            <th class="wh__th wh__th--end">Before</th>
+            <th class="wh__th wh__th--end">After</th>
+            <th class="wh__th">By</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for txn in transactions %}
+          <tr>
+            <td class="wh__td"><span class="wh__meta">{{ txn.created_at|date:"d M Y H:i" }}</span></td>
+            <td class="wh__td"><code class="wh__code">{{ txn.transaction_number|truncatechars:12 }}</code></td>
+            <td class="wh__td">
+              <span class="wh__badge
+                {% if 'receive' in txn.transaction_type %}wh__badge--success
+                {% elif 'ship' in txn.transaction_type %}wh__badge--primary
+                {% elif 'adjust' in txn.transaction_type %}wh__badge--warning
+                {% else %}wh__badge--muted{% endif %}">
+                {{ txn.get_transaction_type_display }}
+              </span>
+            </td>
+            <td class="wh__td">{{ txn.warehouse.name }}</td>
+            <td class="wh__td wh__td--end">
+              {% if txn.quantity > 0 %}<span class="wh__amount--positive">+{{ txn.quantity }}</span>{% else %}<span class="wh__amount--negative">{{ txn.quantity }}</span>{% endif %}
+            </td>
+            <td class="wh__td wh__td--end">{{ txn.quantity_before }}</td>
+            <td class="wh__td wh__td--end"><strong>{{ txn.quantity_after }}</strong></td>
+            <td class="wh__td">{{ txn.created_by.username|default:"-" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="wh__empty">
+              <p>No transactions found</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {% endblock %}

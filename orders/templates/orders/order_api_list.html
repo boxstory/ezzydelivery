@@ -1,113 +1,137 @@
 {% extends "business_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
-<!-- extra css -->
+
 {% block extra_css %}
-  <link href="{% static 'orders/css/orders.css' %}"
-        rel="stylesheet"
-        type="text/css" />
+<link href="{% static 'orders/css/orders.css' %}?v=20260215e" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
+
 {% block content %}
-  <!-- orders_list_view.html -->
-  <div class="col-12" id="orders_api_list_container_main">
-    <section class="d-none d-md-block " id="orders_api_list_section_desktop">
-      <div class="flex-fill pb-2">
-        <div class="ms-3 col-11">
-          <div class="col-md-12 d-flex flex-wrap justify-content-between pb-md-4"
-               id="orders_api_list_header">
-            <div class="m-0 fs-4 fw-bolder" id="orders_api_list_title">Orders Added list({{ len }})</div>
-            <div id="orders_api_list_nav_actions">
-              <a class="btn btn-dark pe-3 text-white"
-                 href="{% url 'orders:get_order_by_api' %}"
-                 id="orders_api_list_btn_api_upload">
-                <i class="fa fa-add me-3"></i> API Upload
-              </a>
-              <a class="btn btn-dark pe-3 text-white"
-                 href="{% url 'orders:order_upload_file' %}"
-                 id="orders_api_list_btn_upload_bulk">
-                <i class="fa fa-add me-3"></i> Upload bulk
-              </a>
-              <a class="btn btn-dark pe-3 text-white"
-                 href="{% url 'orders:add_order' %}"
-                 id="orders_api_list_btn_add_orders">
-                <i class="fa fa-add me-3"></i> Add Orders
-              </a>
-            </div>
-          </div>
-          <!-- shopify orders listing to submit orders to task -->
-          <div class="container mt-4" id="orders_api_list_section_api_orders">
-            <h2>{{ api.api_type }} Orders,</h2>
-            API Provider : {{ api.api_type }},
-            From
-            <input type="date"
-                   id="orders_api_list_input_start_date"
-                   name="start_date"
-                   value="{{ start_date }}">
-            To
-            <input type="date"
-                   id="orders_api_list_input_end_date"
-                   name="end_date"
-                   value="{{ end_date }}">
-            <button class="btn btn-dark"
-                    onclick="getOrders()"
-                    id="orders_api_list_btn_get_orders">Get Orders</button>
-            <table class="table table-bordered table-hover"
-                   id="orders_api_list_table_orders">
-              <thead class="thead-dark" id="orders_api_list_thead">
-                <tr>
-                  <th>Order Date</th>
-                  <th>Order ID</th>
-                  <th>Order Number</th>
-                  <th>Customer</th>
-                  <th>Payment Gateway</th>
-                  <th>Total Price</th>
-                  <th>Items</th>
-                  <th>Confirm</th>
-                </tr>
-              </thead>
-              <tbody id="orders_api_list_tbody">
-                {% for order in orders %}
-                  <tr>
-                    <td>{{ order.created_at }} - {{ order.created_at|date:"Y-m-d" }}</td>
-                    <td>{{ order.id }}</td>
-                    <td>{{ order.customer_info }}</td>
-                    <td>{{ order.customer_info.first_name }}</td>
-                    <td class="fs-6">{{ order.payment_gateway_names|first }}</td>
-                    <td class="fs-6">{{ order.current_total_price | floatformat:2 }}</td>
-                    <td>
-                      <table class="table table-sm">
-                        {% for item in order.line_items %}
-                          <tr>
-                            <td>{{ item.title }}</td>
-                            <td>{{ item.quantity }}</td>
-                          </tr>
-                        {% endfor %}
-                      </table>
-                    </td>
-                    <td>
-                      <div>
-                        <button class="btn btn-dark" onclick="confirmOrder({{ order.id }})">Confirm</button>
-                      </div>
-                    </td>
-                  </tr>
-                {% empty %}
-                  <tr>
-                    <td colspan="6" class="text-center">No orders found.</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-      <section class="d-block d-md-none">
-        {% include "orders/parts/order_list_view_mob.html" %}
-      </section>
+<div class="oap" id="orders_api_list_container_main">
+
+  <!-- Page Header -->
+  <div class="oap__header">
+    <div class="oap__header-left">
+      <div class="oap__header-icon">
+        <i class="fa-solid fa-plug"></i>
+      </div>
+      <div>
+        <h1 class="oap__title">API Orders</h1>
+        <p class="oap__subtitle">{{ len }} order{{ len|pluralize }} from {{ api.api_type }}</p>
+      </div>
     </div>
-  {% endblock content %}
-  {% block extra_js %}
-    <script type="text/javascript"
-            language="JavaScript"
-            charset="UTF-8"
-            src="{%static 'orders/js/orders_main.js' %}"></script>
-  {% endblock extra_js %}
+    <div class="oap__header-actions">
+      <a href="{% url 'orders:get_order_by_api' %}" class="oap__action-btn oap__action-btn--primary" id="orders_api_list_btn_api_upload">
+        <i class="fa-solid fa-plug"></i> API Upload
+      </a>
+      <a href="{% url 'orders:order_upload_file' %}" class="oap__action-btn oap__action-btn--secondary" id="orders_api_list_btn_upload_bulk">
+        <i class="fa-solid fa-file-import"></i> Bulk Upload
+      </a>
+      <a href="{% url 'orders:add_order' %}" class="oap__action-btn oap__action-btn--secondary" id="orders_api_list_btn_add_orders">
+        <i class="fa-solid fa-plus"></i> Add Order
+      </a>
+    </div>
+  </div>
+
+  <!-- Date Filter -->
+  <div class="oap__filter-bar">
+    <div class="oap__section-head">
+      <i class="fa-solid fa-filter"></i>
+      <span>{{ api.api_type }} Orders</span>
+    </div>
+    <div class="oap__filter-row">
+      <div class="oap__filter-group">
+        <label class="oap__filter-label">From</label>
+        <input type="date" class="oap__filter-input" id="orders_api_list_input_start_date" name="start_date" value="{{ start_date }}">
+      </div>
+      <div class="oap__filter-group">
+        <label class="oap__filter-label">To</label>
+        <input type="date" class="oap__filter-input" id="orders_api_list_input_end_date" name="end_date" value="{{ end_date }}">
+      </div>
+      <button class="oap__filter-btn" onclick="getOrders()" id="orders_api_list_btn_get_orders">
+        <i class="fa-solid fa-magnifying-glass"></i> Get Orders
+      </button>
+    </div>
+  </div>
+
+  <!-- Desktop Table View -->
+  <section class="d-none d-md-block">
+    <div class="oap__card">
+      <div class="oap__card-header">
+        <i class="fa-solid fa-list"></i>
+        <span>Orders</span>
+        <span class="oap__count-badge">{{ len }}</span>
+      </div>
+      <div class="oap__table-wrap">
+        <table class="oap__table" id="orders_api_list_table_orders">
+          <thead>
+            <tr>
+              <th class="oap__th">Order Date</th>
+              <th class="oap__th">Order ID</th>
+              <th class="oap__th">Order Number</th>
+              <th class="oap__th">Customer</th>
+              <th class="oap__th">Payment</th>
+              <th class="oap__th">Total Price</th>
+              <th class="oap__th">Items</th>
+              <th class="oap__th">Action</th>
+            </tr>
+          </thead>
+          <tbody id="orders_api_list_tbody">
+            {% for order in orders %}
+            <tr class="oap__row">
+              <td class="oap__td">
+                <span class="oap__date">{{ order.created_at|date:"d M Y" }}</span>
+              </td>
+              <td class="oap__td">
+                <code class="oap__order-id">{{ order.id }}</code>
+              </td>
+              <td class="oap__td">{{ order.customer_info }}</td>
+              <td class="oap__td">
+                <span class="oap__customer">{{ order.customer_info.first_name }}</span>
+              </td>
+              <td class="oap__td">
+                <span class="oap__badge oap__badge--muted">{{ order.payment_gateway_names|first }}</span>
+              </td>
+              <td class="oap__td">
+                <span class="oap__amount">{{ order.current_total_price|floatformat:2 }}</span>
+              </td>
+              <td class="oap__td">
+                <div class="oap__items">
+                  {% for item in order.line_items %}
+                  <div class="oap__item-row">
+                    <span class="oap__item-name">{{ item.title }}</span>
+                    <span class="oap__item-qty">x{{ item.quantity }}</span>
+                  </div>
+                  {% endfor %}
+                </div>
+              </td>
+              <td class="oap__td">
+                <button class="oap__confirm-btn" onclick="confirmOrder({{ order.id }})">
+                  <i class="fa-solid fa-check"></i> Confirm
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="oap__empty">
+                <i class="fa-solid fa-inbox"></i>
+                <p>No orders found</p>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mobile View -->
+  <section class="d-block d-md-none">
+    {% include "orders/parts/order_list_view_mob.html" %}
+  </section>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script type="text/javascript" src="{% static 'orders/js/orders_main.js' %}"></script>
+{% endblock extra_js %}

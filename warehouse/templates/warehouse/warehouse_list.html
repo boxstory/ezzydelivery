@@ -3,230 +3,163 @@
 
 {% block title %}Warehouses{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260215a" type="text/css" />
 
-<div class="container-fluid py-4">
-    <!-- Page Header with Breadcrumb -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-2">
-                    <li class="breadcrumb-item"><a href="{% url 'workforce:wf_dashboard' %}" class="text-decoration-none">Workforce</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'warehouse:dashboard' %}" class="text-decoration-none">Warehouse</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Warehouses</li>
-                </ol>
-            </nav>
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <div>
-                    <h1 class="h3 mb-1 fw-bold">
-                        <i class="fas fa-building-warehouse text-primary me-2"></i>Warehouses
-                    </h1>
-                    <p class="text-muted mb-0">Manage your warehouse locations and facilities</p>
+<div class="wh">
+  <!-- Breadcrumb -->
+  <div class="wh__breadcrumb">
+    <a href="{% url 'workforce:wf_dashboard' %}">Workforce</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <a href="{% url 'warehouse:dashboard' %}">Warehouse</a>
+    <span class="wh__breadcrumb-sep">/</span>
+    <span class="wh__breadcrumb-active">Warehouses</span>
+  </div>
+
+  <!-- Header -->
+  <div class="wh__header">
+    <div class="wh__header-left">
+      <div class="wh__header-icon">
+        <i class="fas fa-building-warehouse"></i>
+      </div>
+      <div>
+        <h1 class="wh__title">Warehouses</h1>
+        <p class="wh__subtitle">Manage your warehouse locations and facilities</p>
+      </div>
+    </div>
+    <a href="{% url 'warehouse:warehouse_add' %}" class="wh__btn wh__btn--primary"
+       hx-get="{% url 'warehouse:warehouse_add' %}"
+       hx-target="#main-content"
+       hx-select="#main-content"
+       hx-swap="outerHTML"
+       hx-push-url="true">
+      <i class="fas fa-plus"></i> Add Warehouse
+    </a>
+  </div>
+
+  <!-- Table Card -->
+  <div class="wh__card">
+    <div class="wh__card-header">
+      <div class="wh__card-header-left">
+        <i class="fas fa-list"></i>
+        <span>All Warehouses</span>
+      </div>
+      <span class="wh__count-badge">{{ warehouses|length }} total</span>
+    </div>
+    <div class="wh__table-wrap">
+      <table class="wh__table">
+        <thead>
+          <tr>
+            <th class="wh__th">Name</th>
+            <th class="wh__th">Code</th>
+            <th class="wh__th">Address</th>
+            <th class="wh__th wh__th--center">Status</th>
+            <th class="wh__th wh__th--center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for wh in warehouses %}
+          <tr>
+            <td class="wh__td">
+              <div class="d-flex align-items-center gap-2">
+                <div class="wh__icon-box">
+                  <i class="fas fa-warehouse"></i>
                 </div>
-                <a href="{% url 'warehouse:warehouse_add' %}" class="btn btn-primary"
-                   hx-get="{% url 'warehouse:warehouse_add' %}"
+                <span class="wh__product-name">{{ wh.name }}</span>
+              </div>
+            </td>
+            <td class="wh__td"><code class="wh__code">{{ wh.code }}</code></td>
+            <td class="wh__td"><span class="wh__muted">{{ wh.address|default:"-"|truncatechars:50 }}</span></td>
+            <td class="wh__td wh__td--center">
+              {% if wh.is_active %}
+              <span class="wh__badge wh__badge--success"><i class="fas fa-check-circle"></i> Active</span>
+              {% else %}
+              <span class="wh__badge wh__badge--muted"><i class="fas fa-pause-circle"></i> Inactive</span>
+              {% endif %}
+            </td>
+            <td class="wh__td wh__td--center">
+              <div class="wh__actions">
+                <a href="{% url 'warehouse:warehouse_detail' wh.pk %}" class="wh__action-btn"
+                   hx-get="{% url 'warehouse:warehouse_detail' wh.pk %}"
                    hx-target="#main-content"
                    hx-select="#main-content"
                    hx-swap="outerHTML"
-                   hx-push-url="true">
-                    <i class="fas fa-plus me-1"></i>Add Warehouse
+                   hx-push-url="true"
+                   title="View Details">
+                  <i class="fas fa-eye"></i>
                 </a>
-            </div>
-        </div>
+                {% if user.is_superuser %}
+                <a href="{% url 'warehouse:warehouse_edit' wh.pk %}" class="wh__action-btn"
+                   hx-get="{% url 'warehouse:warehouse_edit' wh.pk %}"
+                   hx-target="#main-content"
+                   hx-select="#main-content"
+                   hx-swap="outerHTML"
+                   hx-push-url="true"
+                   title="Edit Warehouse">
+                  <i class="fas fa-edit"></i>
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="wh__empty">
+              <i class="fas fa-warehouse"></i>
+              <p>No warehouses found</p>
+              <p class="wh__meta">Create your first warehouse to start managing inventory</p>
+              <a href="{% url 'warehouse:warehouse_add' %}" class="wh__btn wh__btn--primary mt-2"
+                 hx-get="{% url 'warehouse:warehouse_add' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fas fa-plus"></i> Create Your First Warehouse
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+  </div>
 
-    <!-- Warehouses Table -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-semibold"><i class="fas fa-list-ul text-secondary me-2"></i>All Warehouses</h5>
-                    <span class="badge bg-secondary">{{ warehouses|length }} total</span>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="ps-3">Name</th>
-                                    <th>Code</th>
-                                    <th>Address</th>
-                                    <th class="text-center">Status</th>
-                                    <th class="text-center">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for wh in warehouses %}
-                                <tr>
-                                    <td class="ps-3">
-                                        <div class="d-flex align-items-center">
-                                            <div class="bg-primary bg-opacity-10 rounded-3 p-2 me-3">
-                                                <i class="fas fa-warehouse text-primary"></i>
-                                            </div>
-                                            <div>
-                                                <span class="fw-semibold">{{ wh.name }}</span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td><code class="bg-light px-2 py-1 rounded">{{ wh.code }}</code></td>
-                                    <td>
-                                        <span class="text-muted">{{ wh.address|default:"-"|truncatechars:50 }}</span>
-                                    </td>
-                                    <td class="text-center">
-                                        {% if wh.is_active %}
-                                        <span class="badge bg-success-subtle text-success rounded-pill px-3">
-                                            <i class="fas fa-check-circle me-1"></i>Active
-                                        </span>
-                                        {% else %}
-                                        <span class="badge bg-secondary-subtle text-secondary rounded-pill px-3">
-                                            <i class="fas fa-pause-circle me-1"></i>Inactive
-                                        </span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-center">
-                                        <div class="btn-group" role="group">
-                                            <a href="{% url 'warehouse:warehouse_detail' wh.pk %}"
-                                               class="btn btn-sm btn-outline-primary"
-                                               hx-get="{% url 'warehouse:warehouse_detail' wh.pk %}"
-                                               hx-target="#main-content"
-                                               hx-select="#main-content"
-                                               hx-swap="outerHTML"
-                                               hx-push-url="true"
-                                               title="View Details">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            {% if user.is_superuser %}
-                                            <a href="{% url 'warehouse:warehouse_edit' wh.pk %}"
-                                               class="btn btn-sm btn-outline-secondary"
-                                               hx-get="{% url 'warehouse:warehouse_edit' wh.pk %}"
-                                               hx-target="#main-content"
-                                               hx-select="#main-content"
-                                               hx-swap="outerHTML"
-                                               hx-push-url="true"
-                                               title="Edit Warehouse">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted py-5">
-                                        <i class="fas fa-warehouse fa-3x mb-3 d-block opacity-50"></i>
-                                        <p class="mb-2 fw-medium">No warehouses found</p>
-                                        <p class="small text-muted mb-3">Create your first warehouse to start managing inventory</p>
-                                        <a href="{% url 'warehouse:warehouse_add' %}" class="btn btn-primary"
-                                           hx-get="{% url 'warehouse:warehouse_add' %}"
-                                           hx-target="#main-content"
-                                           hx-select="#main-content"
-                                           hx-swap="outerHTML"
-                                           hx-push-url="true">
-                                            <i class="fas fa-plus me-1"></i>Create Your First Warehouse
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Tips & Workflow -->
+  <div class="wh__help-grid">
+    <div class="wh__help-card">
+      <div class="wh__help-header wh__help-header--tips">
+        <i class="fas fa-lightbulb"></i> Quick Tips
+      </div>
+      <div class="wh__help-body">
+        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>System Default:</strong> One warehouse can be marked as system-wide default for automatic fallback</span></div>
+        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>GPS Coordinates:</strong> Add latitude/longitude to enable distance-based warehouse selection</span></div>
+        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Active Status:</strong> Inactive warehouses won't be used for new orders or auto-selection</span></div>
+        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Superuser Only:</strong> Only superusers can create, edit, or delete fulfillment centers</span></div>
+      </div>
     </div>
-
-    <!-- Quick Tips & Workflow Help -->
-    <div class="row mt-4">
-        <div class="col-lg-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-info bg-opacity-10 border-0 py-3">
-                    <h6 class="mb-0 fw-semibold text-info">
-                        <i class="fas fa-lightbulb me-2"></i>Quick Tips
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <ul class="list-unstyled mb-0 small">
-                        <li class="mb-2 d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>System Default:</strong> One warehouse can be marked as system-wide default for automatic fallback</span>
-                        </li>
-                        <li class="mb-2 d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>GPS Coordinates:</strong> Add latitude/longitude to enable distance-based warehouse selection</span>
-                        </li>
-                        <li class="mb-2 d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Active Status:</strong> Inactive warehouses won't be used for new orders or auto-selection</span>
-                        </li>
-                        <li class="d-flex align-items-start">
-                            <i class="fas fa-check-circle text-success me-2 mt-1"></i>
-                            <span><strong>Superuser Only:</strong> Only superusers can create, edit, or delete fulfillment centers</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
+    <div class="wh__help-card">
+      <div class="wh__help-header wh__help-header--workflow">
+        <i class="fas fa-route"></i> Warehouse Setup Workflow
+      </div>
+      <div class="wh__help-body">
+        <div class="wh__step">
+          <div class="wh__step-number">1</div>
+          <div><div class="wh__step-title">Create Fulfillment Center</div><div class="wh__step-desc">Add warehouse with name, code, address, and GPS coordinates</div></div>
         </div>
-
-        <div class="col-lg-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-primary bg-opacity-10 border-0 py-3">
-                    <h6 class="mb-0 fw-semibold text-primary">
-                        <i class="fas fa-route me-2"></i>Warehouse Setup Workflow
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="workflow-step mb-3">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">1</span>
-                            <div>
-                                <strong class="d-block">Create Fulfillment Center</strong>
-                                <small class="text-muted">Add warehouse with name, code, address, and GPS coordinates</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="workflow-step mb-3">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">2</span>
-                            <div>
-                                <strong class="d-block">Add Pickup Locations</strong>
-                                <small class="text-muted">Create pickup/dispatch points (gates, docks) for drivers</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="workflow-step mb-3">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">3</span>
-                            <div>
-                                <strong class="d-block">Add Storage Locations</strong>
-                                <small class="text-muted">Create storage locations (aisles, bins) for inventory placement</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="workflow-step">
-                        <div class="d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-3" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">4</span>
-                            <div>
-                                <strong class="d-block">Link Sellers</strong>
-                                <small class="text-muted">Connect sellers to warehouses with priorities and defaults</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="wh__step">
+          <div class="wh__step-number">2</div>
+          <div><div class="wh__step-title">Add Pickup Locations</div><div class="wh__step-desc">Create pickup/dispatch points (gates, docks) for drivers</div></div>
         </div>
+        <div class="wh__step">
+          <div class="wh__step-number">3</div>
+          <div><div class="wh__step-title">Add Storage Locations</div><div class="wh__step-desc">Create storage locations (aisles, bins) for inventory placement</div></div>
+        </div>
+        <div class="wh__step">
+          <div class="wh__step-number wh__step-number--success"><i class="fas fa-check fa-xs"></i></div>
+          <div><div class="wh__step-title">Link Sellers</div><div class="wh__step-desc">Connect sellers to warehouses with priorities and defaults</div></div>
+        </div>
+      </div>
     </div>
+  </div>
 </div>
-
-<style>
-.bg-success-subtle {
-    background-color: rgba(25, 135, 84, 0.1);
-}
-.bg-secondary-subtle {
-    background-color: rgba(108, 117, 125, 0.1);
-}
-</style>
 {% endblock %}
