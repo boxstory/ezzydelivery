@@ -165,6 +165,17 @@ All styling must use the Brand Kit variables from `static/webpages/css/brand-kit
 - Never use inline styles or `<style>` tags in templates
 - Use CSS variables: `var(--brand-primary)`, `var(--spacing-md)`, etc.
 - Link CSS files in `{% block extra_css %}`
+- **Bootstrap First**: Always prefer Bootstrap 5 utility classes over custom CSS for layout (flex, grid, spacing, alignment, display). Only write custom CSS for visual styling (colors, gradients, shadows, animations) that Bootstrap doesn't cover.
+
+```html
+<!-- Correct: Use Bootstrap utilities for layout -->
+<div class="d-flex flex-row flex-nowrap gap-2 mt-3">
+<div class="row g-3">
+<div class="col-12 col-md-6">
+
+<!-- Wrong: Writing custom CSS for what Bootstrap already provides -->
+.my-flex-row { display: flex; flex-direction: row; gap: 0.5rem; margin-top: 1rem; }
+```
 
 ### Template IDs
 

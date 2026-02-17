@@ -3,130 +3,127 @@
 
 {% block title %}Driver Document Detail - Ezzy Delivery{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
 <div class="col-12 p-3">
-<!-- Page Title -->
-<h1 class="page-title">
-    <i class="fa-solid fa-id-card me-2"></i>Driver Document Detail
-</h1>
+  <!-- Hero Header -->
+  <div class="ddd__hero">
+    <div class="ddd__hero-content">
+      <h1 class="ddd__hero-title">
+        <i class="fa-solid fa-id-card ddd__hero-icon"></i>Driver Document Detail
+      </h1>
+      <p class="ddd__hero-subtitle">View and manage driver identification documents</p>
+    </div>
+  </div>
 
-<!-- Back Button -->
-<div style="margin-bottom: 1.5rem;">
-    <a href="{% url 'workforce:driver_documents_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--brand-grey-700); text-decoration: none; font-weight: 600;">
-        <i class="fa-solid fa-arrow-left"></i>
-        Back to Documents
+  <!-- Back Button -->
+  <div class="ddd__back-section">
+    <a href="{% url 'workforce:driver_documents_list' %}" class="ddd__back-link">
+      <i class="fa-solid fa-arrow-left"></i> Back to Documents
     </a>
-</div>
+  </div>
 
-<!-- Document Details Card -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-circle-info"></i>
-        Document Information
+  <!-- Document Details Card -->
+  <div class="ddd__card">
+    <div class="ddd__card-header">
+      <i class="fa-solid fa-circle-info ddd__section-icon"></i>
+      <h5 class="ddd__card-title">DOCUMENT INFORMATION</h5>
     </div>
 
-    <!-- Document Image -->
     {% if document.document_file %}
-    <div style="margin-bottom: 2rem; text-align: center;">
-        <img src="{{ document.document_file.url }}" alt="Document" style="max-width: 100%; max-height: 400px; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-md);">
+    <div class="ddd__image-preview">
+      <img src="{{ document.document_file.url }}" alt="Document" class="ddd__image">
     </div>
     {% endif %}
 
-    <div class="info-grid">
-        <div class="info-row">
-            <span class="info-label">Driver Name</span>
-            <span class="info-value">{{ document.driver.user.first_name|default:"Unknown" }} {{ document.driver.user.last_name|default:"" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Driver Code</span>
-            <span class="info-value">{{ document.driver.driver_code|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Document Type</span>
-            <span class="info-value">{{ document.document_type|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Document Number</span>
-            <span class="info-value">{{ document.document_no|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Issued From</span>
-            <span class="info-value">{{ document.document_issued_from|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Expiry Date</span>
-            <span class="info-value">{{ document.document_expiry_date|date:"d M Y"|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Created At</span>
-            <span class="info-value">{{ document.created_at|date:"d M Y, h:i A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Last Updated</span>
-            <span class="info-value">{{ document.updated_at|date:"d M Y, h:i A" }}</span>
-        </div>
+    <div class="ddd__info-grid">
+      <div class="ddd__info-row">
+        <span class="ddd__info-label">Driver Name</span>
+        <span class="ddd__info-value">{{ document.driver.user.first_name|default:"Unknown" }} {{ document.driver.user.last_name|default:"" }}</span>
+      </div>
+      <div class="ddd__info-row">
+        <span class="ddd__info-label">Driver Code</span>
+        <span class="ddd__info-value">{{ document.driver.driver_code|default:"N/A" }}</span>
+      </div>
+      <div class="ddd__info-row">
+        <span class="ddd__info-label">Document Type</span>
+        <span class="ddd__info-value">{{ document.document_type|default:"N/A" }}</span>
+      </div>
+      <div class="ddd__info-row">
+        <span class="ddd__info-label">Document Number</span>
+        <span class="ddd__info-value">{{ document.document_no|default:"N/A" }}</span>
+      </div>
+      <div class="ddd__info-row">
+        <span class="ddd__info-label">Issued From</span>
+        <span class="ddd__info-value">{{ document.document_issued_from|default:"N/A" }}</span>
+      </div>
+      <div class="ddd__info-row">
+        <span class="ddd__info-label">Expiry Date</span>
+        <span class="ddd__info-value">{{ document.document_expiry_date|date:"d M Y"|default:"N/A" }}</span>
+      </div>
+      <div class="ddd__info-row">
+        <span class="ddd__info-label">Created At</span>
+        <span class="ddd__info-value">{{ document.created_at|date:"d M Y, h:i A" }}</span>
+      </div>
+      <div class="ddd__info-row">
+        <span class="ddd__info-label">Last Updated</span>
+        <span class="ddd__info-value">{{ document.updated_at|date:"d M Y, h:i A" }}</span>
+      </div>
     </div>
-</div>
+  </div>
 
-<!-- Edit Form -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-edit"></i>
-        Update Document
+  <!-- Edit Form -->
+  <div class="ddd__card">
+    <div class="ddd__card-header">
+      <i class="fa-solid fa-edit ddd__section-icon"></i>
+      <h5 class="ddd__card-title">UPDATE DOCUMENT</h5>
     </div>
 
     <form id="updateForm" enctype="multipart/form-data">
-        {% csrf_token %}
-        <div style="display: grid; gap: 1rem;">
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Document Type</label>
-                <select name="document_type" class="filter-input">
-                    <option value="QID" {% if document.document_type == 'QID' %}selected{% endif %}>QID</option>
-                    <option value="Driving License" {% if document.document_type == 'Driving License' %}selected{% endif %}>Driving License</option>
-                    <option value="Passport" {% if document.document_type == 'Passport' %}selected{% endif %}>Passport</option>
-                    <option value="National Identification" {% if document.document_type == 'National Identification' %}selected{% endif %}>National Identification</option>
-                </select>
-            </div>
-
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Document Number</label>
-                <input type="text" name="document_no" value="{{ document.document_no }}" class="filter-input" required>
-            </div>
-
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Issued From</label>
-                <input type="text" name="document_issued_from" value="{{ document.document_issued_from|default:'' }}" class="filter-input">
-            </div>
-
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Expiry Date</label>
-                <input type="date" name="document_expiry_date" value="{{ document.document_expiry_date|date:'Y-m-d' }}" class="filter-input">
-            </div>
-
-            <div>
-                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Document File (Image)</label>
-                <input type="file" name="document_file" accept="image/*" class="filter-input">
-            </div>
-
-            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                <button type="submit" style="background: var(--brand-primary); color: var(--brand-grey-900); border: none; border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
-                    <i class="fa-solid fa-save"></i>
-                    Save Changes
-                </button>
-                <a href="{% url 'workforce:driver_documents_list' %}" class="cancel-btn" style="background: var(--brand-white); border: 2px solid var(--brand-grey-300); border-radius: var(--brand-radius-sm); padding: 0.75rem 1.5rem; font-weight: 600; cursor: pointer; color: var(--brand-grey-800); text-decoration: none; display: inline-block;">
-                    Cancel
-                </a>
-            </div>
+      {% csrf_token %}
+      <div class="ddd__form-grid">
+        <div class="ddd__form-group">
+          <label class="ddd__form-label">Document Type</label>
+          <select name="document_type" class="form-select">
+            <option value="QID" {% if document.document_type == 'QID' %}selected{% endif %}>QID</option>
+            <option value="Driving License" {% if document.document_type == 'Driving License' %}selected{% endif %}>Driving License</option>
+            <option value="Passport" {% if document.document_type == 'Passport' %}selected{% endif %}>Passport</option>
+            <option value="National Identification" {% if document.document_type == 'National Identification' %}selected{% endif %}>National Identification</option>
+          </select>
         </div>
+
+        <div class="ddd__form-group">
+          <label class="ddd__form-label">Document Number</label>
+          <input type="text" name="document_no" value="{{ document.document_no }}" class="form-control" required>
+        </div>
+
+        <div class="ddd__form-group">
+          <label class="ddd__form-label">Issued From</label>
+          <input type="text" name="document_issued_from" value="{{ document.document_issued_from|default:'' }}" class="form-control">
+        </div>
+
+        <div class="ddd__form-group">
+          <label class="ddd__form-label">Expiry Date</label>
+          <input type="date" name="document_expiry_date" value="{{ document.document_expiry_date|date:'Y-m-d' }}" class="form-control">
+        </div>
+
+        <div class="ddd__form-group">
+          <label class="ddd__form-label">Document File (Image)</label>
+          <input type="file" name="document_file" accept="image/*" class="form-control">
+        </div>
+
+        <div class="ddd__form-actions">
+          <button type="submit" class="ddd__btn ddd__btn--primary">
+            <i class="fa-solid fa-save"></i> Save Changes
+          </button>
+          <a href="{% url 'workforce:driver_documents_list' %}" class="ddd__btn ddd__btn--cancel">
+            Cancel
+          </a>
+        </div>
+      </div>
     </form>
 
-    <div id="updateMessage" style="display: none; margin-top: 1rem; padding: 1rem; border-radius: var(--brand-radius-sm);"></div>
-</div>
-
+    <div id="updateMessage" class="ddd__message"></div>
+  </div>
 </div>
 {% endblock content %}
 
@@ -135,11 +132,9 @@
     // Safe message display helper (XSS-safe)
     function showMessage(messageDiv, isSuccess, text) {
         messageDiv.style.display = 'block';
-        messageDiv.style.background = isSuccess ? '#d4edda' : '#f8d7da';
-        messageDiv.style.color = isSuccess ? '#155724' : '#721c24';
-        // Use textContent for safe text insertion
+        messageDiv.className = 'ddd__message ' + (isSuccess ? 'ddd__message--success' : 'ddd__message--error');
         messageDiv.textContent = '';
-        const icon = document.createElement('i');
+        var icon = document.createElement('i');
         icon.className = isSuccess ? 'fa-solid fa-check-circle' : 'fa-solid fa-exclamation-triangle';
         icon.setAttribute('aria-hidden', 'true');
         messageDiv.appendChild(icon);
@@ -149,13 +144,12 @@
     document.getElementById('updateForm').addEventListener('submit', function(e) {
         e.preventDefault();
 
-        const formData = new FormData(this);
-        const messageDiv = document.getElementById('updateMessage');
-        const submitBtn = this.querySelector('button[type="submit"]');
+        var formData = new FormData(this);
+        var messageDiv = document.getElementById('updateMessage');
+        var submitBtn = this.querySelector('button[type="submit"]');
 
-        // Disable submit button during request
         submitBtn.disabled = true;
-        const originalText = submitBtn.textContent;
+        var originalText = submitBtn.textContent;
         submitBtn.textContent = 'Saving...';
 
         fetch('{% url 'workforce:driver_document_detail' document.id %}', {
@@ -165,25 +159,21 @@
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
             }
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
+        .then(function(response) {
+            if (!response.ok) { throw new Error('Network response was not ok'); }
             return response.json();
         })
-        .then(data => {
+        .then(function(data) {
             if (data.success) {
                 showMessage(messageDiv, true, data.message || 'Document updated successfully');
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
+                setTimeout(function() { window.location.reload(); }, 1500);
             } else {
                 showMessage(messageDiv, false, data.error || 'Failed to update document');
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             showMessage(messageDiv, false, 'Error updating document. Please try again.');
             submitBtn.disabled = false;
             submitBtn.textContent = originalText;

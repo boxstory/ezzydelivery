@@ -1,58 +1,78 @@
 {% extends "wf_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
-<!-- extra css -->
-{% block extra_css %}
-<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
-{% endblock extra_css %}
 
 {% block content %}
-<!-- Page Header -->
-<header class="page-header">
-    <div class="page-header-left">
-        <h2><i class="fa-solid fa-flag me-1"></i>{{ page_title }}</h2>
+<div class="orp">
+    <!-- Hero Header -->
+    <div class="orp__hero">
+        <div class="orp__hero-content">
+            <h1 class="orp__hero-title">
+                <i class="fa-solid fa-flag me-2"></i>{{ page_title }}
+            </h1>
+            <p class="orp__hero-sub">Orders that have been reported or flagged</p>
+        </div>
     </div>
-</header>
-<div class="col-12 p-3">
-<div class="col-md-10 col-lg-10 col-12 p-0">
 
-    <table class="table table-hover">
-        <thead>
-            <tr>
-                <th scope="col">DL_Code</th>
-                <th scope="col">C_Code</th>
-                <th scope="col">Name</th>
-                <th scope="col">Mobile</th>
-                <th scope="col">Status</th>
-                <th scope="col">Created</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% if orders %}
-            {% for order in orders %}
-            <tr>
-                <th scope="row" class="border-right border-bottom-0">{{ order.dl_task }}</th>
-                <td class="border-right border-bottom-0">{{ order.client_order_code }}</td>
-                <td class="border-right border-bottom-0">{{ order.customer_name }}</td>
-                <td class="border-right border-bottom-0">{{ order.customer_phone }}</td>
-                <td class="border-right border-bottom-0">{{ order.order_status }}</td>
-                <td class="border-right border-bottom-0">{{ order.created_at|date:"M d, Y" }}</td>
-            </tr>
-            <tr>
-                <td></td>
-                <td colspan="2"><i class="fa-solid fa-location-pin text-success"></i>
-                    {{ order.pickup_location }}</td>
-                <td colspan="3"><i class="fa-solid fa-location-pin text-danger"></i>
-                    {{ order.customer_address }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% include "includes/components/_pagination.html" with page_obj=orders filter_params=filter_params %}
-    {% else %}
-    <p>No orders found.</p>
-    {% endif %}
-</div>
+    <!-- Orders Table -->
+    <div class="orp__card">
+        <div class="orp__card-header">
+            <i class="fa-solid fa-list me-2 orp__icon-accent"></i>
+            <span class="orp__section-label">Reported Orders</span>
+        </div>
+        {% if orders %}
+        <div class="table-responsive">
+            <table class="orp__table">
+                <thead>
+                    <tr>
+                        <th class="orp__th">DL Code</th>
+                        <th class="orp__th">Client Code</th>
+                        <th class="orp__th">Customer</th>
+                        <th class="orp__th">Mobile</th>
+                        <th class="orp__th">Status</th>
+                        <th class="orp__th">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr class="orp__row">
+                        <td class="orp__td orp__td--bold">{{ order.dl_task }}</td>
+                        <td class="orp__td">{{ order.client_order_code }}</td>
+                        <td class="orp__td">{{ order.customer_name }}</td>
+                        <td class="orp__td">{{ order.customer_phone }}</td>
+                        <td class="orp__td">
+                            <span class="orp__badge orp__badge--red">{{ order.order_status }}</span>
+                        </td>
+                        <td class="orp__td">{{ order.created_at|date:"M d, Y" }}</td>
+                    </tr>
+                    <tr class="orp__row-detail">
+                        <td class="orp__td"></td>
+                        <td class="orp__td" colspan="2">
+                            <span class="orp__location orp__location--pickup">
+                                <i class="fa-solid fa-location-pin"></i>
+                                {{ order.pickup_location }}
+                            </span>
+                        </td>
+                        <td class="orp__td" colspan="3">
+                            <span class="orp__location orp__location--drop">
+                                <i class="fa-solid fa-location-pin"></i>
+                                {{ order.customer_address }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "includes/components/_pagination.html" with page_obj=orders filter_params=filter_params %}
+        {% else %}
+        <div class="orp__empty">
+            <i class="fa-solid fa-flag"></i>
+            <h3>No Reported Orders</h3>
+            <p>There are no reported orders at this time.</p>
+        </div>
+        {% endif %}
+    </div>
 </div>
 {% endblock content %}
 

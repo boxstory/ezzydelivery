@@ -1,91 +1,88 @@
 {% extends "base.html" %}
 {% load static %}
-<!-- title -->
-{% block title %}
-FLEETS
-{% endblock title %}
-<!-- title -->
+
+{% block title %}FLEETS{% endblock title %}
+
+{% block extra_css %}
+<link href="{% static 'fleet/css/fleet.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
 {% block content %}
-<div class="d-flex justify-content-between pt-4 align-content-center mx-3">
-  <h1 class="" id="fleet_drivers_header_title">Drivers</h1>
-  <div>
-    <a href="{% url 'fleet:fleets' %}">
-      <div class="btn btn-dark btn-md-2" id="fleet_drivers_btn_back">
-        <i class="fa-solid fa-chevron-left me-2"></i> Back
-      </div>
-    </a>
-    <a href="{% url 'core:join_driver' %}">
-      <div class="btn btn-dark" id="fleet_drivers_btn_join">
-        <i class="fa fa-add me-2"></i> join As Driver
-      </div>
-    </a>
-  </div>
-</div>
-<section class=" " id="fleet_drivers_section_list">
-  <div class="d-md-flex ">
-    {% for fleet in fleets %}
-    <div class="col-12 col-md-6 border border-1 bg-light rounded-3 mb-2 me-1">
-      <div class="card-block p-0">
-        <div class="d-flex p-3">
-          <div class=" w-25 w-md-50">
-            {% if fleet.profile.profile_picture.all.0 != None %}
-            <img class="img-fluid rounded-circle profile-image" loading="lazy"
-              src="{{ fleet.profile.profile_picture.all.0.profile_picture.url }}" alt="dashboard-user" />
-            {% else %}
-            <img class="img-fluid rounded-circle profile-image" loading="lazy" src="{% static 'webpages/img/avatar.png' %}"
-              alt="dashboard-user" />
-            {% endif %}
-          </div>
-          <div class="text-left ps-3">
-            <h5 class="pt-2">{{ fleet.user.first_name }} {{ fleet.user.last_name }}</h5>
-            <span>{{ fleet.driver_languages }}</span>
-          </div>
+<div class="flt-fleets">
+    <!-- Hero Header -->
+    <div class="flt__hero">
+        <div class="flt__hero-inner">
+            <div class="flt__hero-left">
+                <h1 class="flt__hero-title" id="fleet_drivers_header_title">
+                    <i class="fa-solid fa-users"></i> Drivers
+                </h1>
+                <p class="flt__hero-sub">Browse and add drivers to your directory</p>
+            </div>
+            <div class="flt__hero-right">
+                <a href="{% url 'fleet:fleets' %}" class="flt__hero-btn flt__hero-btn--outline" id="fleet_drivers_btn_back">
+                    <i class="fa-solid fa-chevron-left"></i> Back
+                </a>
+                <a href="{% url 'core:join_driver' %}" class="flt__hero-btn flt__hero-btn--solid" id="fleet_drivers_btn_join">
+                    <i class="fa-solid fa-plus"></i> Join As Driver
+                </a>
+            </div>
         </div>
-        <div class="project-main pt-3">
-          <div class="row text-center">
-            <div class="col-md-4 col-6">
-              <h6 class="text-muted">
-                <i class="fas fa-star me-2"></i> 4.8
-              </h6>
-            </div>
-            <div class="col-md-4 col-6">
-              <h6 class="text-muted">
-                <i class="fas fa-map-marker-alt me-2"></i>{{ fleet.profile.zone_name }}
-              </h6>
-            </div>
-            <div class="col-md-4 col-12">
-              <h6 class="text-muted m-0">
-                <i class="fas fa-file-alt me-2"></i> 28 Task
-              </h6>
-            </div>
-          </div>
-        </div>
-        <div class="row m-t-30 px-2 my-2">
-          <div class="col-6 p-r-0">
-            <form id="fleet_drivers_form_add_directory" action="{% url 'business:driver_directory_add' %}" method="post">
-              {% csrf_token %}
-              <input type="hidden" name="driver_id" value="{{ fleet.profile.id }}">
-              <input type="hidden" name="business_id" value="{{ user.id }}">
-              <button type="submit" class="btn btn-dark  w-100" id="fleet_drivers_btn_add_directory">
-                Add to
-                directory
-              </button>
-            </form>
-          </div>
-          <div class="col-6">
-            <div class="d-grid">
-              <a href="/fleet/{{ fleet.driver_id }}/" class="btn text-uppercase border btn-outline-secondary" id="fleet_drivers_btn_view_profile">View
-                Profile</a>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
-    {% if forloop.counter|divisibleby:2 %}
-  </div>
-  <div class="row row-cols-1 row-cols-md-2">
-    {% endif %}
-    {% endfor %}
-  </div>
-</section>
+
+    <!-- Driver Grid -->
+    <div class="flt__driver-grid" id="fleet_drivers_section_list">
+        {% for fleet in fleets %}
+        <div class="flt__driver-card">
+            <div class="flt__driver-card__top">
+                <div class="flt__driver-card__avatar">
+                    {% if fleet.profile.profile_picture.all.0 != None %}
+                    <img class="flt__driver-card__img" loading="lazy"
+                         src="{{ fleet.profile.profile_picture.all.0.profile_picture.url }}" alt="{{ fleet.user.first_name }}" />
+                    {% else %}
+                    <div class="flt__driver-card__initials">
+                        {{ fleet.user.first_name|first }}{{ fleet.user.last_name|first }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="flt__driver-card__info">
+                    <h5 class="flt__driver-card__name">{{ fleet.user.first_name }} {{ fleet.user.last_name }}</h5>
+                    <span class="flt__driver-card__lang">{{ fleet.driver_languages }}</span>
+                </div>
+            </div>
+            <div class="flt__driver-card__stats">
+                <div class="flt__driver-card__stat">
+                    <i class="fas fa-star flt__driver-card__stat-icon flt__driver-card__stat-icon--gold"></i>
+                    <span>4.8</span>
+                </div>
+                <div class="flt__driver-card__stat">
+                    <i class="fas fa-map-marker-alt flt__driver-card__stat-icon"></i>
+                    <span>{{ fleet.profile.zone_name }}</span>
+                </div>
+                <div class="flt__driver-card__stat">
+                    <i class="fas fa-file-alt flt__driver-card__stat-icon"></i>
+                    <span>28 Tasks</span>
+                </div>
+            </div>
+            <div class="flt__driver-card__actions">
+                <form id="fleet_drivers_form_add_directory_{{ forloop.counter }}" action="{% url 'business:driver_directory_add' %}" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="driver_id" value="{{ fleet.profile.id }}">
+                    <input type="hidden" name="business_id" value="{{ user.id }}">
+                    <button type="submit" class="flt__btn flt__btn--primary" id="fleet_drivers_btn_add_directory">
+                        <i class="fa-solid fa-plus"></i> Add to Directory
+                    </button>
+                </form>
+                <a href="/fleet/{{ fleet.driver_id }}/" class="flt__btn flt__btn--outline" id="fleet_drivers_btn_view_profile">
+                    View Profile
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="flt__empty">
+            <i class="fa-solid fa-users-slash"></i>
+            <p>No drivers found</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
 {% endblock content %}

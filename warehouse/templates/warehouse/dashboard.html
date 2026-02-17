@@ -4,51 +4,57 @@
 {% block title %}Warehouse Logistics{% endblock %}
 
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse-logistics.css' %}" type="text/css" />
 
-<div class="warehouse-logistics-container">
-    <!-- Left Panel - Section View -->
-    <div>
-        <!-- Header -->
-        <div class="warehouse-header">
-            <h1 class="warehouse-title">Warehouse Logistics</h1>
-            <div class="search-box">
-                <i class="fas fa-search"></i>
-                <input type="text" placeholder="Search product..." id="searchInput">
+<div class="whd">
+    <!-- Left Panel -->
+    <div class="whd__main">
+        <!-- Hero Header -->
+        <div class="whd__hero">
+            <div class="whd__hero-left">
+                <div class="whd__hero-icon"><i class="fas fa-warehouse"></i></div>
+                <div>
+                    <h1 class="whd__hero-title">Warehouse Logistics</h1>
+                    <p class="whd__hero-subtitle">Real-time storage monitoring and section overview</p>
+                </div>
+            </div>
+            <div class="whd__search">
+                <i class="fas fa-search whd__search-icon"></i>
+                <input type="text" class="whd__search-input" placeholder="Search product..." id="searchInput">
             </div>
         </div>
 
         <!-- Section Card -->
-        <div class="section-card">
-            <div class="section-header">
-                <h2 class="section-title">Section <span id="currentSectionName">{{ selected_section.code|default:"001" }}</span></h2>
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <div class="section-date">
+        <div class="whd__section-card">
+            <div class="whd__section-header">
+                <h2 class="whd__section-title">
+                    <i class="fas fa-layer-group whd__section-title-icon"></i>
+                    SECTION <span id="currentSectionName">{{ selected_section.code|default:"001" }}</span>
+                </h2>
+                <div class="whd__section-actions">
+                    <div class="whd__section-date">
                         <i class="far fa-calendar"></i>
                         <span id="currentDate">{{ current_date|date:"d.m.Y" }}</span>
                     </div>
-                    <a href="{% url 'warehouse:location_list' %}" class="show-all-btn">Show all</a>
+                    <a href="{% url 'warehouse:location_list' %}" class="wh__btn wh__btn--primary">Show all</a>
                 </div>
             </div>
 
             <!-- Storage Grid -->
-            <div class="storage-grid" id="storageGrid">
+            <div class="whd__grid" id="storageGrid">
                 {% for i in "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" %}
-                <div class="storage-cell {% cycle 'loaded' 'loaded' 'loaded' 'loaded' 'loaded' 'loaded' 'free' 'free' 'free' 'free' 'free' 'free' %}" data-position="{{ forloop.counter }}">
+                <div class="whd__cell whd__cell--{% cycle 'loaded' 'loaded' 'loaded' 'loaded' 'loaded' 'loaded' 'free' 'free' 'free' 'free' 'free' 'free' %}" data-position="{{ forloop.counter }}">
                     {% if forloop.counter == 35 %}
-                    <div class="storage-tooltip">
-                        <div class="tooltip-row">
-                            <span class="tooltip-label">Row 3</span>
-                            <span class="tooltip-value">#132236</span>
+                    <div class="whd__tooltip">
+                        <div class="whd__tooltip-row">
+                            <span class="whd__tooltip-label">Row 3</span>
+                            <span class="whd__tooltip-value">#132236</span>
                         </div>
-                        <div class="tooltip-row">
-                            <span class="tooltip-label">H60 x W60 x 20 KG</span>
+                        <div class="whd__tooltip-row">
+                            <span class="whd__tooltip-label">H60 x W60 x 20 KG</span>
                         </div>
-                        <div class="tooltip-delivered">
-                            Delivered 06.15PM
-                        </div>
+                        <div class="whd__tooltip-delivered">Delivered 06.15PM</div>
                     </div>
                     {% endif %}
                 </div>
@@ -56,22 +62,25 @@
             </div>
 
             <!-- Legend -->
-            <div class="legend">
-                <div class="legend-item">
-                    <div class="legend-box free"></div>
+            <div class="whd__legend">
+                <div class="whd__legend-item">
+                    <div class="whd__legend-box whd__legend-box--free"></div>
                     <span>Free place</span>
                 </div>
-                <div class="legend-item">
-                    <div class="legend-box loaded"></div>
+                <div class="whd__legend-item">
+                    <div class="whd__legend-box whd__legend-box--loaded"></div>
                     <span>Loaded place</span>
                 </div>
             </div>
 
             <!-- Section List -->
-            <div class="section-list">
-                <div class="section-list-header">
-                    <h3 class="section-list-title">List of sections</h3>
-                    <select class="sort-dropdown" id="sortBy">
+            <div class="whd__list">
+                <div class="whd__list-header">
+                    <h3 class="whd__list-title">
+                        <i class="fas fa-list whd__list-title-icon"></i>
+                        LIST OF SECTIONS
+                    </h3>
+                    <select class="wh__filter-select" id="sortBy">
                         <option>Sort by</option>
                         <option value="usage">Usage %</option>
                         <option value="name">Section Name</option>
@@ -79,119 +88,87 @@
                     </select>
                 </div>
 
-                <!-- Section Items -->
                 {% for location in storage_locations %}
-                <div class="section-item" onclick="loadSection('{{ location.code }}', {{ location.id }})">
-                    <div class="section-name">Section {{ location.code }}</div>
-                    <div class="section-meta">
-                        <div class="section-date-small">
+                <div class="whd__item" onclick="loadSection('{{ location.code }}', {{ location.id }})">
+                    <div class="whd__item-name">Section {{ location.code }}</div>
+                    <div class="whd__item-meta">
+                        <div class="whd__item-date">
                             <i class="far fa-calendar"></i>
                             <span>{{ location.created_at|date:"d/m/Y" }}</span>
                         </div>
-                        <div style="display: flex; align-items: center;">
-                            <span class="section-usage">Used</span>
-                            <div class="usage-bar">
-                                <div class="usage-fill {% if location.usage_percent < 40 %}low{% elif location.usage_percent < 70 %}medium{% else %}high{% endif %}"
-                                     style="width: {{ location.usage_percent }}%"></div>
+                        <div class="whd__item-usage">
+                            <span class="whd__item-usage-label">Used</span>
+                            <div class="whd__usage-bar">
+                                <div class="whd__usage-fill whd__usage-fill--{% if location.usage_percent < 40 %}low{% elif location.usage_percent < 70 %}medium{% else %}high{% endif %}" data-width="{{ location.usage_percent }}%"></div>
                             </div>
-                            <span class="section-usage" style="margin-left: 8px;">{{ location.usage_percent|default:"0" }}%</span>
+                            <span class="whd__item-usage-pct">{{ location.usage_percent|default:"0" }}%</span>
                         </div>
                     </div>
                 </div>
                 {% empty %}
-                <div class="section-item">
-                    <div class="section-name">Section 001</div>
-                    <div class="section-meta">
-                        <div class="section-date-small">
-                            <i class="far fa-calendar"></i>
-                            <span>28/09/2020</span>
-                        </div>
-                        <div style="display: flex; align-items: center;">
-                            <span class="section-usage">Used</span>
-                            <div class="usage-bar">
-                                <div class="usage-fill low" style="width: 20%"></div>
-                            </div>
-                            <span class="section-usage" style="margin-left: 8px;">20%</span>
+                <div class="whd__item" onclick="loadSection('001', 0)">
+                    <div class="whd__item-name">Section 001</div>
+                    <div class="whd__item-meta">
+                        <div class="whd__item-date"><i class="far fa-calendar"></i> <span>28/09/2020</span></div>
+                        <div class="whd__item-usage">
+                            <span class="whd__item-usage-label">Used</span>
+                            <div class="whd__usage-bar"><div class="whd__usage-fill whd__usage-fill--low" data-width="20%"></div></div>
+                            <span class="whd__item-usage-pct">20%</span>
                         </div>
                     </div>
                 </div>
-                <div class="section-item">
-                    <div class="section-name">Section 002</div>
-                    <div class="section-meta">
-                        <div class="section-date-small">
-                            <i class="far fa-calendar"></i>
-                            <span>28/09/2020</span>
-                        </div>
-                        <div style="display: flex; align-items: center;">
-                            <span class="section-usage">Used</span>
-                            <div class="usage-bar">
-                                <div class="usage-fill low" style="width: 28%"></div>
-                            </div>
-                            <span class="section-usage" style="margin-left: 8px;">28%</span>
+                <div class="whd__item" onclick="loadSection('002', 0)">
+                    <div class="whd__item-name">Section 002</div>
+                    <div class="whd__item-meta">
+                        <div class="whd__item-date"><i class="far fa-calendar"></i> <span>28/09/2020</span></div>
+                        <div class="whd__item-usage">
+                            <span class="whd__item-usage-label">Used</span>
+                            <div class="whd__usage-bar"><div class="whd__usage-fill whd__usage-fill--low" data-width="28%"></div></div>
+                            <span class="whd__item-usage-pct">28%</span>
                         </div>
                     </div>
                 </div>
-                <div class="section-item">
-                    <div class="section-name">Section 003</div>
-                    <div class="section-meta">
-                        <div class="section-date-small">
-                            <i class="far fa-calendar"></i>
-                            <span>28/09/2020</span>
-                        </div>
-                        <div style="display: flex; align-items: center;">
-                            <span class="section-usage">Used</span>
-                            <div class="usage-bar">
-                                <div class="usage-fill high" style="width: 80%"></div>
-                            </div>
-                            <span class="section-usage" style="margin-left: 8px;">80%</span>
+                <div class="whd__item" onclick="loadSection('003', 0)">
+                    <div class="whd__item-name">Section 003</div>
+                    <div class="whd__item-meta">
+                        <div class="whd__item-date"><i class="far fa-calendar"></i> <span>28/09/2020</span></div>
+                        <div class="whd__item-usage">
+                            <span class="whd__item-usage-label">Used</span>
+                            <div class="whd__usage-bar"><div class="whd__usage-fill whd__usage-fill--high" data-width="80%"></div></div>
+                            <span class="whd__item-usage-pct">80%</span>
                         </div>
                     </div>
                 </div>
-                <div class="section-item">
-                    <div class="section-name">Section 004</div>
-                    <div class="section-meta">
-                        <div class="section-date-small">
-                            <i class="far fa-calendar"></i>
-                            <span>28/02/2020</span>
-                        </div>
-                        <div style="display: flex; align-items: center;">
-                            <span class="section-usage">Used</span>
-                            <div class="usage-bar">
-                                <div class="usage-fill medium" style="width: 50%"></div>
-                            </div>
-                            <span class="section-usage" style="margin-left: 8px;">50%</span>
+                <div class="whd__item" onclick="loadSection('004', 0)">
+                    <div class="whd__item-name">Section 004</div>
+                    <div class="whd__item-meta">
+                        <div class="whd__item-date"><i class="far fa-calendar"></i> <span>28/02/2020</span></div>
+                        <div class="whd__item-usage">
+                            <span class="whd__item-usage-label">Used</span>
+                            <div class="whd__usage-bar"><div class="whd__usage-fill whd__usage-fill--medium" data-width="50%"></div></div>
+                            <span class="whd__item-usage-pct">50%</span>
                         </div>
                     </div>
                 </div>
-                <div class="section-item">
-                    <div class="section-name">Section 005</div>
-                    <div class="section-meta">
-                        <div class="section-date-small">
-                            <i class="far fa-calendar"></i>
-                            <span>28/02/2020</span>
-                        </div>
-                        <div style="display: flex; align-items: center;">
-                            <span class="section-usage">Used</span>
-                            <div class="usage-bar">
-                                <div class="usage-fill medium" style="width: 58%"></div>
-                            </div>
-                            <span class="section-usage" style="margin-left: 8px;">58%</span>
+                <div class="whd__item" onclick="loadSection('005', 0)">
+                    <div class="whd__item-name">Section 005</div>
+                    <div class="whd__item-meta">
+                        <div class="whd__item-date"><i class="far fa-calendar"></i> <span>28/02/2020</span></div>
+                        <div class="whd__item-usage">
+                            <span class="whd__item-usage-label">Used</span>
+                            <div class="whd__usage-bar"><div class="whd__usage-fill whd__usage-fill--medium" data-width="58%"></div></div>
+                            <span class="whd__item-usage-pct">58%</span>
                         </div>
                     </div>
                 </div>
-                <div class="section-item">
-                    <div class="section-name">Section 006</div>
-                    <div class="section-meta">
-                        <div class="section-date-small">
-                            <i class="far fa-calendar"></i>
-                            <span>28/03/2020</span>
-                        </div>
-                        <div style="display: flex; align-items: center;">
-                            <span class="section-usage">Used</span>
-                            <div class="usage-bar">
-                                <div class="usage-fill low" style="width: 36%"></div>
-                            </div>
-                            <span class="section-usage" style="margin-left: 8px;">36%</span>
+                <div class="whd__item" onclick="loadSection('006', 0)">
+                    <div class="whd__item-name">Section 006</div>
+                    <div class="whd__item-meta">
+                        <div class="whd__item-date"><i class="far fa-calendar"></i> <span>28/03/2020</span></div>
+                        <div class="whd__item-usage">
+                            <span class="whd__item-usage-label">Used</span>
+                            <div class="whd__usage-bar"><div class="whd__usage-fill whd__usage-fill--low" data-width="36%"></div></div>
+                            <span class="whd__item-usage-pct">36%</span>
                         </div>
                     </div>
                 </div>
@@ -201,95 +178,81 @@
     </div>
 
     <!-- Right Panel -->
-    <div class="right-panel">
+    <div class="whd__sidebar">
         <!-- Usage Circle -->
-        <div class="usage-circle-card">
-            <button class="close-btn" onclick="this.parentElement.style.display='none'">
+        <div class="whd__usage-card">
+            <button class="whd__close-btn" onclick="this.parentElement.classList.add('whd__usage-card--hidden')">
                 <i class="fas fa-times"></i>
             </button>
-            <div class="usage-title">Section 5 usage</div>
-
-            <div class="circle-container">
-                <div class="progress-circle">
+            <div class="whd__usage-title">Section 5 usage</div>
+            <div class="whd__circle-wrap">
+                <div class="whd__circle">
                     <svg width="180" height="180">
-                        <circle class="progress-bg" cx="90" cy="90" r="80"></circle>
-                        <circle class="progress-bar" cx="90" cy="90" r="80"
-                                stroke-dasharray="502.65"
-                                stroke-dashoffset="210.11"></circle>
+                        <circle class="whd__circle-bg" cx="90" cy="90" r="80"></circle>
+                        <circle class="whd__circle-bar" cx="90" cy="90" r="80"
+                                stroke-dasharray="502.65" stroke-dashoffset="210.11"></circle>
                     </svg>
-                    <div class="circle-text">
-                        <div class="circle-percentage">58%</div>
-                        <div class="circle-label">Location used</div>
+                    <div class="whd__circle-text">
+                        <div class="whd__circle-pct">58%</div>
+                        <div class="whd__circle-label">Location used</div>
                     </div>
                 </div>
             </div>
-
-            <div class="usage-stats">
-                <div class="stat-item">
-                    <div class="stat-label">Loaded</div>
-                    <div class="stat-value">19 Shelves</div>
+            <div class="whd__usage-stats">
+                <div class="whd__usage-stat">
+                    <div class="whd__usage-stat-label">Loaded</div>
+                    <div class="whd__usage-stat-value">19 Shelves</div>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-label">Empty</div>
-                    <div class="stat-value">64 Shelves</div>
+                <div class="whd__usage-stat">
+                    <div class="whd__usage-stat-label">Empty</div>
+                    <div class="whd__usage-stat-value">64 Shelves</div>
                 </div>
             </div>
         </div>
 
         <!-- Box List -->
-        <div class="box-list">
-            <div class="tabs">
-                <div class="tab active">Received</div>
-                <div class="tab">Sent</div>
-                <div class="tab">Expected</div>
+        <div class="whd__box-list">
+            <div class="whd__tabs">
+                <div class="whd__tab whd__tab--active">Received</div>
+                <div class="whd__tab">Sent</div>
+                <div class="whd__tab">Expected</div>
             </div>
-
-            <div class="box-items">
+            <div class="whd__boxes">
                 {% for txn in recent_transactions|slice:":10" %}
-                <div class="box-item">
-                    <div class="box-icon">
-                        <i class="fas fa-box"></i>
-                    </div>
-                    <div class="box-info">
-                        <div class="box-id">Box {{ txn.transaction_number|truncatechars:8 }}</div>
-                        <div class="box-time">Delivered {{ txn.created_at|date:"H:i" }}PM</div>
+                <div class="whd__box-item">
+                    <div class="whd__box-icon"><i class="fas fa-box"></i></div>
+                    <div class="whd__box-info">
+                        <div class="whd__box-id">Box {{ txn.transaction_number|truncatechars:8 }}</div>
+                        <div class="whd__box-time">Delivered {{ txn.created_at|date:"H:i" }}PM</div>
                     </div>
                 </div>
                 {% empty %}
-                <div class="box-item">
-                    <div class="box-icon">
-                        <i class="fas fa-box"></i>
-                    </div>
-                    <div class="box-info">
-                        <div class="box-id">Box 132236</div>
-                        <div class="box-time">Delivered 06:15PM</div>
+                <div class="whd__box-item">
+                    <div class="whd__box-icon"><i class="fas fa-box"></i></div>
+                    <div class="whd__box-info">
+                        <div class="whd__box-id">Box 132236</div>
+                        <div class="whd__box-time">Delivered 06:15PM</div>
                     </div>
                 </div>
-                <div class="box-item">
-                    <div class="box-icon">
-                        <i class="fas fa-box"></i>
-                    </div>
-                    <div class="box-info">
-                        <div class="box-id">Box 232645</div>
-                        <div class="box-time">Delivered 06:15PM</div>
+                <div class="whd__box-item">
+                    <div class="whd__box-icon"><i class="fas fa-box"></i></div>
+                    <div class="whd__box-info">
+                        <div class="whd__box-id">Box 232645</div>
+                        <div class="whd__box-time">Delivered 06:15PM</div>
                     </div>
                 </div>
-                <div class="box-item">
-                    <div class="box-icon">
-                        <i class="fas fa-box"></i>
-                    </div>
-                    <div class="box-info">
-                        <div class="box-id">Box 323624</div>
-                        <div class="box-time">Delivered 06:15PM</div>
+                <div class="whd__box-item">
+                    <div class="whd__box-icon"><i class="fas fa-box"></i></div>
+                    <div class="whd__box-info">
+                        <div class="whd__box-id">Box 323624</div>
+                        <div class="whd__box-time">Delivered 06:15PM</div>
                     </div>
                 </div>
-                <div class="box-item">
-                    <div class="box-icon">
-                        <i class="fas fa-box"></i>
-                    </div>
-                    <div class="box-info">
-                        <div class="box-id">Box 323624</div>
-                        <div class="box-time">Delivered 06:15PM</div>
+                <div class="whd__box-item">
+                    <div class="whd__box-icon"><i class="fas fa-box"></i></div>
+                    <div class="whd__box-info">
+                        <div class="whd__box-id">Box 323624</div>
+                        <div class="whd__box-time">Delivered 06:15PM</div>
                     </div>
                 </div>
                 {% endfor %}
@@ -300,49 +263,42 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Search functionality
-    const searchInput = document.getElementById('searchInput');
+    // Set dynamic widths on usage fills
+    document.querySelectorAll('.whd__usage-fill').forEach(function(el) {
+        el.style.width = el.getAttribute('data-width');
+    });
+
+    var searchInput = document.getElementById('searchInput');
     if (searchInput) {
         searchInput.addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            console.log('Searching for:', searchTerm);
-            // Add search logic here
+            console.log('Searching for:', e.target.value.toLowerCase());
         });
     }
 
-    // Sort functionality
-    const sortBy = document.getElementById('sortBy');
+    var sortBy = document.getElementById('sortBy');
     if (sortBy) {
         sortBy.addEventListener('change', function(e) {
-            const sortValue = e.target.value;
-            console.log('Sorting by:', sortValue);
-            // Add sort logic here
+            console.log('Sorting by:', e.target.value);
         });
     }
 
-    // Tab switching
-    const tabs = document.querySelectorAll('.tab');
-    tabs.forEach(tab => {
+    document.querySelectorAll('.whd__tab').forEach(function(tab) {
         tab.addEventListener('click', function() {
-            tabs.forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-            // Load different data based on tab
+            document.querySelectorAll('.whd__tab').forEach(function(t) { t.classList.remove('whd__tab--active'); });
+            this.classList.add('whd__tab--active');
         });
     });
 
-    // Highlight clicked cell
-    const cells = document.querySelectorAll('.storage-cell.loaded');
-    cells.forEach(cell => {
+    document.querySelectorAll('.whd__cell--loaded').forEach(function(cell) {
         cell.addEventListener('click', function() {
-            cells.forEach(c => c.classList.remove('highlight'));
-            this.classList.add('highlight');
+            document.querySelectorAll('.whd__cell').forEach(function(c) { c.classList.remove('whd__cell--highlight'); });
+            this.classList.add('whd__cell--highlight');
         });
     });
 });
 
 function loadSection(code, id) {
     document.getElementById('currentSectionName').textContent = code;
-    // Load section data via AJAX
     console.log('Loading section:', code, id);
 }
 </script>

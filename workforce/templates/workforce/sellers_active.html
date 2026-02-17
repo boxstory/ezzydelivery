@@ -1,112 +1,118 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
-
 {% block title %}Active Sellers - Ezzy Delivery{% endblock title %}
-
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
-<div class="col-12 p-3">
-<!-- Page Header -->
-<header class="page-header">
-    <div class="page-header-left">
-        <h2><i class="fa-solid fa-circle-check me-1"></i>Active Sellers</h2>
-    </div>
-</header>
-
-<!-- Search Section -->
-<div class="filter-section">
-    <form method="get" class="row g-3"
-          hx-get=""
-          hx-target="#main-content"
-          hx-select="#main-content"
-          hx-swap="outerHTML"
-          hx-push-url="true">
-        <div class="col-md-10">
-            <label for="searchInput" class="filter-label">
-                <i class="fa-solid fa-search me-2"></i>Search Sellers
-            </label>
-            <input type="text" id="searchInput" name="search" class="filter-input"
-                   placeholder="Search by name, email, phone..." value="{{ search }}">
+<div class="sla">
+    <!-- Hero Header -->
+    <div class="sla__hero">
+        <div class="sla__hero-inner">
+            <div class="sla__hero-left">
+                <h1 class="sla__hero-title">
+                    <i class="fa-solid fa-circle-check"></i> Active Sellers
+                </h1>
+                <p class="sla__hero-sub">All active and verified businesses</p>
+            </div>
         </div>
-        <div class="col-md-2">
-            <label class="filter-label" style="visibility: hidden;">Action</label>
-            <button type="submit" class="btn btn-primary w-100">
-                <i class="fa-solid fa-search me-2"></i>Search
-            </button>
-        </div>
-    </form>
-</div>
-
-<!-- Sellers Table -->
-<div class="orders-table-container">
-    {% if page_obj %}
-    <table class="orders-table">
-        <thead>
-            <tr>
-                <th>Business Name</th>
-                <th>Contact</th>
-                <th>Total Orders</th>
-                <th>Member Since</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for business in page_obj %}
-            <tr>
-                <td>
-                    <div class="d-flex align-items-center">
-                        <div class="driver-icon me-3" style="width: 40px; height: 40px; background: #d4edda;">
-                            <i class="fa-solid fa-store" style="color: #28a745;"></i>
-                        </div>
-                        <div>
-                            <strong>{{ business.business_name|default:"Unknown Business" }}</strong>
-                            <br>
-                            <small class="text-muted">{{ business.business_code|default:"N/A" }}</small>
-                        </div>
-                    </div>
-                </td>
-                <td>
-                    {% if business.business_email %}
-                    <div><i class="fa-solid fa-envelope me-2"></i>{{ business.business_email }}</div>
-                    {% endif %}
-                    {% if business.business_phone %}
-                    <div><i class="fa-solid fa-phone me-2"></i>{{ business.business_phone }}</div>
-                    {% endif %}
-                </td>
-                <td>
-                    <strong>{{ business.total_orders|default:0 }}</strong> orders
-                </td>
-                <td>{{ business.business_since|date:"d M Y"|default:"N/A" }}</td>
-                <td>
-                    <span class="status-badge status-active">
-                        <i class="fa-solid fa-circle-check me-1"></i>Active & Verified
-                    </span>
-                </td>
-                <td>
-                    <a href="{% url 'workforce:seller_detail' business.business_id %}"
-                       class="btn btn-sm btn-outline-primary">
-                        <i class="fa-solid fa-eye me-1"></i>View
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <!-- Pagination -->
-    {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params %}
-
-    {% else %}
-    <div class="empty-state">
-        <i class="fa-solid fa-store"></i>
-        <h3>No Active Sellers</h3>
-        <p>{% if search %}No sellers match your search criteria.{% else %}There are no active sellers yet.{% endif %}</p>
     </div>
-    {% endif %}
-</div>
+
+    <!-- Filter -->
+    <div class="sla__filter">
+        <div class="sla__filter-header">
+            <i class="fa-solid fa-sliders sla__filter-header-icon"></i>
+            <span class="sla__filter-header-text">Search</span>
+        </div>
+        <form method="get" class="sla__filter-form"
+              hx-get=""
+              hx-target="#main-content"
+              hx-select="#main-content"
+              hx-swap="outerHTML"
+              hx-push-url="true">
+            <div class="sla__filter-group sla__filter-group--lg">
+                <label for="searchInput" class="sla__filter-label">
+                    <i class="fa-solid fa-search"></i> Search Sellers
+                </label>
+                <input type="text" id="searchInput" name="search"
+                       class="sla__filter-input"
+                       placeholder="Search by name, email, phone..."
+                       value="{{ search }}">
+            </div>
+            <div class="sla__filter-actions">
+                <button type="submit" class="sla__btn sla__btn--primary">
+                    <i class="fa-solid fa-search"></i> Search
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div class="sla__table-wrap">
+        {% if page_obj %}
+        <table class="sla__table">
+            <thead>
+                <tr>
+                    <th>Business Name</th>
+                    <th>Contact</th>
+                    <th>Total Orders</th>
+                    <th>Member Since</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for business in page_obj %}
+                <tr>
+                    <td>
+                        <div class="sla__seller-cell">
+                            <div class="sla__seller-avatar sla__seller-avatar--active">
+                                <i class="fa-solid fa-store"></i>
+                            </div>
+                            <div>
+                                <div class="sla__seller-name">{{ business.business_name|default:"Unknown Business" }}</div>
+                                <div class="sla__seller-code">{{ business.business_code|default:"N/A" }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if business.business_email %}
+                        <div class="sla__contact-line">
+                            <i class="fa-solid fa-envelope"></i> {{ business.business_email }}
+                        </div>
+                        {% endif %}
+                        {% if business.business_phone %}
+                        <div class="sla__contact-line">
+                            <i class="fa-solid fa-phone"></i> {{ business.business_phone }}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="sla__order-count">{{ business.total_orders|default:0 }}</span> orders
+                    </td>
+                    <td>
+                        <span class="sla__date">{{ business.business_since|date:"d M Y"|default:"N/A" }}</span>
+                    </td>
+                    <td>
+                        <span class="sla__badge sla__badge--success">
+                            <i class="fa-solid fa-circle-check"></i> Active
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{% url 'workforce:seller_detail' business.business_id %}"
+                           class="sla__btn sla__btn--view">
+                            <i class="fa-solid fa-eye"></i> View
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params %}
+        {% else %}
+        <div class="sla__empty">
+            <i class="fa-solid fa-store"></i>
+            <h3>No Active Sellers</h3>
+            <p>{% if search %}No sellers match your search criteria.{% else %}There are no active sellers yet.{% endif %}</p>
+        </div>
+        {% endif %}
+    </div>
 </div>
 {% endblock content %}

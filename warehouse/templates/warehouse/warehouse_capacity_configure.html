@@ -3,236 +3,171 @@
 
 {% block title %}Configure Warehouse Capacity{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse-capacity.css' %}" type="text/css" />
 
-<div class="container-fluid py-4">
+<div class="wh">
     <!-- Breadcrumb -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item">
-                        <a href="{% url 'warehouse:warehouse_list' %}">Warehouses</a>
-                    </li>
-                    <li class="breadcrumb-item">
-                        <a href="{% url 'warehouse:warehouse_detail' warehouse.pk %}">{{ warehouse.code }}</a>
-                    </li>
-                    <li class="breadcrumb-item active">Configure Capacity</li>
-                </ol>
-            </nav>
-            <h1 class="h3 mb-0">Configure Warehouse Capacity</h1>
-            <p class="text-muted">Define the internal structure of {{ warehouse.name }}</p>
+    <div class="wh__breadcrumb">
+        <a href="{% url 'warehouse:warehouse_list' %}">Warehouses</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <a href="{% url 'warehouse:warehouse_detail' warehouse.pk %}">{{ warehouse.code }}</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <span class="wh__breadcrumb-active">Configure Capacity</span>
+    </div>
+
+    <!-- Hero Header -->
+    <div class="wcp__hero">
+        <div class="wcp__hero-icon"><i class="fas fa-cogs"></i></div>
+        <div>
+            <h1 class="wcp__hero-title">Configure Warehouse Capacity</h1>
+            <p class="wcp__hero-subtitle">Define the internal structure of {{ warehouse.name }}</p>
         </div>
     </div>
 
     {% if warehouse.is_capacity_configured %}
-    <div class="alert alert-info">
-        <i class="fas fa-info-circle me-2"></i>
-        <strong>Already Configured:</strong> This warehouse was configured on {{ warehouse.capacity_configured_at|date:"M d, Y" }}
-        by {{ warehouse.capacity_configured_by.get_full_name|default:warehouse.capacity_configured_by.username }}.
-        You can update the configuration below.
-    </div>
-    {% endif %}
-
-    <!-- Current Capacity Summary (if configured) -->
-    {% if warehouse.is_capacity_configured %}
-    <div class="capacity-summary-card">
-        <h5 class="text-center mb-4">Current Capacity Configuration</h5>
-        <div class="row">
-            <div class="col-md-3">
-                <div class="capacity-metric">
-                    <div class="capacity-metric-value">{{ warehouse.total_zones }}</div>
-                    <div class="capacity-metric-label">Zones</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="capacity-metric">
-                    <div class="capacity-metric-value">{{ warehouse.total_racks }}</div>
-                    <div class="capacity-metric-label">Total Racks</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="capacity-metric">
-                    <div class="capacity-metric-value">{{ warehouse.total_shelves }}</div>
-                    <div class="capacity-metric-label">Total Shelves</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="capacity-metric">
-                    <div class="capacity-metric-value">{{ warehouse.total_capacity|default:"0" }}</div>
-                    <div class="capacity-metric-label">Total Bins (Capacity)</div>
-                </div>
-            </div>
+    <div class="wld__alert wld__alert--info">
+        <i class="fas fa-info-circle"></i>
+        <div>
+            <strong>Already Configured:</strong> This warehouse was configured on {{ warehouse.capacity_configured_at|date:"M d, Y" }}
+            by {{ warehouse.capacity_configured_by.get_full_name|default:warehouse.capacity_configured_by.username }}.
+            You can update the configuration below.
         </div>
     </div>
     {% endif %}
 
-    <div class="row">
+    {% if warehouse.is_capacity_configured %}
+    <!-- Current Capacity Summary -->
+    <div class="wh__stats">
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--primary"><i class="fas fa-layer-group"></i></div>
+            <div><div class="wh__stat-value">{{ warehouse.total_zones }}</div><div class="wh__stat-label">Zones</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--info"><i class="fas fa-border-all"></i></div>
+            <div><div class="wh__stat-value">{{ warehouse.total_racks }}</div><div class="wh__stat-label">Total Racks</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--success"><i class="fas fa-bars"></i></div>
+            <div><div class="wh__stat-value">{{ warehouse.total_shelves }}</div><div class="wh__stat-label">Total Shelves</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--primary"><i class="fas fa-cube"></i></div>
+            <div><div class="wh__stat-value">{{ warehouse.total_capacity|default:"0" }}</div><div class="wh__stat-label">Total Bins</div></div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="wcp__layout">
         <!-- Configuration Form -->
-        <div class="col-lg-8">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="fas fa-warehouse text-primary me-2"></i>Capacity Structure
-                    </h5>
+        <div class="wcp__main">
+            <div class="wh__card">
+                <div class="wh__card-header">
+                    <div class="wh__card-header-left"><i class="fas fa-warehouse"></i> <span>CAPACITY STRUCTURE</span></div>
                 </div>
-                <div class="card-body">
+                <div class="wh__card-body">
                     <form method="POST" id="capacity-form">
                         {% csrf_token %}
 
-                        <!-- Hierarchy Explanation -->
-                        <div class="alert alert-light border">
-                            <h6 class="alert-heading">
-                                <i class="fas fa-sitemap me-2"></i>Warehouse Hierarchy
-                            </h6>
-                            <p class="mb-0 small">
-                                <strong>Zone</strong> → <strong>Racks</strong> → <strong>Shelves</strong> → <strong>Bins</strong>
-                                <br>
-                                Example: Zone A → Rack 01 → Shelf 02 → Bin 05 = <code>A-01-02-05</code>
-                            </p>
+                        <!-- Hierarchy -->
+                        <div class="wcp__hierarchy-box">
+                            <div class="wha__section-label"><i class="fas fa-sitemap wha__section-icon"></i> WAREHOUSE HIERARCHY</div>
+                            <p class="wha__hint"><strong>Zone</strong> &rarr; <strong>Racks</strong> &rarr; <strong>Shelves</strong> &rarr; <strong>Bins</strong><br>Example: Zone A &rarr; Rack 01 &rarr; Shelf 02 &rarr; Bin 05 = <span class="wh__code">A-01-02-05</span></p>
                         </div>
 
-                        <!-- Capacity Numbers -->
-                        <h6 class="text-primary mb-3 mt-4">Define Capacity</h6>
+                        <div class="wha__section-label"><i class="fas fa-calculator wha__section-icon"></i> DEFINE CAPACITY</div>
 
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label for="total_zones" class="form-label fw-medium">
-                                    <i class="fas fa-layer-group text-muted me-1"></i>Total Zones <span class="text-danger">*</span>
-                                    <i class="fas fa-question-circle help-icon ms-1" title="Number of main zones in your warehouse (e.g., A, B, C, or North, South)"></i>
-                                </label>
-                                <input type="number" class="form-control form-control-lg"
-                                       id="total_zones" name="total_zones" min="1" max="100"
-                                       value="{{ warehouse.total_zones|default:'4' }}" required>
-                                <small class="text-muted">How many zones/areas in the warehouse?</small>
+                        <div class="wha__row">
+                            <div class="wha__field">
+                                <label for="total_zones" class="wha__label"><i class="fas fa-layer-group"></i> Total Zones <span class="wha__required">*</span></label>
+                                <input type="number" class="wha__input" id="total_zones" name="total_zones" min="1" max="100" value="{{ warehouse.total_zones|default:'4' }}" required>
+                                <span class="wha__hint">How many zones/areas in the warehouse?</span>
                             </div>
-
-                            <div class="col-md-6">
-                                <label for="racks_per_zone" class="form-label fw-medium">
-                                    <i class="fas fa-border-all text-muted me-1"></i>Racks per Zone <span class="text-danger">*</span>
-                                    <i class="fas fa-question-circle help-icon ms-1" title="How many racks in each zone"></i>
-                                </label>
-                                <input type="number" class="form-control form-control-lg"
-                                       id="racks_per_zone" name="racks_per_zone" min="1" max="1000"
-                                       value="{{ warehouse.racks_per_zone|default:'10' }}" required>
-                                <small class="text-muted">Number of racks in each zone</small>
-                            </div>
-
-                            <div class="col-md-6">
-                                <label for="shelves_per_rack" class="form-label fw-medium">
-                                    <i class="fas fa-bars text-muted me-1"></i>Shelves per Rack <span class="text-danger">*</span>
-                                    <i class="fas fa-question-circle help-icon ms-1" title="How many shelves on each rack (height)"></i>
-                                </label>
-                                <input type="number" class="form-control form-control-lg"
-                                       id="shelves_per_rack" name="shelves_per_rack" min="1" max="100"
-                                       value="{{ warehouse.shelves_per_rack|default:'5' }}" required>
-                                <small class="text-muted">Number of shelves on each rack</small>
-                            </div>
-
-                            <div class="col-md-6">
-                                <label for="bins_per_shelf" class="form-label fw-medium">
-                                    <i class="fas fa-cube text-muted me-1"></i>Bins per Shelf <span class="text-danger">*</span>
-                                    <i class="fas fa-question-circle help-icon ms-1" title="How many bins/slots on each shelf (width)"></i>
-                                </label>
-                                <input type="number" class="form-control form-control-lg"
-                                       id="bins_per_shelf" name="bins_per_shelf" min="1" max="100"
-                                       value="{{ warehouse.bins_per_shelf|default:'4' }}" required>
-                                <small class="text-muted">Number of bins/positions on each shelf</small>
+                            <div class="wha__field">
+                                <label for="racks_per_zone" class="wha__label"><i class="fas fa-border-all"></i> Racks per Zone <span class="wha__required">*</span></label>
+                                <input type="number" class="wha__input" id="racks_per_zone" name="racks_per_zone" min="1" max="1000" value="{{ warehouse.racks_per_zone|default:'10' }}" required>
+                                <span class="wha__hint">Number of racks in each zone</span>
                             </div>
                         </div>
 
-                        <!-- Real-time Capacity Calculator -->
-                        <div class="naming-preview mt-4">
-                            <h6><i class="fas fa-calculator me-2"></i>Total Capacity Preview</h6>
-                            <div class="row text-center">
-                                <div class="col">
-                                    <strong id="preview-zones">4</strong> zones ×
-                                    <strong id="preview-racks">10</strong> racks ×
-                                    <strong id="preview-shelves">5</strong> shelves ×
-                                    <strong id="preview-bins">4</strong> bins =
-                                    <strong id="preview-total" class="text-primary fs-4">800</strong> total bins
-                                </div>
+                        <div class="wha__row">
+                            <div class="wha__field">
+                                <label for="shelves_per_rack" class="wha__label"><i class="fas fa-bars"></i> Shelves per Rack <span class="wha__required">*</span></label>
+                                <input type="number" class="wha__input" id="shelves_per_rack" name="shelves_per_rack" min="1" max="100" value="{{ warehouse.shelves_per_rack|default:'5' }}" required>
+                                <span class="wha__hint">Number of shelves on each rack</span>
+                            </div>
+                            <div class="wha__field">
+                                <label for="bins_per_shelf" class="wha__label"><i class="fas fa-cube"></i> Bins per Shelf <span class="wha__required">*</span></label>
+                                <input type="number" class="wha__input" id="bins_per_shelf" name="bins_per_shelf" min="1" max="100" value="{{ warehouse.bins_per_shelf|default:'4' }}" required>
+                                <span class="wha__hint">Number of bins/positions on each shelf</span>
                             </div>
                         </div>
 
-                        <hr class="my-4">
-
-                        <!-- Naming Configuration -->
-                        <h6 class="text-primary mb-3">Naming Convention</h6>
-
-                        <div class="mb-3">
-                            <label for="zone_naming_pattern" class="form-label fw-medium">
-                                <i class="fas fa-tag text-muted me-1"></i>Zone Names <span class="text-danger">*</span>
-                            </label>
-                            <input type="text" class="form-control"
-                                   id="zone_naming_pattern" name="zone_naming_pattern"
-                                   value="{{ warehouse.zone_naming_pattern|default:'A,B,C,D' }}"
-                                   placeholder="A,B,C,D" required>
-                            <small class="text-muted">Comma-separated zone names (e.g., "A,B,C,D" or "NORTH,SOUTH,EAST,WEST" or "1,2,3,4")</small>
-                            <div class="naming-preview mt-2">
-                                <strong>Examples:</strong>
-                                <div class="example-code" id="zone-preview">Zones: A, B, C, D</div>
+                        <!-- Capacity Preview -->
+                        <div class="wcp__preview-box">
+                            <div class="wha__section-label"><i class="fas fa-calculator wha__section-icon"></i> TOTAL CAPACITY PREVIEW</div>
+                            <div class="wcp__preview-calc">
+                                <strong id="preview-zones">4</strong> zones &times;
+                                <strong id="preview-racks">10</strong> racks &times;
+                                <strong id="preview-shelves">5</strong> shelves &times;
+                                <strong id="preview-bins">4</strong> bins =
+                                <strong id="preview-total" class="wcp__preview-total">800</strong> total bins
                             </div>
                         </div>
 
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label for="rack_naming_pattern" class="form-label fw-medium">
-                                    Rack Naming
-                                </label>
-                                <select class="form-select" id="rack_naming_pattern" name="rack_naming_pattern">
+                        <div class="wha__divider"></div>
+
+                        <div class="wha__section-label"><i class="fas fa-tag wha__section-icon"></i> NAMING CONVENTION</div>
+
+                        <div class="wha__field">
+                            <label for="zone_naming_pattern" class="wha__label"><i class="fas fa-tag"></i> Zone Names <span class="wha__required">*</span></label>
+                            <input type="text" class="wha__input" id="zone_naming_pattern" name="zone_naming_pattern"
+                                   value="{{ warehouse.zone_naming_pattern|default:'A,B,C,D' }}" placeholder="A,B,C,D" required>
+                            <span class="wha__hint">Comma-separated zone names (e.g., "A,B,C,D" or "NORTH,SOUTH,EAST,WEST")</span>
+                            <div class="wcp__example" id="zone-preview">Zones: A, B, C, D</div>
+                        </div>
+
+                        <div class="wcp__naming-row">
+                            <div class="wha__field">
+                                <label for="rack_naming_pattern" class="wha__label">Rack Naming</label>
+                                <select class="wha__select" id="rack_naming_pattern" name="rack_naming_pattern">
                                     <option value="numeric" {% if warehouse.rack_naming_pattern == 'numeric' or not warehouse.rack_naming_pattern %}selected{% endif %}>Numeric (01, 02, 03...)</option>
                                     <option value="alpha" {% if warehouse.rack_naming_pattern == 'alpha' %}selected{% endif %}>Alpha (A, B, C...)</option>
                                 </select>
-                                <div class="example-code mt-2" id="rack-preview">01, 02, 03...</div>
+                                <div class="wcp__example" id="rack-preview">01, 02, 03...</div>
                             </div>
-
-                            <div class="col-md-4">
-                                <label for="shelf_naming_pattern" class="form-label fw-medium">
-                                    Shelf Naming
-                                </label>
-                                <select class="form-select" id="shelf_naming_pattern" name="shelf_naming_pattern">
+                            <div class="wha__field">
+                                <label for="shelf_naming_pattern" class="wha__label">Shelf Naming</label>
+                                <select class="wha__select" id="shelf_naming_pattern" name="shelf_naming_pattern">
                                     <option value="numeric" {% if warehouse.shelf_naming_pattern == 'numeric' or not warehouse.shelf_naming_pattern %}selected{% endif %}>Numeric (01, 02, 03...)</option>
                                     <option value="alpha" {% if warehouse.shelf_naming_pattern == 'alpha' %}selected{% endif %}>Alpha (A, B, C...)</option>
                                 </select>
-                                <div class="example-code mt-2" id="shelf-preview">01, 02, 03...</div>
+                                <div class="wcp__example" id="shelf-preview">01, 02, 03...</div>
                             </div>
-
-                            <div class="col-md-4">
-                                <label for="bin_naming_pattern" class="form-label fw-medium">
-                                    Bin Naming
-                                </label>
-                                <select class="form-select" id="bin_naming_pattern" name="bin_naming_pattern">
+                            <div class="wha__field">
+                                <label for="bin_naming_pattern" class="wha__label">Bin Naming</label>
+                                <select class="wha__select" id="bin_naming_pattern" name="bin_naming_pattern">
                                     <option value="numeric" {% if warehouse.bin_naming_pattern == 'numeric' or not warehouse.bin_naming_pattern %}selected{% endif %}>Numeric (01, 02, 03...)</option>
                                     <option value="alpha" {% if warehouse.bin_naming_pattern == 'alpha' %}selected{% endif %}>Alpha (A, B, C...)</option>
                                 </select>
-                                <div class="example-code mt-2" id="bin-preview">01, 02, 03...</div>
+                                <div class="wcp__example" id="bin-preview">01, 02, 03...</div>
                             </div>
                         </div>
 
                         <!-- Example Location Code -->
-                        <div class="naming-preview mt-4">
-                            <h6><i class="fas fa-lightbulb me-2"></i>Example Location Code</h6>
-                            <div class="example-code text-center fs-5" id="example-code">
+                        <div class="wcp__preview-box">
+                            <div class="wha__section-label"><i class="fas fa-lightbulb wha__section-icon"></i> EXAMPLE LOCATION CODE</div>
+                            <div class="wcp__example-code" id="example-code">
                                 <strong>A-01-01-01</strong>
-                                <div class="small text-muted mt-2">Zone A → Rack 01 → Shelf 01 → Bin 01</div>
+                                <div class="wh__meta">Zone A &rarr; Rack 01 &rarr; Shelf 01 &rarr; Bin 01</div>
                             </div>
                         </div>
 
-                        <hr class="my-4">
+                        <div class="wha__divider"></div>
 
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg px-4">
-                                <i class="fas fa-save me-2"></i>Save Configuration & Preview
-                            </button>
-                            <a href="{% url 'warehouse:warehouse_detail' warehouse.pk %}" class="btn btn-outline-secondary btn-lg">
-                                Cancel
-                            </a>
+                        <div class="wha__actions">
+                            <button type="submit" class="wh__btn wh__btn--primary"><i class="fas fa-save"></i> Save Configuration & Preview</button>
+                            <a href="{% url 'warehouse:warehouse_detail' warehouse.pk %}" class="wh__btn wh__btn--secondary">Cancel</a>
                         </div>
                     </form>
                 </div>
@@ -240,41 +175,23 @@
         </div>
 
         <!-- Help Sidebar -->
-        <div class="col-lg-4">
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-info bg-opacity-10 border-0 py-3">
-                    <h6 class="mb-0 fw-semibold text-info">
-                        <i class="fas fa-question-circle me-2"></i>Configuration Guide
-                    </h6>
+        <div class="wcp__aside">
+            <div class="wh__card">
+                <div class="wh__card-header wrs__tips-header">
+                    <div class="wh__card-header-left"><i class="fas fa-question-circle"></i> <span>CONFIGURATION GUIDE</span></div>
                 </div>
-                <div class="card-body">
-                    <ul class="list-unstyled mb-0 small">
-                        <li class="mb-3 d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-2">1</span>
-                            <span><strong>Define Zones:</strong> Main areas of your warehouse (e.g., A, B, C or North, South)</span>
-                        </li>
-                        <li class="mb-3 d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-2">2</span>
-                            <span><strong>Racks per Zone:</strong> How many racks/aisles in each zone</span>
-                        </li>
-                        <li class="mb-3 d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-2">3</span>
-                            <span><strong>Shelves per Rack:</strong> Vertical levels on each rack</span>
-                        </li>
-                        <li class="d-flex align-items-start">
-                            <span class="badge bg-success rounded-circle me-2">✓</span>
-                            <span><strong>Bins per Shelf:</strong> Horizontal positions on each shelf</span>
-                        </li>
-                    </ul>
+                <div class="wh__card-body">
+                    <div class="wh__step"><span class="wh__step-number">1</span><div><div class="wh__step-title">Define Zones</div><div class="wh__step-desc">Main areas of your warehouse (e.g., A, B, C or North, South)</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number">2</span><div><div class="wh__step-title">Racks per Zone</div><div class="wh__step-desc">How many racks/aisles in each zone</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number">3</span><div><div class="wh__step-title">Shelves per Rack</div><div class="wh__step-desc">Vertical levels on each rack</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number wh__step-number--success">&#10003;</span><div><div class="wh__step-title">Bins per Shelf</div><div class="wh__step-desc">Horizontal positions on each shelf</div></div></div>
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm bg-light">
-                <div class="card-body text-center py-4">
-                    <i class="fas fa-warehouse fa-3x text-primary mb-3"></i>
-                    <h6 class="fw-semibold">Next Step</h6>
-                    <p class="text-muted small mb-0">After configuring, you'll preview the structure and generate all storage locations automatically</p>
-                </div>
+            <div class="wrs__info-card">
+                <div class="wrs__info-icon"><i class="fas fa-warehouse"></i></div>
+                <h6 class="wrs__info-title">Next Step</h6>
+                <p class="wrs__info-text">After configuring, you'll preview the structure and generate all storage locations automatically</p>
             </div>
         </div>
     </div>
@@ -282,15 +199,12 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Real-time capacity calculator
     function updatePreview() {
-        const zones = parseInt(document.getElementById('total_zones').value) || 0;
-        const racks = parseInt(document.getElementById('racks_per_zone').value) || 0;
-        const shelves = parseInt(document.getElementById('shelves_per_rack').value) || 0;
-        const bins = parseInt(document.getElementById('bins_per_shelf').value) || 0;
-
-        const total = zones * racks * shelves * bins;
-
+        var zones = parseInt(document.getElementById('total_zones').value) || 0;
+        var racks = parseInt(document.getElementById('racks_per_zone').value) || 0;
+        var shelves = parseInt(document.getElementById('shelves_per_rack').value) || 0;
+        var bins = parseInt(document.getElementById('bins_per_shelf').value) || 0;
+        var total = zones * racks * shelves * bins;
         document.getElementById('preview-zones').textContent = zones;
         document.getElementById('preview-racks').textContent = racks;
         document.getElementById('preview-shelves').textContent = shelves;
@@ -298,52 +212,37 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('preview-total').textContent = total.toLocaleString();
     }
 
-    // Zone name preview
     function updateZonePreview() {
-        const pattern = document.getElementById('zone_naming_pattern').value;
-        const zones = pattern.split(',').map(z => z.trim()).filter(z => z);
+        var pattern = document.getElementById('zone_naming_pattern').value;
+        var zones = pattern.split(',').map(function(z) { return z.trim(); }).filter(function(z) { return z; });
         document.getElementById('zone-preview').textContent = 'Zones: ' + zones.join(', ');
         updateExampleCode();
     }
 
-    // Naming pattern preview
     function updateNamingPreview(type) {
-        const select = document.getElementById(type + '_naming_pattern');
-        const preview = document.getElementById(type + '-preview');
-        if (select.value === 'numeric') {
-            preview.textContent = '01, 02, 03...';
-        } else {
-            preview.textContent = 'A, B, C...';
-        }
+        var select = document.getElementById(type + '_naming_pattern');
+        var preview = document.getElementById(type + '-preview');
+        preview.textContent = select.value === 'numeric' ? '01, 02, 03...' : 'A, B, C...';
         updateExampleCode();
     }
 
-    // Example code
     function updateExampleCode() {
-        const zones = document.getElementById('zone_naming_pattern').value.split(',')[0].trim();
-        const rack = document.getElementById('rack_naming_pattern').value === 'numeric' ? '01' : 'A';
-        const shelf = document.getElementById('shelf_naming_pattern').value === 'numeric' ? '01' : 'A';
-        const bin = document.getElementById('bin_naming_pattern').value === 'numeric' ? '01' : 'A';
-
-        const example = `${zones}-${rack}-${shelf}-${bin}`;
-        document.getElementById('example-code').innerHTML = `
-            <strong>${example}</strong>
-            <div class="small text-muted mt-2">Zone ${zones} → Rack ${rack} → Shelf ${shelf} → Bin ${bin}</div>
-        `;
+        var zones = document.getElementById('zone_naming_pattern').value.split(',')[0].trim();
+        var rack = document.getElementById('rack_naming_pattern').value === 'numeric' ? '01' : 'A';
+        var shelf = document.getElementById('shelf_naming_pattern').value === 'numeric' ? '01' : 'A';
+        var bin = document.getElementById('bin_naming_pattern').value === 'numeric' ? '01' : 'A';
+        var example = zones + '-' + rack + '-' + shelf + '-' + bin;
+        document.getElementById('example-code').innerHTML = '<strong>' + example + '</strong><div class="wh__meta">Zone ' + zones + ' &rarr; Rack ' + rack + ' &rarr; Shelf ' + shelf + ' &rarr; Bin ' + bin + '</div>';
     }
 
-    // Event listeners
-    ['total_zones', 'racks_per_zone', 'shelves_per_rack', 'bins_per_shelf'].forEach(id => {
+    ['total_zones', 'racks_per_zone', 'shelves_per_rack', 'bins_per_shelf'].forEach(function(id) {
         document.getElementById(id).addEventListener('input', updatePreview);
     });
-
     document.getElementById('zone_naming_pattern').addEventListener('input', updateZonePreview);
-
-    ['rack', 'shelf', 'bin'].forEach(type => {
-        document.getElementById(type + '_naming_pattern').addEventListener('change', () => updateNamingPreview(type));
+    ['rack', 'shelf', 'bin'].forEach(function(type) {
+        document.getElementById(type + '_naming_pattern').addEventListener('change', function() { updateNamingPreview(type); });
     });
 
-    // Initialize
     updatePreview();
     updateZonePreview();
     updateNamingPreview('rack');

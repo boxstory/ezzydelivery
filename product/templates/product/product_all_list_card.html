@@ -1,68 +1,68 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
-<!-- extra title -->
-{% block extra_head %}
-  Products
-{% endblock extra_head %}
-{% block extra_css %}
-  <link href="{% static 'product/css/product.css' %}"
-        rel="stylesheet"
-        type="text/css" />
-{% endblock extra_css %}
-<!-- extra css -->
 {% load crispy_forms_tags %}
+
+{% block extra_head %}Products{% endblock extra_head %}
+
 {% block content %}
-  <link href="{% static 'product/css/product.css' %}" rel="stylesheet" type="text/css" />
-  <div class="col-12" id="product_list_card_main">
-    <section class="px-3 py-4" id="product_list_card_section">
-      <!-- Page Header -->
-      <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3"
-           id="product_list_card_header">
-        <div id="product_list_card_header_text">
-          <h2 class="fw-bold mb-1" id="product_list_card_title">Products Catalog</h2>
-          <p class="text-muted mb-0" id="product_list_card_subtitle">Browse our collection of products</p>
+<div class="plc" id="product_list_card_main">
+  <!-- Hero Header -->
+  <div class="plc__hero">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="plc__hero-icon">
+          <i class="fas fa-id-card"></i>
         </div>
-        <div class="d-flex align-items-center gap-3" id="product_list_card_header_actions">
-          <!-- View Toggle -->
-          <div class="view-toggle">
-            <a href="{% url 'product:product_all_list' %}" class="view-toggle-btn">
-              <i class="fas fa-th-large"></i> Grid
-            </a>
-            <a href="{% url 'product:product_all_list_card' %}" class="view-toggle-btn active">
-              <i class="fas fa-id-card"></i> Cards
-            </a>
-            <a href="{% url 'product:product_all_list_table' %}" class="view-toggle-btn">
-              <i class="fas fa-table"></i> Table
-            </a>
+        <div>
+          <h1 class="plc__hero-title">Products Catalog</h1>
+          <p class="plc__hero-sub">Browse our collection of products</p>
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <!-- View Toggle -->
+        <div class="plc__view-toggle">
+          <a href="{% url 'product:product_all_list' %}" class="plc__toggle-btn">
+            <i class="fas fa-th-large"></i> <span>Grid</span>
+          </a>
+          <a href="{% url 'product:product_all_list_card' %}" class="plc__toggle-btn plc__toggle-btn--active">
+            <i class="fas fa-id-card"></i> <span>Cards</span>
+          </a>
+          <a href="{% url 'product:product_all_list_table' %}" class="plc__toggle-btn">
+            <i class="fas fa-table"></i> <span>Table</span>
+          </a>
+        </div>
+        <a href="{% url 'product:product_single_add' %}"
+           class="plc__add-btn"
+           id="product_list_card_btn_add">
+          <i class="fa fa-plus me-1"></i>Add Product
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Products Grid -->
+  <div class="row g-3" id="product_list_card_grid">
+    {% if products %}
+      {% for product in products %}
+        {% include "product/parts/product_card2.html" %}
+      {% endfor %}
+    {% else %}
+      <!-- Empty State -->
+      <div class="col-12">
+        <div class="plc__empty">
+          <div class="plc__empty-icon">
+            <i class="fa-solid fa-box-open"></i>
           </div>
+          <h3 class="plc__empty-title">No products found</h3>
+          <p class="plc__empty-text">Start adding products to your catalog</p>
           <a href="{% url 'product:product_single_add' %}"
-             class="btn btn-dark"
-             id="product_list_card_btn_add">
-            <i class="fa fa-plus me-2"></i> Add Product
+             class="plc__add-btn mt-3"
+             id="product_list_card_btn_add_first">
+            <i class="fa fa-plus me-1"></i>Add Your First Product
           </a>
         </div>
       </div>
-      <!-- Products Grid -->
-      <div class="row" id="product_list_card_grid">
-        {% if products %}
-          {% for product in products %}
-            {% include "product/parts/product_card2.html" %}
-          {% endfor %}
-        {% else %}
-          <div class="col-12 text-center py-5" id="product_list_card_empty_state">
-            <div class="text-muted" id="product_list_card_empty_content">
-              <i class="fa-solid fa-box-open fa-3x mb-3"></i>
-              <h4 id="product_list_card_empty_title">No products found</h4>
-              <p id="product_list_card_empty_text">Start adding products to your catalog</p>
-              <a href="{% url 'product:product_single_add' %}"
-                 class="btn btn-primary mt-3"
-                 id="product_list_card_btn_add_first">
-                <i class="fa fa-plus me-2"></i> Add Your First Product
-              </a>
-            </div>
-          </div>
-        {% endif %}
-      </div>
-    </section>
+    {% endif %}
   </div>
+</div>
 {% endblock content %}

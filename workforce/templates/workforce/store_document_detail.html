@@ -3,171 +3,166 @@
 
 {% block title %}Store Document Detail - Ezzy Delivery{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
 <div class="col-12 p-3">
-<!-- Page Title -->
-<h1 class="page-title">
-    <i class="fa-solid fa-store me-2"></i>{{ business.business_name|default:"Store Document Detail" }}
-</h1>
+  <!-- Hero Header -->
+  <div class="sdd__hero">
+    <div class="sdd__hero-content">
+      <h1 class="sdd__hero-title">
+        <i class="fa-solid fa-store sdd__hero-icon"></i>{{ business.business_name|default:"Store Document Detail" }}
+      </h1>
+      <p class="sdd__hero-subtitle">View and manage store business information</p>
+    </div>
+  </div>
 
-<!-- Back Button -->
-<div class="document-back-section">
-    <a href="{% url 'workforce:store_documents_list' %}" class="document-back-link">
-        <i class="fa-solid fa-arrow-left"></i>
-        Back to Stores
+  <!-- Back Button -->
+  <div class="sdd__back-section">
+    <a href="{% url 'workforce:store_documents_list' %}" class="sdd__back-link">
+      <i class="fa-solid fa-arrow-left"></i> Back to Stores
     </a>
-</div>
+  </div>
 
-<!-- Store Basic Info -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-circle-info"></i>
-        Business Information
+  <!-- Store Basic Info -->
+  <div class="sdd__card">
+    <div class="sdd__card-header">
+      <i class="fa-solid fa-circle-info sdd__section-icon"></i>
+      <h5 class="sdd__card-title">BUSINESS INFORMATION</h5>
     </div>
-    <div class="info-grid">
-        <div class="info-row">
-            <span class="info-label">Business Name</span>
-            <span class="info-value">{{ business.business_name|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Business Code</span>
-            <span class="info-value">{{ business.business_code|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Phone</span>
-            <span class="info-value">{{ business.business_phone|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Email</span>
-            <span class="info-value">{{ business.business_email|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">WhatsApp</span>
-            <span class="info-value">{{ business.business_whatsapp|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">QID</span>
-            <span class="info-value">{{ business.business_qid|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Status</span>
-            <span class="info-value">
-                <span class="status-badge {% if business.business_status == 'active' %}status-active{% elif business.business_status == 'pending' %}status-pending{% elif business.business_status == 'suspended' %}status-failed{% else %}status-inactive{% endif %}">
-                    {{ business.business_status|title }}
-                </span>
-            </span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Created At</span>
-            <span class="info-value">{{ business.created_at|date:"d M Y, h:i A" }}</span>
-        </div>
+    <div class="sdd__info-grid">
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">Business Name</span>
+        <span class="sdd__info-value">{{ business.business_name|default:"N/A" }}</span>
+      </div>
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">Business Code</span>
+        <span class="sdd__info-value">{{ business.business_code|default:"N/A" }}</span>
+      </div>
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">Phone</span>
+        <span class="sdd__info-value">{{ business.business_phone|default:"N/A" }}</span>
+      </div>
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">Email</span>
+        <span class="sdd__info-value">{{ business.business_email|default:"N/A" }}</span>
+      </div>
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">WhatsApp</span>
+        <span class="sdd__info-value">{{ business.business_whatsapp|default:"N/A" }}</span>
+      </div>
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">QID</span>
+        <span class="sdd__info-value">{{ business.business_qid|default:"N/A" }}</span>
+      </div>
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">Status</span>
+        <span class="sdd__info-value">
+          <span class="sdd__status-badge sdd__status-badge--{{ business.business_status }}">
+            {{ business.business_status|title }}
+          </span>
+        </span>
+      </div>
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">Created At</span>
+        <span class="sdd__info-value">{{ business.created_at|date:"d M Y, h:i A" }}</span>
+      </div>
     </div>
-</div>
+  </div>
 
-<!-- Store Profile Info -->
-{% if business_profile %}
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-location-dot"></i>
-        Address & Details
+  <!-- Store Profile Info -->
+  {% if business_profile %}
+  <div class="sdd__card">
+    <div class="sdd__card-header">
+      <i class="fa-solid fa-location-dot sdd__section-icon"></i>
+      <h5 class="sdd__card-title">ADDRESS & DETAILS</h5>
     </div>
-    <div class="info-grid">
-        <div class="info-row">
-            <span class="info-label">Address</span>
-            <span class="info-value">{{ business_profile.business_address|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">City</span>
-            <span class="info-value">{{ business_profile.business_city|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">State</span>
-            <span class="info-value">{{ business_profile.business_state|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Zip Code</span>
-            <span class="info-value">{{ business_profile.business_zip_code|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Country</span>
-            <span class="info-value">{{ business_profile.business_country|default:"N/A" }}</span>
-        </div>
+    <div class="sdd__info-grid">
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">Address</span>
+        <span class="sdd__info-value">{{ business_profile.business_address|default:"N/A" }}</span>
+      </div>
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">City</span>
+        <span class="sdd__info-value">{{ business_profile.business_city|default:"N/A" }}</span>
+      </div>
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">State</span>
+        <span class="sdd__info-value">{{ business_profile.business_state|default:"N/A" }}</span>
+      </div>
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">Zip Code</span>
+        <span class="sdd__info-value">{{ business_profile.business_zip_code|default:"N/A" }}</span>
+      </div>
+      <div class="sdd__info-row">
+        <span class="sdd__info-label">Country</span>
+        <span class="sdd__info-value">{{ business_profile.business_country|default:"N/A" }}</span>
+      </div>
     </div>
-</div>
-{% endif %}
+  </div>
+  {% endif %}
 
-<!-- Edit Form -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-edit"></i>
-        Update Store Information
+  <!-- Edit Form -->
+  <div class="sdd__card">
+    <div class="sdd__card-header">
+      <i class="fa-solid fa-edit sdd__section-icon"></i>
+      <h5 class="sdd__card-title">UPDATE STORE INFORMATION</h5>
     </div>
 
     <form id="updateForm">
-        {% csrf_token %}
-        <div class="document-form-grid">
-            <div class="document-form-group">
-                <label class="document-form-label">Business Name</label>
-                <input type="text" name="business_name" value="{{ business.business_name }}" class="filter-input" required>
-            </div>
-
-            <div class="document-form-group">
-                <label class="document-form-label">Phone</label>
-                <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="filter-input">
-            </div>
-
-            <div class="document-form-group">
-                <label class="document-form-label">Email</label>
-                <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="filter-input">
-            </div>
-
-            <div class="document-form-group">
-                <label class="document-form-label">QID</label>
-                <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="filter-input">
-            </div>
-
-            <div class="document-form-group">
-                <label class="document-form-label">Status</label>
-                <select name="business_status" class="filter-input">
-                    <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
-                    <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
-                    <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
-                    <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
-                </select>
-            </div>
-
-            <div class="document-form-actions">
-                <button type="submit" class="document-submit-btn">
-                    <i class="fa-solid fa-save"></i>
-                    Save Changes
-                </button>
-                <a href="{% url 'workforce:store_documents_list' %}" class="document-cancel-btn">
-                    Cancel
-                </a>
-            </div>
+      {% csrf_token %}
+      <div class="sdd__form-grid">
+        <div class="sdd__form-group">
+          <label class="sdd__form-label">Business Name</label>
+          <input type="text" name="business_name" value="{{ business.business_name }}" class="form-control" required>
         </div>
+
+        <div class="sdd__form-group">
+          <label class="sdd__form-label">Phone</label>
+          <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="form-control">
+        </div>
+
+        <div class="sdd__form-group">
+          <label class="sdd__form-label">Email</label>
+          <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="form-control">
+        </div>
+
+        <div class="sdd__form-group">
+          <label class="sdd__form-label">QID</label>
+          <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="form-control">
+        </div>
+
+        <div class="sdd__form-group">
+          <label class="sdd__form-label">Status</label>
+          <select name="business_status" class="form-select">
+            <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
+            <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
+            <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
+            <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
+          </select>
+        </div>
+
+        <div class="sdd__form-actions">
+          <button type="submit" class="sdd__btn sdd__btn--primary">
+            <i class="fa-solid fa-save"></i> Save Changes
+          </button>
+          <a href="{% url 'workforce:store_documents_list' %}" class="sdd__btn sdd__btn--cancel">
+            Cancel
+          </a>
+        </div>
+      </div>
     </form>
 
-    <div id="updateMessage" class="document-update-message"></div>
-</div>
-
+    <div id="updateMessage" class="sdd__message"></div>
+  </div>
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
-    // Safe message display helper (XSS-safe)
     function showMessage(messageDiv, isSuccess, text) {
-        // Remove any existing state classes and add appropriate one
-        messageDiv.classList.remove('success', 'error');
-        messageDiv.classList.add('show', isSuccess ? 'success' : 'error');
-        // Use textContent for safe text insertion
+        messageDiv.style.display = 'block';
+        messageDiv.className = 'sdd__message ' + (isSuccess ? 'sdd__message--success' : 'sdd__message--error');
         messageDiv.textContent = '';
-        const icon = document.createElement('i');
+        var icon = document.createElement('i');
         icon.className = isSuccess ? 'fa-solid fa-check-circle' : 'fa-solid fa-exclamation-triangle';
         icon.setAttribute('aria-hidden', 'true');
         messageDiv.appendChild(icon);
@@ -177,13 +172,12 @@
     document.getElementById('updateForm').addEventListener('submit', function(e) {
         e.preventDefault();
 
-        const formData = new FormData(this);
-        const messageDiv = document.getElementById('updateMessage');
-        const submitBtn = this.querySelector('button[type="submit"]');
+        var formData = new FormData(this);
+        var messageDiv = document.getElementById('updateMessage');
+        var submitBtn = this.querySelector('button[type="submit"]');
 
-        // Disable submit button during request
         submitBtn.disabled = true;
-        const originalText = submitBtn.textContent;
+        var originalText = submitBtn.textContent;
         submitBtn.textContent = 'Saving...';
 
         fetch('{% url 'workforce:store_document_detail' business.business_id %}', {
@@ -193,25 +187,21 @@
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
             }
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
+        .then(function(response) {
+            if (!response.ok) { throw new Error('Network response was not ok'); }
             return response.json();
         })
-        .then(data => {
+        .then(function(data) {
             if (data.success) {
                 showMessage(messageDiv, true, data.message || 'Store document updated successfully');
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
+                setTimeout(function() { window.location.reload(); }, 1500);
             } else {
                 showMessage(messageDiv, false, data.error || 'Failed to update store document');
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             showMessage(messageDiv, false, 'Error updating store document. Please try again.');
             submitBtn.disabled = false;
             submitBtn.textContent = originalText;

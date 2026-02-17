@@ -4,281 +4,594 @@
 {% block title %}User Verification - Staff Dashboard{% endblock title %}
 
 {% block extra_css %}
-<link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<div class="col-12 p-3">
-<!-- Header -->
-<div class="verification-header">
-    <h1 class="mb-2">
-        <i class="fa-solid fa-user-check me-2"></i>User Verification Management
-    </h1>
-    <p class="mb-0">Review and approve user applications</p>
-</div>
+{% csrf_token %}
+<div class="col-12 uvl">
 
-<!-- Filter Tabs - Collapsible -->
-<div class="filter-tabs-container mb-3">
-    <button class="btn btn-outline-primary w-100 d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#filterTabsCollapse" aria-expanded="true" aria-controls="filterTabsCollapse">
-        <span>
-            <i class="fa-solid fa-filter me-2"></i>Filters
-            {% if current_filter != 'all' %}
-                <span class="badge bg-primary ms-2">{{ current_filter|title }}</span>
-            {% endif %}
-        </span>
-        <i class="fa-solid fa-chevron-down"></i>
-    </button>
-    <div class="collapse" id="filterTabsCollapse">
-        <div class="filter-tabs mt-2">
-            <a href="?status=all" class="filter-tab {% if current_filter == 'all' %}active{% endif %}">
-                <i class="fa-solid fa-list me-1"></i>All Users
-            </a>
-            <a href="?status=pending" class="filter-tab {% if current_filter == 'pending' %}active{% endif %}">
-                <i class="fa-solid fa-clock me-1"></i>Pending
-            </a>
-            <a href="?status=under_review" class="filter-tab {% if current_filter == 'under_review' %}active{% endif %}">
-                <i class="fa-solid fa-eye me-1"></i>Under Review
-            </a>
-            <a href="?status=verified" class="filter-tab {% if current_filter == 'verified' %}active{% endif %}">
-                <i class="fa-solid fa-check-circle me-1"></i>Verified
-            </a>
-            <a href="?status=rejected" class="filter-tab {% if current_filter == 'rejected' %}active{% endif %}">
-                <i class="fa-solid fa-times-circle me-1"></i>Rejected
-            </a>
-            <a href="?status=incomplete" class="filter-tab {% if current_filter == 'incomplete' %}active{% endif %}">
-                <i class="fa-solid fa-exclamation-triangle me-1"></i>Incomplete
-            </a>
+<!-- Hero Header -->
+<div class="uvl__hero">
+    <div class="d-flex align-items-center gap-3 mb-2">
+        <div class="uvl__hero-icon">
+            <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div>
+            <h1 class="uvl__hero-title">Verification Management</h1>
+            <p class="uvl__hero-sub">Review and approve user applications</p>
         </div>
     </div>
+    <div class="d-flex flex-wrap gap-2 mt-3">
+        <div class="uvl__hero-stat">
+            <span class="uvl__hero-stat__num">{{ total_count }}</span>
+            <span class="uvl__hero-stat__label">Total</span>
+        </div>
+        <div class="uvl__hero-stat uvl__hero-stat--warn">
+            <span class="uvl__hero-stat__num">{{ status_counts.pending|default:"0" }}</span>
+            <span class="uvl__hero-stat__label">Pending</span>
+        </div>
+        <div class="uvl__hero-stat uvl__hero-stat--info">
+            <span class="uvl__hero-stat__num">{{ status_counts.under_review|default:"0" }}</span>
+            <span class="uvl__hero-stat__label">Review</span>
+        </div>
+        <div class="uvl__hero-stat uvl__hero-stat--ok">
+            <span class="uvl__hero-stat__num">{{ status_counts.verified|default:"0" }}</span>
+            <span class="uvl__hero-stat__label">Verified</span>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Pills -->
+<div class="uvl__filters">
+    <a href="?status=all" class="uvl__pill {% if current_filter == 'all' %}uvl__pill--active{% endif %}">
+        <i class="fa-solid fa-layer-group"></i> All
+        <span class="uvl__pill__count">{{ total_count }}</span>
+    </a>
+    <a href="?status=pending" class="uvl__pill {% if current_filter == 'pending' %}uvl__pill--active{% endif %}">
+        <i class="fa-solid fa-clock"></i> Pending
+        <span class="uvl__pill__count">{{ status_counts.pending|default:"0" }}</span>
+    </a>
+    <a href="?status=under_review" class="uvl__pill {% if current_filter == 'under_review' %}uvl__pill--active{% endif %}">
+        <i class="fa-solid fa-eye"></i> Review
+        <span class="uvl__pill__count">{{ status_counts.under_review|default:"0" }}</span>
+    </a>
+    <a href="?status=verified" class="uvl__pill {% if current_filter == 'verified' %}uvl__pill--active{% endif %}">
+        <i class="fa-solid fa-circle-check"></i> Verified
+        <span class="uvl__pill__count">{{ status_counts.verified|default:"0" }}</span>
+    </a>
+    <a href="?status=rejected" class="uvl__pill {% if current_filter == 'rejected' %}uvl__pill--active{% endif %}">
+        <i class="fa-solid fa-circle-xmark"></i> Rejected
+        <span class="uvl__pill__count">{{ status_counts.rejected|default:"0" }}</span>
+    </a>
+    <a href="?status=incomplete" class="uvl__pill {% if current_filter == 'incomplete' %}uvl__pill--active{% endif %}">
+        <i class="fa-solid fa-triangle-exclamation"></i> Incomplete
+        <span class="uvl__pill__count">{{ status_counts.incomplete|default:"0" }}</span>
+    </a>
 </div>
 
 <!-- Verification Cards -->
 {% if verification_data %}
     {% for data in verification_data %}
-    <div class="verification-card">
-        <!-- User Header -->
-        <div class="user-header">
-            <div class="user-info">
-                <h4>
-                    {{ data.user.first_name }} {{ data.user.last_name }}
-                    <span class="role-badge {% if data.profile.is_business %}role-business{% else %}role-driver{% endif %}">
-                        {% if data.profile.is_business %}
-                            <i class="fa-solid fa-building me-1"></i>Business
-                        {% else %}
-                            <i class="fa-solid fa-car me-1"></i>Driver
+    <div class="uvl__card">
+        <!-- Card Header: Avatar + Name + Status -->
+        <div class="uvl__card__head">
+            <div class="d-flex align-items-center gap-3">
+                <div class="uvl__avatar {% if data.profile.is_business %}uvl__avatar--biz{% endif %}">
+                    {% if data.profile.is_business %}
+                        <i class="fa-solid fa-building"></i>
+                    {% else %}
+                        <i class="fa-solid fa-user"></i>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="uvl__name">
+                        {{ data.user.first_name }} {{ data.user.last_name }}
+                        <span class="uvl__role {% if data.profile.is_business %}uvl__role--biz{% else %}uvl__role--drv{% endif %}">
+                            {% if data.profile.is_business %}Business{% elif data.profile.is_driver %}Driver{% else %}User{% endif %}
+                        </span>
+                    </div>
+                    <div class="uvl__contact">
+                        <span><i class="fa-solid fa-envelope"></i> {{ data.user.email }}</span>
+                        {% if data.profile.phone %}
+                        <span class="uvl__contact__sep">|</span>
+                        <span><i class="fa-solid fa-phone"></i> {{ data.profile.phone }}</span>
                         {% endif %}
-                    </span>
-                </h4>
-                <div class="user-meta">
-                    <i class="fa-solid fa-envelope me-1"></i>{{ data.user.email }}
-                    <span class="mx-2">|</span>
-                    <i class="fa-solid fa-phone me-1"></i>{{ data.profile.phone }}
+                    </div>
                 </div>
             </div>
-            <div class="status-badge badge-{{ data.profile.verification_status }}">
+            <span class="uvl__status uvl__status--{{ data.profile.verification_status }}">
+                {% if data.profile.verification_status == 'verified' %}<i class="fa-solid fa-circle-check"></i>
+                {% elif data.profile.verification_status == 'pending' %}<i class="fa-solid fa-clock"></i>
+                {% elif data.profile.verification_status == 'under_review' %}<i class="fa-solid fa-eye"></i>
+                {% elif data.profile.verification_status == 'rejected' %}<i class="fa-solid fa-circle-xmark"></i>
+                {% else %}<i class="fa-solid fa-triangle-exclamation"></i>
+                {% endif %}
                 {{ data.profile.get_verification_status_display }}
+            </span>
+        </div>
+
+        <!-- Scope Badges -->
+        <div class="uvl__scopes">
+            {% if data.business %}
+            <span class="uvl__scope {% if data.business.business_status == 'active' %}uvl__scope--ok{% else %}uvl__scope--warn{% endif %}">
+                <i class="fa-solid fa-building"></i> Biz: {{ data.business.business_status|title }}
+            </span>
+            {% endif %}
+            {% if data.driver %}
+            <span class="uvl__scope {% if data.driver.driver_status == 'Approved' %}uvl__scope--ok{% else %}uvl__scope--warn{% endif %}">
+                <i class="fa-solid fa-car"></i> Driver: {{ data.driver.driver_status }}
+            </span>
+            {% endif %}
+            <span class="uvl__scope uvl__scope--neutral">
+                <i class="fa-solid fa-at"></i> {{ data.profile.username|default_if_none:"—" }}
+            </span>
+        </div>
+
+        <!-- Profile Completion Bar -->
+        <div class="uvl__progress-wrap">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="uvl__section-head"><i class="fa-solid fa-chart-pie"></i> Profile Completion</span>
+                <span class="uvl__progress-pct {% if data.profile.get_profile_completion_percentage == 100 %}uvl__progress-pct--ok{% elif data.profile.get_profile_completion_percentage >= 50 %}uvl__progress-pct--warn{% else %}uvl__progress-pct--low{% endif %}">
+                    {{ data.profile.get_profile_completion_percentage }}%
+                </span>
+            </div>
+            <div class="uvl__progress-bar">
+                <div class="uvl__progress-fill {% if data.profile.get_profile_completion_percentage == 100 %}uvl__progress-fill--ok{% elif data.profile.get_profile_completion_percentage >= 50 %}uvl__progress-fill--warn{% else %}uvl__progress-fill--low{% endif %}"
+                     style="width: {{ data.profile.get_profile_completion_percentage }}%"></div>
             </div>
         </div>
 
-        <!-- Details Grid -->
-        <div class="detail-grid">
-            <div class="detail-item">
-                <span class="detail-label">Username</span>
-                <span class="detail-value">{{ data.profile.username|default_if_none:"—" }}</span>
-            </div>
-
-            <div class="detail-item">
-                <span class="detail-label">Profile Completion</span>
-                <span class="detail-value">
-                    {{ data.profile.get_profile_completion_percentage }}%
-                    <span class="completion-badge {% if data.profile.get_profile_completion_percentage == 100 %}completion-high{% elif data.profile.get_profile_completion_percentage >= 50 %}completion-medium{% else %}completion-low{% endif %}">
-                        {% if data.profile.get_profile_completion_percentage == 100 %}Complete{% else %}Incomplete{% endif %}
-                    </span>
-                </span>
-            </div>
-
+        <!-- Details Sections -->
+        <div class="row g-0">
             {% if data.business %}
-            <div class="detail-item">
-                <span class="detail-label">Business Name</span>
-                <span class="detail-value">{{ data.business.business_name }}</span>
-            </div>
-            <div class="detail-item">
-                <span class="detail-label">Product Category</span>
-                <span class="detail-value">{{ data.business.business_product_category }}</span>
+            <!-- Business Details -->
+            <div class="{% if data.driver %}col-sm-6 uvl__col-left{% else %}col-12{% endif %}">
+                <div class="uvl__section-head"><i class="fa-solid fa-building"></i> Business Details</div>
+                <div class="uvl__fields">
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Name</span>
+                        <span class="uvl__field__value">{{ data.business.business_name }}</span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Code</span>
+                        <span class="uvl__field__value"><code class="uvl__code">{{ data.business.business_code }}</code></span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Category</span>
+                        <span class="uvl__field__value">{{ data.business.business_product_category|default:"—" }}</span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Phone</span>
+                        <span class="uvl__field__value">{{ data.business.business_phone|default:"—" }}</span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Email</span>
+                        <span class="uvl__field__value">{{ data.business.business_email|default:"—" }}</span>
+                    </div>
+                </div>
             </div>
             {% endif %}
 
             {% if data.driver %}
-            <div class="detail-item">
-                <span class="detail-label">License Number</span>
-                <span class="detail-value">{{ data.driver.driver_license_number }}</span>
-            </div>
-            <div class="detail-item">
-                <span class="detail-label">Languages</span>
-                <span class="detail-value">{{ data.driver.get_driver_languages_display }}</span>
-            </div>
-            {% endif %}
-
-            <div class="detail-item">
-                <span class="detail-label">Applied On</span>
-                <span class="detail-value">
-                    {% if data.profile.verification_applied_at %}
-                        {{ data.profile.verification_applied_at|date:"M d, Y - g:i A" }}
-                    {% else %}
-                        Not yet applied
-                    {% endif %}
-                </span>
-            </div>
-
-            {% if data.profile.verified_at %}
-            <div class="detail-item">
-                <span class="detail-label">Verified On</span>
-                <span class="detail-value">
-                    {{ data.profile.verified_at|date:"M d, Y" }}
-                    {% if data.profile.verified_by %}
-                        by {{ data.profile.verified_by.username }}
-                    {% endif %}
-                </span>
+            <!-- Driver Details -->
+            <div class="{% if data.business %}col-sm-6 uvl__col-right{% else %}col-12{% endif %}">
+                <div class="uvl__section-head"><i class="fa-solid fa-id-card"></i> Driver Details</div>
+                <div class="uvl__fields">
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Code</span>
+                        <span class="uvl__field__value"><code class="uvl__code">{{ data.driver.driver_code }}</code></span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">License</span>
+                        <span class="uvl__field__value">{{ data.driver.driver_license_number|default:"—" }}</span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Phone</span>
+                        <span class="uvl__field__value">{{ data.driver.driver_phone|default:"—" }}</span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Languages</span>
+                        <span class="uvl__field__value">{{ data.driver.get_driver_languages_display|default:"—" }}</span>
+                    </div>
+                </div>
             </div>
             {% endif %}
         </div>
 
+        <!-- Timeline Dates -->
+        <div class="uvl__timeline">
+            <div class="uvl__section-head"><i class="fa-solid fa-clock-rotate-left"></i> Timeline</div>
+            <div class="uvl__tl-row">
+                <!-- Registered -->
+                <div class="uvl__tl-bubble uvl__tl-bubble--neutral">
+                    <div class="uvl__tl-bubble__icon"><i class="fa-solid fa-user-plus"></i></div>
+                    <div class="uvl__tl-bubble__body">
+                        <span class="uvl__tl-bubble__label">Registered</span>
+                        <span class="uvl__tl-bubble__date">{{ data.profile.created_at|date:"M d, Y" }}</span>
+                        <span class="uvl__tl-bubble__time">{{ data.profile.created_at|date:"g:i A" }}</span>
+                    </div>
+                </div>
+
+                <!-- Applied -->
+                {% if data.profile.verification_applied_at %}
+                <div class="uvl__tl-bubble uvl__tl-bubble--applied">
+                    <div class="uvl__tl-bubble__icon"><i class="fa-solid fa-paper-plane"></i></div>
+                    <div class="uvl__tl-bubble__body">
+                        <span class="uvl__tl-bubble__label">Applied</span>
+                        <span class="uvl__tl-bubble__date">{{ data.profile.verification_applied_at|date:"M d, Y" }}</span>
+                        <span class="uvl__tl-bubble__time">{{ data.profile.verification_applied_at|date:"g:i A" }}</span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="uvl__tl-bubble uvl__tl-bubble--waiting">
+                    <div class="uvl__tl-bubble__icon"><i class="fa-solid fa-hourglass-half"></i></div>
+                    <div class="uvl__tl-bubble__body">
+                        <span class="uvl__tl-bubble__label">Application</span>
+                        <span class="uvl__tl-bubble__na">Not yet applied</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Verified -->
+                {% if data.profile.verified_at %}
+                <div class="uvl__tl-bubble uvl__tl-bubble--verified">
+                    <div class="uvl__tl-bubble__icon"><i class="fa-solid fa-circle-check"></i></div>
+                    <div class="uvl__tl-bubble__body">
+                        <span class="uvl__tl-bubble__label">Verified</span>
+                        <span class="uvl__tl-bubble__date">{{ data.profile.verified_at|date:"M d, Y" }}</span>
+                        <span class="uvl__tl-bubble__time">
+                            {{ data.profile.verified_at|date:"g:i A" }}
+                            {% if data.profile.verified_by %}
+                                <span class="uvl__tl-bubble__by">by {{ data.profile.verified_by.username }}</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Rejection Callout -->
         {% if data.profile.rejection_reason %}
-        <div class="alert alert-danger mt-2">
-            <strong><i class="fa-solid fa-exclamation-circle me-2"></i>Rejection Reason:</strong>
-            {{ data.profile.rejection_reason }}
+        <div class="uvl__callout uvl__callout--danger">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <div>
+                <span class="uvl__callout__title">Rejection Reason</span>
+                <span class="uvl__callout__text">{{ data.profile.rejection_reason }}</span>
+            </div>
         </div>
         {% endif %}
 
         <!-- Action Buttons -->
         {% if data.profile.verification_status != 'verified' %}
-        <div class="action-buttons">
-            <button type="button" class="btn-verify" data-action="verify" data-profile-id="{{ data.profile.id }}">
-                <i class="fa-solid fa-check me-1"></i>Verify
+        <div class="uvl__actions">
+            <button type="button" class="uvl__btn uvl__btn--verify" data-action="verify"
+                data-profile-id="{{ data.profile.id }}"
+                data-user-name="{{ data.user.first_name }} {{ data.user.last_name }}"
+                data-user-email="{{ data.user.email }}"
+                data-is-business="{% if data.profile.is_business %}1{% else %}0{% endif %}"
+                data-is-driver="{% if data.profile.is_driver %}1{% else %}0{% endif %}"
+                data-biz-name="{% if data.business %}{{ data.business.business_name }}{% endif %}"
+                data-driver-code="{% if data.driver %}{{ data.driver.driver_code }}{% endif %}">
+                <i class="fa-solid fa-check-double"></i> Approve
             </button>
-            <button type="button" class="btn-review" data-action="under_review" data-profile-id="{{ data.profile.id }}">
-                <i class="fa-solid fa-eye me-1"></i>Mark Under Review
+            <button type="button" class="uvl__btn uvl__btn--review" data-action="under_review" data-profile-id="{{ data.profile.id }}">
+                <i class="fa-solid fa-eye"></i> Review
             </button>
-            <button type="button" class="btn-reject" data-action="reject" data-profile-id="{{ data.profile.id }}">
-                <i class="fa-solid fa-times me-1"></i>Reject
+            <button type="button" class="uvl__btn uvl__btn--reject" data-action="reject"
+                data-profile-id="{{ data.profile.id }}"
+                data-user-name="{{ data.user.first_name }} {{ data.user.last_name }}">
+                <i class="fa-solid fa-xmark"></i> Reject
             </button>
+        </div>
+        {% else %}
+        <div class="uvl__verified-bar">
+            <i class="fa-solid fa-circle-check"></i> This user has been verified
         </div>
         {% endif %}
     </div>
     {% endfor %}
 {% else %}
-    <div class="empty-state">
-        <i class="fa-solid fa-inbox"></i>
-        <h3>No Users Found</h3>
-        <p>There are no users matching this filter.</p>
+    <div class="uvl__empty">
+        <div class="uvl__empty__icon">
+            <i class="fa-solid fa-inbox"></i>
+        </div>
+        <h3 class="uvl__empty__title">No Users Found</h3>
+        <p class="uvl__empty__text">There are no users matching this filter.</p>
+        <a href="?status=all" class="uvl__btn uvl__btn--review">
+            <i class="fa-solid fa-layer-group"></i> View All Users
+        </a>
     </div>
 {% endif %}
 </div>
+
+<!-- ============ APPROVE MODAL ============ -->
+<div class="uvl-modal__overlay" id="uvlApproveOverlay">
+    <div class="uvl-modal">
+        <div class="uvl-modal__header uvl-modal__header--approve">
+            <div class="uvl-modal__header-icon"><i class="fa-solid fa-shield-check"></i></div>
+            <div>
+                <h3 class="uvl-modal__title">Approve User</h3>
+                <p class="uvl-modal__subtitle" id="uvlApproveUser"></p>
+            </div>
+            <button type="button" class="uvl-modal__close" id="uvlApproveClose"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="uvl-modal__body">
+            <div class="uvl-modal__info">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>Review and confirm each action below before approving.</span>
+            </div>
+            <div class="uvl-modal__checks">
+                <label class="uvl-modal__check">
+                    <input type="checkbox" id="uvlChkProfile" checked>
+                    <span class="uvl-modal__checkmark"></span>
+                    <span class="uvl-modal__check-body">
+                        <span class="uvl-modal__check-title"><i class="fa-solid fa-user-check"></i> Verify User Profile</span>
+                        <span class="uvl-modal__check-desc">Set verification status to Verified</span>
+                    </span>
+                </label>
+                <label class="uvl-modal__check" id="uvlChkBizWrap" style="display:none">
+                    <input type="checkbox" id="uvlChkBiz" checked>
+                    <span class="uvl-modal__checkmark"></span>
+                    <span class="uvl-modal__check-body">
+                        <span class="uvl-modal__check-title"><i class="fa-solid fa-building"></i> Activate Business</span>
+                        <span class="uvl-modal__check-desc" id="uvlChkBizName">Set business status to Active</span>
+                    </span>
+                </label>
+                <label class="uvl-modal__check" id="uvlChkDrvWrap" style="display:none">
+                    <input type="checkbox" id="uvlChkDrv" checked>
+                    <span class="uvl-modal__checkmark"></span>
+                    <span class="uvl-modal__check-body">
+                        <span class="uvl-modal__check-title"><i class="fa-solid fa-car"></i> Approve Driver</span>
+                        <span class="uvl-modal__check-desc" id="uvlChkDrvCode">Set driver status to Approved</span>
+                    </span>
+                </label>
+            </div>
+        </div>
+        <div class="uvl-modal__footer">
+            <button type="button" class="uvl__btn uvl__btn--review" id="uvlApproveCancelBtn">Cancel</button>
+            <button type="button" class="uvl__btn uvl__btn--verify" id="uvlApproveConfirmBtn" disabled>
+                <i class="fa-solid fa-check-double"></i> Confirm Approval
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ REJECT MODAL ============ -->
+<div class="uvl-modal__overlay" id="uvlRejectOverlay">
+    <div class="uvl-modal">
+        <div class="uvl-modal__header uvl-modal__header--reject">
+            <div class="uvl-modal__header-icon"><i class="fa-solid fa-circle-xmark"></i></div>
+            <div>
+                <h3 class="uvl-modal__title">Reject User</h3>
+                <p class="uvl-modal__subtitle" id="uvlRejectUser"></p>
+            </div>
+            <button type="button" class="uvl-modal__close" id="uvlRejectClose"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="uvl-modal__body">
+            <div class="uvl-modal__info uvl-modal__info--warn">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>This will reject the user's verification application. Please provide a reason.</span>
+            </div>
+            <div class="uvl-modal__field">
+                <label class="uvl-modal__field-label" for="uvlRejectReason">Rejection Reason</label>
+                <textarea id="uvlRejectReason" class="uvl-modal__textarea" rows="3" placeholder="e.g. Incomplete documents, invalid license number..."></textarea>
+            </div>
+        </div>
+        <div class="uvl-modal__footer">
+            <button type="button" class="uvl__btn uvl__btn--review" id="uvlRejectCancelBtn">Cancel</button>
+            <button type="button" class="uvl__btn uvl__btn--reject" id="uvlRejectConfirmBtn" disabled>
+                <i class="fa-solid fa-xmark"></i> Confirm Rejection
+            </button>
+        </div>
+    </div>
+</div>
+
 {% endblock content %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Get CSRF token
+    /* ---------- CSRF ---------- */
     function getCookie(name) {
-        let cookieValue = null;
+        let v = null;
         if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-    const csrftoken = getCookie('csrftoken');
-
-    function updateStatus(profileId, status) {
-        if (confirm('Are you sure you want to ' + status.replace('_', ' ') + ' this user?')) {
-            fetch('/workforce/verification/' + profileId + '/update-status/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                },
-                body: JSON.stringify({ status: status })
-            })
-            .then(function(response) { return response.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    alert('User ' + status.replace('_', ' ') + ' successfully!');
-                    location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to update status'));
-                }
-            })
-            .catch(function(error) {
-                console.error('Error:', error);
-                alert('An error occurred while updating status');
+            document.cookie.split(';').forEach(function(c) {
+                c = c.trim();
+                if (c.substring(0, name.length + 1) === (name + '='))
+                    v = decodeURIComponent(c.substring(name.length + 1));
             });
         }
+        return v;
+    }
+    var csrftoken = getCookie('csrftoken');
+    if (!csrftoken) {
+        var inp = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (inp) csrftoken = inp.value;
     }
 
-    function rejectUser(profileId) {
-        const reason = prompt('Please provide a reason for rejection:');
-        if (reason) {
-            fetch('/workforce/verification/' + profileId + '/update-status/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                },
-                body: JSON.stringify({
-                    status: 'rejected',
-                    rejection_reason: reason
-                })
-            })
-            .then(function(response) { return response.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    alert('User rejected successfully!');
-                    location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to reject user'));
-                }
-            })
-            .catch(function(error) {
-                console.error('Error:', error);
-                alert('An error occurred while rejecting user');
-            });
-        }
+    function postVerification(profileId, payload) {
+        return fetch('/workforce/verification/' + profileId + '/update-status/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
+        }).then(function(r) {
+            if (!r.ok && r.headers.get('content-type').indexOf('json') === -1)
+                throw new Error('Server returned ' + r.status + '. Please refresh and try again.');
+            return r.json();
+        });
     }
 
-    // Event delegation for action buttons
-    document.querySelectorAll('[data-action][data-profile-id]').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            const action = this.dataset.action;
-            const profileId = this.dataset.profileId;
+    /* ---------- MODAL HELPERS ---------- */
+    var approveOverlay  = document.getElementById('uvlApproveOverlay');
+    var rejectOverlay   = document.getElementById('uvlRejectOverlay');
+    var currentProfileId = null;
 
-            if (action === 'verify') {
-                updateStatus(profileId, 'verified');
-            } else if (action === 'under_review') {
-                updateStatus(profileId, 'under_review');
-            } else if (action === 'reject') {
-                rejectUser(profileId);
-            }
+    function openModal(overlay) {
+        overlay.classList.add('uvl-modal__overlay--open');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModal(overlay) {
+        overlay.classList.remove('uvl-modal__overlay--open');
+        document.body.style.overflow = '';
+    }
+
+    /* Close on overlay click */
+    [approveOverlay, rejectOverlay].forEach(function(ov) {
+        ov.addEventListener('click', function(e) {
+            if (e.target === ov) closeModal(ov);
         });
     });
 
-    // Rotate chevron icon on collapse toggle
-    const filterButton = document.querySelector('[data-bs-target="#filterTabsCollapse"]');
-    if (filterButton) {
-        const chevronIcon = filterButton.querySelector('.fa-chevron-down');
-        if (chevronIcon) {
-            filterButton.addEventListener('click', function() {
-                chevronIcon.style.transition = 'transform 0.3s ease';
-                chevronIcon.style.transform = chevronIcon.style.transform === 'rotate(180deg)' ? 'rotate(0deg)' : 'rotate(180deg)';
-            });
+    /* Close buttons */
+    document.getElementById('uvlApproveClose').addEventListener('click', function() { closeModal(approveOverlay); });
+    document.getElementById('uvlApproveCancelBtn').addEventListener('click', function() { closeModal(approveOverlay); });
+    document.getElementById('uvlRejectClose').addEventListener('click', function() { closeModal(rejectOverlay); });
+    document.getElementById('uvlRejectCancelBtn').addEventListener('click', function() { closeModal(rejectOverlay); });
+
+    /* Escape key closes modals */
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeModal(approveOverlay);
+            closeModal(rejectOverlay);
+        }
+    });
+
+    /* ---------- APPROVE MODAL ---------- */
+    var chkProfile = document.getElementById('uvlChkProfile');
+    var chkBiz     = document.getElementById('uvlChkBiz');
+    var chkDrv     = document.getElementById('uvlChkDrv');
+    var confirmBtn = document.getElementById('uvlApproveConfirmBtn');
+
+    function updateApproveBtn() {
+        /* Must have profile checked + at least reviewed all items */
+        confirmBtn.disabled = !chkProfile.checked;
+    }
+    chkProfile.addEventListener('change', updateApproveBtn);
+    chkBiz.addEventListener('change', updateApproveBtn);
+    chkDrv.addEventListener('change', updateApproveBtn);
+
+    function openApproveModal(btn) {
+        currentProfileId = btn.dataset.profileId;
+        var name = btn.dataset.userName;
+        var email = btn.dataset.userEmail;
+        var isBiz = btn.dataset.isBusiness === '1';
+        var isDrv = btn.dataset.isDriver === '1';
+        var bizName = btn.dataset.bizName;
+        var drvCode = btn.dataset.driverCode;
+
+        document.getElementById('uvlApproveUser').textContent = name + ' (' + email + ')';
+
+        /* Show/hide role checkboxes */
+        document.getElementById('uvlChkBizWrap').style.display = isBiz ? '' : 'none';
+        document.getElementById('uvlChkDrvWrap').style.display = isDrv ? '' : 'none';
+
+        if (isBiz && bizName) {
+            document.getElementById('uvlChkBizName').textContent = 'Activate "' + bizName + '" business account';
+        }
+        if (isDrv && drvCode) {
+            document.getElementById('uvlChkDrvCode').textContent = 'Approve driver ' + drvCode;
+        }
+
+        /* Reset checkboxes */
+        chkProfile.checked = true;
+        chkBiz.checked = true;
+        chkDrv.checked = true;
+        updateApproveBtn();
+
+        openModal(approveOverlay);
+    }
+
+    confirmBtn.addEventListener('click', function() {
+        if (!currentProfileId || confirmBtn.disabled) return;
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Approving...';
+
+        postVerification(currentProfileId, { status: 'verified' })
+        .then(function(data) {
+            if (data.success) {
+                closeModal(approveOverlay);
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to approve'));
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> Confirm Approval';
+            }
+        })
+        .catch(function(err) {
+            alert(err.message || 'An error occurred');
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> Confirm Approval';
+        });
+    });
+
+    /* ---------- REJECT MODAL ---------- */
+    var rejectReason  = document.getElementById('uvlRejectReason');
+    var rejectConfirm = document.getElementById('uvlRejectConfirmBtn');
+
+    rejectReason.addEventListener('input', function() {
+        rejectConfirm.disabled = rejectReason.value.trim().length < 3;
+    });
+
+    function openRejectModal(btn) {
+        currentProfileId = btn.dataset.profileId;
+        var name = btn.dataset.userName;
+        document.getElementById('uvlRejectUser').textContent = name;
+        rejectReason.value = '';
+        rejectConfirm.disabled = true;
+        openModal(rejectOverlay);
+        setTimeout(function() { rejectReason.focus(); }, 200);
+    }
+
+    rejectConfirm.addEventListener('click', function() {
+        if (!currentProfileId || rejectConfirm.disabled) return;
+        rejectConfirm.disabled = true;
+        rejectConfirm.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Rejecting...';
+
+        postVerification(currentProfileId, { status: 'rejected', rejection_reason: rejectReason.value.trim() })
+        .then(function(data) {
+            if (data.success) {
+                closeModal(rejectOverlay);
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to reject'));
+                rejectConfirm.disabled = false;
+                rejectConfirm.innerHTML = '<i class="fa-solid fa-xmark"></i> Confirm Rejection';
+            }
+        })
+        .catch(function(err) {
+            alert(err.message || 'An error occurred');
+            rejectConfirm.disabled = false;
+            rejectConfirm.innerHTML = '<i class="fa-solid fa-xmark"></i> Confirm Rejection';
+        });
+    });
+
+    /* ---------- UNDER REVIEW (simple confirm) ---------- */
+    function markUnderReview(profileId) {
+        if (confirm('Mark this user as Under Review?')) {
+            postVerification(profileId, { status: 'under_review' })
+            .then(function(data) {
+                if (data.success) location.reload();
+                else alert('Error: ' + (data.error || 'Failed to update'));
+            })
+            .catch(function(err) { alert(err.message || 'An error occurred'); });
         }
     }
+
+    /* ---------- EVENT DELEGATION ---------- */
+    document.querySelectorAll('[data-action][data-profile-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var action = this.dataset.action;
+            if (action === 'verify') {
+                openApproveModal(this);
+            } else if (action === 'under_review') {
+                markUnderReview(this.dataset.profileId);
+            } else if (action === 'reject') {
+                openRejectModal(this);
+            }
+        });
+    });
 });
 </script>
 {% endblock extra_js %}

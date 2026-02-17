@@ -3,314 +3,204 @@
 
 {% block title %}DMS Delivery Tasks - Ezzy Delivery{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
-<!-- Page Header -->
-<header class="page-header">
-    <div class="page-header-left">
-        <h2><i class="fa-solid fa-paper-plane me-1"></i>DMS Delivery Tasks</h2>
-    </div>
-</header>
-<div class="col-12 p-3">
-
-<!-- Summary Statistics -->
-<div class="dms-stats-grid">
-    <div class="dms-stat-card stat-info">
-        <div class="dms-stat-label">Total Tasks</div>
-        <div class="dms-stat-value text-info">{{ delivery_tasks.paginator.count|default:"0" }}</div>
-    </div>
-
-    <div class="dms-stat-card stat-success">
-        <div class="dms-stat-label">Synced</div>
-        <div class="dms-stat-value text-success">{{ synced_count|default:"0" }}</div>
-    </div>
-
-    <div class="dms-stat-card stat-danger">
-        <div class="dms-stat-label">Not Synced</div>
-        <div class="dms-stat-value text-danger">{{ not_synced_count|default:"0" }}</div>
-    </div>
-
-    <div class="dms-stat-card stat-warning">
-        <div class="dms-stat-label">Unassigned</div>
-        <div class="dms-stat-value text-warning">{{ unassigned_count|default:"0" }}</div>
-    </div>
-</div>
-
-<!-- Filters Section -->
-<div class="dms-filter-section">
-    <div class="dms-filter-grid">
-        <div>
-            <label for="statusFilter" class="dms-filter-label">Status Filter</label>
-            <select id="statusFilter" class="dms-filter-select">
-                <option value="all">All Statuses</option>
-                <option value="assigned">Assigned</option>
-                <option value="picked_up">Picked Up</option>
-                <option value="in_transit">In Transit</option>
-                <option value="delivered">Delivered</option>
-                <option value="failed">Failed</option>
-            </select>
-        </div>
-        <div>
-            <label for="syncFilter" class="dms-filter-label">Sync Status</label>
-            <select id="syncFilter" class="dms-filter-select">
-                <option value="all">All</option>
-                <option value="synced">Synced</option>
-                <option value="not_synced">Not Synced</option>
-            </select>
-        </div>
-        <div>
-            <label for="searchFilter" class="dms-filter-label">Search</label>
-            <input type="text" id="searchFilter" class="dms-filter-input" placeholder="Order number, customer...">
+<div class="dpo">
+    <!-- Hero Header -->
+    <div class="dpo__hero">
+        <div class="dpo__hero-content">
+            <h1 class="dpo__hero-title"><i class="fa-solid fa-paper-plane me-2"></i>DMS Delivery Tasks</h1>
+            <p class="dpo__hero-subtitle">Manage and publish delivery tasks to ShipDay DMS</p>
         </div>
     </div>
-    <div class="dms-action-buttons">
-        <button type="button" class="btn-action btn-action-outline" data-action="print">
-            <i class="fa-solid fa-print"></i> Print
-        </button>
-        <button type="button" class="btn-action btn-action-primary" data-action="export">
-            <i class="fa-solid fa-file-export"></i> Export CSV
-        </button>
-        <button type="button" class="btn-refresh" data-action="refresh">
-            <i class="fa-solid fa-sync"></i> Refresh
-        </button>
+
+    <!-- Summary Stats -->
+    <div class="dpo__stats">
+        <div class="dpo__stat dpo__stat--blue">
+            <span class="dpo__stat-label">TOTAL TASKS</span>
+            <span class="dpo__stat-value">{{ delivery_tasks.paginator.count|default:"0" }}</span>
+        </div>
+        <div class="dpo__stat dpo__stat--green">
+            <span class="dpo__stat-label">SYNCED</span>
+            <span class="dpo__stat-value">{{ synced_count|default:"0" }}</span>
+        </div>
+        <div class="dpo__stat dpo__stat--red">
+            <span class="dpo__stat-label">NOT SYNCED</span>
+            <span class="dpo__stat-value">{{ not_synced_count|default:"0" }}</span>
+        </div>
+        <div class="dpo__stat dpo__stat--amber">
+            <span class="dpo__stat-label">UNASSIGNED</span>
+            <span class="dpo__stat-value">{{ unassigned_count|default:"0" }}</span>
+        </div>
     </div>
-</div>
 
-<!-- Delivery Tasks Table -->
-{% if delivery_tasks %}
-<div class="tasks-table-container">
-    <table class="tasks-table">
-        <thead>
-            <tr>
-                <th>Task ID</th>
-                <th>Order Number</th>
-                <th>Driver</th>
-                <th>Customer</th>
-                <th>Delivery Address</th>
-                <th>Status</th>
-                <th>Created Date</th>
-                <th>DMS Sync</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for task in delivery_tasks %}
-            <tr>
-                <td><strong>#{{ task.id }}</strong></td>
-                <td>{{ task.order_number|default:"N/A" }}</td>
-                <td>
-                    {% if task.driver %}
-                        {{ task.driver.user.first_name }} {{ task.driver.user.last_name }}
-                    {% else %}
-                        <span class="text-muted-driver">Unassigned</span>
-                    {% endif %}
-                </td>
-                <td>{{ task.customer_name|default:"N/A" }}</td>
-                <td>{{ task.delivery_address|truncatewords:8 }}</td>
-                <td>
-                    <span class="status-badge status-{{ task.status|lower }}">
-                        {{ task.status|default:"Pending" }}
-                    </span>
-                </td>
-                <td>{{ task.created_at|date:"d M Y, h:i A" }}</td>
-                <td>
-                    {% if task.dms_synced %}
-                        <i class="fa-solid fa-check-circle sync-icon-success"></i> Synced
-                    {% else %}
-                        <i class="fa-solid fa-times-circle sync-icon-danger"></i> Not Synced
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+    <!-- Filters -->
+    <div class="dpo__filter-card">
+        <div class="dpo__filter-grid">
+            <div class="dpo__filter-group">
+                <label for="statusFilter" class="dpo__filter-label">STATUS FILTER</label>
+                <select id="statusFilter" class="dpo__filter-select">
+                    <option value="all">All Statuses</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="picked_up">Picked Up</option>
+                    <option value="in_transit">In Transit</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+            <div class="dpo__filter-group">
+                <label for="syncFilter" class="dpo__filter-label">SYNC STATUS</label>
+                <select id="syncFilter" class="dpo__filter-select">
+                    <option value="all">All</option>
+                    <option value="synced">Synced</option>
+                    <option value="not_synced">Not Synced</option>
+                </select>
+            </div>
+            <div class="dpo__filter-group">
+                <label for="searchFilter" class="dpo__filter-label">SEARCH</label>
+                <input type="text" id="searchFilter" class="dpo__filter-input" placeholder="Order number, customer...">
+            </div>
+        </div>
+        <div class="dpo__filter-actions">
+            <button type="button" class="dpo__btn dpo__btn--outline" data-action="print">
+                <i class="fa-solid fa-print"></i> Print
+            </button>
+            <button type="button" class="dpo__btn dpo__btn--primary" data-action="export">
+                <i class="fa-solid fa-file-export"></i> Export CSV
+            </button>
+            <button type="button" class="dpo__btn dpo__btn--refresh" data-action="refresh">
+                <i class="fa-solid fa-sync"></i> Refresh
+            </button>
+        </div>
+    </div>
 
-<!-- Pagination -->
-{% include "includes/components/_pagination.html" with page_obj=delivery_tasks filter_params=filter_params %}
+    <!-- Delivery Tasks Table -->
+    {% if delivery_tasks %}
+    <div class="dpo__card">
+        <div class="dpo__table-wrap">
+            <table class="dpo__table">
+                <thead>
+                    <tr>
+                        <th>Task ID</th>
+                        <th>Order Number</th>
+                        <th>Driver</th>
+                        <th>Customer</th>
+                        <th>Delivery Address</th>
+                        <th>Status</th>
+                        <th>Created Date</th>
+                        <th>DMS Sync</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in delivery_tasks %}
+                    <tr>
+                        <td><strong>#{{ task.id }}</strong></td>
+                        <td>{{ task.order_number|default:"N/A" }}</td>
+                        <td>
+                            {% if task.driver %}
+                                {{ task.driver.user.first_name }} {{ task.driver.user.last_name }}
+                            {% else %}
+                                <span class="dpo__muted">Unassigned</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ task.customer_name|default:"N/A" }}</td>
+                        <td>{{ task.delivery_address|truncatewords:8 }}</td>
+                        <td>
+                            <span class="dpo__status dpo__status--{{ task.status|lower }}">
+                                {{ task.status|default:"Pending" }}
+                            </span>
+                        </td>
+                        <td>{{ task.created_at|date:"d M Y, h:i A" }}</td>
+                        <td>
+                            {% if task.dms_synced %}
+                                <span class="dpo__sync dpo__sync--yes"><i class="fa-solid fa-check-circle"></i> Synced</span>
+                            {% else %}
+                                <span class="dpo__sync dpo__sync--no"><i class="fa-solid fa-times-circle"></i> Not Synced</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-{% else %}
-<!-- Empty State -->
-<div class="empty-state">
-    <i class="fa-solid fa-paper-plane"></i>
-    <h3>No Delivery Tasks Found</h3>
-    <p>There are no delivery tasks from DMS at the moment.</p>
-</div>
-{% endif %}
+    {% include "includes/components/_pagination.html" with page_obj=delivery_tasks filter_params=filter_params %}
+
+    {% else %}
+    <div class="dpo__empty">
+        <i class="fa-solid fa-paper-plane"></i>
+        <h3>No Delivery Tasks Found</h3>
+        <p>There are no delivery tasks from DMS at the moment.</p>
+    </div>
+    {% endif %}
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Filter functionality
-    const statusFilter = document.getElementById('statusFilter');
-    const syncFilter = document.getElementById('syncFilter');
-    const searchFilter = document.getElementById('searchFilter');
+    var statusFilter = document.getElementById('statusFilter');
+    var syncFilter = document.getElementById('syncFilter');
+    var searchFilter = document.getElementById('searchFilter');
 
     function applyFilters() {
-        const statusValue = statusFilter ? statusFilter.value.toLowerCase() : 'all';
-        const syncValue = syncFilter ? syncFilter.value.toLowerCase() : 'all';
-        const searchValue = searchFilter ? searchFilter.value.toLowerCase() : '';
-        const rows = document.querySelectorAll('.tasks-table tbody tr');
-
-        let visibleCount = 0;
-
+        var statusValue = statusFilter ? statusFilter.value.toLowerCase() : 'all';
+        var syncValue = syncFilter ? syncFilter.value.toLowerCase() : 'all';
+        var searchValue = searchFilter ? searchFilter.value.toLowerCase() : '';
+        var rows = document.querySelectorAll('.dpo__table tbody tr');
+        var visibleCount = 0;
         rows.forEach(function(row) {
-            const status = row.cells[5].textContent.trim().toLowerCase().replace(/\s+/g, '_');
-            const syncStatus = row.cells[7].textContent.trim().toLowerCase();
-            const rowText = row.textContent.toLowerCase();
-
-            let showRow = true;
-
-            if (statusValue !== 'all' && !status.includes(statusValue)) {
-                showRow = false;
-            }
-
-            if (syncValue === 'synced' && !syncStatus.includes('synced')) {
-                showRow = false;
-            } else if (syncValue === 'not_synced' && syncStatus.includes('synced')) {
-                showRow = false;
-            }
-
-            if (searchValue && !rowText.includes(searchValue)) {
-                showRow = false;
-            }
-
+            var status = row.cells[5].textContent.trim().toLowerCase().replace(/\s+/g, '_');
+            var syncStatus = row.cells[7].textContent.trim().toLowerCase();
+            var rowText = row.textContent.toLowerCase();
+            var showRow = true;
+            if (statusValue !== 'all' && !status.includes(statusValue)) showRow = false;
+            if (syncValue === 'synced' && !syncStatus.includes('synced')) showRow = false;
+            else if (syncValue === 'not_synced' && syncStatus.includes('synced') && !syncStatus.includes('not')) showRow = false;
+            if (searchValue && !rowText.includes(searchValue)) showRow = false;
             row.style.display = showRow ? '' : 'none';
             if (showRow) visibleCount++;
         });
-
-        // Update count display
-        updateVisibleCount(visibleCount);
     }
 
-    function updateVisibleCount(count) {
-        const existingCounter = document.querySelector('.visible-counter');
-        if (existingCounter) existingCounter.remove();
-
-        const tableContainer = document.querySelector('.tasks-table-container');
-        if (tableContainer) {
-            const counter = document.createElement('div');
-            counter.className = 'visible-counter';
-            // Use DOM methods for XSS-safe content insertion
-            const icon = document.createElement('i');
-            icon.className = 'fa-solid fa-filter me-2';
-            icon.setAttribute('aria-hidden', 'true');
-            counter.appendChild(icon);
-            counter.appendChild(document.createTextNode('Showing ' + count + ' tasks'));
-            tableContainer.insertBefore(counter, tableContainer.firstChild);
-        }
-    }
-
-    // Attach event listeners for filters
     if (statusFilter) statusFilter.addEventListener('change', applyFilters);
     if (syncFilter) syncFilter.addEventListener('change', applyFilters);
     if (searchFilter) {
-        let searchTimeout;
+        var searchTimeout;
         searchFilter.addEventListener('input', function() {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(applyFilters, 300);
         });
     }
 
-    // Export to CSV
     function exportToCSV() {
-        const csvData = [];
-        csvData.push(['Task ID', 'Order Number', 'Driver', 'Customer', 'Delivery Address', 'Status', 'Created Date', 'DMS Sync']);
-
-        const rows = document.querySelectorAll('.tasks-table tbody tr:not([style*="display: none"])');
-        rows.forEach(function(row) {
-            const cells = row.cells;
-            const rowData = [
-                cells[0].textContent.trim(),
-                cells[1].textContent.trim(),
-                cells[2].textContent.trim(),
-                cells[3].textContent.trim(),
-                cells[4].textContent.trim(),
-                cells[5].textContent.trim(),
-                cells[6].textContent.trim(),
-                cells[7].textContent.trim()
-            ];
-            csvData.push(rowData);
+        var csvData = [['Task ID', 'Order Number', 'Driver', 'Customer', 'Delivery Address', 'Status', 'Created Date', 'DMS Sync']];
+        document.querySelectorAll('.dpo__table tbody tr:not([style*="display: none"])').forEach(function(row) {
+            var cells = row.cells;
+            csvData.push([cells[0].textContent.trim(), cells[1].textContent.trim(), cells[2].textContent.trim(), cells[3].textContent.trim(), cells[4].textContent.trim(), cells[5].textContent.trim(), cells[6].textContent.trim(), cells[7].textContent.trim()]);
         });
-
-        const csvContent = csvData.map(function(row) {
-            return row.map(function(cell) {
-                return '"' + cell.replace(/"/g, '""') + '"';
-            }).join(',');
-        }).join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        var csvContent = csvData.map(function(r) { return r.map(function(c) { return '"' + c.replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+        var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement('a');
         a.href = url;
         a.download = 'dms_delivery_tasks_' + new Date().toISOString().split('T')[0] + '.csv';
         a.click();
         window.URL.revokeObjectURL(url);
     }
 
-    // Refresh data with loading animation
-    function refreshData(btn) {
-        const icon = btn.querySelector('i');
-        if (icon) icon.classList.add('fa-spin');
-        btn.disabled = true;
-
-        // Reload the page
-        setTimeout(function() {
-            window.location.reload();
-        }, 500);
-    }
-
-    // Event delegation for action buttons
     document.querySelectorAll('[data-action]').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            const action = this.dataset.action;
-            if (action === 'print') {
-                window.print();
-            } else if (action === 'export') {
-                exportToCSV();
-            } else if (action === 'refresh') {
-                refreshData(this);
-            }
+            var action = this.dataset.action;
+            if (action === 'print') window.print();
+            else if (action === 'export') exportToCSV();
+            else if (action === 'refresh') window.location.reload();
         });
     });
 
-    // Auto-refresh indicator
-    const lastRefresh = new Date();
-    function updateLastRefreshTime() {
-        const existingIndicator = document.querySelector('.last-refresh');
-        if (existingIndicator) existingIndicator.remove();
-
-        const header = document.querySelector('h1');
-        if (header) {
-            const indicator = document.createElement('div');
-            indicator.className = 'last-refresh';
-            // Use DOM methods for XSS-safe content insertion
-            const clockIcon = document.createElement('i');
-            clockIcon.className = 'fa-solid fa-clock me-1';
-            clockIcon.setAttribute('aria-hidden', 'true');
-            indicator.appendChild(clockIcon);
-            indicator.appendChild(document.createTextNode('Last updated: ' + lastRefresh.toLocaleTimeString()));
-            header.parentElement.insertBefore(indicator, header.nextSibling);
-        }
-    }
-
-    // Update time on page load
-    updateLastRefreshTime();
-
-    // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
-            e.preventDefault();
-            exportToCSV();
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
-            e.preventDefault();
-            const refreshBtn = document.querySelector('[data-action="refresh"]');
-            if (refreshBtn) refreshData(refreshBtn);
-        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); exportToCSV(); }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'r') { e.preventDefault(); window.location.reload(); }
     });
 });
 </script>

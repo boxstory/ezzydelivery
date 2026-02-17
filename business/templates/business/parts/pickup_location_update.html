@@ -3,74 +3,80 @@
 {% load crispy_forms_tags %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business.css' %}">
+<link rel="stylesheet" href="{% static 'business/css/business.css' %}?v=20260217a">
 {% endblock extra_css %}
 
 {% block content %}
-<div class="form-container" id="client_location_update_container_main">
-    <!-- Header -->
-    <div class="form-header" id="client_location_update_section_header">
-        <h1 id="client_location_update_title_form">
-            <i class="fa-solid fa-pen-to-square"></i>
-            Update Store Location
-        </h1>
-        <a href="{% url 'business:pickup_location_list' %}" class="back-link">
-            <i class="fa-solid fa-arrow-left"></i>
-            Back to Stores
+<div class="plf" id="client_location_update_container_main">
+
+    <!-- Hero Banner -->
+    <div class="plf__hero" id="client_location_update_section_header">
+        <div class="plf__hero-left">
+            <div class="plf__hero-icon">
+                <i class="fa-solid fa-pen-to-square"></i>
+            </div>
+            <div>
+                <h1 class="plf__hero-title" id="client_location_update_title_form">Update Store Location</h1>
+                <p class="plf__hero-sub">Edit pickup point details</p>
+            </div>
+        </div>
+        <a href="{% url 'business:pickup_location_list' %}" class="plf__hero-back">
+            <i class="fa-solid fa-arrow-left"></i> Back to Stores
         </a>
     </div>
 
     <!-- Form Card -->
-    <div class="form-card">
-        <div class="form-card-header">
-            <h2>
-                <i class="fa-solid fa-location-dot"></i>
-                Location Details
+    <div class="plf__card">
+        <div class="plf__card__head">
+            <h2 class="plf__card__head-label">
+                <i class="fa-solid fa-location-dot"></i> Location Details
             </h2>
             {% if store.pickup_status == 'active' %}
-            <span class="status-badge active">
-                <i class="fa-solid fa-check-circle"></i> Active
+            <span class="plf__status plf__status--active">
+                <i class="fa-solid fa-circle-check"></i> Active
             </span>
             {% else %}
-            <span class="status-badge inactive">
-                <i class="fa-solid fa-circle-xmark"></i> {{ store.pickup_status|default:"Inactive"|title }}
+            <span class="plf__status plf__status--inactive">
+                <i class="fa-solid fa-circle-minus"></i> {{ store.pickup_status|default:"Inactive"|title }}
             </span>
             {% endif %}
         </div>
         <form method="POST" id="client_location_update_form_main">
             {% csrf_token %}
             {% if form.non_field_errors %}
-            <div class="alert alert-danger mb-3" role="alert">
-                {% for error in form.non_field_errors %}
-                <div>{{ error }}</div>
-                {% endfor %}
+            <div class="plf__alert" role="alert">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <div>
+                    {% for error in form.non_field_errors %}
+                    <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
             </div>
             {% endif %}
-            <div class="form-card-body">
+            <div class="plf__card__body">
                 {{ form | crispy }}
             </div>
-            <div class="form-card-footer">
-                <a href="{% url 'business:pickup_location_list' %}" class="btn-cancel" id="client_location_update_btn_cancel">
-                    <i class="fa-solid fa-xmark"></i>
-                    Cancel
+            <div class="plf__card__foot">
+                <a href="{% url 'business:pickup_location_list' %}" class="plf__btn plf__btn--cancel" id="client_location_update_btn_cancel">
+                    <i class="fa-solid fa-xmark"></i> Cancel
                 </a>
-                <button type="submit" class="btn-submit" id="client_location_update_btn_submit">
-                    <i class="fa-solid fa-floppy-disk"></i>
-                    Save Changes
+                <button type="submit" class="plf__btn plf__btn--submit" id="client_location_update_btn_submit">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Changes
                 </button>
             </div>
         </form>
     </div>
 
-    <!-- Info Note -->
-    <div class="form-info-note">
-        <div class="form-info-note-title">
-            <i class="fa-solid fa-circle-info"></i>
-            Tip
+    <!-- Info Callout -->
+    <div class="plf__callout">
+        <i class="fa-solid fa-circle-info plf__callout-icon"></i>
+        <div class="plf__callout-body">
+            <p class="plf__callout-title">Tip</p>
+            <p class="plf__callout-text">
+                Keep your store location details up to date to ensure smooth pickup operations. Any changes will be reflected immediately for new orders.
+            </p>
         </div>
-        <p class="form-info-note-text">
-            Keep your store location details up to date to ensure smooth pickup operations. Any changes will be reflected immediately for new orders.
-        </p>
     </div>
+
 </div>
 {% endblock content %}

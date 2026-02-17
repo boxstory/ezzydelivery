@@ -58,6 +58,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Q
 from datetime import datetime, timedelta, timezone
+from django.utils import timezone as dj_timezone
 from django.forms import inlineformset_factory
 import pandas as pd
 from django.contrib import messages
@@ -671,7 +672,7 @@ def bulk_order_entry(request):
             try:
                 order = orders_models.Order(
                     business=business,
-                    client_order_code=row_data['client_order_code'] or f"BULK-{datetime.now().strftime('%Y%m%d%H%M%S')}-{i}",
+                    client_order_code=row_data['client_order_code'] or f"BULK-{dj_timezone.localtime().strftime('%Y%m%d%H%M%S')}-{i}",
                     customer_name=row_data['customer_name'],
                     customer_phone=row_data['customer_phone'],
                     customer_whatsapp=row_data['customer_whatsapp'] or row_data['customer_phone'],
@@ -1654,8 +1655,8 @@ def get_order_by_api(request):
         order_list_end_date = request.POST.get('end_date')
         logger.debug('Using posted date range')
     else:
-        order_list_start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-        order_list_end_date = datetime.now().strftime('%Y-%m-%d')
+        order_list_start_date = (dj_timezone.localtime() - timedelta(days=30)).strftime('%Y-%m-%d')
+        order_list_end_date = dj_timezone.localtime().strftime('%Y-%m-%d')
         logger.debug('Using default date range (last 30 days)')
 
     logger.debug(f'Date range: {order_list_start_date} to {order_list_end_date}')
@@ -1759,8 +1760,8 @@ def get_orders_by_base_api(request):
         product_response = None
 
 
-    start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
-    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = (dj_timezone.localtime() - timedelta(days=10)).strftime('%Y-%m-%d')
+    end_date = dj_timezone.localtime().strftime('%Y-%m-%d')
     logger.debug(f'API fetch date range: {start_date} to {end_date}')
 
     try:

@@ -45,6 +45,7 @@ Related:
 from datetime import datetime
 from django.db import models
 from django.conf import settings
+from django.utils import timezone as dj_timezone
 import os
 from core import models as core_models
 
@@ -407,7 +408,7 @@ class DriverTransaction(models.Model):
         from django.db.models import Max
 
         prefix = self.TYPE_PREFIXES.get(self.transaction_type, 'TXN')
-        today_str = datetime.now().strftime('%Y%m%d')
+        today_str = dj_timezone.localtime().strftime('%Y%m%d')
         code_pattern = f"{prefix}-{today_str}-"
 
         # Get next daily sequence for this prefix+date
@@ -507,8 +508,7 @@ class DriverSettlement(models.Model):
     def save(self, *args, **kwargs):
         # Generate settlement code if not exists
         if not self.settlement_code:
-            from datetime import datetime
-            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            timestamp = dj_timezone.localtime().strftime('%Y%m%d%H%M%S')
             self.settlement_code = f"STL-{self.driver.driver_id}-{timestamp}"
         super().save(*args, **kwargs)
 

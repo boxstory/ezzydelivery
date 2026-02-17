@@ -3,209 +3,109 @@
 
 {% block title %}Dispatch Dashboard{% endblock %}
 
-{% block extra_css %}
-<style>
-    .dispatch-stats {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .dispatch-stat-card {
-        background: white;
-        border-radius: var(--brand-radius-md, 12px);
-        padding: 1rem;
-        text-align: center;
-        box-shadow: var(--brand-shadow-sm);
-        border-left: 4px solid var(--brand-grey-300);
-    }
-
-    .dispatch-stat-card.holding { border-left-color: #ffc107; }
-    .dispatch-stat-card.ready { border-left-color: #17a2b8; }
-    .dispatch-stat-card.assigned { border-left-color: #007bff; }
-    .dispatch-stat-card.in-progress { border-left-color: #fd7e14; }
-    .dispatch-stat-card.completed { border-left-color: #28a745; }
-    .dispatch-stat-card.riders { border-left-color: var(--brand-primary); }
-
-    .dispatch-stat-value {
-        font-size: 2rem;
-        font-weight: 700;
-        color: var(--brand-navy);
-    }
-
-    .dispatch-stat-label {
-        font-size: 0.8rem;
-        color: var(--brand-grey-600);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .batch-monitor {
-        background: white;
-        border-radius: var(--brand-radius-md);
-        padding: 1rem;
-        margin-bottom: 1.5rem;
-        box-shadow: var(--brand-shadow-sm);
-    }
-
-    .batch-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.75rem;
-        border-bottom: 1px solid var(--brand-grey-200);
-        transition: background 0.2s;
-    }
-
-    .batch-item:hover {
-        background: var(--brand-grey-100);
-    }
-
-    .batch-item:last-child {
-        border-bottom: none;
-    }
-
-    .batch-code {
-        font-weight: 600;
-        font-family: monospace;
-    }
-
-    .batch-zone {
-        background: var(--brand-grey-200);
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.85rem;
-    }
-
-    .batch-status-badge {
-        font-size: 0.7rem;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-weight: 600;
-        text-transform: uppercase;
-    }
-
-    .batch-status-badge.holding { background: #fff3cd; color: #856404; }
-    .batch-status-badge.ready { background: #d1ecf1; color: #0c5460; }
-    .batch-status-badge.assigned { background: #cce5ff; color: #004085; }
-    .batch-status-badge.in-progress { background: #ffe5d0; color: #8a4500; }
-
-    .hold-countdown {
-        font-weight: 600;
-        color: #ffc107;
-    }
-
-    .activity-log {
-        max-height: 300px;
-        overflow-y: auto;
-    }
-
-    .log-item {
-        display: flex;
-        gap: 0.75rem;
-        padding: 0.5rem 0;
-        border-bottom: 1px solid var(--brand-grey-100);
-        font-size: 0.875rem;
-    }
-
-    .log-time {
-        color: var(--brand-grey-500);
-        white-space: nowrap;
-    }
-
-    .log-action {
-        flex: 1;
-    }
-
-    .quick-actions {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        margin-bottom: 1.5rem;
-    }
-
-    .quick-actions .btn {
-        flex: 1;
-        min-width: 150px;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
-    <!-- Page Header -->
-    <header class="page-header">
-        <div class="page-header-left">
-            <h2><i class="fa-solid fa-layer-group me-1"></i>Dispatch Dashboard</h2>
+<div class="dpd">
+    <!-- Hero Header -->
+    <div class="dpd__hero">
+        <div class="dpd__hero-inner">
+            <div class="dpd__hero-left">
+                <h1 class="dpd__hero-title">
+                    <i class="fa-solid fa-layer-group dpd__hero-icon"></i>
+                    Dispatch Dashboard
+                </h1>
+                <p class="dpd__hero-subtitle">Real-time batch monitoring and rider management</p>
+            </div>
+            <div class="dpd__hero-right">
+                <a href="{% url 'workforce:dispatch_shift_create' %}" class="dpd__hero-btn">
+                    <i class="fa-solid fa-plus me-1"></i>New Shift
+                </a>
+            </div>
         </div>
-        <div class="page-header-right">
-            <a href="{% url 'workforce:dispatch_shift_create' %}" class="btn btn-outline-dark">
-                <i class="fa-solid fa-plus me-1"></i>New Shift
-            </a>
-        </div>
-    </header>
+    </div>
 
     <!-- Quick Actions -->
-    <div class="quick-actions">
-        <a href="{% url 'workforce:dispatch_batch_list' %}" class="btn btn-outline-secondary">
-            <i class="fa-solid fa-boxes-stacked me-1"></i> All Batches
+    <div class="dpd__actions">
+        <a href="{% url 'workforce:dispatch_batch_list' %}" class="dpd__action-btn">
+            <i class="fa-solid fa-boxes-stacked dpd__action-icon"></i>
+            <span>All Batches</span>
         </a>
-        <a href="{% url 'workforce:dispatch_shift_list' %}" class="btn btn-outline-secondary">
-            <i class="fa-solid fa-calendar-days me-1"></i> Manage Shifts
+        <a href="{% url 'workforce:dispatch_shift_list' %}" class="dpd__action-btn">
+            <i class="fa-solid fa-calendar-days dpd__action-icon"></i>
+            <span>Manage Shifts</span>
         </a>
-        <a href="{% url 'workforce:dispatch_kpi_dashboard' %}" class="btn btn-outline-secondary">
-            <i class="fa-solid fa-chart-line me-1"></i> KPI Dashboard
+        <a href="{% url 'workforce:dispatch_kpi_dashboard' %}" class="dpd__action-btn">
+            <i class="fa-solid fa-chart-line dpd__action-icon"></i>
+            <span>KPI Dashboard</span>
         </a>
-        <a href="{% url 'workforce:dispatch_config_list' %}" class="btn btn-outline-secondary">
-            <i class="fa-solid fa-sliders me-1"></i> Config
+        <a href="{% url 'workforce:dispatch_config_list' %}" class="dpd__action-btn">
+            <i class="fa-solid fa-sliders dpd__action-icon"></i>
+            <span>Config</span>
         </a>
     </div>
 
-    <!-- Stats -->
-    <div class="dispatch-stats">
-        <div class="dispatch-stat-card holding">
-            <div class="dispatch-stat-value">{{ batch_stats.holding|default:0 }}</div>
-            <div class="dispatch-stat-label">Holding</div>
+    <!-- Stats Grid -->
+    <div class="dpd__stats">
+        <div class="dpd__stat-card dpd__stat-card--holding">
+            <div class="dpd__stat-icon-wrap dpd__stat-icon-wrap--holding">
+                <i class="fa-solid fa-pause"></i>
+            </div>
+            <div class="dpd__stat-value">{{ batch_stats.holding|default:0 }}</div>
+            <div class="dpd__stat-label">Holding</div>
         </div>
-        <div class="dispatch-stat-card ready">
-            <div class="dispatch-stat-value">{{ batch_stats.ready|default:0 }}</div>
-            <div class="dispatch-stat-label">Ready</div>
+        <div class="dpd__stat-card dpd__stat-card--ready">
+            <div class="dpd__stat-icon-wrap dpd__stat-icon-wrap--ready">
+                <i class="fa-solid fa-check-circle"></i>
+            </div>
+            <div class="dpd__stat-value">{{ batch_stats.ready|default:0 }}</div>
+            <div class="dpd__stat-label">Ready</div>
         </div>
-        <div class="dispatch-stat-card assigned">
-            <div class="dispatch-stat-value">{{ batch_stats.assigned|default:0 }}</div>
-            <div class="dispatch-stat-label">Assigned</div>
+        <div class="dpd__stat-card dpd__stat-card--assigned">
+            <div class="dpd__stat-icon-wrap dpd__stat-icon-wrap--assigned">
+                <i class="fa-solid fa-user-check"></i>
+            </div>
+            <div class="dpd__stat-value">{{ batch_stats.assigned|default:0 }}</div>
+            <div class="dpd__stat-label">Assigned</div>
         </div>
-        <div class="dispatch-stat-card in-progress">
-            <div class="dispatch-stat-value">{{ batch_stats.in_progress|default:0 }}</div>
-            <div class="dispatch-stat-label">In Progress</div>
+        <div class="dpd__stat-card dpd__stat-card--progress">
+            <div class="dpd__stat-icon-wrap dpd__stat-icon-wrap--progress">
+                <i class="fa-solid fa-spinner"></i>
+            </div>
+            <div class="dpd__stat-value">{{ batch_stats.in_progress|default:0 }}</div>
+            <div class="dpd__stat-label">In Progress</div>
         </div>
-        <div class="dispatch-stat-card completed">
-            <div class="dispatch-stat-value">{{ batch_stats.completed|default:0 }}</div>
-            <div class="dispatch-stat-label">Completed</div>
+        <div class="dpd__stat-card dpd__stat-card--completed">
+            <div class="dpd__stat-icon-wrap dpd__stat-icon-wrap--completed">
+                <i class="fa-solid fa-flag-checkered"></i>
+            </div>
+            <div class="dpd__stat-value">{{ batch_stats.completed|default:0 }}</div>
+            <div class="dpd__stat-label">Completed</div>
         </div>
-        <div class="dispatch-stat-card riders">
-            <div class="dispatch-stat-value">{{ active_rider_count|default:0 }}</div>
-            <div class="dispatch-stat-label">Active Riders</div>
+        <div class="dpd__stat-card dpd__stat-card--riders">
+            <div class="dpd__stat-icon-wrap dpd__stat-icon-wrap--riders">
+                <i class="fa-solid fa-motorcycle"></i>
+            </div>
+            <div class="dpd__stat-value">{{ active_rider_count|default:0 }}</div>
+            <div class="dpd__stat-label">Active Riders</div>
         </div>
     </div>
 
-    <div class="row">
+    <!-- Main Content Grid -->
+    <div class="row g-3">
         <!-- Batch Monitor -->
         <div class="col-lg-8">
-            <div class="batch-monitor">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">
-                        <i class="fa-solid fa-eye me-2"></i>Active Batches
-                    </h5>
-                    <button class="btn btn-sm btn-outline-secondary"
+            <div class="dpd__panel">
+                <div class="dpd__panel-header">
+                    <h2 class="dpd__panel-title">
+                        <i class="fa-solid fa-eye dpd__panel-title-icon"></i>
+                        ACTIVE BATCHES
+                    </h2>
+                    <button class="dpd__refresh-btn"
                             hx-get="{% url 'workforce:dispatch_batch_monitor_partial' %}"
                             hx-target="#batch-monitor-content"
                             hx-swap="innerHTML">
                         <i class="fa-solid fa-refresh"></i>
                     </button>
                 </div>
-
                 <div id="batch-monitor-content"
                      hx-get="{% url 'workforce:dispatch_batch_monitor_partial' %}"
                      hx-trigger="every 10s"
@@ -215,14 +115,16 @@
             </div>
         </div>
 
-        <!-- Activity Log & Riders -->
+        <!-- Sidebar -->
         <div class="col-lg-4">
             <!-- Active Riders -->
-            <div class="batch-monitor mb-3">
-                <h6 class="mb-3">
-                    <i class="fa-solid fa-motorcycle me-2"></i>Active Riders
-                </h6>
-
+            <div class="dpd__panel dpd__panel--compact">
+                <div class="dpd__panel-header">
+                    <h2 class="dpd__panel-title">
+                        <i class="fa-solid fa-motorcycle dpd__panel-title-icon"></i>
+                        ACTIVE RIDERS
+                    </h2>
+                </div>
                 <div id="shift-status-content"
                      hx-get="{% url 'workforce:dispatch_shift_status_partial' %}"
                      hx-trigger="every 30s"
@@ -232,22 +134,28 @@
             </div>
 
             <!-- Activity Log -->
-            <div class="batch-monitor">
-                <h6 class="mb-3">
-                    <i class="fa-solid fa-clock-rotate-left me-2"></i>Recent Activity
-                </h6>
-                <div class="activity-log">
+            <div class="dpd__panel dpd__panel--compact">
+                <div class="dpd__panel-header">
+                    <h2 class="dpd__panel-title">
+                        <i class="fa-solid fa-clock-rotate-left dpd__panel-title-icon"></i>
+                        RECENT ACTIVITY
+                    </h2>
+                </div>
+                <div class="dpd__activity-log">
                     {% for log in recent_logs %}
-                    <div class="log-item">
-                        <span class="log-time">{{ log.created_at|time:"H:i" }}</span>
-                        <span class="log-action">
+                    <div class="dpd__log-item">
+                        <span class="dpd__log-time">{{ log.created_at|time:"H:i" }}</span>
+                        <span class="dpd__log-action">
                             {{ log.get_action_display }}
-                            {% if log.batch %}<code>{{ log.batch.batch_code }}</code>{% endif %}
-                            {% if log.rider %}<span class="text-muted">- {{ log.rider.driver_code }}</span>{% endif %}
+                            {% if log.batch %}<code class="dpd__log-code">{{ log.batch.batch_code }}</code>{% endif %}
+                            {% if log.rider %}<span class="dpd__log-rider">{{ log.rider.driver_code }}</span>{% endif %}
                         </span>
                     </div>
                     {% empty %}
-                    <p class="text-muted text-center py-3">No recent activity</p>
+                    <div class="dpd__empty">
+                        <i class="fa-solid fa-inbox"></i>
+                        <p>No recent activity</p>
+                    </div>
                     {% endfor %}
                 </div>
             </div>
@@ -258,7 +166,6 @@
 
 {% block extra_js %}
 <script>
-// Countdown timers for holding batches
 function updateCountdowns() {
     document.querySelectorAll('[data-expires]').forEach(el => {
         const expires = new Date(el.dataset.expires);

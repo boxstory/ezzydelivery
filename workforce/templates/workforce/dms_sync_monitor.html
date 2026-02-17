@@ -3,147 +3,112 @@
 
 {% block title %}DMS Sync Monitor - Ezzy Delivery{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
-<!-- Page Header -->
-<header class="page-header">
-    <div class="page-header-left">
-        <h2><i class="fa-solid fa-rotate me-1"></i>DMS Sync Monitor</h2>
-    </div>
-</header>
-<div class="col-12 p-3">
-
-<!-- Error Message -->
-{% if error_message %}
-<div class="error-banner">
-    <i class="fa-solid fa-triangle-exclamation"></i>
-    <p>{{ error_message }}</p>
-</div>
-{% endif %}
-
-<!-- Refresh Banner -->
-<div class="refresh-banner">
-    <div class="refresh-banner-content">
-        <i class="fa-solid fa-circle-info"></i>
-        <p>Monitoring DMS sync status - Last updated: <span id="lastUpdate"></span></p>
-    </div>
-    <button type="button" class="btn-refresh" data-action="refresh">
-        <i class="fa-solid fa-rotate"></i>
-        Refresh
-    </button>
-</div>
-
-<!-- Recently Synced Tasks -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-check-circle"></i>
-        Recently Synced Tasks (Last 50)
-    </div>
-    {% if recently_synced %}
-    <div class="tasks-list">
-        {% for task in recently_synced %}
-        <div class="task-item synced">
-            <div class="task-header">
-                <span class="task-id">Task #{{ task.id }} - {{ task.order.order_number|default:"N/A" }}</span>
-                <span class="task-status status-synced">Synced</span>
-            </div>
-            <div class="task-details">
-                <div class="task-detail-item">
-                    <i class="fa-solid fa-user"></i>
-                    <span>{{ task.driver.user.first_name|default:"Unassigned" }} {{ task.driver.user.last_name|default:"" }}</span>
-                </div>
-                <div class="task-detail-item">
-                    <i class="fa-solid fa-circle-info"></i>
-                    <span>{{ task.status|default:"N/A"|title }}</span>
-                </div>
-                <div class="task-detail-item">
-                    <i class="fa-solid fa-clock"></i>
-                    <span>{{ task.updated_at|date:"d M Y, h:i A"|default:"N/A" }}</span>
-                </div>
-            </div>
+<div class="dsm">
+    <!-- Hero Header -->
+    <div class="dsm__hero">
+        <div class="dsm__hero-content">
+            <h1 class="dsm__hero-title"><i class="fa-solid fa-rotate me-2"></i>DMS Sync Monitor</h1>
+            <p class="dsm__hero-subtitle">Real-time monitoring of DMS sync status</p>
         </div>
-        {% endfor %}
+        <div class="dsm__hero-actions">
+            <button type="button" class="dsm__btn dsm__btn--refresh" data-action="refresh">
+                <i class="fa-solid fa-rotate"></i> Refresh
+            </button>
+        </div>
     </div>
-    {% else %}
-    <div class="empty-state">
-        <i class="fa-solid fa-check-circle"></i>
-        <h4>No Recently Synced Tasks</h4>
-        <p>There are no recently synced tasks to display</p>
-    </div>
-    {% endif %}
-</div>
 
-<!-- Failed Sync Attempts -->
-<div class="section-container">
-    <div class="section-title">
+    <!-- Error Message -->
+    {% if error_message %}
+    <div class="dsm__alert dsm__alert--error">
         <i class="fa-solid fa-triangle-exclamation"></i>
-        Failed Sync Attempts (Pending Tasks)
-    </div>
-    {% if failed_sync %}
-    <div class="tasks-list">
-        {% for task in failed_sync %}
-        <div class="task-item failed">
-            <div class="task-header">
-                <span class="task-id">Task #{{ task.id }} - {{ task.order.order_number|default:"N/A" }}</span>
-                <span class="task-status status-failed">Not Synced</span>
-            </div>
-            <div class="task-details">
-                <div class="task-detail-item">
-                    <i class="fa-solid fa-user"></i>
-                    <span>{{ task.driver.user.first_name|default:"Unassigned" }} {{ task.driver.user.last_name|default:"" }}</span>
-                </div>
-                <div class="task-detail-item">
-                    <i class="fa-solid fa-circle-info"></i>
-                    <span>{{ task.status|default:"N/A"|title }}</span>
-                </div>
-                <div class="task-detail-item">
-                    <i class="fa-solid fa-clock"></i>
-                    <span>{{ task.created_at|date:"d M Y, h:i A"|default:"N/A" }}</span>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <div class="empty-state">
-        <i class="fa-solid fa-check-circle"></i>
-        <h4>No Failed Syncs</h4>
-        <p>All tasks are successfully synced with DMS</p>
+        <span>{{ error_message }}</span>
     </div>
     {% endif %}
-</div>
 
+    <!-- Info Banner -->
+    <div class="dsm__banner">
+        <i class="fa-solid fa-circle-info dsm__banner-icon"></i>
+        <span>Monitoring DMS sync status &mdash; Last updated: <strong id="lastUpdate"></strong></span>
+    </div>
+
+    <!-- Recently Synced Tasks -->
+    <div class="dsm__card">
+        <div class="dsm__card-header">
+            <i class="fa-solid fa-check-circle dsm__card-icon dsm__card-icon--green"></i>
+            <span class="dsm__card-title">RECENTLY SYNCED TASKS (LAST 50)</span>
+        </div>
+        <div class="dsm__card-body">
+            {% if recently_synced %}
+            <div class="dsm__list">
+                {% for task in recently_synced %}
+                <div class="dsm__item">
+                    <div class="dsm__item-top">
+                        <span class="dsm__item-id">Task #{{ task.id }} &mdash; {{ task.order.order_number|default:"N/A" }}</span>
+                        <span class="dsm__status dsm__status--green">Synced</span>
+                    </div>
+                    <div class="dsm__item-details">
+                        <span class="dsm__item-detail"><i class="fa-solid fa-user"></i> {{ task.driver.user.first_name|default:"Unassigned" }} {{ task.driver.user.last_name|default:"" }}</span>
+                        <span class="dsm__item-detail"><i class="fa-solid fa-circle-info"></i> {{ task.status|default:"N/A"|title }}</span>
+                        <span class="dsm__item-detail"><i class="fa-solid fa-clock"></i> {{ task.updated_at|date:"d M Y, h:i A"|default:"N/A" }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="dsm__empty">
+                <i class="fa-solid fa-check-circle"></i>
+                <h4>No Recently Synced Tasks</h4>
+                <p>There are no recently synced tasks to display</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Failed Sync Attempts -->
+    <div class="dsm__card">
+        <div class="dsm__card-header">
+            <i class="fa-solid fa-triangle-exclamation dsm__card-icon dsm__card-icon--red"></i>
+            <span class="dsm__card-title">FAILED SYNC ATTEMPTS (PENDING TASKS)</span>
+        </div>
+        <div class="dsm__card-body">
+            {% if failed_sync %}
+            <div class="dsm__list">
+                {% for task in failed_sync %}
+                <div class="dsm__item dsm__item--failed">
+                    <div class="dsm__item-top">
+                        <span class="dsm__item-id">Task #{{ task.id }} &mdash; {{ task.order.order_number|default:"N/A" }}</span>
+                        <span class="dsm__status dsm__status--red">Not Synced</span>
+                    </div>
+                    <div class="dsm__item-details">
+                        <span class="dsm__item-detail"><i class="fa-solid fa-user"></i> {{ task.driver.user.first_name|default:"Unassigned" }} {{ task.driver.user.last_name|default:"" }}</span>
+                        <span class="dsm__item-detail"><i class="fa-solid fa-circle-info"></i> {{ task.status|default:"N/A"|title }}</span>
+                        <span class="dsm__item-detail"><i class="fa-solid fa-clock"></i> {{ task.created_at|date:"d M Y, h:i A"|default:"N/A" }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="dsm__empty">
+                <i class="fa-solid fa-check-circle"></i>
+                <h4>No Failed Syncs</h4>
+                <p>All tasks are successfully synced with DMS</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Update last refresh time
-    function updateLastRefreshTime() {
-        const now = new Date();
-        const updateEl = document.getElementById('lastUpdate');
-        if (updateEl) {
-            updateEl.textContent = now.toLocaleTimeString();
-        }
-    }
-
-    // Update on page load
-    updateLastRefreshTime();
-
-    // Auto-refresh every 30 seconds
-    setInterval(function() {
-        window.location.reload();
-    }, 30000);
-
-    // Event delegation for refresh button
+    var now = new Date();
+    var el = document.getElementById('lastUpdate');
+    if (el) el.textContent = now.toLocaleTimeString();
+    setInterval(function() { window.location.reload(); }, 30000);
     document.querySelectorAll('[data-action="refresh"]').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            window.location.reload();
-        });
+        btn.addEventListener('click', function() { window.location.reload(); });
     });
 });
 </script>

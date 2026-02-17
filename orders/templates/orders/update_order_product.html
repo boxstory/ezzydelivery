@@ -5,108 +5,125 @@
 {% block title %}Update Order Products{% endblock %}
 
 {% block content %}
-<div class="p-3 col-12" id="orders_update_product_container_main">
-    <div class="container align-content-center w-100">
-        <div class="row">
-            <div class="col-md-12 pb-3">
-                <div class="col p-2">
-                    <h2 class="m-0 text-center" id="orders_update_product_header_title">Update Order Products</h2>
+<div class="uop" id="orders_update_product_container_main">
+    <!-- Hero Header -->
+    <div class="uop__hero">
+        <div class="uop__hero-content">
+            <div class="uop__hero-left">
+                <h1 class="uop__title">
+                    <i class="fas fa-pen-square"></i>
+                    Update Order Products
+                </h1>
+                <p class="uop__subtitle">Manage products for order #{{ order.client_order_code|default:order.order_number }}</p>
+            </div>
+            <div class="uop__hero-actions">
+                <a href="{% url 'orders:orders_all_list' %}" class="uop__btn uop__btn--outline" id="orders_update_product_btn_orders_list">
+                    <i class="fas fa-list"></i> Orders List
+                </a>
+                <a href="{% url 'orders:order_details' order.id %}" class="uop__btn uop__btn--outline d-none d-md-inline-flex" id="orders_update_product_btn_order_details">
+                    <i class="fas fa-eye"></i> Order Details
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Info Card -->
+    <div class="uop__card">
+        <div class="uop__card-header">
+            <i class="fas fa-info-circle"></i>
+            <span>Order Information</span>
+        </div>
+        <div class="uop__card-body">
+            <div class="uop__info-grid">
+                <div class="uop__info-row">
+                    <span class="uop__info-label">Customer</span>
+                    <span class="uop__info-value">{{ order.customer_name }}</span>
                 </div>
-                <div class="col d-flex justify-content-between rounded-2 bg-light" id="orders_update_product_nav_actions">
-                    <a class="btn pe-3 text-dark" href="{% url 'orders:orders_all_list' %}">
-                        <div class="btn btn-dark my-2" id="orders_update_product_btn_orders_list">Orders List</div>
-                    </a>
-                    <a class="btn pe-3 text-dark d-none d-md-block" href="{% url 'orders:order_details' order.id %}">
-                        <div class="btn btn-outline-dark my-2" id="orders_update_product_btn_order_details">Order Details</div>
-                    </a>
+                <div class="uop__info-row">
+                    <span class="uop__info-label">Mobile</span>
+                    <span class="uop__info-value">{{ order.customer_phone }}</span>
+                </div>
+                <div class="uop__info-row">
+                    <span class="uop__info-label">Order Number</span>
+                    <span class="uop__info-value">{{ order.client_order_code|default:order.order_number }}</span>
+                </div>
+                <div class="uop__info-row">
+                    <span class="uop__info-label">Date</span>
+                    <span class="uop__info-value">{{ order.order_date }}</span>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Order Info -->
-        <div class="pb-2 bg-light p-3 pt-0" id="orders_update_product_card_order_info">
-            <div class="pb-2">
-                <div class="d-flex justify-content-between">
-                    <div>Name</div>
-                    <div>Mobile</div>
-                </div>
-                <hr class="p-0 m-0" />
-                <div class="d-flex justify-content-between p-0">
-                    <p>{{ order.customer_name }}</p>
-                    <p>{{ order.customer_phone }}</p>
-                </div>
-            </div>
-            <div>
-                <div class="d-flex justify-content-between">
-                    <div>Order Number</div>
-                    <div>Date</div>
-                </div>
-                <hr class="p-0 m-0 align-content-center" />
-                <div class="d-flex justify-content-between pt-2">
-                    <div>{{ order.client_order_code|default:order.order_number }}</div>
-                    <div>{{ order.order_date }}</div>
-                </div>
-            </div>
+    <!-- Current Order Items -->
+    {% if order_items %}
+    <div class="uop__card">
+        <div class="uop__card-header">
+            <i class="fas fa-shopping-cart"></i>
+            <span>Current Products</span>
+            <span class="uop__count">{{ order_items|length }}</span>
         </div>
-
-        <!-- Current Order Items -->
-        {% if order_items %}
-        <div class="mt-3 mb-3">
-            <h5>Current Products in Order</h5>
-            <div class="table-responsive">
-                <table class="table table-sm table-bordered">
-                    <thead class="bg-light">
-                        <tr>
-                            <th>Product</th>
-                            <th>Quantity</th>
-                            <th>Unit Price</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in order_items %}
-                        <tr>
-                            <td>{{ item.product.product_name|default:"Unknown" }}</td>
-                            <td>{{ item.quantity }}</td>
-                            <td>QAR {{ item.unit_price|default:"0.00" }}</td>
-                            <td>QAR {{ item.total_price|default:"0.00" }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Add/Update Products Form -->
-        <div class="row mt-3">
-            <div class="col-md-12">
-                {{ error }}
-                <form method="POST" id="orders_update_product_form_main">
-                    {% if form.non_field_errors %}
-                    {% for error in form.non_field_errors %}
-                    <div class="alert alert-danger">{{ error }}</div>
+        <div class="uop__table-wrap">
+            <table class="uop__table">
+                <thead>
+                    <tr>
+                        <th class="uop__th">Product</th>
+                        <th class="uop__th">Quantity</th>
+                        <th class="uop__th">Unit Price</th>
+                        <th class="uop__th">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order_items %}
+                    <tr class="uop__row">
+                        <td class="uop__td uop__td--product">{{ item.product.product_name|default:"Unknown" }}</td>
+                        <td class="uop__td">{{ item.quantity }}</td>
+                        <td class="uop__td">QAR {{ item.unit_price|default:"0.00" }}</td>
+                        <td class="uop__td uop__td--total">QAR {{ item.total_price|default:"0.00" }}</td>
+                    </tr>
                     {% endfor %}
-                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 
-                    {% csrf_token %}
-                    {{ form|crispy }}
+    <!-- Add/Update Products Form -->
+    <div class="uop__card">
+        <div class="uop__card-header">
+            <i class="fas fa-plus-circle"></i>
+            <span>Add / Update Products</span>
+        </div>
+        <div class="uop__card-body">
+            {{ error }}
+            <form method="POST" id="orders_update_product_form_main">
+                {% if form.non_field_errors %}
+                <div class="uop__errors">
+                    {% for error in form.non_field_errors %}
+                    <div class="uop__error-item">
+                        <i class="fas fa-exclamation-circle"></i> {{ error }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
 
-                    {% if order.order_status == 'publish' %}
-                    <div class="my-3 text-center">
-                        <button class="btn btn-success w-50" disabled id="orders_update_product_btn_published">
-                            <p class="m-0">Order Already Published</p>
-                        </button>
-                    </div>
-                    {% else %}
-                    <div class="my-3 text-center">
-                        <button class="btn btn-dark w-50 align-content-center" type="submit" id="orders_update_product_btn_save">
-                            Save Products
-                        </button>
-                    </div>
-                    {% endif %}
-                </form>
-            </div>
+                {% csrf_token %}
+                {{ form|crispy }}
+
+                {% if order.order_status == 'publish' %}
+                <div class="uop__submit-row">
+                    <button class="uop__btn uop__btn--disabled" disabled id="orders_update_product_btn_published">
+                        <i class="fas fa-lock"></i> Order Already Published
+                    </button>
+                </div>
+                {% else %}
+                <div class="uop__submit-row">
+                    <button class="uop__btn uop__btn--primary uop__btn--lg" type="submit" id="orders_update_product_btn_save">
+                        <i class="fas fa-save"></i> Save Products
+                    </button>
+                </div>
+                {% endif %}
+            </form>
         </div>
     </div>
 </div>

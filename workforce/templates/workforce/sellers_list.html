@@ -1,205 +1,189 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
-{% block title %}
-    All Sellers - Ezzy Delivery
-{% endblock title %}
-{% block extra_css %}
-    <link type="text/css"
-          rel="stylesheet"
-          href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
+{% block title %}All Sellers - Ezzy Delivery{% endblock title %}
 {% block content %}
-<div class="col-12 p-3">
-    <!-- Page Header -->
-    <header class="page-header">
-        <div class="page-header-left">
-            <h2><i class="fa-solid fa-store me-1"></i>All Sellers</h2>
-        </div>
-        <div class="page-header-right">
-            <div class="page-header-count">
-                <span class="count-value">{{ total_sellers|default:"0" }}</span>
-                <span class="count-label">total</span>
+<div class="sll">
+    <!-- Hero Header -->
+    <div class="sll__hero">
+        <div class="sll__hero-inner">
+            <div class="sll__hero-left">
+                <h1 class="sll__hero-title">
+                    <i class="fa-solid fa-store"></i> All Sellers
+                </h1>
+                <p class="sll__hero-sub">Manage registered businesses and sellers</p>
             </div>
-        </div>
-    </header>
-    <!-- Statistics Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="stat-icon stat-icon-primary">
-                    <i class="fa-solid fa-store"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>{{ total_sellers }}</h3>
-                    <p>Total Sellers</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="stat-icon stat-icon-success">
-                    <i class="fa-solid fa-circle-check"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>{{ active_sellers }}</h3>
-                    <p>Active Sellers</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="stat-icon stat-icon-warning">
-                    <i class="fa-solid fa-clock"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>{{ pending_sellers }}</h3>
-                    <p>Pending Approval</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="stat-icon stat-icon-danger">
-                    <i class="fa-solid fa-circle-xmark"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>{{ inactive_sellers }}</h3>
-                    <p>Inactive Sellers</p>
-                </div>
+            <div class="sll__hero-right">
+                <div class="sll__hero-count">{{ total_sellers|default:"0" }}</div>
+                <div class="sll__hero-count-label">Total Sellers</div>
             </div>
         </div>
     </div>
-    <!-- Filter Section -->
-    <div class="filter-section">
-        <form method="get" class="row g-3"
+
+    <!-- Stat Cards -->
+    <div class="sll__stats">
+        <div class="sll__stat-card">
+            <div class="sll__stat-icon sll__stat-icon--primary">
+                <i class="fa-solid fa-store"></i>
+            </div>
+            <div class="sll__stat-body">
+                <div class="sll__stat-value">{{ total_sellers }}</div>
+                <div class="sll__stat-label">Total Sellers</div>
+            </div>
+        </div>
+        <div class="sll__stat-card">
+            <div class="sll__stat-icon sll__stat-icon--success">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <div class="sll__stat-body">
+                <div class="sll__stat-value">{{ active_sellers }}</div>
+                <div class="sll__stat-label">Active Sellers</div>
+            </div>
+        </div>
+        <div class="sll__stat-card">
+            <div class="sll__stat-icon sll__stat-icon--warning">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <div class="sll__stat-body">
+                <div class="sll__stat-value">{{ pending_sellers }}</div>
+                <div class="sll__stat-label">Pending Approval</div>
+            </div>
+        </div>
+        <div class="sll__stat-card">
+            <div class="sll__stat-icon sll__stat-icon--danger">
+                <i class="fa-solid fa-circle-xmark"></i>
+            </div>
+            <div class="sll__stat-body">
+                <div class="sll__stat-value">{{ inactive_sellers }}</div>
+                <div class="sll__stat-label">Inactive Sellers</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="sll__filter">
+        <div class="sll__filter-header">
+            <i class="fa-solid fa-sliders sll__filter-header-icon"></i>
+            <span class="sll__filter-header-text">Filters</span>
+        </div>
+        <form method="get" class="sll__filter-form"
               hx-get=""
               hx-target="#main-content"
               hx-select="#main-content"
               hx-swap="outerHTML"
               hx-push-url="true">
-            <div class="col-md-4">
-                <label for="searchInput" class="filter-label">
-                    <i class="fa-solid fa-search me-2"></i>Search Sellers
+            <div class="sll__filter-group sll__filter-group--lg">
+                <label for="searchInput" class="sll__filter-label">
+                    <i class="fa-solid fa-search"></i> Search Sellers
                 </label>
-                <input type="text"
-                       id="searchInput"
-                       name="search"
-                       class="filter-input"
+                <input type="text" id="searchInput" name="search"
+                       class="sll__filter-input"
                        placeholder="Search by name, email, phone..."
                        value="{{ search }}">
             </div>
-            <div class="col-md-3">
-                <label for="statusFilter" class="filter-label">
-                    <i class="fa-solid fa-filter me-2"></i>Business Status
+            <div class="sll__filter-group">
+                <label for="statusFilter" class="sll__filter-label">
+                    <i class="fa-solid fa-filter"></i> Business Status
                 </label>
-                <select id="statusFilter" name="status" class="filter-input">
+                <select id="statusFilter" name="status" class="sll__filter-input">
                     <option value="">All Status</option>
                     <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
                     <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactive</option>
                     <option value="suspended" {% if status == 'suspended' %}selected{% endif %}>Suspended</option>
                 </select>
             </div>
-            <div class="col-md-3">
-                <label for="verificationFilter" class="filter-label">
-                    <i class="fa-solid fa-user-check me-2"></i>Verification
+            <div class="sll__filter-group">
+                <label for="verificationFilter" class="sll__filter-label">
+                    <i class="fa-solid fa-user-check"></i> Verification
                 </label>
-                <select id="verificationFilter" name="verification" class="filter-input">
+                <select id="verificationFilter" name="verification" class="sll__filter-input">
                     <option value="">All</option>
                     <option value="pending" {% if verification == 'pending' %}selected{% endif %}>Pending</option>
-                    <option value="verified"
-                            {% if verification == 'verified' %}selected{% endif %}>Verified</option>
-                    <option value="rejected"
-                            {% if verification == 'rejected' %}selected{% endif %}>Rejected</option>
+                    <option value="verified" {% if verification == 'verified' %}selected{% endif %}>Verified</option>
+                    <option value="rejected" {% if verification == 'rejected' %}selected{% endif %}>Rejected</option>
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="filter-label filter-label-hidden">Action</label>
-                <button type="submit" class="wfl__filter-btn w-100">
+            <div class="sll__filter-actions">
+                <button type="submit" class="sll__btn sll__btn--primary">
                     <i class="fa-solid fa-search"></i> Filter
                 </button>
             </div>
         </form>
     </div>
-    <!-- Sellers Table -->
-    <div class="orders-table-container">
+
+    <!-- Table -->
+    <div class="sll__table-wrap">
         {% if page_obj %}
-            <table class="orders-table">
-                <thead>
-                    <tr>
-                        <th>Business Name</th>
-                        <th>Contact</th>
-                        <th>Business Status</th>
-                        <th>Verification</th>
-                        <th>Registered</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for business in page_obj %}
-                        <tr>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="driver-icon wfl__seller-icon me-3">
-                                        <i class="fa-solid fa-store"></i>
-                                    </div>
-                                    <div>
-                                        <strong>{{ business.business_name|default:"Unknown Business" }}</strong>
-                                        <br>
-                                        <small class="text-muted">{{ business.business_code|default:"N/A" }}</small>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                {% if business.business_email %}
-                                    <div>
-                                        <i class="fa-solid fa-envelope me-2"></i>{{ business.business_email }}
-                                    </div>
-                                {% endif %}
-                                {% if business.business_phone %}
-                                    <div>
-                                        <i class="fa-solid fa-phone me-2"></i>{{ business.business_phone }}
-                                    </div>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="status-badge {% if business.business_status == 'active' %}status-active{% elif business.business_status == 'pending' %}status-pending{% elif business.business_status == 'suspended' %}status-failed{% else %}status-inactive{% endif %}">
-                                    {{ business.business_status|title }}
-                                </span>
-                            </td>
-                            <td>
-                                {% if business.profile %}
-                                    <span class="status-badge {% if business.profile.verification_status == 'verified' %}status-active{% elif business.profile.verification_status == 'pending' %}status-pending{% else %}status-failed{% endif %}">
-                                        {{ business.profile.verification_status|title }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">N/A</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ business.business_since|date:"d M Y"|default:"N/A" }}</td>
-                            <td>
-                                <a href="{% url 'workforce:seller_detail' business.business_id %}"
-                                   class="wfl__view-btn">
-                                    <i class="fa-solid fa-eye"></i> View
-                                </a>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <!-- Pagination -->
-            {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params %}
+        <table class="sll__table">
+            <thead>
+                <tr>
+                    <th>Business Name</th>
+                    <th>Contact</th>
+                    <th>Business Status</th>
+                    <th>Verification</th>
+                    <th>Registered</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for business in page_obj %}
+                <tr>
+                    <td>
+                        <div class="sll__seller-cell">
+                            <div class="sll__seller-avatar">
+                                <i class="fa-solid fa-store"></i>
+                            </div>
+                            <div>
+                                <div class="sll__seller-name">{{ business.business_name|default:"Unknown Business" }}</div>
+                                <div class="sll__seller-code">{{ business.business_code|default:"N/A" }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if business.business_email %}
+                        <div class="sll__contact-line">
+                            <i class="fa-solid fa-envelope"></i> {{ business.business_email }}
+                        </div>
+                        {% endif %}
+                        {% if business.business_phone %}
+                        <div class="sll__contact-line">
+                            <i class="fa-solid fa-phone"></i> {{ business.business_phone }}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="sll__badge {% if business.business_status == 'active' %}sll__badge--success{% elif business.business_status == 'pending' %}sll__badge--warning{% elif business.business_status == 'suspended' %}sll__badge--danger{% else %}sll__badge--muted{% endif %}">
+                            {{ business.business_status|title }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if business.profile %}
+                        <span class="sll__badge {% if business.profile.verification_status == 'verified' %}sll__badge--success{% elif business.profile.verification_status == 'pending' %}sll__badge--warning{% else %}sll__badge--danger{% endif %}">
+                            {{ business.profile.verification_status|title }}
+                        </span>
+                        {% else %}
+                        <span class="sll__text-muted">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="sll__date">{{ business.business_since|date:"d M Y"|default:"N/A" }}</span>
+                    </td>
+                    <td>
+                        <a href="{% url 'workforce:seller_detail' business.business_id %}"
+                           class="sll__btn sll__btn--view">
+                            <i class="fa-solid fa-eye"></i> View
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params %}
         {% else %}
-            <div class="empty-state">
-                <i class="fa-solid fa-store"></i>
-                <h3>No Sellers Found</h3>
-                <p>
-                    {% if search or status or verification %}
-                        No sellers match your filter criteria.
-                    {% else %}
-                        There are no sellers registered yet.
-                    {% endif %}
-                </p>
-            </div>
+        <div class="sll__empty">
+            <i class="fa-solid fa-store"></i>
+            <h3>No Sellers Found</h3>
+            <p>{% if search or status or verification %}No sellers match your filter criteria.{% else %}There are no sellers registered yet.{% endif %}</p>
+        </div>
         {% endif %}
     </div>
 </div>

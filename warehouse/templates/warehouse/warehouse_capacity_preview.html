@@ -3,227 +3,175 @@
 
 {% block title %}Preview Warehouse Structure{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse-capacity.css' %}" type="text/css" />
 
-<div class="container-fluid py-4">
+<div class="wh">
     <!-- Breadcrumb -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item">
-                        <a href="{% url 'warehouse:warehouse_list' %}">Warehouses</a>
-                    </li>
-                    <li class="breadcrumb-item">
-                        <a href="{% url 'warehouse:warehouse_detail' warehouse.pk %}">{{ warehouse.code }}</a>
-                    </li>
-                    <li class="breadcrumb-item">
-                        <a href="{% url 'warehouse:warehouse_capacity_configure' warehouse.pk %}">Configure Capacity</a>
-                    </li>
-                    <li class="breadcrumb-item active">Preview</li>
-                </ol>
-            </nav>
-            <h1 class="h3 mb-0">Preview Warehouse Structure</h1>
-            <p class="text-muted">Review the structure before generating storage locations</p>
+    <div class="wh__breadcrumb">
+        <a href="{% url 'warehouse:warehouse_list' %}">Warehouses</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <a href="{% url 'warehouse:warehouse_detail' warehouse.pk %}">{{ warehouse.code }}</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <a href="{% url 'warehouse:warehouse_capacity_configure' warehouse.pk %}">Configure Capacity</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <span class="wh__breadcrumb-active">Preview</span>
+    </div>
+
+    <!-- Hero Header -->
+    <div class="wcpv__hero">
+        <div class="wcpv__hero-icon"><i class="fas fa-eye"></i></div>
+        <div>
+            <h1 class="wcpv__hero-title">Preview Warehouse Structure</h1>
+            <p class="wcpv__hero-subtitle">Review the structure before generating storage locations</p>
         </div>
     </div>
 
     <!-- Capacity Statistics -->
-    <div class="capacity-stats">
-        <h5 class="text-center mb-4">Warehouse Capacity Summary</h5>
-        <div class="row">
-            <div class="col-md-3">
-                <div class="stat-box">
-                    <div class="stat-value">{{ warehouse.total_zones }}</div>
-                    <div class="stat-label">Zones</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-box">
-                    <div class="stat-value">{{ warehouse.total_racks }}</div>
-                    <div class="stat-label">Total Racks</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-box">
-                    <div class="stat-value">{{ warehouse.total_shelves }}</div>
-                    <div class="stat-label">Total Shelves</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-box">
-                    <div class="stat-value">{{ warehouse.total_capacity|default:"0" }}</div>
-                    <div class="stat-label">Total Bins</div>
-                </div>
-            </div>
+    <div class="wh__stats">
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--primary"><i class="fas fa-layer-group"></i></div>
+            <div><div class="wh__stat-value">{{ warehouse.total_zones }}</div><div class="wh__stat-label">Zones</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--info"><i class="fas fa-border-all"></i></div>
+            <div><div class="wh__stat-value">{{ warehouse.total_racks }}</div><div class="wh__stat-label">Total Racks</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--success"><i class="fas fa-bars"></i></div>
+            <div><div class="wh__stat-value">{{ warehouse.total_shelves }}</div><div class="wh__stat-label">Total Shelves</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--primary"><i class="fas fa-cube"></i></div>
+            <div><div class="wh__stat-value">{{ warehouse.total_capacity|default:"0" }}</div><div class="wh__stat-label">Total Bins</div></div>
         </div>
     </div>
 
     <!-- Warning or Success Message -->
     {% if existing_count > 0 %}
-    <div class="warning-box">
-        <h6 class="text-warning mb-2">
-            <i class="fas fa-exclamation-triangle me-2"></i>Existing Locations Found
-        </h6>
-        <p class="mb-3">
-            This warehouse already has <strong>{{ existing_count }}</strong> storage locations.
-            If you generate new locations, you can choose to:
-        </p>
-        <ul class="mb-0">
-            <li><strong>Delete existing locations</strong> and create fresh structure</li>
-            <li><strong>Keep existing locations</strong> and only add new ones (may cause duplicates)</li>
-        </ul>
+    <div class="wld__alert wld__alert--warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>
+            <strong>Existing Locations Found</strong>
+            <p>This warehouse already has <strong>{{ existing_count }}</strong> storage locations. If you generate new locations, you can choose to:</p>
+            <ul class="wld__impact-list">
+                <li><strong>Delete existing locations</strong> and create fresh structure</li>
+                <li><strong>Keep existing locations</strong> and only add new ones (may cause duplicates)</li>
+            </ul>
+        </div>
     </div>
     {% else %}
-    <div class="success-box">
-        <h6 class="text-success mb-2">
-            <i class="fas fa-check-circle me-2"></i>Ready to Generate
-        </h6>
-        <p class="mb-0">
-            No existing locations found. Click "Generate Locations" below to create <strong>{{ warehouse.total_capacity }}</strong> storage locations.
-        </p>
+    <div class="wld__alert wld__alert--success">
+        <i class="fas fa-check-circle"></i>
+        <div>
+            <strong>Ready to Generate</strong>
+            <p>No existing locations found. Click "Generate Locations" below to create <strong>{{ warehouse.total_capacity }}</strong> storage locations.</p>
+        </div>
     </div>
     {% endif %}
 
-    <div class="row">
+    <div class="wcp__layout">
         <!-- Structure Preview -->
-        <div class="col-lg-8">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="fas fa-sitemap text-primary me-2"></i>Structure Preview
-                        <span class="badge bg-info ms-2">Showing first few items</span>
-                    </h5>
+        <div class="wcp__main">
+            <div class="wh__card">
+                <div class="wh__card-header">
+                    <div class="wh__card-header-left">
+                        <i class="fas fa-sitemap"></i>
+                        <span>STRUCTURE PREVIEW</span>
+                        <span class="wh__badge wh__badge--info">Showing first few items</span>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="structure-tree">
+                <div class="wh__card-body">
+                    <div class="wcpv__tree">
                         {% for zone in preview_structure %}
-                        <div class="zone-block">
-                            <div class="zone-title">
-                                <i class="fas fa-layer-group me-2"></i>Zone {{ zone.name }}
-                            </div>
-
+                        <div class="wcpv__zone">
+                            <div class="wcpv__zone-title"><i class="fas fa-layer-group"></i> Zone {{ zone.name }}</div>
                             {% for rack in zone.racks %}
                             {% if rack.shelves %}
-                            <div class="rack-block">
-                                <div class="rack-title">
-                                    <i class="fas fa-border-all me-2"></i>Rack {{ rack.name }}
-                                </div>
-
+                            <div class="wcpv__rack">
+                                <div class="wcpv__rack-title"><i class="fas fa-border-all"></i> Rack {{ rack.name }}</div>
                                 {% for shelf in rack.shelves %}
                                 {% if shelf.bins %}
-                                <div class="shelf-block">
-                                    <div class="shelf-title">
-                                        <i class="fas fa-bars me-2"></i>Shelf {{ shelf.name }}
-                                    </div>
-                                    <div class="bin-list">
+                                <div class="wcpv__shelf">
+                                    <div class="wcpv__shelf-title"><i class="fas fa-bars"></i> Shelf {{ shelf.name }}</div>
+                                    <div class="wcpv__bins">
                                         {% for bin in shelf.bins %}
-                                        <span class="bin-tag">
-                                            <i class="fas fa-cube fa-xs me-1"></i>{{ bin }}
-                                        </span>
+                                        <span class="wcpv__bin"><i class="fas fa-cube"></i> {{ bin }}</span>
                                         {% endfor %}
                                     </div>
                                 </div>
                                 {% else %}
-                                <div class="text-muted small ms-3">{{ shelf.name }}</div>
+                                <div class="wh__meta wcpv__indent">{{ shelf.name }}</div>
                                 {% endif %}
                                 {% endfor %}
                             </div>
                             {% else %}
-                            <div class="text-muted small ms-3">{{ rack.name }}</div>
+                            <div class="wh__meta wcpv__indent">{{ rack.name }}</div>
                             {% endif %}
                             {% endfor %}
                         </div>
                         {% endfor %}
                     </div>
 
-                    <div class="alert alert-info mt-4 mb-0">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <strong>Note:</strong> This is a preview showing only the first 3 items of each level.
-                        The full structure will be generated with all {{ warehouse.total_capacity }} bins.
+                    <div class="wld__alert wld__alert--info wcpv__note">
+                        <i class="fas fa-info-circle"></i>
+                        <div><strong>Note:</strong> This is a preview showing only the first 3 items of each level. The full structure will be generated with all {{ warehouse.total_capacity }} bins.</div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Action Panel -->
-        <div class="col-lg-4">
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="fas fa-play-circle text-success me-2"></i>Generate Locations
-                    </h5>
+        <div class="wcp__aside">
+            <div class="wh__card">
+                <div class="wh__card-header">
+                    <div class="wh__card-header-left"><i class="fas fa-play-circle"></i> <span>GENERATE LOCATIONS</span></div>
                 </div>
-                <div class="card-body">
+                <div class="wh__card-body">
                     <form method="POST" action="{% url 'warehouse:warehouse_generate_locations' warehouse.pk %}" id="generate-form">
                         {% csrf_token %}
 
                         {% if existing_count > 0 %}
-                        <div class="mb-3">
-                            <label class="form-label fw-medium">What to do with existing locations?</label>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="delete_existing" id="delete_yes" value="yes">
-                                <label class="form-check-label" for="delete_yes">
-                                    <strong>Delete existing ({{ existing_count }})</strong> and create fresh
-                                </label>
+                        <div class="wha__field">
+                            <label class="wha__label">What to do with existing locations?</label>
+                            <div class="wha__check-card">
+                                <input type="radio" class="wha__check-input" name="delete_existing" id="delete_yes" value="yes">
+                                <label class="wha__check-label" for="delete_yes"><strong>Delete existing ({{ existing_count }})</strong> and create fresh</label>
                             </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="delete_existing" id="delete_no" value="no" checked>
-                                <label class="form-check-label" for="delete_no">
-                                    <strong>Keep existing</strong> and add new ones
-                                </label>
+                            <div class="wha__check-card">
+                                <input type="radio" class="wha__check-input" name="delete_existing" id="delete_no" value="no" checked>
+                                <label class="wha__check-label" for="delete_no"><strong>Keep existing</strong> and add new ones</label>
                             </div>
                         </div>
-
-                        <div class="alert alert-warning small mb-3">
-                            <i class="fas fa-exclamation-triangle me-1"></i>
-                            <strong>Warning:</strong> Deleting existing locations will also delete any stock level data associated with them.
+                        <div class="wld__alert wld__alert--warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <div><strong>Warning:</strong> Deleting existing locations will also delete any stock level data associated with them.</div>
                         </div>
                         {% endif %}
 
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-success btn-lg" id="generate-btn">
-                                <i class="fas fa-cogs me-2"></i>Generate {{ warehouse.total_capacity }} Locations
+                        <div class="wcpv__gen-actions">
+                            <button type="submit" class="wh__btn wcpv__btn--success" id="generate-btn">
+                                <i class="fas fa-cogs"></i> Generate {{ warehouse.total_capacity }} Locations
                             </button>
-                            <a href="{% url 'warehouse:warehouse_capacity_configure' warehouse.pk %}" class="btn btn-outline-secondary">
-                                <i class="fas fa-arrow-left me-2"></i>Back to Configuration
+                            <a href="{% url 'warehouse:warehouse_capacity_configure' warehouse.pk %}" class="wh__btn wh__btn--secondary">
+                                <i class="fas fa-arrow-left"></i> Back to Configuration
                             </a>
-                            <a href="{% url 'warehouse:warehouse_detail' warehouse.pk %}" class="btn btn-outline-secondary">
-                                <i class="fas fa-times me-2"></i>Cancel
+                            <a href="{% url 'warehouse:warehouse_detail' warehouse.pk %}" class="wh__btn wh__btn--secondary">
+                                <i class="fas fa-times"></i> Cancel
                             </a>
                         </div>
                     </form>
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm bg-light">
-                <div class="card-body">
-                    <h6 class="fw-semibold mb-3">
-                        <i class="fas fa-info-circle me-2"></i>What happens next?
-                    </h6>
-                    <ul class="list-unstyled mb-0 small">
-                        <li class="mb-2 d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-2" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">1</span>
-                            <span>System will create all zones, racks, shelves, and bins</span>
-                        </li>
-                        <li class="mb-2 d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-2" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">2</span>
-                            <span>Each location gets a unique barcode</span>
-                        </li>
-                        <li class="mb-2 d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-2" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">3</span>
-                            <span>Bins are marked as pickable locations</span>
-                        </li>
-                        <li class="d-flex align-items-start">
-                            <span class="badge bg-success rounded-circle me-2" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">✓</span>
-                            <span>You can start receiving inventory to these locations</span>
-                        </li>
-                    </ul>
+            <div class="wrs__info-card">
+                <div class="wrs__info-icon"><i class="fas fa-info-circle"></i></div>
+                <h6 class="wrs__info-title">What happens next?</h6>
+                <div class="wh__card-body">
+                    <div class="wh__step"><span class="wh__step-number">1</span><div><div class="wh__step-desc">System will create all zones, racks, shelves, and bins</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number">2</span><div><div class="wh__step-desc">Each location gets a unique barcode</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number">3</span><div><div class="wh__step-desc">Bins are marked as pickable locations</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number wh__step-number--success">&#10003;</span><div><div class="wh__step-desc">You can start receiving inventory to these locations</div></div></div>
                 </div>
             </div>
         </div>
@@ -232,12 +180,11 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('generate-form');
-    const btn = document.getElementById('generate-btn');
-
-    form.addEventListener('submit', function(e) {
+    var form = document.getElementById('generate-form');
+    var btn = document.getElementById('generate-btn');
+    form.addEventListener('submit', function() {
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating...';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
     });
 });
 </script>

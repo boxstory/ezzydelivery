@@ -4,74 +4,78 @@
 {% block title %}Dispatch Configuration{% endblock %}
 
 {% block content %}
-<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">
-            <i class="fa-solid fa-sliders me-2"></i>Dispatch Configuration
-        </h4>
-        <a href="{% url 'workforce:dispatch_dashboard' %}" class="btn btn-outline-secondary btn-sm">
-            <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
-        </a>
+<div class="dpc">
+    <!-- Hero Header -->
+    <div class="dpc__hero">
+        <div class="dpc__hero-inner">
+            <div class="dpc__hero-left">
+                <h1 class="dpc__hero-title">
+                    <i class="fa-solid fa-sliders dpc__hero-icon"></i>
+                    Dispatch Configuration
+                </h1>
+                <p class="dpc__hero-subtitle">Configure batching parameters for each pickup location</p>
+            </div>
+            <div class="dpc__hero-right">
+                <a href="{% url 'workforce:dispatch_dashboard' %}" class="dpc__back-btn">
+                    <i class="fa-solid fa-arrow-left me-1"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
     </div>
 
-    <p class="text-muted mb-4">
-        Configure batching parameters for each pickup location. Locations without custom config use system defaults.
-    </p>
-
     <!-- Configs Table -->
-    <div class="card">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
+    <div class="dpc__card">
+        <div class="dpc__table-wrap">
+            <table class="dpc__table">
+                <thead class="dpc__table-head">
                     <tr>
-                        <th>Location</th>
-                        <th>Max Batch Size</th>
-                        <th>Hold Window</th>
-                        <th>Max Hold</th>
-                        <th>SLA</th>
-                        <th>SLA Buffer</th>
-                        <th>Batching</th>
-                        <th>Auto-Assign</th>
-                        <th>Actions</th>
+                        <th class="dpc__th">Location</th>
+                        <th class="dpc__th">Max Batch Size</th>
+                        <th class="dpc__th">Hold Window</th>
+                        <th class="dpc__th">Max Hold</th>
+                        <th class="dpc__th">SLA</th>
+                        <th class="dpc__th">SLA Buffer</th>
+                        <th class="dpc__th">Batching</th>
+                        <th class="dpc__th">Auto-Assign</th>
+                        <th class="dpc__th">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for config in configs %}
-                    <tr>
-                        <td>
-                            <strong>{{ config.pickup_location.pickup_location_title }}</strong>
+                    <tr class="dpc__tr">
+                        <td class="dpc__td">
+                            <strong class="dpc__location-name">{{ config.pickup_location.pickup_location_title }}</strong>
                         </td>
-                        <td>{{ config.max_batch_size }} orders</td>
-                        <td>{{ config.hold_window_seconds }}s</td>
-                        <td>{{ config.max_hold_seconds }}s</td>
-                        <td>{{ config.sla_minutes }} min</td>
-                        <td>{{ config.sla_buffer_minutes }} min</td>
-                        <td>
+                        <td class="dpc__td">{{ config.max_batch_size }} orders</td>
+                        <td class="dpc__td">{{ config.hold_window_seconds }}s</td>
+                        <td class="dpc__td">{{ config.max_hold_seconds }}s</td>
+                        <td class="dpc__td">{{ config.sla_minutes }} min</td>
+                        <td class="dpc__td">{{ config.sla_buffer_minutes }} min</td>
+                        <td class="dpc__td">
                             {% if config.batching_enabled %}
-                            <span class="badge bg-success">Enabled</span>
+                            <span class="dpc__badge dpc__badge--success">Enabled</span>
                             {% else %}
-                            <span class="badge bg-secondary">Disabled</span>
+                            <span class="dpc__badge dpc__badge--muted">Disabled</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td class="dpc__td">
                             {% if config.auto_assignment_enabled %}
-                            <span class="badge bg-success">Enabled</span>
+                            <span class="dpc__badge dpc__badge--success">Enabled</span>
                             {% else %}
-                            <span class="badge bg-secondary">Disabled</span>
+                            <span class="dpc__badge dpc__badge--muted">Disabled</span>
                             {% endif %}
                         </td>
-                        <td>
-                            <a href="{% url 'workforce:dispatch_config_edit' config.id %}"
-                               class="btn btn-sm btn-outline-primary">
-                                <i class="fa-solid fa-edit"></i> Edit
+                        <td class="dpc__td">
+                            <a href="{% url 'workforce:dispatch_config_edit' config.id %}" class="dpc__edit-btn">
+                                <i class="fa-solid fa-edit me-1"></i>Edit
                             </a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
-                            No configurations found. Locations will use system defaults.
+                        <td colspan="9" class="dpc__empty-cell">
+                            <i class="fa-solid fa-cog"></i>
+                            <p>No configurations found. Locations will use system defaults.</p>
                         </td>
                     </tr>
                     {% endfor %}
@@ -80,36 +84,45 @@
         </div>
     </div>
 
-    <!-- Default Settings Info -->
-    <div class="card mt-3">
-        <div class="card-header">
-            <h6 class="mb-0"><i class="fa-solid fa-info-circle me-2"></i>System Defaults</h6>
+    <!-- System Defaults -->
+    <div class="dpc__card">
+        <div class="dpc__card-header">
+            <i class="fa-solid fa-info-circle dpc__card-header-icon"></i>
+            SYSTEM DEFAULTS
         </div>
-        <div class="card-body">
-            <div class="row">
+        <div class="dpc__card-body">
+            <div class="row g-4">
                 <div class="col-md-6">
-                    <dl class="row mb-0">
-                        <dt class="col-6">Max Batch Size</dt>
-                        <dd class="col-6">2 orders</dd>
-
-                        <dt class="col-6">Hold Window</dt>
-                        <dd class="col-6">180 seconds (3 min)</dd>
-
-                        <dt class="col-6">Max Hold</dt>
-                        <dd class="col-6">240 seconds (4 min)</dd>
-                    </dl>
+                    <div class="dpc__defaults-group">
+                        <div class="dpc__default-row">
+                            <span class="dpc__default-label">Max Batch Size</span>
+                            <span class="dpc__default-value">2 orders</span>
+                        </div>
+                        <div class="dpc__default-row">
+                            <span class="dpc__default-label">Hold Window</span>
+                            <span class="dpc__default-value">180 seconds (3 min)</span>
+                        </div>
+                        <div class="dpc__default-row">
+                            <span class="dpc__default-label">Max Hold</span>
+                            <span class="dpc__default-value">240 seconds (4 min)</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-md-6">
-                    <dl class="row mb-0">
-                        <dt class="col-6">SLA Target</dt>
-                        <dd class="col-6">60 minutes</dd>
-
-                        <dt class="col-6">SLA Buffer</dt>
-                        <dd class="col-6">15 minutes</dd>
-
-                        <dt class="col-6">Max Orders/Rider</dt>
-                        <dd class="col-6">2 active orders</dd>
-                    </dl>
+                    <div class="dpc__defaults-group">
+                        <div class="dpc__default-row">
+                            <span class="dpc__default-label">SLA Target</span>
+                            <span class="dpc__default-value">60 minutes</span>
+                        </div>
+                        <div class="dpc__default-row">
+                            <span class="dpc__default-label">SLA Buffer</span>
+                            <span class="dpc__default-value">15 minutes</span>
+                        </div>
+                        <div class="dpc__default-row">
+                            <span class="dpc__default-label">Max Orders/Rider</span>
+                            <span class="dpc__default-value">2 active orders</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -4,284 +4,271 @@
 
 {% block title %}Inventory Dashboard{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'product/css/product.css' %}" type="text/css" />
-<link rel="stylesheet" href="{% static 'product/css/inventory.css' %}" type="text/css" />
-{% endblock %}
-
 {% block content %}
-<div id="main-content" class="container-fluid py-4">
-    <!-- Inventory Header with Stats -->
-    <div class="inventory-header">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-                <h1>All Inventory Items</h1>
-                <p class="mb-0 opacity-90">Manage your product inventory across all warehouses</p>
-            </div>
-            <a href="{% url 'warehouse:receive_stock' %}"
-               class="btn btn-light"
-               hx-get="{% url 'warehouse:receive_stock' %}"
-               hx-target="#main-content"
-               hx-swap="outerHTML"
-               hx-push-url="true">
-                <i class="fas fa-plus me-2"></i>Receive Stock
-            </a>
+<div class="ivl" id="main-content">
+  <!-- Hero Header -->
+  <div class="ivl__hero">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="ivl__hero-icon">
+          <i class="fas fa-warehouse"></i>
         </div>
-
-        <div class="inventory-stats">
-            <div class="stat-item">
-                <div class="stat-label">Total Items</div>
-                <div class="stat-value">{{ stock_levels.paginator.count }}</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">Total Quantity</div>
-                <div class="stat-value">{{ stock_levels.object_list|length }}</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">Warehouses</div>
-                <div class="stat-value">{{ warehouses.count }}</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">Total Value</div>
-                <div class="stat-value">QAR {{ total_value|floatformat:2 }}</div>
-            </div>
+        <div>
+          <h1 class="ivl__hero-title">All Inventory Items</h1>
+          <p class="ivl__hero-sub">Manage your product inventory across all warehouses</p>
         </div>
+      </div>
+      <a href="{% url 'warehouse:receive_stock' %}"
+         class="ivl__action-btn"
+         hx-get="{% url 'warehouse:receive_stock' %}"
+         hx-target="#main-content"
+         hx-swap="outerHTML"
+         hx-push-url="true">
+        <i class="fas fa-plus me-2"></i>Receive Stock
+      </a>
     </div>
 
-    <!-- Search and Filters -->
-    <div class="inventory-filters">
-        <form method="GET"
-              hx-get="{% url 'product:inventory_list' %}"
-              hx-target="#main-content"
-              hx-swap="outerHTML"
-              hx-push-url="true"
-              hx-trigger="change, submit"
-              class="d-flex align-items-center gap-3 flex-wrap">
-
-            <!-- Search Box -->
-            <div class="search-box">
-                <input type="text"
-                       name="search"
-                       value="{{ search }}"
-                       placeholder="Search products..."
-                       class="form-control">
-                <i class="fas fa-search search-icon"></i>
-            </div>
-
-            <!-- Warehouse Filter -->
-            <select name="warehouse" class="warehouse-selector">
-                <option value="">All Warehouses</option>
-                {% for warehouse in warehouses %}
-                <option value="{{ warehouse.id }}" {% if selected_warehouse == warehouse.id|stringformat:"s" %}selected{% endif %}>
-                    {{ warehouse.name }}
-                </option>
-                {% endfor %}
-            </select>
-
-            <!-- Category Filter -->
-            <select name="category" class="warehouse-selector">
-                <option value="">All Categories</option>
-                {% for category in categories %}
-                <option value="{{ category.id }}" {% if selected_category == category.id|stringformat:"s" %}selected{% endif %}>
-                    {{ category.name }}
-                </option>
-                {% endfor %}
-            </select>
-
-            <!-- Low Stock Filter -->
-            <div class="form-check">
-                <input type="checkbox"
-                       name="low_stock"
-                       value="1"
-                       id="low_stock"
-                       class="form-check-input"
-                       {% if low_stock_only %}checked{% endif %}>
-                <label for="low_stock" class="form-check-label">Low Stock Only</label>
-            </div>
-
-            <!-- Filter Button -->
-            <button type="submit" class="filter-button">
-                <i class="fas fa-filter me-2"></i>Apply Filters
-            </button>
-
-            <!-- Clear Filters -->
-            {% if search or selected_warehouse or selected_category or low_stock_only %}
-            <a href="{% url 'product:inventory_list' %}"
-               class="btn btn-outline-secondary"
-               hx-get="{% url 'product:inventory_list' %}"
-               hx-target="#main-content"
-               hx-swap="outerHTML"
-               hx-push-url="true">
-                <i class="fas fa-times me-2"></i>Clear
-            </a>
-            {% endif %}
-        </form>
+    <!-- Stats Row -->
+    <div class="ivl__stats">
+      <div class="ivl__stat">
+        <div class="ivl__stat-label">Total Items</div>
+        <div class="ivl__stat-value">{{ stock_levels.paginator.count }}</div>
+      </div>
+      <div class="ivl__stat">
+        <div class="ivl__stat-label">Total Quantity</div>
+        <div class="ivl__stat-value">{{ stock_levels.object_list|length }}</div>
+      </div>
+      <div class="ivl__stat">
+        <div class="ivl__stat-label">Warehouses</div>
+        <div class="ivl__stat-value">{{ warehouses.count }}</div>
+      </div>
+      <div class="ivl__stat">
+        <div class="ivl__stat-label">Total Value</div>
+        <div class="ivl__stat-value">QAR {{ total_value|floatformat:2 }}</div>
+      </div>
     </div>
+  </div>
 
-    <!-- Products Grid -->
-    {% if stock_levels %}
-    <div class="products-grid">
-        {% for stock in stock_levels %}
-        <div class="product-card"
-             hx-get="{% url 'product:stock_card' stock.product.id %}"
-             hx-target="#main-content"
-             hx-swap="outerHTML"
-             hx-push-url="true">
-            <div class="product-card-header">
-                {% if stock.product.item_image %}
-                <img src="{{ stock.product.item_image.url }}"
-                     alt="{{ stock.product.item_name }}"
-                     class="product-image">
-                {% else %}
-                <div class="product-image-placeholder">
-                    {{ stock.product.item_name|first|upper }}
-                </div>
-                {% endif %}
+  <!-- Filters -->
+  <div class="ivl__filters">
+    <form method="GET"
+          hx-get="{% url 'product:inventory_list' %}"
+          hx-target="#main-content"
+          hx-swap="outerHTML"
+          hx-push-url="true"
+          hx-trigger="change, submit"
+          class="d-flex align-items-center gap-3 flex-wrap">
 
-                <div class="product-info">
-                    <div class="product-sku">SKU{{ stock.product.product_id }}</div>
-                    <div class="product-name" title="{{ stock.product.item_name }}">
-                        {{ stock.product.item_name }}
-                    </div>
-                    {% if stock.product.brand_name %}
-                    <div class="product-brand">{{ stock.product.brand_name }}</div>
-                    {% endif %}
-                </div>
-            </div>
+      <div class="ivl__search">
+        <input type="text"
+               name="search"
+               value="{{ search }}"
+               placeholder="Search products..."
+               class="ivl__search-input">
+        <i class="fas fa-search ivl__search-icon"></i>
+      </div>
 
-            <!-- Stock Status Badge -->
-            <div class="mb-3">
-                {% if stock.quantity_on_hand > stock.reorder_point %}
-                <span class="stock-badge in-stock">
-                    <i class="fas fa-check-circle me-1"></i>In Stock
-                </span>
-                {% elif stock.quantity_on_hand > 0 %}
-                <span class="stock-badge low-stock">
-                    <i class="fas fa-exclamation-triangle me-1"></i>Low Stock
-                </span>
-                {% else %}
-                <span class="stock-badge out-of-stock">
-                    <i class="fas fa-times-circle me-1"></i>Out of Stock
-                </span>
-                {% endif %}
-            </div>
-
-            <!-- Product Metrics -->
-            <div class="product-metrics">
-                <div class="metric">
-                    <div class="metric-label">On Hand</div>
-                    <div class="metric-value">{{ stock.quantity_on_hand|default:0 }} Units</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Reserved</div>
-                    <div class="metric-value">{{ stock.quantity_reserved|default:0 }} Units</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Warehouse</div>
-                    <div class="metric-value" style="font-size: 0.9rem;">{{ stock.warehouse.code }}</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Total Value</div>
-                    <div class="metric-value price">
-                        QAR {{ stock.quantity_on_hand|default:0|multiply:stock.product.item_price|default:0|floatformat:2 }}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Stock Level Bar -->
-            <div class="stock-level-bar">
-                {% widthratio stock.quantity_on_hand stock.reorder_point 100 as stock_percentage %}
-                <div class="stock-level-fill {% if stock_percentage < 50 %}critical{% elif stock_percentage < 100 %}low{% endif %}"
-                     style="width: {{ stock_percentage|default:0 }}%"></div>
-            </div>
-
-            <!-- View Details Button -->
-            <button class="view-details-btn"
-                    onclick="event.stopPropagation()">
-                <i class="fas fa-eye me-2"></i>View Details
-            </button>
-        </div>
+      <select name="warehouse" class="ivl__select">
+        <option value="">All Warehouses</option>
+        {% for warehouse in warehouses %}
+        <option value="{{ warehouse.id }}" {% if selected_warehouse == warehouse.id|stringformat:"s" %}selected{% endif %}>
+          {{ warehouse.name }}
+        </option>
         {% endfor %}
-    </div>
+      </select>
 
-    <!-- Pagination -->
-    {% if stock_levels.paginator.num_pages > 1 %}
-    <div class="pagination-wrapper">
-        {% if stock_levels.has_previous %}
-        <a href="?page={{ stock_levels.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}"
-           class="pagination-btn"
-           hx-get="?page={{ stock_levels.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}"
-           hx-target="#main-content"
-           hx-swap="outerHTML"
-           hx-push-url="true">
-            <i class="fas fa-chevron-left"></i>
-        </a>
+      <select name="category" class="ivl__select">
+        <option value="">All Categories</option>
+        {% for category in categories %}
+        <option value="{{ category.id }}" {% if selected_category == category.id|stringformat:"s" %}selected{% endif %}>
+          {{ category.name }}
+        </option>
+        {% endfor %}
+      </select>
+
+      <div class="form-check">
+        <input type="checkbox"
+               name="low_stock"
+               value="1"
+               id="ivl_low_stock"
+               class="form-check-input"
+               {% if low_stock_only %}checked{% endif %}>
+        <label for="ivl_low_stock" class="form-check-label ivl__check-label">Low Stock Only</label>
+      </div>
+
+      <button type="submit" class="ivl__filter-btn">
+        <i class="fas fa-filter me-1"></i>Apply
+      </button>
+
+      {% if search or selected_warehouse or selected_category or low_stock_only %}
+      <a href="{% url 'product:inventory_list' %}"
+         class="ivl__clear-btn"
+         hx-get="{% url 'product:inventory_list' %}"
+         hx-target="#main-content"
+         hx-swap="outerHTML"
+         hx-push-url="true">
+        <i class="fas fa-times me-1"></i>Clear
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Products Grid -->
+  {% if stock_levels %}
+  <div class="ivl__grid">
+    {% for stock in stock_levels %}
+    <div class="ivl__card"
+         hx-get="{% url 'product:stock_card' stock.product.id %}"
+         hx-target="#main-content"
+         hx-swap="outerHTML"
+         hx-push-url="true">
+
+      <!-- Card Header -->
+      <div class="ivl__card-header">
+        {% if stock.product.item_image %}
+        <img src="{{ stock.product.item_image.url }}"
+             alt="{{ stock.product.item_name }}"
+             class="ivl__card-img">
         {% else %}
-        <button class="pagination-btn" disabled>
-            <i class="fas fa-chevron-left"></i>
-        </button>
-        {% endif %}
-
-        <span class="page-info">
-            Page {{ stock_levels.number }} of {{ stock_levels.paginator.num_pages }}
-        </span>
-
-        {% if stock_levels.has_next %}
-        <a href="?page={{ stock_levels.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}"
-           class="pagination-btn"
-           hx-get="?page={{ stock_levels.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}"
-           hx-target="#main-content"
-           hx-swap="outerHTML"
-           hx-push-url="true">
-            <i class="fas fa-chevron-right"></i>
-        </a>
-        {% else %}
-        <button class="pagination-btn" disabled>
-            <i class="fas fa-chevron-right"></i>
-        </button>
-        {% endif %}
-    </div>
-    {% endif %}
-
-    {% else %}
-    <!-- Empty State -->
-    <div class="empty-state">
-        <div class="empty-state-icon">
-            <i class="fas fa-box-open"></i>
+        <div class="ivl__card-img-placeholder">
+          {{ stock.product.item_name|first|upper }}
         </div>
-        <h3>No inventory items found</h3>
-        <p>
-            {% if search or selected_warehouse or selected_category or low_stock_only %}
-            Try adjusting your filters to see more results.
-            {% else %}
-            Start by receiving stock into your warehouse.
-            {% endif %}
-        </p>
-        {% if not search and not selected_warehouse and not selected_category and not low_stock_only %}
-        <a href="{% url 'warehouse:receive_stock' %}"
-           class="btn btn-primary mt-3"
-           hx-get="{% url 'warehouse:receive_stock' %}"
-           hx-target="#main-content"
-           hx-swap="outerHTML"
-           hx-push-url="true">
-            <i class="fas fa-plus me-2"></i>Receive Stock
-        </a>
         {% endif %}
+        <div class="ivl__card-info">
+          <div class="ivl__card-sku">SKU{{ stock.product.product_id }}</div>
+          <div class="ivl__card-name" title="{{ stock.product.item_name }}">{{ stock.product.item_name }}</div>
+          {% if stock.product.brand_name %}
+          <div class="ivl__card-brand">{{ stock.product.brand_name }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Status Badge -->
+      <div class="mb-2">
+        {% if stock.quantity_on_hand > stock.reorder_point %}
+        <span class="ivl__badge ivl__badge--success">
+          <i class="fas fa-check-circle me-1"></i>In Stock
+        </span>
+        {% elif stock.quantity_on_hand > 0 %}
+        <span class="ivl__badge ivl__badge--warning">
+          <i class="fas fa-exclamation-triangle me-1"></i>Low Stock
+        </span>
+        {% else %}
+        <span class="ivl__badge ivl__badge--danger">
+          <i class="fas fa-times-circle me-1"></i>Out of Stock
+        </span>
+        {% endif %}
+      </div>
+
+      <!-- Metrics -->
+      <div class="ivl__metrics">
+        <div class="ivl__metric">
+          <div class="ivl__metric-label">On Hand</div>
+          <div class="ivl__metric-value">{{ stock.quantity_on_hand|default:0 }} Units</div>
+        </div>
+        <div class="ivl__metric">
+          <div class="ivl__metric-label">Reserved</div>
+          <div class="ivl__metric-value">{{ stock.quantity_reserved|default:0 }} Units</div>
+        </div>
+        <div class="ivl__metric">
+          <div class="ivl__metric-label">Warehouse</div>
+          <div class="ivl__metric-value ivl__metric-value--sm">{{ stock.warehouse.code }}</div>
+        </div>
+        <div class="ivl__metric">
+          <div class="ivl__metric-label">Total Value</div>
+          <div class="ivl__metric-value ivl__metric-value--green">
+            QAR {{ stock.quantity_on_hand|default:0|multiply:stock.product.item_price|default:0|floatformat:2 }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Stock Level Bar -->
+      <div class="ivl__level-bar">
+        {% widthratio stock.quantity_on_hand stock.reorder_point 100 as stock_percentage %}
+        <div class="ivl__level-fill {% if stock_percentage < 50 %}ivl__level-fill--critical{% elif stock_percentage < 100 %}ivl__level-fill--low{% endif %}"
+             style="width: {{ stock_percentage|default:0 }}%"></div>
+      </div>
+
+      <!-- View Details -->
+      <button class="ivl__details-btn" onclick="event.stopPropagation()">
+        <i class="fas fa-eye me-2"></i>View Details
+      </button>
     </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if stock_levels.paginator.num_pages > 1 %}
+  <div class="ivl__pagination">
+    {% if stock_levels.has_previous %}
+    <a href="?page={{ stock_levels.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}"
+       class="ivl__page-btn"
+       hx-get="?page={{ stock_levels.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}"
+       hx-target="#main-content"
+       hx-swap="outerHTML"
+       hx-push-url="true">
+      <i class="fas fa-chevron-left"></i>
+    </a>
+    {% else %}
+    <button class="ivl__page-btn" disabled>
+      <i class="fas fa-chevron-left"></i>
+    </button>
     {% endif %}
+
+    <span class="ivl__page-info">
+      Page {{ stock_levels.number }} of {{ stock_levels.paginator.num_pages }}
+    </span>
+
+    {% if stock_levels.has_next %}
+    <a href="?page={{ stock_levels.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}"
+       class="ivl__page-btn"
+       hx-get="?page={{ stock_levels.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_warehouse %}&warehouse={{ selected_warehouse }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if low_stock_only %}&low_stock=1{% endif %}"
+       hx-target="#main-content"
+       hx-swap="outerHTML"
+       hx-push-url="true">
+      <i class="fas fa-chevron-right"></i>
+    </a>
+    {% else %}
+    <button class="ivl__page-btn" disabled>
+      <i class="fas fa-chevron-right"></i>
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <!-- Empty State -->
+  <div class="ivl__empty">
+    <div class="ivl__empty-icon">
+      <i class="fas fa-box-open"></i>
+    </div>
+    <h3 class="ivl__empty-title">No inventory items found</h3>
+    <p class="ivl__empty-text">
+      {% if search or selected_warehouse or selected_category or low_stock_only %}
+      Try adjusting your filters to see more results.
+      {% else %}
+      Start by receiving stock into your warehouse.
+      {% endif %}
+    </p>
+    {% if not search and not selected_warehouse and not selected_category and not low_stock_only %}
+    <a href="{% url 'warehouse:receive_stock' %}"
+       class="ivl__action-btn mt-3"
+       hx-get="{% url 'warehouse:receive_stock' %}"
+       hx-target="#main-content"
+       hx-swap="outerHTML"
+       hx-push-url="true">
+      <i class="fas fa-plus me-2"></i>Receive Stock
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 
-
 <script>
-// Prevent card click event from triggering when clicking the button
-document.querySelectorAll('.view-details-btn').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-    });
+document.querySelectorAll('.ivl__details-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) { e.stopPropagation(); });
 });
-
-// Auto-submit form on filter changes
-document.querySelectorAll('.warehouse-selector, #low_stock').forEach(elem => {
+document.querySelectorAll('.ivl__select, #ivl_low_stock').forEach(elem => {
     elem.addEventListener('change', function() {
         this.closest('form').dispatchEvent(new Event('submit'));
     });

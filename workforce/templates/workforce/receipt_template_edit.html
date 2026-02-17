@@ -3,472 +3,208 @@
 
 {% block title %}{{ page_title }} - Ezzy Delivery{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-<style>
-.form-container {
-    display: grid;
-    grid-template-columns: 1fr 400px;
-    gap: 2rem;
-}
-
-@media (max-width: 1024px) {
-    .form-container {
-        grid-template-columns: 1fr;
-    }
-}
-
-.form-panel {
-    background: white;
-    border-radius: var(--brand-radius-md);
-    box-shadow: var(--brand-shadow-sm);
-    padding: 1.5rem;
-}
-
-.form-section {
-    margin-bottom: 2rem;
-}
-
-.form-section:last-child {
-    margin-bottom: 0;
-}
-
-.section-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--brand-grey-800);
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid var(--brand-primary);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.form-group {
-    margin-bottom: 1rem;
-}
-
-.form-group label {
-    display: block;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--brand-grey-700);
-    margin-bottom: 0.5rem;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-    width: 100%;
-    padding: 0.625rem 0.875rem;
-    border: 1px solid var(--brand-grey-300);
-    border-radius: var(--brand-radius-sm);
-    font-size: 0.875rem;
-    transition: border-color 0.2s;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-    outline: none;
-    border-color: var(--brand-primary);
-    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
-}
-
-.form-group textarea {
-    min-height: 100px;
-    resize: vertical;
-}
-
-.form-group input[type="color"] {
-    width: 60px;
-    height: 40px;
-    padding: 0.25rem;
-    cursor: pointer;
-}
-
-.color-input-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.color-input-wrapper input[type="text"] {
-    flex: 1;
-}
-
-.checkbox-group {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0;
-}
-
-.checkbox-group input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--brand-primary);
-}
-
-.checkbox-group label {
-    margin-bottom: 0;
-    cursor: pointer;
-}
-
-.form-actions {
-    display: flex;
-    gap: 1rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--brand-grey-200);
-    margin-top: 1.5rem;
-}
-
-.btn-save {
-    padding: 0.75rem 1.5rem;
-    background: var(--brand-primary);
-    color: white;
-    border: none;
-    border-radius: var(--brand-radius-sm);
-    font-weight: 500;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.btn-save:hover {
-    background: var(--brand-primary-dark, #1a5a8a);
-}
-
-.btn-cancel {
-    padding: 0.75rem 1.5rem;
-    background: white;
-    color: var(--brand-grey-700);
-    border: 1px solid var(--brand-grey-300);
-    border-radius: var(--brand-radius-sm);
-    font-weight: 500;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.btn-cancel:hover {
-    background: var(--brand-grey-100);
-}
-
-/* Preview Panel */
-.preview-panel {
-    position: sticky;
-    top: 20px;
-}
-
-.preview-title {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.preview-frame {
-    background: #f5f5f5;
-    border-radius: var(--brand-radius-sm);
-    padding: 1rem;
-    min-height: 500px;
-    display: flex;
-    justify-content: center;
-}
-
-.preview-receipt {
-    width: 200px;
-    background: white;
-    padding: 1rem;
-    font-family: 'Courier New', monospace;
-    font-size: 8px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-.preview-receipt .logo {
-    text-align: center;
-    margin-bottom: 0.5rem;
-}
-
-.preview-receipt .logo-img {
-    width: 50px;
-    height: 50px;
-    background: #eee;
-    border-radius: 50%;
-    margin: 0 auto 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    color: #666;
-}
-
-.preview-receipt .company-name {
-    font-weight: bold;
-    font-size: 10px;
-    margin-bottom: 0.25rem;
-}
-
-.preview-receipt .divider {
-    border-top: 1px dashed #ccc;
-    margin: 0.5rem 0;
-}
-
-.preview-receipt .title {
-    text-align: center;
-    background: #f5f5f5;
-    padding: 0.25rem;
-    font-weight: bold;
-    margin: 0.5rem 0;
-}
-
-.preview-receipt .row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.125rem 0;
-}
-
-.preview-receipt .total-row {
-    font-weight: bold;
-    font-size: 10px;
-    border-top: 1px solid #333;
-    margin-top: 0.5rem;
-    padding-top: 0.25rem;
-}
-
-.preview-receipt .signature-line {
-    border-bottom: 1px solid #333;
-    height: 20px;
-    margin: 0.5rem 0 0.25rem;
-}
-
-.preview-receipt .footer {
-    text-align: center;
-    font-size: 7px;
-    color: #666;
-    margin-top: 0.5rem;
-}
-
-.help-text {
-    font-size: 0.75rem;
-    color: var(--brand-grey-500);
-    margin-top: 0.25rem;
-}
-</style>
-{% endblock extra_css %}
-
 {% block content %}
 <div class="col-12 p-3">
-    <!-- Page Title -->
-    <h1 class="page-title">
-        <i class="fa-solid fa-file-invoice me-2"></i>{{ page_title }}
-    </h1>
+  <!-- Hero Header -->
+  <div class="rte__hero">
+    <div class="rte__hero-content">
+      <h1 class="rte__hero-title">
+        <i class="fa-solid fa-file-invoice rte__hero-icon"></i>{{ page_title }}
+      </h1>
+      <p class="rte__hero-subtitle">Configure receipt layout, branding, and content settings</p>
+    </div>
+  </div>
 
-    <form method="post" class="form-container">
-        {% csrf_token %}
+  <form method="post" class="rte__container">
+    {% csrf_token %}
 
-        <!-- Form Panel -->
-        <div class="form-panel">
-            <!-- Basic Info -->
-            <div class="form-section">
-                <h3 class="section-title"><i class="fa-solid fa-info-circle"></i>Basic Information</h3>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="name">Template Name *</label>
-                        <input type="text" id="name" name="name" value="{{ template.name|default:'' }}" required placeholder="e.g., Standard Settlement Receipt">
-                    </div>
-                    <div class="form-group">
-                        <label for="template_type">Template Type *</label>
-                        <select id="template_type" name="template_type" required>
-                            <option value="">Select Type</option>
-                            {% for type_code, type_label in template_types %}
-                            <option value="{{ type_code }}" {% if template.template_type == type_code %}selected{% endif %}>{{ type_label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="paper_size">Paper Size</label>
-                        <select id="paper_size" name="paper_size">
-                            {% for size_code, size_label in paper_sizes %}
-                            <option value="{{ size_code }}" {% if template.paper_size == size_code %}selected{% endif %}>{{ size_label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="is_default" name="is_default" {% if template.is_default %}checked{% endif %}>
-                            <label for="is_default">Set as default template for this type</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Company Info -->
-            <div class="form-section">
-                <h3 class="section-title"><i class="fa-solid fa-building"></i>Company Information</h3>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="company_name">Company Name</label>
-                        <input type="text" id="company_name" name="company_name" value="{{ template.company_name|default:'Ezzy Delivery' }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="company_phone">Phone</label>
-                        <input type="text" id="company_phone" name="company_phone" value="{{ template.company_phone|default:'' }}" placeholder="+974-XXXX-XXXX">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="company_address">Address</label>
-                    <textarea id="company_address" name="company_address" rows="2">{{ template.company_address|default:'Doha, Qatar' }}</textarea>
-                </div>
-                <div class="form-group">
-                    <label for="company_email">Email</label>
-                    <input type="email" id="company_email" name="company_email" value="{{ template.company_email|default:'' }}" placeholder="info@example.com">
-                </div>
-            </div>
-
-            <!-- Logo Settings -->
-            <div class="form-section">
-                <h3 class="section-title"><i class="fa-solid fa-image"></i>Logo Settings</h3>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="show_logo" name="show_logo" {% if template.show_logo or not template %}checked{% endif %}>
-                    <label for="show_logo">Show logo on receipt</label>
-                </div>
-                <div class="form-group">
-                    <label for="logo_url">Logo URL</label>
-                    <input type="text" id="logo_url" name="logo_url" value="{{ template.logo_url|default:'' }}" placeholder="/static/webpages/img/ezzy-logo-512-512.png">
-                    <p class="help-text">Leave empty to use default logo. Enter full URL or static file path.</p>
-                </div>
-            </div>
-
-            <!-- Style Settings -->
-            <div class="form-section">
-                <h3 class="section-title"><i class="fa-solid fa-palette"></i>Style Settings</h3>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="primary_color">Primary Color</label>
-                        <div class="color-input-wrapper">
-                            <input type="color" id="primary_color_picker" value="{{ template.primary_color|default:'#2196F3' }}" onchange="document.getElementById('primary_color').value = this.value; updatePreview();">
-                            <input type="text" id="primary_color" name="primary_color" value="{{ template.primary_color|default:'#2196F3' }}" onchange="document.getElementById('primary_color_picker').value = this.value; updatePreview();">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="font_size">Font Size (px)</label>
-                        <input type="number" id="font_size" name="font_size" value="{{ template.font_size|default:12 }}" min="8" max="16">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="font_family">Font Family</label>
-                    <select id="font_family" name="font_family">
-                        <option value="Courier New, monospace" {% if template.font_family == 'Courier New, monospace' or not template.font_family %}selected{% endif %}>Courier New (Receipt style)</option>
-                        <option value="Arial, sans-serif" {% if template.font_family == 'Arial, sans-serif' %}selected{% endif %}>Arial (Clean)</option>
-                        <option value="Georgia, serif" {% if template.font_family == 'Georgia, serif' %}selected{% endif %}>Georgia (Formal)</option>
-                        <option value="Roboto, sans-serif" {% if template.font_family == 'Roboto, sans-serif' %}selected{% endif %}>Roboto (Modern)</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Content Settings -->
-            <div class="form-section">
-                <h3 class="section-title"><i class="fa-solid fa-text-width"></i>Content Settings</h3>
-                <div class="form-row">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="show_signature_line" name="show_signature_line" {% if template.show_signature_line or not template %}checked{% endif %}>
-                        <label for="show_signature_line">Show signature line</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="show_qr_code" name="show_qr_code" {% if template.show_qr_code %}checked{% endif %}>
-                        <label for="show_qr_code">Show QR code</label>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="footer_message">Footer Message</label>
-                    <textarea id="footer_message" name="footer_message" rows="2">{{ template.footer_message|default:'Thank you for your service!' }}</textarea>
-                </div>
-            </div>
-
-            <!-- Advanced -->
-            <div class="form-section">
-                <h3 class="section-title"><i class="fa-solid fa-code"></i>Advanced (Custom CSS)</h3>
-                <div class="form-group">
-                    <label for="custom_css">Custom CSS</label>
-                    <textarea id="custom_css" name="custom_css" rows="4" placeholder="/* Add custom CSS to override default styles */">{{ template.custom_css|default:'' }}</textarea>
-                    <p class="help-text">Advanced users can add custom CSS to fine-tune the receipt appearance.</p>
-                </div>
-            </div>
-
-            <!-- Form Actions -->
-            <div class="form-actions">
-                <button type="submit" class="btn-save">
-                    <i class="fa-solid fa-save"></i>
-                    {% if template %}Update Template{% else %}Create Template{% endif %}
-                </button>
-                <a href="{% url 'workforce:receipt_templates_list' %}" class="btn-cancel">
-                    <i class="fa-solid fa-times"></i>
-                    Cancel
-                </a>
-            </div>
+    <!-- Form Panel -->
+    <div class="rte__form-panel">
+      <!-- Basic Info -->
+      <div class="rte__section">
+        <h3 class="rte__section-title"><i class="fa-solid fa-info-circle rte__section-icon"></i> BASIC INFORMATION</h3>
+        <div class="rte__form-row">
+          <div class="rte__form-group">
+            <label for="name" class="rte__form-label">Template Name *</label>
+            <input type="text" id="name" name="name" value="{{ template.name|default:'' }}" class="form-control" required placeholder="e.g., Standard Settlement Receipt">
+          </div>
+          <div class="rte__form-group">
+            <label for="template_type" class="rte__form-label">Template Type *</label>
+            <select id="template_type" name="template_type" class="form-select" required>
+              <option value="">Select Type</option>
+              {% for type_code, type_label in template_types %}
+              <option value="{{ type_code }}" {% if template.template_type == type_code %}selected{% endif %}>{{ type_label }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
-
-        <!-- Preview Panel -->
-        <div class="form-panel preview-panel">
-            <h3 class="preview-title"><i class="fa-solid fa-eye"></i>Live Preview</h3>
-            <div class="preview-frame">
-                <div class="preview-receipt" id="previewReceipt">
-                    <div class="logo" id="previewLogo">
-                        <div class="logo-img"><i class="fa-solid fa-building"></i></div>
-                        <div class="company-name" id="previewCompanyName">Ezzy Delivery</div>
-                        <div style="font-size: 6px; color: #666;" id="previewAddress">Doha, Qatar</div>
-                    </div>
-                    <div class="divider"></div>
-                    <div class="title">Settlement Receipt</div>
-                    <div class="row"><span>Receipt No:</span><span>STL-001</span></div>
-                    <div class="row"><span>Date:</span><span>15 Jan 2026</span></div>
-                    <div class="row"><span>Driver:</span><span>Ahmed Khan</span></div>
-                    <div class="divider"></div>
-                    <div class="row"><span>COD #1234</span><span>350.00</span></div>
-                    <div class="row"><span>COD #1235</span><span>275.00</span></div>
-                    <div class="row"><span>COD #1236</span><span>425.00</span></div>
-                    <div class="total-row">
-                        <div class="row"><span>TOTAL</span><span>QAR 1,050.00</span></div>
-                    </div>
-                    <div id="previewSignature">
-                        <div class="signature-line"></div>
-                        <div style="text-align: center; font-size: 6px;">Driver's Signature</div>
-                    </div>
-                    <div class="divider"></div>
-                    <div class="footer" id="previewFooter">Thank you for your service!</div>
-                </div>
+        <div class="rte__form-row">
+          <div class="rte__form-group">
+            <label for="paper_size" class="rte__form-label">Paper Size</label>
+            <select id="paper_size" name="paper_size" class="form-select">
+              {% for size_code, size_label in paper_sizes %}
+              <option value="{{ size_code }}" {% if template.paper_size == size_code %}selected{% endif %}>{{ size_label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="rte__form-group">
+            <div class="rte__checkbox-group">
+              <input type="checkbox" id="is_default" name="is_default" {% if template.is_default %}checked{% endif %}>
+              <label for="is_default">Set as default template for this type</label>
             </div>
+          </div>
         </div>
-    </form>
+      </div>
+
+      <!-- Company Info -->
+      <div class="rte__section">
+        <h3 class="rte__section-title"><i class="fa-solid fa-building rte__section-icon"></i> COMPANY INFORMATION</h3>
+        <div class="rte__form-row">
+          <div class="rte__form-group">
+            <label for="company_name" class="rte__form-label">Company Name</label>
+            <input type="text" id="company_name" name="company_name" value="{{ template.company_name|default:'Ezzy Delivery' }}" class="form-control">
+          </div>
+          <div class="rte__form-group">
+            <label for="company_phone" class="rte__form-label">Phone</label>
+            <input type="text" id="company_phone" name="company_phone" value="{{ template.company_phone|default:'' }}" class="form-control" placeholder="+974-XXXX-XXXX">
+          </div>
+        </div>
+        <div class="rte__form-group">
+          <label for="company_address" class="rte__form-label">Address</label>
+          <textarea id="company_address" name="company_address" class="form-control" rows="2">{{ template.company_address|default:'Doha, Qatar' }}</textarea>
+        </div>
+        <div class="rte__form-group">
+          <label for="company_email" class="rte__form-label">Email</label>
+          <input type="email" id="company_email" name="company_email" value="{{ template.company_email|default:'' }}" class="form-control" placeholder="info@example.com">
+        </div>
+      </div>
+
+      <!-- Logo Settings -->
+      <div class="rte__section">
+        <h3 class="rte__section-title"><i class="fa-solid fa-image rte__section-icon"></i> LOGO SETTINGS</h3>
+        <div class="rte__checkbox-group">
+          <input type="checkbox" id="show_logo" name="show_logo" {% if template.show_logo or not template %}checked{% endif %}>
+          <label for="show_logo">Show logo on receipt</label>
+        </div>
+        <div class="rte__form-group">
+          <label for="logo_url" class="rte__form-label">Logo URL</label>
+          <input type="text" id="logo_url" name="logo_url" value="{{ template.logo_url|default:'' }}" class="form-control" placeholder="/static/webpages/img/ezzy-logo-512-512.png">
+          <p class="rte__help-text">Leave empty to use default logo. Enter full URL or static file path.</p>
+        </div>
+      </div>
+
+      <!-- Style Settings -->
+      <div class="rte__section">
+        <h3 class="rte__section-title"><i class="fa-solid fa-palette rte__section-icon"></i> STYLE SETTINGS</h3>
+        <div class="rte__form-row">
+          <div class="rte__form-group">
+            <label for="primary_color" class="rte__form-label">Primary Color</label>
+            <div class="rte__color-wrapper">
+              <input type="color" id="primary_color_picker" value="{{ template.primary_color|default:'#2196F3' }}" class="rte__color-picker" onchange="document.getElementById('primary_color').value = this.value; updatePreview();">
+              <input type="text" id="primary_color" name="primary_color" value="{{ template.primary_color|default:'#2196F3' }}" class="form-control" onchange="document.getElementById('primary_color_picker').value = this.value; updatePreview();">
+            </div>
+          </div>
+          <div class="rte__form-group">
+            <label for="font_size" class="rte__form-label">Font Size (px)</label>
+            <input type="number" id="font_size" name="font_size" value="{{ template.font_size|default:12 }}" class="form-control" min="8" max="16">
+          </div>
+        </div>
+        <div class="rte__form-group">
+          <label for="font_family" class="rte__form-label">Font Family</label>
+          <select id="font_family" name="font_family" class="form-select">
+            <option value="Courier New, monospace" {% if template.font_family == 'Courier New, monospace' or not template.font_family %}selected{% endif %}>Courier New (Receipt style)</option>
+            <option value="Arial, sans-serif" {% if template.font_family == 'Arial, sans-serif' %}selected{% endif %}>Arial (Clean)</option>
+            <option value="Georgia, serif" {% if template.font_family == 'Georgia, serif' %}selected{% endif %}>Georgia (Formal)</option>
+            <option value="Roboto, sans-serif" {% if template.font_family == 'Roboto, sans-serif' %}selected{% endif %}>Roboto (Modern)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Content Settings -->
+      <div class="rte__section">
+        <h3 class="rte__section-title"><i class="fa-solid fa-text-width rte__section-icon"></i> CONTENT SETTINGS</h3>
+        <div class="rte__form-row">
+          <div class="rte__checkbox-group">
+            <input type="checkbox" id="show_signature_line" name="show_signature_line" {% if template.show_signature_line or not template %}checked{% endif %}>
+            <label for="show_signature_line">Show signature line</label>
+          </div>
+          <div class="rte__checkbox-group">
+            <input type="checkbox" id="show_qr_code" name="show_qr_code" {% if template.show_qr_code %}checked{% endif %}>
+            <label for="show_qr_code">Show QR code</label>
+          </div>
+        </div>
+        <div class="rte__form-group">
+          <label for="footer_message" class="rte__form-label">Footer Message</label>
+          <textarea id="footer_message" name="footer_message" class="form-control" rows="2">{{ template.footer_message|default:'Thank you for your service!' }}</textarea>
+        </div>
+      </div>
+
+      <!-- Advanced -->
+      <div class="rte__section">
+        <h3 class="rte__section-title"><i class="fa-solid fa-code rte__section-icon"></i> ADVANCED (CUSTOM CSS)</h3>
+        <div class="rte__form-group">
+          <label for="custom_css" class="rte__form-label">Custom CSS</label>
+          <textarea id="custom_css" name="custom_css" class="form-control rte__code-textarea" rows="4" placeholder="/* Add custom CSS to override default styles */">{{ template.custom_css|default:'' }}</textarea>
+          <p class="rte__help-text">Advanced users can add custom CSS to fine-tune the receipt appearance.</p>
+        </div>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="rte__form-actions">
+        <button type="submit" class="rte__btn rte__btn--primary">
+          <i class="fa-solid fa-save"></i>
+          {% if template %}Update Template{% else %}Create Template{% endif %}
+        </button>
+        <a href="{% url 'workforce:receipt_templates_list' %}" class="rte__btn rte__btn--cancel">
+          <i class="fa-solid fa-times"></i> Cancel
+        </a>
+      </div>
+    </div>
+
+    <!-- Preview Panel -->
+    <div class="rte__form-panel rte__preview-panel">
+      <h3 class="rte__section-title"><i class="fa-solid fa-eye rte__section-icon"></i> LIVE PREVIEW</h3>
+      <div class="rte__preview-frame">
+        <div class="rte__preview-receipt" id="previewReceipt">
+          <div class="rte__preview-receipt-logo" id="previewLogo">
+            <div class="rte__preview-receipt-logo-img"><i class="fa-solid fa-building"></i></div>
+            <div class="rte__preview-receipt-company" id="previewCompanyName">Ezzy Delivery</div>
+            <div class="rte__preview-receipt-address" id="previewAddress">Doha, Qatar</div>
+          </div>
+          <div class="rte__preview-receipt-divider"></div>
+          <div class="rte__preview-receipt-title">Settlement Receipt</div>
+          <div class="rte__preview-receipt-row"><span>Receipt No:</span><span>STL-001</span></div>
+          <div class="rte__preview-receipt-row"><span>Date:</span><span>15 Jan 2026</span></div>
+          <div class="rte__preview-receipt-row"><span>Driver:</span><span>Ahmed Khan</span></div>
+          <div class="rte__preview-receipt-divider"></div>
+          <div class="rte__preview-receipt-row"><span>COD #1234</span><span>350.00</span></div>
+          <div class="rte__preview-receipt-row"><span>COD #1235</span><span>275.00</span></div>
+          <div class="rte__preview-receipt-row"><span>COD #1236</span><span>425.00</span></div>
+          <div class="rte__preview-receipt-total">
+            <div class="rte__preview-receipt-row"><span>TOTAL</span><span>QAR 1,050.00</span></div>
+          </div>
+          <div id="previewSignature">
+            <div class="rte__preview-receipt-sigline"></div>
+            <div class="rte__preview-receipt-siglabel">Driver's Signature</div>
+          </div>
+          <div class="rte__preview-receipt-divider"></div>
+          <div class="rte__preview-receipt-footer" id="previewFooter">Thank you for your service!</div>
+        </div>
+      </div>
+    </div>
+  </form>
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
 function updatePreview() {
-    const companyName = document.getElementById('company_name').value || 'Ezzy Delivery';
-    const companyAddress = document.getElementById('company_address').value || 'Doha, Qatar';
-    const primaryColor = document.getElementById('primary_color').value || '#2196F3';
-    const showSignature = document.getElementById('show_signature_line').checked;
-    const showLogo = document.getElementById('show_logo').checked;
-    const footerMessage = document.getElementById('footer_message').value || 'Thank you for your service!';
+    var companyName = document.getElementById('company_name').value || 'Ezzy Delivery';
+    var companyAddress = document.getElementById('company_address').value || 'Doha, Qatar';
+    var primaryColor = document.getElementById('primary_color').value || '#2196F3';
+    var showSignature = document.getElementById('show_signature_line').checked;
+    var showLogo = document.getElementById('show_logo').checked;
+    var footerMessage = document.getElementById('footer_message').value || 'Thank you for your service!';
 
     document.getElementById('previewCompanyName').textContent = companyName;
     document.getElementById('previewCompanyName').style.color = primaryColor;
@@ -478,13 +214,11 @@ function updatePreview() {
     document.getElementById('previewFooter').textContent = footerMessage;
 }
 
-// Add event listeners for live preview
-document.querySelectorAll('input, select, textarea').forEach(el => {
+document.querySelectorAll('input, select, textarea').forEach(function(el) {
     el.addEventListener('input', updatePreview);
     el.addEventListener('change', updatePreview);
 });
 
-// Initial preview update
 updatePreview();
 </script>
 {% endblock extra_js %}

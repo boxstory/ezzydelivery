@@ -4,135 +4,124 @@
 {% block title %}Rider Shifts{% endblock %}
 
 {% block content %}
-<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">
-            <i class="fa-solid fa-calendar-days me-2"></i>Rider Shifts
-        </h4>
-        <div>
-            <a href="{% url 'workforce:dispatch_shift_create' %}" class="btn btn-primary btn-sm">
-                <i class="fa-solid fa-plus me-1"></i> New Shift
-            </a>
-            <a href="{% url 'workforce:dispatch_dashboard' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="fa-solid fa-arrow-left me-1"></i> Dashboard
-            </a>
+<div class="dps">
+    <!-- Hero Header -->
+    <div class="dps__hero">
+        <div class="dps__hero-inner">
+            <div class="dps__hero-left">
+                <h1 class="dps__hero-title">
+                    <i class="fa-solid fa-calendar-days dps__hero-icon"></i>
+                    Rider Shifts
+                </h1>
+                <p class="dps__hero-subtitle">Manage rider shift schedules and assignments</p>
+            </div>
+            <div class="dps__hero-right">
+                <a href="{% url 'workforce:dispatch_shift_create' %}" class="dps__hero-btn">
+                    <i class="fa-solid fa-plus me-1"></i>New Shift
+                </a>
+                <a href="{% url 'workforce:dispatch_dashboard' %}" class="dps__back-btn">
+                    <i class="fa-solid fa-arrow-left me-1"></i>Dashboard
+                </a>
+            </div>
         </div>
     </div>
 
     <!-- Filters -->
-    <div class="card mb-3">
-        <div class="card-body">
-            <form method="get" class="row g-3">
-                <div class="col-md-3">
-                    <label class="form-label">Status</label>
-                    <select name="status" class="form-select">
-                        <option value="">All Statuses</option>
-                        <option value="scheduled" {% if request.GET.status == 'scheduled' %}selected{% endif %}>Scheduled</option>
-                        <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
-                        <option value="break" {% if request.GET.status == 'break' %}selected{% endif %}>On Break</option>
-                        <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>Completed</option>
-                    </select>
-                </div>
-
-                <div class="col-md-3">
-                    <label class="form-label">Location</label>
-                    <select name="location" class="form-select">
-                        <option value="">All Locations</option>
-                        {% for loc in locations %}
-                        <option value="{{ loc.id }}" {% if request.GET.location == loc.id|stringformat:"s" %}selected{% endif %}>
-                            {{ loc.pickup_location_title }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="col-md-3">
-                    <label class="form-label">Date</label>
-                    <input type="date" name="date" class="form-control" value="{{ request.GET.date|default:today }}">
-                </div>
-
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary me-2">
-                        <i class="fa-solid fa-filter me-1"></i> Filter
-                    </button>
-                    <a href="{% url 'workforce:dispatch_shift_list' %}" class="btn btn-outline-secondary">
-                        Clear
-                    </a>
-                </div>
-            </form>
-        </div>
+    <div class="dps__filter-bar">
+        <form method="get" class="dps__filter-form">
+            <div class="dps__filter-group">
+                <label class="dps__filter-label">Status</label>
+                <select name="status" class="dps__filter-select">
+                    <option value="">All Statuses</option>
+                    <option value="scheduled" {% if request.GET.status == 'scheduled' %}selected{% endif %}>Scheduled</option>
+                    <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="break" {% if request.GET.status == 'break' %}selected{% endif %}>On Break</option>
+                    <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>Completed</option>
+                </select>
+            </div>
+            <div class="dps__filter-group">
+                <label class="dps__filter-label">Location</label>
+                <select name="location" class="dps__filter-select">
+                    <option value="">All Locations</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc.id }}" {% if request.GET.location == loc.id|stringformat:"s" %}selected{% endif %}>
+                        {{ loc.pickup_location_title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="dps__filter-group">
+                <label class="dps__filter-label">Date</label>
+                <input type="date" name="date" class="dps__filter-input" value="{{ request.GET.date|default:today }}">
+            </div>
+            <div class="dps__filter-actions">
+                <button type="submit" class="dps__filter-btn">
+                    <i class="fa-solid fa-filter me-1"></i>Filter
+                </button>
+                <a href="{% url 'workforce:dispatch_shift_list' %}" class="dps__clear-btn">Clear</a>
+            </div>
+        </form>
     </div>
 
     <!-- Shifts Table -->
-    <div class="card">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
+    <div class="dps__card">
+        <div class="dps__table-wrap">
+            <table class="dps__table">
+                <thead class="dps__table-head">
                     <tr>
-                        <th>Shift Code</th>
-                        <th>Rider</th>
-                        <th>Location</th>
-                        <th>Scheduled</th>
-                        <th>Actual</th>
-                        <th>Status</th>
-                        <th>Batches</th>
-                        <th>Orders</th>
-                        <th>Actions</th>
+                        <th class="dps__th">Shift Code</th>
+                        <th class="dps__th">Rider</th>
+                        <th class="dps__th">Location</th>
+                        <th class="dps__th">Scheduled</th>
+                        <th class="dps__th">Actual</th>
+                        <th class="dps__th">Status</th>
+                        <th class="dps__th">Batches</th>
+                        <th class="dps__th">Orders</th>
+                        <th class="dps__th">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for shift in shifts %}
-                    <tr>
-                        <td>
-                            <a href="{% url 'workforce:dispatch_shift_detail' shift.id %}" class="text-decoration-none">
-                                <code>{{ shift.shift_code }}</code>
+                    <tr class="dps__tr">
+                        <td class="dps__td">
+                            <a href="{% url 'workforce:dispatch_shift_detail' shift.id %}" class="dps__code-link">
+                                {{ shift.shift_code }}
                             </a>
                         </td>
-                        <td>
-                            <div class="d-flex align-items-center">
-                                <div class="rider-avatar me-2" style="width: 32px; height: 32px; background: var(--brand-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600;">
-                                    {{ shift.rider.driver_code|slice:":2" }}
-                                </div>
-                                <div>
-                                    <strong>{{ shift.rider.driver_code }}</strong>
-                                    <br>
-                                    <small class="text-muted">{{ shift.rider.user.first_name }}</small>
+                        <td class="dps__td">
+                            <div class="dps__rider">
+                                <div class="dps__rider-avatar">{{ shift.rider.driver_code|slice:":2" }}</div>
+                                <div class="dps__rider-info">
+                                    <strong class="dps__rider-code">{{ shift.rider.driver_code }}</strong>
+                                    <span class="dps__rider-name">{{ shift.rider.user.first_name }}</span>
                                 </div>
                             </div>
                         </td>
-                        <td>{{ shift.pickup_location.pickup_location_title|truncatechars:20 }}</td>
-                        <td>
+                        <td class="dps__td">{{ shift.pickup_location.pickup_location_title|truncatechars:20 }}</td>
+                        <td class="dps__td">
                             {{ shift.scheduled_start|time:"H:i" }} - {{ shift.scheduled_end|time:"H:i" }}
                         </td>
-                        <td>
+                        <td class="dps__td">
                             {% if shift.actual_start %}
-                            {{ shift.actual_start|time:"H:i" }}
-                            {% if shift.actual_end %} - {{ shift.actual_end|time:"H:i" }}{% endif %}
+                            {{ shift.actual_start|time:"H:i" }}{% if shift.actual_end %} - {{ shift.actual_end|time:"H:i" }}{% endif %}
                             {% else %}
-                            <span class="text-muted">-</span>
+                            <span class="dps__text-muted">-</span>
                             {% endif %}
                         </td>
-                        <td>
-                            <span class="badge
-                                {% if shift.status == 'active' %}bg-success
-                                {% elif shift.status == 'break' %}bg-warning text-dark
-                                {% elif shift.status == 'completed' %}bg-secondary
-                                {% else %}bg-info{% endif %}">
+                        <td class="dps__td">
+                            <span class="dps__status-badge dps__status-badge--{{ shift.status }}">
                                 {{ shift.get_status_display }}
                             </span>
                         </td>
-                        <td>{{ shift.batches_completed }}</td>
-                        <td>{{ shift.orders_delivered }}</td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="{% url 'workforce:dispatch_shift_detail' shift.id %}"
-                                   class="btn btn-outline-primary" title="View Details">
+                        <td class="dps__td">{{ shift.batches_completed }}</td>
+                        <td class="dps__td">{{ shift.orders_delivered }}</td>
+                        <td class="dps__td">
+                            <div class="dps__action-group">
+                                <a href="{% url 'workforce:dispatch_shift_detail' shift.id %}" class="dps__action-btn" title="View Details">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
                                 {% if shift.status == 'scheduled' %}
-                                <a href="{% url 'workforce:dispatch_shift_edit' shift.id %}"
-                                   class="btn btn-outline-secondary" title="Edit">
+                                <a href="{% url 'workforce:dispatch_shift_edit' shift.id %}" class="dps__action-btn dps__action-btn--edit" title="Edit">
                                     <i class="fa-solid fa-edit"></i>
                                 </a>
                                 {% endif %}
@@ -141,8 +130,9 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
-                            No shifts found for the selected criteria.
+                        <td colspan="9" class="dps__empty-cell">
+                            <i class="fa-solid fa-calendar-xmark"></i>
+                            <p>No shifts found for the selected criteria.</p>
                         </td>
                     </tr>
                     {% endfor %}

@@ -106,6 +106,40 @@ Use this skill when designing UI components, creating landing pages, or building
 
 ## Design Principles
 
+### 0. Bootstrap First — No Redundant CSS
+**CRITICAL RULE:** Always use Bootstrap 5 utility classes for layout before writing custom CSS. Only write custom CSS for visual styling (colors, gradients, shadows, animations, brand-specific components) that Bootstrap doesn't provide.
+
+**Use Bootstrap for:**
+- Flexbox: `d-flex`, `flex-row`, `flex-nowrap`, `flex-wrap`, `flex-fill`, `align-items-center`, `justify-content-between`
+- Grid: `row`, `col-*`, `g-*` (gutters)
+- Spacing: `m-*`, `p-*`, `gap-*`, `mt-3`, `mb-2`, `px-4`
+- Display: `d-none`, `d-block`, `d-md-flex`, `d-lg-none`
+- Text: `text-center`, `text-nowrap`, `fw-bold`, `fs-5`
+- Sizing: `w-100`, `w-50`, `h-auto`
+
+```html
+<!-- CORRECT: Bootstrap utilities for layout -->
+<div class="d-flex flex-row flex-nowrap gap-2 mt-3">
+    <button class="btn-verify flex-fill">Verify</button>
+    <button class="btn-review flex-fill">Review</button>
+    <button class="btn-reject flex-fill">Reject</button>
+</div>
+
+<div class="row g-3">
+    <div class="col-12 col-md-6 col-lg-3">Card</div>
+</div>
+
+<!-- WRONG: Custom CSS for what Bootstrap already does -->
+.my-flex-row { display: flex; flex-direction: row; gap: 0.5rem; }
+.my-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
+```
+
+**Only write custom CSS for:**
+- Brand colors, gradients, shadows
+- Custom component styling (hover effects, transitions, animations)
+- Complex component states
+- Anything Bootstrap utilities can't express
+
 ### 1. Mobile-First Responsive Design
 Always design for mobile first, then enhance for larger screens.
 
@@ -586,7 +620,37 @@ Always design for mobile first, then enhance for larger screens.
 - Consider mobile, tablet, desktop layouts
 - Plan accessibility features
 
-### 2. CSS Architecture
+### 2. CSS Architecture — CRITICAL HTMX Rule
+
+**NEVER load page-specific CSS via `{% block extra_css %}` on dashboard pages!**
+
+Dashboard pages use HTMX for sidebar navigation. HTMX only swaps `#main-content`, NOT the `<head>`. CSS loaded via `extra_css` block won't be injected during HTMX navigation, causing "styles missing" bugs.
+
+**ALWAYS add new page styles to the app's main CSS file with a BEM prefix.**
+
+**Base Template → CSS File Mapping:**
+| Base Template | CSS File | Cache-bust line |
+|---|---|---|
+| `wf_dashboard_base.html` | `workforce/static/workforce/css/workforce.css` | Line 15 |
+| `business_dashboard_base.html` | `business/static/business/css/business.css` | Line 30 |
+| `fleet_dashboard_base.html` | `fleet/static/fleet/css/fleet.css` | Check template |
+| Public pages (`base.html`) | Use `{% block extra_css %}` — this is fine for non-HTMX pages |
+
+**After editing CSS:**
+1. Update cache-buster version: `?v=YYYYMMDDx` (e.g., `?v=20260216a` → `?v=20260216b`)
+2. Run: `source venvezzy/bin/activate && python manage.py collectstatic --noinput`
+3. Reload: `kill -HUP $(pgrep -f "gunicorn.*ezzydelivery" | head -1)`
+
+**BEM Prefix Convention (2-4 letters per page):**
+| Prefix | Page |
+|---|---|
+| `uvl__` | User Verification List |
+| `spl__` | Suppliers List |
+| `pkl__` | Pickup Locations |
+| `odp__` | Order Detail Panel |
+| `odt-` | Order Details |
+| `pwa-` | PWA mobile components |
+
 **File Organization:**
 ```
 static/
@@ -597,11 +661,44 @@ static/
 │   │   ├── shared-components.css  # Buttons, cards
 │   │   └── shared-layout.css  # Grid, containers
 │   └── pages/
-│       ├── homepage.css
+│       ├── homepage.css       # Public pages only (non-HTMX)
 │       └── services.css
+├── workforce/css/
+│   └── workforce.css          # ALL workforce dashboard page styles (uvl__, spl__, etc.)
+├── business/css/
+│   └── business.css           # ALL business dashboard page styles (pkl__, etc.)
+├── orders/css/
+│   └── orders.css             # ALL orders dashboard page styles (odp__, odt-, etc.)
+├── fleet/css/
+│   └── fleet.css              # ALL fleet dashboard page styles
+└── delivery/css/
+    └── delivery.css           # ALL delivery dashboard page styles
 ```
 
 ### 3. Template Structure
+
+**For Dashboard Pages (HTMX):**
+```html
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Page Title{% endblock %}
+
+{# NO extra_css block! All CSS goes in the app's main CSS file #}
+
+{% block content %}
+<div class="col-12 xyz" id="app_page_container_main">
+  <!-- Page content using xyz__ BEM classes -->
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{# Only for page-specific JS that can't go in a global file #}
+<script src="{% static 'app/js/page.js' %}"></script>
+{% endblock %}
+```
+
+**For Public Pages (non-HTMX):**
 ```html
 {% extends "base.html" %}
 {% load static %}
@@ -694,6 +791,7 @@ static/
 
 ## Checklist for New Components
 
+- [ ] Bootstrap utilities used for layout (flex, grid, spacing, display) — no custom CSS for what Bootstrap provides
 - [ ] Mobile-first responsive design
 - [ ] Uses brand kit CSS variables
 - [ ] No inline styles or `<style>` tags

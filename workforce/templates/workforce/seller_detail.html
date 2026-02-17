@@ -1,758 +1,761 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
-
 {% block title %}{{ business.business_name|default:"Seller Detail" }} - Ezzy Delivery{% endblock title %}
-
-{% block extra_css %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
-<div class="col-12 p-3">
-<div class="seller-page">
+<div class="sld">
 
-<!-- Back Link -->
-<a href="{% url 'workforce:sellers_list' %}" class="back-link">
-    <i class="fa-solid fa-arrow-left"></i>
-    Back to Sellers
-</a>
+    <!-- Back Link -->
+    <a href="{% url 'workforce:sellers_list' %}" class="sld__back">
+        <i class="fa-solid fa-arrow-left"></i> Back to Sellers
+    </a>
 
-<!-- Header -->
-<div class="seller-header">
-    <div class="seller-main-info">
-        <h1 class="seller-name">
-            <i class="fa-solid fa-store"></i>
-            {{ business.business_name|default:"Unknown Business" }}
-        </h1>
-        <div class="seller-id">{{ business.business_code|default:"N/A" }} &bull; ID #{{ business.business_id }}</div>
-
-        <div class="seller-contact-row">
-            {% if business.business_phone %}
-            <div class="seller-contact-item">
-                <i class="fa-solid fa-phone"></i>
-                {{ business.business_phone }}
-            </div>
-            {% endif %}
-            {% if business.business_email %}
-            <div class="seller-contact-item">
-                <i class="fa-solid fa-envelope"></i>
-                {{ business.business_email }}
-            </div>
-            {% endif %}
-            {% if business.business_since %}
-            <div class="seller-contact-item">
-                <i class="fa-solid fa-calendar"></i>
-                Since {{ business.business_since|date:"M Y" }}
-            </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="seller-status-badges">
-        <span class="status-pill status-pill-{% if business.business_status == 'active' %}active{% elif business.business_status == 'pending' %}pending{% elif business.business_status == 'suspended' %}suspended{% else %}inactive{% endif %}">
-            <i class="fa-solid fa-circle" style="font-size: 6px;"></i>
-            {{ business.business_status|title }}
-        </span>
-        {% if business.profile.verification_status == 'verified' %}
-        <span class="status-pill status-pill-verified">
-            <i class="fa-solid fa-check"></i>
-            Verified
-        </span>
-        {% endif %}
-        {% if business.fulfillment_service_enabled %}
-        <span class="status-pill status-pill-fulfillment">
-            <i class="fa-solid fa-warehouse"></i>
-            Fulfillment
-        </span>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Stats Row -->
-<div class="stats-row">
-    <div class="stat-box">
-        <div class="stat-box-value">{{ order_stats.total_orders|default:0 }}</div>
-        <div class="stat-box-label">Total Orders</div>
-        {% if last_7_days_orders > 0 %}
-        <div class="stat-box-trend">+{{ last_7_days_orders }} this week</div>
-        {% endif %}
-    </div>
-    <div class="stat-box">
-        <div class="stat-box-value">{{ delivery_success_rate }}%</div>
-        <div class="stat-box-label">Success Rate</div>
-    </div>
-    <div class="stat-box">
-        <div class="stat-box-value">{{ recent_orders_count|default:0 }}</div>
-        <div class="stat-box-label">Last 30 Days</div>
-    </div>
-    <div class="stat-box">
-        <div class="stat-box-value">{{ cod_stats.total_cod_orders|default:0 }}</div>
-        <div class="stat-box-label">COD Orders</div>
-    </div>
-    <div class="stat-box">
-        <div class="stat-box-value">{{ team_members.count|default:0 }}</div>
-        <div class="stat-box-label">Team Members</div>
-    </div>
-    <div class="stat-box">
-        <div class="stat-box-value">{{ pickup_locations.count|default:0 }}</div>
-        <div class="stat-box-label">Locations</div>
-    </div>
-</div>
-
-<!-- Tabs -->
-<div class="tabs-nav" role="tablist">
-    <button class="tab-btn active" data-tab="overview">Overview</button>
-    <button class="tab-btn" data-tab="orders">Orders <span class="tab-btn-count">{{ order_stats.total_orders|default:0 }}</span></button>
-    <button class="tab-btn" data-tab="details">Details</button>
-    <button class="tab-btn" data-tab="documents">Documents <span class="tab-btn-count">{{ documents|length }}</span></button>
-    <button class="tab-btn" data-tab="team">Team <span class="tab-btn-count">{{ team_members.count|default:0 }}</span></button>
-    <button class="tab-btn" data-tab="integrations">Integrations <span class="tab-btn-count">{{ api_settings.count|default:0 }}</span></button>
-    <button class="tab-btn" data-tab="edit">Edit</button>
-</div>
-
-<!-- Tab: Overview -->
-<div id="panel-overview" class="tab-panel active">
-    <div class="two-col">
-        <div>
-            <!-- Order Summary -->
-            <div class="card-section">
-                <h3 class="section-heading">Order Summary</h3>
-                <div class="order-stats-grid">
-                    <div class="order-stat-cell">
-                        <div class="order-stat-num success">{{ order_stats.delivered_orders|default:0 }}</div>
-                        <div class="order-stat-text">Delivered</div>
-                    </div>
-                    <div class="order-stat-cell">
-                        <div class="order-stat-num warning">{{ order_stats.pending_orders|default:0 }}</div>
-                        <div class="order-stat-text">Pending</div>
-                    </div>
-                    <div class="order-stat-cell">
-                        <div class="order-stat-num info">{{ order_stats.processing_orders|default:0 }}</div>
-                        <div class="order-stat-text">Processing</div>
-                    </div>
-                    <div class="order-stat-cell">
-                        <div class="order-stat-num danger">{{ order_stats.cancelled_orders|default:0 }}</div>
-                        <div class="order-stat-text">Cancelled</div>
-                    </div>
-                    <div class="order-stat-cell">
-                        <div class="order-stat-num muted">{{ order_stats.failed_orders|default:0 }}</div>
-                        <div class="order-stat-text">Failed</div>
-                    </div>
-                </div>
-                {% if order_stats.total_orders > 0 %}
-                <div class="progress-track">
-                    {% with d=order_stats.delivered_orders|default:0 p=order_stats.pending_orders|default:0 pr=order_stats.processing_orders|default:0 c=order_stats.cancelled_orders|default:0 t=order_stats.total_orders %}
-                    <div class="progress-fill success" style="width: {% widthratio d t 100 %}%;"></div>
-                    <div class="progress-fill warning" style="width: {% widthratio p t 100 %}%;"></div>
-                    <div class="progress-fill info" style="width: {% widthratio pr t 100 %}%;"></div>
-                    <div class="progress-fill danger" style="width: {% widthratio c t 100 %}%;"></div>
-                    {% endwith %}
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- COD Summary -->
-            {% if cod_stats.total_cod_orders > 0 %}
-            <div class="card-section">
-                <h3 class="section-heading">COD Summary</h3>
-                <div class="cod-grid">
-                    <div class="cod-item">
-                        <div class="cod-value">{{ cod_stats.total_cod_orders|default:0 }}</div>
-                        <div class="cod-label">Orders</div>
-                    </div>
-                    <div class="cod-item">
-                        <div class="cod-value">{{ cod_stats.total_cod_amount|default:0|floatformat:0 }} QAR</div>
-                        <div class="cod-label">Total</div>
-                    </div>
-                    <div class="cod-item">
-                        <div class="cod-value success">{{ cod_stats.collected_cod|default:0|floatformat:0 }} QAR</div>
-                        <div class="cod-label">Collected</div>
-                    </div>
-                    <div class="cod-item">
-                        <div class="cod-value warning">{{ cod_stats.pending_cod|default:0|floatformat:0 }} QAR</div>
-                        <div class="cod-label">Pending</div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Quick Actions -->
-            <div class="card-section">
-                <h3 class="section-heading">Quick Actions</h3>
-                <div class="actions-row">
-                    <a href="{% url 'workforce:wf_orders_by_seller' %}?business={{ business.business_id }}" class="action-btn">
-                        <i class="fa-solid fa-box"></i>
-                        View Orders
-                    </a>
-                    <a href="{% url 'workforce:store_document_detail' business.business_id %}" class="action-btn">
-                        <i class="fa-solid fa-file-alt"></i>
-                        Documents
-                    </a>
-                    <a href="{% url 'workforce:business_license_detail' business.business_id %}" class="action-btn">
-                        <i class="fa-solid fa-certificate"></i>
-                        License
-                    </a>
-                    <button class="action-btn" onclick="document.querySelector('[data-tab=edit]').click();">
-                        <i class="fa-solid fa-edit"></i>
-                        Edit Info
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div>
-            <!-- Recent Activity -->
-            <div class="card-section">
-                <h3 class="section-heading">Recent Activity</h3>
-                {% if recent_orders %}
-                <ul class="activity-list">
-                    {% for order in recent_orders %}
-                    <li class="activity-item">
-                        <span class="activity-dot {% if order.order_status == 'delivered' %}success{% elif order.order_status == 'pending' %}warning{% elif order.order_status == 'cancelled' or order.order_status == 'failed' %}danger{% endif %}"></span>
-                        <div class="activity-content">
-                            <div class="activity-title">#{{ order.order_number|default:order.client_order_code|truncatechars:20 }}</div>
-                            <div class="activity-meta">{{ order.order_status|title }} &bull; {{ order.created_at|timesince }} ago</div>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <div class="empty-msg">
-                    <i class="fa-solid fa-inbox"></i>
-                    No recent orders
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Contact Info -->
-            <div class="card-section">
-                <h3 class="section-heading">Contact</h3>
-                <ul class="contact-list">
-                    <li class="contact-row">
-                        <span class="contact-icon"><i class="fa-solid fa-phone"></i></span>
-                        <div class="contact-text">
-                            <div class="contact-label">Phone</div>
-                            <div class="contact-value">{{ business.business_phone|default:"Not provided" }}</div>
-                        </div>
-                    </li>
-                    <li class="contact-row">
-                        <span class="contact-icon"><i class="fa-solid fa-envelope"></i></span>
-                        <div class="contact-text">
-                            <div class="contact-label">Email</div>
-                            <div class="contact-value">{{ business.business_email|default:"Not provided" }}</div>
-                        </div>
-                    </li>
-                    <li class="contact-row">
-                        <span class="contact-icon"><i class="fa-brands fa-whatsapp"></i></span>
-                        <div class="contact-text">
-                            <div class="contact-label">WhatsApp</div>
-                            <div class="contact-value">{{ business.business_whatsapp|default:"Not provided" }}</div>
-                        </div>
-                    </li>
-                    {% if business_profile.business_address %}
-                    <li class="contact-row">
-                        <span class="contact-icon"><i class="fa-solid fa-location-dot"></i></span>
-                        <div class="contact-text">
-                            <div class="contact-label">Address</div>
-                            <div class="contact-value">{{ business_profile.business_address }}</div>
-                        </div>
-                    </li>
-                    {% endif %}
-                </ul>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Tab: Orders -->
-<div id="panel-orders" class="tab-panel">
-    <h3 class="section-heading">Recent Orders</h3>
-    {% if recent_orders %}
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Order</th>
-                <th>Customer</th>
-                <th>Status</th>
-                <th>COD</th>
-                <th>Date</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for order in recent_orders %}
-            <tr>
-                <td><strong>{{ order.order_number|default:order.client_order_code|truncatechars:20 }}</strong></td>
-                <td>
-                    {{ order.customer_name|default:"N/A" }}
-                    {% if order.customer_phone %}<br><small style="color: var(--brand-grey-500);">{{ order.customer_phone }}</small>{% endif %}
-                </td>
-                <td>
-                    <span class="badge {% if order.order_status == 'delivered' %}badge-success{% elif order.order_status == 'pending' %}badge-warning{% elif order.order_status == 'cancelled' or order.order_status == 'failed' %}badge-danger{% else %}badge-default{% endif %}">
-                        {{ order.order_status|title }}
+    <!-- Hero Header -->
+    <div class="sld__hero">
+        <div class="sld__hero-inner">
+            <div class="sld__hero-left">
+                <h1 class="sld__hero-title">
+                    <i class="fa-solid fa-store"></i>
+                    {{ business.business_name|default:"Unknown Business" }}
+                </h1>
+                <div class="sld__hero-id">{{ business.business_code|default:"N/A" }} &bull; ID #{{ business.business_id }}</div>
+                <div class="sld__hero-contacts">
+                    {% if business.business_phone %}
+                    <span class="sld__hero-contact">
+                        <i class="fa-solid fa-phone"></i> {{ business.business_phone }}
                     </span>
-                </td>
-                <td>{% if order.cod_amount %}{{ order.cod_amount|floatformat:0 }} QAR{% else %}-{% endif %}</td>
-                <td>{{ order.created_at|date:"d M Y" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <div style="margin-top: 1rem;">
-        <a href="{% url 'workforce:wf_orders_by_seller' %}?business={{ business.business_id }}" class="action-btn">
-            <i class="fa-solid fa-external-link"></i>
-            View All Orders
-        </a>
-    </div>
-    {% else %}
-    <div class="empty-msg">
-        <i class="fa-solid fa-box"></i>
-        No orders yet
-    </div>
-    {% endif %}
-</div>
-
-<!-- Tab: Details -->
-<div id="panel-details" class="tab-panel">
-    <div class="two-col">
-        <div>
-            <!-- Business Info -->
-            <div class="card-section">
-                <h3 class="section-heading">Business Information</h3>
-                <div class="info-list">
-                    <div class="info-item">
-                        <div class="info-label">Business Name</div>
-                        <div class="info-value">{{ business.business_name|default:"N/A" }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Business Code</div>
-                        <div class="info-value">{{ business.business_code|default:"N/A" }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">QID</div>
-                        <div class="info-value">{{ business.business_qid|default:"N/A" }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Category</div>
-                        <div class="info-value">{{ business.business_product_category|default:"N/A" }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Business Since</div>
-                        <div class="info-value">{{ business.business_since|date:"d M Y"|default:"N/A" }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Created</div>
-                        <div class="info-value">{{ business.created_at|date:"d M Y" }}</div>
-                    </div>
-                </div>
-            </div>
-
-            {% if business.user or business.profile %}
-            <!-- Owner Info -->
-            <div class="card-section">
-                <h3 class="section-heading">Owner Information</h3>
-                <div class="info-list">
-                    {% if business.user %}
-                    <div class="info-item">
-                        <div class="info-label">Name</div>
-                        <div class="info-value">{{ business.user.first_name }} {{ business.user.last_name|default:"" }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Username</div>
-                        <div class="info-value">{{ business.user.username|default:"N/A" }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Email</div>
-                        <div class="info-value">{{ business.user.email|default:"N/A" }}</div>
-                    </div>
                     {% endif %}
-                    {% if business.profile %}
-                    <div class="info-item">
-                        <div class="info-label">Phone</div>
-                        <div class="info-value">{{ business.profile.phone|default:"N/A" }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Verification</div>
-                        <div class="info-value">
-                            <span class="badge {% if business.profile.verification_status == 'verified' %}badge-success{% elif business.profile.verification_status == 'pending' %}badge-warning{% else %}badge-danger{% endif %}">
-                                {{ business.profile.verification_status|title }}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="info-item"></div>
+                    {% if business.business_email %}
+                    <span class="sld__hero-contact">
+                        <i class="fa-solid fa-envelope"></i> {{ business.business_email }}
+                    </span>
+                    {% endif %}
+                    {% if business.business_since %}
+                    <span class="sld__hero-contact">
+                        <i class="fa-solid fa-calendar"></i> Since {{ business.business_since|date:"M Y" }}
+                    </span>
                     {% endif %}
                 </div>
             </div>
-            {% endif %}
-
-            {% if business_profile %}
-            <!-- Address -->
-            <div class="card-section">
-                <h3 class="section-heading">Business Address</h3>
-                <div class="info-list">
-                    <div class="info-item">
-                        <div class="info-label">Address</div>
-                        <div class="info-value">{{ business_profile.business_address|default:"N/A" }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">City</div>
-                        <div class="info-value">{{ business_profile.business_city|default:"N/A" }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">State</div>
-                        <div class="info-value">{{ business_profile.business_state|default:"N/A" }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Zip Code</div>
-                        <div class="info-value">{{ business_profile.business_zip_code|default:"N/A" }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Country</div>
-                        <div class="info-value">{{ business_profile.business_country|default:"N/A" }}</div>
-                    </div>
-                    <div class="info-item"></div>
-                </div>
+            <div class="sld__hero-badges">
+                <span class="sld__pill sld__pill--{% if business.business_status == 'active' %}active{% elif business.business_status == 'pending' %}pending{% elif business.business_status == 'suspended' %}suspended{% else %}inactive{% endif %}">
+                    {{ business.business_status|title }}
+                </span>
+                {% if business.profile.verification_status == 'verified' %}
+                <span class="sld__pill sld__pill--verified">
+                    <i class="fa-solid fa-check"></i> Verified
+                </span>
+                {% endif %}
+                {% if business.fulfillment_service_enabled %}
+                <span class="sld__pill sld__pill--fulfillment">
+                    <i class="fa-solid fa-warehouse"></i> Fulfillment
+                </span>
+                {% endif %}
             </div>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="sld__stats">
+        <div class="sld__stat-box">
+            <div class="sld__stat-box-val">{{ order_stats.total_orders|default:0 }}</div>
+            <div class="sld__stat-box-lbl">Total Orders</div>
+            {% if last_7_days_orders > 0 %}
+            <div class="sld__stat-box-trend">+{{ last_7_days_orders }} this week</div>
             {% endif %}
         </div>
+        <div class="sld__stat-box">
+            <div class="sld__stat-box-val">{{ delivery_success_rate }}%</div>
+            <div class="sld__stat-box-lbl">Success Rate</div>
+        </div>
+        <div class="sld__stat-box">
+            <div class="sld__stat-box-val">{{ recent_orders_count|default:0 }}</div>
+            <div class="sld__stat-box-lbl">Last 30 Days</div>
+        </div>
+        <div class="sld__stat-box">
+            <div class="sld__stat-box-val">{{ cod_stats.total_cod_orders|default:0 }}</div>
+            <div class="sld__stat-box-lbl">COD Orders</div>
+        </div>
+        <div class="sld__stat-box">
+            <div class="sld__stat-box-val">{{ team_members.count|default:0 }}</div>
+            <div class="sld__stat-box-lbl">Team Members</div>
+        </div>
+        <div class="sld__stat-box">
+            <div class="sld__stat-box-val">{{ pickup_locations.count|default:0 }}</div>
+            <div class="sld__stat-box-lbl">Locations</div>
+        </div>
+    </div>
 
-        <div>
-            <!-- Pickup Locations -->
-            <div class="card-section">
-                <h3 class="section-heading">Pickup Locations</h3>
-                {% if pickup_locations %}
-                <ul class="location-list">
-                    {% for loc in pickup_locations %}
-                    <li class="location-item">
-                        <span class="location-icon"><i class="fa-solid fa-location-dot"></i></span>
-                        <div class="location-info">
-                            <div class="location-title">{{ loc.pickup_location_title }}</div>
-                            <div class="location-address">Zone {{ loc.pickup_zone_no|default:"N/A" }}, St {{ loc.pickup_street_no|default:"N/A" }}, Bldg {{ loc.pickup_building_no|default:"N/A" }}</div>
+    <!-- Tabs -->
+    <div class="sld__tabs" role="tablist">
+        <button class="sld__tab active" data-tab="overview">Overview</button>
+        <button class="sld__tab" data-tab="orders">Orders <span class="sld__tab-count">{{ order_stats.total_orders|default:0 }}</span></button>
+        <button class="sld__tab" data-tab="details">Details</button>
+        <button class="sld__tab" data-tab="documents">Documents <span class="sld__tab-count">{{ documents|length }}</span></button>
+        <button class="sld__tab" data-tab="team">Team <span class="sld__tab-count">{{ team_members.count|default:0 }}</span></button>
+        <button class="sld__tab" data-tab="integrations">Integrations <span class="sld__tab-count">{{ api_settings.count|default:0 }}</span></button>
+        <button class="sld__tab" data-tab="edit">Edit</button>
+    </div>
+
+    <!-- Tab: Overview -->
+    <div id="panel-overview" class="sld__panel active">
+        <div class="sld__two-col">
+            <div>
+                <!-- Order Summary -->
+                <div class="sld__section">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-chart-bar sld__section-icon"></i> Order Summary
+                    </h3>
+                    <div class="sld__order-grid">
+                        <div class="sld__order-cell">
+                            <div class="sld__order-num sld__order-num--success">{{ order_stats.delivered_orders|default:0 }}</div>
+                            <div class="sld__order-text">Delivered</div>
                         </div>
-                        <span class="badge {% if loc.pickup_status == 'active' %}badge-success{% else %}badge-warning{% endif %}">{{ loc.pickup_status|title }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <div class="empty-msg">
-                    <i class="fa-solid fa-map-marker-alt"></i>
-                    No pickup locations
+                        <div class="sld__order-cell">
+                            <div class="sld__order-num sld__order-num--warning">{{ order_stats.pending_orders|default:0 }}</div>
+                            <div class="sld__order-text">Pending</div>
+                        </div>
+                        <div class="sld__order-cell">
+                            <div class="sld__order-num sld__order-num--info">{{ order_stats.processing_orders|default:0 }}</div>
+                            <div class="sld__order-text">Processing</div>
+                        </div>
+                        <div class="sld__order-cell">
+                            <div class="sld__order-num sld__order-num--danger">{{ order_stats.cancelled_orders|default:0 }}</div>
+                            <div class="sld__order-text">Cancelled</div>
+                        </div>
+                        <div class="sld__order-cell">
+                            <div class="sld__order-num sld__order-num--muted">{{ order_stats.failed_orders|default:0 }}</div>
+                            <div class="sld__order-text">Failed</div>
+                        </div>
+                    </div>
+                    {% if order_stats.total_orders > 0 %}
+                    <div class="sld__progress">
+                        {% with d=order_stats.delivered_orders|default:0 p=order_stats.pending_orders|default:0 pr=order_stats.processing_orders|default:0 c=order_stats.cancelled_orders|default:0 t=order_stats.total_orders %}
+                        <div class="sld__progress-bar sld__progress-bar--success" style="width: {% widthratio d t 100 %}%;"></div>
+                        <div class="sld__progress-bar sld__progress-bar--warning" style="width: {% widthratio p t 100 %}%;"></div>
+                        <div class="sld__progress-bar sld__progress-bar--info" style="width: {% widthratio pr t 100 %}%;"></div>
+                        <div class="sld__progress-bar sld__progress-bar--danger" style="width: {% widthratio c t 100 %}%;"></div>
+                        {% endwith %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- COD Summary -->
+                {% if cod_stats.total_cod_orders > 0 %}
+                <div class="sld__section">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-sack-dollar sld__section-icon"></i> COD Summary
+                    </h3>
+                    <div class="sld__cod-grid">
+                        <div class="sld__cod-item">
+                            <div class="sld__cod-val">{{ cod_stats.total_cod_orders|default:0 }}</div>
+                            <div class="sld__cod-lbl">Orders</div>
+                        </div>
+                        <div class="sld__cod-item">
+                            <div class="sld__cod-val">{{ cod_stats.total_cod_amount|default:0|floatformat:0 }} QAR</div>
+                            <div class="sld__cod-lbl">Total</div>
+                        </div>
+                        <div class="sld__cod-item">
+                            <div class="sld__cod-val sld__cod-val--success">{{ cod_stats.collected_cod|default:0|floatformat:0 }} QAR</div>
+                            <div class="sld__cod-lbl">Collected</div>
+                        </div>
+                        <div class="sld__cod-item">
+                            <div class="sld__cod-val sld__cod-val--warning">{{ cod_stats.pending_cod|default:0|floatformat:0 }} QAR</div>
+                            <div class="sld__cod-lbl">Pending</div>
+                        </div>
+                    </div>
                 </div>
                 {% endif %}
+
+                <!-- Quick Actions -->
+                <div class="sld__section">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-bolt sld__section-icon"></i> Quick Actions
+                    </h3>
+                    <div class="sld__actions">
+                        <a href="{% url 'workforce:wf_orders_by_seller' %}?business={{ business.business_id }}" class="sld__action-btn">
+                            <i class="fa-solid fa-box"></i> View Orders
+                        </a>
+                        <a href="{% url 'workforce:store_document_detail' business.business_id %}" class="sld__action-btn">
+                            <i class="fa-solid fa-file-alt"></i> Documents
+                        </a>
+                        <a href="{% url 'workforce:business_license_detail' business.business_id %}" class="sld__action-btn">
+                            <i class="fa-solid fa-certificate"></i> License
+                        </a>
+                        <button class="sld__action-btn" onclick="document.querySelector('[data-tab=edit]').click();">
+                            <i class="fa-solid fa-edit"></i> Edit Info
+                        </button>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-</div>
 
-<!-- Tab: Documents -->
-<div id="panel-documents" class="tab-panel">
-    <h3 class="section-heading">Business Documents</h3>
-    {% if documents %}
-    {% for doc in documents %}
-    <div class="document-card">
-        <div class="document-icon">
-            <i class="fa-solid fa-{% if doc.document_type == 'license' %}certificate{% elif doc.document_type == 'id' %}id-card{% else %}file-alt{% endif %}"></i>
-        </div>
-        <div class="document-info">
-            <div class="document-type">{{ doc.document_type|default:"Document"|title }}</div>
-            <div class="document-number">{{ doc.document_no|default:"N/A" }}</div>
-            {% if doc.document_expiry_date %}
-            <div class="document-expiry">
-                Expires: {{ doc.document_expiry_date|date:"d M Y" }}
-                {% if doc.document_expiry_date < now %}
-                <span class="badge badge-danger" style="margin-left: 0.5rem;">Expired</span>
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-        {% if doc.document_file and doc.document_file.name %}
-        <button type="button" class="action-btn doc-view-btn btn-doc-available"
-                data-doc-url="{{ doc.document_file.url }}"
-                data-doc-title="{{ doc.document_type|default:'Document'|title }} - {{ doc.document_no }}">
-            <i class="fa-solid fa-eye"></i>
-            View
-        </button>
-        {% else %}
-        <span class="action-btn btn-doc-unavailable">
-            <i class="fa-solid fa-eye-slash"></i>
-            No File
-        </span>
-        {% endif %}
-    </div>
-    {% endfor %}
-    {% else %}
-    <div class="empty-msg">
-        <i class="fa-solid fa-folder-open"></i>
-        No documents uploaded
-    </div>
-    {% endif %}
-</div>
-
-<!-- Document Modal -->
-<div id="docModal" class="doc-modal-overlay">
-    <div class="doc-modal">
-        <div class="doc-modal-header">
-            <h4 class="doc-modal-title" id="docModalTitle">Document</h4>
-            <button type="button" class="doc-modal-close" id="docModalClose">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </div>
-        <div class="doc-modal-body">
-            <img id="docModalImage" src="" alt="Document">
-        </div>
-        <div class="doc-modal-footer">
-            <a href="#" id="docModalDownload" class="btn-secondary" target="_blank">
-                <i class="fa-solid fa-download"></i>
-                Open in New Tab
-            </a>
-            <button type="button" class="btn-primary" id="docModalCloseBtn">
-                <i class="fa-solid fa-xmark"></i>
-                Close
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- Tab: Team -->
-<div id="panel-team" class="tab-panel">
-    <h3 class="section-heading">Team Members</h3>
-    {% if team_members %}
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Email</th>
-                <th>Phone</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for member in team_members %}
-            <tr>
-                <td>
-                    <strong>{{ member.team_name|default:member.user.username }}</strong>
-                    {% if member.team_code %}<br><small style="color: var(--brand-grey-500);">{{ member.team_code }}</small>{% endif %}
-                </td>
-                <td>
-                    <span class="badge {% if member.team_role == 'manager' %}badge-info{% else %}badge-default{% endif %}">
-                        {{ member.team_role|title }}
-                    </span>
-                </td>
-                <td>
-                    <span class="badge {% if member.team_status == 'active' %}badge-success{% elif member.team_status == 'pending' %}badge-warning{% else %}badge-default{% endif %}">
-                        {{ member.team_status|title }}
-                    </span>
-                </td>
-                <td>{{ member.team_email|default:member.user.email|default:"N/A" }}</td>
-                <td>{{ member.team_phone|default:"N/A" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div class="empty-msg">
-        <i class="fa-solid fa-users"></i>
-        No team members
-    </div>
-    {% endif %}
-</div>
-
-<!-- Tab: Integrations -->
-<div id="panel-integrations" class="tab-panel">
-    <h3 class="section-heading">API Integrations</h3>
-    {% if api_settings %}
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Platform</th>
-                <th>API URL</th>
-                <th>Status</th>
-                <th>Default</th>
-                <th>Created</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for api in api_settings %}
-            <tr>
-                <td><span class="badge badge-default">{{ api.api_type|title }}</span></td>
-                <td><small>{{ api.site_api_url|default:"N/A"|truncatechars:40 }}</small></td>
-                <td>
-                    {% if api.is_verify_api %}
-                    <span class="badge badge-success">Verified</span>
+            <div>
+                <!-- Recent Activity -->
+                <div class="sld__section">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-clock-rotate-left sld__section-icon"></i> Recent Activity
+                    </h3>
+                    {% if recent_orders %}
+                    <ul class="sld__activity-list">
+                        {% for order in recent_orders %}
+                        <li class="sld__activity-item">
+                            <span class="sld__activity-dot {% if order.order_status == 'delivered' %}sld__activity-dot--success{% elif order.order_status == 'pending' %}sld__activity-dot--warning{% elif order.order_status == 'cancelled' or order.order_status == 'failed' %}sld__activity-dot--danger{% endif %}"></span>
+                            <div class="sld__activity-body">
+                                <div class="sld__activity-title">#{{ order.order_number|default:order.client_order_code|truncatechars:20 }}</div>
+                                <div class="sld__activity-meta">{{ order.order_status|title }} &bull; {{ order.created_at|timesince }} ago</div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
                     {% else %}
-                    <span class="badge badge-warning">Pending</span>
+                    <div class="sld__empty-msg">
+                        <i class="fa-solid fa-inbox"></i>
+                        No recent orders
+                    </div>
                     {% endif %}
-                </td>
-                <td>
-                    {% if api.is_default %}<i class="fa-solid fa-check" style="color: #16a34a;"></i>{% else %}-{% endif %}
-                </td>
-                <td>{{ api.created_at|date:"d M Y" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div class="empty-msg">
-        <i class="fa-solid fa-plug"></i>
-        No API integrations
+                </div>
+
+                <!-- Contact Info -->
+                <div class="sld__section">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-address-book sld__section-icon"></i> Contact
+                    </h3>
+                    <ul class="sld__contact-list">
+                        <li class="sld__contact-row">
+                            <span class="sld__contact-icon"><i class="fa-solid fa-phone"></i></span>
+                            <div class="sld__contact-body">
+                                <div class="sld__contact-lbl">Phone</div>
+                                <div class="sld__contact-val">{{ business.business_phone|default:"Not provided" }}</div>
+                            </div>
+                        </li>
+                        <li class="sld__contact-row">
+                            <span class="sld__contact-icon"><i class="fa-solid fa-envelope"></i></span>
+                            <div class="sld__contact-body">
+                                <div class="sld__contact-lbl">Email</div>
+                                <div class="sld__contact-val">{{ business.business_email|default:"Not provided" }}</div>
+                            </div>
+                        </li>
+                        <li class="sld__contact-row">
+                            <span class="sld__contact-icon"><i class="fa-brands fa-whatsapp"></i></span>
+                            <div class="sld__contact-body">
+                                <div class="sld__contact-lbl">WhatsApp</div>
+                                <div class="sld__contact-val">{{ business.business_whatsapp|default:"Not provided" }}</div>
+                            </div>
+                        </li>
+                        {% if business_profile.business_address %}
+                        <li class="sld__contact-row">
+                            <span class="sld__contact-icon"><i class="fa-solid fa-location-dot"></i></span>
+                            <div class="sld__contact-body">
+                                <div class="sld__contact-lbl">Address</div>
+                                <div class="sld__contact-val">{{ business_profile.business_address }}</div>
+                            </div>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
-    {% endif %}
-</div>
 
-<!-- Tab: Edit -->
-<div id="panel-edit" class="tab-panel">
-    <h3 class="section-heading">Update Seller</h3>
-    <form id="updateForm">
-        {% csrf_token %}
+    <!-- Tab: Orders -->
+    <div id="panel-orders" class="sld__panel">
+        <h3 class="sld__section-title">
+            <i class="fa-solid fa-box sld__section-icon"></i> Recent Orders
+        </h3>
+        {% if recent_orders %}
+        <div class="sld__table-wrap">
+            <table class="sld__table">
+                <thead>
+                    <tr>
+                        <th>Order</th>
+                        <th>Customer</th>
+                        <th>Status</th>
+                        <th>COD</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                    <tr>
+                        <td><span class="sld__order-id">{{ order.order_number|default:order.client_order_code|truncatechars:20 }}</span></td>
+                        <td>
+                            <div class="sld__customer-name">{{ order.customer_name|default:"N/A" }}</div>
+                            {% if order.customer_phone %}
+                            <div class="sld__customer-phone">{{ order.customer_phone }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="sld__badge {% if order.order_status == 'delivered' %}sld__badge--success{% elif order.order_status == 'pending' %}sld__badge--warning{% elif order.order_status == 'cancelled' or order.order_status == 'failed' %}sld__badge--danger{% else %}sld__badge--muted{% endif %}">
+                                {{ order.order_status|title }}
+                            </span>
+                        </td>
+                        <td>{% if order.cod_amount %}{{ order.cod_amount|floatformat:0 }} QAR{% else %}-{% endif %}</td>
+                        <td class="sld__date-cell">{{ order.created_at|date:"d M Y" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="sld__view-all">
+            <a href="{% url 'workforce:wf_orders_by_seller' %}?business={{ business.business_id }}" class="sld__action-btn">
+                <i class="fa-solid fa-external-link"></i> View All Orders
+            </a>
+        </div>
+        {% else %}
+        <div class="sld__empty-msg">
+            <i class="fa-solid fa-box"></i>
+            No orders yet
+        </div>
+        {% endif %}
+    </div>
 
-        <!-- Basic Information Section -->
-        <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-700); margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--brand-grey-100);">
-            <i class="fa-solid fa-store" style="margin-right: 0.5rem; color: var(--brand-primary);"></i>
-            Basic Information
-        </h4>
-        <div class="form-grid">
-            <div class="form-group">
-                <label class="form-label">Business Code</label>
-                <input type="text" name="business_code" value="{{ business.business_code|default:'' }}" class="form-input" placeholder="e.g., SHOP001">
+    <!-- Tab: Details -->
+    <div id="panel-details" class="sld__panel">
+        <div class="sld__two-col">
+            <div>
+                <!-- Business Info -->
+                <div class="sld__section">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-building sld__section-icon"></i> Business Information
+                    </h3>
+                    <div class="sld__info-grid">
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Business Name</div>
+                            <div class="sld__info-val">{{ business.business_name|default:"N/A" }}</div>
+                        </div>
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Business Code</div>
+                            <div class="sld__info-val">{{ business.business_code|default:"N/A" }}</div>
+                        </div>
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">QID</div>
+                            <div class="sld__info-val">{{ business.business_qid|default:"N/A" }}</div>
+                        </div>
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Category</div>
+                            <div class="sld__info-val">{{ business.business_product_category|default:"N/A" }}</div>
+                        </div>
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Business Since</div>
+                            <div class="sld__info-val">{{ business.business_since|date:"d M Y"|default:"N/A" }}</div>
+                        </div>
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Created</div>
+                            <div class="sld__info-val">{{ business.created_at|date:"d M Y" }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if business.user or business.profile %}
+                <!-- Owner Info -->
+                <div class="sld__section">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-user-tie sld__section-icon"></i> Owner Information
+                    </h3>
+                    <div class="sld__info-grid">
+                        {% if business.user %}
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Name</div>
+                            <div class="sld__info-val">{{ business.user.first_name }} {{ business.user.last_name|default:"" }}</div>
+                        </div>
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Username</div>
+                            <div class="sld__info-val">{{ business.user.username|default:"N/A" }}</div>
+                        </div>
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Email</div>
+                            <div class="sld__info-val">{{ business.user.email|default:"N/A" }}</div>
+                        </div>
+                        {% endif %}
+                        {% if business.profile %}
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Phone</div>
+                            <div class="sld__info-val">{{ business.profile.phone|default:"N/A" }}</div>
+                        </div>
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Verification</div>
+                            <div class="sld__info-val">
+                                <span class="sld__badge {% if business.profile.verification_status == 'verified' %}sld__badge--success{% elif business.profile.verification_status == 'pending' %}sld__badge--warning{% else %}sld__badge--danger{% endif %}">
+                                    {{ business.profile.verification_status|title }}
+                                </span>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if business_profile %}
+                <!-- Address -->
+                <div class="sld__section">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-location-dot sld__section-icon"></i> Business Address
+                    </h3>
+                    <div class="sld__info-grid">
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Address</div>
+                            <div class="sld__info-val">{{ business_profile.business_address|default:"N/A" }}</div>
+                        </div>
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">City</div>
+                            <div class="sld__info-val">{{ business_profile.business_city|default:"N/A" }}</div>
+                        </div>
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">State</div>
+                            <div class="sld__info-val">{{ business_profile.business_state|default:"N/A" }}</div>
+                        </div>
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Zip Code</div>
+                            <div class="sld__info-val">{{ business_profile.business_zip_code|default:"N/A" }}</div>
+                        </div>
+                        <div class="sld__info-row">
+                            <div class="sld__info-lbl">Country</div>
+                            <div class="sld__info-val">{{ business_profile.business_country|default:"N/A" }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
-            <div class="form-group">
-                <label class="form-label">Business Name *</label>
-                <input type="text" name="business_name" value="{{ business.business_name }}" class="form-input" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">QID</label>
-                <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="form-input" maxlength="11" placeholder="11 digits">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Product Category</label>
-                <input type="text" name="business_product_category" value="{{ business.business_product_category|default:'' }}" class="form-input" placeholder="e.g., Electronics, Fashion">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Business Since</label>
-                <input type="date" name="business_since" value="{{ business.business_since|date:'Y-m-d' }}" class="form-input">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Status</label>
-                <select name="business_status" class="form-input">
-                    <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
-                    <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
-                    <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
-                    <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
-                </select>
-            </div>
-            <div class="form-group full-width">
-                <label class="form-label">Business Bio</label>
-                <input type="text" name="business_bio" value="{{ business.business_bio|default:'' }}" class="form-input" maxlength="225" placeholder="Short description of the business">
+
+            <div>
+                <!-- Pickup Locations -->
+                <div class="sld__section">
+                    <h3 class="sld__section-title">
+                        <i class="fa-solid fa-map-location-dot sld__section-icon"></i> Pickup Locations
+                    </h3>
+                    {% if pickup_locations %}
+                    <ul class="sld__location-list">
+                        {% for loc in pickup_locations %}
+                        <li class="sld__location-item">
+                            <span class="sld__location-icon"><i class="fa-solid fa-location-dot"></i></span>
+                            <div class="sld__location-body">
+                                <div class="sld__location-title">{{ loc.pickup_location_title }}</div>
+                                <div class="sld__location-addr">Zone {{ loc.pickup_zone_no|default:"N/A" }}, St {{ loc.pickup_street_no|default:"N/A" }}, Bldg {{ loc.pickup_building_no|default:"N/A" }}</div>
+                            </div>
+                            <span class="sld__badge {% if loc.pickup_status == 'active' %}sld__badge--success{% else %}sld__badge--warning{% endif %}">{{ loc.pickup_status|title }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="sld__empty-msg">
+                        <i class="fa-solid fa-map-marker-alt"></i>
+                        No pickup locations
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
+    </div>
 
-        <!-- Contact Information Section -->
-        <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-700); margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--brand-grey-100);">
-            <i class="fa-solid fa-address-book" style="margin-right: 0.5rem; color: var(--brand-primary);"></i>
-            Contact Information
-        </h4>
-        <div class="form-grid">
-            <div class="form-group">
-                <label class="form-label">Phone</label>
-                <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="form-input" placeholder="e.g., +974 1234 5678">
+    <!-- Tab: Documents -->
+    <div id="panel-documents" class="sld__panel">
+        <h3 class="sld__section-title">
+            <i class="fa-solid fa-folder-open sld__section-icon"></i> Business Documents
+        </h3>
+        {% if documents %}
+        {% for doc in documents %}
+        <div class="sld__doc-card">
+            <div class="sld__doc-icon">
+                <i class="fa-solid fa-{% if doc.document_type == 'license' %}certificate{% elif doc.document_type == 'id' %}id-card{% else %}file-alt{% endif %}"></i>
             </div>
-            <div class="form-group">
-                <label class="form-label">WhatsApp</label>
-                <input type="text" name="business_whatsapp" value="{{ business.business_whatsapp|default:'' }}" class="form-input" placeholder="e.g., +974 1234 5678">
+            <div class="sld__doc-info">
+                <div class="sld__doc-type">{{ doc.document_type|default:"Document"|title }}</div>
+                <div class="sld__doc-number">{{ doc.document_no|default:"N/A" }}</div>
+                {% if doc.document_expiry_date %}
+                <div class="sld__doc-expiry">
+                    Expires: {{ doc.document_expiry_date|date:"d M Y" }}
+                    {% if doc.document_expiry_date < now %}
+                    <span class="sld__badge sld__badge--danger sld__badge--sm">Expired</span>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
-            <div class="form-group">
-                <label class="form-label">Email</label>
-                <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="form-input" placeholder="business@example.com">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Website</label>
-                <input type="url" name="business_website" value="{{ business_profile.business_website|default:'' }}" class="form-input" placeholder="https://example.com">
-            </div>
-        </div>
-
-        <!-- Social Media Section -->
-        <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-700); margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--brand-grey-100);">
-            <i class="fa-solid fa-share-nodes" style="margin-right: 0.5rem; color: var(--brand-primary);"></i>
-            Social Media
-        </h4>
-        <div class="form-grid">
-            <div class="form-group">
-                <label class="form-label"><i class="fa-brands fa-instagram" style="margin-right: 0.375rem;"></i>Instagram</label>
-                <input type="text" name="business_instagram" value="{{ business.business_instagram|default:'' }}" class="form-input" placeholder="@username or URL">
-            </div>
-            <div class="form-group">
-                <label class="form-label"><i class="fa-brands fa-facebook" style="margin-right: 0.375rem;"></i>Facebook</label>
-                <input type="text" name="business_facebook_page" value="{{ business.business_facebook_page|default:'' }}" class="form-input" placeholder="Page name or URL">
-            </div>
-        </div>
-
-        <!-- Address Section -->
-        <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-700); margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--brand-grey-100);">
-            <i class="fa-solid fa-location-dot" style="margin-right: 0.5rem; color: var(--brand-primary);"></i>
-            Business Address
-        </h4>
-        <div class="form-grid">
-            <div class="form-group full-width">
-                <label class="form-label">Street Address</label>
-                <input type="text" name="business_address" value="{{ business_profile.business_address|default:'' }}" class="form-input" placeholder="Street address">
-            </div>
-            <div class="form-group">
-                <label class="form-label">City</label>
-                <input type="text" name="business_city" value="{{ business_profile.business_city|default:'' }}" class="form-input" placeholder="e.g., Doha">
-            </div>
-            <div class="form-group">
-                <label class="form-label">State/Area</label>
-                <input type="text" name="business_state" value="{{ business_profile.business_state|default:'' }}" class="form-input" placeholder="e.g., Al Wakrah">
-            </div>
-            <div class="form-group">
-                <label class="form-label">ZIP Code</label>
-                <input type="text" name="business_zip_code" value="{{ business_profile.business_zip_code|default:'' }}" class="form-input" maxlength="10">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Country</label>
-                <input type="text" name="business_country" value="{{ business_profile.business_country|default:'Qatar' }}" class="form-input">
-            </div>
-        </div>
-
-        <!-- Settings Section -->
-        <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-700); margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid var(--brand-grey-100);">
-            <i class="fa-solid fa-gear" style="margin-right: 0.5rem; color: var(--brand-primary);"></i>
-            Service Settings
-        </h4>
-        <div class="form-grid">
-            <div class="form-group">
-                <label class="form-checkbox">
-                    <input type="checkbox" name="fulfillment_service_enabled" {% if business.fulfillment_service_enabled %}checked{% endif %}>
-                    Enable Fulfillment Service (WMS Integration)
-                </label>
-            </div>
-        </div>
-
-        <div class="form-actions">
-            <button type="submit" class="btn-primary">
-                <i class="fa-solid fa-save"></i>
-                Save Changes
+            {% if doc.document_file and doc.document_file.name %}
+            <button type="button" class="sld__doc-btn sld__doc-btn--available doc-view-btn"
+                    data-doc-url="{{ doc.document_file.url }}"
+                    data-doc-title="{{ doc.document_type|default:'Document'|title }} - {{ doc.document_no }}">
+                <i class="fa-solid fa-eye"></i> View
             </button>
-            <a href="{% url 'workforce:sellers_list' %}" class="btn-secondary">Cancel</a>
+            {% else %}
+            <span class="sld__doc-btn sld__doc-btn--unavailable">
+                <i class="fa-solid fa-eye-slash"></i> No File
+            </span>
+            {% endif %}
         </div>
-    </form>
-    <div id="updateMessage" class="toast-msg"></div>
-</div>
+        {% endfor %}
+        {% else %}
+        <div class="sld__empty-msg">
+            <i class="fa-solid fa-folder-open"></i>
+            No documents uploaded
+        </div>
+        {% endif %}
+    </div>
 
-</div>
+    <!-- Document Modal -->
+    <div id="docModal" class="sld__modal-overlay">
+        <div class="sld__modal">
+            <div class="sld__modal-header">
+                <h4 class="sld__modal-title" id="docModalTitle">Document</h4>
+                <button type="button" class="sld__modal-close" id="docModalClose">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="sld__modal-body">
+                <img id="docModalImage" src="" alt="Document">
+            </div>
+            <div class="sld__modal-footer">
+                <a href="#" id="docModalDownload" class="sld__modal-btn sld__modal-btn--secondary" target="_blank">
+                    <i class="fa-solid fa-download"></i> Open in New Tab
+                </a>
+                <button type="button" class="sld__modal-btn sld__modal-btn--primary" id="docModalCloseBtn">
+                    <i class="fa-solid fa-xmark"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Team -->
+    <div id="panel-team" class="sld__panel">
+        <h3 class="sld__section-title">
+            <i class="fa-solid fa-users sld__section-icon"></i> Team Members
+        </h3>
+        {% if team_members %}
+        <div class="sld__table-wrap">
+            <table class="sld__table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for member in team_members %}
+                    <tr>
+                        <td>
+                            <div class="sld__team-name">{{ member.team_name|default:member.user.username }}</div>
+                            {% if member.team_code %}
+                            <div class="sld__team-code">{{ member.team_code }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="sld__badge {% if member.team_role == 'manager' %}sld__badge--info{% else %}sld__badge--muted{% endif %}">
+                                {{ member.team_role|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="sld__badge {% if member.team_status == 'active' %}sld__badge--success{% elif member.team_status == 'pending' %}sld__badge--warning{% else %}sld__badge--muted{% endif %}">
+                                {{ member.team_status|title }}
+                            </span>
+                        </td>
+                        <td class="sld__text-muted">{{ member.team_email|default:member.user.email|default:"N/A" }}</td>
+                        <td class="sld__text-muted">{{ member.team_phone|default:"N/A" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="sld__empty-msg">
+            <i class="fa-solid fa-users"></i>
+            No team members
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Tab: Integrations -->
+    <div id="panel-integrations" class="sld__panel">
+        <h3 class="sld__section-title">
+            <i class="fa-solid fa-plug sld__section-icon"></i> API Integrations
+        </h3>
+        {% if api_settings %}
+        <div class="sld__table-wrap">
+            <table class="sld__table">
+                <thead>
+                    <tr>
+                        <th>Platform</th>
+                        <th>API URL</th>
+                        <th>Status</th>
+                        <th>Default</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for api in api_settings %}
+                    <tr>
+                        <td><span class="sld__badge sld__badge--muted">{{ api.api_type|title }}</span></td>
+                        <td class="sld__api-url">{{ api.site_api_url|default:"N/A"|truncatechars:40 }}</td>
+                        <td>
+                            {% if api.is_verify_api %}
+                            <span class="sld__badge sld__badge--success">Verified</span>
+                            {% else %}
+                            <span class="sld__badge sld__badge--warning">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if api.is_default %}<i class="fa-solid fa-check sld__check-icon"></i>{% else %}-{% endif %}
+                        </td>
+                        <td class="sld__date-cell">{{ api.created_at|date:"d M Y" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="sld__empty-msg">
+            <i class="fa-solid fa-plug"></i>
+            No API integrations
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Tab: Edit -->
+    <div id="panel-edit" class="sld__panel">
+        <h3 class="sld__section-title">
+            <i class="fa-solid fa-pen-to-square sld__section-icon"></i> Update Seller
+        </h3>
+        <form id="updateForm">
+            {% csrf_token %}
+
+            <!-- Basic Information -->
+            <h4 class="sld__form-heading">
+                <i class="fa-solid fa-store sld__form-heading-icon"></i> Basic Information
+            </h4>
+            <div class="sld__form-grid">
+                <div class="sld__form-group">
+                    <label class="sld__form-label">Business Code</label>
+                    <input type="text" name="business_code" value="{{ business.business_code|default:'' }}" class="sld__form-input" placeholder="e.g., SHOP001">
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label">Business Name *</label>
+                    <input type="text" name="business_name" value="{{ business.business_name }}" class="sld__form-input" required>
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label">QID</label>
+                    <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="sld__form-input" maxlength="11" placeholder="11 digits">
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label">Product Category</label>
+                    <input type="text" name="business_product_category" value="{{ business.business_product_category|default:'' }}" class="sld__form-input" placeholder="e.g., Electronics, Fashion">
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label">Business Since</label>
+                    <input type="date" name="business_since" value="{{ business.business_since|date:'Y-m-d' }}" class="sld__form-input">
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label">Status</label>
+                    <select name="business_status" class="sld__form-input">
+                        <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                        <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
+                    </select>
+                </div>
+                <div class="sld__form-group sld__form-group--full">
+                    <label class="sld__form-label">Business Bio</label>
+                    <input type="text" name="business_bio" value="{{ business.business_bio|default:'' }}" class="sld__form-input" maxlength="225" placeholder="Short description of the business">
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <h4 class="sld__form-heading">
+                <i class="fa-solid fa-address-book sld__form-heading-icon"></i> Contact Information
+            </h4>
+            <div class="sld__form-grid">
+                <div class="sld__form-group">
+                    <label class="sld__form-label">Phone</label>
+                    <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="sld__form-input" placeholder="e.g., +974 1234 5678">
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label">WhatsApp</label>
+                    <input type="text" name="business_whatsapp" value="{{ business.business_whatsapp|default:'' }}" class="sld__form-input" placeholder="e.g., +974 1234 5678">
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label">Email</label>
+                    <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="sld__form-input" placeholder="business@example.com">
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label">Website</label>
+                    <input type="url" name="business_website" value="{{ business_profile.business_website|default:'' }}" class="sld__form-input" placeholder="https://example.com">
+                </div>
+            </div>
+
+            <!-- Social Media -->
+            <h4 class="sld__form-heading">
+                <i class="fa-solid fa-share-nodes sld__form-heading-icon"></i> Social Media
+            </h4>
+            <div class="sld__form-grid">
+                <div class="sld__form-group">
+                    <label class="sld__form-label"><i class="fa-brands fa-instagram sld__form-label-icon"></i> Instagram</label>
+                    <input type="text" name="business_instagram" value="{{ business.business_instagram|default:'' }}" class="sld__form-input" placeholder="@username or URL">
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label"><i class="fa-brands fa-facebook sld__form-label-icon"></i> Facebook</label>
+                    <input type="text" name="business_facebook_page" value="{{ business.business_facebook_page|default:'' }}" class="sld__form-input" placeholder="Page name or URL">
+                </div>
+            </div>
+
+            <!-- Address -->
+            <h4 class="sld__form-heading">
+                <i class="fa-solid fa-location-dot sld__form-heading-icon"></i> Business Address
+            </h4>
+            <div class="sld__form-grid">
+                <div class="sld__form-group sld__form-group--full">
+                    <label class="sld__form-label">Street Address</label>
+                    <input type="text" name="business_address" value="{{ business_profile.business_address|default:'' }}" class="sld__form-input" placeholder="Street address">
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label">City</label>
+                    <input type="text" name="business_city" value="{{ business_profile.business_city|default:'' }}" class="sld__form-input" placeholder="e.g., Doha">
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label">State/Area</label>
+                    <input type="text" name="business_state" value="{{ business_profile.business_state|default:'' }}" class="sld__form-input" placeholder="e.g., Al Wakrah">
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label">ZIP Code</label>
+                    <input type="text" name="business_zip_code" value="{{ business_profile.business_zip_code|default:'' }}" class="sld__form-input" maxlength="10">
+                </div>
+                <div class="sld__form-group">
+                    <label class="sld__form-label">Country</label>
+                    <input type="text" name="business_country" value="{{ business_profile.business_country|default:'Qatar' }}" class="sld__form-input">
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <h4 class="sld__form-heading">
+                <i class="fa-solid fa-gear sld__form-heading-icon"></i> Service Settings
+            </h4>
+            <div class="sld__form-grid">
+                <div class="sld__form-group">
+                    <label class="sld__form-checkbox">
+                        <input type="checkbox" name="fulfillment_service_enabled" {% if business.fulfillment_service_enabled %}checked{% endif %}>
+                        Enable Fulfillment Service (WMS Integration)
+                    </label>
+                </div>
+            </div>
+
+            <div class="sld__form-actions">
+                <button type="submit" class="sld__btn-submit">
+                    <i class="fa-solid fa-save"></i> Save Changes
+                </button>
+                <a href="{% url 'workforce:sellers_list' %}" class="sld__btn-cancel">Cancel</a>
+            </div>
+        </form>
+        <div id="updateMessage" class="sld__toast"></div>
+    </div>
+
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
 // Tab switching
-document.querySelectorAll('.tab-btn').forEach(function(btn) {
+document.querySelectorAll('.sld__tab').forEach(function(btn) {
     btn.addEventListener('click', function() {
-        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-        document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+        document.querySelectorAll('.sld__tab').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('.sld__panel').forEach(function(p) { p.classList.remove('active'); });
         this.classList.add('active');
         document.getElementById('panel-' + this.getAttribute('data-tab')).classList.add('active');
     });
@@ -778,32 +781,16 @@ function closeDocModal() {
     docModalImage.src = '';
 }
 
-// View button click handlers
 document.querySelectorAll('.doc-view-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
-        var url = this.getAttribute('data-doc-url');
-        var title = this.getAttribute('data-doc-title');
-        openDocModal(url, title);
+        openDocModal(this.getAttribute('data-doc-url'), this.getAttribute('data-doc-title'));
     });
 });
 
-// Close button handlers
 document.getElementById('docModalClose').addEventListener('click', closeDocModal);
 document.getElementById('docModalCloseBtn').addEventListener('click', closeDocModal);
-
-// Close on overlay click
-docModal.addEventListener('click', function(e) {
-    if (e.target === docModal) {
-        closeDocModal();
-    }
-});
-
-// Close on Escape key
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && docModal.classList.contains('show')) {
-        closeDocModal();
-    }
-});
+docModal.addEventListener('click', function(e) { if (e.target === docModal) closeDocModal(); });
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && docModal.classList.contains('show')) closeDocModal(); });
 
 // Form submit
 document.getElementById('updateForm').addEventListener('submit', function(e) {
@@ -820,13 +807,13 @@ document.getElementById('updateForm').addEventListener('submit', function(e) {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        msg.className = 'toast-msg show ' + (data.success ? 'success' : 'error');
+        msg.className = 'sld__toast sld__toast--show sld__toast--' + (data.success ? 'success' : 'error');
         msg.innerHTML = '<i class="fa-solid fa-' + (data.success ? 'check-circle' : 'exclamation-circle') + '"></i> ' + (data.message || data.error || 'Done');
         if (data.success) setTimeout(function() { location.reload(); }, 1500);
         else { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes'; }
     })
     .catch(function() {
-        msg.className = 'toast-msg show error';
+        msg.className = 'sld__toast sld__toast--show sld__toast--error';
         msg.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Error saving';
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes';

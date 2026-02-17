@@ -45,6 +45,7 @@ import random
 import secrets
 import string
 from datetime import datetime, timedelta
+from django.utils import timezone as dj_timezone
 from functools import wraps
 
 from django.contrib import messages
@@ -276,7 +277,7 @@ def join_driver(request):
                 driver.driver_rating_count = 0
                 driver.driver_reviews = 0
                 driver.driver_reviews_count = 0
-                driver.created_at = datetime.now()
+                driver.created_at = dj_timezone.now()
                 driver.save()
 
                 profile_update = joinusform.save(commit=False)
@@ -878,7 +879,7 @@ def business_register(request):
                 if completion_percentage == 100:
                     profile.is_business_profile_completed = True
                     profile.verification_status = VERIFICATION_STATUS_PENDING
-                    profile.verification_applied_at = datetime.now()
+                    profile.verification_applied_at = dj_timezone.now()
                     profile.save()
                     logger.info(f"Business verification applied for user {request.user.id}")
                     messages.success(request, "Application submitted for verification! Our team will review it soon.")
@@ -977,7 +978,7 @@ def driver_register(request):
                 if completion_percentage == 100:
                     profile.is_driver_profile_completed = True
                     profile.verification_status = VERIFICATION_STATUS_PENDING
-                    profile.verification_applied_at = datetime.now()
+                    profile.verification_applied_at = dj_timezone.now()
                     profile.save()
                     logger.info(f"Driver verification applied for user {request.user.id}")
                     messages.success(request, "Application submitted for verification! Our team will review it soon.")

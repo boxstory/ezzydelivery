@@ -4,226 +4,41 @@
 {% block title %}Navigation - Task #{{ task.dl_task_number }}{% endblock %}
 
 {% block extra_css %}
-<link href="{% static 'fleet/css/fleet.css' %}" rel="stylesheet" type="text/css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>
-  .navigation-container {
-    height: calc(100vh - 60px);
-    display: flex;
-    flex-direction: column;
-  }
-  .task-info-bar {
-    background: var(--pwa-navy, #001f3f);
-    color: white;
-    padding: 12px 16px;
-  }
-  .task-info-bar__title {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 4px;
-  }
-  .task-info-bar__subtitle {
-    font-size: 12px;
-    opacity: 0.9;
-  }
-  .map-container {
-    flex: 1;
-    position: relative;
-    min-height: 300px;
-  }
-  #navigation-map {
-    width: 100%;
-    height: 100%;
-    z-index: 1;
-  }
-  .destination-card {
-    position: absolute;
-    bottom: 80px;
-    left: 16px;
-    right: 16px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-    padding: 16px;
-    z-index: 1000;
-  }
-  .destination-card__header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 12px;
-  }
-  .destination-card__icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--pwa-danger, #dc3545);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 12px;
-    flex-shrink: 0;
-  }
-  .destination-card__label {
-    font-size: 12px;
-    color: #666;
-  }
-  .destination-card__address {
-    font-weight: 600;
-    font-size: 14px;
-  }
-  .destination-card__details {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 8px;
-    font-size: 13px;
-    color: #666;
-    flex-wrap: wrap;
-  }
-  .destination-card__detail {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .navigation-actions {
-    position: absolute;
-    bottom: 16px;
-    left: 16px;
-    right: 16px;
-    display: flex;
-    gap: 12px;
-    z-index: 1000;
-  }
-  .navigation-actions .btn {
-    flex: 1;
-    padding: 14px;
-    font-weight: 600;
-    border-radius: 10px;
-  }
-  .btn-navigate {
-    background: var(--pwa-primary, #f7c000);
-    border: none;
-    color: #000;
-  }
-  .btn-navigate:hover {
-    background: #e5b000;
-    color: #000;
-  }
-  .btn-complete {
-    background: var(--pwa-success, #28a745);
-    border: none;
-    color: white;
-  }
-  .btn-call {
-    background: white;
-    border: 2px solid var(--pwa-navy, #001f3f);
-    color: var(--pwa-navy, #001f3f);
-    flex: 0 0 auto;
-    width: 52px;
-  }
-  .btn-whatsapp {
-    background: #25D366;
-    border: none;
-    color: white;
-    flex: 0 0 auto;
-    width: 52px;
-  }
-  .btn-whatsapp:hover {
-    background: #1da851;
-    color: white;
-  }
-  .btn-start {
-    background: var(--pwa-primary, #f7c000);
-    border: none;
-    color: #000;
-  }
-  .btn-start:hover {
-    background: #e5b000;
-    color: #000;
-  }
-  .btn-pickup {
-    background: #17a2b8;
-    border: none;
-    color: white;
-  }
-  .btn-pickup:hover {
-    background: #138496;
-    color: white;
-  }
-  .btn-contacted {
-    background: #6c757d;
-    border: none;
-    color: white;
-  }
-  .btn-contacted:hover {
-    background: #5a6268;
-    color: white;
-  }
-  .btn-non-reachable {
-    background: #343a40;
-    border: none;
-    color: white;
-  }
-  .btn-non-reachable:hover {
-    background: #23272b;
-    color: white;
-  }
-  .action-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-  .no-address-info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    background: #f8f9fa;
-    color: #666;
-    text-align: center;
-    padding: 20px;
-  }
-  .no-address-info i {
-    font-size: 48px;
-    margin-bottom: 16px;
-    color: #aaa;
-  }
-</style>
 {% endblock %}
 
 {% block content %}
-<div class="navigation-container">
+<div class="tnv">
   <!-- Task Info Bar -->
-  <div class="task-info-bar">
+  <div class="tnv__info-bar">
     <div class="d-flex justify-content-between align-items-center">
       <div>
-        <div class="task-info-bar__title">
+        <div class="tnv__info-bar-title">
           <i class="fa-solid fa-truck-fast me-2"></i>Task #{{ task.dl_task_number }}
         </div>
-        <div class="task-info-bar__subtitle">
+        <div class="tnv__info-bar-subtitle">
           {{ task.order.business.business_name|default:"Pickup" }} &rarr; {% if dropoff %}{{ dropoff.area_name|default:"Delivery" }}{% else %}Delivery{% endif %}
         </div>
       </div>
-      <a href="{% url 'delivery:all_delivery_tasks' %}?tab=accepted" class="btn btn-sm btn-light">
+      <a href="{% url 'delivery:all_delivery_tasks' %}?tab=accepted" class="tnv__back-btn">
         <i class="fa-solid fa-arrow-left me-1"></i>Back
       </a>
     </div>
   </div>
 
   <!-- Map Container -->
-  <div class="map-container">
-    <div id="navigation-map"></div>
+  <div class="tnv__map-wrap">
+    <div id="navigation-map" class="tnv__map"></div>
 
     <!-- Destination Card -->
-    <div class="destination-card">
-      <div class="destination-card__header">
-        <div class="destination-card__icon">
+    <div class="tnv__dest-card">
+      <div class="tnv__dest-card-header">
+        <div class="tnv__dest-card-icon">
           <i class="fa-solid fa-location-dot"></i>
         </div>
         <div>
-          <div class="destination-card__label">Delivery Location</div>
-          <div class="destination-card__address">
+          <div class="tnv__dest-card-label">Delivery Location</div>
+          <div class="tnv__dest-card-address">
             {% if dropoff and dropoff.dl_zone %}
               Zone {{ dropoff.dl_zone }}, {{ dropoff.area_name|default:"N/A" }}
             {% elif task.order.dl_zone %}
@@ -236,33 +51,33 @@
           </div>
         </div>
       </div>
-      <div class="destination-card__details">
+      <div class="tnv__dest-card-details">
         {% if dropoff.dl_street or task.order.dl_street %}
-        <div class="destination-card__detail">
+        <div class="tnv__dest-card-detail">
           <i class="fa-solid fa-road"></i>
           Street {{ dropoff.dl_street|default:task.order.dl_street }}
         </div>
         {% endif %}
         {% if dropoff.dl_building or task.order.dl_building %}
-        <div class="destination-card__detail">
+        <div class="tnv__dest-card-detail">
           <i class="fa-solid fa-building"></i>
           Building {{ dropoff.dl_building|default:task.order.dl_building }}
         </div>
         {% endif %}
         {% if task.order.cod_amount > 0 %}
-        <div class="destination-card__detail">
+        <div class="tnv__dest-card-detail">
           <i class="fa-solid fa-coins"></i>
           COD: {{ task.order.cod_amount }} QR
         </div>
         {% endif %}
       </div>
-      <div class="destination-card__details">
-        <div class="destination-card__detail">
+      <div class="tnv__dest-card-details">
+        <div class="tnv__dest-card-detail">
           <i class="fa-solid fa-user"></i>
           {% if dropoff.full_name %}{{ dropoff.full_name }}{% else %}{{ task.order.customer_name|default:"Customer" }}{% endif %}
         </div>
         {% if dropoff.mobile_no or task.order.customer_phone %}
-        <div class="destination-card__detail">
+        <div class="tnv__dest-card-detail">
           <i class="fa-solid fa-phone"></i>
           {{ dropoff.mobile_no|default:task.order.customer_phone }}
         </div>
@@ -271,20 +86,20 @@
     </div>
 
     <!-- Navigation Actions -->
-    <div class="navigation-actions">
+    <div class="tnv__actions">
       {% if dropoff.mobile_no %}
-      <a href="tel:{{ dropoff.mobile_no }}" class="btn btn-call" title="Call Customer">
+      <a href="tel:{{ dropoff.mobile_no }}" class="tnv__btn tnv__btn--call" title="Call Customer">
         <i class="fa-solid fa-phone"></i>
       </a>
-      <a href="#" class="btn btn-whatsapp" id="btn-whatsapp-location" title="Send Location via WhatsApp"
+      <a href="#" class="tnv__btn tnv__btn--whatsapp" id="btn-whatsapp-location" title="Send Location via WhatsApp"
          data-phone="{{ task.order.customer_whatsapp|default:dropoff.mobile_no }}">
         <i class="fa-brands fa-whatsapp"></i>
       </a>
       {% endif %}
-      <button type="button" class="btn btn-navigate flex-grow-1" id="btn-open-maps">
+      <button type="button" class="tnv__btn tnv__btn--navigate flex-grow-1" id="btn-open-maps">
         <i class="fa-solid fa-diamond-turn-right me-1"></i>Navigate
       </button>
-      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#statusModal">
+      <button type="button" class="tnv__btn tnv__btn--primary" data-bs-toggle="modal" data-bs-target="#statusModal">
         <i class="fa-solid fa-list-check me-1"></i>Actions
       </button>
     </div>
@@ -302,66 +117,66 @@
           <div class="modal-body">
             <!-- Current Status Badge -->
             <div class="text-center mb-3">
-              <span class="badge bg-primary fs-6">Current: {{ task.get_dl_task_status_display }}</span>
+              <span class="tnv__status-badge tnv__status-badge--info">Current: {{ task.get_dl_task_status_display }}</span>
             </div>
             <div class="d-grid gap-2">
               {% if task.dl_task_status == 'picked_up' or task.dl_task_status == 'start_ride' or task.dl_task_status == 'out_for_delivery' or task.dl_task_status == 'in_transit' or task.dl_task_status == 'contacted' or task.dl_task_status == 'non_reachable' %}
-              <button type="button" class="btn btn-outline-success btn-lg" disabled>
+              <button type="button" class="tnv__modal-btn tnv__modal-btn--done" disabled>
                 <i class="fa-solid fa-check me-2"></i>Picked Up <i class="fa-solid fa-circle-check ms-2"></i>
               </button>
               {% else %}
-              <button type="button" class="btn btn-info btn-lg" id="btn-picked-up" data-task-id="{{ task.id }}">
+              <button type="button" class="tnv__modal-btn tnv__modal-btn--pickup" id="btn-picked-up" data-task-id="{{ task.id }}">
                 <i class="fa-solid fa-box me-2"></i>Picked Up
               </button>
               {% endif %}
 
               {% if task.dl_task_status == 'start_ride' or task.dl_task_status == 'out_for_delivery' or task.dl_task_status == 'in_transit' or task.dl_task_status == 'contacted' or task.dl_task_status == 'non_reachable' %}
-              <button type="button" class="btn btn-outline-success btn-lg" disabled>
+              <button type="button" class="tnv__modal-btn tnv__modal-btn--done" disabled>
                 <i class="fa-solid fa-check me-2"></i>Start Ride <i class="fa-solid fa-circle-check ms-2"></i>
               </button>
               {% else %}
-              <button type="button" class="btn btn-warning btn-lg" id="btn-start-ride" data-task-id="{{ task.id }}">
+              <button type="button" class="tnv__modal-btn tnv__modal-btn--start" id="btn-start-ride" data-task-id="{{ task.id }}">
                 <i class="fa-solid fa-play me-2"></i>Start Ride
               </button>
               {% endif %}
 
               {% if task.dl_task_status == 'contacted' %}
-              <button type="button" class="btn btn-outline-success btn-lg" disabled>
+              <button type="button" class="tnv__modal-btn tnv__modal-btn--done" disabled>
                 <i class="fa-solid fa-check me-2"></i>Contacted & Confirmed <i class="fa-solid fa-circle-check ms-2"></i>
               </button>
               {% else %}
-              <button type="button" class="btn btn-secondary btn-lg" id="btn-contacted" data-task-id="{{ task.id }}">
+              <button type="button" class="tnv__modal-btn tnv__modal-btn--contacted" id="btn-contacted" data-task-id="{{ task.id }}">
                 <i class="fa-solid fa-phone-volume me-2"></i>Contacted & Confirmed
               </button>
               {% endif %}
 
               {% if task.dl_task_status == 'non_reachable' %}
-              <button type="button" class="btn btn-outline-warning btn-lg" disabled>
+              <button type="button" class="tnv__modal-btn tnv__modal-btn--done-warn" disabled>
                 <i class="fa-solid fa-exclamation-triangle me-2"></i>Non Reachable <i class="fa-solid fa-circle-check ms-2"></i>
               </button>
               {% else %}
-              <button type="button" class="btn btn-dark btn-lg" id="btn-non-reachable" data-task-id="{{ task.id }}">
+              <button type="button" class="tnv__modal-btn tnv__modal-btn--dark" id="btn-non-reachable" data-task-id="{{ task.id }}">
                 <i class="fa-solid fa-phone-slash me-2"></i>Non Reachable
               </button>
               {% endif %}
 
               <hr>
               {% if task.dl_task_status == 'delivered' %}
-              <button type="button" class="btn btn-outline-success btn-lg" disabled>
+              <button type="button" class="tnv__modal-btn tnv__modal-btn--done" disabled>
                 <i class="fa-solid fa-check me-2"></i>Delivered <i class="fa-solid fa-circle-check ms-2"></i>
               </button>
               {% else %}
-              <button type="button" class="btn btn-success btn-lg" id="btn-complete-task" data-task-id="{{ task.id }}">
+              <button type="button" class="tnv__modal-btn tnv__modal-btn--success" id="btn-complete-task" data-task-id="{{ task.id }}">
                 <i class="fa-solid fa-check me-2"></i>Delivered
               </button>
               {% endif %}
 
               {% if task.dl_task_status == 'failed' %}
-              <button type="button" class="btn btn-outline-danger btn-lg" disabled>
+              <button type="button" class="tnv__modal-btn tnv__modal-btn--done-danger" disabled>
                 <i class="fa-solid fa-times me-2"></i>Failed <i class="fa-solid fa-circle-check ms-2"></i>
               </button>
               {% else %}
-              <button type="button" class="btn btn-danger btn-lg" id="btn-failed-task" data-task-id="{{ task.id }}">
+              <button type="button" class="tnv__modal-btn tnv__modal-btn--danger" id="btn-failed-task" data-task-id="{{ task.id }}">
                 <i class="fa-solid fa-times me-2"></i>Failed
               </button>
               {% endif %}

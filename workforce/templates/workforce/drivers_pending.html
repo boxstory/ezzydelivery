@@ -1,135 +1,129 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
-{% block title %}
-    Pending Drivers - Ezzy Delivery
-{% endblock title %}
-{% block extra_css %}
-    <link type="text/css"
-          rel="stylesheet"
-          href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
+{% block title %}Pending Drivers - Ezzy Delivery{% endblock title %}
 {% block content %}
-<div class="col-12 p-3">
-    <!-- Page Title -->
-    <h1 class="page-title">
-        <i class="fa-solid fa-clock me-2"></i>Pending Drivers
-    </h1>
-    <!-- Filter Section -->
-    <div class="filter-section">
-        <form method="get" class="row g-3"
+<div class="drp">
+    <!-- Hero Header -->
+    <div class="drp__hero">
+        <div class="drp__hero-inner">
+            <div class="drp__hero-left">
+                <h1 class="drp__hero-title">
+                    <i class="fa-solid fa-clock"></i> Pending Drivers
+                </h1>
+                <p class="drp__hero-sub">Drivers awaiting review and approval</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="drp__filter">
+        <div class="drp__filter-header">
+            <i class="fa-solid fa-sliders drp__filter-header-icon"></i>
+            <span class="drp__filter-header-text">Search</span>
+        </div>
+        <form method="get" class="drp__filter-form"
               id="workforce_drivers_pending_form_filter"
               hx-get=""
               hx-target="#main-content"
               hx-select="#main-content"
               hx-swap="outerHTML"
               hx-push-url="true">
-            <div class="col-md-8">
-                <label for="searchInput" class="filter-label">
-                    <i class="fa-solid fa-search me-2"></i>Search Drivers
+            <div class="drp__filter-group drp__filter-group--lg">
+                <label for="searchInput" class="drp__filter-label">
+                    <i class="fa-solid fa-search"></i> Search Drivers
                 </label>
-                <input type="text"
-                       id="searchInput"
-                       name="search"
-                       class="filter-input"
+                <input type="text" id="searchInput" name="search"
+                       class="drp__filter-input"
                        placeholder="Search by name, code, phone..."
                        value="{{ search }}">
             </div>
-            <div class="col-md-4">
-                <label class="filter-label filter-label-hidden">Action</label>
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="fa-solid fa-search me-2"></i>Search
+            <div class="drp__filter-actions">
+                <button type="submit" class="drp__btn drp__btn--primary">
+                    <i class="fa-solid fa-search"></i> Search
                 </button>
             </div>
         </form>
     </div>
-    <!-- Drivers Table -->
-    <div class="orders-table-container">
+
+    <!-- Table -->
+    <div class="drp__table-wrap">
         {% if page_obj %}
-            <table class="orders-table" id="workforce_drivers_pending_table_list">
-                <thead>
-                    <tr>
-                        <th>Driver</th>
-                        <th>Contact</th>
-                        <th>Status</th>
-                        <th>Vehicle</th>
-                        <th>Documents</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for driver in page_obj %}
-                        <tr>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="driver-icon driver-icon-sm me-3">
-                                        <i class="fa-solid fa-user"></i>
-                                    </div>
-                                    <div>
-                                        <strong>{{ driver.user.first_name }} {{ driver.user.last_name }}</strong>
-                                        <br>
-                                        <small class="text-muted">{{ driver.driver_code|default:"N/A" }}</small>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                {% if driver.driver_phone %}
-                                    <div>
-                                        <i class="fa-solid fa-phone me-2"></i>{{ driver.driver_phone }}
-                                    </div>
-                                {% endif %}
-                                {% if driver.driver_whatsapp %}
-                                    <div>
-                                        <i class="fa-brands fa-whatsapp me-2"></i>{{ driver.driver_whatsapp }}
-                                    </div>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="status-badge status-pending">
-                                    {{ driver.driver_status }}
-                                </span>
-                            </td>
-                            <td>
-                                {% with vehicle=driver.driver_vehicle.first %}
-                                    {% if vehicle %}
-                                        <span>{{ vehicle.vehicle_type|title }}</span>
-                                        <br>
-                                        <small class="text-muted">{{ vehicle.vehicle_no|default:"" }}</small>
-                                    {% else %}
-                                        <span class="text-muted">No vehicle</span>
-                                    {% endif %}
-                                {% endwith %}
-                            </td>
-                            <td>
-                                {% with doc_count=driver.driver_document.count %}
-                                    <span class="{% if doc_count > 0 %}text-success{% else %}text-danger{% endif %}">
-                                        {{ doc_count }} document{{ doc_count|pluralize }}
-                                    </span>
-                                {% endwith %}
-                            </td>
-                            <td>
-                                <a href="{% url 'workforce:driver_detail' driver.driver_id %}"
-                                   class="btn btn-sm btn-outline-primary">
-                                    <i class="fa-solid fa-eye me-1"></i>Review
-                                </a>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <!-- Pagination -->
-            {% include "includes/components/_pagination.html" with page_obj=page_obj %}
+        <table class="drp__table" id="workforce_drivers_pending_table_list">
+            <thead>
+                <tr>
+                    <th>Driver</th>
+                    <th>Contact</th>
+                    <th>Status</th>
+                    <th>Vehicle</th>
+                    <th>Documents</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for driver in page_obj %}
+                <tr>
+                    <td>
+                        <div class="drp__driver-cell">
+                            <div class="drp__driver-avatar">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <div>
+                                <div class="drp__driver-name">{{ driver.user.first_name }} {{ driver.user.last_name }}</div>
+                                <div class="drp__driver-code">{{ driver.driver_code|default:"N/A" }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if driver.driver_phone %}
+                        <div class="drp__contact-line">
+                            <i class="fa-solid fa-phone"></i> {{ driver.driver_phone }}
+                        </div>
+                        {% endif %}
+                        {% if driver.driver_whatsapp %}
+                        <div class="drp__contact-line">
+                            <i class="fa-brands fa-whatsapp"></i> {{ driver.driver_whatsapp }}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="drp__badge drp__badge--warning">
+                            {{ driver.driver_status }}
+                        </span>
+                    </td>
+                    <td>
+                        {% with vehicle=driver.driver_vehicle.first %}
+                        {% if vehicle %}
+                        <div class="drp__vehicle-type">{{ vehicle.vehicle_type|title }}</div>
+                        <div class="drp__vehicle-no">{{ vehicle.vehicle_no|default:"" }}</div>
+                        {% else %}
+                        <span class="drp__text-muted">No vehicle</span>
+                        {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td>
+                        {% with doc_count=driver.driver_document.count %}
+                        <span class="drp__doc-count {% if doc_count > 0 %}drp__doc-count--has{% else %}drp__doc-count--none{% endif %}">
+                            <i class="fa-solid fa-file-alt"></i> {{ doc_count }} document{{ doc_count|pluralize }}
+                        </span>
+                        {% endwith %}
+                    </td>
+                    <td>
+                        <a href="{% url 'workforce:driver_detail' driver.driver_id %}"
+                           class="drp__btn drp__btn--review">
+                            <i class="fa-solid fa-eye"></i> Review
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% include "includes/components/_pagination.html" with page_obj=page_obj %}
         {% else %}
-            <div class="empty-state">
-                <i class="fa-solid fa-clock"></i>
-                <h3>No Pending Drivers</h3>
-                <p>
-                    {% if search %}
-                        No pending drivers match your search criteria.
-                    {% else %}
-                        There are no drivers pending approval.
-                    {% endif %}
-                </p>
-            </div>
+        <div class="drp__empty">
+            <i class="fa-solid fa-clock"></i>
+            <h3>No Pending Drivers</h3>
+            <p>{% if search %}No pending drivers match your search criteria.{% else %}There are no drivers pending approval.{% endif %}</p>
+        </div>
         {% endif %}
     </div>
 </div>

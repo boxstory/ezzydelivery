@@ -1,245 +1,246 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+
 {% block content %}
-<div class="order-product-add-page" id="orders_add_product_container_main">
-  <!-- Page Header -->
-  <div class="order-product-header">
-    <div class="order-product-header-content">
-      <div class="order-product-title-section">
-        <h1 class="order-product-title">
-          <i class="fas fa-boxes me-2"></i>Add Products to Order
-        </h1>
-        <p class="order-product-subtitle">Add one or more products to order #{{ order.client_order_code }}</p>
-      </div>
-      <div class="order-product-quick-actions">
-        <a href="{% url 'orders:order_update' order.id %}" class="quick-action-btn">
-          <i class="fas fa-edit"></i>
-          <span>Edit Order</span>
-        </a>
-        <a href="{% url 'orders:orders_all_list' %}" class="quick-action-btn">
-          <i class="fas fa-arrow-left"></i>
-          <span>Back to Orders</span>
-        </a>
-      </div>
-    </div>
-  </div>
-
-  <!-- Order Summary Card -->
-  <div class="order-summary-card">
-    <div class="order-summary-header">
-      <i class="fas fa-file-invoice"></i>
-      <h3>Order Details</h3>
-    </div>
-    <div class="order-summary-body">
-      <div class="order-summary-grid">
-        <div class="summary-item">
-          <span class="summary-label">Customer</span>
-          <span class="summary-value">{{ order.customer_name }}</span>
+<div class="opa" id="orders_add_product_container_main">
+    <!-- Hero Header -->
+    <div class="opa__hero">
+        <div class="opa__hero-content">
+            <div class="opa__hero-left">
+                <h1 class="opa__title">
+                    <i class="fas fa-boxes"></i>
+                    Add Products to Order
+                </h1>
+                <p class="opa__subtitle">Add one or more products to order #{{ order.client_order_code }}</p>
+            </div>
+            <div class="opa__hero-actions">
+                <a href="{% url 'orders:order_update' order.id %}" class="opa__btn opa__btn--outline">
+                    <i class="fas fa-edit"></i> Edit Order
+                </a>
+                <a href="{% url 'orders:orders_all_list' %}" class="opa__btn opa__btn--outline">
+                    <i class="fas fa-arrow-left"></i> Back to Orders
+                </a>
+            </div>
         </div>
-        <div class="summary-item">
-          <span class="summary-label">Phone</span>
-          <span class="summary-value">{{ order.customer_phone }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-label">Order ID</span>
-          <span class="summary-value">{{ order.client_order_code }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-label">Date</span>
-          <span class="summary-value">{{ order.order_date }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-label">Status</span>
-          <span class="summary-value">
-            <span class="badge bg-{{ order.order_status|default:'secondary' }}">{{ order.get_order_status_display }}</span>
-          </span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Existing Products (if any) -->
-  {% if existing_items %}
-  <div class="existing-products-card">
-    <div class="existing-products-header">
-      <i class="fas fa-shopping-cart"></i>
-      <h3>Current Products ({{ existing_items.count }})</h3>
-    </div>
-    <div class="existing-products-body">
-      <table class="existing-products-table">
-        <thead>
-          <tr>
-            <th>Product</th>
-            <th>SKU</th>
-            <th>Qty</th>
-            <th>Unit Price</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in existing_items %}
-          <tr>
-            <td>{{ item.product.brand_name }} {{ item.product.item_name }}</td>
-            <td><code>{{ item.product.item_sku }}</code></td>
-            <td>{{ item.quantity }}</td>
-            <td>{{ item.unit_price|default:"0.00" }} QAR</td>
-            <td><strong>{{ item.total_price|default:"0.00" }} QAR</strong></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  <!-- Add Products Form -->
-  <div class="add-products-card">
-    <div class="add-products-header">
-      <i class="fas fa-plus-circle"></i>
-      <h3>Add New Products</h3>
-      <span class="product-count-badge" id="product_count_badge">2 products</span>
     </div>
 
-    <form method="POST" id="add_products_form" class="add-products-form">
-      {% csrf_token %}
+    <!-- Order Summary Card -->
+    <div class="opa__card">
+        <div class="opa__card-header">
+            <i class="fas fa-file-invoice"></i>
+            <span>Order Details</span>
+        </div>
+        <div class="opa__card-body">
+            <div class="opa__info-grid">
+                <div class="opa__info-row">
+                    <span class="opa__info-label">Customer</span>
+                    <span class="opa__info-value">{{ order.customer_name }}</span>
+                </div>
+                <div class="opa__info-row">
+                    <span class="opa__info-label">Phone</span>
+                    <span class="opa__info-value">{{ order.customer_phone }}</span>
+                </div>
+                <div class="opa__info-row">
+                    <span class="opa__info-label">Order ID</span>
+                    <span class="opa__info-value">{{ order.client_order_code }}</span>
+                </div>
+                <div class="opa__info-row">
+                    <span class="opa__info-label">Date</span>
+                    <span class="opa__info-value">{{ order.order_date }}</span>
+                </div>
+                <div class="opa__info-row">
+                    <span class="opa__info-label">Status</span>
+                    <span class="opa__info-value">
+                        <span class="opa__status-badge">{{ order.get_order_status_display }}</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
 
-      <div class="products-container" id="products_container">
-        <!-- Product Row 1 -->
-        <div class="product-row" data-row-index="0">
-          <div class="product-row-header">
-            <span class="product-row-number">Product #1</span>
-            <button type="button" class="btn-remove-product" title="Remove this product" disabled>
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-          <div class="product-row-fields">
-            <div class="field-group field-product">
-              <label class="form-label">
-                <i class="fas fa-box me-1"></i>Product <span class="text-danger">*</span>
-              </label>
-              <select name="product_id[]" class="product-select" required>
-                <option value="">Select a product...</option>
-              </select>
-              <div class="product-info-display" style="display: none;">
-                <span class="sku-badge"></span>
-                {% if inventory_enabled %}
-                <span class="inventory-badge"></span>
-                {% endif %}
-              </div>
-            </div>
-            <div class="field-group field-quantity">
-              <label class="form-label">
-                <i class="fas fa-hashtag me-1"></i>Qty
-              </label>
-              <input type="number" name="quantity[]" class="form-control quantity-input" value="1" min="1" required>
-            </div>
-            <div class="field-group field-price">
-              <label class="form-label">
-                <i class="fas fa-tag me-1"></i>Unit Price (QAR)
-              </label>
-              <input type="number" name="unit_price[]" class="form-control price-input" step="0.01" min="0" placeholder="Auto-filled">
-            </div>
-            <div class="field-group field-total">
-              <label class="form-label">
-                <i class="fas fa-calculator me-1"></i>Total
-              </label>
-              <div class="total-display">0.00 QAR</div>
-            </div>
-            <div class="field-group field-notes">
-              <label class="form-label">
-                <i class="fas fa-sticky-note me-1"></i>Notes
-              </label>
-              <input type="text" name="notes[]" class="form-control notes-input" placeholder="Optional notes">
-            </div>
-          </div>
+    <!-- Existing Products (if any) -->
+    {% if existing_items %}
+    <div class="opa__card">
+        <div class="opa__card-header">
+            <i class="fas fa-shopping-cart"></i>
+            <span>Current Products</span>
+            <span class="opa__count">{{ existing_items.count }}</span>
+        </div>
+        <div class="opa__table-wrap">
+            <table class="opa__table">
+                <thead>
+                    <tr>
+                        <th class="opa__th">Product</th>
+                        <th class="opa__th">SKU</th>
+                        <th class="opa__th">Qty</th>
+                        <th class="opa__th">Unit Price</th>
+                        <th class="opa__th">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in existing_items %}
+                    <tr class="opa__row">
+                        <td class="opa__td opa__td--product">{{ item.product.brand_name }} {{ item.product.item_name }}</td>
+                        <td class="opa__td"><code class="opa__sku">{{ item.product.item_sku }}</code></td>
+                        <td class="opa__td">{{ item.quantity }}</td>
+                        <td class="opa__td">{{ item.unit_price|default:"0.00" }} QAR</td>
+                        <td class="opa__td opa__td--total">{{ item.total_price|default:"0.00" }} QAR</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Add Products Form -->
+    <div class="opa__card">
+        <div class="opa__card-header">
+            <i class="fas fa-plus-circle"></i>
+            <span>Add New Products</span>
+            <span class="opa__count" id="product_count_badge">2 products</span>
         </div>
 
-        <!-- Product Row 2 -->
-        <div class="product-row" data-row-index="1">
-          <div class="product-row-header">
-            <span class="product-row-number">Product #2</span>
-            <button type="button" class="btn-remove-product" title="Remove this product">
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-          <div class="product-row-fields">
-            <div class="field-group field-product">
-              <label class="form-label">
-                <i class="fas fa-box me-1"></i>Product
-              </label>
-              <select name="product_id[]" class="product-select">
-                <option value="">Select a product...</option>
-              </select>
-              <div class="product-info-display" style="display: none;">
-                <span class="sku-badge"></span>
-                {% if inventory_enabled %}
-                <span class="inventory-badge"></span>
-                {% endif %}
-              </div>
-            </div>
-            <div class="field-group field-quantity">
-              <label class="form-label">
-                <i class="fas fa-hashtag me-1"></i>Qty
-              </label>
-              <input type="number" name="quantity[]" class="form-control quantity-input" value="1" min="1">
-            </div>
-            <div class="field-group field-price">
-              <label class="form-label">
-                <i class="fas fa-tag me-1"></i>Unit Price (QAR)
-              </label>
-              <input type="number" name="unit_price[]" class="form-control price-input" step="0.01" min="0" placeholder="Auto-filled">
-            </div>
-            <div class="field-group field-total">
-              <label class="form-label">
-                <i class="fas fa-calculator me-1"></i>Total
-              </label>
-              <div class="total-display">0.00 QAR</div>
-            </div>
-            <div class="field-group field-notes">
-              <label class="form-label">
-                <i class="fas fa-sticky-note me-1"></i>Notes
-              </label>
-              <input type="text" name="notes[]" class="form-control notes-input" placeholder="Optional notes">
-            </div>
-          </div>
-        </div>
-      </div>
+        <form method="POST" id="add_products_form" class="opa__form">
+            {% csrf_token %}
 
-      <!-- Add More Button -->
-      <div class="add-product-btn-container">
-        <button type="button" class="btn-add-product" id="btn_add_product">
-          <i class="fas fa-plus me-2"></i>Add Another Product
-        </button>
-      </div>
+            <div class="products-container" id="products_container">
+                <!-- Product Row 1 -->
+                <div class="product-row" data-row-index="0">
+                    <div class="product-row-header">
+                        <span class="product-row-number">Product #1</span>
+                        <button type="button" class="btn-remove-product" title="Remove this product" disabled>
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="product-row-fields">
+                        <div class="field-group field-product">
+                            <label class="form-label">
+                                <i class="fas fa-box me-1"></i>Product <span class="opa__required">*</span>
+                            </label>
+                            <select name="product_id[]" class="product-select" required>
+                                <option value="">Select a product...</option>
+                            </select>
+                            <div class="product-info-display" style="display: none;">
+                                <span class="sku-badge"></span>
+                                {% if inventory_enabled %}
+                                <span class="inventory-badge"></span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="field-group field-quantity">
+                            <label class="form-label">
+                                <i class="fas fa-hashtag me-1"></i>Qty
+                            </label>
+                            <input type="number" name="quantity[]" class="form-control quantity-input" value="1" min="1" required>
+                        </div>
+                        <div class="field-group field-price">
+                            <label class="form-label">
+                                <i class="fas fa-tag me-1"></i>Unit Price (QAR)
+                            </label>
+                            <input type="number" name="unit_price[]" class="form-control price-input" step="0.01" min="0" placeholder="Auto-filled">
+                        </div>
+                        <div class="field-group field-total">
+                            <label class="form-label">
+                                <i class="fas fa-calculator me-1"></i>Total
+                            </label>
+                            <div class="total-display">0.00 QAR</div>
+                        </div>
+                        <div class="field-group field-notes">
+                            <label class="form-label">
+                                <i class="fas fa-sticky-note me-1"></i>Notes
+                            </label>
+                            <input type="text" name="notes[]" class="form-control notes-input" placeholder="Optional notes">
+                        </div>
+                    </div>
+                </div>
 
-      <!-- Order Total -->
-      <div class="order-total-section">
-        <div class="order-total-row">
-          <span class="order-total-label">Order Total:</span>
-          <span class="order-total-value" id="order_total">0.00 QAR</span>
-        </div>
-      </div>
+                <!-- Product Row 2 -->
+                <div class="product-row" data-row-index="1">
+                    <div class="product-row-header">
+                        <span class="product-row-number">Product #2</span>
+                        <button type="button" class="btn-remove-product" title="Remove this product">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="product-row-fields">
+                        <div class="field-group field-product">
+                            <label class="form-label">
+                                <i class="fas fa-box me-1"></i>Product
+                            </label>
+                            <select name="product_id[]" class="product-select">
+                                <option value="">Select a product...</option>
+                            </select>
+                            <div class="product-info-display" style="display: none;">
+                                <span class="sku-badge"></span>
+                                {% if inventory_enabled %}
+                                <span class="inventory-badge"></span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="field-group field-quantity">
+                            <label class="form-label">
+                                <i class="fas fa-hashtag me-1"></i>Qty
+                            </label>
+                            <input type="number" name="quantity[]" class="form-control quantity-input" value="1" min="1">
+                        </div>
+                        <div class="field-group field-price">
+                            <label class="form-label">
+                                <i class="fas fa-tag me-1"></i>Unit Price (QAR)
+                            </label>
+                            <input type="number" name="unit_price[]" class="form-control price-input" step="0.01" min="0" placeholder="Auto-filled">
+                        </div>
+                        <div class="field-group field-total">
+                            <label class="form-label">
+                                <i class="fas fa-calculator me-1"></i>Total
+                            </label>
+                            <div class="total-display">0.00 QAR</div>
+                        </div>
+                        <div class="field-group field-notes">
+                            <label class="form-label">
+                                <i class="fas fa-sticky-note me-1"></i>Notes
+                            </label>
+                            <input type="text" name="notes[]" class="form-control notes-input" placeholder="Optional notes">
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-      <!-- Submit Buttons -->
-      {% if order.order_status == 'publish' %}
-      <div class="form-submit-section">
-        <div class="alert alert-success">
-          <i class="fas fa-check-circle me-2"></i>
-          This order has already been published
-        </div>
-      </div>
-      {% else %}
-      <div class="form-submit-section">
-        <a href="{% url 'orders:orders_all_list' %}" class="btn btn-outline-secondary btn-lg">
-          <i class="fas fa-times me-2"></i>Cancel
-        </a>
-        <button type="submit" class="btn btn-primary btn-lg" id="btn_submit_products">
-          <i class="fas fa-save me-2"></i>Save Products
-        </button>
-      </div>
-      {% endif %}
-    </form>
-  </div>
+            <!-- Add More Button -->
+            <div class="add-product-btn-container">
+                <button type="button" class="btn-add-product" id="btn_add_product">
+                    <i class="fas fa-plus me-2"></i>Add Another Product
+                </button>
+            </div>
+
+            <!-- Order Total -->
+            <div class="order-total-section">
+                <div class="order-total-row">
+                    <span class="order-total-label">Order Total:</span>
+                    <span class="order-total-value" id="order_total">0.00 QAR</span>
+                </div>
+            </div>
+
+            <!-- Submit Buttons -->
+            {% if order.order_status == 'publish' %}
+            <div class="opa__submit-row">
+                <div class="opa__published-notice">
+                    <i class="fas fa-check-circle"></i>
+                    This order has already been published
+                </div>
+            </div>
+            {% else %}
+            <div class="opa__submit-row">
+                <a href="{% url 'orders:orders_all_list' %}" class="opa__btn opa__btn--outline opa__btn--lg">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
+                <button type="submit" class="opa__btn opa__btn--primary opa__btn--lg" id="btn_submit_products">
+                    <i class="fas fa-save"></i> Save Products
+                </button>
+            </div>
+            {% endif %}
+        </form>
+    </div>
 </div>
 {% endblock content %}
 

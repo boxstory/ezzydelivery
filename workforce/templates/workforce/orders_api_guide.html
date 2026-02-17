@@ -3,59 +3,58 @@
 
 {% block title %}API Integration - Staff Dashboard{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
 <div class="col-12 p-3">
-    <!-- Page Title -->
-    <h1 class="page-title">
-        <i class="fa-solid fa-code me-2"></i>API Integration Guide
-    </h1>
+  <!-- Hero Header -->
+  <div class="oag__hero">
+    <div class="oag__hero-content">
+      <h1 class="oag__hero-title">
+        <i class="fa-solid fa-code oag__hero-icon"></i>API Integration Guide
+      </h1>
+      <p class="oag__hero-subtitle">Documentation for the Orders API endpoints and webhooks</p>
+    </div>
+  </div>
 
-    <div class="row">
-        <!-- Main Content -->
-        <div class="col-lg-8">
-            <!-- API Endpoint -->
-            <div class="card-modern mb-4">
-                <div class="card-header-modern">
-                    <h5 class="mb-0">
-                        <i class="fa-solid fa-link me-2"></i>
-                        Create Order API Endpoint
-                    </h5>
-                </div>
-                <div class="card-body p-4">
-                    <div class="mb-4">
-                        <span class="badge badge-success me-2">POST</span>
-                        <code class="bg-light p-2 rounded">/api/v1/orders/create/</code>
-                    </div>
+  <div class="row g-3">
+    <!-- Main Content -->
+    <div class="col-lg-8">
+      <!-- API Endpoint -->
+      <div class="oag__card">
+        <div class="oag__card-header">
+          <i class="fa-solid fa-link oag__section-icon"></i>
+          <h5 class="oag__card-title">CREATE ORDER API ENDPOINT</h5>
+        </div>
+        <div class="oag__card-body">
+          <div class="oag__endpoint">
+            <span class="oag__method oag__method--post">POST</span>
+            <code class="oag__url">/api/v1/orders/create/</code>
+          </div>
 
-                    <h6 class="mt-4 mb-3">Headers</h6>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Header</th>
-                                <th>Value</th>
-                                <th>Required</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><code>Content-Type</code></td>
-                                <td>application/json</td>
-                                <td><span class="badge badge-danger">Yes</span></td>
-                            </tr>
-                            <tr>
-                                <td><code>Authorization</code></td>
-                                <td>Token {your_api_token}</td>
-                                <td><span class="badge badge-danger">Yes</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
+          <h6 class="oag__subtitle">Headers</h6>
+          <table class="oag__table">
+            <thead>
+              <tr>
+                <th>Header</th>
+                <th>Value</th>
+                <th>Required</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>Content-Type</code></td>
+                <td>application/json</td>
+                <td><span class="oag__required">Yes</span></td>
+              </tr>
+              <tr>
+                <td><code>Authorization</code></td>
+                <td>Token {your_api_token}</td>
+                <td><span class="oag__required">Yes</span></td>
+              </tr>
+            </tbody>
+          </table>
 
-                    <h6 class="mt-4 mb-3">Request Body</h6>
-                    <pre class="bg-dark text-light p-3 rounded"><code>{
+          <h6 class="oag__subtitle">Request Body</h6>
+          <pre class="oag__code-block"><code>{
     "business_id": 123,
     "client_order_code": "ORD-001",
     "customer_name": "John Doe",
@@ -70,8 +69,8 @@
     "order_notes": "Handle with care"
 }</code></pre>
 
-                    <h6 class="mt-4 mb-3">Response (Success - 201)</h6>
-                    <pre class="bg-dark text-light p-3 rounded"><code>{
+          <h6 class="oag__subtitle">Response (Success - 201)</h6>
+          <pre class="oag__code-block"><code>{
     "success": true,
     "message": "Order created successfully",
     "data": {
@@ -81,30 +80,28 @@
     }
 }</code></pre>
 
-                    <h6 class="mt-4 mb-3">Response (Error - 400)</h6>
-                    <pre class="bg-dark text-light p-3 rounded"><code>{
+          <h6 class="oag__subtitle">Response (Error - 400)</h6>
+          <pre class="oag__code-block"><code>{
     "success": false,
     "error": "customer_name is required"
 }</code></pre>
-                </div>
-            </div>
+        </div>
+      </div>
 
-            <!-- Bulk API -->
-            <div class="card-modern mb-4">
-                <div class="card-header-modern">
-                    <h5 class="mb-0">
-                        <i class="fa-solid fa-layer-group me-2"></i>
-                        Bulk Create Orders API
-                    </h5>
-                </div>
-                <div class="card-body p-4">
-                    <div class="mb-4">
-                        <span class="badge badge-success me-2">POST</span>
-                        <code class="bg-light p-2 rounded">/api/v1/orders/bulk-create/</code>
-                    </div>
+      <!-- Bulk API -->
+      <div class="oag__card">
+        <div class="oag__card-header">
+          <i class="fa-solid fa-layer-group oag__section-icon"></i>
+          <h5 class="oag__card-title">BULK CREATE ORDERS API</h5>
+        </div>
+        <div class="oag__card-body">
+          <div class="oag__endpoint">
+            <span class="oag__method oag__method--post">POST</span>
+            <code class="oag__url">/api/v1/orders/bulk-create/</code>
+          </div>
 
-                    <h6 class="mt-4 mb-3">Request Body</h6>
-                    <pre class="bg-dark text-light p-3 rounded"><code>{
+          <h6 class="oag__subtitle">Request Body</h6>
+          <pre class="oag__code-block"><code>{
     "business_id": 123,
     "orders": [
         {
@@ -124,8 +121,8 @@
     ]
 }</code></pre>
 
-                    <h6 class="mt-4 mb-3">Response (Success - 201)</h6>
-                    <pre class="bg-dark text-light p-3 rounded"><code>{
+          <h6 class="oag__subtitle">Response (Success - 201)</h6>
+          <pre class="oag__code-block"><code>{
     "success": true,
     "message": "2 orders created successfully",
     "data": {
@@ -137,22 +134,20 @@
         ]
     }
 }</code></pre>
-                </div>
-            </div>
+        </div>
+      </div>
 
-            <!-- Webhook -->
-            <div class="card-modern">
-                <div class="card-header-modern">
-                    <h5 class="mb-0">
-                        <i class="fa-solid fa-bell me-2"></i>
-                        Webhook Notifications
-                    </h5>
-                </div>
-                <div class="card-body p-4">
-                    <p>Configure webhook URL in your business settings to receive order status updates.</p>
+      <!-- Webhook -->
+      <div class="oag__card">
+        <div class="oag__card-header">
+          <i class="fa-solid fa-bell oag__section-icon"></i>
+          <h5 class="oag__card-title">WEBHOOK NOTIFICATIONS</h5>
+        </div>
+        <div class="oag__card-body">
+          <p class="oag__desc">Configure webhook URL in your business settings to receive order status updates.</p>
 
-                    <h6 class="mt-4 mb-3">Webhook Payload</h6>
-                    <pre class="bg-dark text-light p-3 rounded"><code>{
+          <h6 class="oag__subtitle">Webhook Payload</h6>
+          <pre class="oag__code-block"><code>{
     "event": "order.status_updated",
     "timestamp": "2026-01-14T10:30:00Z",
     "data": {
@@ -164,121 +159,93 @@
     }
 }</code></pre>
 
-                    <h6 class="mt-4 mb-3">Event Types</h6>
-                    <ul class="list-unstyled">
-                        <li class="mb-2"><code>order.created</code> - New order created</li>
-                        <li class="mb-2"><code>order.status_updated</code> - Order status changed</li>
-                        <li class="mb-2"><code>order.delivered</code> - Order delivered</li>
-                        <li class="mb-2"><code>order.failed</code> - Delivery failed</li>
-                    </ul>
-                </div>
-            </div>
+          <h6 class="oag__subtitle">Event Types</h6>
+          <ul class="oag__event-list">
+            <li><code>order.created</code> - New order created</li>
+            <li><code>order.status_updated</code> - Order status changed</li>
+            <li><code>order.delivered</code> - Order delivered</li>
+            <li><code>order.failed</code> - Delivery failed</li>
+          </ul>
         </div>
-
-        <!-- Sidebar -->
-        <div class="col-lg-4">
-            <!-- Field Reference -->
-            <div class="card-modern mb-4">
-                <div class="card-header-modern">
-                    <h5 class="mb-0">
-                        <i class="fa-solid fa-list-check me-2"></i>
-                        Field Reference
-                    </h5>
-                </div>
-                <div class="card-body p-4">
-                    <h6 class="mb-3">Required Fields</h6>
-                    <ul class="list-unstyled">
-                        <li class="mb-2">
-                            <code>business_id</code>
-                            <small class="text-muted d-block">Seller's business ID</small>
-                        </li>
-                        <li class="mb-2">
-                            <code>customer_name</code>
-                            <small class="text-muted d-block">Customer full name</small>
-                        </li>
-                        <li class="mb-2">
-                            <code>customer_phone</code>
-                            <small class="text-muted d-block">Phone number</small>
-                        </li>
-                        <li class="mb-2">
-                            <code>customer_address</code>
-                            <small class="text-muted d-block">Delivery address</small>
-                        </li>
-                    </ul>
-
-                    <h6 class="mb-3 mt-4">Optional Fields</h6>
-                    <ul class="list-unstyled">
-                        <li class="mb-2">
-                            <code>client_order_code</code>
-                            <small class="text-muted d-block">Your reference (auto-generated if empty)</small>
-                        </li>
-                        <li class="mb-2">
-                            <code>customer_whatsapp</code>
-                            <small class="text-muted d-block">WhatsApp number</small>
-                        </li>
-                        <li class="mb-2">
-                            <code>dl_zone</code>
-                            <small class="text-muted d-block">Zone number (integer)</small>
-                        </li>
-                        <li class="mb-2">
-                            <code>dl_street</code>
-                            <small class="text-muted d-block">Street number (integer)</small>
-                        </li>
-                        <li class="mb-2">
-                            <code>dl_building</code>
-                            <small class="text-muted d-block">Building number (integer)</small>
-                        </li>
-                        <li class="mb-2">
-                            <code>cod_amount</code>
-                            <small class="text-muted d-block">COD in QAR (default: 0)</small>
-                        </li>
-                        <li class="mb-2">
-                            <code>dl_amount</code>
-                            <small class="text-muted d-block">Delivery fee in QAR</small>
-                        </li>
-                        <li class="mb-2">
-                            <code>order_notes</code>
-                            <small class="text-muted d-block">Special instructions</small>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Business IDs -->
-            <div class="card-modern">
-                <div class="card-header-modern">
-                    <h5 class="mb-0">
-                        <i class="fa-solid fa-store me-2"></i>
-                        Active Business IDs
-                    </h5>
-                </div>
-                <div class="card-body p-4">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Business</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for business in businesses %}
-                            <tr>
-                                <td><code>{{ business.business_id }}</code></td>
-                                <td>{{ business.business_name }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="2" class="text-muted">No active businesses</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    <small class="text-muted mt-2 d-block">
-                        <a href="{% url 'workforce:sellers_list' %}">View all sellers</a>
-                    </small>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+      <!-- Field Reference -->
+      <div class="oag__card">
+        <div class="oag__card-header">
+          <i class="fa-solid fa-list-check oag__section-icon"></i>
+          <h5 class="oag__card-title">FIELD REFERENCE</h5>
+        </div>
+        <div class="oag__card-body">
+          <h6 class="oag__subtitle">Required Fields</h6>
+          <ul class="oag__field-list">
+            <li>
+              <code>business_id</code>
+              <small>Seller's business ID</small>
+            </li>
+            <li>
+              <code>customer_name</code>
+              <small>Customer full name</small>
+            </li>
+            <li>
+              <code>customer_phone</code>
+              <small>Phone number</small>
+            </li>
+            <li>
+              <code>customer_address</code>
+              <small>Delivery address</small>
+            </li>
+          </ul>
+
+          <h6 class="oag__subtitle">Optional Fields</h6>
+          <ul class="oag__field-list">
+            <li><code>client_order_code</code><small>Your reference (auto-generated if empty)</small></li>
+            <li><code>customer_whatsapp</code><small>WhatsApp number</small></li>
+            <li><code>dl_zone</code><small>Zone number (integer)</small></li>
+            <li><code>dl_street</code><small>Street number (integer)</small></li>
+            <li><code>dl_building</code><small>Building number (integer)</small></li>
+            <li><code>cod_amount</code><small>COD in QAR (default: 0)</small></li>
+            <li><code>dl_amount</code><small>Delivery fee in QAR</small></li>
+            <li><code>order_notes</code><small>Special instructions</small></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Business IDs -->
+      <div class="oag__card">
+        <div class="oag__card-header">
+          <i class="fa-solid fa-store oag__section-icon"></i>
+          <h5 class="oag__card-title">ACTIVE BUSINESS IDS</h5>
+        </div>
+        <div class="oag__card-body">
+          <table class="oag__table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Business</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for business in businesses %}
+              <tr>
+                <td><code>{{ business.business_id }}</code></td>
+                <td>{{ business.business_name }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="2" class="text-muted">No active businesses</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <div class="oag__link-footer">
+            <a href="{% url 'workforce:sellers_list' %}">View all sellers</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock content %}

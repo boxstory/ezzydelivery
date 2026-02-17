@@ -3,125 +3,118 @@
 
 {% block title %}Delete Storage Location{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
 
-<div class="container-fluid py-4">
+<div class="wh">
     <!-- Back Button -->
-    <div class="mb-3">
-        <a href="{% url 'warehouse:location_list' %}" class="btn btn-outline-secondary btn-sm"
-           hx-get="{% url 'warehouse:location_list' %}"
-           hx-target="#main-content"
-           hx-select="#main-content"
-           hx-swap="outerHTML"
-           hx-push-url="true">
-            <i class="fa-solid fa-arrow-left me-2"></i>Back to Locations
+    <div>
+        <a href="{% url 'warehouse:location_list' %}" class="wh__btn wh__btn--secondary"
+           hx-get="{% url 'warehouse:location_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+            <i class="fa-solid fa-arrow-left"></i> Back to Locations
         </a>
     </div>
 
-    <!-- Delete Confirmation Card -->
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card border-danger shadow-sm">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0">
-                        <i class="fa-solid fa-triangle-exclamation me-2"></i>
-                        Confirm Delete Storage Location
-                    </h5>
+    <!-- Delete Header -->
+    <div class="wld__hero">
+        <div class="wld__hero-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div>
+            <h1 class="wld__hero-title">Confirm Delete Storage Location</h1>
+            <p class="wld__hero-subtitle">This action cannot be undone</p>
+        </div>
+    </div>
+
+    <!-- Warning Alert -->
+    <div class="wld__alert wld__alert--danger">
+        <i class="fa-solid fa-exclamation-triangle"></i>
+        <div>
+            <strong>Warning:</strong> This action cannot be undone. Deleting this storage location will affect all inventory at this location.
+        </div>
+    </div>
+
+    <!-- Location Details -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left">
+                <i class="fa-solid fa-info-circle"></i>
+                <span>LOCATION TO DELETE</span>
+            </div>
+        </div>
+        <div class="wh__card-body">
+            <div class="wld__detail-grid">
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Code</span>
+                    <span class="whdt__field-value"><span class="wh__code">{{ location.code }}</span></span>
                 </div>
-                <div class="card-body">
-                    <!-- Warning Alert -->
-                    <div class="alert alert-danger mb-4">
-                        <i class="fa-solid fa-exclamation-triangle me-2"></i>
-                        <strong>Warning:</strong> This action cannot be undone. Deleting this storage location will affect all inventory at this location.
-                    </div>
-
-                    <!-- Location Details -->
-                    <div class="mb-4">
-                        <h6 class="text-muted mb-3">Location to Delete:</h6>
-                        <div class="bg-light border rounded p-3">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <p class="mb-2">
-                                        <strong>Code:</strong>
-                                        <span class="badge bg-secondary">{{ location.code }}</span>
-                                    </p>
-                                    <p class="mb-2">
-                                        <strong>Name:</strong> {{ location.name }}
-                                    </p>
-                                    <p class="mb-2">
-                                        <strong>Type:</strong>
-                                        <span class="badge bg-info">{{ location.get_location_type_display }}</span>
-                                    </p>
-                                </div>
-                                <div class="col-md-6">
-                                    <p class="mb-2">
-                                        <strong>Warehouse:</strong> {{ location.warehouse.name }}
-                                    </p>
-                                    <p class="mb-2">
-                                        <strong>Barcode:</strong> <code>{{ location.barcode }}</code>
-                                    </p>
-                                    <p class="mb-2">
-                                        <strong>Status:</strong>
-                                        {% if location.is_active %}
-                                        <span class="badge bg-success">Active</span>
-                                        {% else %}
-                                        <span class="badge bg-secondary">Inactive</span>
-                                        {% endif %}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Impact Warning -->
-                    <div class="alert alert-warning">
-                        <h6><i class="fa-solid fa-info-circle me-2"></i>What will happen:</h6>
-                        <ul class="mb-0">
-                            <li>This storage location will be permanently removed</li>
-                            <li>Any inventory at this location will need to be reassigned</li>
-                            <li>Historical transactions will remain unchanged</li>
-                        </ul>
-                    </div>
-
-                    <!-- Confirmation Form -->
-                    <form method="post" action="">
-                        {% csrf_token %}
-
-                        <div class="form-check mb-4">
-                            <input class="form-check-input" type="checkbox" id="confirm-delete" required>
-                            <label class="form-check-label" for="confirm-delete">
-                                <strong>I understand that this action is permanent and cannot be reversed</strong>
-                            </label>
-                        </div>
-
-                        <div class="d-flex gap-3 justify-content-center">
-                            <button type="submit" class="btn btn-danger" id="delete-button" disabled>
-                                <i class="fa-solid fa-trash me-2"></i>
-                                Yes, Delete Location
-                            </button>
-                            <a href="{% url 'warehouse:location_list' %}" class="btn btn-secondary"
-                               hx-get="{% url 'warehouse:location_list' %}"
-                               hx-target="#main-content"
-                               hx-select="#main-content"
-                               hx-swap="outerHTML"
-                               hx-push-url="true">
-                                <i class="fa-solid fa-times me-2"></i>
-                                Cancel
-                            </a>
-                        </div>
-                    </form>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Name</span>
+                    <span class="whdt__field-value">{{ location.name }}</span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Type</span>
+                    <span class="whdt__field-value"><span class="wh__badge wh__badge--info">{{ location.get_location_type_display }}</span></span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Warehouse</span>
+                    <span class="whdt__field-value">{{ location.warehouse.name }}</span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Barcode</span>
+                    <span class="whdt__field-value"><span class="wh__code">{{ location.barcode }}</span></span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Status</span>
+                    <span class="whdt__field-value">
+                        {% if location.is_active %}
+                        <span class="wh__badge wh__badge--success">Active</span>
+                        {% else %}
+                        <span class="wh__badge wh__badge--muted">Inactive</span>
+                        {% endif %}
+                    </span>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Impact Warning -->
+    <div class="wld__alert wld__alert--warning">
+        <i class="fa-solid fa-info-circle"></i>
+        <div>
+            <strong>What will happen:</strong>
+            <ul class="wld__impact-list">
+                <li>This storage location will be permanently removed</li>
+                <li>Any inventory at this location will need to be reassigned</li>
+                <li>Historical transactions will remain unchanged</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Confirmation Form -->
+    <div class="wh__card">
+        <div class="wh__card-body">
+            <form method="post" action="">
+                {% csrf_token %}
+                <div class="wha__check-card">
+                    <input type="checkbox" class="wha__check-input" id="confirm-delete" required>
+                    <label class="wha__check-label" for="confirm-delete">
+                        <strong>I understand that this action is permanent and cannot be reversed</strong>
+                    </label>
+                </div>
+                <div class="wld__confirm-actions">
+                    <button type="submit" class="wh__btn wld__btn--danger" id="delete-button" disabled>
+                        <i class="fa-solid fa-trash"></i> Yes, Delete Location
+                    </button>
+                    <a href="{% url 'warehouse:location_list' %}" class="wh__btn wh__btn--secondary"
+                       hx-get="{% url 'warehouse:location_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                        <i class="fa-solid fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
 <script>
-// Enable delete button only when checkbox is checked
 document.getElementById('confirm-delete').addEventListener('change', function() {
     document.getElementById('delete-button').disabled = !this.checked;
 });

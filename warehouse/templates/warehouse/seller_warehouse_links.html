@@ -3,402 +3,209 @@
 
 {% block title %}Seller-Warehouse Links{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse-seller-links-enhanced.css' %}" type="text/css" />
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
 
-<div class="container-fluid py-4">
-
-  <!-- Page Header -->
-  <div class="seller-links-header">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-      <div>
-        <h2>
-          <i class="fa-solid fa-link me-2"></i>
-          Seller-Warehouse Links
-        </h2>
-        <p>
-          <i class="fa-solid fa-info-circle me-1"></i>
-          Manage seller-warehouse connections and fulfillment assignments
-        </p>
-      </div>
-      <a href="{% url 'warehouse:seller_warehouse_link_add' %}"
-         class="btn btn-primary"
-         hx-get="{% url 'warehouse:seller_warehouse_link_add' %}"
-         hx-target="body"
-         hx-push-url="true">
-        <i class="fa-solid fa-plus me-2"></i>Add New Link
-      </a>
-    </div>
-  </div>
-
-  <!-- Statistics Cards -->
-  <div class="seller-links-stats-grid">
-    <div class="seller-links-stat-card seller-links-stat-card--primary">
-      <div class="seller-links-stat-number">{{ total_links }}</div>
-      <div class="seller-links-stat-label">Total Links</div>
-    </div>
-
-    <div class="seller-links-stat-card seller-links-stat-card--success">
-      <div class="seller-links-stat-number">{{ active_links }}</div>
-      <div class="seller-links-stat-label">Active Links</div>
-    </div>
-
-    <div class="seller-links-stat-card seller-links-stat-card--info">
-      <div class="seller-links-stat-number">{{ default_links }}</div>
-      <div class="seller-links-stat-label">Default Links</div>
-    </div>
-  </div>
-
-  <!-- Filters -->
-  <div class="seller-links-filter-card">
-    <form method="get" action="" id="filter-form">
-      <div class="seller-links-filter-row">
-        <div>
-          <label class="form-label">
-            <i class="fa-solid fa-search"></i>
-            Search
-          </label>
-          <input type="text"
-                 name="search"
-                 class="form-control"
-                 placeholder="Search seller or warehouse..."
-                 value="{{ search_query }}">
-        </div>
-
-        <div>
-          <label class="form-label">
-            <i class="fa-solid fa-store"></i>
-            Seller
-          </label>
-          <select name="business" class="form-select">
-            <option value="">All Sellers</option>
-            {% for business in all_businesses %}
-            <option value="{{ business.id }}"
-                    {% if business_filter == business.id|stringformat:"s" %}selected{% endif %}>
-              {{ business.business_name }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <div>
-          <label class="form-label">
-            <i class="fa-solid fa-warehouse"></i>
-            Warehouse
-          </label>
-          <select name="warehouse" class="form-select">
-            <option value="">All Warehouses</option>
-            {% for warehouse in all_warehouses %}
-            <option value="{{ warehouse.id }}"
-                    {% if warehouse_filter == warehouse.id|stringformat:"s" %}selected{% endif %}>
-              {{ warehouse.name }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <div>
-          <label class="form-label">
-            <i class="fa-solid fa-toggle-on"></i>
-            Status
-          </label>
-          <select name="is_active" class="form-select">
-            <option value="">All</option>
-            <option value="true" {% if is_active_filter == 'true' %}selected{% endif %}>Active</option>
-            <option value="false" {% if is_active_filter == 'false' %}selected{% endif %}>Inactive</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="form-label">
-            <i class="fa-solid fa-star"></i>
-            Default
-          </label>
-          <select name="is_default" class="form-select">
-            <option value="">All</option>
-            <option value="true" {% if is_default_filter == 'true' %}selected{% endif %}>Default Only</option>
-            <option value="false" {% if is_default_filter == 'false' %}selected{% endif %}>Non-Default</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="d-flex gap-2 mt-3">
-        <button type="submit" class="btn btn-primary">
-          <i class="fa-solid fa-filter me-1"></i>Apply Filters
-        </button>
-        <a href="{% url 'warehouse:seller_warehouse_links' %}"
-           class="btn btn-outline-secondary">
-          <i class="fa-solid fa-rotate-left me-1"></i>Clear
-        </a>
-      </div>
-    </form>
-  </div>
-
-  <!-- Links List -->
-  {% if links %}
-    {% for link in links %}
-    <div class="seller-link-card">
-
-      <!-- Card Header -->
-      <div class="seller-link-header">
-        <div class="seller-link-title">
-          <span>{{ link.business.business_name }}</span>
-          <i class="fa-solid fa-arrow-right seller-link-arrow"></i>
-          <span>{{ link.warehouse.name }}</span>
-        </div>
-
-        <div class="seller-link-badges">
-          {% if link.is_default %}
-          <span class="seller-link-badge seller-link-badge--default">
-            <i class="fa-solid fa-star me-1"></i>
-            Default
-          </span>
-          {% endif %}
-
-          {% if link.is_active %}
-          <span class="seller-link-badge seller-link-badge--active">
-            <i class="fa-solid fa-check-circle me-1"></i>
-            Active
-          </span>
-          {% else %}
-          <span class="seller-link-badge seller-link-badge--inactive">
-            <i class="fa-solid fa-circle me-1"></i>
-            Inactive
-          </span>
-          {% endif %}
-        </div>
-      </div>
-
-      <!-- Link Details Grid -->
-      <div class="seller-link-details">
-        <div class="seller-link-detail-item">
-          <div class="seller-link-detail-icon">
-            <i class="fa-solid fa-location-dot"></i>
-          </div>
-          <div class="seller-link-detail-content">
-            <h6>Default Location</h6>
-            <p>{{ link.default_location.name|default:"Not set" }}</p>
-          </div>
-        </div>
-
-        <div class="seller-link-detail-item">
-          <div class="seller-link-detail-icon">
-            <i class="fa-solid fa-signal"></i>
-          </div>
-          <div class="seller-link-detail-content">
-            <h6>Priority</h6>
-            <p>{{ link.priority }}</p>
-            <div class="seller-link-priority-bar">
-              <div class="seller-link-priority-fill" style="width: {{ link.priority }}%"></div>
+<div class="wh">
+    <!-- Hero Header -->
+    <div class="wh__header">
+        <div class="wh__header-left">
+            <div class="wh__header-icon"><i class="fa-solid fa-link"></i></div>
+            <div>
+                <h1 class="wh__title">Seller-Warehouse Links</h1>
+                <p class="wh__subtitle">Manage seller-warehouse connections and fulfillment assignments</p>
             </div>
-          </div>
         </div>
-
-        <div class="seller-link-detail-item">
-          <div class="seller-link-detail-icon">
-            <i class="fa-solid fa-warehouse"></i>
-          </div>
-          <div class="seller-link-detail-content">
-            <h6>Warehouse Code</h6>
-            <p>{{ link.warehouse.code }}</p>
-          </div>
-        </div>
-
-        <div class="seller-link-detail-item">
-          <div class="seller-link-detail-icon">
-            <i class="fa-solid fa-calendar"></i>
-          </div>
-          <div class="seller-link-detail-content">
-            <h6>Linked Date</h6>
-            <p>{{ link.linked_at|date:"M d, Y" }}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Notes Section -->
-      {% if link.notes %}
-      <div class="seller-link-notes">
-        <h6>
-          <i class="fa-solid fa-note-sticky me-1"></i>
-          Notes
-        </h6>
-        <p>{{ link.notes }}</p>
-      </div>
-      {% endif %}
-
-      <!-- Action Buttons -->
-      <div class="seller-link-actions">
-        <a href="{% url 'warehouse:seller_warehouse_link_detail' link.pk %}"
-           class="seller-link-action-btn seller-link-action-btn--view"
-           hx-get="{% url 'warehouse:seller_warehouse_link_detail' link.pk %}"
-           hx-target="body"
-           hx-push-url="true">
-          <i class="fa-solid fa-eye"></i>
-          View Details
+        <a href="{% url 'warehouse:seller_warehouse_link_add' %}" class="wh__btn wh__btn--primary"
+           hx-get="{% url 'warehouse:seller_warehouse_link_add' %}" hx-target="body" hx-push-url="true">
+            <i class="fa-solid fa-plus"></i> Add New Link
         </a>
+    </div>
 
-        <a href="{% url 'warehouse:seller_warehouse_link_edit' link.pk %}"
-           class="seller-link-action-btn seller-link-action-btn--edit"
-           hx-get="{% url 'warehouse:seller_warehouse_link_edit' link.pk %}"
-           hx-target="body"
-           hx-push-url="true">
-          <i class="fa-solid fa-edit"></i>
-          Edit
-        </a>
-      </div>
+    <!-- Statistics -->
+    <div class="wh__stats">
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--primary"><i class="fa-solid fa-link"></i></div>
+            <div><div class="wh__stat-value">{{ total_links }}</div><div class="wh__stat-label">Total Links</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--success"><i class="fa-solid fa-check-circle"></i></div>
+            <div><div class="wh__stat-value">{{ active_links }}</div><div class="wh__stat-label">Active Links</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--info"><i class="fa-solid fa-star"></i></div>
+            <div><div class="wh__stat-value">{{ default_links }}</div><div class="wh__stat-label">Default Links</div></div>
+        </div>
+    </div>
 
+    <!-- Filters -->
+    <div class="wh__filter-bar">
+        <form method="get" action="" id="filter-form" class="wh__filter-form">
+            <div class="wh__filter-group wh__filter-group--lg">
+                <label class="wh__filter-label"><i class="fa-solid fa-search"></i> Search</label>
+                <input type="text" name="search" class="wh__filter-input" placeholder="Search seller or warehouse..." value="{{ search_query }}">
+            </div>
+            <div class="wh__filter-group">
+                <label class="wh__filter-label"><i class="fa-solid fa-store"></i> Seller</label>
+                <select name="business" class="wh__filter-select">
+                    <option value="">All Sellers</option>
+                    {% for business in all_businesses %}
+                    <option value="{{ business.id }}" {% if business_filter == business.id|stringformat:"s" %}selected{% endif %}>{{ business.business_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="wh__filter-group">
+                <label class="wh__filter-label"><i class="fa-solid fa-warehouse"></i> Warehouse</label>
+                <select name="warehouse" class="wh__filter-select">
+                    <option value="">All Warehouses</option>
+                    {% for warehouse in all_warehouses %}
+                    <option value="{{ warehouse.id }}" {% if warehouse_filter == warehouse.id|stringformat:"s" %}selected{% endif %}>{{ warehouse.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="wh__filter-group wh__filter-group--sm">
+                <label class="wh__filter-label"><i class="fa-solid fa-toggle-on"></i> Status</label>
+                <select name="is_active" class="wh__filter-select">
+                    <option value="">All</option>
+                    <option value="true" {% if is_active_filter == 'true' %}selected{% endif %}>Active</option>
+                    <option value="false" {% if is_active_filter == 'false' %}selected{% endif %}>Inactive</option>
+                </select>
+            </div>
+            <div class="wh__filter-group wh__filter-group--sm">
+                <label class="wh__filter-label"><i class="fa-solid fa-star"></i> Default</label>
+                <select name="is_default" class="wh__filter-select">
+                    <option value="">All</option>
+                    <option value="true" {% if is_default_filter == 'true' %}selected{% endif %}>Default Only</option>
+                    <option value="false" {% if is_default_filter == 'false' %}selected{% endif %}>Non-Default</option>
+                </select>
+            </div>
+            <div class="wha__actions">
+                <button type="submit" class="wh__btn wh__btn--primary"><i class="fa-solid fa-filter"></i> Apply</button>
+                <a href="{% url 'warehouse:seller_warehouse_links' %}" class="wh__btn wh__btn--secondary"><i class="fa-solid fa-rotate-left"></i> Clear</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Links List -->
+    {% if links %}
+    {% for link in links %}
+    <div class="swl__card">
+        <div class="swl__card-header">
+            <div class="swl__link-title">
+                <span>{{ link.business.business_name }}</span>
+                <i class="fa-solid fa-arrow-right swl__arrow"></i>
+                <span>{{ link.warehouse.name }}</span>
+            </div>
+            <div class="swl__badges">
+                {% if link.is_default %}
+                <span class="wh__badge wh__badge--warning"><i class="fa-solid fa-star"></i> Default</span>
+                {% endif %}
+                {% if link.is_active %}
+                <span class="wh__badge wh__badge--success"><i class="fa-solid fa-check-circle"></i> Active</span>
+                {% else %}
+                <span class="wh__badge wh__badge--muted"><i class="fa-solid fa-circle"></i> Inactive</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="swl__details">
+            <div class="swl__detail">
+                <div class="swl__detail-icon"><i class="fa-solid fa-location-dot"></i></div>
+                <div><div class="swl__detail-label">Default Location</div><div class="swl__detail-value">{{ link.default_location.name|default:"Not set" }}</div></div>
+            </div>
+            <div class="swl__detail">
+                <div class="swl__detail-icon"><i class="fa-solid fa-signal"></i></div>
+                <div>
+                    <div class="swl__detail-label">Priority</div>
+                    <div class="swl__detail-value">{{ link.priority }}</div>
+                    <div class="swl__priority-bar"><div class="swl__priority-fill" data-width="{{ link.priority }}%"></div></div>
+                </div>
+            </div>
+            <div class="swl__detail">
+                <div class="swl__detail-icon"><i class="fa-solid fa-warehouse"></i></div>
+                <div><div class="swl__detail-label">Warehouse Code</div><div class="swl__detail-value">{{ link.warehouse.code }}</div></div>
+            </div>
+            <div class="swl__detail">
+                <div class="swl__detail-icon"><i class="fa-solid fa-calendar"></i></div>
+                <div><div class="swl__detail-label">Linked Date</div><div class="swl__detail-value">{{ link.linked_at|date:"M d, Y" }}</div></div>
+            </div>
+        </div>
+        {% if link.notes %}
+        <div class="swl__notes">
+            <div class="swl__notes-label"><i class="fa-solid fa-note-sticky"></i> Notes</div>
+            <p class="swl__notes-text">{{ link.notes }}</p>
+        </div>
+        {% endif %}
+        <div class="swl__actions">
+            <a href="{% url 'warehouse:seller_warehouse_link_detail' link.pk %}" class="wh__action-btn wh__action-btn--pill"
+               hx-get="{% url 'warehouse:seller_warehouse_link_detail' link.pk %}" hx-target="body" hx-push-url="true">
+                <i class="fa-solid fa-eye"></i> View
+            </a>
+            <a href="{% url 'warehouse:seller_warehouse_link_edit' link.pk %}" class="wh__action-btn wh__action-btn--pill"
+               hx-get="{% url 'warehouse:seller_warehouse_link_edit' link.pk %}" hx-target="body" hx-push-url="true">
+                <i class="fa-solid fa-edit"></i> Edit
+            </a>
+        </div>
     </div>
     {% endfor %}
 
-    <!-- Pagination -->
     {% if page_obj.has_other_pages %}
-    <nav aria-label="Links pagination" class="seller-links-pagination">
-      <ul class="pagination justify-content-center">
-        {% if page_obj.has_previous %}
-        <li class="page-item">
-          <a class="page-link"
-             href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if warehouse_filter %}&warehouse={{ warehouse_filter }}{% endif %}{% if business_filter %}&business={{ business_filter }}{% endif %}{% if is_active_filter %}&is_active={{ is_active_filter }}{% endif %}{% if is_default_filter %}&is_default={{ is_default_filter }}{% endif %}">
-            <i class="fa-solid fa-chevron-left"></i>
-          </a>
-        </li>
-        {% endif %}
-
-        <li class="page-item active">
-          <span class="page-link">
-            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-          </span>
-        </li>
-
-        {% if page_obj.has_next %}
-        <li class="page-item">
-          <a class="page-link"
-             href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if warehouse_filter %}&warehouse={{ warehouse_filter }}{% endif %}{% if business_filter %}&business={{ business_filter }}{% endif %}{% if is_active_filter %}&is_active={{ is_active_filter }}{% endif %}{% if is_default_filter %}&is_default={{ is_default_filter }}{% endif %}">
-            <i class="fa-solid fa-chevron-right"></i>
-          </a>
-        </li>
-        {% endif %}
-      </ul>
+    <nav aria-label="Links pagination" class="swl__pagination">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if warehouse_filter %}&warehouse={{ warehouse_filter }}{% endif %}{% if business_filter %}&business={{ business_filter }}{% endif %}{% if is_active_filter %}&is_active={{ is_active_filter }}{% endif %}{% if is_default_filter %}&is_default={{ is_default_filter }}{% endif %}"><i class="fa-solid fa-chevron-left"></i></a></li>
+            {% endif %}
+            <li class="page-item active"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if warehouse_filter %}&warehouse={{ warehouse_filter }}{% endif %}{% if business_filter %}&business={{ business_filter }}{% endif %}{% if is_active_filter %}&is_active={{ is_active_filter }}{% endif %}{% if is_default_filter %}&is_default={{ is_default_filter }}{% endif %}"><i class="fa-solid fa-chevron-right"></i></a></li>
+            {% endif %}
+        </ul>
     </nav>
     {% endif %}
 
-  {% else %}
-    <!-- Empty State -->
-    <div class="seller-links-empty-state">
-      <i class="fa-solid fa-link-slash seller-links-empty-icon"></i>
-      <h4 class="seller-links-empty-title">No Seller-Warehouse Links Found</h4>
-      <p class="seller-links-empty-text">
-        {% if search_query or warehouse_filter or business_filter %}
-          Try adjusting your filters to find what you're looking for
-        {% else %}
-          Create your first link to connect sellers with fulfillment centers
-        {% endif %}
-      </p>
-
-      {% if not search_query and not warehouse_filter and not business_filter %}
-      <a href="{% url 'warehouse:seller_warehouse_link_add' %}"
-         class="btn btn-primary btn-lg"
-         hx-get="{% url 'warehouse:seller_warehouse_link_add' %}"
-         hx-target="body"
-         hx-push-url="true">
-        <i class="fa-solid fa-plus me-2"></i>Add First Link
-      </a>
-      {% endif %}
+    {% else %}
+    <div class="wh__card">
+        <div class="wh__card-body wh__empty">
+            <i class="fa-solid fa-link-slash"></i>
+            <p><strong>No Seller-Warehouse Links Found</strong></p>
+            <p>{% if search_query or warehouse_filter or business_filter %}Try adjusting your filters{% else %}Create your first link to connect sellers with fulfillment centers{% endif %}</p>
+            {% if not search_query and not warehouse_filter and not business_filter %}
+            <a href="{% url 'warehouse:seller_warehouse_link_add' %}" class="wh__btn wh__btn--primary"
+               hx-get="{% url 'warehouse:seller_warehouse_link_add' %}" hx-target="body" hx-push-url="true">
+                <i class="fa-solid fa-plus"></i> Add First Link
+            </a>
+            {% endif %}
+        </div>
     </div>
-  {% endif %}
+    {% endif %}
 
-  <!-- Quick Tips & Workflow Cards -->
-  <div class="row mt-4">
-
-    <!-- Quick Tips Card -->
-    <div class="col-lg-6 mb-4">
-      <div class="seller-links-tips-card">
-        <div class="seller-links-tips-header">
-          <h6>
-            <i class="fa-solid fa-lightbulb"></i>
-            Quick Tips
-          </h6>
+    <!-- Tips & Workflow -->
+    <div class="wh__help-grid">
+        <div class="wh__help-card">
+            <div class="wh__help-header wh__help-header--tips"><i class="fa-solid fa-lightbulb"></i> QUICK TIPS</div>
+            <div class="wh__help-body">
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span><strong>Default Warehouse:</strong> Each seller should have one default warehouse for fallback during auto-selection</span></div>
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span><strong>Priority Levels:</strong> Higher priority (80-100) = preferred warehouses, lower priority (0-20) = emergency/backup</span></div>
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span><strong>Default Locations:</strong> Set preferred pickup points for each seller-warehouse combination</span></div>
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span><strong>Active/Inactive:</strong> Use inactive status to temporarily disable links without deleting them</span></div>
+            </div>
         </div>
-        <div class="seller-links-tips-body">
-          <div class="seller-links-tip-item">
-            <i class="fa-solid fa-check-circle seller-links-tip-icon"></i>
-            <span class="seller-links-tip-text">
-              <strong>Default Warehouse:</strong> Each seller should have one default warehouse for fallback during auto-selection
-            </span>
-          </div>
-
-          <div class="seller-links-tip-item">
-            <i class="fa-solid fa-check-circle seller-links-tip-icon"></i>
-            <span class="seller-links-tip-text">
-              <strong>Priority Levels:</strong> Higher priority (80-100) = preferred warehouses, lower priority (0-20) = emergency/backup
-            </span>
-          </div>
-
-          <div class="seller-links-tip-item">
-            <i class="fa-solid fa-check-circle seller-links-tip-icon"></i>
-            <span class="seller-links-tip-text">
-              <strong>Default Locations:</strong> Set preferred pickup points for each seller-warehouse combination
-            </span>
-          </div>
-
-          <div class="seller-links-tip-item">
-            <i class="fa-solid fa-check-circle seller-links-tip-icon"></i>
-            <span class="seller-links-tip-text">
-              <strong>Active/Inactive:</strong> Use inactive status to temporarily disable links without deleting them
-            </span>
-          </div>
+        <div class="wh__help-card">
+            <div class="wh__help-header wh__help-header--workflow"><i class="fa-solid fa-route"></i> LINK MANAGEMENT WORKFLOW</div>
+            <div class="wh__help-body">
+                <div class="wh__step"><span class="wh__step-number">1</span><div><div class="wh__step-title">Create Seller-Warehouse Links</div><div class="wh__step-desc">Connect each seller to their fulfillment centers</div></div></div>
+                <div class="wh__step"><span class="wh__step-number">2</span><div><div class="wh__step-title">Set Priorities & Defaults</div><div class="wh__step-desc">Configure priority levels and mark one warehouse as default per seller</div></div></div>
+                <div class="wh__step"><span class="wh__step-number">3</span><div><div class="wh__step-title">Configure Pickup Locations</div><div class="wh__step-desc">Assign default pickup locations for each link</div></div></div>
+                <div class="wh__step"><span class="wh__step-number">4</span><div><div class="wh__step-title">Monitor & Adjust</div><div class="wh__step-desc">Review link performance and adjust priorities as needed</div></div></div>
+            </div>
         </div>
-      </div>
     </div>
-
-    <!-- Workflow Card -->
-    <div class="col-lg-6 mb-4">
-      <div class="seller-links-tips-card">
-        <div class="seller-links-tips-header">
-          <h6>
-            <i class="fa-solid fa-route"></i>
-            Link Management Workflow
-          </h6>
-        </div>
-        <div class="seller-links-tips-body">
-          <div class="seller-links-workflow-step">
-            <span class="seller-links-workflow-number">1</span>
-            <div class="seller-links-workflow-content">
-              <strong>Create Seller-Warehouse Links</strong>
-              <small>Connect each seller to their fulfillment centers</small>
-            </div>
-          </div>
-
-          <div class="seller-links-workflow-step">
-            <span class="seller-links-workflow-number">2</span>
-            <div class="seller-links-workflow-content">
-              <strong>Set Priorities & Defaults</strong>
-              <small>Configure priority levels and mark one warehouse as default per seller</small>
-            </div>
-          </div>
-
-          <div class="seller-links-workflow-step">
-            <span class="seller-links-workflow-number">3</span>
-            <div class="seller-links-workflow-content">
-              <strong>Configure Pickup Locations</strong>
-              <small>Assign default pickup locations for each link</small>
-            </div>
-          </div>
-
-          <div class="seller-links-workflow-step">
-            <span class="seller-links-workflow-number">4</span>
-            <div class="seller-links-workflow-content">
-              <strong>Monitor & Adjust</strong>
-              <small>Review link performance and adjust priorities as needed</small>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.swl__priority-fill').forEach(function(el) {
+        el.style.width = el.getAttribute('data-width');
+    });
+});
+</script>
 {% endblock %}

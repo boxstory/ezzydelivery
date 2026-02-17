@@ -3,145 +3,128 @@
 
 {% block title %}Pickup/Dispatch Locations{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
 
-<div class="container-fluid py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h1 class="h3 mb-0">Warehouse Pickup/Dispatch Locations</h1>
-            <p class="text-muted">Manage pickup and dispatch locations for warehouses (used for order pickup and driver dispatch)</p>
+<div class="wh">
+    <!-- Hero Header -->
+    <div class="wh__header">
+        <div class="wh__header-left">
+            <div class="wh__header-icon"><i class="fa-solid fa-map-marker-alt"></i></div>
+            <div>
+                <h1 class="wh__title">Warehouse Pickup/Dispatch Locations</h1>
+                <p class="wh__subtitle">Manage pickup and dispatch locations for warehouses (used for order pickup and driver dispatch)</p>
+            </div>
         </div>
+        <a href="{% url 'warehouse:warehouse_location_add' %}" class="wh__btn wh__btn--primary">
+            <i class="fas fa-plus"></i> Add Pickup/Dispatch Location
+        </a>
     </div>
 
-    <!-- Filter and Actions -->
-    <div class="row mb-4">
-        <div class="col-md-8">
-            <form method="GET" class="d-flex gap-2">
-                <select name="warehouse" class="form-select" style="max-width: 300px;">
+    <!-- Filter Bar -->
+    <div class="wh__filter-bar">
+        <form method="GET" class="wh__filter-form">
+            <div class="wh__filter-group">
+                <label class="wh__filter-label"><i class="fas fa-warehouse"></i> Warehouse</label>
+                <select name="warehouse" class="wh__filter-select">
                     <option value="">All Warehouses</option>
                     {% for wh in warehouses %}
                     <option value="{{ wh.id }}" {% if selected_warehouse and selected_warehouse.id == wh.id %}selected{% endif %}>{{ wh.code }} - {{ wh.name }}</option>
                     {% endfor %}
                 </select>
-                <button type="submit" class="btn btn-primary">Filter</button>
-            </form>
-        </div>
-        <div class="col-md-4 text-end">
-            <a href="{% url 'warehouse:warehouse_location_add' %}" class="btn btn-success">
-                <i class="fas fa-plus me-1"></i>Add Pickup/Dispatch Location
-            </a>
-        </div>
+            </div>
+            <button type="submit" class="wh__filter-btn"><i class="fas fa-filter"></i> Filter</button>
+        </form>
     </div>
 
     <!-- Locations Table -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">
-                        <i class="fa-solid fa-map-marker-alt me-2 text-primary"></i>Pickup/Dispatch Locations
-                    </h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>Warehouse</th>
-                                    <th>Location Name</th>
-                                    <th>Code</th>
-                                    <th>Zone</th>
-                                    <th>Address</th>
-                                    <th>Status</th>
-                                    <th>Default</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for loc in locations %}
-                                <tr>
-                                    <td><strong>{{ loc.warehouse.code }}</strong><br><small class="text-muted">{{ loc.warehouse.name }}</small></td>
-                                    <td>{{ loc.name }}</td>
-                                    <td><code>{{ loc.code }}</code></td>
-                                    <td>
-                                        {% if loc.zone_number %}
-                                        <span class="badge bg-info">Zone {{ loc.zone_number }}</span>
-                                        {% else %}
-                                        <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if loc.address %}
-                                        <small>{{ loc.address|truncatewords:8 }}</small>
-                                        {% else %}
-                                        <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if loc.is_active %}
-                                        <span class="badge bg-success">Active</span>
-                                        {% else %}
-                                        <span class="badge bg-secondary">Inactive</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if loc.is_default %}
-                                        <span class="badge bg-primary">Default</span>
-                                        {% else %}
-                                        <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="7" class="text-center text-muted py-5">
-                                        <i class="fas fa-map-marker-alt fa-3x mb-3 d-block"></i>
-                                        No warehouse locations found
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Pagination -->
-                {% if locations.has_other_pages %}
-                <div class="card-footer bg-white">
-                    <nav aria-label="Page navigation">
-                        <ul class="pagination mb-0 justify-content-center">
-                            {% if locations.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page=1{% if selected_warehouse %}&warehouse={{ selected_warehouse.id }}{% endif %}">First</a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ locations.previous_page_number }}{% if selected_warehouse %}&warehouse={{ selected_warehouse.id }}{% endif %}">Previous</a>
-                            </li>
-                            {% endif %}
-
-                            <li class="page-item active">
-                                <span class="page-link">
-                                    Page {{ locations.number }} of {{ locations.paginator.num_pages }}
-                                </span>
-                            </li>
-
-                            {% if locations.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ locations.next_page_number }}{% if selected_warehouse %}&warehouse={{ selected_warehouse.id }}{% endif %}">Next</a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ locations.paginator.num_pages }}{% if selected_warehouse %}&warehouse={{ selected_warehouse.id }}{% endif %}">Last</a>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                </div>
-                {% endif %}
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left">
+                <i class="fa-solid fa-map-marker-alt"></i>
+                <span>PICKUP/DISPATCH LOCATIONS</span>
             </div>
         </div>
+        <div class="wh__table-wrap">
+            <table class="wh__table">
+                <thead>
+                    <tr>
+                        <th class="wh__th">Warehouse</th>
+                        <th class="wh__th">Location Name</th>
+                        <th class="wh__th">Code</th>
+                        <th class="wh__th">Zone</th>
+                        <th class="wh__th">Address</th>
+                        <th class="wh__th">Status</th>
+                        <th class="wh__th">Default</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for loc in locations %}
+                    <tr>
+                        <td class="wh__td">
+                            <strong>{{ loc.warehouse.code }}</strong>
+                            <div class="wh__meta">{{ loc.warehouse.name }}</div>
+                        </td>
+                        <td class="wh__td wh__product-name">{{ loc.name }}</td>
+                        <td class="wh__td"><span class="wh__code">{{ loc.code }}</span></td>
+                        <td class="wh__td">
+                            {% if loc.zone_number %}
+                            <span class="wh__badge wh__badge--info">Zone {{ loc.zone_number }}</span>
+                            {% else %}
+                            <span class="wh__muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="wh__td">
+                            {% if loc.address %}
+                            <span class="wh__meta">{{ loc.address|truncatewords:8 }}</span>
+                            {% else %}
+                            <span class="wh__muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="wh__td">
+                            {% if loc.is_active %}
+                            <span class="wh__badge wh__badge--success">Active</span>
+                            {% else %}
+                            <span class="wh__badge wh__badge--muted">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="wh__td">
+                            {% if loc.is_default %}
+                            <span class="wh__badge wh__badge--primary">Default</span>
+                            {% else %}
+                            <span class="wh__muted">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="wh__empty">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <p>No warehouse locations found</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if locations.has_other_pages %}
+        <div class="wh__card-footer">
+            <nav aria-label="Page navigation">
+                <ul class="pagination mb-0 justify-content-center">
+                    {% if locations.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page=1{% if selected_warehouse %}&warehouse={{ selected_warehouse.id }}{% endif %}">First</a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ locations.previous_page_number }}{% if selected_warehouse %}&warehouse={{ selected_warehouse.id }}{% endif %}">Previous</a></li>
+                    {% endif %}
+                    <li class="page-item active"><span class="page-link">Page {{ locations.number }} of {{ locations.paginator.num_pages }}</span></li>
+                    {% if locations.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ locations.next_page_number }}{% if selected_warehouse %}&warehouse={{ selected_warehouse.id }}{% endif %}">Next</a></li>
+                    <li class="page-item"><a class="page-link" href="?page={{ locations.paginator.num_pages }}{% if selected_warehouse %}&warehouse={{ selected_warehouse.id }}{% endif %}">Last</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

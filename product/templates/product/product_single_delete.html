@@ -1,15 +1,71 @@
-{% extends "base.html" %}
-{% load crispy_forms_tags %}
-{% block extra_head %}
-Products
-{% endblock extra_head %}
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Delete Product{% endblock %}
+
 {% block content %}
-<div class="container" id="product_delete_container">
-    <div class="row">
-        <div class="col-md-12" id="product_delete_section_main">product_item_delete</div>
+<div class="col-12 pdl" id="product_delete_container">
+    <!-- Page Header -->
+    <div class="pdl__header">
+        <div class="pdl__header__left">
+            <a href="{% url 'product:product_list' %}" class="pdl__back-btn">
+                <i class="fa-solid fa-arrow-left"></i>
+            </a>
+            <div>
+                <h1 class="pdl__title">Delete Product</h1>
+                <p class="pdl__subtitle">This action cannot be undone</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Card -->
+    <div class="pdl__card">
+        <div class="pdl__card__header">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            Confirm Deletion
+        </div>
+        <div class="pdl__card__body">
+            <div class="pdl__warning-banner">
+                <div class="pdl__warning-icon">
+                    <i class="fa-solid fa-trash"></i>
+                </div>
+                <div>
+                    <p class="pdl__warning-title">Are you sure you want to delete this product?</p>
+                    <p class="pdl__warning-text">This will permanently remove the product and all associated inventory records. This action cannot be undone.</p>
+                </div>
+            </div>
+
+            {% if product %}
+            <div class="pdl__product-info">
+                <div class="pdl__field">
+                    <span class="pdl__field__label">Product Name</span>
+                    <span class="pdl__field__value">{{ product.item_name|default:"N/A" }}</span>
+                </div>
+                <div class="pdl__field">
+                    <span class="pdl__field__label">Product ID</span>
+                    <span class="pdl__field__value pdl__field__value--mono">{{ product.product_id|default:"N/A" }}</span>
+                </div>
+                {% if product.item_sku %}
+                <div class="pdl__field">
+                    <span class="pdl__field__label">SKU</span>
+                    <span class="pdl__field__value pdl__field__value--mono">{{ product.item_sku }}</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="pdl__actions">
+                <a href="{% url 'product:product_list' %}" class="pdl__btn pdl__btn--secondary">
+                    <i class="fa-solid fa-arrow-left me-1"></i> Cancel
+                </a>
+                <form method="POST" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="pdl__btn pdl__btn--danger">
+                        <i class="fa-solid fa-trash me-1"></i> Delete Product
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock content %}
-{% block extra_js %}
-<!-- extra js -->
-{% endblock extra_js %}

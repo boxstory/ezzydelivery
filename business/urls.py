@@ -16,6 +16,8 @@ urlpatterns = [
     path('<int:business_id>/settings/', business_views.business_settings,
          name='business_settings'),
     # PICKUP LOCATIONS settings
+    path('settings/pickup_location/choose/',
+         business_views.pickup_location_choose, name='pickup_location_choose'),
     path('settings/pickup_location/add/',
          business_views.pickup_location_add, name='pickup_location_add'),
     path('settings/pickup_location/<int:pickup_location_id>/update/',

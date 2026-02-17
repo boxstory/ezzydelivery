@@ -4,125 +4,136 @@
 {% block title %}KPI - {{ rider.driver_code }}{% endblock %}
 
 {% block content %}
-<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">
-            <i class="fa-solid fa-chart-line me-2"></i>KPI Details - {{ rider.driver_code }}
-        </h4>
-        <a href="{% url 'workforce:dispatch_kpi_dashboard' %}" class="btn btn-outline-secondary btn-sm">
-            <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
-        </a>
+<div class="dpr">
+    <!-- Hero Header -->
+    <div class="dpr__hero">
+        <div class="dpr__hero-inner">
+            <div class="dpr__hero-left">
+                <h1 class="dpr__hero-title">
+                    <i class="fa-solid fa-chart-line dpr__hero-icon"></i>
+                    KPI Details
+                </h1>
+                <p class="dpr__hero-subtitle">Performance metrics for {{ rider.driver_code }}</p>
+            </div>
+            <div class="dpr__hero-right">
+                <a href="{% url 'workforce:dispatch_kpi_dashboard' %}" class="dpr__back-btn">
+                    <i class="fa-solid fa-arrow-left me-1"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
     </div>
 
-    <div class="row">
-        <!-- Rider Info & Summary -->
+    <div class="row g-3">
+        <!-- Left Column -->
         <div class="col-lg-4">
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fa-solid fa-user me-2"></i>Rider Info</h6>
+            <!-- Rider Info -->
+            <div class="dpr__card">
+                <div class="dpr__card-header">
+                    <i class="fa-solid fa-user dpr__card-header-icon"></i>
+                    RIDER INFO
                 </div>
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="rider-avatar me-3" style="width: 64px; height: 64px; background: var(--brand-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 600;">
-                            {{ rider.driver_code|slice:":2" }}
-                        </div>
-                        <div>
-                            <strong class="fs-5">{{ rider.driver_code }}</strong>
-                            <br>
-                            {{ rider.user.first_name }} {{ rider.user.last_name }}
-                            <br>
-                            <small class="text-muted">{{ rider.user.email }}</small>
+                <div class="dpr__card-body">
+                    <div class="dpr__rider-profile">
+                        <div class="dpr__rider-avatar">{{ rider.driver_code|slice:":2" }}</div>
+                        <div class="dpr__rider-details">
+                            <strong class="dpr__rider-code">{{ rider.driver_code }}</strong>
+                            <span class="dpr__rider-name">{{ rider.user.first_name }} {{ rider.user.last_name }}</span>
+                            <span class="dpr__rider-email">{{ rider.user.email }}</span>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- 30-Day Summary -->
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fa-solid fa-calendar-days me-2"></i>30-Day Summary</h6>
+            <div class="dpr__card">
+                <div class="dpr__card-header">
+                    <i class="fa-solid fa-calendar-days dpr__card-header-icon"></i>
+                    30-DAY SUMMARY
                 </div>
-                <div class="card-body">
-                    <div class="row text-center mb-3">
-                        <div class="col-6">
-                            <div class="display-6 fw-bold text-primary">{{ stats.total_orders|default:0 }}</div>
-                            <small class="text-muted">Total Orders</small>
+                <div class="dpr__card-body">
+                    <div class="dpr__summary-stats">
+                        <div class="dpr__summary-stat">
+                            <span class="dpr__summary-value dpr__summary-value--primary">{{ stats.total_orders|default:0 }}</span>
+                            <span class="dpr__summary-label">Total Orders</span>
                         </div>
-                        <div class="col-6">
-                            <div class="display-6 fw-bold text-success">{{ stats.total_batched|default:0 }}</div>
-                            <small class="text-muted">Batched Orders</small>
+                        <div class="dpr__summary-stat">
+                            <span class="dpr__summary-value dpr__summary-value--success">{{ stats.total_batched|default:0 }}</span>
+                            <span class="dpr__summary-label">Batched Orders</span>
                         </div>
                     </div>
 
-                    <hr>
+                    <div class="dpr__divider"></div>
 
-                    <dl class="row mb-0">
-                        <dt class="col-7">Avg Batching %</dt>
-                        <dd class="col-5 text-end">
-                            <span class="badge {% if stats.avg_batching >= 50 %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                    <div class="dpr__detail-row">
+                        <span class="dpr__detail-label">Avg Batching %</span>
+                        <span class="dpr__detail-value">
+                            <span class="dpr__badge {% if stats.avg_batching >= 50 %}dpr__badge--success{% else %}dpr__badge--warning{% endif %}">
                                 {{ stats.avg_batching|floatformat:1|default:0 }}%
                             </span>
-                        </dd>
-
-                        <dt class="col-7">Avg Orders/Hour</dt>
-                        <dd class="col-5 text-end">{{ stats.avg_orders_hour|floatformat:1|default:0 }}</dd>
-
-                        <dt class="col-7">Avg SLA Compliance</dt>
-                        <dd class="col-5 text-end">
-                            <span class="badge {% if stats.avg_sla >= 90 %}bg-success{% elif stats.avg_sla >= 70 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                        </span>
+                    </div>
+                    <div class="dpr__detail-row">
+                        <span class="dpr__detail-label">Avg Orders/Hour</span>
+                        <span class="dpr__detail-value">{{ stats.avg_orders_hour|floatformat:1|default:0 }}</span>
+                    </div>
+                    <div class="dpr__detail-row">
+                        <span class="dpr__detail-label">Avg SLA Compliance</span>
+                        <span class="dpr__detail-value">
+                            <span class="dpr__badge {% if stats.avg_sla >= 90 %}dpr__badge--success{% elif stats.avg_sla >= 70 %}dpr__badge--warning{% else %}dpr__badge--danger{% endif %}">
                                 {{ stats.avg_sla|floatformat:1|default:0 }}%
                             </span>
-                        </dd>
-                    </dl>
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Daily KPIs -->
+        <!-- Right Column -->
         <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fa-solid fa-table me-2"></i>Daily KPIs (Last 30 Days)</h6>
+            <div class="dpr__card">
+                <div class="dpr__card-header">
+                    <i class="fa-solid fa-table dpr__card-header-icon"></i>
+                    DAILY KPIS (LAST 30 DAYS)
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
+                <div class="dpr__table-wrap">
+                    <table class="dpr__table">
+                        <thead class="dpr__table-head">
                             <tr>
-                                <th>Date</th>
-                                <th>Location</th>
-                                <th>Total</th>
-                                <th>Batched</th>
-                                <th>Single</th>
-                                <th>Batching %</th>
-                                <th>SLA %</th>
-                                <th>Orders/Hr</th>
+                                <th class="dpr__th">Date</th>
+                                <th class="dpr__th">Location</th>
+                                <th class="dpr__th">Total</th>
+                                <th class="dpr__th">Batched</th>
+                                <th class="dpr__th">Single</th>
+                                <th class="dpr__th">Batching %</th>
+                                <th class="dpr__th">SLA %</th>
+                                <th class="dpr__th">Orders/Hr</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for kpi in kpis %}
-                            <tr>
-                                <td>{{ kpi.date|date:"M d" }}</td>
-                                <td>{{ kpi.pickup_location.pickup_location_title|truncatechars:15|default:"-" }}</td>
-                                <td><strong>{{ kpi.total_orders }}</strong></td>
-                                <td>{{ kpi.batched_orders }}</td>
-                                <td>{{ kpi.single_orders }}</td>
-                                <td>
-                                    <span class="badge {% if kpi.batching_percentage >= 50 %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                            <tr class="dpr__tr">
+                                <td class="dpr__td">{{ kpi.date|date:"M d" }}</td>
+                                <td class="dpr__td">{{ kpi.pickup_location.pickup_location_title|truncatechars:15|default:"-" }}</td>
+                                <td class="dpr__td"><strong>{{ kpi.total_orders }}</strong></td>
+                                <td class="dpr__td">{{ kpi.batched_orders }}</td>
+                                <td class="dpr__td">{{ kpi.single_orders }}</td>
+                                <td class="dpr__td">
+                                    <span class="dpr__badge {% if kpi.batching_percentage >= 50 %}dpr__badge--success{% else %}dpr__badge--warning{% endif %}">
                                         {{ kpi.batching_percentage|floatformat:0 }}%
                                     </span>
                                 </td>
-                                <td>
-                                    <span class="badge {% if kpi.sla_compliance_rate >= 90 %}bg-success{% elif kpi.sla_compliance_rate >= 70 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                <td class="dpr__td">
+                                    <span class="dpr__badge {% if kpi.sla_compliance_rate >= 90 %}dpr__badge--success{% elif kpi.sla_compliance_rate >= 70 %}dpr__badge--warning{% else %}dpr__badge--danger{% endif %}">
                                         {{ kpi.sla_compliance_rate|floatformat:0 }}%
                                     </span>
                                 </td>
-                                <td>{{ kpi.orders_per_hour|floatformat:1 }}</td>
+                                <td class="dpr__td">{{ kpi.orders_per_hour|floatformat:1 }}</td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="8" class="text-center text-muted py-4">
-                                    No KPI data available for this rider.
+                                <td colspan="8" class="dpr__empty-cell">
+                                    <i class="fa-solid fa-chart-bar"></i>
+                                    <p>No KPI data available for this rider.</p>
                                 </td>
                             </tr>
                             {% endfor %}

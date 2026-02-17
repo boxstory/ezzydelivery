@@ -1,204 +1,222 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
 {% block content %}
-<div class="p-3 col-12">
-  <section>
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="btp" id="business_team_permissions_container_main">
+
+  <!-- Hero Banner -->
+  <div class="btp__hero">
+    <div class="d-flex align-items-center gap-3">
+      <div class="btp__hero-icon">
+        <i class="fa-solid fa-shield-halved"></i>
+      </div>
       <div>
-        <h3 class="mb-1">Manage Permissions</h3>
-        <p class="text-muted mb-0">
+        <h1 class="btp__hero-title">Manage Permissions</h1>
+        <p class="btp__hero-sub">
           {{ team_member.team_name|default:team_member.user.username }}
-          <span class="badge bg-secondary ms-2">{{ effective_count }} permissions</span>
+          <span class="btp__hero-count">{{ effective_count }} permissions</span>
         </p>
       </div>
-      <a href="{% url 'business:business_teams' business.business_id %}" class="btn btn-outline-secondary">
-        <i class="fa fa-arrow-left me-2"></i>Back to Team
-      </a>
     </div>
+    <a href="{% url 'business:business_teams' business.business_id %}" class="btp__hero-back">
+      <i class="fa fa-arrow-left"></i> Back to Team
+    </a>
+  </div>
 
-    <div class="row">
-      <!-- Left Column: Role & Info -->
-      <div class="col-md-4 mb-4">
-        <!-- Team Member Card -->
-        <div class="card mb-4">
-          <div class="card-header">
-            <strong>Team Member</strong>
-          </div>
-          <div class="card-body text-center">
-            <img src="{% if team_member.team_logo %}{{ team_member.team_logo.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}" alt="{{ team_member.team_name|default:team_member.user.username }} avatar" class="rounded-circle mb-3"
-                 style="width: 80px; height: 80px; object-fit: cover;">
-            <h5 class="mb-1">{{ team_member.team_name|default:team_member.user.username }}</h5>
-            <p class="text-muted mb-2">{{ team_member.team_email|default:team_member.user.email }}</p>
+  <div class="row g-3">
+    <!-- Left Column: Role & Info -->
+    <div class="col-lg-4">
 
-            <!-- Status -->
-            {% if team_member.team_status == 'active' %}
-              <span class="badge bg-success">Active</span>
-            {% elif team_member.team_status == 'pending' %}
-              <span class="badge bg-warning text-dark">Pending</span>
-            {% elif team_member.team_status == 'suspended' %}
-              <span class="badge bg-danger">Suspended</span>
-            {% else %}
-              <span class="badge bg-secondary">{{ team_member.team_status }}</span>
-            {% endif %}
-          </div>
+      <!-- Team Member Card -->
+      <div class="btp__card mb-3" id="business_team_permissions_card_member">
+        <div class="btp__card-header">
+          <i class="fa-solid fa-user"></i>
+          <span>TEAM MEMBER</span>
         </div>
-
-        <!-- Role Selection -->
-        <div class="card mb-4">
-          <div class="card-header">
-            <strong>Current Role</strong>
+        <div class="btp__card-body d-flex flex-column align-items-center text-center">
+          <div class="btp__avatar">
+            <img src="{% if team_member.team_logo %}{{ team_member.team_logo.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}"
+                 alt="{{ team_member.team_name|default:team_member.user.username }} avatar"
+                 class="btp__avatar-img">
           </div>
-          <div class="card-body">
-            <form method="POST">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="change_role">
-              <div class="mb-3">
-                <select name="role" class="form-select">
-                  {% for value, label in role_choices %}
-                  <option value="{{ value }}" {% if value == current_role %}selected{% endif %}>
-                    {{ label }}
-                  </option>
-                  {% endfor %}
-                </select>
-              </div>
-              <button type="submit" class="btn btn-primary w-100">
-                <i class="fa fa-save me-2"></i>Change Role
-              </button>
-            </form>
-            <hr>
-            <small class="text-muted">
-              <strong>Role Descriptions:</strong><br>
-              <span class="badge bg-primary">Manager</span> Full operational access<br>
-              <span class="badge bg-info text-dark">Staff</span> Create/edit orders & products<br>
-              <span class="badge bg-secondary">Viewer</span> Read-only access
-            </small>
-          </div>
+          <h3 class="btp__member-name">{{ team_member.team_name|default:team_member.user.username }}</h3>
+          <p class="btp__member-email">{{ team_member.team_email|default:team_member.user.email }}</p>
+          {% if team_member.team_status == 'active' %}
+            <span class="btp__badge btp__badge--success"><i class="fa-solid fa-circle-check"></i> Active</span>
+          {% elif team_member.team_status == 'pending' %}
+            <span class="btp__badge btp__badge--warning"><i class="fa-solid fa-clock"></i> Pending</span>
+          {% elif team_member.team_status == 'suspended' %}
+            <span class="btp__badge btp__badge--danger"><i class="fa-solid fa-ban"></i> Suspended</span>
+          {% else %}
+            <span class="btp__badge btp__badge--muted">{{ team_member.team_status }}</span>
+          {% endif %}
         </div>
+      </div>
 
-        <!-- Reset Permissions -->
-        <div class="card border-warning">
-          <div class="card-header bg-warning text-dark">
-            <strong>Reset Permissions</strong>
-          </div>
-          <div class="card-body">
-            <p class="small text-muted mb-3">
-              Remove all custom permission overrides and restore to role defaults.
-            </p>
-            <form method="POST" onsubmit="return confirm('Reset all custom permissions to role defaults?');">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="reset">
-              <button type="submit" class="btn btn-outline-warning w-100">
-                <i class="fa fa-refresh me-2"></i>Reset to Defaults
-              </button>
-            </form>
+      <!-- Role Selection Card -->
+      <div class="btp__card mb-3" id="business_team_permissions_card_role">
+        <div class="btp__card-header">
+          <i class="fa-solid fa-user-tag"></i>
+          <span>CURRENT ROLE</span>
+        </div>
+        <div class="btp__card-body">
+          <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="change_role">
+            <div class="mb-3">
+              <select name="role" class="btp__select" id="business_team_permissions_select_role">
+                {% for value, label in role_choices %}
+                <option value="{{ value }}" {% if value == current_role %}selected{% endif %}>
+                  {{ label }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <button type="submit" class="btp__btn btp__btn--primary w-100" id="business_team_permissions_btn_role">
+              <i class="fa fa-save"></i> Change Role
+            </button>
+          </form>
+
+          <div class="btp__divider"></div>
+
+          <div class="btp__role-info">
+            <p class="btp__role-info-title">Role Descriptions</p>
+            <div class="btp__role-desc">
+              <span class="btp__badge btp__badge--info"><i class="fa-solid fa-star"></i> Manager</span>
+              <span class="btp__role-desc-text">Full operational access</span>
+            </div>
+            <div class="btp__role-desc">
+              <span class="btp__badge btp__badge--info"><i class="fa-solid fa-pen"></i> Staff</span>
+              <span class="btp__role-desc-text">Create/edit orders &amp; products</span>
+            </div>
+            <div class="btp__role-desc">
+              <span class="btp__badge btp__badge--muted"><i class="fa-solid fa-eye"></i> Viewer</span>
+              <span class="btp__role-desc-text">Read-only access</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Right Column: Permissions Grid -->
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-header">
-            <strong>Permissions</strong>
-            <span class="badge bg-primary ms-2">{{ effective_count }} active</span>
-          </div>
-          <div class="card-body p-0">
-            <!-- Legend -->
-            <div class="p-3 bg-light border-bottom">
-              <small>
-                <span class="badge bg-success me-2">Active</span> Permission is enabled
-                <span class="badge bg-secondary me-2 ms-3">Inactive</span> Permission is disabled
-                <span class="badge bg-warning text-dark me-2 ms-3">+Custom</span> Granted beyond role
-                <span class="badge bg-dark me-2 ms-3">-Revoked</span> Removed from role
-              </small>
-            </div>
+      <!-- Reset Permissions Card -->
+      <div class="btp__card btp__card--warning" id="business_team_permissions_card_reset">
+        <div class="btp__card-header btp__card-header--warning">
+          <i class="fa-solid fa-rotate-left"></i>
+          <span>RESET PERMISSIONS</span>
+        </div>
+        <div class="btp__card-body">
+          <p class="btp__reset-text">
+            Remove all custom permission overrides and restore to role defaults.
+          </p>
+          <form method="POST" onsubmit="return confirm('Reset all custom permissions to role defaults?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reset">
+            <button type="submit" class="btp__btn btp__btn--warning w-100" id="business_team_permissions_btn_reset">
+              <i class="fa fa-refresh"></i> Reset to Defaults
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
 
-            <!-- Permission Groups -->
-            <div class="accordion" id="permissionsAccordion">
-              {% for group_name, permissions in permission_groups.items %}
-              <div class="accordion-item">
-                <h2 class="accordion-header" id="heading{{ forloop.counter }}">
-                  <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button"
-                          data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}"
-                          aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
-                          aria-controls="collapse{{ forloop.counter }}">
-                    <strong>{{ group_name }}</strong>
-                    <span class="badge bg-secondary ms-2">
-                      {% for perm in permissions %}{% if perm.is_effective %}1{% else %}0{% endif %}{% endfor %}
-                    </span>
-                  </button>
-                </h2>
-                <div id="collapse{{ forloop.counter }}"
-                     class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
-                     aria-labelledby="heading{{ forloop.counter }}"
-                     data-bs-parent="#permissionsAccordion">
-                  <div class="accordion-body p-0">
-                    <table class="table table-hover table-sm mb-0">
-                      <thead class="table-light">
-                        <tr>
-                          <th>Permission</th>
-                          <th class="text-center col-width-sm">Role Default</th>
-                          <th class="text-center col-width-sm">Status</th>
-                          <th class="text-center col-width-md">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {% for perm in permissions %}
-                        <tr>
-                          <td>
-                            {{ perm.label }}
-                            {% if perm.override_status == 'granted' %}
-                              <span class="badge bg-warning text-dark">+Custom</span>
-                            {% elif perm.override_status == 'revoked' %}
-                              <span class="badge bg-dark">-Revoked</span>
-                            {% endif %}
-                          </td>
-                          <td class="text-center">
-                            {% if perm.in_role_default %}
-                              <i class="fa fa-check text-success"></i>
-                            {% else %}
-                              <i class="fa fa-times text-muted"></i>
-                            {% endif %}
-                          </td>
-                          <td class="text-center">
-                            {% if perm.is_effective %}
-                              <span class="badge bg-success">Active</span>
-                            {% else %}
-                              <span class="badge bg-secondary">Inactive</span>
-                            {% endif %}
-                          </td>
-                          <td class="text-center">
-                            <form method="POST" class="d-inline">
-                              {% csrf_token %}
-                              <input type="hidden" name="permission_code" value="{{ perm.code }}">
-                              {% if perm.is_effective %}
-                                <input type="hidden" name="action" value="revoke">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Revoke">
-                                  <i class="fa fa-times"></i> Revoke
-                                </button>
-                              {% else %}
-                                <input type="hidden" name="action" value="grant">
-                                <button type="submit" class="btn btn-sm btn-outline-success" title="Grant">
-                                  <i class="fa fa-check"></i> Grant
-                                </button>
-                              {% endif %}
-                            </form>
-                          </td>
-                        </tr>
-                        {% endfor %}
-                      </tbody>
-                    </table>
-                  </div>
+    <!-- Right Column: Permissions Grid -->
+    <div class="col-lg-8">
+      <div class="btp__card" id="business_team_permissions_card_perms">
+        <div class="btp__card-header">
+          <i class="fa-solid fa-key"></i>
+          <span>PERMISSIONS</span>
+          <span class="btp__badge btp__badge--info ms-auto">{{ effective_count }} active</span>
+        </div>
+
+        <!-- Legend -->
+        <div class="btp__legend">
+          <span class="btp__badge btp__badge--success"><i class="fa-solid fa-check"></i> Active</span>
+          <span class="btp__badge btp__badge--muted"><i class="fa-solid fa-minus"></i> Inactive</span>
+          <span class="btp__badge btp__badge--warning"><i class="fa-solid fa-plus"></i> +Custom</span>
+          <span class="btp__badge btp__badge--danger"><i class="fa-solid fa-xmark"></i> -Revoked</span>
+        </div>
+
+        <!-- Permission Groups Accordion -->
+        <div class="btp__accordion" id="permissionsAccordion">
+          {% for group_name, permissions in permission_groups.items %}
+          <div class="btp__accordion-item">
+            <div class="btp__accordion-header" id="heading{{ forloop.counter }}">
+              <button class="btp__accordion-btn {% if not forloop.first %}btp__accordion-btn--collapsed{% endif %}"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#collapse{{ forloop.counter }}"
+                      aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                      aria-controls="collapse{{ forloop.counter }}">
+                <div class="d-flex align-items-center gap-2">
+                  <i class="fa-solid fa-folder"></i>
+                  <span class="btp__accordion-title">{{ group_name }}</span>
                 </div>
+                <span class="btp__badge btp__badge--muted">
+                  {% for perm in permissions %}{% if perm.is_effective %}1{% else %}0{% endif %}{% endfor %}
+                </span>
+              </button>
+            </div>
+            <div id="collapse{{ forloop.counter }}"
+                 class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                 aria-labelledby="heading{{ forloop.counter }}"
+                 data-bs-parent="#permissionsAccordion">
+              <div class="btp__perm-list">
+                <!-- Table Header -->
+                <div class="btp__perm-row btp__perm-row--header">
+                  <span class="btp__perm-cell btp__perm-cell--name">Permission</span>
+                  <span class="btp__perm-cell btp__perm-cell--default">Role Default</span>
+                  <span class="btp__perm-cell btp__perm-cell--status">Status</span>
+                  <span class="btp__perm-cell btp__perm-cell--action">Action</span>
+                </div>
+                {% for perm in permissions %}
+                <div class="btp__perm-row">
+                  <span class="btp__perm-cell btp__perm-cell--name">
+                    {{ perm.label }}
+                    {% if perm.override_status == 'granted' %}
+                      <span class="btp__badge btp__badge--warning">+Custom</span>
+                    {% elif perm.override_status == 'revoked' %}
+                      <span class="btp__badge btp__badge--danger">-Revoked</span>
+                    {% endif %}
+                  </span>
+                  <span class="btp__perm-cell btp__perm-cell--default">
+                    {% if perm.in_role_default %}
+                      <i class="fa fa-check btp__icon--success"></i>
+                    {% else %}
+                      <i class="fa fa-times btp__icon--muted"></i>
+                    {% endif %}
+                  </span>
+                  <span class="btp__perm-cell btp__perm-cell--status">
+                    {% if perm.is_effective %}
+                      <span class="btp__badge btp__badge--success">Active</span>
+                    {% else %}
+                      <span class="btp__badge btp__badge--muted">Inactive</span>
+                    {% endif %}
+                  </span>
+                  <span class="btp__perm-cell btp__perm-cell--action">
+                    <form method="POST" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="permission_code" value="{{ perm.code }}">
+                      {% if perm.is_effective %}
+                        <input type="hidden" name="action" value="revoke">
+                        <button type="submit" class="btp__action-btn btp__action-btn--revoke" title="Revoke">
+                          <i class="fa fa-times"></i> Revoke
+                        </button>
+                      {% else %}
+                        <input type="hidden" name="action" value="grant">
+                        <button type="submit" class="btp__action-btn btp__action-btn--grant" title="Grant">
+                          <i class="fa fa-check"></i> Grant
+                        </button>
+                      {% endif %}
+                    </form>
+                  </span>
+                </div>
+                {% endfor %}
               </div>
-              {% endfor %}
             </div>
           </div>
+          {% endfor %}
         </div>
       </div>
     </div>
-  </section>
+  </div>
 </div>
 {% endblock content %}
 
@@ -219,7 +237,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (panel) {
           panel.classList.add('show');
           const button = document.querySelector(`[data-bs-target="#${panelId}"]`);
-          if (button) button.classList.remove('collapsed');
+          if (button) button.classList.remove('btp__accordion-btn--collapsed');
         }
       });
     } catch(e) {}

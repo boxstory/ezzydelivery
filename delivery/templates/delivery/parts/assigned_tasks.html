@@ -6,90 +6,90 @@
 
   <!-- Mobile Card View -->
   <div class="d-md-none">
-    <div class="d-flex justify-content-between align-items-center px-3 py-2" style="background: #f9fafb;">
-      <h6 class="mb-0 fw-bold"><i class="fa-solid fa-clipboard-list text-primary me-2"></i>Accepted Tasks</h6>
-      <span class="badge bg-primary">{{ tasks|length }}</span>
+    <div class="atk__mob-header">
+      <h6 class="atk__mob-header-title"><i class="fa-solid fa-clipboard-list atk__mob-header-icon"></i>Accepted Tasks</h6>
+      <span class="atk__badge atk__badge--info">{{ tasks|length }}</span>
     </div>
     {% for card in tasks %}
-    <div class="card border-0 border-bottom" style="border-radius: 0;">
-      <div class="card-body p-3" data-bs-toggle="collapse" data-bs-target="#mob-collapse-{{ card.id }}" style="cursor: pointer;">
+    <div class="atk__mob-card">
+      <div class="atk__mob-card-body" data-bs-toggle="collapse" data-bs-target="#mob-collapse-{{ card.id }}">
         <div class="d-flex justify-content-between align-items-start">
           <div>
-            <code class="fw-bold text-primary">#{{ card.dl_task_number }}</code>
-            <span class="ms-2 badge {% if card.dl_task_status == 'delivered' %}bg-success{% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' %}bg-primary{% elif card.dl_task_status == 'cancelled' or card.dl_task_status == 'failed' %}bg-danger{% elif card.dl_task_status == 'accepted' or card.dl_task_status == 'picked_up' %}bg-info{% elif card.dl_task_status == 'contacted' %}bg-secondary{% elif card.dl_task_status == 'non_reachable' %}bg-dark{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.65rem;">{{ card.get_dl_task_status_display }}</span>
+            <code class="atk__task-code">#{{ card.dl_task_number }}</code>
+            <span class="atk__badge ms-2 {% if card.dl_task_status == 'delivered' %}atk__badge--success{% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' %}atk__badge--primary{% elif card.dl_task_status == 'cancelled' or card.dl_task_status == 'failed' %}atk__badge--danger{% elif card.dl_task_status == 'accepted' or card.dl_task_status == 'picked_up' %}atk__badge--info{% elif card.dl_task_status == 'contacted' %}atk__badge--muted{% elif card.dl_task_status == 'non_reachable' %}atk__badge--dark{% else %}atk__badge--warning{% endif %}">{{ card.get_dl_task_status_display }}</span>
           </div>
           <div class="text-end">
-            {% if card.order.cod_amount %}<span class="fw-bold text-warning">{{ card.order.cod_amount|floatformat:0 }} QR</span>{% endif %}
+            {% if card.order.cod_amount %}<span class="atk__cod-amount">{{ card.order.cod_amount|floatformat:0 }} QR</span>{% endif %}
           </div>
         </div>
-        <div class="mt-2" style="font-size: 0.8rem;">
+        <div class="atk__mob-route mt-2">
           <div><i class="fa-solid fa-arrow-up text-success me-1"></i>{{ card.pickup_location.pickup_location_title|default:"N/A" }}</div>
           <div><i class="fa-solid fa-arrow-down text-danger me-1"></i>Zone {{ card.dl_to_address.dl_zone|default:card.order.dl_zone }} - {{ card.dl_to_address.zone_name|default:"" }}</div>
         </div>
-        <div class="d-flex justify-content-between align-items-center mt-2 text-muted" style="font-size: 0.75rem;">
+        <div class="atk__mob-meta mt-2">
           <span>{{ card.dl_task_date }}{% if card.dl_to_address.time_slot %} | {{ card.dl_to_address.time_slot }}{% endif %}</span>
           <span>{{ card.dl_speed }}</span>
-          <i class="fa-solid fa-chevron-down mob-chevron" style="transition: transform 0.2s;"></i>
+          <i class="fa-solid fa-chevron-down mob-chevron atk__chevron"></i>
         </div>
       </div>
       <div class="collapse" id="mob-collapse-{{ card.id }}">
-        <div class="px-3 pb-3" style="background: #f9fafb;">
-          <div class="row g-2 mb-2" style="font-size: 0.8rem;">
+        <div class="atk__mob-expand">
+          <div class="row g-2 mb-2">
             <div class="col-6">
-              <div class="fw-bold text-success" style="font-size: 0.7rem;"><i class="fa-solid fa-arrow-up me-1"></i>FROM</div>
-              <div><span class="text-muted">Pickup:</span> {{ card.order.business.pickup_location|default:"-" }}</div>
-              <div><span class="text-muted">Business:</span> {{ card.order.business.business_name }}</div>
+              <div class="atk__section-head atk__section-head--origin"><i class="fa-solid fa-arrow-up me-1"></i>FROM</div>
+              <div class="atk__field-text"><span class="atk__field-label">Pickup:</span> {{ card.order.business.pickup_location|default:"-" }}</div>
+              <div class="atk__field-text"><span class="atk__field-label">Business:</span> {{ card.order.business.business_name }}</div>
             </div>
             <div class="col-6">
-              <div class="fw-bold text-danger" style="font-size: 0.7rem;"><i class="fa-solid fa-arrow-down me-1"></i>TO</div>
-              <div><span class="text-muted">Zone:</span> {{ card.dl_to_address.zone_number }}-{{ card.dl_to_address.zone_name }}</div>
-              <div><span class="text-muted">Address:</span> St {{ card.dl_to_address.street_no }}, Bldg {{ card.dl_to_address.building_no }}</div>
-              <div><span class="text-muted">Customer:</span> {{ card.order.customer_name|default:"-" }}</div>
+              <div class="atk__section-head atk__section-head--dest"><i class="fa-solid fa-arrow-down me-1"></i>TO</div>
+              <div class="atk__field-text"><span class="atk__field-label">Zone:</span> {{ card.dl_to_address.zone_number }}-{{ card.dl_to_address.zone_name }}</div>
+              <div class="atk__field-text"><span class="atk__field-label">Address:</span> St {{ card.dl_to_address.street_no }}, Bldg {{ card.dl_to_address.building_no }}</div>
+              <div class="atk__field-text"><span class="atk__field-label">Customer:</span> {{ card.order.customer_name|default:"-" }}</div>
             </div>
           </div>
-          <div class="row g-2 mb-2" style="font-size: 0.8rem;">
+          <div class="row g-2 mb-2">
             <div class="col-12">
-              <div class="fw-bold text-muted" style="font-size: 0.7rem;"><i class="fa-solid fa-info-circle me-1"></i>DETAILS</div>
+              <div class="atk__section-head atk__section-head--info"><i class="fa-solid fa-info-circle me-1"></i>DETAILS</div>
               <div class="d-flex flex-wrap gap-2">
-                <span><span class="text-muted">COD:</span> <span class="fw-bold text-warning">{{ card.order.cod_amount|default:0 }} QR</span></span>
-                {% if card.order.order_type == 'pick_and_drop' %}<span><span class="text-muted">Delivery:</span> {{ card.dl_price }} QR</span>{% endif %}
+                <span class="atk__field-text"><span class="atk__field-label">COD:</span> <span class="atk__cod-amount">{{ card.order.cod_amount|default:0 }} QR</span></span>
+                {% if card.order.order_type == 'pick_and_drop' %}<span class="atk__field-text"><span class="atk__field-label">Delivery:</span> {{ card.dl_price }} QR</span>{% endif %}
               </div>
-              {% if card.dl_task_description %}<div><span class="text-muted">Notes:</span> {{ card.dl_task_description|truncatechars:50 }}</div>{% endif %}
+              {% if card.dl_task_description %}<div class="atk__field-text"><span class="atk__field-label">Notes:</span> {{ card.dl_task_description|truncatechars:50 }}</div>{% endif %}
             </div>
           </div>
           {% if card.order.order_items.all %}
           <div class="mb-2">
-            <div class="fw-bold text-muted" style="font-size: 0.7rem;"><i class="fa-solid fa-box me-1"></i>PRODUCTS</div>
+            <div class="atk__section-head atk__section-head--info"><i class="fa-solid fa-box me-1"></i>PRODUCTS</div>
             <div class="d-flex flex-wrap gap-1">
               {% for item in card.order.order_items.all %}
-              <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">{{ item.product.item_name|default:item.notes|default:"Item" }} x{{ item.quantity }}</span>
+              <span class="atk__product-tag">{{ item.product.item_name|default:item.notes|default:"Item" }} x{{ item.quantity }}</span>
               {% endfor %}
             </div>
           </div>
           {% endif %}
           <div class="pt-2 border-top">
             {% if card.dl_task_status_dms == '2' and card.order.cod_status_by_staff == 'cod_settled_with_business' %}
-            <div class="text-center text-muted py-1" style="font-size: 0.75rem;">
+            <div class="atk__settled-msg">
               <i class="fa-solid fa-lock me-1"></i>Completed & settled
             </div>
             {% else %}
             <div class="d-flex flex-wrap gap-1 justify-content-center">
-              <button class="btn btn-sm btn-outline-danger task-status-btn" data-task-id="{{ card.id }}" data-action="reject">
+              <button class="atk__action-btn atk__action-btn--danger task-status-btn" data-task-id="{{ card.id }}" data-action="reject">
                 <i class="fa-solid fa-times"></i> Reject
               </button>
               {% if card.dl_task_status == 'out_for_delivery' %}
-              <button class="btn btn-sm btn-primary" disabled>
+              <button class="atk__action-btn atk__action-btn--primary-solid" disabled>
                 <i class="fa-solid fa-truck"></i> Out4Del
               </button>
               {% else %}
-              <button class="btn btn-sm btn-outline-primary task-status-btn" data-task-id="{{ card.id }}" data-action="start">
+              <button class="atk__action-btn atk__action-btn--primary task-status-btn" data-task-id="{{ card.id }}" data-action="start">
                 <i class="fa-solid fa-play"></i> Start
               </button>
               {% endif %}
-              <button class="btn btn-sm btn-success task-status-btn" data-task-id="{{ card.id }}" data-action="delivered">
+              <button class="atk__action-btn atk__action-btn--success task-status-btn" data-task-id="{{ card.id }}" data-action="delivered">
                 <i class="fa-solid fa-check"></i> Done
               </button>
-              <button class="btn btn-sm btn-outline-warning task-status-btn" data-task-id="{{ card.id }}" data-action="failed">
+              <button class="atk__action-btn atk__action-btn--warning task-status-btn" data-task-id="{{ card.id }}" data-action="failed">
                 <i class="fa-solid fa-ban"></i> Failed
               </button>
             </div>
@@ -99,9 +99,9 @@
       </div>
     </div>
     {% empty %}
-    <div class="text-center py-5">
-      <i class="fa-solid fa-clipboard-check fa-3x text-muted mb-3"></i>
-      <p class="text-muted">No assigned tasks</p>
+    <div class="atk__empty">
+      <i class="fa-solid fa-clipboard-check"></i>
+      <p>No assigned tasks</p>
     </div>
     {% endfor %}
   </div>
@@ -119,64 +119,64 @@
           <th>DL# / Date</th>
           <th>Speed / Status</th>
           <th>Pickup / Dropoff</th>
-          <th style="width: 30px;"></th>
+          <th class="atk__th-expand"></th>
         </tr>
         </thead>
         <tbody id="delivery_accepted_tasks_tbody">
         {% for card in tasks %}
-        <tr data-order-id="{{ card.id }}" class="data-order-row task-row-clickable" data-bs-toggle="collapse" data-bs-target="#collapse-{{ card.id }}" aria-expanded="false" aria-controls="collapse-{{ card.id }}" style="cursor: pointer;">
+        <tr data-order-id="{{ card.id }}" class="data-order-row task-row-clickable" data-bs-toggle="collapse" data-bs-target="#collapse-{{ card.id }}" aria-expanded="false" aria-controls="collapse-{{ card.id }}">
           <td>
             <code class="fw-bold">#{{ card.dl_task_number }}</code><br>
-            <span class="text-muted" style="font-size: 0.75rem;">{{ card.dl_task_date }}</span>
-            {% if card.dl_to_address.time_slot %}<br><span class="text-muted" style="font-size: 0.7rem;">{{ card.dl_to_address.time_slot }}</span>{% endif %}
+            <span class="atk__meta">{{ card.dl_task_date }}</span>
+            {% if card.dl_to_address.time_slot %}<br><span class="atk__meta atk__meta--sm">{{ card.dl_to_address.time_slot }}</span>{% endif %}
           </td>
           <td>
-            <span style="font-size: 0.8rem;">{{ card.dl_speed }}</span><br>
+            <span class="atk__speed-text">{{ card.dl_speed }}</span><br>
             <span class="listing-status {% if card.dl_task_status == 'delivered' %}success{% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' %}primary{% elif card.dl_task_status == 'cancelled' or card.dl_task_status == 'failed' %}danger{% elif card.dl_task_status == 'accepted' or card.dl_task_status == 'picked_up' %}info{% else %}warning{% endif %}">{{ card.get_dl_task_status_display }}</span>
           </td>
           <td>
-            <span style="font-size: 0.8rem;"><i class="fa-solid fa-arrow-up text-success me-1"></i>{{ card.pickup_location.pickup_location_title|default:"N/A" }}</span><br>
-            <span style="font-size: 0.8rem;"><i class="fa-solid fa-arrow-down text-danger me-1"></i>Zone {{ card.dl_to_address.dl_zone|default:card.order.dl_zone }} - {{ card.dl_to_address.zone_name|default:"" }}</span>
+            <span class="atk__route-text"><i class="fa-solid fa-arrow-up text-success me-1"></i>{{ card.pickup_location.pickup_location_title|default:"N/A" }}</span><br>
+            <span class="atk__route-text"><i class="fa-solid fa-arrow-down text-danger me-1"></i>Zone {{ card.dl_to_address.dl_zone|default:card.order.dl_zone }} - {{ card.dl_to_address.zone_name|default:"" }}</span>
           </td>
           <td class="text-center">
-            <i class="fa-solid fa-chevron-down text-muted task-chevron" style="transition: transform 0.2s;"></i>
+            <i class="fa-solid fa-chevron-down text-muted task-chevron atk__chevron"></i>
           </td>
         </tr>
         <tr class="collapse" id="collapse-{{ card.id }}">
           <td colspan="4" class="p-0">
-            <div class="p-3" style="background: #f9fafb;" id="delivery_accepted_tasks_card_details_{{ card.id }}">
+            <div class="atk__detail-panel" id="delivery_accepted_tasks_card_details_{{ card.id }}">
                 <div class="row g-2">
                   <div class="col-md-4">
-                    <div class="fw-bold mb-1" style="font-size: 0.75rem; color: #059669;"><i class="fa-solid fa-arrow-up me-1"></i>From</div>
-                    <div style="font-size: 0.8rem;">
-                      <div><span class="text-muted">Pickup:</span> {{ card.order.business.pickup_location|default:"-" }}</div>
-                      <div><span class="text-muted">Business:</span> {{ card.order.business.business_name }}</div>
+                    <div class="atk__section-head atk__section-head--origin"><i class="fa-solid fa-arrow-up me-1"></i>From</div>
+                    <div class="atk__detail-fields">
+                      <div class="atk__field-text"><span class="atk__field-label">Pickup:</span> {{ card.order.business.pickup_location|default:"-" }}</div>
+                      <div class="atk__field-text"><span class="atk__field-label">Business:</span> {{ card.order.business.business_name }}</div>
                     </div>
                   </div>
                   <div class="col-md-4">
-                    <div class="fw-bold mb-1" style="font-size: 0.75rem; color: #dc2626;"><i class="fa-solid fa-arrow-down me-1"></i>To</div>
-                    <div style="font-size: 0.8rem;">
-                      <div><span class="text-muted">Zone:</span> {{ card.dl_to_address.zone_number }}-{{ card.dl_to_address.zone_name }}</div>
-                      <div><span class="text-muted">Address:</span> St {{ card.dl_to_address.street_no }}, Bldg {{ card.dl_to_address.building_no }}</div>
-                      <div><span class="text-muted">Customer:</span> {{ card.order.customer_name|default:"-" }}</div>
+                    <div class="atk__section-head atk__section-head--dest"><i class="fa-solid fa-arrow-down me-1"></i>To</div>
+                    <div class="atk__detail-fields">
+                      <div class="atk__field-text"><span class="atk__field-label">Zone:</span> {{ card.dl_to_address.zone_number }}-{{ card.dl_to_address.zone_name }}</div>
+                      <div class="atk__field-text"><span class="atk__field-label">Address:</span> St {{ card.dl_to_address.street_no }}, Bldg {{ card.dl_to_address.building_no }}</div>
+                      <div class="atk__field-text"><span class="atk__field-label">Customer:</span> {{ card.order.customer_name|default:"-" }}</div>
                     </div>
                   </div>
                   <div class="col-md-4">
-                    <div class="fw-bold mb-1" style="font-size: 0.75rem; color: #6b7280;"><i class="fa-solid fa-info-circle me-1"></i>Details</div>
-                    <div style="font-size: 0.8rem;">
-                      <div><span class="text-muted">COD:</span> <span class="fw-bold text-warning">{{ card.order.cod_amount|default:0 }} QR</span></div>
-                      {% if card.order.order_type == 'pick_and_drop' %}<div><span class="text-muted">Delivery:</span> {{ card.dl_price }} QR</div>{% endif %}
-                      <div><span class="text-muted">Notes:</span> {{ card.dl_task_description|default:"-"|truncatechars:30 }}</div>
+                    <div class="atk__section-head atk__section-head--info"><i class="fa-solid fa-info-circle me-1"></i>Details</div>
+                    <div class="atk__detail-fields">
+                      <div class="atk__field-text"><span class="atk__field-label">COD:</span> <span class="atk__cod-amount">{{ card.order.cod_amount|default:0 }} QR</span></div>
+                      {% if card.order.order_type == 'pick_and_drop' %}<div class="atk__field-text"><span class="atk__field-label">Delivery:</span> {{ card.dl_price }} QR</div>{% endif %}
+                      <div class="atk__field-text"><span class="atk__field-label">Notes:</span> {{ card.dl_task_description|default:"-"|truncatechars:30 }}</div>
                     </div>
                   </div>
                 </div>
                 {% if card.order.order_items.all %}
                 <div class="row mt-2 pt-2 border-top">
                   <div class="col-12">
-                    <div class="fw-bold mb-1" style="font-size: 0.75rem; color: #6b7280;"><i class="fa-solid fa-box me-1"></i>Products</div>
-                    <div class="d-flex flex-wrap gap-1" style="font-size: 0.75rem;">
+                    <div class="atk__section-head atk__section-head--info"><i class="fa-solid fa-box me-1"></i>Products</div>
+                    <div class="d-flex flex-wrap gap-1">
                       {% for item in card.order.order_items.all %}
-                      <span class="badge bg-light text-dark border">{{ item.product.item_name|default:item.notes|default:"Item" }} x{{ item.quantity }}</span>
+                      <span class="atk__product-tag">{{ item.product.item_name|default:item.notes|default:"Item" }} x{{ item.quantity }}</span>
                       {% endfor %}
                     </div>
                   </div>
@@ -185,25 +185,25 @@
                 <div class="row mt-2 pt-2 border-top">
                   <div class="col-12 text-center" id="delivery_accepted_tasks_section_actions_{{ card.id }}">
                     {% if card.dl_task_status_dms == '2' and card.order.cod_status_by_staff == 'cod_settled_with_business' %}
-                    <span class="text-muted" style="font-size: 0.75rem;"><i class="fa-solid fa-lock me-1"></i>Completed & settled</span>
+                    <span class="atk__settled-msg"><i class="fa-solid fa-lock me-1"></i>Completed & settled</span>
                     {% else %}
                     <div class="d-flex flex-wrap gap-1 justify-content-center">
-                      <button class="btn btn-sm btn-outline-danger task-status-btn" data-task-id="{{ card.id }}" data-action="reject" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+                      <button class="atk__action-btn atk__action-btn--danger task-status-btn" data-task-id="{{ card.id }}" data-action="reject">
                         <i class="fa-solid fa-times"></i> Reject
                       </button>
                       {% if card.dl_task_status == 'out_for_delivery' %}
-                      <button class="btn btn-sm btn-primary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" disabled>
+                      <button class="atk__action-btn atk__action-btn--primary-solid" disabled>
                         <i class="fa-solid fa-truck"></i> Out4Del
                       </button>
                       {% else %}
-                      <button class="btn btn-sm btn-outline-primary task-status-btn" data-task-id="{{ card.id }}" data-action="start" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+                      <button class="atk__action-btn atk__action-btn--primary task-status-btn" data-task-id="{{ card.id }}" data-action="start">
                         <i class="fa-solid fa-play"></i> Start
                       </button>
                       {% endif %}
-                      <button class="btn btn-sm btn-success task-status-btn" data-task-id="{{ card.id }}" data-action="delivered" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+                      <button class="atk__action-btn atk__action-btn--success task-status-btn" data-task-id="{{ card.id }}" data-action="delivered">
                         <i class="fa-solid fa-check"></i> Done
                       </button>
-                      <button class="btn btn-sm btn-outline-warning task-status-btn" data-task-id="{{ card.id }}" data-action="failed" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+                      <button class="atk__action-btn atk__action-btn--warning task-status-btn" data-task-id="{{ card.id }}" data-action="failed">
                         <i class="fa-solid fa-ban"></i> Failed
                       </button>
                     </div>

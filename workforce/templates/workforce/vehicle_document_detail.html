@@ -3,224 +3,206 @@
 
 {% block title %}Vehicle Document Detail - Ezzy Delivery{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
 <div class="col-12 p-3">
-<!-- Page Title -->
-<h1 class="page-title">
-    <i class="fa-solid fa-car me-2"></i>Vehicle Documents for {{ driver.user.first_name }} {{ driver.user.last_name }}
-</h1>
+  <!-- Hero Header -->
+  <div class="vdd__hero">
+    <div class="vdd__hero-content">
+      <h1 class="vdd__hero-title">
+        <i class="fa-solid fa-car vdd__hero-icon"></i>Vehicle Documents for {{ driver.user.first_name }} {{ driver.user.last_name }}
+      </h1>
+      <p class="vdd__hero-subtitle">View and manage vehicle registration documents</p>
+    </div>
+  </div>
 
-<!-- Back Button -->
-<div class="document-back-section">
-    <a href="{% url 'workforce:vehicle_documents_list' %}" class="document-back-link">
-        <i class="fa-solid fa-arrow-left"></i>
-        Back to Vehicles
+  <!-- Back Button -->
+  <div class="vdd__back-section">
+    <a href="{% url 'workforce:vehicle_documents_list' %}" class="vdd__back-link">
+      <i class="fa-solid fa-arrow-left"></i> Back to Vehicles
     </a>
-</div>
+  </div>
 
-<!-- Driver Info -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-user"></i>
-        Driver Information
+  <!-- Driver Info -->
+  <div class="vdd__card">
+    <div class="vdd__card-header">
+      <i class="fa-solid fa-user vdd__section-icon"></i>
+      <h5 class="vdd__card-title">DRIVER INFORMATION</h5>
     </div>
-    <div class="info-grid">
-        <div class="info-row">
-            <span class="info-label">Driver Name</span>
-            <span class="info-value">{{ driver.user.first_name|default:"Unknown" }} {{ driver.user.last_name|default:"" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Driver Code</span>
-            <span class="info-value">{{ driver.driver_code|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Phone</span>
-            <span class="info-value">{{ driver.driver_phone|default:"N/A" }}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Status</span>
-            <span class="info-value">{{ driver.driver_status|default:"N/A" }}</span>
-        </div>
+    <div class="vdd__info-grid">
+      <div class="vdd__info-row">
+        <span class="vdd__info-label">Driver Name</span>
+        <span class="vdd__info-value">{{ driver.user.first_name|default:"Unknown" }} {{ driver.user.last_name|default:"" }}</span>
+      </div>
+      <div class="vdd__info-row">
+        <span class="vdd__info-label">Driver Code</span>
+        <span class="vdd__info-value">{{ driver.driver_code|default:"N/A" }}</span>
+      </div>
+      <div class="vdd__info-row">
+        <span class="vdd__info-label">Phone</span>
+        <span class="vdd__info-value">{{ driver.driver_phone|default:"N/A" }}</span>
+      </div>
+      <div class="vdd__info-row">
+        <span class="vdd__info-label">Status</span>
+        <span class="vdd__info-value">{{ driver.driver_status|default:"N/A" }}</span>
+      </div>
     </div>
-</div>
+  </div>
 
-<!-- Vehicles List -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-car"></i>
-        Registered Vehicles
+  <!-- Vehicles List -->
+  <div class="vdd__card">
+    <div class="vdd__card-header">
+      <i class="fa-solid fa-car vdd__section-icon"></i>
+      <h5 class="vdd__card-title">REGISTERED VEHICLES</h5>
     </div>
 
     {% if vehicles %}
-        {% for vehicle in vehicles %}
-        <div class="document-detail-container">
-            <div class="info-grid">
-                <div class="info-row">
-                    <span class="info-label">Vehicle Number</span>
-                    <span class="info-value">{{ vehicle.vehicle_no|default:"N/A" }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Vehicle Type</span>
-                    <span class="info-value">{{ vehicle.vehicle_type|default:"N/A"|title }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Model</span>
-                    <span class="info-value">{{ vehicle.vehicle_model|default:"N/A" }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Color</span>
-                    <span class="info-value">{{ vehicle.vehicle_color|default:"N/A" }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Status</span>
-                    <span class="info-value">
-                        <span class="status-badge {% if vehicle.vehicle_status == 'active' %}status-active{% else %}status-inactive{% endif %}">
-                            {{ vehicle.vehicle_status|title }}
-                        </span>
-                    </span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Created At</span>
-                    <span class="info-value">{{ vehicle.created_at|date:"d M Y, h:i A" }}</span>
-                </div>
-            </div>
-
-            <!-- Edit Button - Using data attributes for XSS prevention -->
-            <button type="button"
-                    class="btn-edit-vehicle document-action-btn"
-                    data-vehicle-id="{{ vehicle.id }}"
-                    data-vehicle-no="{{ vehicle.vehicle_no|escapejs }}"
-                    data-vehicle-type="{{ vehicle.vehicle_type|escapejs }}"
-                    data-vehicle-model="{{ vehicle.vehicle_model|escapejs }}"
-                    data-vehicle-color="{{ vehicle.vehicle_color|escapejs }}"
-                    data-vehicle-status="{{ vehicle.vehicle_status|escapejs }}"
-                    aria-label="Edit vehicle {{ vehicle.vehicle_no }}">
-                <i class="fa-solid fa-edit" aria-hidden="true"></i>
-                Edit Vehicle
-            </button>
+      {% for vehicle in vehicles %}
+      <div class="vdd__vehicle-block">
+        <div class="vdd__info-grid">
+          <div class="vdd__info-row">
+            <span class="vdd__info-label">Vehicle Number</span>
+            <span class="vdd__info-value">{{ vehicle.vehicle_no|default:"N/A" }}</span>
+          </div>
+          <div class="vdd__info-row">
+            <span class="vdd__info-label">Vehicle Type</span>
+            <span class="vdd__info-value">{{ vehicle.vehicle_type|default:"N/A"|title }}</span>
+          </div>
+          <div class="vdd__info-row">
+            <span class="vdd__info-label">Model</span>
+            <span class="vdd__info-value">{{ vehicle.vehicle_model|default:"N/A" }}</span>
+          </div>
+          <div class="vdd__info-row">
+            <span class="vdd__info-label">Color</span>
+            <span class="vdd__info-value">{{ vehicle.vehicle_color|default:"N/A" }}</span>
+          </div>
+          <div class="vdd__info-row">
+            <span class="vdd__info-label">Status</span>
+            <span class="vdd__info-value">
+              <span class="vdd__status-badge vdd__status-badge--{{ vehicle.vehicle_status }}">
+                {{ vehicle.vehicle_status|title }}
+              </span>
+            </span>
+          </div>
+          <div class="vdd__info-row">
+            <span class="vdd__info-label">Created At</span>
+            <span class="vdd__info-value">{{ vehicle.created_at|date:"d M Y, h:i A" }}</span>
+          </div>
         </div>
-        {% endfor %}
+
+        <button type="button"
+                class="btn-edit-vehicle vdd__edit-btn"
+                data-vehicle-id="{{ vehicle.id }}"
+                data-vehicle-no="{{ vehicle.vehicle_no|escapejs }}"
+                data-vehicle-type="{{ vehicle.vehicle_type|escapejs }}"
+                data-vehicle-model="{{ vehicle.vehicle_model|escapejs }}"
+                data-vehicle-color="{{ vehicle.vehicle_color|escapejs }}"
+                data-vehicle-status="{{ vehicle.vehicle_status|escapejs }}"
+                aria-label="Edit vehicle {{ vehicle.vehicle_no }}">
+          <i class="fa-solid fa-edit"></i> Edit Vehicle
+        </button>
+      </div>
+      {% endfor %}
     {% else %}
-        <div class="empty-state">
-            <i class="fa-solid fa-car"></i>
-            <h3>No Vehicles Found</h3>
-            <p>This driver has no registered vehicles.</p>
-        </div>
+      <div class="vdd__empty">
+        <i class="fa-solid fa-car"></i>
+        <h3>No Vehicles Found</h3>
+        <p>This driver has no registered vehicles.</p>
+      </div>
     {% endif %}
-</div>
+  </div>
 
-<!-- Edit Modal -->
-<div id="editModal" class="document-modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
-    <div class="document-modal-content">
-        <h2 class="document-modal-title" id="editModalTitle">Edit Vehicle</h2>
+  <!-- Edit Modal -->
+  <div id="editModal" class="vdd__modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+    <div class="vdd__modal-content">
+      <h2 class="vdd__modal-title" id="editModalTitle">
+        <i class="fa-solid fa-edit vdd__section-icon"></i> Edit Vehicle
+      </h2>
 
-        <form id="editForm">
-            {% csrf_token %}
-            <input type="hidden" id="vehicleId" name="vehicle_id">
+      <form id="editForm">
+        {% csrf_token %}
+        <input type="hidden" id="vehicleId" name="vehicle_id">
 
-            <div class="document-form-grid">
-                <div class="document-form-group">
-                    <label class="document-form-label">Vehicle Number</label>
-                    <input type="text" id="vehicleNo" name="vehicle_no" class="filter-input" required>
-                </div>
+        <div class="vdd__form-grid">
+          <div class="vdd__form-group">
+            <label class="vdd__form-label">Vehicle Number</label>
+            <input type="text" id="vehicleNo" name="vehicle_no" class="form-control" required>
+          </div>
 
-                <div class="document-form-group">
-                    <label class="document-form-label">Vehicle Type</label>
-                    <select id="vehicleType" name="vehicle_type" class="filter-input">
-                        <option value="none">None</option>
-                        <option value="bike">Bike</option>
-                        <option value="car">Car</option>
-                        <option value="van">Van</option>
-                        <option value="pickup">Pickup</option>
-                        <option value="pickup3ton">Pickup 3Ton</option>
-                        <option value="pickup_big">Pickup Big Items</option>
-                    </select>
-                </div>
+          <div class="vdd__form-group">
+            <label class="vdd__form-label">Vehicle Type</label>
+            <select id="vehicleType" name="vehicle_type" class="form-select">
+              <option value="none">None</option>
+              <option value="bike">Bike</option>
+              <option value="car">Car</option>
+              <option value="van">Van</option>
+              <option value="pickup">Pickup</option>
+              <option value="pickup3ton">Pickup 3Ton</option>
+              <option value="pickup_big">Pickup Big Items</option>
+            </select>
+          </div>
 
-                <div class="document-form-group">
-                    <label class="document-form-label">Model</label>
-                    <input type="text" id="vehicleModel" name="vehicle_model" class="filter-input">
-                </div>
+          <div class="vdd__form-group">
+            <label class="vdd__form-label">Model</label>
+            <input type="text" id="vehicleModel" name="vehicle_model" class="form-control">
+          </div>
 
-                <div class="document-form-group">
-                    <label class="document-form-label">Color</label>
-                    <input type="text" id="vehicleColor" name="vehicle_color" class="filter-input">
-                </div>
+          <div class="vdd__form-group">
+            <label class="vdd__form-label">Color</label>
+            <input type="text" id="vehicleColor" name="vehicle_color" class="form-control">
+          </div>
 
-                <div class="document-form-group">
-                    <label class="document-form-label">Status</label>
-                    <select id="vehicleStatus" name="vehicle_status" class="filter-input">
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
-                </div>
+          <div class="vdd__form-group">
+            <label class="vdd__form-label">Status</label>
+            <select id="vehicleStatus" name="vehicle_status" class="form-select">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
 
-                <div class="document-form-actions">
-                    <button type="submit" class="document-submit-btn">
-                        Save Changes
-                    </button>
-                    <button type="button" id="cancelEditBtn" class="document-cancel-btn" aria-label="Cancel and close modal">
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        </form>
+          <div class="vdd__form-actions">
+            <button type="submit" class="vdd__btn vdd__btn--primary">
+              <i class="fa-solid fa-save"></i> Save Changes
+            </button>
+            <button type="button" id="cancelEditBtn" class="vdd__btn vdd__btn--cancel" aria-label="Cancel and close modal">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </form>
 
-        <div id="updateMessage" class="document-update-message"></div>
+      <div id="updateMessage" class="vdd__message"></div>
     </div>
-</div>
-
+  </div>
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
-    // Use event delegation for edit buttons (XSS-safe approach)
     document.addEventListener('DOMContentLoaded', function() {
-        // Event delegation for all edit vehicle buttons
         document.addEventListener('click', function(e) {
-            const editBtn = e.target.closest('.btn-edit-vehicle');
-            if (editBtn) {
-                openEditModal(editBtn);
-            }
+            var editBtn = e.target.closest('.btn-edit-vehicle');
+            if (editBtn) { openEditModal(editBtn); }
         });
 
-        // Close modal on cancel button click
-        const cancelBtn = document.getElementById('cancelEditBtn');
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', closeEditModal);
-        }
+        var cancelBtn = document.getElementById('cancelEditBtn');
+        if (cancelBtn) { cancelBtn.addEventListener('click', closeEditModal); }
 
-        // Close modal on backdrop click
-        const modal = document.getElementById('editModal');
+        var modal = document.getElementById('editModal');
         if (modal) {
             modal.addEventListener('click', function(e) {
-                if (e.target === modal) {
-                    closeEditModal();
-                }
+                if (e.target === modal) { closeEditModal(); }
             });
         }
 
-        // Close modal on Escape key
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeEditModal();
-            }
+            if (e.key === 'Escape') { closeEditModal(); }
         });
 
-        // Form submission
-        const editForm = document.getElementById('editForm');
-        if (editForm) {
-            editForm.addEventListener('submit', handleFormSubmit);
-        }
+        var editForm = document.getElementById('editForm');
+        if (editForm) { editForm.addEventListener('submit', handleFormSubmit); }
     });
 
     function openEditModal(button) {
-        // Safely extract data from data attributes (XSS-safe)
         document.getElementById('vehicleId').value = button.dataset.vehicleId || '';
         document.getElementById('vehicleNo').value = button.dataset.vehicleNo || '';
         document.getElementById('vehicleType').value = button.dataset.vehicleType || '';
@@ -228,7 +210,6 @@
         document.getElementById('vehicleColor').value = button.dataset.vehicleColor || '';
         document.getElementById('vehicleStatus').value = button.dataset.vehicleStatus || '';
         document.getElementById('editModal').classList.add('show');
-        // Focus on first input for accessibility
         document.getElementById('vehicleNo').focus();
     }
 
@@ -237,12 +218,10 @@
     }
 
     function showMessage(messageDiv, isSuccess, text) {
-        // Remove any existing state classes and add appropriate one
-        messageDiv.classList.remove('success', 'error');
-        messageDiv.classList.add('show', isSuccess ? 'success' : 'error');
-        // Use textContent for safe text insertion, then add icon
+        messageDiv.style.display = 'block';
+        messageDiv.className = 'vdd__message ' + (isSuccess ? 'vdd__message--success' : 'vdd__message--error');
         messageDiv.textContent = '';
-        const icon = document.createElement('i');
+        var icon = document.createElement('i');
         icon.className = isSuccess ? 'fa-solid fa-check-circle' : 'fa-solid fa-exclamation-triangle';
         icon.setAttribute('aria-hidden', 'true');
         messageDiv.appendChild(icon);
@@ -251,12 +230,10 @@
 
     function handleFormSubmit(e) {
         e.preventDefault();
+        var formData = new FormData(e.target);
+        var messageDiv = document.getElementById('updateMessage');
+        var submitBtn = e.target.querySelector('button[type="submit"]');
 
-        const formData = new FormData(e.target);
-        const messageDiv = document.getElementById('updateMessage');
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-
-        // Disable submit button during request
         submitBtn.disabled = true;
         submitBtn.textContent = 'Saving...';
 
@@ -267,25 +244,21 @@
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
             }
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
+        .then(function(response) {
+            if (!response.ok) { throw new Error('Network response was not ok'); }
             return response.json();
         })
-        .then(data => {
+        .then(function(data) {
             if (data.success) {
                 showMessage(messageDiv, true, data.message || 'Vehicle updated successfully');
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
+                setTimeout(function() { window.location.reload(); }, 1500);
             } else {
                 showMessage(messageDiv, false, data.error || 'Failed to update vehicle');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Save Changes';
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             showMessage(messageDiv, false, 'Error updating vehicle. Please try again.');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Save Changes';

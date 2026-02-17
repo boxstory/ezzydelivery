@@ -3,90 +3,68 @@
 
 {% block title %}{% if is_create %}Add New Link{% else %}Edit Link{% endif %}{% endblock %}
 
-
-
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Priority slider
-    const prioritySlider = document.getElementById('priority');
-    const priorityValue = document.getElementById('priority-value');
-
+    var prioritySlider = document.getElementById('priority');
+    var priorityValue = document.getElementById('priority-value');
     if (prioritySlider) {
         prioritySlider.addEventListener('input', function() {
             priorityValue.textContent = this.value;
         });
     }
 
-    // Load locations when warehouse is selected
-    const warehouseSelect = document.getElementById('warehouse');
-    const locationSelect = document.getElementById('default_location');
-
+    var warehouseSelect = document.getElementById('warehouse');
+    var locationSelect = document.getElementById('default_location');
     if (warehouseSelect && locationSelect) {
         warehouseSelect.addEventListener('change', function() {
-            const warehouseId = this.value;
-
+            var warehouseId = this.value;
             if (!warehouseId) {
                 locationSelect.innerHTML = '<option value="">-- Select warehouse first --</option>';
                 locationSelect.disabled = true;
                 return;
             }
-
-            // Show loading state
             locationSelect.innerHTML = '<option value="">Loading locations...</option>';
             locationSelect.disabled = true;
-
-            // Fetch locations for selected warehouse
-            fetch(`/workforce/warehouse/api/warehouses/${warehouseId}/locations/`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
+            fetch('/workforce/warehouse/api/warehouses/' + warehouseId + '/locations/')
+                .then(function(response) {
+                    if (!response.ok) throw new Error('HTTP error! status: ' + response.status);
                     return response.json();
                 })
-                .then(data => {
+                .then(function(data) {
                     locationSelect.innerHTML = '<option value="">-- No Default Location --</option>';
-
                     if (data.length === 0) {
-                        const option = document.createElement('option');
-                        option.value = '';
-                        option.textContent = 'No locations available for this warehouse';
-                        option.disabled = true;
-                        locationSelect.appendChild(option);
+                        var opt = document.createElement('option');
+                        opt.value = ''; opt.textContent = 'No locations available'; opt.disabled = true;
+                        locationSelect.appendChild(opt);
                     } else {
-                        data.forEach(location => {
-                            const option = document.createElement('option');
-                            option.value = location.id;
-                            option.textContent = `${location.name} (${location.code})`;
-                            if (location.is_default) {
-                                option.textContent += ' - WH Default';
-                            }
-                            locationSelect.appendChild(option);
+                        data.forEach(function(location) {
+                            var opt = document.createElement('option');
+                            opt.value = location.id;
+                            opt.textContent = location.name + ' (' + location.code + ')';
+                            if (location.is_default) opt.textContent += ' - WH Default';
+                            locationSelect.appendChild(opt);
                         });
                     }
-
                     locationSelect.disabled = false;
                 })
-                .catch(error => {
+                .catch(function(error) {
                     console.error('Error loading locations:', error);
-                    locationSelect.innerHTML = '<option value="">Error loading locations - check console</option>';
+                    locationSelect.innerHTML = '<option value="">Error loading locations</option>';
                     locationSelect.disabled = true;
                 });
         });
     }
 
-    // Warn if setting non-default priority too high
-    const isDefaultCheckbox = document.getElementById('is_default');
+    var isDefaultCheckbox = document.getElementById('is_default');
     if (isDefaultCheckbox && prioritySlider) {
         function checkPriorityWarning() {
-            const priority = parseInt(prioritySlider.value);
-            const isDefault = isDefaultCheckbox.checked;
-
+            var priority = parseInt(prioritySlider.value);
+            var isDefault = isDefaultCheckbox.checked;
             if (!isDefault && priority > 80) {
                 alert('Note: This is a high priority link but not marked as default. Consider marking it as default if it should be the primary warehouse.');
             }
         }
-
         prioritySlider.addEventListener('change', checkPriorityWarning);
         isDefaultCheckbox.addEventListener('change', checkPriorityWarning);
     }
@@ -95,348 +73,183 @@ document.addEventListener('DOMContentLoaded', function() {
 {% endblock %}
 
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
-<style>
-.form-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 12px;
-    padding: 30px;
-    margin-bottom: 30px;
-}
 
-.form-card {
-    background: white;
-    border-radius: 12px;
-    padding: 30px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.form-section {
-    margin-bottom: 30px;
-    padding-bottom: 30px;
-    border-bottom: 1px solid #ecf0f1;
-}
-
-.form-section:last-child {
-    margin-bottom: 0;
-    padding-bottom: 0;
-    border-bottom: none;
-}
-
-.section-title {
-    color: #667eea;
-    font-weight: 600;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.form-label {
-    font-weight: 500;
-    color: #2c3e50;
-    margin-bottom: 8px;
-}
-
-.form-control, .form-select {
-    border-radius: 8px;
-    border: 1px solid #ddd;
-    padding: 10px 15px;
-}
-
-.form-control:focus, .form-select:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-}
-
-.form-check-input:checked {
-    background-color: #667eea;
-    border-color: #667eea;
-}
-
-.help-text {
-    font-size: 0.85rem;
-    color: #7f8c8d;
-    margin-top: 5px;
-}
-
-.priority-slider {
-    width: 100%;
-    margin-top: 10px;
-}
-
-.priority-value {
-    display: inline-block;
-    padding: 5px 15px;
-    background: #667eea;
-    color: white;
-    border-radius: 6px;
-    font-weight: 600;
-    margin-left: 10px;
-}
-
-.checkbox-card {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 15px;
-}
-
-.checkbox-card .form-check {
-    margin-bottom: 0;
-}
-
-.checkbox-label {
-    font-weight: 500;
-    margin-left: 10px;
-}
-
-.location-preview {
-    background: #f0f4ff;
-    border: 2px solid #667eea;
-    border-radius: 8px;
-    padding: 15px;
-    margin-top: 10px;
-}
-
-.required-field::after {
-    content: " *";
-    color: #e74c3c;
-}
-</style>
-
-<div class="container-fluid py-4">
-    <!-- Back Button -->
-    <div class="mb-3">
+<div class="wh">
+    <!-- Back -->
+    <div>
         <a href="{% if not is_create %}{% url 'warehouse:seller_warehouse_link_detail' link.pk %}{% else %}{% url 'warehouse:seller_warehouse_links' %}{% endif %}"
-           class="btn btn-outline-secondary btn-sm"
+           class="wh__btn wh__btn--secondary"
            hx-get="{% if not is_create %}{% url 'warehouse:seller_warehouse_link_detail' link.pk %}{% else %}{% url 'warehouse:seller_warehouse_links' %}{% endif %}"
-           hx-target="body"
-           hx-push-url="true">
-            <i class="fa-solid fa-arrow-left me-2"></i>Back
+           hx-target="body" hx-push-url="true">
+            <i class="fa-solid fa-arrow-left"></i> Back
         </a>
     </div>
 
-    <!-- Header -->
-    <div class="form-header">
-        <h2>
-            <i class="fa-solid fa-link me-2"></i>
-            {% if is_create %}
-            Add New Seller-Warehouse Link
-            {% else %}
-            Edit Link: {{ link.business.business_name }} → {{ link.warehouse.name }}
-            {% endif %}
-        </h2>
-        <p class="mb-0 mt-2">
-            {% if is_create %}
-            Create a new connection between a seller and a warehouse
-            {% else %}
-            Update link settings (cannot change seller or warehouse)
-            {% endif %}
-        </p>
+    <!-- Hero Header -->
+    <div class="swlf__hero">
+        <div class="swlf__hero-icon"><i class="fa-solid fa-link"></i></div>
+        <div>
+            <h1 class="swlf__hero-title">{% if is_create %}Add New Seller-Warehouse Link{% else %}Edit Link: {{ link.business.business_name }} &rarr; {{ link.warehouse.name }}{% endif %}</h1>
+            <p class="swlf__hero-subtitle">{% if is_create %}Create a new connection between a seller and a warehouse{% else %}Update link settings (cannot change seller or warehouse){% endif %}</p>
+        </div>
     </div>
 
     <!-- Form -->
     <form method="post" action="">
         {% csrf_token %}
 
-        <div class="form-card">
-            {% if is_create %}
-            <!-- Seller and Warehouse Selection (Create Only) -->
-            <div class="form-section">
-                <h5 class="section-title">
-                    <i class="fa-solid fa-handshake"></i>
-                    Link Partners
-                </h5>
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="business" class="form-label required-field">Seller (Business)</label>
-                        <select name="business" id="business" class="form-select" required>
+        {% if is_create %}
+        <!-- Seller and Warehouse Selection -->
+        <div class="wh__card">
+            <div class="wh__card-header">
+                <div class="wh__card-header-left"><i class="fa-solid fa-handshake"></i> <span>LINK PARTNERS</span></div>
+            </div>
+            <div class="wh__card-body">
+                <div class="wha__row">
+                    <div class="wha__field">
+                        <label for="business" class="wha__label">Seller (Business) <span class="wha__required">*</span></label>
+                        <select name="business" id="business" class="wha__select" required>
                             <option value="">-- Select Seller --</option>
                             {% for business in businesses %}
                             <option value="{{ business.id }}">{{ business.business_name }}</option>
                             {% endfor %}
                         </select>
-                        <div class="help-text">Choose the seller to link to a warehouse</div>
+                        <span class="wha__hint">Choose the seller to link to a warehouse</span>
                     </div>
-
-                    <div class="col-md-6 mb-3">
-                        <label for="warehouse" class="form-label required-field">Warehouse</label>
-                        <select name="warehouse" id="warehouse" class="form-select" required>
+                    <div class="wha__field">
+                        <label for="warehouse" class="wha__label">Warehouse <span class="wha__required">*</span></label>
+                        <select name="warehouse" id="warehouse" class="wha__select" required>
                             <option value="">-- Select Warehouse --</option>
                             {% for warehouse in warehouses %}
-                            <option value="{{ warehouse.id }}">
-                                {{ warehouse.name }} ({{ warehouse.code }})
-                                {% if warehouse.is_default %} - System Default{% endif %}
-                            </option>
+                            <option value="{{ warehouse.id }}">{{ warehouse.name }} ({{ warehouse.code }}){% if warehouse.is_default %} - System Default{% endif %}</option>
                             {% endfor %}
                         </select>
-                        <div class="help-text">Choose the fulfillment center</div>
+                        <span class="wha__hint">Choose the fulfillment center</span>
                     </div>
                 </div>
             </div>
-            {% else %}
-            <!-- Display Current Link (Edit Mode) -->
-            <div class="form-section">
-                <h5 class="section-title">
-                    <i class="fa-solid fa-info-circle"></i>
-                    Current Link
-                </h5>
-
-                <div class="location-preview">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <strong>Seller:</strong> {{ link.business.business_name }}
-                        </div>
-                        <div class="col-md-6">
-                            <strong>Warehouse:</strong> {{ link.warehouse.name }} ({{ link.warehouse.code }})
-                        </div>
+        </div>
+        {% else %}
+        <!-- Current Link (Edit Mode) -->
+        <div class="wh__card">
+            <div class="wh__card-header">
+                <div class="wh__card-header-left"><i class="fa-solid fa-info-circle"></i> <span>CURRENT LINK</span></div>
+            </div>
+            <div class="wh__card-body">
+                <div class="swlf__current-link">
+                    <div class="wha__row">
+                        <div class="whdt__field"><span class="whdt__field-label">Seller</span><span class="whdt__field-value">{{ link.business.business_name }}</span></div>
+                        <div class="whdt__field"><span class="whdt__field-label">Warehouse</span><span class="whdt__field-value">{{ link.warehouse.name }} ({{ link.warehouse.code }})</span></div>
                     </div>
-                    <div class="help-text mt-2">
-                        <i class="fa-solid fa-lock me-1"></i>
-                        Seller and warehouse cannot be changed. Create a new link if needed.
-                    </div>
+                    <span class="wha__hint"><i class="fa-solid fa-lock"></i> Seller and warehouse cannot be changed. Create a new link if needed.</span>
                 </div>
             </div>
-            {% endif %}
+        </div>
+        {% endif %}
 
-            <!-- Location Settings -->
-            <div class="form-section">
-                <h5 class="section-title">
-                    <i class="fa-solid fa-location-dot"></i>
-                    Default Location
-                </h5>
-
-                <div class="mb-3">
-                    <label for="default_location" class="form-label">Default Pickup Location</label>
-                    <select name="default_location" id="default_location" class="form-select" {% if is_create %}disabled{% endif %}>
+        <!-- Default Location -->
+        <div class="wh__card">
+            <div class="wh__card-header">
+                <div class="wh__card-header-left"><i class="fa-solid fa-location-dot"></i> <span>DEFAULT LOCATION</span></div>
+            </div>
+            <div class="wh__card-body">
+                <div class="wha__field">
+                    <label for="default_location" class="wha__label">Default Pickup Location</label>
+                    <select name="default_location" id="default_location" class="wha__select" {% if is_create %}disabled{% endif %}>
                         <option value="">-- No Default Location --</option>
                         {% if not is_create %}
-                            {% for location in available_locations %}
-                            <option value="{{ location.id }}" {% if link.default_location == location %}selected{% endif %}>
-                                {{ location.name }} ({{ location.code }})
-                                {% if location.is_default %} - WH Default{% endif %}
-                                {% if location.zone_number %} - Zone {{ location.zone_number }}{% endif %}
-                            </option>
-                            {% endfor %}
+                        {% for location in available_locations %}
+                        <option value="{{ location.id }}" {% if link.default_location == location %}selected{% endif %}>
+                            {{ location.name }} ({{ location.code }}){% if location.is_default %} - WH Default{% endif %}{% if location.zone_number %} - Zone {{ location.zone_number }}{% endif %}
+                        </option>
+                        {% endfor %}
                         {% endif %}
                     </select>
-                    <div class="help-text">
-                        Preferred pickup location for this seller at this warehouse
-                        {% if is_create %}(select warehouse first to load locations){% endif %}
-                    </div>
+                    <span class="wha__hint">Preferred pickup location for this seller at this warehouse{% if is_create %} (select warehouse first to load locations){% endif %}</span>
                 </div>
             </div>
+        </div>
 
-            <!-- Priority Settings -->
-            <div class="form-section">
-                <h5 class="section-title">
-                    <i class="fa-solid fa-signal"></i>
-                    Priority & Defaults
-                </h5>
+        <!-- Priority & Defaults -->
+        <div class="wh__card">
+            <div class="wh__card-header">
+                <div class="wh__card-header-left"><i class="fa-solid fa-signal"></i> <span>PRIORITY & DEFAULTS</span></div>
+            </div>
+            <div class="wh__card-body">
+                <div class="wha__field">
+                    <label for="priority" class="wha__label">Priority <span class="swlf__priority-val" id="priority-value">{% if not is_create %}{{ link.priority }}{% else %}50{% endif %}</span></label>
+                    <input type="range" name="priority" id="priority" class="swlf__slider" min="0" max="100" value="{% if not is_create %}{{ link.priority }}{% else %}50{% endif %}">
+                    <span class="wha__hint">Higher priority warehouses are preferred during auto-selection (0-100)</span>
+                </div>
 
-                <div class="mb-3">
-                    <label for="priority" class="form-label">
-                        Priority
-                        <span class="priority-value" id="priority-value">{% if not is_create %}{{ link.priority }}{% else %}50{% endif %}</span>
+                <div class="wha__check-card">
+                    <input class="wha__check-input" type="checkbox" name="is_default" id="is_default"
+                           {% if not is_create and link.is_default %}checked{% endif %}>
+                    <label class="wha__check-label" for="is_default">
+                        <strong>Mark as Default Warehouse</strong>
+                        <span class="wha__check-desc">This will be the primary warehouse for this seller. Only one link can be default per seller.</span>
                     </label>
-                    <input type="range" name="priority" id="priority" class="priority-slider form-range"
-                           min="0" max="100" value="{% if not is_create %}{{ link.priority }}{% else %}50{% endif %}">
-                    <div class="help-text">
-                        Higher priority warehouses are preferred during auto-selection (0-100)
-                    </div>
                 </div>
 
-                <div class="checkbox-card">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="is_default" id="is_default"
-                               {% if not is_create and link.is_default %}checked{% endif %}>
-                        <label class="form-check-label checkbox-label" for="is_default">
-                            <strong>Mark as Default Warehouse</strong>
-                        </label>
-                    </div>
-                    <div class="help-text">
-                        This will be the primary warehouse for this seller. Only one link can be default per seller.
-                    </div>
-                </div>
-
-                <div class="checkbox-card">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="is_active" id="is_active"
-                               {% if is_create or link.is_active %}checked{% endif %}>
-                        <label class="form-check-label checkbox-label" for="is_active">
-                            <strong>Link is Active</strong>
-                        </label>
-                    </div>
-                    <div class="help-text">
-                        Inactive links are not used for warehouse selection
-                    </div>
+                <div class="wha__check-card">
+                    <input class="wha__check-input" type="checkbox" name="is_active" id="is_active"
+                           {% if is_create or link.is_active %}checked{% endif %}>
+                    <label class="wha__check-label" for="is_active">
+                        <strong>Link is Active</strong>
+                        <span class="wha__check-desc">Inactive links are not used for warehouse selection</span>
+                    </label>
                 </div>
             </div>
+        </div>
 
-            <!-- Notes -->
-            <div class="form-section">
-                <h5 class="section-title">
-                    <i class="fa-solid fa-note-sticky"></i>
-                    Additional Notes
-                </h5>
-
-                <div class="mb-3">
-                    <label for="notes" class="form-label">Notes (Optional)</label>
-                    <textarea name="notes" id="notes" class="form-control" rows="4"
+        <!-- Notes -->
+        <div class="wh__card">
+            <div class="wh__card-header">
+                <div class="wh__card-header-left"><i class="fa-solid fa-note-sticky"></i> <span>ADDITIONAL NOTES</span></div>
+            </div>
+            <div class="wh__card-body">
+                <div class="wha__field">
+                    <label for="notes" class="wha__label">Notes (Optional)</label>
+                    <textarea name="notes" id="notes" class="wha__textarea" rows="4"
                               placeholder="Add any notes about this seller-warehouse relationship...">{% if not is_create %}{{ link.notes }}{% endif %}</textarea>
-                    <div class="help-text">
-                        Internal notes about this link (e.g., special handling instructions, contract details)
-                    </div>
+                    <span class="wha__hint">Internal notes about this link (e.g., special handling instructions, contract details)</span>
                 </div>
             </div>
+        </div>
 
-            <!-- Action Buttons -->
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary btn-lg">
-                    <i class="fa-solid fa-save me-2"></i>
-                    {% if is_create %}Create Link{% else %}Save Changes{% endif %}
-                </button>
-                <a href="{% if not is_create %}{% url 'warehouse:seller_warehouse_link_detail' link.pk %}{% else %}{% url 'warehouse:seller_warehouse_links' %}{% endif %}"
-                   class="btn btn-outline-secondary btn-lg"
-                   hx-get="{% if not is_create %}{% url 'warehouse:seller_warehouse_link_detail' link.pk %}{% else %}{% url 'warehouse:seller_warehouse_links' %}{% endif %}"
-                   hx-target="body"
-                   hx-push-url="true">
-                    <i class="fa-solid fa-times me-2"></i>Cancel
-                </a>
-            </div>
+        <!-- Actions -->
+        <div class="wha__actions">
+            <button type="submit" class="wh__btn wh__btn--primary">
+                <i class="fa-solid fa-save"></i> {% if is_create %}Create Link{% else %}Save Changes{% endif %}
+            </button>
+            <a href="{% if not is_create %}{% url 'warehouse:seller_warehouse_link_detail' link.pk %}{% else %}{% url 'warehouse:seller_warehouse_links' %}{% endif %}"
+               class="wh__btn wh__btn--secondary"
+               hx-get="{% if not is_create %}{% url 'warehouse:seller_warehouse_link_detail' link.pk %}{% else %}{% url 'warehouse:seller_warehouse_links' %}{% endif %}"
+               hx-target="body" hx-push-url="true">
+                <i class="fa-solid fa-times"></i> Cancel
+            </a>
         </div>
     </form>
 
     <!-- Help Section -->
-    <div class="form-card mt-3">
-        <h5 class="section-title">
-            <i class="fa-solid fa-question-circle"></i>
-            Help & Guidelines
-        </h5>
-
-        <div class="row">
-            <div class="col-md-6">
-                <h6><i class="fa-solid fa-lightbulb me-2 text-warning"></i>Priority Guidelines</h6>
-                <ul class="small">
-                    <li><strong>80-100:</strong> Primary/preferred warehouses</li>
-                    <li><strong>50-79:</strong> Standard warehouses</li>
-                    <li><strong>20-49:</strong> Backup warehouses</li>
-                    <li><strong>0-19:</strong> Emergency/temporary warehouses</li>
-                </ul>
+    <div class="wh__help-grid">
+        <div class="wh__help-card">
+            <div class="wh__help-header wh__help-header--tips"><i class="fa-solid fa-lightbulb"></i> PRIORITY GUIDELINES</div>
+            <div class="wh__help-body">
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span><strong>80-100:</strong> Primary/preferred warehouses</span></div>
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span><strong>50-79:</strong> Standard warehouses</span></div>
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span><strong>20-49:</strong> Backup warehouses</span></div>
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span><strong>0-19:</strong> Emergency/temporary warehouses</span></div>
             </div>
-            <div class="col-md-6">
-                <h6><i class="fa-solid fa-lightbulb me-2 text-warning"></i>Default Settings</h6>
-                <ul class="small">
-                    <li>Only <strong>one link</strong> should be marked as default per seller</li>
-                    <li>Default warehouse is used as fallback during auto-selection</li>
-                    <li>Default location is the preferred pickup point</li>
-                    <li>System will automatically unset other defaults when setting a new one</li>
-                </ul>
+        </div>
+        <div class="wh__help-card">
+            <div class="wh__help-header wh__help-header--workflow"><i class="fa-solid fa-lightbulb"></i> DEFAULT SETTINGS</div>
+            <div class="wh__help-body">
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span>Only <strong>one link</strong> should be marked as default per seller</span></div>
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span>Default warehouse is used as fallback during auto-selection</span></div>
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span>Default location is the preferred pickup point</span></div>
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span>System will automatically unset other defaults when setting a new one</span></div>
             </div>
         </div>
     </div>

@@ -2,104 +2,124 @@
 <!-- Order Detail Panel Content - No extends, just content -->
 <div class="order-detail-panel-scroll">
     <!-- Order Info Card -->
-    <div class="card mb-3">
-        <div class="card-header bg-primary text-white">
-            <h6 class="mb-0">
-                <i class="fa-solid fa-info-circle me-2"></i>
-                Order Information
-            </h6>
+    <div class="odp__card">
+        <div class="odp__card__header">
+            <i class="fa-solid fa-info-circle"></i>
+            Order Information
         </div>
-        <div class="card-body">
-            <div class="row g-2">
+        <div class="odp__card__body">
+            <div class="row g-0">
                 <div class="col-6">
-                    <small class="text-muted d-block">Order Number</small>
-                    <strong>{{ order.order_number }}</strong>
+                    <div class="odp__field">
+                        <span class="odp__field__label">Order Number</span>
+                        <span class="odp__field__value odp__field__value--mono">{{ order.order_number }}</span>
+                    </div>
                 </div>
                 <div class="col-6">
-                    <small class="text-muted d-block">Client Code</small>
-                    <strong>{{ order.client_order_code }}</strong>
+                    <div class="odp__field">
+                        <span class="odp__field__label">Client Code</span>
+                        <span class="odp__field__value odp__field__value--mono">{{ order.client_order_code }}</span>
+                    </div>
                 </div>
                 <div class="col-6">
-                    <small class="text-muted d-block">Status</small>
-                    {% if order.order_status == 'to_review' %}
-                    <span class="badge bg-warning text-dark">To Review</span>
-                    {% elif order.order_status == 'to_publish' %}
-                    <span class="badge bg-info">To Publish</span>
-                    {% elif order.order_status == 'published' %}
-                    <span class="badge bg-success">Published</span>
-                    {% elif order.order_status == 'cancelled' %}
-                    <span class="badge bg-danger">Cancelled</span>
-                    {% else %}
-                    <span class="badge bg-secondary">{{ order.order_status }}</span>
-                    {% endif %}
+                    <div class="odp__field">
+                        <span class="odp__field__label">Status</span>
+                        {% if order.order_status == 'to_review' %}
+                        <span class="odp__badge odp__badge--warning">To Review</span>
+                        {% elif order.order_status == 'to_publish' %}
+                        <span class="odp__badge odp__badge--info">To Publish</span>
+                        {% elif order.order_status == 'published' %}
+                        <span class="odp__badge odp__badge--success">Published</span>
+                        {% elif order.order_status == 'cancelled' %}
+                        <span class="odp__badge odp__badge--danger">Cancelled</span>
+                        {% else %}
+                        <span class="odp__badge odp__badge--muted">{{ order.order_status }}</span>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="col-6">
-                    <small class="text-muted d-block">Verification</small>
-                    {% if order.verification_status == 'pending' %}
-                    <span class="badge bg-warning text-dark">Pending</span>
-                    {% elif order.verification_status == 'verified' %}
-                    <span class="badge bg-success">Verified</span>
-                    {% else %}
-                    <span class="badge bg-secondary">{{ order.verification_status }}</span>
-                    {% endif %}
+                    <div class="odp__field">
+                        <span class="odp__field__label">Verification</span>
+                        {% if order.verification_status == 'pending' %}
+                        <span class="odp__badge odp__badge--warning">Pending</span>
+                        {% elif order.verification_status == 'verified' %}
+                        <span class="odp__badge odp__badge--success">Verified</span>
+                        {% else %}
+                        <span class="odp__badge odp__badge--muted">{{ order.verification_status }}</span>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="col-6">
-                    <small class="text-muted d-block">Business</small>
-                    <strong>{{ order.business.business_name }}</strong>
+                    <div class="odp__field">
+                        <span class="odp__field__label">Business</span>
+                        <span class="odp__field__value">{{ order.business.business_name }}</span>
+                    </div>
                 </div>
                 <div class="col-6">
-                    <small class="text-muted d-block">Date</small>
-                    {{ order.order_date|date:"d M Y" }}
+                    <div class="odp__field">
+                        <span class="odp__field__label">Date</span>
+                        <span class="odp__field__value">{{ order.order_date|date:"d M Y" }}</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Customer Info Card -->
-    <div class="card mb-3">
-        <div class="card-header bg-info text-white">
-            <h6 class="mb-0">
-                <i class="fa-solid fa-user me-2"></i>
-                Customer Information
-            </h6>
+    <div class="odp__card">
+        <div class="odp__card__header">
+            <i class="fa-solid fa-user"></i>
+            Customer Information
         </div>
-        <div class="card-body">
-            <div class="row g-2">
-                <div class="col-12">
-                    <small class="text-muted d-block">Name</small>
-                    <strong>{{ order.customer_name }}</strong>
+        <div class="odp__card__body">
+            <div class="odp__field">
+                <span class="odp__field__label">Name</span>
+                <span class="odp__field__value">{{ order.customer_name }}</span>
+            </div>
+            <div class="row g-0">
+                <div class="col-6">
+                    <div class="odp__field">
+                        <span class="odp__field__label">Phone</span>
+                        <a href="tel:{{ order.customer_phone }}" class="odp__contact-pill odp__contact-pill--phone">
+                            <i class="fa-solid fa-phone"></i> {{ order.customer_phone }}
+                        </a>
+                    </div>
                 </div>
                 <div class="col-6">
-                    <small class="text-muted d-block">Phone</small>
-                    <a href="tel:{{ order.customer_phone }}" class="text-decoration-none">
-                        <i class="fa-solid fa-phone me-1"></i>{{ order.customer_phone }}
-                    </a>
+                    <div class="odp__field">
+                        <span class="odp__field__label">WhatsApp</span>
+                        {% if order.customer_whatsapp %}
+                        <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="odp__contact-pill odp__contact-pill--whatsapp">
+                            <i class="fa-brands fa-whatsapp"></i> {{ order.customer_whatsapp }}
+                        </a>
+                        {% else %}
+                        <span class="odp__field__value odp__field__value--muted">-</span>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="col-6">
-                    <small class="text-muted d-block">WhatsApp</small>
-                    {% if order.customer_whatsapp %}
-                    <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="text-decoration-none text-success">
-                        <i class="fa-brands fa-whatsapp me-1"></i>{{ order.customer_whatsapp }}
-                    </a>
-                    {% else %}
-                    <span class="text-muted">-</span>
-                    {% endif %}
-                </div>
-                <div class="col-12">
-                    <small class="text-muted d-block">Address</small>
-                    {{ order.customer_address }}
+            </div>
+            <div class="odp__field">
+                <span class="odp__field__label">Address</span>
+                <span class="odp__field__value">{{ order.customer_address }}</span>
+            </div>
+            <div class="row g-0">
+                <div class="col-4">
+                    <div class="odp__field">
+                        <span class="odp__field__label">Zone</span>
+                        <span class="odp__field__value odp__field__value--mono">{{ order.dl_zone|default:"-" }}</span>
+                    </div>
                 </div>
                 <div class="col-4">
-                    <small class="text-muted d-block">Zone</small>
-                    {{ order.dl_zone|default:"-" }}
+                    <div class="odp__field">
+                        <span class="odp__field__label">Street</span>
+                        <span class="odp__field__value">{{ order.dl_street|default:"-" }}</span>
+                    </div>
                 </div>
                 <div class="col-4">
-                    <small class="text-muted d-block">Street</small>
-                    {{ order.dl_street|default:"-" }}
-                </div>
-                <div class="col-4">
-                    <small class="text-muted d-block">Building</small>
-                    {{ order.dl_building|default:"-" }}
+                    <div class="odp__field">
+                        <span class="odp__field__label">Building</span>
+                        <span class="odp__field__value">{{ order.dl_building|default:"-" }}</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -107,19 +127,17 @@
 
     <!-- Order Items -->
     {% if order_items %}
-    <div class="card mb-3">
-        <div class="card-header">
-            <h6 class="mb-0">
-                <i class="fa-solid fa-box me-2"></i>
-                Order Items
-            </h6>
+    <div class="odp__card">
+        <div class="odp__card__header">
+            <i class="fa-solid fa-box"></i>
+            Order Items
         </div>
-        <div class="card-body p-0">
-            <table class="table table-sm table-hover mb-0">
-                <thead class="table-light">
+        <div class="odp__card__body odp__card__body--flush">
+            <table class="odp__table">
+                <thead>
                     <tr>
                         <th>Product</th>
-                        <th>Quantity</th>
+                        <th>Qty</th>
                         <th>Unit Price</th>
                         <th>Total</th>
                     </tr>
@@ -130,7 +148,7 @@
                         <td>{{ item.product|default:item.notes|truncatechars:30 }}</td>
                         <td>{{ item.quantity }}</td>
                         <td>{{ item.unit_price|default:"0.00" }} QAR</td>
-                        <td>{{ item.total_price|default:"0.00" }} QAR</td>
+                        <td class="odp__table__amount">{{ item.total_price|default:"0.00" }} QAR</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -139,23 +157,25 @@
     </div>
     {% endif %}
 
-    <!-- Payment Info -->
-    <div class="card mb-3">
-        <div class="card-header bg-success text-white">
-            <h6 class="mb-0">
-                <i class="fa-solid fa-money-bill-wave me-2"></i>
-                Payment Information
-            </h6>
+    <!-- Payment Info - COD Highlight -->
+    <div class="odp__cod-card">
+        <div class="odp__cod-card__header">
+            <i class="fa-solid fa-money-bill-wave"></i>
+            Payment Information
         </div>
-        <div class="card-body">
-            <div class="row g-2">
+        <div class="odp__cod-card__body">
+            <div class="row g-0">
                 <div class="col-6">
-                    <small class="text-muted d-block">COD Amount</small>
-                    <strong class="text-success">{{ order.cod_amount|default:"0" }} QAR</strong>
+                    <div class="odp__field">
+                        <span class="odp__cod-label">COD Amount</span>
+                        <span class="odp__cod-amount">{{ order.cod_amount|default:"0" }} <span class="odp__cod-currency">QAR</span></span>
+                    </div>
                 </div>
                 <div class="col-6">
-                    <small class="text-muted d-block">Delivery Fee</small>
-                    {{ order.dl_amount|default:"0" }} QAR
+                    <div class="odp__field">
+                        <span class="odp__cod-label">Delivery Fee</span>
+                        <span class="odp__field__value">{{ order.dl_amount|default:"0" }} QAR</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -163,27 +183,34 @@
 
     <!-- Delivery Task Info -->
     {% if delivery_task %}
-    <div class="card mb-3">
-        <div class="card-header bg-warning">
-            <h6 class="mb-0">
-                <i class="fa-solid fa-truck me-2"></i>
-                Delivery Task
-            </h6>
+    <div class="odp__card">
+        <div class="odp__card__header">
+            <i class="fa-solid fa-truck"></i>
+            Delivery Task
         </div>
-        <div class="card-body">
-            <div class="row g-2">
+        <div class="odp__card__body">
+            <div class="row g-0">
                 <div class="col-6">
-                    <small class="text-muted d-block">Task Number</small>
-                    <strong>{{ delivery_task.dl_task_number }}</strong>
+                    <div class="odp__field">
+                        <span class="odp__field__label">Task Number</span>
+                        <span class="odp__field__value odp__field__value--mono">{{ delivery_task.dl_task_number }}</span>
+                    </div>
                 </div>
                 <div class="col-6">
-                    <small class="text-muted d-block">DMS Status</small>
-                    <span class="badge bg-secondary">{{ delivery_task.get_dl_task_status_dms_display }}</span>
+                    <div class="odp__field">
+                        <span class="odp__field__label">DMS Status</span>
+                        <span class="odp__badge odp__badge--muted">{{ delivery_task.get_dl_task_status_dms_display }}</span>
+                    </div>
                 </div>
                 {% if delivery_task.driver %}
                 <div class="col-12">
-                    <small class="text-muted d-block">Driver</small>
-                    {{ delivery_task.driver.first_name }} {{ delivery_task.driver.last_name }}
+                    <div class="odp__field">
+                        <span class="odp__field__label">Driver</span>
+                        <span class="odp__field__value">
+                            <span class="odp__avatar"><i class="fa-solid fa-user"></i></span>
+                            {{ delivery_task.driver.first_name }} {{ delivery_task.driver.last_name }}
+                        </span>
+                    </div>
                 </div>
                 {% endif %}
             </div>
@@ -192,34 +219,34 @@
     {% endif %}
 
     <!-- Status Timeline -->
-    <div class="card mb-3 tl-card">
-        <div class="card-header tl-header">
-            <div class="tl-header__left">
+    <div class="odp__tl-card">
+        <div class="odp__tl-header">
+            <div class="odp__tl-header__left">
                 <i class="fa-solid fa-clock-rotate-left me-2"></i>
                 Status Timeline
             </div>
         </div>
-        <div class="card-body p-0">
-            <div class="tl-wrap">
+        <div class="odp__tl-content">
+            <div class="odp__tl-wrap">
                 <!-- Order Created -->
-                <div class="tl-item tl-item--first">
-                    <div class="tl-track">
-                        <div class="tl-icon tl-icon--created"><i class="fa-solid fa-plus"></i></div>
+                <div class="odp__tl-item odp__tl-item--first">
+                    <div class="odp__tl-track">
+                        <div class="odp__tl-icon odp__tl-icon--created"><i class="fa-solid fa-plus"></i></div>
                     </div>
-                    <div class="tl-body">
-                        <div class="tl-card-inner tl-card-inner--created">
-                            <div class="tl-row">
-                                <span class="tl-title">Order Created</span>
-                                <span class="tl-timestamp">{{ order.created_at|date:"d/m H:i" }}</span>
+                    <div class="odp__tl-body">
+                        <div class="odp__tl-card-inner odp__tl-card-inner--created">
+                            <div class="odp__tl-row">
+                                <span class="odp__tl-title">Order Created</span>
+                                <span class="odp__tl-timestamp">{{ order.created_at|date:"d/m H:i" }}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {% for entry in status_history %}
-                <div class="tl-item">
-                    <div class="tl-track">
-                        <div class="tl-icon {% if entry.field_name == 'order_status' %}tl-icon--order{% elif entry.field_name == 'verification_status' %}tl-icon--verify{% elif entry.field_name == 'dl_task_status' %}tl-icon--task{% elif entry.field_name == 'dl_task_status_dms' %}tl-icon--dms{% elif entry.field_name == 'cod_status_by_staff' %}tl-icon--cod{% else %}tl-icon--default{% endif %}">
+                <div class="odp__tl-item">
+                    <div class="odp__tl-track">
+                        <div class="odp__tl-icon {% if entry.field_name == 'order_status' %}odp__tl-icon--order{% elif entry.field_name == 'verification_status' %}odp__tl-icon--verify{% elif entry.field_name == 'dl_task_status' %}odp__tl-icon--task{% elif entry.field_name == 'dl_task_status_dms' %}odp__tl-icon--dms{% elif entry.field_name == 'cod_status_by_staff' %}odp__tl-icon--cod{% else %}odp__tl-icon--default{% endif %}">
                             {% if entry.field_name == 'order_status' %}<i class="fa-solid fa-box"></i>
                             {% elif entry.field_name == 'verification_status' %}<i class="fa-solid fa-shield-halved"></i>
                             {% elif entry.field_name == 'dl_task_status' %}<i class="fa-solid fa-truck-fast"></i>
@@ -229,18 +256,18 @@
                             {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
                         </div>
                     </div>
-                    <div class="tl-body">
-                        <div class="tl-card-inner">
-                            <div class="tl-row">
-                                <span class="tl-title">{{ entry.get_field_name_display }}</span>
-                                <span class="tl-timestamp">{{ entry.created_at|date:"d/m H:i" }}</span>
+                    <div class="odp__tl-body">
+                        <div class="odp__tl-card-inner">
+                            <div class="odp__tl-row">
+                                <span class="odp__tl-title">{{ entry.get_field_name_display }}</span>
+                                <span class="odp__tl-timestamp">{{ entry.created_at|date:"d/m H:i" }}</span>
                             </div>
-                            <div class="tl-transition">
+                            <div class="odp__tl-transition">
                                 {% if entry.old_display %}
-                                <span class="tl-pill tl-pill--from">{{ entry.old_display }}</span>
-                                <span class="tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
+                                <span class="odp__tl-pill odp__tl-pill--from">{{ entry.old_display }}</span>
+                                <span class="odp__tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
                                 {% endif %}
-                                <span class="tl-pill {% if entry.new_value == 'delivered' or entry.new_value == 'fulfilled' or entry.new_value == 'verified' or entry.new_value == '2' %}tl-pill--success{% elif entry.new_value == 'cancelled' or entry.new_value == 'rejected' or entry.new_value == 'failed' or entry.new_value == '3' or entry.new_value == '9' %}tl-pill--danger{% else %}tl-pill--to{% endif %}">{{ entry.new_display }}</span>
+                                <span class="odp__tl-pill {% if entry.new_value == 'delivered' or entry.new_value == 'fulfilled' or entry.new_value == 'verified' or entry.new_value == '2' %}odp__tl-pill--success{% elif entry.new_value == 'cancelled' or entry.new_value == 'rejected' or entry.new_value == 'failed' or entry.new_value == '3' or entry.new_value == '9' %}odp__tl-pill--danger{% else %}odp__tl-pill--to{% endif %}">{{ entry.new_display }}</span>
                             </div>
                         </div>
                     </div>
@@ -250,22 +277,22 @@
 
                 {% if not status_history %}
                 {% for log in verification_logs %}
-                <div class="tl-item">
-                    <div class="tl-track">
-                        <div class="tl-icon tl-icon--verify"><i class="fa-solid fa-shield-halved"></i></div>
+                <div class="odp__tl-item">
+                    <div class="odp__tl-track">
+                        <div class="odp__tl-icon odp__tl-icon--verify"><i class="fa-solid fa-shield-halved"></i></div>
                     </div>
-                    <div class="tl-body">
-                        <div class="tl-card-inner">
-                            <div class="tl-row">
-                                <span class="tl-title">{{ log.action }}</span>
-                                <span class="tl-timestamp">{{ log.created_at|date:"d/m H:i" }}</span>
+                    <div class="odp__tl-body">
+                        <div class="odp__tl-card-inner">
+                            <div class="odp__tl-row">
+                                <span class="odp__tl-title">{{ log.action }}</span>
+                                <span class="odp__tl-timestamp">{{ log.created_at|date:"d/m H:i" }}</span>
                             </div>
-                            <div class="tl-transition">
+                            <div class="odp__tl-transition">
                                 {% if log.old_status %}
-                                <span class="tl-pill tl-pill--from">{{ log.old_status }}</span>
-                                <span class="tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
+                                <span class="odp__tl-pill odp__tl-pill--from">{{ log.old_status }}</span>
+                                <span class="odp__tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
                                 {% endif %}
-                                <span class="tl-pill tl-pill--to">{{ log.new_status }}</span>
+                                <span class="odp__tl-pill odp__tl-pill--to">{{ log.new_status }}</span>
                             </div>
                         </div>
                     </div>
@@ -274,32 +301,32 @@
                 {% endif %}
 
                 <!-- Current State -->
-                <div class="tl-item tl-item--last">
-                    <div class="tl-track">
-                        <div class="tl-icon tl-icon--now"><i class="fa-solid fa-location-dot"></i></div>
+                <div class="odp__tl-item odp__tl-item--last">
+                    <div class="odp__tl-track">
+                        <div class="odp__tl-icon odp__tl-icon--now"><i class="fa-solid fa-location-dot"></i></div>
                     </div>
-                    <div class="tl-body">
-                        <div class="tl-card-inner tl-card-inner--now">
-                            <div class="tl-row">
-                                <span class="tl-title">Current State</span>
+                    <div class="odp__tl-body">
+                        <div class="odp__tl-card-inner odp__tl-card-inner--now">
+                            <div class="odp__tl-row">
+                                <span class="odp__tl-title">Current State</span>
                             </div>
-                            <div class="tl-now-grid">
-                                <div class="tl-now-cell">
-                                    <span class="tl-now-label">Order</span>
-                                    <span class="tl-pill tl-pill--live">{{ order.get_order_status_display }}</span>
+                            <div class="odp__tl-now-grid">
+                                <div class="odp__tl-now-cell">
+                                    <span class="odp__tl-now-label">Order</span>
+                                    <span class="odp__tl-pill odp__tl-pill--live">{{ order.get_order_status_display }}</span>
                                 </div>
-                                <div class="tl-now-cell">
-                                    <span class="tl-now-label">Verification</span>
-                                    <span class="tl-pill {% if order.verification_status == 'verified' %}tl-pill--success{% elif order.verification_status == 'rejected' %}tl-pill--danger{% else %}tl-pill--live{% endif %}">{{ order.get_verification_status_display }}</span>
+                                <div class="odp__tl-now-cell">
+                                    <span class="odp__tl-now-label">Verification</span>
+                                    <span class="odp__tl-pill {% if order.verification_status == 'verified' %}odp__tl-pill--success{% elif order.verification_status == 'rejected' %}odp__tl-pill--danger{% else %}odp__tl-pill--live{% endif %}">{{ order.get_verification_status_display }}</span>
                                 </div>
                                 {% if delivery_task %}
-                                <div class="tl-now-cell">
-                                    <span class="tl-now-label">Delivery</span>
-                                    <span class="tl-pill tl-pill--live-alt">{{ delivery_task.get_dl_task_status_display }}</span>
+                                <div class="odp__tl-now-cell">
+                                    <span class="odp__tl-now-label">Delivery</span>
+                                    <span class="odp__tl-pill odp__tl-pill--live-alt">{{ delivery_task.get_dl_task_status_display }}</span>
                                 </div>
-                                <div class="tl-now-cell">
-                                    <span class="tl-now-label">DMS</span>
-                                    <span class="tl-pill tl-pill--live-dms">{{ delivery_task.get_dl_task_status_dms_display }}</span>
+                                <div class="odp__tl-now-cell">
+                                    <span class="odp__tl-now-label">DMS</span>
+                                    <span class="odp__tl-pill odp__tl-pill--live-dms">{{ delivery_task.get_dl_task_status_dms_display }}</span>
                                 </div>
                                 {% endif %}
                             </div>
@@ -311,10 +338,10 @@
     </div>
 
     <!-- Action Buttons -->
-    <div class="d-grid gap-2 mt-4">
+    <div class="odp__actions">
         {% if order.verification_status == 'pending' %}
         <button type="button"
-                class="btn btn-success"
+                class="odp__btn odp__btn--success"
                 hx-post="/workforce/orders/{{ order.id }}/verify/"
                 hx-confirm="Verify this order?"
                 hx-target="closest .order-detail-panel-scroll"
@@ -325,7 +352,7 @@
 
         {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
         <button type="button"
-                class="btn btn-info"
+                class="odp__btn odp__btn--info"
                 hx-post="/workforce/orders/{{ order.id }}/publish/"
                 hx-confirm="Publish this order?"
                 hx-target="closest .order-detail-panel-scroll"
@@ -334,13 +361,13 @@
         </button>
         {% endif %}
 
-        <a href="/workforce/orders/{{ order.id }}/" class="btn btn-outline-primary" target="_blank">
+        <a href="/workforce/orders/{{ order.id }}/" class="odp__btn odp__btn--outline" target="_blank">
             <i class="fa-solid fa-external-link me-1"></i> Open Full Page
         </a>
 
         {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
         <button type="button"
-                class="btn btn-outline-danger"
+                class="odp__btn odp__btn--danger-outline"
                 hx-post="/workforce/orders/{{ order.id }}/cancel/"
                 hx-confirm="Cancel this order?"
                 hx-target="closest .order-detail-panel-scroll"
@@ -352,16 +379,11 @@
 
     <!-- Order Notes -->
     {% if order.order_notes %}
-    <div class="card mt-3">
-        <div class="card-header">
-            <h6 class="mb-0">
-                <i class="fa-solid fa-note-sticky me-2"></i>
-                Notes
-            </h6>
+    <div class="odp__callout">
+        <div class="odp__callout__header">
+            <i class="fa-solid fa-note-sticky"></i> Notes
         </div>
-        <div class="card-body">
-            <p class="mb-0 small">{{ order.order_notes }}</p>
-        </div>
+        <p class="odp__callout__text">{{ order.order_notes }}</p>
     </div>
     {% endif %}
 </div>

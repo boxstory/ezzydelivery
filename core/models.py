@@ -113,9 +113,9 @@ class Profile(models.Model):
         """Override save to auto-generate user_number on creation"""
         if not self.user_number:
             # Generate user number: EZZY + Year + 6-digit number
-            from datetime import datetime
+            from django.utils import timezone as dj_timezone
             import random
-            year = datetime.now().year
+            year = dj_timezone.localtime().year
             random_num = random.randint(100000, 999999)
             self.user_number = f"EZZY{year}{random_num}"
 

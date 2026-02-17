@@ -1,53 +1,85 @@
 {% extends "wf_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
-<!-- extra css -->
-{% block extra_css %}
-<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
-{% endblock extra_css %}
-{% block content %}
-<div class="col-12 p-3">
-<div class="col-md-10 col-lg-10 col-12 p-0">
 
-    <table class="table table-hover  ">
-        <thead>
-            <tr>
-                <th scope="col">DL_Code</th>
-                <th scope="col">C_Code</th>
-                <th scope="col">Name</th>
-                <th scope="col">Mobile</th>
-                <th scope="col">C_status</th>
-                <th scope="col">DMS_status</th>
-            </tr>
-        </thead>
-        <tbody>{% if items_page %}
-            {% for order in items_page %}
-            <tr>
-                <th scope="row" class="border-right border-bottom-0">{{ order.dl_task}}</th>
-                <td class="border-right border-bottom-0">{{ order.client_order_code }}</td>
-                <td class="border-right border-bottom-0">{{ order.customer_name }}</td>
-                <td class="border-right border-bottom-0">{{ order.customer_phone }}</td>
-                <td class="border-right border-bottom-0">{{ order.order_status }}</td>
-                <td class="border-right border-bottom-0">{{ order.dl_task.dl_task_status_dms }}</td>
-            </tr>
-            <tr>
-                <td></td>
-                <td colspan="2"><i class="fa-solid fa-location-pin" style="color: #008000;"></i>
-                    {{ order.pickup_location }}</td>
-                <td colspan="2"><i class="fa-solid fa-location-pin" style="color: #ff0000;"></i>
-                    {{ order.customer_address }}</td>
-                <td>{{ order.dl_task.dl_task_status_dms }}</td>
-            </tr> {% endfor %}
-        </tbody>
-    </table>
-    {% include "includes/components/_pagination.html" with page_obj=items_page filter_params=filter_params %}
-    {% else %}
-    <p>No items found.</p>
-    {% endif %}
-</div>
+{% block content %}
+<div class="oli">
+    <!-- Hero Header -->
+    <div class="oli__hero">
+        <div class="oli__hero-content">
+            <h1 class="oli__hero-title">
+                <i class="fa-solid fa-clock-rotate-left me-2"></i>Incompleted Orders
+            </h1>
+            <p class="oli__hero-sub">Orders pending completion or processing</p>
+        </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="oli__card">
+        <div class="oli__card-header">
+            <i class="fa-solid fa-list me-2 oli__icon-accent"></i>
+            <span class="oli__section-label">Order List</span>
+        </div>
+        {% if items_page %}
+        <div class="table-responsive">
+            <table class="oli__table">
+                <thead>
+                    <tr>
+                        <th class="oli__th">DL Code</th>
+                        <th class="oli__th">Client Code</th>
+                        <th class="oli__th">Customer</th>
+                        <th class="oli__th">Mobile</th>
+                        <th class="oli__th">Status</th>
+                        <th class="oli__th">DMS Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in items_page %}
+                    <tr class="oli__row">
+                        <td class="oli__td oli__td--bold">{{ order.dl_task }}</td>
+                        <td class="oli__td">{{ order.client_order_code }}</td>
+                        <td class="oli__td">{{ order.customer_name }}</td>
+                        <td class="oli__td">{{ order.customer_phone }}</td>
+                        <td class="oli__td">
+                            <span class="oli__badge oli__badge--amber">{{ order.order_status }}</span>
+                        </td>
+                        <td class="oli__td">
+                            <span class="oli__badge oli__badge--blue">{{ order.dl_task.dl_task_status_dms }}</span>
+                        </td>
+                    </tr>
+                    <tr class="oli__row-detail">
+                        <td class="oli__td"></td>
+                        <td class="oli__td" colspan="2">
+                            <span class="oli__location oli__location--pickup">
+                                <i class="fa-solid fa-location-pin"></i>
+                                {{ order.pickup_location }}
+                            </span>
+                        </td>
+                        <td class="oli__td" colspan="2">
+                            <span class="oli__location oli__location--drop">
+                                <i class="fa-solid fa-location-pin"></i>
+                                {{ order.customer_address }}
+                            </span>
+                        </td>
+                        <td class="oli__td">{{ order.dl_task.dl_task_status_dms }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "includes/components/_pagination.html" with page_obj=items_page filter_params=filter_params %}
+        {% else %}
+        <div class="oli__empty">
+            <i class="fa-solid fa-inbox"></i>
+            <h3>No Incompleted Orders</h3>
+            <p>All orders are up to date.</p>
+        </div>
+        {% endif %}
+    </div>
 </div>
 {% endblock content %}
+
 {% block extra_js %}
 <script type="text/javascript" language="JavaScript" charset="UTF-8"
-    src="{%static 'orders/js/orders_main.js' %}"></script>
+    src="{% static 'orders/js/orders_main.js' %}"></script>
 {% endblock extra_js %}

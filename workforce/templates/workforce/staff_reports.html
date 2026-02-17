@@ -3,176 +3,167 @@
 
 {% block title %}Staff Reports - Ezzy Delivery{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
-<div class="col-12 p-3">
-<!-- Page Title -->
-<h1 class="page-title">
-    <i class="fa-solid fa-chart-bar me-2"></i>Staff Reports Dashboard
-</h1>
-
-<!-- Staff To-Do List -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-list-check"></i>
-        Staff To-Do List
-    </div>
-    <div class="todo-list">
-        {% if todos %}
-            {% for todo in todos %}
-            <div class="todo-item {% if todo.is_completed %}completed{% endif %}">
-                <input type="checkbox" class="todo-checkbox" {% if todo.is_completed %}checked{% endif %} onchange="toggleTodo({{ todo.id }})">
-                <div class="todo-content">
-                    <div class="todo-title">{{ todo.title }}</div>
-                    <div class="todo-meta">
-                        <i class="fa-solid fa-user"></i> {{ todo.assigned_to|default:"Unassigned" }} |
-                        <i class="fa-solid fa-calendar"></i> {{ todo.due_date|date:"d M Y"|default:"No due date" }}
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        {% else %}
-            <p style="color: var(--brand-grey-500); text-align: center; padding: 2rem;">No tasks for today</p>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Staff Team Notes -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-sticky-note"></i>
-        Staff Team Notes
-    </div>
-    <div class="notes-grid">
-        {% if notes %}
-            {% for note in notes %}
-            <div class="note-card">
-                <div class="note-header">
-                    <span class="note-author">{{ note.author.first_name }} {{ note.author.last_name }}</span>
-                    <span class="note-date">{{ note.created_at|date:"d M Y, h:i A" }}</span>
-                </div>
-                <div class="note-content">{{ note.content }}</div>
-            </div>
-            {% endfor %}
-        {% else %}
-            <p style="color: var(--brand-grey-500); text-align: center; padding: 2rem;">No team notes available</p>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Daily Report Generator -->
-<div class="section-container">
-    <div class="section-title">
-        <i class="fa-solid fa-file-pdf"></i>
-        Daily Report Generator
-    </div>
-    <form method="post" action="" class="report-form" id="reportForm">
-        {% csrf_token %}
-        <div class="form-group">
-            <label class="form-label">Report Date</label>
-            <input type="date" name="report_date" class="form-input" value="{{ today }}" required>
+<div class="str">
+    <!-- Hero Header -->
+    <div class="str__hero">
+        <div class="str__hero-content">
+            <h1 class="str__hero-title"><i class="fa-solid fa-chart-bar me-2"></i>Staff Reports Dashboard</h1>
+            <p class="str__hero-subtitle">To-do lists, team notes, and report generation</p>
         </div>
+    </div>
 
-        <div class="form-group">
-            <label class="form-label">Report Type</label>
-            <select name="report_type" class="form-select" id="reportType" required>
-                <option value="">Select Report Type</option>
-                <option value="daily_summary">Daily Summary (All Tasks)</option>
-                <option value="deliveries">Deliveries Only</option>
-                <option value="cod">COD Transactions</option>
-                <option value="fleet">Fleet Performance</option>
-                <option value="custom">Custom (Filter Below)</option>
-            </select>
+    <!-- Staff To-Do List -->
+    <div class="str__card">
+        <div class="str__card-header">
+            <i class="fa-solid fa-list-check str__card-icon"></i>
+            <span class="str__card-title">STAFF TO-DO LIST</span>
         </div>
-
-        <div id="customFilters" style="display: none;">
-            <div class="form-group">
-                <label class="form-label">Include Sections</label>
-                <div class="checkbox-group">
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="includeDeliveries" name="include_deliveries" value="1">
-                        <label for="includeDeliveries">Deliveries</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="includeCOD" name="include_cod" value="1">
-                        <label for="includeCOD">COD Transactions</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="includeFleet" name="include_fleet" value="1">
-                        <label for="includeFleet">Fleet Performance</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="includeInventory" name="include_inventory" value="1">
-                        <label for="includeInventory">Inventory</label>
+        <div class="str__card-body">
+            {% if todos %}
+            <div class="str__todo-list">
+                {% for todo in todos %}
+                <div class="str__todo {% if todo.is_completed %}str__todo--done{% endif %}">
+                    <input type="checkbox" class="str__todo-check" {% if todo.is_completed %}checked{% endif %} onchange="toggleTodo({{ todo.id }})">
+                    <div class="str__todo-content">
+                        <span class="str__todo-title">{{ todo.title }}</span>
+                        <span class="str__todo-meta">
+                            <i class="fa-solid fa-user"></i> {{ todo.assigned_to|default:"Unassigned" }} |
+                            <i class="fa-solid fa-calendar"></i> {{ todo.due_date|date:"d M Y"|default:"No due date" }}
+                        </span>
                     </div>
                 </div>
+                {% endfor %}
             </div>
+            {% else %}
+            <div class="str__empty-inline">No tasks for today</div>
+            {% endif %}
+        </div>
+    </div>
 
-            <div class="filter-grid">
-                <div class="form-group">
-                    <label class="form-label">Delivery Status</label>
-                    <select name="delivery_status" class="form-select">
-                        <option value="">All Statuses</option>
-                        <option value="delivered">Delivered</option>
-                        <option value="in_transit">In Transit</option>
-                        <option value="failed">Failed</option>
-                    </select>
+    <!-- Staff Team Notes -->
+    <div class="str__card">
+        <div class="str__card-header">
+            <i class="fa-solid fa-sticky-note str__card-icon"></i>
+            <span class="str__card-title">STAFF TEAM NOTES</span>
+        </div>
+        <div class="str__card-body">
+            {% if notes %}
+            <div class="str__notes-grid">
+                {% for note in notes %}
+                <div class="str__note">
+                    <div class="str__note-top">
+                        <span class="str__note-author">{{ note.author.first_name }} {{ note.author.last_name }}</span>
+                        <span class="str__note-date">{{ note.created_at|date:"d M Y, h:i A" }}</span>
+                    </div>
+                    <div class="str__note-body">{{ note.content }}</div>
                 </div>
-
-                <div class="form-group">
-                    <label class="form-label">Fleet Driver</label>
-                    <select name="driver_id" class="form-select">
-                        <option value="">All Drivers</option>
-                        {% for driver in drivers %}
-                        <option value="{{ driver.id }}">{{ driver.user.first_name }} {{ driver.user.last_name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+                {% endfor %}
             </div>
+            {% else %}
+            <div class="str__empty-inline">No team notes available</div>
+            {% endif %}
         </div>
+    </div>
 
-        <div>
-            <button type="submit" class="btn-generate">
-                <i class="fa-solid fa-file-pdf"></i>
-                Generate & Print Report
-            </button>
+    <!-- Daily Report Generator -->
+    <div class="str__card">
+        <div class="str__card-header">
+            <i class="fa-solid fa-file-pdf str__card-icon"></i>
+            <span class="str__card-title">DAILY REPORT GENERATOR</span>
         </div>
-    </form>
-</div>
+        <div class="str__card-body">
+            <form method="post" action="" class="str__form" id="reportForm">
+                {% csrf_token %}
+                <div class="str__form-row">
+                    <div class="str__form-group">
+                        <label class="str__form-label">Report Date</label>
+                        <input type="date" name="report_date" class="str__form-input" value="{{ today }}" required>
+                    </div>
+                    <div class="str__form-group">
+                        <label class="str__form-label">Report Type</label>
+                        <select name="report_type" class="str__form-select" id="reportType" required>
+                            <option value="">Select Report Type</option>
+                            <option value="daily_summary">Daily Summary (All Tasks)</option>
+                            <option value="deliveries">Deliveries Only</option>
+                            <option value="cod">COD Transactions</option>
+                            <option value="fleet">Fleet Performance</option>
+                            <option value="custom">Custom (Filter Below)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="customFilters" class="str__custom-filters" hidden>
+                    <div class="str__form-group">
+                        <label class="str__form-label">Include Sections</label>
+                        <div class="str__checkbox-group">
+                            <label class="str__checkbox">
+                                <input type="checkbox" id="includeDeliveries" name="include_deliveries" value="1">
+                                <span>Deliveries</span>
+                            </label>
+                            <label class="str__checkbox">
+                                <input type="checkbox" id="includeCOD" name="include_cod" value="1">
+                                <span>COD Transactions</span>
+                            </label>
+                            <label class="str__checkbox">
+                                <input type="checkbox" id="includeFleet" name="include_fleet" value="1">
+                                <span>Fleet Performance</span>
+                            </label>
+                            <label class="str__checkbox">
+                                <input type="checkbox" id="includeInventory" name="include_inventory" value="1">
+                                <span>Inventory</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="str__form-row">
+                        <div class="str__form-group">
+                            <label class="str__form-label">Delivery Status</label>
+                            <select name="delivery_status" class="str__form-select">
+                                <option value="">All Statuses</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="in_transit">In Transit</option>
+                                <option value="failed">Failed</option>
+                            </select>
+                        </div>
+                        <div class="str__form-group">
+                            <label class="str__form-label">Fleet Driver</label>
+                            <select name="driver_id" class="str__form-select">
+                                <option value="">All Drivers</option>
+                                {% for driver in drivers %}
+                                <option value="{{ driver.id }}">{{ driver.user.first_name }} {{ driver.user.last_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="str__form-submit">
+                    <button type="submit" class="str__btn str__btn--primary">
+                        <i class="fa-solid fa-file-pdf"></i> Generate & Print Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
-    // Toggle report type filters
     document.getElementById('reportType').addEventListener('change', function() {
-        const customFilters = document.getElementById('customFilters');
-        if (this.value === 'custom') {
-            customFilters.style.display = 'block';
-        } else {
-            customFilters.style.display = 'none';
-        }
+        var el = document.getElementById('customFilters');
+        el.hidden = this.value !== 'custom';
     });
 
-    // Toggle todo completion
     function toggleTodo(todoId) {
         fetch('/workforce/api/toggle-todo/' + todoId + '/', {
             method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
-        }).then(response => response.json())
-          .then(data => {
-              if (data.success) {
-                  location.reload();
-              }
-          });
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+        }).then(function(r) { return r.json(); })
+          .then(function(data) { if (data.success) location.reload(); });
     }
 
-    // Form submission
     document.getElementById('reportForm').addEventListener('submit', function(e) {
         e.preventDefault();
         alert('Report generation feature will be implemented soon.');

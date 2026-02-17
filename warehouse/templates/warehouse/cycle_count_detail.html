@@ -3,113 +3,116 @@
 
 {% block title %}Cycle Count {{ cycle_count.count_number }}{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
 
-<div class="container-fluid py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'warehouse:cycle_count_list' %}">Cycle Counts</a></li>
-                    <li class="breadcrumb-item active">{{ cycle_count.count_number }}</li>
-                </ol>
-            </nav>
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 class="h3 mb-0">{{ cycle_count.count_number }}</h1>
-                    <p class="text-muted">{{ cycle_count.warehouse.name }} - {{ cycle_count.location.code|default:"All Locations" }}</p>
-                </div>
-                <div>
-                    <span class="badge fs-6 {% if cycle_count.status == 'completed' %}bg-success{% elif cycle_count.status == 'in_progress' %}bg-primary{% else %}bg-info{% endif %}">
-                        {{ cycle_count.get_status_display }}
-                    </span>
-                </div>
+<div class="wh">
+    <!-- Breadcrumb -->
+    <div class="wh__breadcrumb">
+        <a href="{% url 'warehouse:cycle_count_list' %}">Cycle Counts</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <span class="wh__breadcrumb-active">{{ cycle_count.count_number }}</span>
+    </div>
+
+    <!-- Hero Header -->
+    <div class="wcc__hero">
+        <div class="wcc__hero-left">
+            <div class="wcc__hero-icon"><i class="fas fa-clipboard-check"></i></div>
+            <div>
+                <h1 class="wcc__hero-title">{{ cycle_count.count_number }}</h1>
+                <p class="wcc__hero-subtitle">{{ cycle_count.warehouse.name }} - {{ cycle_count.location.code|default:"All Locations" }}</p>
             </div>
+        </div>
+        <div>
+            <span class="wh__badge {% if cycle_count.status == 'completed' %}wh__badge--success{% elif cycle_count.status == 'in_progress' %}wh__badge--primary{% else %}wh__badge--info{% endif %}">
+                {{ cycle_count.get_status_display }}
+            </span>
         </div>
     </div>
 
     <!-- Count Info -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Warehouse</span>
-                        <strong>{{ cycle_count.warehouse.name }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Location</span>
-                        <strong>{{ cycle_count.location.code|default:"All" }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Scheduled</span>
-                        <strong>{{ cycle_count.scheduled_date|date:"d M Y" }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Assigned To</span>
-                        <strong>{{ cycle_count.assigned_to.username|default:"Unassigned" }}</strong>
-                    </div>
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left">
+                <i class="fas fa-info-circle"></i>
+                <span>COUNT DETAILS</span>
+            </div>
+        </div>
+        <div class="wh__card-body">
+            <div class="wcc__info-grid">
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Warehouse</span>
+                    <span class="whdt__field-value">{{ cycle_count.warehouse.name }}</span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Location</span>
+                    <span class="whdt__field-value">{{ cycle_count.location.code|default:"All" }}</span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Scheduled</span>
+                    <span class="whdt__field-value">{{ cycle_count.scheduled_date|date:"d M Y" }}</span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label">Assigned To</span>
+                    <span class="whdt__field-value">{{ cycle_count.assigned_to.username|default:"Unassigned" }}</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Count Items -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Items to Count ({{ items|length }})</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>Location</th>
-                                    <th>Product</th>
-                                    <th class="text-center">System Qty</th>
-                                    <th class="text-center">Counted Qty</th>
-                                    <th class="text-center">Variance</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in items %}
-                                <tr {% if item.variance and item.variance != 0 %}class="table-warning"{% endif %}>
-                                    <td><code>{{ item.location.code|default:"-" }}</code></td>
-                                    <td>{{ item.product.item_name }}</td>
-                                    <td class="text-center">{{ item.system_quantity }}</td>
-                                    <td class="text-center">{{ item.counted_quantity|default:"-" }}</td>
-                                    <td class="text-center">
-                                        {% if item.variance %}
-                                        <span class="{% if item.variance > 0 %}text-success{% elif item.variance < 0 %}text-danger{% endif %}">
-                                            {% if item.variance > 0 %}+{% endif %}{{ item.variance }}
-                                        </span>
-                                        {% else %}-{% endif %}
-                                    </td>
-                                    <td>
-                                        {% if item.counted_quantity is not None %}
-                                        <span class="badge bg-success">Counted</span>
-                                        {% else %}
-                                        <span class="badge bg-secondary">Pending</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">No items in this cycle count</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    <!-- Count Items Table -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left">
+                <i class="fas fa-list-check"></i>
+                <span>ITEMS TO COUNT</span>
+                <span class="wh__count-badge">{{ items|length }}</span>
             </div>
+        </div>
+        <div class="wh__table-wrap">
+            <table class="wh__table">
+                <thead>
+                    <tr>
+                        <th class="wh__th">Location</th>
+                        <th class="wh__th">Product</th>
+                        <th class="wh__th wh__th--center">System Qty</th>
+                        <th class="wh__th wh__th--center">Counted Qty</th>
+                        <th class="wh__th wh__th--center">Variance</th>
+                        <th class="wh__th">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr class="{% if item.variance and item.variance != 0 %}wh__row--warning{% endif %}">
+                        <td class="wh__td"><span class="wh__code">{{ item.location.code|default:"-" }}</span></td>
+                        <td class="wh__td wh__product-name">{{ item.product.item_name }}</td>
+                        <td class="wh__td wh__td--center">{{ item.system_quantity }}</td>
+                        <td class="wh__td wh__td--center">{{ item.counted_quantity|default:"-" }}</td>
+                        <td class="wh__td wh__td--center">
+                            {% if item.variance %}
+                            <span class="{% if item.variance > 0 %}wh__amount--positive{% elif item.variance < 0 %}wh__amount--negative{% endif %}">
+                                {% if item.variance > 0 %}+{% endif %}{{ item.variance }}
+                            </span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="wh__td">
+                            {% if item.counted_quantity is not None %}
+                            <span class="wh__badge wh__badge--success">Counted</span>
+                            {% else %}
+                            <span class="wh__badge wh__badge--muted">Pending</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="wh__empty">
+                            <i class="fas fa-clipboard-list"></i>
+                            <p>No items in this cycle count</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>

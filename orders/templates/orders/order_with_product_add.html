@@ -1,75 +1,83 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+
 {% block content %}
-  <div class="p-3 col-12  " id="orders_add_with_product_container_main">
-    <div class="container align-content-center">
-      <div class="row">
-        <div class="col-md-12 pb-3">
-          <div class="col p-2">
-            <h2 class="m-0 text-center" id="orders_add_with_product_header_title">Add Order</h2>
-          </div>
-          <div class="col d-flex justify-content-between rounded-2 bg-light" id="orders_add_with_product_nav_actions">
-            <a class="btn pe-3 text-dark"
-               href="{% url 'business:pickup_location_list' %}">
-              <div class="btn btn-dark my-2" id="orders_add_with_product_btn_pickup_locations">Pickup locations</div>
-            </a>
-            <a class="btn pe-3 text-dark"
-               href="{% url 'business:pickup_location_list' %}">
-              <div class="btn btn-dark my-2" id="orders_add_with_product_btn_pick_delivery">Pick and Delivery</div>
-            </a>
-            <a class="btn pe-3 text-dark d-none d-md-block"
-               href="{% url 'orders:order_upload_file' %}">
-              <div class="btn btn-dark my-2" id="orders_add_with_product_btn_upload_bulk">Upload bulk</div>
-            </a><a class="btn pe-3 text-dark d-none d-md-block"
-   href="{% url 'orders:orders_all_list' %}">
-            <div class="btn btn-dark my-2" id="orders_add_with_product_btn_back">Back</div>
-          </a>
+<div class="owp" id="orders_add_with_product_container_main">
+    <!-- Hero Header -->
+    <div class="owp__hero">
+        <div class="owp__hero-content">
+            <div class="owp__hero-left">
+                <h1 class="owp__title">
+                    <i class="fas fa-cart-plus"></i>
+                    Add Order
+                </h1>
+                <p class="owp__subtitle">Create a new order with products</p>
+            </div>
         </div>
-      </div>
     </div>
-    <div class="row">
-      <div class="col-md-12">
-        <form method="POST" id="orders_add_with_product_form_main">
-          {% if form.non_field_errors %}
-            <!-- extra css -->
-            {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
-          {% endif %}
-          {% csrf_token %} {{ order_product_formset | crispy }}
-          <div class="text-end">
-            <button type="submit"
-                    class="btn btn-dark w-100 w-md-50"
-                    href="{% url 'orders:add_order' %}"
-                    id="orders_add_with_product_btn_submit">
-              Save & Add
-              Products
-            </button>
-          </div>
-        </form>
-      </div>
+
+    <!-- Quick Nav -->
+    <div class="owp__nav">
+        <a href="{% url 'business:pickup_location_list' %}" class="owp__nav-btn" id="orders_add_with_product_btn_pickup_locations">
+            <i class="fas fa-map-marker-alt"></i> Pickup Locations
+        </a>
+        <a href="{% url 'business:pickup_location_list' %}" class="owp__nav-btn" id="orders_add_with_product_btn_pick_delivery">
+            <i class="fas fa-truck"></i> Pick and Delivery
+        </a>
+        <a href="{% url 'orders:order_upload_file' %}" class="owp__nav-btn d-none d-md-inline-flex" id="orders_add_with_product_btn_upload_bulk">
+            <i class="fas fa-file-upload"></i> Upload Bulk
+        </a>
+        <a href="{% url 'orders:orders_all_list' %}" class="owp__nav-btn owp__nav-btn--outline" id="orders_add_with_product_btn_back">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
     </div>
-  </div>
+
+    <!-- Form Card -->
+    <div class="owp__card">
+        <div class="owp__card-header">
+            <i class="fas fa-file-alt"></i>
+            <span>Order Details</span>
+        </div>
+        <div class="owp__card-body">
+            <form method="POST" id="orders_add_with_product_form_main">
+                {% if form.non_field_errors %}
+                <div class="owp__errors">
+                    {% for error in form.non_field_errors %}
+                    <div class="owp__error-item">
+                        <i class="fas fa-exclamation-circle"></i> {{ error }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% csrf_token %}
+                {{ order_product_formset|crispy }}
+                <div class="owp__submit-row">
+                    <button type="submit" class="owp__btn owp__btn--primary owp__btn--lg" id="orders_add_with_product_btn_submit">
+                        <i class="fas fa-save"></i> Save & Add Products
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock content %}
+
 {% block extra_js %}
-  <script>
-  $(document).ready(function () {
-    // Get references to the input fields
+<script>
+$(document).ready(function () {
     const id_customer_phone = $("#id_customer_phone");
     const id_customer_whatsapp = $("#id_customer_whatsapp");
 
-    // Add event listeners for the driverIdField
     id_customer_phone.on("input", function () {
-      const phoneNumberValue = id_customer_phone.val();
-      id_customer_whatsapp.val(974 + phoneNumberValue);
+        const phoneNumberValue = id_customer_phone.val();
+        id_customer_whatsapp.val(974 + phoneNumberValue);
     });
-  });
+});
 
-  // Initialize select2 in pickuplocation search field
-  if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
+if (typeof jQuery !== 'undefined' && typeof jQuery.fn.select2 !== 'undefined') {
     $("#id_pickup_location").select2();
     $("#id_product_list").select2();
-  }
-
-  </script>
+}
+</script>
 {% endblock extra_js %}

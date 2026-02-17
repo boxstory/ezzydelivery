@@ -3,116 +3,107 @@
 
 {% block title %}Restock List - Ezzy Delivery{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
 <div class="col-12 p-3">
-<!-- Page Title -->
-<h1 class="page-title">
-    <i class="fa-solid fa-box-open me-2"></i>Inventory Restock List
-</h1>
+  <!-- Hero Header -->
+  <div class="irl__hero">
+    <div class="irl__hero-content">
+      <h1 class="irl__hero-title">
+        <i class="fa-solid fa-box-open irl__hero-icon"></i>Inventory Restock List
+      </h1>
+      <p class="irl__hero-subtitle">Products requiring restocking and suggested quantities</p>
+    </div>
+  </div>
 
-<!-- Seller/Store Filter Section -->
-<div class="filter-section">
-    <label for="sellerFilter" class="filter-label">
-        <i class="fa-solid fa-filter me-2"></i>Filter by Seller/Store
+  <!-- Filter Section -->
+  <div class="irl__filter-bar">
+    <label for="sellerFilter" class="irl__filter-label">
+      <i class="fa-solid fa-filter"></i> Filter by Seller/Store
     </label>
-    <input type="text" id="sellerFilter" class="filter-input" placeholder="Search by seller or store name...">
-</div>
+    <input type="text" id="sellerFilter" class="form-control irl__filter-input" placeholder="Search by seller or store name...">
+  </div>
 
-{% if selected_seller %}
-<!-- Back Button -->
-<a href="{% url 'workforce:inventory_restock_list' %}" class="back-btn">
-    <i class="fa-solid fa-arrow-left"></i>
-    Back to All Sellers
-</a>
+  {% if selected_seller %}
+  <!-- Back Button -->
+  <a href="{% url 'workforce:inventory_restock_list' %}" class="irl__back-link">
+    <i class="fa-solid fa-arrow-left"></i> Back to All Sellers
+  </a>
 
-<!-- Detailed Inventory Table -->
-<div class="inventory-table-container">
-    <table class="inventory-table">
-        <thead>
-            <tr>
-                <th>Product Name</th>
-                <th>SKU</th>
-                <th>Current Stock</th>
-                <th>Reorder Level</th>
-                <th>Suggested Qty</th>
-                <th>Priority</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for product in products %}
-            <tr>
-                <td><strong>{{ product.name }}</strong></td>
-                <td>{{ product.sku|default:"N/A" }}</td>
-                <td><strong style="color: #dc3545;">{{ product.quantity|default:"0" }}</strong> {{ product.unit|default:"units" }}</td>
-                <td>{{ product.reorder_level|default:"N/A" }}</td>
-                <td><strong>{{ product.suggested_qty|default:"N/A" }}</strong></td>
-                <td>
-                    {% if product.quantity == 0 %}
-                    <span style="color: #dc3545; font-weight: 700;">Urgent</span>
-                    {% else %}
-                    <span style="color: #ffc107; font-weight: 700;">High</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
+  <!-- Detailed Inventory Table -->
+  <div class="irl__table-card">
+    <table class="irl__table">
+      <thead>
+        <tr>
+          <th>Product Name</th>
+          <th>SKU</th>
+          <th>Current Stock</th>
+          <th>Reorder Level</th>
+          <th>Suggested Qty</th>
+          <th>Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for product in products %}
+        <tr>
+          <td><strong>{{ product.name }}</strong></td>
+          <td><code>{{ product.sku|default:"N/A" }}</code></td>
+          <td class="irl__stock-critical">{{ product.quantity|default:"0" }} {{ product.unit|default:"units" }}</td>
+          <td>{{ product.reorder_level|default:"N/A" }}</td>
+          <td><strong>{{ product.suggested_qty|default:"N/A" }}</strong></td>
+          <td>
+            {% if product.quantity == 0 %}
+            <span class="irl__priority-badge irl__priority-badge--urgent">Urgent</span>
+            {% else %}
+            <span class="irl__priority-badge irl__priority-badge--high">High</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
     </table>
-</div>
+  </div>
 
-{% else %}
-<!-- Compact View - Product Cards -->
-{% if products %}
-<div class="product-grid">
+  {% else %}
+  <!-- Compact View - Product Cards -->
+  {% if products %}
+  <div class="irl__card-grid">
     {% for product in products %}
-    <div class="product-card" onclick="window.location.href='?seller_id={{ product.seller_id }}'">
-        <div class="product-card-header">
-            <div class="product-icon">
-                <i class="fa-solid fa-box"></i>
-            </div>
-            <div class="product-info">
-                <h4>{{ product.name }}</h4>
-                <p>{{ product.seller_name|default:"Store" }}</p>
-            </div>
+    <div class="irl__card" onclick="window.location.href='?seller_id={{ product.seller_id }}'">
+      <div class="irl__card-top">
+        <div class="irl__card-avatar">
+          <i class="fa-solid fa-box"></i>
         </div>
-        <div class="product-details">
-            <div>
-                <div class="stock-label">Stock Quantity</div>
-                <div class="stock-qty">{{ product.quantity|default:"0" }}</div>
-            </div>
+        <div class="irl__card-info">
+          <h4 class="irl__card-name">{{ product.name }}</h4>
+          <p class="irl__card-seller">{{ product.seller_name|default:"Store" }}</p>
         </div>
+      </div>
+      <div class="irl__card-details">
+        <div class="irl__stock-label">Stock Quantity</div>
+        <div class="irl__stock-qty">{{ product.quantity|default:"0" }}</div>
+      </div>
     </div>
     {% endfor %}
-</div>
-{% else %}
-<div class="empty-state">
+  </div>
+  {% else %}
+  <div class="irl__empty">
     <i class="fa-solid fa-check-circle"></i>
     <h3>All Stocked Up!</h3>
     <p>No products require restocking at this time.</p>
-</div>
-{% endif %}
-{% endif %}
-
+  </div>
+  {% endif %}
+  {% endif %}
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
-    // Filter product cards
     document.getElementById('sellerFilter').addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
-        const cards = document.querySelectorAll('.product-card');
-
-        cards.forEach(card => {
-            const text = card.textContent.toLowerCase();
-            if (text.includes(searchTerm)) {
-                card.style.display = 'block';
-            } else {
-                card.style.display = 'none';
-            }
+        var searchTerm = this.value.toLowerCase();
+        var cards = document.querySelectorAll('.irl__card');
+        cards.forEach(function(card) {
+            var text = card.textContent.toLowerCase();
+            card.style.display = text.includes(searchTerm) ? 'block' : 'none';
         });
     });
 </script>

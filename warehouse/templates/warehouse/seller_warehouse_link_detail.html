@@ -3,392 +3,225 @@
 
 {% block title %}Link Details{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
-<style>
-.detail-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 12px;
-    padding: 30px;
-    margin-bottom: 30px;
-}
 
-.link-title {
-    font-size: 1.8rem;
-    font-weight: 600;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.link-arrow {
-    font-size: 2rem;
-}
-
-.badge-group {
-    display: flex;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.info-card {
-    background: white;
-    border-radius: 12px;
-    padding: 25px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.info-card h5 {
-    color: #667eea;
-    font-weight: 600;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-}
-
-.info-item {
-    border-left: 3px solid #667eea;
-    padding-left: 15px;
-}
-
-.info-label {
-    font-size: 0.85rem;
-    color: #7f8c8d;
-    margin-bottom: 5px;
-    font-weight: 500;
-}
-
-.info-value {
-    font-size: 1.1rem;
-    color: #2c3e50;
-    font-weight: 600;
-}
-
-.priority-display {
-    margin-top: 10px;
-}
-
-.priority-bar {
-    width: 100%;
-    height: 8px;
-    background: #ecf0f1;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-top: 8px;
-}
-
-.priority-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #3498db 0%, #667eea 100%);
-}
-
-.related-section {
-    background: white;
-    border-radius: 12px;
-    padding: 25px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.related-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.related-item {
-    padding: 12px;
-    border-bottom: 1px solid #ecf0f1;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.related-item:last-child {
-    border-bottom: none;
-}
-
-.related-item:hover {
-    background: #f8f9fa;
-}
-
-.action-buttons {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.location-card {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 10px;
-    border: 2px solid transparent;
-}
-
-.location-card.default {
-    border-color: #667eea;
-    background: #f0f4ff;
-}
-
-.location-name {
-    font-weight: 600;
-    color: #2c3e50;
-    margin-bottom: 5px;
-}
-
-.location-details {
-    font-size: 0.9rem;
-    color: #7f8c8d;
-}
-</style>
-
-<div class="container-fluid py-4">
-    <!-- Back Button -->
-    <div class="mb-3">
-        <a href="{% url 'warehouse:seller_warehouse_links' %}" class="btn btn-outline-secondary btn-sm"
-           hx-get="{% url 'warehouse:seller_warehouse_links' %}"
-           hx-target="body"
-           hx-push-url="true">
-            <i class="fa-solid fa-arrow-left me-2"></i>Back to Links
+<div class="wh">
+    <!-- Back -->
+    <div>
+        <a href="{% url 'warehouse:seller_warehouse_links' %}" class="wh__btn wh__btn--secondary"
+           hx-get="{% url 'warehouse:seller_warehouse_links' %}" hx-target="body" hx-push-url="true">
+            <i class="fa-solid fa-arrow-left"></i> Back to Links
         </a>
     </div>
 
-    <!-- Header -->
-    <div class="detail-header">
-        <div class="link-title">
-            <span>{{ link.business.business_name }}</span>
-            <i class="fa-solid fa-arrow-right link-arrow"></i>
-            <span>{{ link.warehouse.name }}</span>
-        </div>
-        <div class="badge-group">
-            {% if link.is_default %}
-            <span class="badge bg-warning text-dark fs-6">DEFAULT WAREHOUSE</span>
-            {% endif %}
-            {% if link.is_active %}
-            <span class="badge bg-success fs-6">Active</span>
-            {% else %}
-            <span class="badge bg-secondary fs-6">Inactive</span>
-            {% endif %}
+    <!-- Hero Header -->
+    <div class="swld__hero">
+        <div class="swld__hero-top">
+            <div class="swld__link-title">
+                <span>{{ link.business.business_name }}</span>
+                <i class="fa-solid fa-arrow-right swld__arrow"></i>
+                <span>{{ link.warehouse.name }}</span>
+            </div>
+            <div class="swld__badges">
+                {% if link.is_default %}
+                <span class="wh__badge wh__badge--warning">DEFAULT WAREHOUSE</span>
+                {% endif %}
+                {% if link.is_active %}
+                <span class="wh__badge wh__badge--success">Active</span>
+                {% else %}
+                <span class="wh__badge wh__badge--muted">Inactive</span>
+                {% endif %}
+            </div>
         </div>
     </div>
 
     <!-- Link Information -->
-    <div class="info-card">
-        <h5><i class="fa-solid fa-info-circle"></i> Link Information</h5>
-        <div class="info-grid">
-            <div class="info-item">
-                <div class="info-label">Default Location</div>
-                <div class="info-value">{{ link.default_location.name|default:"Not set" }}</div>
-                {% if link.default_location %}
-                <small class="text-muted">{{ link.default_location.full_code }}</small>
-                {% endif %}
-            </div>
-            <div class="info-item">
-                <div class="info-label">Priority</div>
-                <div class="info-value">{{ link.priority }}</div>
-                <div class="priority-display">
-                    <div class="priority-bar">
-                        <div class="priority-fill" style="width: {{ link.priority }}%"></div>
-                    </div>
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-info-circle"></i> <span>LINK INFORMATION</span></div>
+        </div>
+        <div class="wh__card-body">
+            <div class="swld__info-grid">
+                <div class="swld__info-item">
+                    <div class="swld__info-label">Default Location</div>
+                    <div class="swld__info-value">{{ link.default_location.name|default:"Not set" }}</div>
+                    {% if link.default_location %}<span class="wh__meta">{{ link.default_location.full_code }}</span>{% endif %}
+                </div>
+                <div class="swld__info-item">
+                    <div class="swld__info-label">Priority</div>
+                    <div class="swld__info-value">{{ link.priority }}</div>
+                    <div class="swl__priority-bar"><div class="swl__priority-fill" data-width="{{ link.priority }}%"></div></div>
+                </div>
+                <div class="swld__info-item">
+                    <div class="swld__info-label">Linked Date</div>
+                    <div class="swld__info-value">{{ link.linked_at|date:"M d, Y" }}</div>
+                    <span class="wh__meta">{{ link.linked_at|date:"h:i A" }}</span>
+                </div>
+                <div class="swld__info-item">
+                    <div class="swld__info-label">Linked By</div>
+                    <div class="swld__info-value">{{ link.linked_by.get_full_name|default:link.linked_by.username }}</div>
                 </div>
             </div>
-            <div class="info-item">
-                <div class="info-label">Linked Date</div>
-                <div class="info-value">{{ link.linked_at|date:"M d, Y" }}</div>
-                <small class="text-muted">{{ link.linked_at|date:"h:i A" }}</small>
+            {% if link.notes %}
+            <div class="swld__notes-section">
+                <div class="swld__info-label"><i class="fa-solid fa-note-sticky"></i> Notes:</div>
+                <div class="swld__notes-text">{{ link.notes }}</div>
             </div>
-            <div class="info-item">
-                <div class="info-label">Linked By</div>
-                <div class="info-value">{{ link.linked_by.get_full_name|default:link.linked_by.username }}</div>
-            </div>
+            {% endif %}
         </div>
-
-        {% if link.notes %}
-        <div class="mt-4 pt-3" style="border-top: 1px solid #ecf0f1;">
-            <div class="info-label mb-2"><i class="fa-solid fa-note-sticky me-1"></i> Notes:</div>
-            <div class="info-value" style="font-weight: normal; white-space: pre-wrap;">{{ link.notes }}</div>
-        </div>
-        {% endif %}
     </div>
 
     <!-- Warehouse Details -->
-    <div class="info-card">
-        <h5><i class="fa-solid fa-warehouse"></i> Warehouse Details</h5>
-        <div class="info-grid">
-            <div class="info-item">
-                <div class="info-label">Warehouse Name</div>
-                <div class="info-value">{{ link.warehouse.name }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Warehouse Code</div>
-                <div class="info-value">{{ link.warehouse.code }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Location</div>
-                <div class="info-value">{{ link.warehouse.city }}, {{ link.warehouse.state }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Status</div>
-                <div class="info-value">
-                    {% if link.warehouse.is_active %}
-                    <span class="badge bg-success">Active</span>
-                    {% else %}
-                    <span class="badge bg-secondary">Inactive</span>
-                    {% endif %}
-                    {% if link.warehouse.is_default %}
-                    <span class="badge bg-primary ms-2">System Default</span>
-                    {% endif %}
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-warehouse"></i> <span>WAREHOUSE DETAILS</span></div>
+        </div>
+        <div class="wh__card-body">
+            <div class="swld__info-grid">
+                <div class="swld__info-item">
+                    <div class="swld__info-label">Warehouse Name</div>
+                    <div class="swld__info-value">{{ link.warehouse.name }}</div>
+                </div>
+                <div class="swld__info-item">
+                    <div class="swld__info-label">Warehouse Code</div>
+                    <div class="swld__info-value">{{ link.warehouse.code }}</div>
+                </div>
+                <div class="swld__info-item">
+                    <div class="swld__info-label">Location</div>
+                    <div class="swld__info-value">{{ link.warehouse.city }}, {{ link.warehouse.state }}</div>
+                </div>
+                <div class="swld__info-item">
+                    <div class="swld__info-label">Status</div>
+                    <div class="swld__info-value">
+                        {% if link.warehouse.is_active %}<span class="wh__badge wh__badge--success">Active</span>{% else %}<span class="wh__badge wh__badge--muted">Inactive</span>{% endif %}
+                        {% if link.warehouse.is_default %}<span class="wh__badge wh__badge--primary">System Default</span>{% endif %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Seller Details -->
-    <div class="info-card">
-        <h5><i class="fa-solid fa-store"></i> Seller Details</h5>
-        <div class="info-grid">
-            <div class="info-item">
-                <div class="info-label">Business Name</div>
-                <div class="info-value">{{ link.business.business_name }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Business ID</div>
-                <div class="info-value">{{ link.business.business_id }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Status</div>
-                <div class="info-value">{{ link.business.get_business_status_display }}</div>
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-store"></i> <span>SELLER DETAILS</span></div>
+        </div>
+        <div class="wh__card-body">
+            <div class="swld__info-grid">
+                <div class="swld__info-item">
+                    <div class="swld__info-label">Business Name</div>
+                    <div class="swld__info-value">{{ link.business.business_name }}</div>
+                </div>
+                <div class="swld__info-item">
+                    <div class="swld__info-label">Business ID</div>
+                    <div class="swld__info-value">{{ link.business.business_id }}</div>
+                </div>
+                <div class="swld__info-item">
+                    <div class="swld__info-label">Status</div>
+                    <div class="swld__info-value">{{ link.business.get_business_status_display }}</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Available Locations at this Warehouse -->
-    <div class="related-section">
-        <h5><i class="fa-solid fa-location-dot"></i> Available Locations at {{ link.warehouse.name }}</h5>
-        {% if available_locations %}
-        <div class="mt-3">
-            {% for location in available_locations %}
-            <div class="location-card {% if location == link.default_location %}default{% endif %}">
-                <div class="location-name">
-                    {{ location.name }}
-                    {% if location == link.default_location %}
-                    <span class="badge bg-primary ms-2">Link Default</span>
-                    {% endif %}
-                    {% if location.is_default %}
-                    <span class="badge bg-info text-dark ms-2">WH Default</span>
-                    {% endif %}
-                </div>
-                <div class="location-details">
-                    <strong>Code:</strong> {{ location.full_code }}
-                    {% if location.zone_number %}
-                    | <strong>Zone:</strong> {{ location.zone_number }}
-                    {% endif %}
-                    {% if location.address %}
-                    | {{ location.address }}
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
+    <!-- Available Locations -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-location-dot"></i> <span>AVAILABLE LOCATIONS AT {{ link.warehouse.name|upper }}</span></div>
         </div>
-        {% else %}
-        <p class="text-muted mt-3">No locations configured for this warehouse.</p>
-        {% endif %}
+        <div class="wh__card-body">
+            {% if available_locations %}
+            <div class="swld__locations">
+                {% for location in available_locations %}
+                <div class="swld__loc-card {% if location == link.default_location %}swld__loc-card--default{% endif %}">
+                    <div class="swld__loc-name">
+                        {{ location.name }}
+                        {% if location == link.default_location %}<span class="wh__badge wh__badge--primary">Link Default</span>{% endif %}
+                        {% if location.is_default %}<span class="wh__badge wh__badge--info">WH Default</span>{% endif %}
+                    </div>
+                    <div class="swld__loc-details">
+                        <strong>Code:</strong> {{ location.full_code }}
+                        {% if location.zone_number %} | <strong>Zone:</strong> {{ location.zone_number }}{% endif %}
+                        {% if location.address %} | {{ location.address }}{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="wh__muted">No locations configured for this warehouse.</p>
+            {% endif %}
+        </div>
     </div>
 
-    <!-- Other Links for this Business -->
+    <!-- Other Links for Business -->
     {% if other_business_links %}
-    <div class="related-section">
-        <h5><i class="fa-solid fa-link"></i> Other Warehouses for {{ link.business.business_name }}</h5>
-        <ul class="related-list">
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-link"></i> <span>OTHER WAREHOUSES FOR {{ link.business.business_name|upper }}</span></div>
+        </div>
+        <div class="wh__card-body">
             {% for other_link in other_business_links %}
-            <li class="related-item">
+            <div class="swld__related-item">
                 <div>
                     <strong>{{ other_link.warehouse.name }}</strong>
-                    {% if other_link.is_default %}
-                    <span class="badge bg-primary ms-2">DEFAULT</span>
-                    {% endif %}
-                    {% if not other_link.is_active %}
-                    <span class="badge bg-secondary ms-2">Inactive</span>
-                    {% endif %}
-                    <br>
-                    <small class="text-muted">Priority: {{ other_link.priority }}</small>
+                    {% if other_link.is_default %}<span class="wh__badge wh__badge--primary">DEFAULT</span>{% endif %}
+                    {% if not other_link.is_active %}<span class="wh__badge wh__badge--muted">Inactive</span>{% endif %}
+                    <div class="wh__meta">Priority: {{ other_link.priority }}</div>
                 </div>
-                <a href="{% url 'warehouse:seller_warehouse_link_detail' other_link.pk %}" class="btn btn-sm btn-outline-primary"
-                   hx-get="{% url 'warehouse:seller_warehouse_link_detail' other_link.pk %}"
-                   hx-target="body"
-                   hx-push-url="true">
-                    View
-                </a>
-            </li>
+                <a href="{% url 'warehouse:seller_warehouse_link_detail' other_link.pk %}" class="wh__action-btn wh__action-btn--pill"
+                   hx-get="{% url 'warehouse:seller_warehouse_link_detail' other_link.pk %}" hx-target="body" hx-push-url="true">View</a>
+            </div>
             {% endfor %}
-        </ul>
+        </div>
     </div>
     {% endif %}
 
-    <!-- Other Links for this Warehouse -->
+    <!-- Other Links for Warehouse -->
     {% if other_warehouse_links %}
-    <div class="related-section">
-        <h5><i class="fa-solid fa-link"></i> Other Sellers at {{ link.warehouse.name }}</h5>
-        <ul class="related-list">
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-link"></i> <span>OTHER SELLERS AT {{ link.warehouse.name|upper }}</span></div>
+        </div>
+        <div class="wh__card-body">
             {% for other_link in other_warehouse_links %}
-            <li class="related-item">
+            <div class="swld__related-item">
                 <div>
                     <strong>{{ other_link.business.business_name }}</strong>
-                    {% if other_link.is_default %}
-                    <span class="badge bg-primary ms-2">DEFAULT</span>
-                    {% endif %}
-                    {% if not other_link.is_active %}
-                    <span class="badge bg-secondary ms-2">Inactive</span>
-                    {% endif %}
-                    <br>
-                    <small class="text-muted">Priority: {{ other_link.priority }}</small>
+                    {% if other_link.is_default %}<span class="wh__badge wh__badge--primary">DEFAULT</span>{% endif %}
+                    {% if not other_link.is_active %}<span class="wh__badge wh__badge--muted">Inactive</span>{% endif %}
+                    <div class="wh__meta">Priority: {{ other_link.priority }}</div>
                 </div>
-                <a href="{% url 'warehouse:seller_warehouse_link_detail' other_link.pk %}" class="btn btn-sm btn-outline-primary"
-                   hx-get="{% url 'warehouse:seller_warehouse_link_detail' other_link.pk %}"
-                   hx-target="body"
-                   hx-push-url="true">
-                    View
-                </a>
-            </li>
+                <a href="{% url 'warehouse:seller_warehouse_link_detail' other_link.pk %}" class="wh__action-btn wh__action-btn--pill"
+                   hx-get="{% url 'warehouse:seller_warehouse_link_detail' other_link.pk %}" hx-target="body" hx-push-url="true">View</a>
+            </div>
             {% endfor %}
-        </ul>
+        </div>
     </div>
     {% endif %}
 
     <!-- Action Buttons -->
-    <div class="action-buttons mt-4">
-        <a href="{% url 'warehouse:seller_warehouse_link_edit' link.pk %}" class="btn btn-primary"
-           hx-get="{% url 'warehouse:seller_warehouse_link_edit' link.pk %}"
-           hx-target="body"
-           hx-push-url="true">
-            <i class="fa-solid fa-edit me-2"></i>Edit Link
+    <div class="wha__actions">
+        <a href="{% url 'warehouse:seller_warehouse_link_edit' link.pk %}" class="wh__btn wh__btn--primary"
+           hx-get="{% url 'warehouse:seller_warehouse_link_edit' link.pk %}" hx-target="body" hx-push-url="true">
+            <i class="fa-solid fa-edit"></i> Edit Link
         </a>
-        <a href="{% url 'warehouse:seller_warehouse_link_delete' link.pk %}" class="btn btn-danger"
-           hx-get="{% url 'warehouse:seller_warehouse_link_delete' link.pk %}"
-           hx-target="body"
-           hx-push-url="true">
-            <i class="fa-solid fa-trash me-2"></i>Delete Link
+        <a href="{% url 'warehouse:seller_warehouse_link_delete' link.pk %}" class="wh__btn wld__btn--danger"
+           hx-get="{% url 'warehouse:seller_warehouse_link_delete' link.pk %}" hx-target="body" hx-push-url="true">
+            <i class="fa-solid fa-trash"></i> Delete Link
         </a>
-        <a href="{% url 'warehouse:seller_warehouse_links' %}" class="btn btn-outline-secondary"
-           hx-get="{% url 'warehouse:seller_warehouse_links' %}"
-           hx-target="body"
-           hx-push-url="true">
-            <i class="fa-solid fa-arrow-left me-2"></i>Back to List
+        <a href="{% url 'warehouse:seller_warehouse_links' %}" class="wh__btn wh__btn--secondary"
+           hx-get="{% url 'warehouse:seller_warehouse_links' %}" hx-target="body" hx-push-url="true">
+            <i class="fa-solid fa-arrow-left"></i> Back to List
         </a>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.swl__priority-fill').forEach(function(el) {
+        el.style.width = el.getAttribute('data-width');
+    });
+});
+</script>
 {% endblock %}

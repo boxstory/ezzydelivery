@@ -4,94 +4,107 @@
 {% block title %}Batch {{ batch.batch_code }}{% endblock %}
 
 {% block content %}
-<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">
-            <i class="fa-solid fa-box me-2"></i>Batch <code>{{ batch.batch_code }}</code>
-        </h4>
-        <a href="{% url 'workforce:dispatch_batch_list' %}" class="btn btn-outline-secondary btn-sm">
-            <i class="fa-solid fa-arrow-left me-1"></i> Back to List
-        </a>
+<div class="dpb">
+    <!-- Hero Header -->
+    <div class="dpb__hero">
+        <div class="dpb__hero-inner">
+            <div class="dpb__hero-left">
+                <h1 class="dpb__hero-title">
+                    <i class="fa-solid fa-box dpb__hero-icon"></i>
+                    Batch <code class="dpb__hero-code">{{ batch.batch_code }}</code>
+                </h1>
+                <p class="dpb__hero-subtitle">
+                    {{ batch.pickup_location.pickup_location_title }} &middot; Zone {{ batch.destination_zone }}
+                </p>
+            </div>
+            <div class="dpb__hero-right">
+                <a href="{% url 'workforce:dispatch_batch_list' %}" class="dpb__back-btn">
+                    <i class="fa-solid fa-arrow-left me-1"></i>Back to List
+                </a>
+            </div>
+        </div>
     </div>
 
-    <div class="row">
-        <!-- Batch Info -->
+    <div class="row g-3">
+        <!-- Left Column -->
         <div class="col-lg-4">
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fa-solid fa-info-circle me-2"></i>Batch Details</h6>
+            <!-- Batch Details Card -->
+            <div class="dpb__card">
+                <div class="dpb__card-header">
+                    <i class="fa-solid fa-info-circle dpb__card-header-icon"></i>
+                    BATCH DETAILS
                 </div>
-                <div class="card-body">
-                    <dl class="row mb-0">
-                        <dt class="col-5">Status</dt>
-                        <dd class="col-7">
-                            <span class="badge
-                                {% if batch.status == 'completed' %}bg-success
-                                {% elif batch.status == 'in_progress' %}bg-primary
-                                {% elif batch.status == 'assigned' %}bg-info
-                                {% elif batch.status == 'ready' %}bg-warning text-dark
-                                {% elif batch.status == 'holding' %}bg-secondary
-                                {% elif batch.status == 'cancelled' %}bg-danger
-                                {% else %}bg-light text-dark{% endif %}">
+                <div class="dpb__card-body">
+                    <div class="dpb__detail-row">
+                        <span class="dpb__detail-label">Status</span>
+                        <span class="dpb__detail-value">
+                            <span class="dpb__status-badge dpb__status-badge--{{ batch.status }}">
                                 {{ batch.get_status_display }}
                             </span>
-                        </dd>
-
-                        <dt class="col-5">Location</dt>
-                        <dd class="col-7">{{ batch.pickup_location.pickup_location_title }}</dd>
-
-                        <dt class="col-5">Zone</dt>
-                        <dd class="col-7"><span class="badge bg-secondary">Zone {{ batch.destination_zone }}</span></dd>
-
-                        <dt class="col-5">Orders</dt>
-                        <dd class="col-7">{{ batch.order_count }}/2</dd>
-
-                        <dt class="col-5">Total COD</dt>
-                        <dd class="col-7">
+                        </span>
+                    </div>
+                    <div class="dpb__detail-row">
+                        <span class="dpb__detail-label">Location</span>
+                        <span class="dpb__detail-value">{{ batch.pickup_location.pickup_location_title }}</span>
+                    </div>
+                    <div class="dpb__detail-row">
+                        <span class="dpb__detail-label">Zone</span>
+                        <span class="dpb__detail-value">
+                            <span class="dpb__zone-badge">Zone {{ batch.destination_zone }}</span>
+                        </span>
+                    </div>
+                    <div class="dpb__detail-row">
+                        <span class="dpb__detail-label">Orders</span>
+                        <span class="dpb__detail-value">{{ batch.order_count }}/2</span>
+                    </div>
+                    <div class="dpb__detail-row">
+                        <span class="dpb__detail-label">Total COD</span>
+                        <span class="dpb__detail-value">
                             {% if batch.total_cod > 0 %}
-                            <span class="badge bg-warning text-dark">{{ batch.total_cod }} QR</span>
+                            <span class="dpb__cod-badge">{{ batch.total_cod }} QR</span>
                             {% else %}
-                            <span class="text-muted">No COD</span>
+                            <span class="dpb__text-muted">No COD</span>
                             {% endif %}
-                        </dd>
-
-                        {% if batch.release_reason %}
-                        <dt class="col-5">Release Reason</dt>
-                        <dd class="col-7">{{ batch.get_release_reason_display }}</dd>
-                        {% endif %}
-
-                        <dt class="col-5">Created</dt>
-                        <dd class="col-7">{{ batch.created_at|date:"M d, Y H:i" }}</dd>
-
-                        {% if batch.assigned_at %}
-                        <dt class="col-5">Assigned</dt>
-                        <dd class="col-7">{{ batch.assigned_at|date:"M d, Y H:i" }}</dd>
-                        {% endif %}
-
-                        {% if batch.completed_at %}
-                        <dt class="col-5">Completed</dt>
-                        <dd class="col-7">{{ batch.completed_at|date:"M d, Y H:i" }}</dd>
-                        {% endif %}
-                    </dl>
+                        </span>
+                    </div>
+                    {% if batch.release_reason %}
+                    <div class="dpb__detail-row">
+                        <span class="dpb__detail-label">Release Reason</span>
+                        <span class="dpb__detail-value">{{ batch.get_release_reason_display }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="dpb__detail-row">
+                        <span class="dpb__detail-label">Created</span>
+                        <span class="dpb__detail-value">{{ batch.created_at|date:"M d, Y H:i" }}</span>
+                    </div>
+                    {% if batch.assigned_at %}
+                    <div class="dpb__detail-row">
+                        <span class="dpb__detail-label">Assigned</span>
+                        <span class="dpb__detail-value">{{ batch.assigned_at|date:"M d, Y H:i" }}</span>
+                    </div>
+                    {% endif %}
+                    {% if batch.completed_at %}
+                    <div class="dpb__detail-row">
+                        <span class="dpb__detail-label">Completed</span>
+                        <span class="dpb__detail-value">{{ batch.completed_at|date:"M d, Y H:i" }}</span>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
             <!-- Assigned Rider -->
             {% if batch.assigned_rider %}
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fa-solid fa-motorcycle me-2"></i>Assigned Rider</h6>
+            <div class="dpb__card">
+                <div class="dpb__card-header">
+                    <i class="fa-solid fa-motorcycle dpb__card-header-icon"></i>
+                    ASSIGNED RIDER
                 </div>
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="rider-avatar me-3" style="width: 48px; height: 48px; background: var(--brand-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600;">
-                            {{ batch.assigned_rider.driver_code|slice:":2" }}
-                        </div>
-                        <div>
-                            <strong>{{ batch.assigned_rider.driver_code }}</strong>
-                            <br>
-                            <span class="text-muted">{{ batch.assigned_rider.user.first_name }} {{ batch.assigned_rider.user.last_name }}</span>
+                <div class="dpb__card-body">
+                    <div class="dpb__rider">
+                        <div class="dpb__rider-avatar">{{ batch.assigned_rider.driver_code|slice:":2" }}</div>
+                        <div class="dpb__rider-info">
+                            <strong class="dpb__rider-code">{{ batch.assigned_rider.driver_code }}</strong>
+                            <span class="dpb__rider-name">{{ batch.assigned_rider.user.first_name }} {{ batch.assigned_rider.user.last_name }}</span>
                         </div>
                     </div>
                 </div>
@@ -100,25 +113,25 @@
 
             <!-- Actions -->
             {% if batch.status in 'holding,ready,assigned' %}
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fa-solid fa-bolt me-2"></i>Actions</h6>
+            <div class="dpb__card">
+                <div class="dpb__card-header">
+                    <i class="fa-solid fa-bolt dpb__card-header-icon"></i>
+                    ACTIONS
                 </div>
-                <div class="card-body">
+                <div class="dpb__card-body">
                     {% if batch.status == 'holding' %}
-                    <form method="post" action="{% url 'workforce:dispatch_batch_release' batch.id %}" class="mb-2">
+                    <form method="post" action="{% url 'workforce:dispatch_batch_release' batch.id %}">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-warning w-100"
+                        <button type="submit" class="dpb__action-btn dpb__action-btn--warning"
                                 onclick="return confirm('Release this batch immediately?')">
                             <i class="fa-solid fa-bolt me-1"></i> Release Now
                         </button>
                     </form>
                     {% endif %}
-
                     {% if batch.status in 'pending,holding,ready' %}
                     <form method="post" action="{% url 'workforce:dispatch_batch_cancel' batch.id %}">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-outline-danger w-100"
+                        <button type="submit" class="dpb__action-btn dpb__action-btn--danger"
                                 onclick="return confirm('Cancel this batch? Orders will be unassigned.')">
                             <i class="fa-solid fa-times me-1"></i> Cancel Batch
                         </button>
@@ -129,65 +142,66 @@
             {% endif %}
         </div>
 
-        <!-- Orders in Batch -->
+        <!-- Right Column -->
         <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fa-solid fa-shopping-cart me-2"></i>Orders in Batch</h6>
+            <!-- Orders Table -->
+            <div class="dpb__card">
+                <div class="dpb__card-header">
+                    <i class="fa-solid fa-shopping-cart dpb__card-header-icon"></i>
+                    ORDERS IN BATCH
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
+                <div class="dpb__table-wrap">
+                    <table class="dpb__table">
+                        <thead class="dpb__table-head">
                             <tr>
-                                <th>Seq</th>
-                                <th>Order</th>
-                                <th>Customer</th>
-                                <th>Address</th>
-                                <th>COD</th>
-                                <th>SLA Deadline</th>
-                                <th>Status</th>
+                                <th class="dpb__th">Seq</th>
+                                <th class="dpb__th">Order</th>
+                                <th class="dpb__th">Customer</th>
+                                <th class="dpb__th">Address</th>
+                                <th class="dpb__th">COD</th>
+                                <th class="dpb__th">SLA Deadline</th>
+                                <th class="dpb__th">Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for batch_order in batch_orders %}
-                            <tr>
-                                <td><strong>{{ batch_order.sequence }}</strong></td>
-                                <td>
-                                    <a href="{% url 'orders:order_detail' batch_order.order.id %}" target="_blank">
+                            <tr class="dpb__tr">
+                                <td class="dpb__td"><strong>{{ batch_order.sequence }}</strong></td>
+                                <td class="dpb__td">
+                                    <a href="{% url 'orders:order_detail' batch_order.order.id %}" target="_blank" class="dpb__order-link">
                                         {{ batch_order.order.order_number }}
                                     </a>
                                 </td>
-                                <td>
-                                    {{ batch_order.order.customer_name }}
-                                    <br>
-                                    <small class="text-muted">{{ batch_order.order.customer_phone }}</small>
+                                <td class="dpb__td">
+                                    <span class="dpb__customer-name">{{ batch_order.order.customer_name }}</span>
+                                    <span class="dpb__customer-phone">{{ batch_order.order.customer_phone }}</span>
                                 </td>
-                                <td>
-                                    {{ batch_order.order.dl_address|truncatechars:30 }}
-                                    <br>
-                                    <small class="text-muted">Zone {{ batch_order.order.dl_zone }}</small>
+                                <td class="dpb__td">
+                                    <span class="dpb__address">{{ batch_order.order.dl_address|truncatechars:30 }}</span>
+                                    <span class="dpb__address-zone">Zone {{ batch_order.order.dl_zone }}</span>
                                 </td>
-                                <td>
+                                <td class="dpb__td">
                                     {% if batch_order.order.cod_amount > 0 %}
-                                    <span class="badge bg-warning text-dark">{{ batch_order.order.cod_amount }} QR</span>
+                                    <span class="dpb__cod-badge">{{ batch_order.order.cod_amount }} QR</span>
                                     {% else %}
-                                    <span class="text-muted">Paid</span>
+                                    <span class="dpb__text-muted">Paid</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td class="dpb__td">
                                     {{ batch_order.sla_deadline|date:"H:i" }}
                                     {% if batch_order.is_sla_at_risk %}
-                                    <span class="badge bg-danger">AT RISK</span>
+                                    <span class="dpb__sla-risk">AT RISK</span>
                                     {% endif %}
                                 </td>
-                                <td>
-                                    <span class="badge bg-secondary">{{ batch_order.order.get_order_status_display }}</span>
+                                <td class="dpb__td">
+                                    <span class="dpb__order-status">{{ batch_order.order.get_order_status_display }}</span>
                                 </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4">
-                                    No orders in this batch.
+                                <td colspan="7" class="dpb__empty-cell">
+                                    <i class="fa-solid fa-inbox"></i>
+                                    <p>No orders in this batch.</p>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -197,24 +211,28 @@
             </div>
 
             <!-- Activity Log -->
-            <div class="card mt-3">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fa-solid fa-clock-rotate-left me-2"></i>Activity Log</h6>
+            <div class="dpb__card">
+                <div class="dpb__card-header">
+                    <i class="fa-solid fa-clock-rotate-left dpb__card-header-icon"></i>
+                    ACTIVITY LOG
                 </div>
-                <div class="card-body">
+                <div class="dpb__card-body">
                     {% for log in logs %}
-                    <div class="d-flex gap-3 py-2 border-bottom">
-                        <span class="text-muted" style="min-width: 50px;">{{ log.created_at|time:"H:i" }}</span>
-                        <span>{{ log.get_action_display }}</span>
+                    <div class="dpb__log-item">
+                        <span class="dpb__log-time">{{ log.created_at|time:"H:i" }}</span>
+                        <span class="dpb__log-action">{{ log.get_action_display }}</span>
                         {% if log.rider %}
-                        <span class="text-muted">by {{ log.rider.driver_code }}</span>
+                        <span class="dpb__log-rider">by {{ log.rider.driver_code }}</span>
                         {% endif %}
                         {% if log.notes %}
-                        <small class="text-muted">- {{ log.notes }}</small>
+                        <span class="dpb__log-note">{{ log.notes }}</span>
                         {% endif %}
                     </div>
                     {% empty %}
-                    <p class="text-muted mb-0">No activity recorded.</p>
+                    <div class="dpb__empty">
+                        <i class="fa-solid fa-inbox"></i>
+                        <p>No activity recorded.</p>
+                    </div>
                     {% endfor %}
                 </div>
             </div>

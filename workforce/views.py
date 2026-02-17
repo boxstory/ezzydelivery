@@ -63,6 +63,7 @@ import csv
 from django.contrib.auth.decorators import login_required
 from core.decorators import staff_required
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import ensure_csrf_cookie
 import json
 import logging
 from django.core.paginator import (
@@ -2571,16 +2572,26 @@ def update_task_status(request, task_id):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+@ensure_csrf_cookie
 def user_verification_list(request):
     """Staff view to see all users pending verification"""
     from core import models as core_models
     from business import models as business_models
+    from django.db.models import Count
+
+    # Get status counts for filter tabs
+    status_counts = dict(
+        core_models.Profile.objects.values_list('verification_status')
+        .annotate(cnt=Count('id'))
+        .values_list('verification_status', 'cnt')
+    )
+    total_count = sum(status_counts.values())
 
     # Get all profiles based on filter
     verification_filter = request.GET.get('status', 'all')
 
     profiles = core_models.Profile.objects.select_related('user')
-    if verification_filter in ('pending', 'verified', 'rejected', 'incomplete'):
+    if verification_filter in ('pending', 'under_review', 'verified', 'rejected', 'incomplete'):
         profiles = profiles.filter(verification_status=verification_filter)
 
     # Order by application date (most recent first)
@@ -2612,6 +2623,8 @@ def user_verification_list(request):
     context = {
         'verification_data': verification_data,
         'current_filter': verification_filter,
+        'total_count': total_count,
+        'status_counts': status_counts,
     }
 
     return render(request, 'workforce/user_verification_list.html', context)
@@ -2686,7 +2699,7 @@ def update_verification_status(request, profile_id):
         logger.exception("Error updating verification status for profile %s: %s", profile_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': 'An error occurred while updating verification status'
+            'error': f'Error: {type(e).__name__}: {str(e)}'
         }, status=400)
 
 
@@ -5000,7 +5013,6 @@ def business_license_detail(request, business_id):
                         logger.info(f"Warehouse link {action} for business {business.business_id} -> {warehouse_location.warehouse.code}")
 
                         # Create or update a PickupLocation for the warehouse fulfillment center
-                        from business import models as business_models
                         pickup_location, pickup_created = business_models.PickupLocation.objects.update_or_create(
                             business=business,
                             warehouse=warehouse_location.warehouse,

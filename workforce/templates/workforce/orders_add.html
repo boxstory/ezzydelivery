@@ -3,277 +3,297 @@
 
 {% block title %}Add Order - Staff Dashboard{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
-<div class="col-12 p-3">
-    <!-- Page Header -->
-    <header class="page-header">
-        <div class="page-header-left">
-            <h2><i class="fa-solid fa-plus me-1"></i>Add Order for Client</h2>
+<div class="woa">
+    <!-- Hero Header -->
+    <div class="woa__hero">
+        <div class="woa__hero-content">
+            <h1 class="woa__hero-title">
+                <i class="fa-solid fa-plus me-2"></i>Add Order for Client
+            </h1>
+            <p class="woa__hero-sub">Create a new delivery order</p>
         </div>
-    </header>
-
-    <!-- Seller Selection Card -->
-    <div class="filter-section mb-4">
-        <form method="get" id="workforce_orders_add_form_seller">
-            <div class="row align-items-end">
-                <div class="col-md-8">
-                    <label for="businessSelect" class="filter-label">
-                        <i class="fa-solid fa-store me-2"></i>Select Seller
-                    </label>
-                    <select id="businessSelect" name="business" class="filter-input" onchange="this.form.submit()">
-                        <option value="">-- Select a Seller --</option>
-                        {% for business in businesses %}
-                            <option value="{{ business.business_id }}" {% if selected_business_id == business.business_id|stringformat:"s" %}selected{% endif %}>
-                                {{ business.business_name }} ({{ business.business_code }})
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    {% if selected_business %}
-                        <span class="badge badge-success">
-                            <i class="fa-solid fa-check me-1"></i>
-                            {{ selected_business.business_name }}
-                        </span>
-                    {% endif %}
-                </div>
-            </div>
-        </form>
     </div>
 
-    {% if selected_business %}
-    <!-- Order Form -->
-    <div class="card-modern">
-        <div class="card-header-modern">
-            <h5 class="mb-0">
-                <i class="fa-solid fa-file-lines me-2"></i>
-                Order Details for {{ selected_business.business_name }}
-            </h5>
-        </div>
-        <div class="card-body p-4">
-            <form method="post" id="workforce_orders_add_form_order">
-                {% csrf_token %}
-                <input type="hidden" name="business" value="{{ selected_business.business_id }}">
-
-                <!-- Customer Information -->
-                <h6 class="section-heading">Customer Information</h6>
-                <div class="row mb-4">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label" for="customer_name">Customer Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-input" id="customer_name" name="customer_name" required>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label" for="customer_phone">Phone Number <span class="text-danger">*</span></label>
-                        <input type="tel" class="form-input" id="customer_phone" name="customer_phone" required placeholder="+974 XXXX XXXX">
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label" for="customer_whatsapp">WhatsApp Number</label>
-                        <input type="tel" class="form-input" id="customer_whatsapp" name="customer_whatsapp" placeholder="+974 XXXX XXXX">
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label" for="client_order_code">Client Order Code</label>
-                        <input type="text" class="form-input" id="client_order_code" name="client_order_code" placeholder="Leave blank for auto-generate">
-                    </div>
-                </div>
-
-                <!-- Delivery Address -->
-                <h6 class="section-heading">Delivery Address</h6>
-                <div class="row mb-4">
-                    <div class="col-md-8 mb-3">
-                        <label class="form-label" for="customer_address">Full Address <span class="text-danger">*</span></label>
-                        <textarea class="form-input" id="customer_address" name="customer_address" rows="2" required></textarea>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="dl_landmark">City / Landmark</label>
-                        <input type="text" class="form-input" id="dl_landmark" name="dl_landmark" placeholder="e.g., Al Wakrah, near Mall">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="dl_zone">Zone Number</label>
-                        <input type="number" class="form-input" id="dl_zone" name="dl_zone" min="0" placeholder="e.g., 45">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="dl_street">Street Number</label>
-                        <input type="number" class="form-input" id="dl_street" name="dl_street" min="0" placeholder="e.g., 123">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="dl_building">Building Number</label>
-                        <input type="number" class="form-input" id="dl_building" name="dl_building" min="0" placeholder="e.g., 56">
-                    </div>
-                    <div class="col-12 mb-3">
-                        <label class="form-label" for="location_link">Google Maps Link</label>
-                        <input type="url" class="form-input" id="location_link" name="location_link" placeholder="https://maps.google.com/...">
-                    </div>
-                </div>
-
-                <!-- Product Details -->
-                <h6 class="section-heading">Product Details</h6>
-
-                {% if has_fulfillment and warehouse_products %}
-                <!-- Warehouse Inventory Selection -->
-                <div class="alert alert-info mb-3">
-                    <i class="fa-solid fa-warehouse me-2"></i>
-                    <strong>Fulfillment Service Active:</strong> Select from available warehouse inventory below, or enter product details manually.
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-12">
-                        <label class="form-label">
-                            <i class="fa-solid fa-box me-1"></i> Select from Warehouse Inventory
-                        </label>
-                        <select class="form-input" id="warehouse_product_select" onchange="fillProductFromWarehouse()">
-                            <option value="">-- Or Enter Product Manually Below --</option>
-                            {% for stock in warehouse_products %}
-                            <option
-                                value="{{ stock.product.id }}"
-                                data-name="{{ stock.product.name }}"
-                                data-sku="{{ stock.product.sku }}"
-                                data-available="{{ stock.available_quantity }}"
-                                data-warehouse="{{ stock.warehouse.name }}"
-                                data-location="{{ stock.storage_location.full_code|default:'-' }}">
-                                {{ stock.product.name }} (SKU: {{ stock.product.sku }}) - {{ stock.available_quantity }} available at {{ stock.warehouse.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <small class="text-muted">Showing {{ warehouse_products|length }} product(s) with available stock</small>
-                    </div>
-                </div>
-                {% endif %}
-
-                <div class="row mb-4">
-                    <div class="col-md-8 mb-3">
-                        <label class="form-label" for="product_name">Product Name / Description</label>
-                        <input type="text" class="form-input" id="product_name" name="product_name" placeholder="e.g., iPhone 15 Pro Max 256GB">
-                        <input type="hidden" id="warehouse_product_id" name="warehouse_product_id" value="">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="quantity">Quantity</label>
-                        <input type="number" class="form-input" id="quantity" name="quantity" min="1" value="1">
-                        <small class="text-muted" id="quantity_hint"></small>
-                    </div>
-                </div>
-
-                <!-- Order Details -->
-                <h6 class="section-heading">Order & Delivery Details</h6>
-                <div class="row mb-4">
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="cod_amount">COD Amount (QAR)</label>
-                        <input type="number" class="form-input" id="cod_amount" name="cod_amount" min="0" value="0">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="dl_amount">Delivery Fee (QAR)</label>
-                        <input type="number" class="form-input" id="dl_amount" name="dl_amount" min="0" value="0">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="pickup_location">Pickup Location</label>
-                        <select class="form-input" id="pickup_location" name="pickup_location">
-                            {% for location in pickup_locations %}
-                                <option value="{{ location.id }}" {% if 'ezzy' in location.location_name|lower or 'fulfilment' in location.location_name|lower or 'fulfillment' in location.location_name|lower %}selected{% endif %}>{{ location.location_name }}</option>
-                            {% endfor %}
-                            {% if not pickup_locations %}
-                                <option value="">-- No Locations Available --</option>
+    <div class="p-3">
+        <!-- Seller Selection Card -->
+        <div class="woa__card woa__card--select">
+            <div class="woa__card-header">
+                <i class="fa-solid fa-store me-2 woa__icon-accent"></i>
+                <span class="woa__section-label">Select Seller</span>
+            </div>
+            <div class="woa__card-body">
+                <form method="get" id="workforce_orders_add_form_seller">
+                    <div class="row align-items-end">
+                        <div class="col-md-8">
+                            <label for="businessSelect" class="woa__form-label">
+                                <i class="fa-solid fa-store me-1"></i>Seller
+                            </label>
+                            <select id="businessSelect" name="business" class="woa__form-input" onchange="this.form.submit()">
+                                <option value="">-- Select a Seller --</option>
+                                {% for business in businesses %}
+                                    <option value="{{ business.business_id }}" {% if selected_business_id == business.business_id|stringformat:"s" %}selected{% endif %}>
+                                        {{ business.business_name }} ({{ business.business_code }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            {% if selected_business %}
+                                <span class="woa__badge woa__badge--green">
+                                    <i class="fa-solid fa-check me-1"></i>
+                                    {{ selected_business.business_name }}
+                                </span>
                             {% endif %}
-                        </select>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="order_type">Order Type</label>
-                        <select class="form-input" id="order_type" name="order_type">
-                            <option value="normal_delivery" selected>Normal Delivery</option>
-                            <option value="pick_and_drop">Pick and Drop</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="deadline_date">Delivery Date/Time Preference</label>
-                        <input type="text" class="form-input" id="deadline_date" name="deadline_date" placeholder="e.g., Tomorrow, ASAP, Jan 15 evening">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="order_date">Order Date</label>
-                        <input type="date" class="form-input" id="order_date" name="order_date" value="{{ today }}">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <div class="form-check mt-4">
-                            <input type="checkbox" class="form-check-input" id="scheduled_delivery" name="scheduled_delivery" onchange="toggleScheduledTime()">
-                            <label class="form-check-label" for="scheduled_delivery">Scheduled Delivery</label>
                         </div>
                     </div>
-                    <div class="col-md-4 mb-3" id="scheduled_time_container" style="display: none;">
-                        <label class="form-label" for="scheduled_time">Scheduled Time</label>
-                        <input type="time" class="form-input" id="scheduled_time" name="scheduled_time">
-                    </div>
-                </div>
-
-                <!-- Notes Section -->
-                <h6 class="section-heading">Notes</h6>
-                <div class="row mb-4">
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="order_notes">Customer Notes</label>
-                        <textarea class="form-input" id="order_notes" name="order_notes" rows="2" placeholder="Notes from customer..."></textarea>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="seller_notes">Seller Notes</label>
-                        <textarea class="form-input" id="seller_notes" name="seller_notes" rows="2" placeholder="Notes from seller..."></textarea>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label" for="internal_notes">Internal Notes</label>
-                        <textarea class="form-input" id="internal_notes" name="internal_notes" rows="2" placeholder="Staff only notes..."></textarea>
-                    </div>
-                </div>
-
-                <!-- Submit Button -->
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fa-solid fa-plus me-2"></i>Create Order
-                    </button>
-                    <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-outline-secondary">
-                        Cancel
-                    </a>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
+
+        {% if selected_business %}
+        <!-- Order Form -->
+        <div class="woa__card">
+            <div class="woa__card-header">
+                <i class="fa-solid fa-file-lines me-2 woa__icon-accent"></i>
+                <span class="woa__section-label">Order Details for {{ selected_business.business_name }}</span>
+            </div>
+            <div class="woa__card-body">
+                <form method="post" id="workforce_orders_add_form_order">
+                    {% csrf_token %}
+                    <input type="hidden" name="business" value="{{ selected_business.business_id }}">
+
+                    <!-- Customer Information -->
+                    <div class="woa__form-section">
+                        <h6 class="woa__form-section-title">
+                            <i class="fa-solid fa-user me-2 woa__icon-accent"></i>Customer Information
+                        </h6>
+                        <div class="row mb-4">
+                            <div class="col-md-6 mb-3">
+                                <label class="woa__form-label" for="customer_name">Customer Name <span class="text-danger">*</span></label>
+                                <input type="text" class="woa__form-input" id="customer_name" name="customer_name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="woa__form-label" for="customer_phone">Phone Number <span class="text-danger">*</span></label>
+                                <input type="tel" class="woa__form-input" id="customer_phone" name="customer_phone" required placeholder="+974 XXXX XXXX">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="woa__form-label" for="customer_whatsapp">WhatsApp Number</label>
+                                <input type="tel" class="woa__form-input" id="customer_whatsapp" name="customer_whatsapp" placeholder="+974 XXXX XXXX">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="woa__form-label" for="client_order_code">Client Order Code</label>
+                                <input type="text" class="woa__form-input" id="client_order_code" name="client_order_code" placeholder="Leave blank for auto-generate">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Delivery Address -->
+                    <div class="woa__form-section">
+                        <h6 class="woa__form-section-title">
+                            <i class="fa-solid fa-location-dot me-2 woa__icon-accent"></i>Delivery Address
+                        </h6>
+                        <div class="row mb-4">
+                            <div class="col-md-8 mb-3">
+                                <label class="woa__form-label" for="customer_address">Full Address <span class="text-danger">*</span></label>
+                                <textarea class="woa__form-input" id="customer_address" name="customer_address" rows="2" required></textarea>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="dl_landmark">City / Landmark</label>
+                                <input type="text" class="woa__form-input" id="dl_landmark" name="dl_landmark" placeholder="e.g., Al Wakrah, near Mall">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="dl_zone">Zone Number</label>
+                                <input type="number" class="woa__form-input" id="dl_zone" name="dl_zone" min="0" placeholder="e.g., 45">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="dl_street">Street Number</label>
+                                <input type="number" class="woa__form-input" id="dl_street" name="dl_street" min="0" placeholder="e.g., 123">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="dl_building">Building Number</label>
+                                <input type="number" class="woa__form-input" id="dl_building" name="dl_building" min="0" placeholder="e.g., 56">
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="woa__form-label" for="location_link">Google Maps Link</label>
+                                <input type="url" class="woa__form-input" id="location_link" name="location_link" placeholder="https://maps.google.com/...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product Details -->
+                    <div class="woa__form-section">
+                        <h6 class="woa__form-section-title">
+                            <i class="fa-solid fa-box me-2 woa__icon-accent"></i>Product Details
+                        </h6>
+
+                        {% if has_fulfillment and warehouse_products %}
+                        <div class="woa__alert woa__alert--info">
+                            <i class="fa-solid fa-warehouse me-2"></i>
+                            <strong>Fulfillment Service Active:</strong> Select from available warehouse inventory below, or enter product details manually.
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label class="woa__form-label">
+                                    <i class="fa-solid fa-box me-1"></i> Select from Warehouse Inventory
+                                </label>
+                                <select class="woa__form-input" id="warehouse_product_select" onchange="fillProductFromWarehouse()">
+                                    <option value="">-- Or Enter Product Manually Below --</option>
+                                    {% for stock in warehouse_products %}
+                                    <option
+                                        value="{{ stock.product.id }}"
+                                        data-name="{{ stock.product.name }}"
+                                        data-sku="{{ stock.product.sku }}"
+                                        data-available="{{ stock.available_quantity }}"
+                                        data-warehouse="{{ stock.warehouse.name }}"
+                                        data-location="{{ stock.storage_location.full_code|default:'-' }}">
+                                        {{ stock.product.name }} (SKU: {{ stock.product.sku }}) - {{ stock.available_quantity }} available at {{ stock.warehouse.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Showing {{ warehouse_products|length }} product(s) with available stock</small>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="row mb-4">
+                            <div class="col-md-8 mb-3">
+                                <label class="woa__form-label" for="product_name">Product Name / Description</label>
+                                <input type="text" class="woa__form-input" id="product_name" name="product_name" placeholder="e.g., iPhone 15 Pro Max 256GB">
+                                <input type="hidden" id="warehouse_product_id" name="warehouse_product_id" value="">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="quantity">Quantity</label>
+                                <input type="number" class="woa__form-input" id="quantity" name="quantity" min="1" value="1">
+                                <small class="text-muted" id="quantity_hint"></small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Order Details -->
+                    <div class="woa__form-section">
+                        <h6 class="woa__form-section-title">
+                            <i class="fa-solid fa-truck me-2 woa__icon-accent"></i>Order & Delivery Details
+                        </h6>
+                        <div class="row mb-4">
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="cod_amount">COD Amount (QAR)</label>
+                                <input type="number" class="woa__form-input" id="cod_amount" name="cod_amount" min="0" value="0">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="dl_amount">Delivery Fee (QAR)</label>
+                                <input type="number" class="woa__form-input" id="dl_amount" name="dl_amount" min="0" value="0">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="pickup_location">Pickup Location</label>
+                                <select class="woa__form-input" id="pickup_location" name="pickup_location">
+                                    {% for location in pickup_locations %}
+                                        <option value="{{ location.id }}" {% if 'ezzy' in location.location_name|lower or 'fulfilment' in location.location_name|lower or 'fulfillment' in location.location_name|lower %}selected{% endif %}>{{ location.location_name }}</option>
+                                    {% endfor %}
+                                    {% if not pickup_locations %}
+                                        <option value="">-- No Locations Available --</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="order_type">Order Type</label>
+                                <select class="woa__form-input" id="order_type" name="order_type">
+                                    <option value="normal_delivery" selected>Normal Delivery</option>
+                                    <option value="pick_and_drop">Pick and Drop</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="deadline_date">Delivery Date/Time Preference</label>
+                                <input type="text" class="woa__form-input" id="deadline_date" name="deadline_date" placeholder="e.g., Tomorrow, ASAP, Jan 15 evening">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="order_date">Order Date</label>
+                                <input type="date" class="woa__form-input" id="order_date" name="order_date" value="{{ today }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="form-check mt-4">
+                                    <input type="checkbox" class="form-check-input" id="scheduled_delivery" name="scheduled_delivery" onchange="toggleScheduledTime()">
+                                    <label class="form-check-label" for="scheduled_delivery">Scheduled Delivery</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3 woa__scheduled-time" id="scheduled_time_container">
+                                <label class="woa__form-label" for="scheduled_time">Scheduled Time</label>
+                                <input type="time" class="woa__form-input" id="scheduled_time" name="scheduled_time">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes Section -->
+                    <div class="woa__form-section">
+                        <h6 class="woa__form-section-title">
+                            <i class="fa-solid fa-sticky-note me-2 woa__icon-accent"></i>Notes
+                        </h6>
+                        <div class="row mb-4">
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="order_notes">Customer Notes</label>
+                                <textarea class="woa__form-input" id="order_notes" name="order_notes" rows="2" placeholder="Notes from customer..."></textarea>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="seller_notes">Seller Notes</label>
+                                <textarea class="woa__form-input" id="seller_notes" name="seller_notes" rows="2" placeholder="Notes from seller..."></textarea>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="woa__form-label" for="internal_notes">Internal Notes</label>
+                                <textarea class="woa__form-input" id="internal_notes" name="internal_notes" rows="2" placeholder="Staff only notes..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="woa__form-actions">
+                        <button type="submit" class="woa__btn woa__btn--primary">
+                            <i class="fa-solid fa-plus me-2"></i>Create Order
+                        </button>
+                        <a href="{% url 'workforce:wf_orders_all' %}" class="woa__btn woa__btn--outline">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <!-- No Seller Selected -->
+        <div class="woa__empty">
+            <i class="fa-solid fa-store"></i>
+            <h3>Select a Seller</h3>
+            <p>Please select a seller from the dropdown above to create an order.</p>
+        </div>
+        {% endif %}
     </div>
-    {% else %}
-    <!-- No Seller Selected -->
-    <div class="empty-state">
-        <i class="fa-solid fa-store"></i>
-        <h3>Select a Seller</h3>
-        <p>Please select a seller from the dropdown above to create an order.</p>
-    </div>
-    {% endif %}
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
-// Toggle scheduled time field visibility
 function toggleScheduledTime() {
     var checkbox = document.getElementById('scheduled_delivery');
     var timeContainer = document.getElementById('scheduled_time_container');
     var timeInput = document.getElementById('scheduled_time');
 
     if (checkbox.checked) {
-        timeContainer.style.display = 'block';
+        timeContainer.classList.add('woa__scheduled-time--visible');
         timeInput.required = true;
     } else {
-        timeContainer.style.display = 'none';
+        timeContainer.classList.remove('woa__scheduled-time--visible');
         timeInput.required = false;
         timeInput.value = '';
     }
 }
 
-// Fill product details from warehouse inventory selection
 function fillProductFromWarehouse() {
     var select = document.getElementById('warehouse_product_select');
     var selectedOption = select.options[select.selectedIndex];
 
     if (selectedOption.value) {
-        // Fill product name and ID
         document.getElementById('product_name').value = selectedOption.dataset.name;
         document.getElementById('warehouse_product_id').value = selectedOption.value;
 
-        // Update quantity hint
         var availableQty = selectedOption.dataset.available;
         var quantityInput = document.getElementById('quantity');
         var quantityHint = document.getElementById('quantity_hint');
@@ -282,26 +302,23 @@ function fillProductFromWarehouse() {
         quantityHint.style.color = '#10b981';
         quantityInput.max = availableQty;
 
-        // Show warehouse info in product name field (optional enhancement)
         var warehouse = selectedOption.dataset.warehouse;
         var location = selectedOption.dataset.location;
         var sku = selectedOption.dataset.sku;
 
-        // Add SKU to internal notes if exists
-        var internalNotes = document.getElementById('internal_notes');
         var note = 'Warehouse: ' + warehouse;
         if (location && location !== '-') {
             note += ' | Location: ' + location;
         }
         note += ' | SKU: ' + sku;
 
+        var internalNotes = document.getElementById('internal_notes');
         if (internalNotes.value) {
             internalNotes.value += '\n' + note;
         } else {
             internalNotes.value = note;
         }
     } else {
-        // Clear warehouse product ID
         document.getElementById('warehouse_product_id').value = '';
         document.getElementById('quantity_hint').textContent = '';
         document.getElementById('quantity').removeAttribute('max');
@@ -309,11 +326,10 @@ function fillProductFromWarehouse() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Convert Arabic/Persian numerals to English
     function convertArabicNumerals(text) {
         if (!text) return '';
-        const arabicNumerals = '٠١٢٣٤٥٦٧٨٩';
-        const persianNumerals = '۰۱۲۳۴۵۶۷۸۹';
+        const arabicNumerals = '\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669';
+        const persianNumerals = '\u06F0\u06F1\u06F2\u06F3\u06F4\u06F5\u06F6\u06F7\u06F8\u06F9';
         const englishNumerals = '0123456789';
 
         let result = String(text);
@@ -324,48 +340,32 @@ document.addEventListener('DOMContentLoaded', function() {
         return result;
     }
 
-    // Format phone number for WhatsApp (Qatar formatting)
     function formatWhatsAppNumber(phone) {
         if (!phone) return '';
-
-        // Convert Arabic numerals first
         phone = convertArabicNumerals(String(phone));
-
-        // Remove +, spaces, dashes, parentheses and any non-digit
         let digitsOnly = phone.replace(/\D/g, '');
-
         if (!digitsOnly) return '';
-
-        // 8-digit Qatar mobile (starts with 3, 5, 6, 7) - add 974
         if (digitsOnly.length === 8 && '3567'.includes(digitsOnly[0])) {
             return '974' + digitsOnly;
         }
-
-        // 8-digit Qatar landline (starts with 4) - no country code needed
         if (digitsOnly.length === 8 && digitsOnly[0] === '4') {
             return digitsOnly;
         }
-
-        // Already has country code or other format - return as is
         return digitsOnly;
     }
 
-    // Get form elements
     var phoneField = document.getElementById('customer_phone');
     var whatsappField = document.getElementById('customer_whatsapp');
 
-    // Auto-fill and format WhatsApp when phone loses focus
     if (phoneField) {
         phoneField.addEventListener('blur', function() {
             if (whatsappField && !whatsappField.value.trim() && this.value.trim()) {
                 var formatted = formatWhatsAppNumber(this.value);
                 whatsappField.value = formatted;
-                console.log('Phone:', this.value, '-> WhatsApp:', formatted);
             }
         });
     }
 
-    // Also format WhatsApp field on blur if user enters it manually
     if (whatsappField) {
         whatsappField.addEventListener('blur', function() {
             if (this.value.trim()) {

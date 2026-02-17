@@ -3,134 +3,88 @@
 
 {% block title %}COD Settlement Report{% endblock %}
 
-{% block extra_css %}
-<style>
-  .settlement-card {
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    padding: 20px;
-    margin-bottom: 20px;
-  }
-  .summary-stat {
-    text-align: center;
-    padding: 15px;
-    border-radius: 8px;
-  }
-  .summary-stat__value {
-    font-size: 28px;
-    font-weight: 700;
-    color: #001f3f;
-  }
-  .summary-stat__label {
-    font-size: 13px;
-    color: #666;
-    margin-top: 5px;
-  }
-  .driver-row {
-    border-bottom: 1px solid #eee;
-    padding: 12px 0;
-  }
-  .driver-row:last-child {
-    border-bottom: none;
-  }
-  .driver-row:hover {
-    background: #f8f9fa;
-  }
-  .cod-amount {
-    font-size: 18px;
-    font-weight: 600;
-    color: #28a745;
-  }
-  .payment-method-badge {
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 12px;
-  }
-  .select-all-checkbox {
-    width: 20px;
-    height: 20px;
-  }
-  .action-buttons {
-    position: sticky;
-    bottom: 0;
-    background: #fff;
-    padding: 15px;
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-    z-index: 100;
-  }
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="container-fluid py-3">
-  <!-- Header -->
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <h4 class="mb-1"><i class="fa-solid fa-file-invoice-dollar me-2"></i>COD Settlement Report</h4>
-      <p class="text-muted mb-0">Collect COD from drivers and generate settlement reports</p>
+  <!-- Hero Header -->
+  <div class="csr__hero">
+    <div class="csr__hero-content">
+      <h1 class="csr__hero-title">
+        <i class="fa-solid fa-file-invoice-dollar csr__hero-icon"></i>COD Settlement Report
+      </h1>
+      <p class="csr__hero-subtitle">Collect COD from drivers and generate settlement reports</p>
     </div>
-    <div>
-      <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="btn btn-outline-secondary">
-        <i class="fa-solid fa-arrow-left me-1"></i>Back to COD List
+    <div class="csr__hero-actions">
+      <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="csr__back-btn">
+        <i class="fa-solid fa-arrow-left"></i> Back to COD List
       </a>
     </div>
   </div>
 
   <!-- Date Filter -->
-  <div class="settlement-card">
+  <div class="csr__filter-card">
     <form method="GET" class="row g-3 align-items-end">
       <div class="col-md-3">
-        <label class="form-label">From Date</label>
-        <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+        <label class="csr__filter-label">From Date</label>
+        <input type="date" name="date_from" class="form-control csr__filter-input" value="{{ date_from }}">
       </div>
       <div class="col-md-3">
-        <label class="form-label">To Date</label>
-        <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+        <label class="csr__filter-label">To Date</label>
+        <input type="date" name="date_to" class="form-control csr__filter-input" value="{{ date_to }}">
       </div>
       <div class="col-md-3">
-        <button type="submit" class="btn btn-primary">
-          <i class="fa-solid fa-filter me-1"></i>Filter
+        <button type="submit" class="csr__filter-btn">
+          <i class="fa-solid fa-filter"></i> Filter
         </button>
       </div>
     </form>
   </div>
 
   <!-- Summary Cards -->
-  <div class="row mb-4">
+  <div class="row mb-4 g-3">
     <div class="col-md-4">
-      <div class="settlement-card summary-stat bg-light">
-        <div class="summary-stat__value text-danger">{{ total_unsettled|floatformat:2 }} QR</div>
-        <div class="summary-stat__label">Total Unsettled COD</div>
+      <div class="csr__stat-card">
+        <div class="csr__stat-icon csr__stat-icon--danger">
+          <i class="fa-solid fa-exclamation-circle"></i>
+        </div>
+        <div class="csr__stat-value csr__stat-value--danger">{{ total_unsettled|floatformat:2 }} QR</div>
+        <div class="csr__stat-label">Total Unsettled COD</div>
       </div>
     </div>
     <div class="col-md-4">
-      <div class="settlement-card summary-stat bg-light">
-        <div class="summary-stat__value">{{ drivers_with_cod }}</div>
-        <div class="summary-stat__label">Drivers with COD</div>
+      <div class="csr__stat-card">
+        <div class="csr__stat-icon csr__stat-icon--primary">
+          <i class="fa-solid fa-users"></i>
+        </div>
+        <div class="csr__stat-value">{{ drivers_with_cod }}</div>
+        <div class="csr__stat-label">Drivers with COD</div>
       </div>
     </div>
     <div class="col-md-4">
-      <div class="settlement-card summary-stat bg-light">
-        <div class="summary-stat__value text-success" id="selected-total">0.00 QR</div>
-        <div class="summary-stat__label">Selected Amount</div>
+      <div class="csr__stat-card">
+        <div class="csr__stat-icon csr__stat-icon--success">
+          <i class="fa-solid fa-check-circle"></i>
+        </div>
+        <div class="csr__stat-value csr__stat-value--success" id="selected-total">0.00 QR</div>
+        <div class="csr__stat-label">Selected Amount</div>
       </div>
     </div>
   </div>
 
   <!-- Drivers List -->
-  <div class="settlement-card">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="mb-0">Drivers with Unsettled COD</h5>
+  <div class="csr__card">
+    <div class="csr__card-header">
+      <h5 class="csr__card-title">
+        <i class="fa-solid fa-users csr__section-icon"></i>DRIVERS WITH UNSETTLED COD
+      </h5>
       <div class="form-check">
-        <input class="form-check-input select-all-checkbox" type="checkbox" id="selectAll">
+        <input class="form-check-input csr__select-all" type="checkbox" id="selectAll">
         <label class="form-check-label" for="selectAll">Select All</label>
       </div>
     </div>
 
     <div id="drivers-list">
       {% for driver in drivers %}
-      <div class="driver-row d-flex align-items-center">
+      <div class="csr__driver-row">
         <div class="form-check me-3">
           <input class="form-check-input driver-checkbox" type="checkbox"
                  value="{{ driver.driver_id }}"
@@ -139,20 +93,20 @@
                  id="driver{{ driver.driver_id }}">
         </div>
         <div class="flex-grow-1">
-          <div class="fw-bold">{{ driver.driver_name }}</div>
-          <small class="text-muted">
+          <div class="csr__driver-name">{{ driver.driver_name }}</div>
+          <div class="csr__driver-meta">
             ID: {{ driver.driver_id }} |
             Phone: {{ driver.driver_mobile|default:"-" }} |
             Last Settlement: {{ driver.last_settlement_date|date:"d M Y"|default:"Never" }}
-          </small>
+          </div>
         </div>
-        <div class="cod-amount">
+        <div class="csr__cod-amount">
           {{ driver.cod_in_hand|floatformat:2 }} QR
         </div>
       </div>
       {% empty %}
-      <div class="text-center text-muted py-5">
-        <i class="fa-solid fa-check-circle fa-3x mb-3"></i>
+      <div class="csr__empty">
+        <i class="fa-solid fa-check-circle"></i>
         <p>No unsettled COD found</p>
       </div>
       {% endfor %}
@@ -160,10 +114,10 @@
   </div>
 
   <!-- Action Buttons -->
-  <div class="action-buttons">
+  <div class="csr__action-bar">
     <div class="row align-items-center">
       <div class="col-md-4">
-        <label class="form-label mb-1">Payment Method</label>
+        <label class="csr__filter-label">Payment Method</label>
         <select class="form-select" id="payment-method">
           <option value="cash" selected>Cash</option>
           <option value="bank">Bank Transfer</option>
@@ -172,15 +126,15 @@
         </select>
       </div>
       <div class="col-md-4">
-        <label class="form-label mb-1">Reference (Optional)</label>
+        <label class="csr__filter-label">Reference (Optional)</label>
         <input type="text" class="form-control" id="payment-reference" placeholder="Transaction ID / Receipt No.">
       </div>
       <div class="col-md-4 text-end">
-        <button type="button" class="btn btn-outline-primary me-2" id="btn-export-pdf" disabled>
-          <i class="fa-solid fa-file-pdf me-1"></i>Export PDF
+        <button type="button" class="csr__btn csr__btn--outline me-2" id="btn-export-pdf" disabled>
+          <i class="fa-solid fa-file-pdf"></i> Export PDF
         </button>
-        <button type="button" class="btn btn-success" id="btn-settle" disabled>
-          <i class="fa-solid fa-check me-1"></i>Settle Selected (<span id="settle-count">0</span>)
+        <button type="button" class="csr__btn csr__btn--success" id="btn-settle" disabled>
+          <i class="fa-solid fa-check"></i> Settle Selected (<span id="settle-count">0</span>)
         </button>
       </div>
     </div>

@@ -3,191 +3,139 @@
 
 {% block title %}Driver Earnings - Ezzy Delivery{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
-<div class="col-12 p-3">
-<!-- Page Title -->
-<h1 class="page-title">
-    <i class="fa-solid fa-money-bill-wave me-2"></i>Fleet Driver Earnings
-</h1>
-
-<!-- Summary Statistics -->
-<div class="stats-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
-    <div style="background: var(--brand-white); padding: 1.5rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #28a745;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-            <span style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase;">Total Earnings</span>
-            <i class="fa-solid fa-coins" style="font-size: 1.5rem; color: #28a745; opacity: 0.3;"></i>
+<div class="fde">
+    <!-- Hero Header -->
+    <div class="fde__hero">
+        <div class="fde__hero-content">
+            <h1 class="fde__hero-title"><i class="fa-solid fa-money-bill-wave me-2"></i>Fleet Driver Earnings</h1>
+            <p class="fde__hero-subtitle">Track and manage driver earnings and delivery performance</p>
         </div>
-        <div style="font-size: 2rem; font-weight: 800; color: #28a745;">QAR {{ total_earnings|default:"0.00" }}</div>
-        <div style="font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;">Pending driver earnings</div>
     </div>
 
-    <div style="background: var(--brand-white); padding: 1.5rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid #2196f3;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-            <span style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase;">Total Deliveries</span>
-            <i class="fa-solid fa-truck-fast" style="font-size: 1.5rem; color: #2196f3; opacity: 0.3;"></i>
+    <!-- Summary Stats -->
+    <div class="fde__stats">
+        <div class="fde__stat fde__stat--green">
+            <div class="fde__stat-top">
+                <span class="fde__stat-label">TOTAL EARNINGS</span>
+                <i class="fa-solid fa-coins fde__stat-icon"></i>
+            </div>
+            <div class="fde__stat-value">QAR {{ total_earnings|default:"0.00" }}</div>
+            <div class="fde__stat-desc">Pending driver earnings</div>
         </div>
-        <div style="font-size: 2rem; font-weight: 800; color: #2196f3;">{{ total_deliveries|default:"0" }}</div>
-        <div style="font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;">After last settlement</div>
+        <div class="fde__stat fde__stat--blue">
+            <div class="fde__stat-top">
+                <span class="fde__stat-label">TOTAL DELIVERIES</span>
+                <i class="fa-solid fa-truck-fast fde__stat-icon"></i>
+            </div>
+            <div class="fde__stat-value">{{ total_deliveries|default:"0" }}</div>
+            <div class="fde__stat-desc">After last settlement</div>
+        </div>
+        <div class="fde__stat">
+            <div class="fde__stat-top">
+                <span class="fde__stat-label">ACTIVE DRIVERS</span>
+                <i class="fa-solid fa-users fde__stat-icon"></i>
+            </div>
+            <div class="fde__stat-value">{{ drivers.paginator.count|default:"0" }}</div>
+            <div class="fde__stat-desc">With pending earnings</div>
+        </div>
     </div>
 
-    <div style="background: var(--brand-white); padding: 1.5rem; border-radius: var(--brand-radius-md); box-shadow: var(--brand-shadow-sm); border-left: 4px solid var(--brand-primary);">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-            <span style="font-size: 0.875rem; font-weight: 600; color: var(--brand-grey-600); text-transform: uppercase;">Active Drivers</span>
-            <i class="fa-solid fa-users" style="font-size: 1.5rem; color: var(--brand-primary); opacity: 0.3;"></i>
-        </div>
-        <div style="font-size: 2rem; font-weight: 800; color: var(--brand-grey-800);">{{ drivers.paginator.count|default:"0" }}</div>
-        <div style="font-size: 0.812rem; color: var(--brand-grey-500); margin-top: 0.5rem;">With pending earnings</div>
-    </div>
-</div>
-
-<!-- Fleet Filter Section -->
-<div class="filter-section">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-        <div style="flex: 1; min-width: 250px;">
-            <label for="fleetFilter" class="filter-label">
-                <i class="fa-solid fa-filter me-2"></i>Filter by Fleet Driver
+    <!-- Filter Bar -->
+    <div class="fde__filter">
+        <div class="fde__filter-group">
+            <label class="fde__filter-label" for="fleetFilter">
+                <i class="fa-solid fa-magnifying-glass"></i> SEARCH DRIVERS
             </label>
-            <input type="text" id="fleetFilter" class="filter-input" placeholder="Search by driver name or ID...">
+            <input type="text" id="fleetFilter" class="fde__filter-input" placeholder="Search by driver name or ID...">
         </div>
-        <div class="fleet-report-actions">
-            <button onclick="window.print()" class="btn-print-report">
-                <i class="fa-solid fa-print"></i>
-                Print
+        <div class="fde__filter-actions">
+            <button type="button" class="fde__btn fde__btn--outline" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print
             </button>
-            <button onclick="exportToCSV()" class="btn-export-report">
-                <i class="fa-solid fa-file-export"></i>
-                Export CSV
+            <button type="button" class="fde__btn fde__btn--primary" onclick="exportToCSV()">
+                <i class="fa-solid fa-file-export"></i> Export CSV
             </button>
         </div>
     </div>
-</div>
 
-<!-- Fleet Cards Grid -->
-{% if drivers %}
-<div class="fleet-grid">
-    {% for driver in drivers %}
-    <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.id }}" class="fleet-card" data-driver-name="{{ driver.user.first_name }} {{ driver.user.last_name }}">
-        <div class="fleet-card-header">
-            <div class="fleet-avatar">
-                {{ driver.user.first_name|first|upper }}{{ driver.user.last_name|first|upper }}
+    <!-- Fleet Cards Grid -->
+    {% if drivers %}
+    <div class="fde__grid">
+        {% for driver in drivers %}
+        <a href="{% url 'workforce:fleet_transactions' %}?driver_id={{ driver.id }}" class="fde__card" data-driver-name="{{ driver.user.first_name }} {{ driver.user.last_name }}">
+            <div class="fde__card-top">
+                <div class="fde__avatar">
+                    {{ driver.user.first_name|first|upper }}{{ driver.user.last_name|first|upper }}
+                </div>
+                <div class="fde__card-info">
+                    <h3 class="fde__card-name">{{ driver.user.first_name }} {{ driver.user.last_name }}</h3>
+                    <span class="fde__card-id">ID: {{ driver.driver_id }}</span>
+                </div>
             </div>
-            <div class="fleet-info">
-                <h3>{{ driver.user.first_name }} {{ driver.user.last_name }}</h3>
-                <p>ID: {{ driver.driver_id }}</p>
+            <div class="fde__card-body">
+                <div class="fde__detail">
+                    <span class="fde__detail-label">Deliveries After Settlement</span>
+                    <span class="fde__detail-value fde__detail-value--highlight">{{ driver.deliveries_after_settlement|default:"0" }}</span>
+                </div>
+                <div class="fde__detail fde__detail--last">
+                    <span class="fde__detail-label">Last Settled</span>
+                    <span class="fde__detail-value">{{ driver.last_settled_date|date:"d M Y"|default:"Never" }}</span>
+                </div>
             </div>
-        </div>
-        <div class="fleet-details">
-            <div class="detail-row">
-                <span class="detail-label">Deliveries After Settlement</span>
-                <span class="detail-value deliveries">{{ driver.deliveries_after_settlement|default:"0" }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Last Settled</span>
-                <span class="detail-value date">{{ driver.last_settled_date|date:"d M Y"|default:"Never" }}</span>
-            </div>
-        </div>
-    </a>
-    {% endfor %}
-</div>
+        </a>
+        {% endfor %}
+    </div>
 
-<!-- Pagination -->
-{% include "includes/components/_pagination.html" with page_obj=drivers filter_params=filter_params %}
+    {% include "includes/components/_pagination.html" with page_obj=drivers filter_params=filter_params %}
 
-{% else %}
-<!-- Empty State -->
-<div class="empty-state">
-    <i class="fa-solid fa-money-bill-wave"></i>
-    <h3>No Fleet Drivers Found</h3>
-    <p>There are no drivers with earnings records at the moment.</p>
-</div>
-{% endif %}
+    {% else %}
+    <div class="fde__empty">
+        <i class="fa-solid fa-money-bill-wave"></i>
+        <h3>No Fleet Drivers Found</h3>
+        <p>There are no drivers with earnings records at the moment.</p>
+    </div>
+    {% endif %}
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
-    // Debounced search functionality
-    let searchTimeout;
+    var searchTimeout;
     document.getElementById('fleetFilter').addEventListener('input', function() {
         clearTimeout(searchTimeout);
-        const searchTerm = this.value.toLowerCase();
-
-        searchTimeout = setTimeout(() => {
-            const cards = document.querySelectorAll('.fleet-card');
-            let visibleCount = 0;
-
-            cards.forEach(card => {
-                const driverName = card.getAttribute('data-driver-name').toLowerCase();
-                if (driverName.includes(searchTerm)) {
-                    card.style.display = 'block';
-                    visibleCount++;
-                } else {
-                    card.style.display = 'none';
-                }
+        var searchTerm = this.value.toLowerCase();
+        searchTimeout = setTimeout(function() {
+            var cards = document.querySelectorAll('.fde__card');
+            cards.forEach(function(card) {
+                var name = card.getAttribute('data-driver-name').toLowerCase();
+                card.style.display = name.includes(searchTerm) ? '' : 'none';
             });
-
-            // Show message if no results
-            const existingMessage = document.querySelector('.no-results-message');
-            if (existingMessage) existingMessage.remove();
-
-            if (visibleCount === 0 && searchTerm !== '') {
-                const grid = document.querySelector('.fleet-grid');
-                const message = document.createElement('div');
-                message.className = 'no-results-message';
-                message.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--brand-grey-500);';
-                // Use DOM methods for XSS-safe content insertion
-                const icon = document.createElement('i');
-                icon.className = 'fa-solid fa-search';
-                icon.style.cssText = 'font-size: 2rem; margin-bottom: 1rem; display: block;';
-                icon.setAttribute('aria-hidden', 'true');
-                const paragraph = document.createElement('p');
-                paragraph.textContent = 'No drivers found matching "' + searchTerm + '"';
-                message.appendChild(icon);
-                message.appendChild(paragraph);
-                grid.appendChild(message);
-            }
         }, 300);
     });
 
-    // Export to CSV functionality
     function exportToCSV() {
-        const csvData = [];
-        csvData.push(['Driver Name', 'Driver ID', 'Deliveries After Settlement', 'Last Settled Date']);
-
-        const cards = document.querySelectorAll('.fleet-card:not([style*="display: none"])');
-        cards.forEach(card => {
-            const name = card.getAttribute('data-driver-name');
-            const idText = card.querySelector('.fleet-info p').textContent.replace('ID: ', '');
-            const deliveries = card.querySelector('.detail-value.deliveries').textContent.trim();
-            const lastSettled = card.querySelector('.detail-value.date').textContent.trim();
-
+        var csvData = [['Driver Name', 'Driver ID', 'Deliveries After Settlement', 'Last Settled Date']];
+        document.querySelectorAll('.fde__card:not([style*="display: none"])').forEach(function(card) {
+            var name = card.getAttribute('data-driver-name');
+            var idText = card.querySelector('.fde__card-id').textContent.replace('ID: ', '');
+            var deliveries = card.querySelector('.fde__detail-value--highlight').textContent.trim();
+            var lastSettled = card.querySelectorAll('.fde__detail-value')[1].textContent.trim();
             csvData.push([name, idText, deliveries, lastSettled]);
         });
-
-        const csvContent = csvData.map(row => row.join(',')).join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        var csvContent = csvData.map(function(row) { return row.join(','); }).join('\n');
+        var blob = new Blob([csvContent], { type: 'text/csv' });
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement('a');
         a.href = url;
         a.download = 'fleet_driver_earnings_' + new Date().toISOString().split('T')[0] + '.csv';
         a.click();
         window.URL.revokeObjectURL(url);
     }
 
-    // Add keyboard shortcuts
     document.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-            e.preventDefault();
-            document.getElementById('fleetFilter').focus();
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
-            e.preventDefault();
-            exportToCSV();
-        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); document.getElementById('fleetFilter').focus(); }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); exportToCSV(); }
     });
 </script>
 {% endblock extra_js %}

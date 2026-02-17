@@ -4,57 +4,61 @@
 {% block title %}Businesses - Fulfillment Service{% endblock title %}
 
 {% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
 {% endblock extra_css %}
 
 {% block content %}
-<div class="col-12 p-3">
-<!-- Page Title -->
-<h1 class="page-title">
-    <i class="fa-solid fa-boxes-stacked me-2"></i>Businesses - Fulfillment Service
-</h1>
+<div class="col-12 spl">
 
-<!-- Summary Stats -->
-<div class="supplier-stats-grid">
-    <div class="supplier-stat-card stat-primary">
-        <div class="supplier-stat-label">Total Businesses</div>
-        <div class="supplier-stat-value text-primary">{{ total_sellers }}</div>
+<!-- Hero Header -->
+<div class="spl__hero">
+    <div class="d-flex align-items-center gap-3 mb-2">
+        <div class="spl__hero-icon">
+            <i class="fa-solid fa-boxes-stacked"></i>
+        </div>
+        <div>
+            <h1 class="spl__hero-title">Fulfillment Service</h1>
+            <p class="spl__hero-sub">Manage business fulfillment accounts</p>
+        </div>
     </div>
-    <div class="supplier-stat-card stat-success">
-        <div class="supplier-stat-label">Active Fulfillment</div>
-        <div class="supplier-stat-value text-success">{{ active_count }}</div>
-    </div>
-    <div class="supplier-stat-card" style="border-left-color: var(--brand-warning, #ffc107);">
-        <div class="supplier-stat-label">Requested</div>
-        <div class="supplier-stat-value" style="color: var(--brand-warning, #ffc107);">{{ requested_count }}</div>
-    </div>
-    <div class="supplier-stat-card" style="border-left-color: var(--brand-grey-500, #6c757d);">
-        <div class="supplier-stat-label">Non-Active</div>
-        <div class="supplier-stat-value" style="color: var(--brand-grey-500, #6c757d);">{{ nonactive_count }}</div>
+    <div class="d-flex flex-wrap gap-2 mt-3">
+        <div class="spl__hero-stat">
+            <span class="spl__hero-stat__num">{{ total_sellers }}</span>
+            <span class="spl__hero-stat__label">Total</span>
+        </div>
+        <div class="spl__hero-stat spl__hero-stat--ok">
+            <span class="spl__hero-stat__num">{{ active_count }}</span>
+            <span class="spl__hero-stat__label">Active</span>
+        </div>
+        <div class="spl__hero-stat spl__hero-stat--warn">
+            <span class="spl__hero-stat__num">{{ requested_count }}</span>
+            <span class="spl__hero-stat__label">Requested</span>
+        </div>
+        <div class="spl__hero-stat spl__hero-stat--muted">
+            <span class="spl__hero-stat__num">{{ nonactive_count }}</span>
+            <span class="spl__hero-stat__label">Non-Active</span>
+        </div>
     </div>
 </div>
 
-<!-- Search Section -->
-<div class="filter-section">
-    <form method="get" class="row g-3"
+<!-- Search -->
+<div class="spl__search">
+    <form method="get"
           hx-get="{% url 'workforce:suppliers_list' %}"
           hx-target="#main-content"
           hx-select="#main-content"
           hx-swap="outerHTML"
           hx-push-url="true">
-        <div class="col-md-10">
-            <label for="searchInput" class="filter-label">
-                <i class="fa-solid fa-search me-2"></i>Search Businesses
-            </label>
-            <input type="text" id="searchInput" name="search" class="filter-input"
-                   placeholder="Search by name, code, email, phone..." value="{{ search }}">
-        </div>
-        <div class="col-md-2 d-flex align-items-end gap-2">
-            <button type="submit" class="btn btn-primary flex-grow-1">
-                <i class="fa-solid fa-search me-1"></i>Search
+        <div class="spl__search-row">
+            <div class="spl__search-input-wrap">
+                <i class="fa-solid fa-magnifying-glass spl__search-icon"></i>
+                <input type="text" name="search" class="spl__search-input"
+                       placeholder="Search by name, code, email, phone..." value="{{ search }}">
+            </div>
+            <button type="submit" class="spl__btn spl__btn--primary">
+                <i class="fa-solid fa-magnifying-glass"></i> Search
             </button>
             {% if search %}
-            <a href="{% url 'workforce:suppliers_list' %}" class="btn btn-outline-secondary" title="Clear search">
+            <a href="{% url 'workforce:suppliers_list' %}" class="spl__btn spl__btn--ghost" title="Clear search">
                 <i class="fa-solid fa-xmark"></i>
             </a>
             {% endif %}
@@ -62,65 +66,61 @@
     </form>
 </div>
 
-<!-- ============================================ -->
-<!-- SECTION 1: Active Fulfillment Service -->
-<!-- ============================================ -->
-<div class="mb-4">
-    <div class="d-flex align-items-center mb-3 p-3 rounded" style="background: linear-gradient(135deg, #e8f5e9, #c8e6c9); border-left: 4px solid #28a745;">
-        <i class="fa-solid fa-circle-check me-2 text-success fa-lg"></i>
-        <h5 class="mb-0 fw-bold">Active Fulfillment Service <span class="badge bg-success ms-2">{{ active_count }}</span></h5>
+<!-- ===== SECTION: Active Fulfillment ===== -->
+<div class="spl__section">
+    <div class="spl__section-head spl__section-head--ok">
+        <i class="fa-solid fa-circle-check"></i>
+        <span>Active Fulfillment</span>
+        <span class="spl__section-count spl__section-count--ok">{{ active_count }}</span>
     </div>
 
     {% if active_sellers %}
-    <div class="orders-table-container">
-        <table class="orders-table">
+    <div class="spl__table-wrap">
+        <table class="spl__table">
             <thead>
                 <tr>
                     <th>Business</th>
                     <th>Contact</th>
-                    <th>Fulfilled Orders</th>
-                    <th>Pending Orders</th>
-                    <th>Total Orders</th>
-                    <th>Activated On</th>
-                    <th>Actions</th>
+                    <th class="text-center">Fulfilled</th>
+                    <th class="text-center">Pending</th>
+                    <th class="text-center">Total</th>
+                    <th>Activated</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 {% for biz in active_sellers %}
                 <tr>
                     <td>
-                        <div class="d-flex align-items-center">
-                            <div class="supplier-icon me-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="spl__avatar spl__avatar--ok">
                                 <i class="fa-solid fa-boxes-stacked"></i>
                             </div>
                             <div>
-                                <strong>{{ biz.business_name|default:"Unknown Business" }}</strong>
-                                <br>
-                                <small class="text-muted">{{ biz.business_code|default:"N/A" }}</small>
+                                <span class="spl__biz-name">{{ biz.business_name|default:"Unknown" }}</span>
+                                <code class="spl__biz-code">{{ biz.business_code|default:"N/A" }}</code>
                             </div>
                         </div>
                     </td>
                     <td>
-                        {% if biz.business_email %}
-                        <div><i class="fa-solid fa-envelope me-2 text-muted"></i>{{ biz.business_email }}</div>
-                        {% endif %}
-                        {% if biz.business_phone %}
-                        <div><i class="fa-solid fa-phone me-2 text-muted"></i>{{ biz.business_phone }}</div>
-                        {% endif %}
+                        <div class="spl__contact">
+                            {% if biz.business_email %}<span><i class="fa-solid fa-envelope"></i> {{ biz.business_email }}</span>{% endif %}
+                            {% if biz.business_phone %}<span><i class="fa-solid fa-phone"></i> {{ biz.business_phone }}</span>{% endif %}
+                        </div>
                     </td>
-                    <td><span class="badge bg-success badge-count">{{ biz.fulfilled_orders|default:0 }}</span></td>
-                    <td><span class="badge bg-warning text-dark badge-count">{{ biz.pending_orders|default:0 }}</span></td>
-                    <td><strong>{{ biz.total_orders|default:0 }}</strong></td>
-                    <td>{{ biz.fulfillment_activated_at|date:"d M Y"|default:"N/A" }}</td>
+                    <td class="text-center"><span class="spl__badge spl__badge--ok">{{ biz.fulfilled_orders|default:0 }}</span></td>
+                    <td class="text-center"><span class="spl__badge spl__badge--warn">{{ biz.pending_orders|default:0 }}</span></td>
+                    <td class="text-center"><strong class="spl__total">{{ biz.total_orders|default:0 }}</strong></td>
+                    <td><span class="spl__date">{{ biz.fulfillment_activated_at|date:"d M Y"|default:"—" }}</span></td>
                     <td>
-                        <div class="btn-group">
+                        <div class="d-flex gap-1">
                             <a href="{% url 'workforce:fulfilled_orders_list' %}?business={{ biz.business_id }}"
-                               class="btn btn-sm btn-outline-success" title="View Purchase Orders">
-                                <i class="fa-solid fa-receipt me-1"></i>Orders
+                               class="spl__action spl__action--ok" title="Purchase Orders">
+                                <i class="fa-solid fa-receipt"></i>
                             </a>
                             <a href="{% url 'workforce:business_license_detail' biz.business_id %}"
-                               class="btn btn-sm btn-outline-primary" title="View Details">
-                                <i class="fa-solid fa-eye me-1"></i>Details
+                               class="spl__action spl__action--navy" title="View Details">
+                                <i class="fa-solid fa-eye"></i>
                             </a>
                         </div>
                     </td>
@@ -130,65 +130,61 @@
         </table>
     </div>
     {% else %}
-    <div class="empty-state py-4">
-        <i class="fa-solid fa-circle-check text-muted"></i>
-        <p class="text-muted mt-2 mb-0">{% if search %}No active businesses match your search.{% else %}No businesses with active fulfillment service yet.{% endif %}</p>
+    <div class="spl__empty">
+        <i class="fa-solid fa-circle-check"></i>
+        <p>{% if search %}No active businesses match your search.{% else %}No businesses with active fulfillment service yet.{% endif %}</p>
     </div>
     {% endif %}
 </div>
 
-<!-- ============================================ -->
-<!-- SECTION 2: Requested & Non-Active -->
-<!-- ============================================ -->
-<div class="mb-4">
-    <div class="d-flex align-items-center mb-3 p-3 rounded" style="background: linear-gradient(135deg, #fff8e1, #ffecb3); border-left: 4px solid #ffc107;">
-        <i class="fa-solid fa-clock me-2 fa-lg" style="color: #ffc107;"></i>
-        <h5 class="mb-0 fw-bold">Requested Fulfillment <span class="badge bg-warning text-dark ms-2">{{ requested_count }}</span></h5>
+<!-- ===== SECTION: Requested ===== -->
+<div class="spl__section">
+    <div class="spl__section-head spl__section-head--warn">
+        <i class="fa-solid fa-clock"></i>
+        <span>Requested Fulfillment</span>
+        <span class="spl__section-count spl__section-count--warn">{{ requested_count }}</span>
     </div>
 
     {% if requested_sellers %}
-    <div class="orders-table-container">
-        <table class="orders-table">
+    <div class="spl__table-wrap">
+        <table class="spl__table">
             <thead>
                 <tr>
                     <th>Business</th>
                     <th>Contact</th>
                     <th>Status</th>
-                    <th>Total Orders</th>
+                    <th class="text-center">Orders</th>
                     <th>Registered</th>
-                    <th>Actions</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 {% for biz in requested_sellers %}
                 <tr>
                     <td>
-                        <div class="d-flex align-items-center">
-                            <div class="supplier-icon me-3" style="background: #fff3e0;">
-                                <i class="fa-solid fa-store" style="color: #ff9800;"></i>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="spl__avatar spl__avatar--warn">
+                                <i class="fa-solid fa-store"></i>
                             </div>
                             <div>
-                                <strong>{{ biz.business_name|default:"Unknown Business" }}</strong>
-                                <br>
-                                <small class="text-muted">{{ biz.business_code|default:"N/A" }}</small>
+                                <span class="spl__biz-name">{{ biz.business_name|default:"Unknown" }}</span>
+                                <code class="spl__biz-code">{{ biz.business_code|default:"N/A" }}</code>
                             </div>
                         </div>
                     </td>
                     <td>
-                        {% if biz.business_email %}
-                        <div><i class="fa-solid fa-envelope me-2 text-muted"></i>{{ biz.business_email }}</div>
-                        {% endif %}
-                        {% if biz.business_phone %}
-                        <div><i class="fa-solid fa-phone me-2 text-muted"></i>{{ biz.business_phone }}</div>
-                        {% endif %}
+                        <div class="spl__contact">
+                            {% if biz.business_email %}<span><i class="fa-solid fa-envelope"></i> {{ biz.business_email }}</span>{% endif %}
+                            {% if biz.business_phone %}<span><i class="fa-solid fa-phone"></i> {{ biz.business_phone }}</span>{% endif %}
+                        </div>
                     </td>
-                    <td><span class="badge bg-warning text-dark">Requested</span></td>
-                    <td><strong>{{ biz.total_orders|default:0 }}</strong></td>
-                    <td>{{ biz.created_at|date:"d M Y"|default:"N/A" }}</td>
+                    <td><span class="spl__status spl__status--warn"><i class="fa-solid fa-clock"></i> Requested</span></td>
+                    <td class="text-center"><strong class="spl__total">{{ biz.total_orders|default:0 }}</strong></td>
+                    <td><span class="spl__date">{{ biz.created_at|date:"d M Y"|default:"—" }}</span></td>
                     <td>
                         <a href="{% url 'workforce:business_license_detail' biz.business_id %}"
-                           class="btn btn-sm btn-outline-primary" title="View Details">
-                            <i class="fa-solid fa-eye me-1"></i>Details
+                           class="spl__action spl__action--navy" title="View Details">
+                            <i class="fa-solid fa-eye"></i>
                         </a>
                     </td>
                 </tr>
@@ -197,72 +193,71 @@
         </table>
     </div>
     {% else %}
-    <div class="empty-state py-4">
-        <i class="fa-solid fa-clock text-muted"></i>
-        <p class="text-muted mt-2 mb-0">{% if search %}No requested businesses match your search.{% else %}No pending fulfillment requests.{% endif %}</p>
+    <div class="spl__empty">
+        <i class="fa-solid fa-clock"></i>
+        <p>{% if search %}No requested businesses match your search.{% else %}No pending fulfillment requests.{% endif %}</p>
     </div>
     {% endif %}
 </div>
 
-<div class="mb-4">
-    <div class="d-flex align-items-center mb-3 p-3 rounded" style="background: linear-gradient(135deg, #f5f5f5, #e0e0e0); border-left: 4px solid #6c757d;">
-        <i class="fa-solid fa-circle-minus me-2 fa-lg text-secondary"></i>
-        <h5 class="mb-0 fw-bold">Non-Active <span class="badge bg-secondary ms-2">{{ nonactive_count }}</span></h5>
+<!-- ===== SECTION: Non-Active ===== -->
+<div class="spl__section">
+    <div class="spl__section-head spl__section-head--muted">
+        <i class="fa-solid fa-circle-minus"></i>
+        <span>Non-Active</span>
+        <span class="spl__section-count spl__section-count--muted">{{ nonactive_count }}</span>
     </div>
 
     {% if nonactive_sellers %}
-    <div class="orders-table-container">
-        <table class="orders-table">
+    <div class="spl__table-wrap">
+        <table class="spl__table">
             <thead>
                 <tr>
                     <th>Business</th>
                     <th>Contact</th>
                     <th>Account Status</th>
-                    <th>Total Orders</th>
+                    <th class="text-center">Orders</th>
                     <th>Registered</th>
-                    <th>Actions</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 {% for biz in nonactive_sellers %}
                 <tr>
                     <td>
-                        <div class="d-flex align-items-center">
-                            <div class="supplier-icon me-3" style="background: #f5f5f5;">
-                                <i class="fa-solid fa-store" style="color: #9e9e9e;"></i>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="spl__avatar spl__avatar--muted">
+                                <i class="fa-solid fa-store"></i>
                             </div>
                             <div>
-                                <strong>{{ biz.business_name|default:"Unknown Business" }}</strong>
-                                <br>
-                                <small class="text-muted">{{ biz.business_code|default:"N/A" }}</small>
+                                <span class="spl__biz-name">{{ biz.business_name|default:"Unknown" }}</span>
+                                <code class="spl__biz-code">{{ biz.business_code|default:"N/A" }}</code>
                             </div>
                         </div>
                     </td>
                     <td>
-                        {% if biz.business_email %}
-                        <div><i class="fa-solid fa-envelope me-2 text-muted"></i>{{ biz.business_email }}</div>
-                        {% endif %}
-                        {% if biz.business_phone %}
-                        <div><i class="fa-solid fa-phone me-2 text-muted"></i>{{ biz.business_phone }}</div>
-                        {% endif %}
+                        <div class="spl__contact">
+                            {% if biz.business_email %}<span><i class="fa-solid fa-envelope"></i> {{ biz.business_email }}</span>{% endif %}
+                            {% if biz.business_phone %}<span><i class="fa-solid fa-phone"></i> {{ biz.business_phone }}</span>{% endif %}
+                        </div>
                     </td>
                     <td>
                         {% if biz.business_status == 'active' %}
-                        <span class="badge bg-success">Active</span>
+                            <span class="spl__status spl__status--ok"><i class="fa-solid fa-circle-check"></i> Active</span>
                         {% elif biz.business_status == 'pending' %}
-                        <span class="badge bg-warning text-dark">Pending</span>
+                            <span class="spl__status spl__status--warn"><i class="fa-solid fa-clock"></i> Pending</span>
                         {% elif biz.business_status == 'suspended' %}
-                        <span class="badge bg-danger">Suspended</span>
+                            <span class="spl__status spl__status--danger"><i class="fa-solid fa-ban"></i> Suspended</span>
                         {% else %}
-                        <span class="badge bg-secondary">Inactive</span>
+                            <span class="spl__status spl__status--muted"><i class="fa-solid fa-circle-minus"></i> Inactive</span>
                         {% endif %}
                     </td>
-                    <td><strong>{{ biz.total_orders|default:0 }}</strong></td>
-                    <td>{{ biz.created_at|date:"d M Y"|default:"N/A" }}</td>
+                    <td class="text-center"><strong class="spl__total">{{ biz.total_orders|default:0 }}</strong></td>
+                    <td><span class="spl__date">{{ biz.created_at|date:"d M Y"|default:"—" }}</span></td>
                     <td>
                         <a href="{% url 'workforce:business_license_detail' biz.business_id %}"
-                           class="btn btn-sm btn-outline-primary" title="View Details">
-                            <i class="fa-solid fa-eye me-1"></i>Details
+                           class="spl__action spl__action--navy" title="View Details">
+                            <i class="fa-solid fa-eye"></i>
                         </a>
                     </td>
                 </tr>
@@ -271,9 +266,9 @@
         </table>
     </div>
     {% else %}
-    <div class="empty-state py-4">
-        <i class="fa-solid fa-circle-minus text-muted"></i>
-        <p class="text-muted mt-2 mb-0">{% if search %}No non-active businesses match your search.{% else %}All businesses have fulfillment service enabled.{% endif %}</p>
+    <div class="spl__empty">
+        <i class="fa-solid fa-circle-minus"></i>
+        <p>{% if search %}No non-active businesses match your search.{% else %}All businesses have fulfillment service enabled.{% endif %}</p>
     </div>
     {% endif %}
 </div>

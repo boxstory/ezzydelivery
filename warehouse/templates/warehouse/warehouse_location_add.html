@@ -3,166 +3,140 @@
 
 {% block title %}Add Pickup/Dispatch Location{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
 
-<div class="container-fluid py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item">
-                        <a href="{% url 'warehouse:warehouse_location_list' %}"
-                           hx-get="{% url 'warehouse:warehouse_location_list' %}"
-                           hx-target="#main-content"
-                           hx-select="#main-content"
-                           hx-swap="outerHTML"
-                           hx-push-url="true">Pickup/Dispatch Locations</a>
-                    </li>
-                    <li class="breadcrumb-item active">Add New</li>
-                </ol>
-            </nav>
-            <h1 class="h3 mb-0">Add Pickup/Dispatch Location</h1>
-            <p class="text-muted">Create a new pickup or dispatch location for a warehouse (used for order pickup and driver assignments)</p>
+<div class="wh">
+    <!-- Breadcrumb -->
+    <div class="wh__breadcrumb">
+        <a href="{% url 'warehouse:warehouse_location_list' %}"
+           hx-get="{% url 'warehouse:warehouse_location_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Pickup/Dispatch Locations</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <span class="wh__breadcrumb-active">Add New</span>
+    </div>
+
+    <!-- Hero Header -->
+    <div class="wla2__hero">
+        <div class="wla2__hero-icon"><i class="fa-solid fa-map-marker-alt"></i></div>
+        <div>
+            <h1 class="wla2__hero-title">Add Pickup/Dispatch Location</h1>
+            <p class="wla2__hero-subtitle">Create a new pickup or dispatch location for a warehouse (used for order pickup and driver assignments)</p>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-lg-8">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">
-                        <i class="fa-solid fa-map-marker-alt me-2 text-primary"></i>Location Details
-                    </h5>
+    <!-- Form Card -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-map-marker-alt"></i> <span>LOCATION DETAILS</span></div>
+        </div>
+        <div class="wh__card-body">
+            <form method="POST">
+                {% csrf_token %}
+
+                <!-- Warehouse Selection -->
+                <div class="wha__section-label"><i class="fas fa-warehouse wha__section-icon"></i> WAREHOUSE</div>
+                <div class="wha__field">
+                    <label for="warehouse" class="wha__label">Warehouse <span class="wha__required">*</span></label>
+                    <select name="warehouse" id="warehouse" class="wha__select" required>
+                        <option value="">-- Select Warehouse --</option>
+                        {% for warehouse in warehouses %}
+                        <option value="{{ warehouse.id }}">{{ warehouse.name }} ({{ warehouse.code }})</option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <div class="card-body">
-                    <form method="POST">
-                        {% csrf_token %}
 
-                        <!-- Warehouse Selection -->
-                        <h6 class="text-primary mb-3">Warehouse</h6>
+                <div class="wha__divider"></div>
 
-                        <div class="mb-3">
-                            <label for="warehouse" class="form-label">Warehouse <span class="text-danger">*</span></label>
-                            <select name="warehouse" id="warehouse" class="form-select" required>
-                                <option value="">-- Select Warehouse --</option>
-                                {% for warehouse in warehouses %}
-                                <option value="{{ warehouse.id }}">
-                                    {{ warehouse.name }} ({{ warehouse.code }})
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
+                <!-- Basic Information -->
+                <div class="wha__section-label"><i class="fas fa-info-circle wha__section-icon"></i> BASIC INFORMATION</div>
 
-                        <hr class="my-4">
-
-                        <!-- Basic Information -->
-                        <h6 class="text-primary mb-3">Basic Information</h6>
-
-                        <div class="mb-3">
-                            <label for="name" class="form-label">Location Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="name" name="name" required
-                                   placeholder="e.g., North Gate, Main Entrance">
-                            <small class="text-muted">Descriptive name for this location</small>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="code" class="form-label">Location Code <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="code" name="code" required
-                                   placeholder="e.g., NG, ME, GATE-1">
-                            <small class="text-muted">Short code for this location</small>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="address" class="form-label">Address/Directions</label>
-                            <textarea class="form-control" id="address" name="address" rows="2"
-                                      placeholder="Specific address or directions to this location"></textarea>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="zone_number" class="form-label">Zone Number</label>
-                            <input type="number" class="form-control" id="zone_number" name="zone_number"
-                                   placeholder="e.g., 44">
-                            <small class="text-muted">Delivery zone number (optional)</small>
-                        </div>
-
-                        <hr class="my-4">
-
-                        <!-- GPS Coordinates -->
-                        <h6 class="text-primary mb-3">GPS Coordinates <small class="text-muted">(Optional)</small></h6>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="latitude" class="form-label">Latitude</label>
-                                <input type="number" step="0.000001" class="form-control" id="latitude" name="latitude"
-                                       placeholder="e.g., 26.2361">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="longitude" class="form-label">Longitude</label>
-                                <input type="number" step="0.000001" class="form-control" id="longitude" name="longitude"
-                                       placeholder="e.g., 50.5922">
-                            </div>
-                        </div>
-
-                        <hr class="my-4">
-
-                        <!-- Operating Information -->
-                        <h6 class="text-primary mb-3">Operating Information</h6>
-
-                        <div class="mb-3">
-                            <label for="operating_hours" class="form-label">Operating Hours</label>
-                            <textarea class="form-control" id="operating_hours" name="operating_hours" rows="2"
-                                      placeholder="e.g., Mon-Fri: 8AM-5PM, Sat: 9AM-2PM"></textarea>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="notes" class="form-label">Special Instructions/Notes</label>
-                            <textarea class="form-control" id="notes" name="notes" rows="2"
-                                      placeholder="Special instructions for drivers"></textarea>
-                        </div>
-
-                        <hr class="my-4">
-
-                        <!-- Settings -->
-                        <h6 class="text-primary mb-3">Settings</h6>
-
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="is_active" name="is_active" checked>
-                            <label class="form-check-label" for="is_active">
-                                <strong>Active</strong>
-                            </label>
-                            <small class="d-block text-muted">Location is operational and can be used</small>
-                        </div>
-
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="is_default" name="is_default">
-                            <label class="form-check-label" for="is_default">
-                                <strong>Default Location</strong>
-                            </label>
-                            <small class="d-block text-muted">Make this the default pickup location for this warehouse</small>
-                        </div>
-
-                        <hr class="my-4">
-
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-success">
-                                <i class="fas fa-plus me-1"></i>Create Pickup/Dispatch Location
-                            </button>
-                            <a href="{% url 'warehouse:warehouse_location_list' %}" class="btn btn-outline-secondary"
-                               hx-get="{% url 'warehouse:warehouse_location_list' %}"
-                               hx-target="#main-content"
-                               hx-select="#main-content"
-                               hx-swap="outerHTML"
-                               hx-push-url="true">
-                                Cancel
-                            </a>
-                        </div>
-                    </form>
+                <div class="wha__field">
+                    <label for="name" class="wha__label">Location Name <span class="wha__required">*</span></label>
+                    <input type="text" class="wha__input" id="name" name="name" required placeholder="e.g., North Gate, Main Entrance">
+                    <span class="wha__hint">Descriptive name for this location</span>
                 </div>
-            </div>
+
+                <div class="wha__field">
+                    <label for="code" class="wha__label">Location Code <span class="wha__required">*</span></label>
+                    <input type="text" class="wha__input" id="code" name="code" required placeholder="e.g., NG, ME, GATE-1">
+                    <span class="wha__hint">Short code for this location</span>
+                </div>
+
+                <div class="wha__field">
+                    <label for="address" class="wha__label">Address/Directions</label>
+                    <textarea class="wha__textarea" id="address" name="address" rows="2" placeholder="Specific address or directions to this location"></textarea>
+                </div>
+
+                <div class="wha__field">
+                    <label for="zone_number" class="wha__label">Zone Number</label>
+                    <input type="number" class="wha__input" id="zone_number" name="zone_number" placeholder="e.g., 44">
+                    <span class="wha__hint">Delivery zone number (optional)</span>
+                </div>
+
+                <div class="wha__divider"></div>
+
+                <!-- GPS Coordinates -->
+                <div class="wha__section-label"><i class="fas fa-map-pin wha__section-icon"></i> GPS COORDINATES <span class="wha__hint-inline">(Optional)</span></div>
+
+                <div class="wha__row">
+                    <div class="wha__field">
+                        <label for="latitude" class="wha__label">Latitude</label>
+                        <input type="number" step="0.000001" class="wha__input" id="latitude" name="latitude" placeholder="e.g., 26.2361">
+                    </div>
+                    <div class="wha__field">
+                        <label for="longitude" class="wha__label">Longitude</label>
+                        <input type="number" step="0.000001" class="wha__input" id="longitude" name="longitude" placeholder="e.g., 50.5922">
+                    </div>
+                </div>
+
+                <div class="wha__divider"></div>
+
+                <!-- Operating Information -->
+                <div class="wha__section-label"><i class="fas fa-clock wha__section-icon"></i> OPERATING INFORMATION</div>
+
+                <div class="wha__field">
+                    <label for="operating_hours" class="wha__label">Operating Hours</label>
+                    <textarea class="wha__textarea" id="operating_hours" name="operating_hours" rows="2" placeholder="e.g., Mon-Fri: 8AM-5PM, Sat: 9AM-2PM"></textarea>
+                </div>
+
+                <div class="wha__field">
+                    <label for="notes" class="wha__label">Special Instructions/Notes</label>
+                    <textarea class="wha__textarea" id="notes" name="notes" rows="2" placeholder="Special instructions for drivers"></textarea>
+                </div>
+
+                <div class="wha__divider"></div>
+
+                <!-- Settings -->
+                <div class="wha__section-label"><i class="fas fa-cog wha__section-icon"></i> SETTINGS</div>
+
+                <div class="wha__check-card">
+                    <input class="wha__check-input" type="checkbox" id="is_active" name="is_active" checked>
+                    <label class="wha__check-label" for="is_active">
+                        <strong>Active</strong>
+                        <span class="wha__check-desc">Location is operational and can be used</span>
+                    </label>
+                </div>
+
+                <div class="wha__check-card">
+                    <input class="wha__check-input" type="checkbox" id="is_default" name="is_default">
+                    <label class="wha__check-label" for="is_default">
+                        <strong>Default Location</strong>
+                        <span class="wha__check-desc">Make this the default pickup location for this warehouse</span>
+                    </label>
+                </div>
+
+                <div class="wha__divider"></div>
+
+                <div class="wha__actions">
+                    <button type="submit" class="wh__btn wh__btn--primary">
+                        <i class="fas fa-plus"></i> Create Pickup/Dispatch Location
+                    </button>
+                    <a href="{% url 'warehouse:warehouse_location_list' %}" class="wh__btn wh__btn--secondary"
+                       hx-get="{% url 'warehouse:warehouse_location_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                        Cancel
+                    </a>
+                </div>
+            </form>
         </div>
     </div>
 </div>

@@ -3,16 +3,20 @@
 
 {% block title %}Bulk Import Orders - Client Dashboard{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'business/css/business.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
-<div class="col-12 p-3">
-    <!-- Page Title -->
-    <h1 class="page-title">
-        <i class="fa-solid fa-file-import me-2"></i>Bulk Import Orders
-    </h1>
+<div class="bim" id="orders_bulk_import_container_main">
+    <!-- Hero Header -->
+    <div class="bim__hero">
+        <div class="bim__hero-content">
+            <div class="bim__hero-left">
+                <h1 class="bim__title">
+                    <i class="fa-solid fa-file-import"></i>
+                    Bulk Import Orders
+                </h1>
+                <p class="bim__subtitle">Upload and import multiple orders at once</p>
+            </div>
+        </div>
+    </div>
 
     <!-- Wizard Steps -->
     <div class="wizard-steps">
@@ -48,9 +52,9 @@
                         <!-- Business Selection/Info -->
                         {% if is_staff_user %}
                         <!-- Staff: Business Selector -->
-                        <div class="mb-4">
-                            <label for="businessSelect" class="form-label">
-                                <i class="fa-solid fa-store me-2"></i>Select Seller <span class="text-danger">*</span>
+                        <div class="bim__field-group">
+                            <label for="businessSelect" class="bim__field-label">
+                                <i class="fa-solid fa-store"></i> Select Seller <span class="bim__required">*</span>
                             </label>
                             <select id="businessSelect" name="business" class="form-select" required>
                                 <option value="">-- Select a Seller --</option>
@@ -63,12 +67,12 @@
                         </div>
                         {% else %}
                         <!-- Client: Business Info (Disabled - Auto-selected) -->
-                        <div class="business-info-disabled">
-                            <label class="form-label mb-2">
-                                <i class="fa-solid fa-store me-2"></i>Business
+                        <div class="bim__biz-info">
+                            <label class="bim__field-label">
+                                <i class="fa-solid fa-store"></i> Business
                             </label>
-                            <div class="business-name">{{ business.business_name }}</div>
-                            <div class="business-code">Code: {{ business.business_code }}</div>
+                            <div class="bim__biz-name">{{ business.business_name }}</div>
+                            <div class="bim__biz-code">Code: {{ business.business_code }}</div>
                             <input type="hidden" id="businessId" value="{{ business.business_id }}">
                         </div>
                         {% endif %}
@@ -114,25 +118,25 @@
                         </h5>
                     </div>
                     <div class="card-body p-4">
-                        <h6 class="mb-3">Required Columns:</h6>
-                        <ul class="list-unstyled">
-                            <li class="mb-2">
-                                <code>customer_name</code> <span class="text-danger">*</span>
+                        <h6 class="bim__guide-heading">Required Columns:</h6>
+                        <ul class="bim__guide-list">
+                            <li class="bim__guide-item">
+                                <code>customer_name</code> <span class="bim__required">*</span>
                             </li>
-                            <li class="mb-2">
-                                <code>customer_phone</code> <span class="text-danger">*</span>
+                            <li class="bim__guide-item">
+                                <code>customer_phone</code> <span class="bim__required">*</span>
                             </li>
-                            <li class="mb-2">
-                                <code>customer_address</code> <span class="text-danger">*</span>
+                            <li class="bim__guide-item">
+                                <code>customer_address</code> <span class="bim__required">*</span>
                             </li>
                         </ul>
 
-                        <h6 class="mb-3 mt-4">Optional Columns:</h6>
-                        <ul class="list-unstyled small">
-                            <li class="mb-1"><code>client_order_code</code></li>
-                            <li class="mb-1"><code>customer_whatsapp</code></li>
-                            <li class="mb-1"><code>dl_zone</code>, <code>dl_street</code>, <code>dl_building</code></li>
-                            <li class="mb-1"><code>cod_amount</code>, <code>dl_amount</code></li>
+                        <h6 class="bim__guide-heading bim__guide-heading--mt">Optional Columns:</h6>
+                        <ul class="bim__guide-list bim__guide-list--small">
+                            <li><code>client_order_code</code></li>
+                            <li><code>customer_whatsapp</code></li>
+                            <li><code>dl_zone</code>, <code>dl_street</code>, <code>dl_building</code></li>
+                            <li><code>cod_amount</code>, <code>dl_amount</code></li>
                         </ul>
 
                         <hr>
@@ -164,7 +168,7 @@
             </div>
             <div class="card-body p-4">
                 <p class="text-muted mb-4">
-                    Map your file columns to the corresponding order fields. Required fields are marked with <span class="text-danger">*</span>
+                    Map your file columns to the corresponding order fields. Required fields are marked with <span class="bim__required">*</span>
                 </p>
 
                 <!-- Mapping Header -->

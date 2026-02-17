@@ -1,137 +1,129 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
-{% block title %}
-    Active Drivers - Ezzy Delivery
-{% endblock title %}
-{% block extra_css %}
-    <link type="text/css"
-          rel="stylesheet"
-          href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
+{% block title %}Active Drivers - Ezzy Delivery{% endblock title %}
 {% block content %}
-<div class="col-12 p-3">
-    <!-- Page Header -->
-    <header class="page-header">
-        <div class="page-header-left">
-            <h2><i class="fa-solid fa-circle-check me-1"></i>Active Drivers</h2>
+<div class="dra">
+    <!-- Hero Header -->
+    <div class="dra__hero">
+        <div class="dra__hero-inner">
+            <div class="dra__hero-left">
+                <h1 class="dra__hero-title">
+                    <i class="fa-solid fa-circle-check"></i> Active Drivers
+                </h1>
+                <p class="dra__hero-sub">All approved and active fleet members</p>
+            </div>
         </div>
-    </header>
-    <!-- Filter Section -->
-    <div class="filter-section">
-        <form method="get" class="row g-3"
+    </div>
+
+    <!-- Filter -->
+    <div class="dra__filter">
+        <div class="dra__filter-header">
+            <i class="fa-solid fa-sliders dra__filter-header-icon"></i>
+            <span class="dra__filter-header-text">Search</span>
+        </div>
+        <form method="get" class="dra__filter-form"
               id="workforce_drivers_active_form_filter"
               hx-get=""
               hx-target="#main-content"
               hx-select="#main-content"
               hx-swap="outerHTML"
               hx-push-url="true">
-            <div class="col-md-8">
-                <label for="searchInput" class="filter-label">
-                    <i class="fa-solid fa-search me-2"></i>Search Drivers
+            <div class="dra__filter-group dra__filter-group--lg">
+                <label for="searchInput" class="dra__filter-label">
+                    <i class="fa-solid fa-search"></i> Search Drivers
                 </label>
-                <input type="text"
-                       id="searchInput"
-                       name="search"
-                       class="filter-input"
+                <input type="text" id="searchInput" name="search"
+                       class="dra__filter-input"
                        placeholder="Search by name, code, phone..."
                        value="{{ search }}">
             </div>
-            <div class="col-md-4">
-                <label class="filter-label filter-label-hidden">Action</label>
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="fa-solid fa-search me-2"></i>Search
+            <div class="dra__filter-actions">
+                <button type="submit" class="dra__btn dra__btn--primary">
+                    <i class="fa-solid fa-search"></i> Search
                 </button>
             </div>
         </form>
     </div>
-    <!-- Drivers Table -->
-    <div class="orders-table-container">
+
+    <!-- Table -->
+    <div class="dra__table-wrap">
         {% if page_obj %}
-            <table class="orders-table" id="workforce_drivers_active_table_list">
-                <thead>
-                    <tr>
-                        <th>Driver</th>
-                        <th>Contact</th>
-                        <th>Vehicle</th>
-                        <th>Rating</th>
-                        <th>Wallet Balance</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for driver in page_obj %}
-                        <tr>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="driver-icon driver-icon-sm driver-icon-active me-3">
-                                        <i class="fa-solid fa-user"></i>
-                                    </div>
-                                    <div>
-                                        <strong>{{ driver.user.first_name }} {{ driver.user.last_name }}</strong>
-                                        <br>
-                                        <small class="text-muted">{{ driver.driver_code|default:"N/A" }}</small>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                {% if driver.driver_phone %}
-                                    <div>
-                                        <i class="fa-solid fa-phone me-2"></i>{{ driver.driver_phone }}
-                                    </div>
-                                {% endif %}
-                                {% if driver.driver_whatsapp %}
-                                    <div>
-                                        <i class="fa-brands fa-whatsapp me-2"></i>{{ driver.driver_whatsapp }}
-                                    </div>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% with vehicle=driver.driver_vehicle.first %}
-                                    {% if vehicle %}
-                                        <span>{{ vehicle.vehicle_type|title }}</span>
-                                        <br>
-                                        <small class="text-muted">{{ vehicle.vehicle_no|default:"" }}</small>
-                                    {% else %}
-                                        <span class="text-muted">No vehicle</span>
-                                    {% endif %}
-                                {% endwith %}
-                            </td>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <i class="fa-solid fa-star me-1 star-icon"></i>
-                                    {{ driver.driver_rating|default:0 }}
-                                    <small class="text-muted ms-1">({{ driver.driver_rating_count }})</small>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="{% if driver.wallet_balance > 0 %}text-success{% else %}text-muted{% endif %}">
-                                    QAR {{ driver.wallet_balance|floatformat:2 }}
-                                </span>
-                            </td>
-                            <td>
-                                <a href="{% url 'workforce:driver_detail' driver.driver_id %}"
-                                   class="btn btn-sm btn-outline-primary">
-                                    <i class="fa-solid fa-eye me-1"></i>View
-                                </a>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <!-- Pagination -->
-            {% include "includes/components/_pagination.html" with page_obj=page_obj %}
+        <table class="dra__table" id="workforce_drivers_active_table_list">
+            <thead>
+                <tr>
+                    <th>Driver</th>
+                    <th>Contact</th>
+                    <th>Vehicle</th>
+                    <th>Rating</th>
+                    <th>Wallet Balance</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for driver in page_obj %}
+                <tr>
+                    <td>
+                        <div class="dra__driver-cell">
+                            <div class="dra__driver-avatar dra__driver-avatar--active">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <div>
+                                <div class="dra__driver-name">{{ driver.user.first_name }} {{ driver.user.last_name }}</div>
+                                <div class="dra__driver-code">{{ driver.driver_code|default:"N/A" }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if driver.driver_phone %}
+                        <div class="dra__contact-line">
+                            <i class="fa-solid fa-phone"></i> {{ driver.driver_phone }}
+                        </div>
+                        {% endif %}
+                        {% if driver.driver_whatsapp %}
+                        <div class="dra__contact-line">
+                            <i class="fa-brands fa-whatsapp"></i> {{ driver.driver_whatsapp }}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% with vehicle=driver.driver_vehicle.first %}
+                        {% if vehicle %}
+                        <div class="dra__vehicle-type">{{ vehicle.vehicle_type|title }}</div>
+                        <div class="dra__vehicle-no">{{ vehicle.vehicle_no|default:"" }}</div>
+                        {% else %}
+                        <span class="dra__text-muted">No vehicle</span>
+                        {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td>
+                        <div class="dra__rating">
+                            <i class="fa-solid fa-star dra__rating-star"></i>
+                            <span>{{ driver.driver_rating|default:0 }}</span>
+                            <span class="dra__rating-count">({{ driver.driver_rating_count }})</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="{% if driver.wallet_balance > 0 %}dra__wallet--positive{% else %}dra__wallet--zero{% endif %}">
+                            QAR {{ driver.wallet_balance|floatformat:2 }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{% url 'workforce:driver_detail' driver.driver_id %}"
+                           class="dra__btn dra__btn--view">
+                            <i class="fa-solid fa-eye"></i> View
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% include "includes/components/_pagination.html" with page_obj=page_obj %}
         {% else %}
-            <div class="empty-state">
-                <i class="fa-solid fa-circle-check"></i>
-                <h3>No Active Drivers</h3>
-                <p>
-                    {% if search %}
-                        No active drivers match your search criteria.
-                    {% else %}
-                        There are no active drivers at the moment.
-                    {% endif %}
-                </p>
-            </div>
+        <div class="dra__empty">
+            <i class="fa-solid fa-circle-check"></i>
+            <h3>No Active Drivers</h3>
+            <p>{% if search %}No active drivers match your search criteria.{% else %}There are no active drivers at the moment.{% endif %}</p>
+        </div>
         {% endif %}
     </div>
 </div>

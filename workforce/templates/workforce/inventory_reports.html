@@ -3,124 +3,117 @@
 
 {% block title %}Inventory Reports - Ezzy Delivery{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
 <div class="col-12 p-3">
-<!-- Page Title -->
-<h1 class="page-title">
-    <i class="fa-solid fa-file-lines me-2"></i>Inventory Reports
-</h1>
+  <!-- Hero Header -->
+  <div class="ivr__hero">
+    <div class="ivr__hero-content">
+      <h1 class="ivr__hero-title">
+        <i class="fa-solid fa-file-lines ivr__hero-icon"></i>Inventory Reports
+      </h1>
+      <p class="ivr__hero-subtitle">Track stock levels and inventory status across sellers</p>
+    </div>
+  </div>
 
-<!-- Seller/Store Filter Section -->
-<div class="filter-section">
-    <label for="sellerFilter" class="filter-label">
-        <i class="fa-solid fa-filter me-2"></i>Filter by Seller/Store
+  <!-- Filter Section -->
+  <div class="ivr__filter-bar">
+    <label for="sellerFilter" class="ivr__filter-label">
+      <i class="fa-solid fa-filter"></i> Filter by Seller/Store
     </label>
-    <input type="text" id="sellerFilter" class="filter-input" placeholder="Search by seller or store name...">
-</div>
+    <input type="text" id="sellerFilter" class="form-control ivr__filter-input" placeholder="Search by seller or store name...">
+  </div>
 
-{% if selected_seller %}
-<!-- Back Button -->
-<a href="{% url 'workforce:inventory_reports' %}" class="back-btn">
-    <i class="fa-solid fa-arrow-left"></i>
-    Back to All Sellers
-</a>
+  {% if selected_seller %}
+  <!-- Back Button -->
+  <a href="{% url 'workforce:inventory_reports' %}" class="ivr__back-link">
+    <i class="fa-solid fa-arrow-left"></i> Back to All Sellers
+  </a>
 
-<!-- Detailed Inventory Table -->
-<div class="inventory-table-container">
-    <table class="inventory-table">
-        <thead>
-            <tr>
-                <th>Product Name</th>
-                <th>SKU</th>
-                <th>Category</th>
-                <th>Current Stock</th>
-                <th>Reorder Level</th>
-                <th>Status</th>
-                <th>Last Updated</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for product in products %}
-            <tr>
-                <td><strong>{{ product.name }}</strong></td>
-                <td>{{ product.sku|default:"N/A" }}</td>
-                <td>{{ product.category|default:"Uncategorized" }}</td>
-                <td><strong>{{ product.quantity|default:"0" }}</strong> {{ product.unit|default:"units" }}</td>
-                <td>{{ product.reorder_level|default:"N/A" }}</td>
-                <td>
-                    {% if product.quantity == 0 %}
-                    <span class="stock-badge stock-out">Out of Stock</span>
-                    {% elif product.quantity <= product.reorder_level %}
-                    <span class="stock-badge stock-low">Low Stock</span>
-                    {% else %}
-                    <span class="stock-badge stock-high">In Stock</span>
-                    {% endif %}
-                </td>
-                <td>{{ product.updated_at|date:"d M Y"|default:"N/A" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
+  <!-- Detailed Inventory Table -->
+  <div class="ivr__table-card">
+    <table class="ivr__table">
+      <thead>
+        <tr>
+          <th>Product Name</th>
+          <th>SKU</th>
+          <th>Category</th>
+          <th>Current Stock</th>
+          <th>Reorder Level</th>
+          <th>Status</th>
+          <th>Last Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for product in products %}
+        <tr>
+          <td><strong>{{ product.name }}</strong></td>
+          <td><code>{{ product.sku|default:"N/A" }}</code></td>
+          <td>{{ product.category|default:"Uncategorized" }}</td>
+          <td><strong>{{ product.quantity|default:"0" }}</strong> {{ product.unit|default:"units" }}</td>
+          <td>{{ product.reorder_level|default:"N/A" }}</td>
+          <td>
+            {% if product.quantity == 0 %}
+            <span class="ivr__stock-badge ivr__stock-badge--out">Out of Stock</span>
+            {% elif product.quantity <= product.reorder_level %}
+            <span class="ivr__stock-badge ivr__stock-badge--low">Low Stock</span>
+            {% else %}
+            <span class="ivr__stock-badge ivr__stock-badge--ok">In Stock</span>
+            {% endif %}
+          </td>
+          <td>{{ product.updated_at|date:"d M Y"|default:"N/A" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
     </table>
-</div>
+  </div>
 
-{% else %}
-<!-- Compact View - Seller/Store Cards -->
-{% if sellers %}
-<div class="seller-grid">
+  {% else %}
+  <!-- Compact View - Seller/Store Cards -->
+  {% if sellers %}
+  <div class="ivr__card-grid">
     {% for seller in sellers %}
-    <div class="seller-card" onclick="window.location.href='?seller_id={{ seller.id }}'">
-        <div class="seller-card-header">
-            <div class="seller-icon">
-                <i class="fa-solid fa-store"></i>
-            </div>
-            <div class="seller-info">
-                <h3>{{ seller.name }}</h3>
-                <p>{{ seller.location|default:"Location not specified" }}</p>
-            </div>
+    <div class="ivr__card" onclick="window.location.href='?seller_id={{ seller.id }}'">
+      <div class="ivr__card-top">
+        <div class="ivr__card-avatar">
+          <i class="fa-solid fa-store"></i>
         </div>
-        <div class="seller-details">
-            <div class="detail-row">
-                <span class="detail-label">Total Products</span>
-                <span class="detail-value">{{ seller.total_products|default:"0" }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Last Settled</span>
-                <span class="detail-value" style="font-size: 1rem; font-weight: 600;">{{ seller.last_settled_date|date:"d M Y"|default:"Never" }}</span>
-            </div>
+        <div class="ivr__card-info">
+          <h3 class="ivr__card-name">{{ seller.name }}</h3>
+          <p class="ivr__card-location">{{ seller.location|default:"Location not specified" }}</p>
         </div>
+      </div>
+      <div class="ivr__card-details">
+        <div class="ivr__detail-row">
+          <span class="ivr__detail-label">Total Products</span>
+          <span class="ivr__detail-value">{{ seller.total_products|default:"0" }}</span>
+        </div>
+        <div class="ivr__detail-row">
+          <span class="ivr__detail-label">Last Settled</span>
+          <span class="ivr__detail-value ivr__detail-value--bold">{{ seller.last_settled_date|date:"d M Y"|default:"Never" }}</span>
+        </div>
+      </div>
     </div>
     {% endfor %}
-</div>
-{% else %}
-<div class="empty-state">
+  </div>
+  {% else %}
+  <div class="ivr__empty">
     <i class="fa-solid fa-store"></i>
     <h3>No Sellers Found</h3>
     <p>There are no sellers or stores registered in the system.</p>
-</div>
-{% endif %}
-{% endif %}
-
+  </div>
+  {% endif %}
+  {% endif %}
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
-    // Filter seller cards
     document.getElementById('sellerFilter').addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
-        const cards = document.querySelectorAll('.seller-card');
-
-        cards.forEach(card => {
-            const text = card.textContent.toLowerCase();
-            if (text.includes(searchTerm)) {
-                card.style.display = 'block';
-            } else {
-                card.style.display = 'none';
-            }
+        var searchTerm = this.value.toLowerCase();
+        var cards = document.querySelectorAll('.ivr__card');
+        cards.forEach(function(card) {
+            var text = card.textContent.toLowerCase();
+            card.style.display = text.includes(searchTerm) ? 'block' : 'none';
         });
     });
 </script>

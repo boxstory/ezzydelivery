@@ -3,39 +3,43 @@
 
 {% block title %}Add Storage Location{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
 
-<div class="container-fluid py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'warehouse:location_list' %}">Locations</a></li>
-                    <li class="breadcrumb-item active">Add New</li>
-                </ol>
-            </nav>
-            <h1 class="h3 mb-0">Add Storage Location</h1>
-            <p class="text-muted">Create a new storage location</p>
+<div class="wh">
+    <!-- Breadcrumb -->
+    <div class="wh__breadcrumb">
+        <a href="{% url 'warehouse:location_list' %}">Locations</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <span class="wh__breadcrumb-active">Add New</span>
+    </div>
+
+    <!-- Hero Header -->
+    <div class="wla__hero">
+        <div class="wla__hero-icon"><i class="fas fa-map-marker-alt"></i></div>
+        <div>
+            <h1 class="wla__hero-title">Add Storage Location</h1>
+            <p class="wla__hero-subtitle">Create a new storage location</p>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-lg-8">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Location Details</h5>
+    <div class="wla__layout">
+        <!-- Form Card -->
+        <div class="wla__main">
+            <div class="wh__card">
+                <div class="wh__card-header">
+                    <div class="wh__card-header-left">
+                        <i class="fas fa-map-pin"></i>
+                        <span>LOCATION DETAILS</span>
+                    </div>
                 </div>
-                <div class="card-body">
+                <div class="wh__card-body">
                     <form method="POST">
                         {% csrf_token %}
 
-                        <div class="mb-3">
-                            <label for="warehouse" class="form-label">Warehouse <span class="text-danger">*</span></label>
-                            <select name="warehouse" id="warehouse" class="form-select" required>
+                        <div class="wha__field">
+                            <label for="warehouse" class="wha__label">Warehouse <span class="wha__required">*</span></label>
+                            <select name="warehouse" id="warehouse" class="wha__select" required>
                                 <option value="">Select Warehouse</option>
                                 {% for wh in warehouses %}
                                 <option value="{{ wh.id }}">{{ wh.name }} ({{ wh.code }})</option>
@@ -43,17 +47,17 @@
                             </select>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="parent" class="form-label">Parent Location</label>
-                            <select name="parent" id="parent" class="form-select">
+                        <div class="wha__field">
+                            <label for="parent" class="wha__label">Parent Location</label>
+                            <select name="parent" id="parent" class="wha__select">
                                 <option value="">None (Top Level)</option>
                             </select>
-                            <small class="text-muted">Locations will load based on selected warehouse</small>
+                            <span class="wha__hint">Locations will load based on selected warehouse</span>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="location_type" class="form-label">Location Type <span class="text-danger">*</span></label>
-                            <select name="location_type" id="location_type" class="form-select" required>
+                        <div class="wha__field">
+                            <label for="location_type" class="wha__label">Location Type <span class="wha__required">*</span></label>
+                            <select name="location_type" id="location_type" class="wha__select" required>
                                 <option value="">Select Type</option>
                                 {% for type_val, type_label in location_types %}
                                 <option value="{{ type_val }}">{{ type_label }}</option>
@@ -61,39 +65,43 @@
                             </select>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="code" class="form-label">Location Code <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="code" name="code" required placeholder="e.g., A-01-01">
+                        <div class="wha__field">
+                            <label for="code" class="wha__label">Location Code <span class="wha__required">*</span></label>
+                            <input type="text" class="wha__input" id="code" name="code" required placeholder="e.g., A-01-01">
                         </div>
 
-                        <div class="mb-3">
-                            <label for="name" class="form-label">Location Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="name" name="name" required placeholder="e.g., Shelf A Row 1 Position 1">
+                        <div class="wha__field">
+                            <label for="name" class="wha__label">Location Name <span class="wha__required">*</span></label>
+                            <input type="text" class="wha__input" id="name" name="name" required placeholder="e.g., Shelf A Row 1 Position 1">
                         </div>
 
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-plus me-1"></i>Create Location
+                        <div class="wha__actions">
+                            <button type="submit" class="wh__btn wh__btn--primary">
+                                <i class="fas fa-plus"></i> Create Location
                             </button>
-                            <a href="{% url 'warehouse:location_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                            <a href="{% url 'warehouse:location_list' %}" class="wh__btn wh__btn--secondary">Cancel</a>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
 
-        <div class="col-lg-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <h6 class="mb-0">Location Code Tips</h6>
+        <!-- Tips Sidebar -->
+        <div class="wla__aside">
+            <div class="wh__card">
+                <div class="wh__card-header">
+                    <div class="wh__card-header-left">
+                        <i class="fas fa-lightbulb"></i>
+                        <span>LOCATION CODE TIPS</span>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <p class="small text-muted mb-2">Use a consistent naming convention:</p>
-                    <ul class="small text-muted mb-0">
-                        <li><code>A-01</code> - Zone A, Row 1</li>
-                        <li><code>A-01-01</code> - Zone A, Row 1, Position 1</li>
-                        <li><code>RECV</code> - Receiving area</li>
-                        <li><code>SHIP</code> - Shipping area</li>
+                <div class="wh__card-body">
+                    <p class="wla__tip-intro">Use a consistent naming convention:</p>
+                    <ul class="wla__tip-list">
+                        <li><span class="wh__code">A-01</span> - Zone A, Row 1</li>
+                        <li><span class="wh__code">A-01-01</span> - Zone A, Row 1, Position 1</li>
+                        <li><span class="wh__code">RECV</span> - Receiving area</li>
+                        <li><span class="wh__code">SHIP</span> - Shipping area</li>
                     </ul>
                 </div>
             </div>
@@ -105,39 +113,30 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const warehouseSelect = document.getElementById('warehouse');
-    const parentSelect = document.getElementById('parent');
-    const locationTypeSelect = document.getElementById('location_type');
+    var warehouseSelect = document.getElementById('warehouse');
+    var parentSelect = document.getElementById('parent');
+    var locationTypeSelect = document.getElementById('location_type');
 
-    // Function to load parent locations based on warehouse
     function loadParentLocations(warehouseId) {
         if (!warehouseId) {
             parentSelect.innerHTML = '<option value="">None (Top Level)</option>';
             parentSelect.disabled = true;
             return;
         }
-
-        // Show loading state
         parentSelect.disabled = true;
         parentSelect.innerHTML = '<option value="">Loading...</option>';
-
-        // Fetch locations for the selected warehouse
-        fetch(`/workforce/warehouse/api/warehouses/${warehouseId}/storage-locations/`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to fetch locations');
-                }
+        fetch('/workforce/warehouse/api/warehouses/' + warehouseId + '/storage-locations/')
+            .then(function(response) {
+                if (!response.ok) throw new Error('Failed to fetch locations');
                 return response.json();
             })
-            .then(locations => {
-                // Clear and rebuild options
+            .then(function(locations) {
                 parentSelect.innerHTML = '<option value="">None (Top Level)</option>';
-
                 if (locations.length > 0) {
-                    locations.forEach(location => {
-                        const option = document.createElement('option');
+                    locations.forEach(function(location) {
+                        var option = document.createElement('option');
                         option.value = location.id;
-                        option.textContent = `${location.code} - ${location.name}`;
+                        option.textContent = location.code + ' - ' + location.name;
                         parentSelect.appendChild(option);
                     });
                     parentSelect.disabled = false;
@@ -146,36 +145,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     parentSelect.disabled = false;
                 }
             })
-            .catch(error => {
+            .catch(function(error) {
                 console.error('Error loading parent locations:', error);
                 parentSelect.innerHTML = '<option value="">None (Top Level) - Error loading locations</option>';
                 parentSelect.disabled = false;
             });
     }
 
-    // Pre-select warehouse from URL parameter if present
-    const urlParams = new URLSearchParams(window.location.search);
-    const warehouseParam = urlParams.get('warehouse');
+    var urlParams = new URLSearchParams(window.location.search);
+    var warehouseParam = urlParams.get('warehouse');
     if (warehouseParam) {
         warehouseSelect.value = warehouseParam;
         loadParentLocations(warehouseParam);
     }
 
-    // Listen for warehouse selection changes
     warehouseSelect.addEventListener('change', function() {
-        const selectedWarehouseId = this.value;
-        loadParentLocations(selectedWarehouseId);
+        loadParentLocations(this.value);
     });
 
-    // Auto-generate location name from code (optional helper)
-    const codeInput = document.getElementById('code');
-    const nameInput = document.getElementById('name');
-
+    var codeInput = document.getElementById('code');
+    var nameInput = document.getElementById('name');
     codeInput.addEventListener('blur', function() {
         if (!nameInput.value && this.value) {
-            // Suggest a name based on code
-            const selectedType = locationTypeSelect.options[locationTypeSelect.selectedIndex]?.text || 'Location';
-            nameInput.value = `${selectedType} ${this.value}`;
+            var selectedType = locationTypeSelect.options[locationTypeSelect.selectedIndex]
+                ? locationTypeSelect.options[locationTypeSelect.selectedIndex].text
+                : 'Location';
+            nameInput.value = selectedType + ' ' + this.value;
         }
     });
 });

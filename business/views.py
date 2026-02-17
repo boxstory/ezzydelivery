@@ -398,6 +398,8 @@ def pickup_location_list(request):
         all_locations = list(pickup_locations)
 
         if not all_locations and not warehouse_locations:
+            if business.fulfillment_service_enabled:
+                return redirect('business:pickup_location_choose')
             return redirect('business:pickup_location_add')
 
         logger.info(f"User {request.user.id} viewing {len(all_locations)} pickup locations and {len(warehouse_locations)} warehouse locations for business {business.business_id}")
@@ -413,6 +415,21 @@ def pickup_location_list(request):
         logger.error(f"Business not found for user {request.user.id}")
         messages.error(request, "Business not found")
         return redirect('core:main_dashboard')
+
+
+@login_required(login_url='account_login')
+@business_required
+def pickup_location_choose(request):
+    """Choice page: add pickup location or link to fulfillment center."""
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+    if not business.fulfillment_service_enabled:
+        return redirect('business:pickup_location_add')
+    return render(request, 'business/parts/pickup_location_choose.html', {
+        'business': business,
+    })
 
 
 @login_required(login_url='account_login')
@@ -892,7 +909,8 @@ def business_settings_api_test_result(request, business_id, api_id):
 
     business = user_business
     business_api = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
-    update_time = datetime.now().strftime('%Y-%m-%d  Time : %H:%M:%S')
+    from django.utils import timezone as dj_timezone
+    update_time = dj_timezone.localtime().strftime('%Y-%m-%d  Time : %H:%M:%S')
 
     if not business_api:
         messages.error(request, "API settings not found.")

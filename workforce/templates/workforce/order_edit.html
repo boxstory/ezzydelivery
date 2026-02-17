@@ -3,23 +3,15 @@
 
 {% block title %}Edit Order {{ order.order_number }} - Workforce{% endblock %}
 
-{% block extra_css %}
-<link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
-{% endblock %}
-
 {% block content %}
-<div class="flex-fill p-3">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h4 class="mb-1">
-                <i class="fa-solid fa-pen-to-square me-2"></i>
-                Edit Order
-            </h4>
+<div class="woe">
+    <!-- Hero Header -->
+    <div class="woe__hero">
+        <div class="woe__hero-content">
             <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-0">
+                <ol class="breadcrumb mb-2">
                     <li class="breadcrumb-item">
-                        <a href="{% url 'workforce:wf_dashboard' %}"
+                        <a href="{% url 'workforce:wf_dashboard' %}" class="woe__breadcrumb-link"
                            hx-get="{% url 'workforce:wf_dashboard' %}"
                            hx-target="#main-content"
                            hx-select="#main-content"
@@ -27,7 +19,7 @@
                            hx-push-url="true">Dashboard</a>
                     </li>
                     <li class="breadcrumb-item">
-                        <a href="{% url 'workforce:wf_orders_all' %}"
+                        <a href="{% url 'workforce:wf_orders_all' %}" class="woe__breadcrumb-link"
                            hx-get="{% url 'workforce:wf_orders_all' %}"
                            hx-target="#main-content"
                            hx-select="#main-content"
@@ -35,88 +27,93 @@
                            hx-push-url="true">Orders</a>
                     </li>
                     <li class="breadcrumb-item">
-                        <a href="{% url 'workforce:order_detail' order.id %}"
+                        <a href="{% url 'workforce:order_detail' order.id %}" class="woe__breadcrumb-link"
                            hx-get="{% url 'workforce:order_detail' order.id %}"
                            hx-target="#main-content"
                            hx-select="#main-content"
                            hx-swap="outerHTML"
                            hx-push-url="true">{{ order.order_number }}</a>
                     </li>
-                    <li class="breadcrumb-item active">Edit</li>
+                    <li class="breadcrumb-item active text-white-50">Edit</li>
                 </ol>
             </nav>
+            <h1 class="woe__hero-title">
+                <i class="fa-solid fa-pen-to-square me-2"></i>Edit Order
+            </h1>
+            <p class="woe__hero-sub">Editing order {{ order.order_number }}</p>
         </div>
-        <div>
-            <a href="{% url 'workforce:order_detail' order.id %}"
-               class="btn btn-outline-secondary"
-               hx-get="{% url 'workforce:order_detail' order.id %}"
-               hx-target="#main-content"
-               hx-select="#main-content"
-               hx-swap="outerHTML"
-               hx-push-url="true">
-                <i class="fa-solid fa-times me-1"></i> Cancel
-            </a>
-        </div>
+        <a href="{% url 'workforce:order_detail' order.id %}" class="woe__btn woe__btn--outline-light"
+           hx-get="{% url 'workforce:order_detail' order.id %}"
+           hx-target="#main-content"
+           hx-select="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true">
+            <i class="fa-solid fa-times me-1"></i> Cancel
+        </a>
     </div>
 
     <form method="post" id="orderEditForm">
         {% csrf_token %}
-        <div class="row">
-            <!-- Order Info -->
+        <div class="row g-3 p-3">
+            <!-- Main Column -->
             <div class="col-lg-8">
                 <!-- Order Information (Read-only) -->
-                <div class="card mb-4">
-                    <div class="card-header bg-secondary text-white">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-info-circle me-2"></i>
-                            Order Information
-                        </h5>
+                <div class="woe__card">
+                    <div class="woe__card-header">
+                        <i class="fa-solid fa-info-circle me-2 woe__icon-accent"></i>
+                        <span class="woe__section-label">Order Information</span>
                     </div>
-                    <div class="card-body">
+                    <div class="woe__card-body">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label text-muted small">Order Number</label>
-                                <input type="text" class="form-control" value="{{ order.order_number }}" readonly disabled>
+                                <div class="woe__field">
+                                    <span class="woe__field-label">Order Number</span>
+                                    <span class="woe__field-value">{{ order.order_number }}</span>
+                                </div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label text-muted small">Client Order Code</label>
-                                <input type="text" class="form-control" value="{{ order.client_order_code }}" readonly disabled>
+                                <div class="woe__field">
+                                    <span class="woe__field-label">Client Order Code</span>
+                                    <span class="woe__field-value">{{ order.client_order_code }}</span>
+                                </div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label text-muted small">Business</label>
-                                <input type="text" class="form-control" value="{{ order.business.business_name }}" readonly disabled>
+                                <div class="woe__field">
+                                    <span class="woe__field-label">Business</span>
+                                    <span class="woe__field-value">{{ order.business.business_name }}</span>
+                                </div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label text-muted small">Order Date</label>
-                                <input type="text" class="form-control" value="{{ order.order_date|date:'d M Y' }}" readonly disabled>
+                                <div class="woe__field">
+                                    <span class="woe__field-label">Order Date</span>
+                                    <span class="woe__field-value">{{ order.order_date|date:'d M Y' }}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Customer Information (Editable) -->
-                <div class="card mb-4">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-user me-2"></i>
-                            Customer Information
-                        </h5>
+                <div class="woe__card">
+                    <div class="woe__card-header woe__card-header--info">
+                        <i class="fa-solid fa-user me-2"></i>
+                        <span class="woe__section-label">Customer Information</span>
                     </div>
-                    <div class="card-body">
+                    <div class="woe__card-body">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="customer_name" class="form-label">Customer Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="customer_name" name="customer_name"
+                                <label for="customer_name" class="woe__form-label">Customer Name <span class="text-danger">*</span></label>
+                                <input type="text" class="woe__form-input" id="customer_name" name="customer_name"
                                        value="{{ order.customer_name }}" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="customer_phone" class="form-label">Phone <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="customer_phone" name="customer_phone"
+                                <label for="customer_phone" class="woe__form-label">Phone <span class="text-danger">*</span></label>
+                                <input type="text" class="woe__form-input" id="customer_phone" name="customer_phone"
                                        value="{{ order.customer_phone }}" required>
                             </div>
                             <div class="col-md-6">
-                                <label for="customer_whatsapp" class="form-label">WhatsApp</label>
-                                <input type="text" class="form-control" id="customer_whatsapp" name="customer_whatsapp"
+                                <label for="customer_whatsapp" class="woe__form-label">WhatsApp</label>
+                                <input type="text" class="woe__form-input" id="customer_whatsapp" name="customer_whatsapp"
                                        value="{{ order.customer_whatsapp }}">
                             </div>
                         </div>
@@ -124,33 +121,31 @@
                 </div>
 
                 <!-- Delivery Address (Editable) -->
-                <div class="card mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-location-dot me-2"></i>
-                            Delivery Address
-                        </h5>
+                <div class="woe__card">
+                    <div class="woe__card-header woe__card-header--primary">
+                        <i class="fa-solid fa-location-dot me-2"></i>
+                        <span class="woe__section-label">Delivery Address</span>
                     </div>
-                    <div class="card-body">
+                    <div class="woe__card-body">
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <label for="dl_zone" class="form-label">Zone Number</label>
-                                <input type="number" class="form-control" id="dl_zone" name="dl_zone"
+                                <label for="dl_zone" class="woe__form-label">Zone Number</label>
+                                <input type="number" class="woe__form-input" id="dl_zone" name="dl_zone"
                                        value="{{ order.dl_zone|default:'' }}" min="1" max="100">
                             </div>
                             <div class="col-md-4">
-                                <label for="dl_street" class="form-label">Street Number</label>
-                                <input type="number" class="form-control" id="dl_street" name="dl_street"
+                                <label for="dl_street" class="woe__form-label">Street Number</label>
+                                <input type="number" class="woe__form-input" id="dl_street" name="dl_street"
                                        value="{{ order.dl_street|default:'' }}" min="1">
                             </div>
                             <div class="col-md-4">
-                                <label for="dl_building" class="form-label">Building Number</label>
-                                <input type="number" class="form-control" id="dl_building" name="dl_building"
+                                <label for="dl_building" class="woe__form-label">Building Number</label>
+                                <input type="number" class="woe__form-input" id="dl_building" name="dl_building"
                                        value="{{ order.dl_building|default:'' }}" min="1">
                             </div>
                             <div class="col-12">
-                                <label for="customer_address" class="form-label">Full Address</label>
-                                <textarea class="form-control" id="customer_address" name="customer_address"
+                                <label for="customer_address" class="woe__form-label">Full Address</label>
+                                <textarea class="woe__form-input" id="customer_address" name="customer_address"
                                           rows="3">{{ order.customer_address }}</textarea>
                             </div>
                         </div>
@@ -158,47 +153,35 @@
                 </div>
 
                 <!-- Pickup Location -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-store me-2"></i>
-                            Pickup Location
-                        </h5>
+                <div class="woe__card">
+                    <div class="woe__card-header">
+                        <i class="fa-solid fa-store me-2 woe__icon-accent"></i>
+                        <span class="woe__section-label">Pickup Location</span>
                     </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <label for="pickup_location" class="form-label">Select Pickup Location</label>
-                                <select class="form-select" id="pickup_location" name="pickup_location">
-                                    <option value="">-- Select --</option>
-                                    {% for location in pickup_locations %}
-                                    <option value="{{ location.id }}"
-                                            {% if order.pickup_location_id == location.id %}selected{% endif %}>
-                                        {{ location.location_name }} - {{ location.pickup_location_address|truncatechars:40 }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
+                    <div class="woe__card-body">
+                        <label for="pickup_location" class="woe__form-label">Select Pickup Location</label>
+                        <select class="woe__form-input" id="pickup_location" name="pickup_location">
+                            <option value="">-- Select --</option>
+                            {% for location in pickup_locations %}
+                            <option value="{{ location.id }}"
+                                    {% if order.pickup_location_id == location.id %}selected{% endif %}>
+                                {{ location.location_name }} - {{ location.pickup_location_address|truncatechars:40 }}
+                            </option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
 
                 <!-- Notes -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-sticky-note me-2"></i>
-                            Notes
-                        </h5>
+                <div class="woe__card">
+                    <div class="woe__card-header">
+                        <i class="fa-solid fa-sticky-note me-2 woe__icon-accent"></i>
+                        <span class="woe__section-label">Notes</span>
                     </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <label for="order_notes" class="form-label">Order Notes</label>
-                                <textarea class="form-control" id="order_notes" name="order_notes"
-                                          rows="2">{{ order.order_notes }}</textarea>
-                            </div>
-                        </div>
+                    <div class="woe__card-body">
+                        <label for="order_notes" class="woe__form-label">Order Notes</label>
+                        <textarea class="woe__form-input" id="order_notes" name="order_notes"
+                                  rows="2">{{ order.order_notes }}</textarea>
                     </div>
                 </div>
             </div>
@@ -206,16 +189,14 @@
             <!-- Sidebar -->
             <div class="col-lg-4">
                 <!-- Payment Info -->
-                <div class="card mb-4">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-money-bill me-2"></i>
-                            Payment Details
-                        </h5>
+                <div class="woe__card">
+                    <div class="woe__card-header woe__card-header--success">
+                        <i class="fa-solid fa-money-bill me-2"></i>
+                        <span class="woe__section-label">Payment Details</span>
                     </div>
-                    <div class="card-body">
+                    <div class="woe__card-body">
                         <div class="mb-3">
-                            <label class="form-label">COD Status</label>
+                            <label class="woe__form-label">COD Status</label>
                             <div class="d-flex gap-3">
                                 {% for value, label in cod_statuses %}
                                 <div class="form-check">
@@ -228,35 +209,32 @@
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label for="cod_amount" class="form-label">COD Amount (QAR)</label>
-                            <input type="number" class="form-control" id="cod_amount" name="cod_amount"
+                            <label for="cod_amount" class="woe__form-label">COD Amount (QAR)</label>
+                            <input type="number" class="woe__form-input" id="cod_amount" name="cod_amount"
                                    value="{{ order.cod_amount }}" min="0">
                         </div>
                         <div class="mb-3">
-                            <label for="dl_amount" class="form-label">Delivery Fee (QAR)</label>
-                            <input type="number" class="form-control" id="dl_amount" name="dl_amount"
+                            <label for="dl_amount" class="woe__form-label">Delivery Fee (QAR)</label>
+                            <input type="number" class="woe__form-input" id="dl_amount" name="dl_amount"
                                    value="{{ order.dl_amount }}" min="0">
                         </div>
-                        <hr>
-                        <div class="d-flex justify-content-between">
-                            <span class="fw-bold">Total:</span>
-                            <strong class="text-success fs-5" id="totalAmount">{{ order.cod_amount|add:order.dl_amount }} QAR</strong>
+                        <div class="woe__total-row">
+                            <span class="woe__total-label">Total:</span>
+                            <strong class="woe__total-value" id="totalAmount">{{ order.cod_amount|add:order.dl_amount }} QAR</strong>
                         </div>
                     </div>
                 </div>
 
                 <!-- Status -->
-                <div class="card mb-4">
-                    <div class="card-header bg-warning text-dark">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-flag me-2"></i>
-                            Status
-                        </h5>
+                <div class="woe__card">
+                    <div class="woe__card-header woe__card-header--warning">
+                        <i class="fa-solid fa-flag me-2"></i>
+                        <span class="woe__section-label">Status</span>
                     </div>
-                    <div class="card-body">
+                    <div class="woe__card-body">
                         <div class="mb-3">
-                            <label for="order_status" class="form-label">Order Status</label>
-                            <select class="form-select" id="order_status" name="order_status">
+                            <label for="order_status" class="woe__form-label">Order Status</label>
+                            <select class="woe__form-input" id="order_status" name="order_status">
                                 {% for value, label in order_statuses %}
                                 <option value="{{ value }}" {% if order.order_status == value %}selected{% endif %}>
                                     {{ label }}
@@ -265,8 +243,8 @@
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label for="verification_status" class="form-label">Verification Status</label>
-                            <select class="form-select" id="verification_status" name="verification_status">
+                            <label for="verification_status" class="woe__form-label">Verification Status</label>
+                            <select class="woe__form-input" id="verification_status" name="verification_status">
                                 {% for value, label in verification_statuses %}
                                 <option value="{{ value }}" {% if order.verification_status == value %}selected{% endif %}>
                                     {{ label }}
@@ -278,13 +256,13 @@
                 </div>
 
                 <!-- Submit Button -->
-                <div class="card">
-                    <div class="card-body">
-                        <button type="submit" class="btn btn-primary w-100 mb-2">
+                <div class="woe__card">
+                    <div class="woe__card-body">
+                        <button type="submit" class="woe__btn woe__btn--primary w-100 mb-2">
                             <i class="fa-solid fa-save me-2"></i> Save Changes
                         </button>
                         <a href="{% url 'workforce:order_detail' order.id %}"
-                           class="btn btn-outline-secondary w-100"
+                           class="woe__btn woe__btn--outline w-100"
                            hx-get="{% url 'workforce:order_detail' order.id %}"
                            hx-target="#main-content"
                            hx-select="#main-content"
@@ -302,7 +280,6 @@
 
 {% block extra_js %}
 <script>
-// Update total amount when COD or delivery fee changes
 document.getElementById('cod_amount').addEventListener('input', updateTotal);
 document.getElementById('dl_amount').addEventListener('input', updateTotal);
 

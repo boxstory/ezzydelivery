@@ -1,0 +1,75 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'business/css/business.css' %}?v=20260217b">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="plc" id="client_location_choose_container">
+
+    <!-- Hero Banner -->
+    <div class="plc__hero">
+        <div class="plc__hero-icon">
+            <i class="fa-solid fa-map-location-dot"></i>
+        </div>
+        <h1 class="plc__hero-title">Get Started</h1>
+        <p class="plc__hero-sub">Choose how you'd like to set up your store location</p>
+    </div>
+
+    <!-- Choice Cards -->
+    <div class="plc__grid">
+
+        <!-- Option 1: Add Pickup Location -->
+        <a href="{% url 'business:pickup_location_add' %}" class="plc__option" id="client_location_choose_btn_pickup">
+            <div class="plc__option__icon plc__option__icon--store">
+                <i class="fa-solid fa-store"></i>
+            </div>
+            <h2 class="plc__option__title">Add Store Location</h2>
+            <p class="plc__option__desc">
+                Create your own pickup point with custom address, zone, and GPS coordinates.
+            </p>
+            <div class="plc__option__features">
+                <span class="plc__option__tag"><i class="fa-solid fa-check"></i> Custom address</span>
+                <span class="plc__option__tag"><i class="fa-solid fa-check"></i> GPS coordinates</span>
+                <span class="plc__option__tag"><i class="fa-solid fa-check"></i> Multiple locations</span>
+            </div>
+            <span class="plc__option__cta">
+                <i class="fa-solid fa-plus"></i> Add Location
+            </span>
+        </a>
+
+        <!-- Option 2: Link Fulfillment Center -->
+        <a href="{% url 'warehouse:seller_warehouse_link_add' %}" class="plc__option plc__option--fulfillment" id="client_location_choose_btn_fulfillment">
+            <div class="plc__option__icon plc__option__icon--warehouse">
+                <i class="fa-solid fa-warehouse"></i>
+            </div>
+            <h2 class="plc__option__title">Link Fulfillment Center</h2>
+            <p class="plc__option__desc">
+                Connect to an existing EzzyDelivery warehouse for managed fulfillment and inventory.
+            </p>
+            <div class="plc__option__features">
+                <span class="plc__option__tag"><i class="fa-solid fa-check"></i> Managed warehouse</span>
+                <span class="plc__option__tag"><i class="fa-solid fa-check"></i> Inventory sync</span>
+                <span class="plc__option__tag"><i class="fa-solid fa-check"></i> Pick & pack</span>
+            </div>
+            <span class="plc__option__cta plc__option__cta--navy">
+                <i class="fa-solid fa-link"></i> Link Warehouse
+            </span>
+        </a>
+
+    </div>
+
+    <!-- Help Callout -->
+    <div class="plc__callout">
+        <i class="fa-solid fa-circle-info plc__callout-icon"></i>
+        <div>
+            <p class="plc__callout-title">Not sure which to choose?</p>
+            <p class="plc__callout-text">
+                Use <strong>Store Location</strong> if you handle your own pickups. Use <strong>Fulfillment Center</strong> if EzzyDelivery manages your warehouse, inventory, and dispatching.
+            </p>
+        </div>
+    </div>
+
+</div>
+{% endblock content %}

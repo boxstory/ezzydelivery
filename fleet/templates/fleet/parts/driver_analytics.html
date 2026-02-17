@@ -6,257 +6,238 @@
 {% endblock extra_css %}
 
 {% block content %}
-<div class="flex-fill p-2">
-    <div class="col-12 py-2">
-        <!-- Page Header -->
-        <section class="m-0 p-0 mb-4" id="fleet_analytics_section_header">
-            <div class="pt-3 pt-md-3 pb-0 text-dark">
-                <div class="text-center">
-                    <h3 class="fw-bolder text-uppercase" id="fleet_analytics_header_title">
-                        <i class="fa-solid fa-chart-pie me-2"></i>Advanced Analytics
-                        <br />
-                        <span class="fw-light text-lowercase h5">{{ driver.user.get_full_name }}</span>
-                    </h3>
-                    <p class="text-muted">Data from the last 90 days</p>
+<div class="flt-analytics">
+    <!-- Hero Banner -->
+    <div class="flt__hero" id="fleet_analytics_section_header">
+        <div class="flt__hero-inner">
+            <div class="flt__hero-left">
+                <h1 class="flt__hero-title" id="fleet_analytics_header_title">
+                    <i class="fa-solid fa-chart-pie"></i> Advanced Analytics
+                </h1>
+                <p class="flt__hero-sub">{{ driver.user.get_full_name }} &middot; Data from the last 90 days</p>
+            </div>
+            <div class="flt__hero-right">
+                <div class="flt__hero-stat">
+                    <span class="flt__hero-stat__num">{{ cod_count|add:prepaid_count }}</span>
+                    <span class="flt__hero-stat__label">Total Orders</span>
+                </div>
+                <div class="flt__hero-stat flt__hero-stat--warn">
+                    <span class="flt__hero-stat__num">{{ cod_count }}</span>
+                    <span class="flt__hero-stat__label">COD</span>
                 </div>
             </div>
-        </section>
+        </div>
+    </div>
 
-        <!-- Monthly Trend Chart -->
-        <div class="row g-3 mb-4">
-            <div class="col-12">
-                <section class="p-4 bg-white rounded shadow-sm" id="fleet_analytics_card_monthly_trend">
-                    <h5 class="fw-bold mb-3" id="fleet_analytics_title_monthly">
-                        <i class="fa-solid fa-chart-line me-2"></i>
-                        Monthly Performance Trend
-                    </h5>
-                    <canvas id="fleet_analytics_chart_monthly" height="80"></canvas>
-                </section>
+    <!-- Monthly Trend Chart -->
+    <div class="flt__card" id="fleet_analytics_card_monthly_trend">
+        <div class="flt__card-header" id="fleet_analytics_title_monthly">
+            <i class="fa-solid fa-chart-line"></i> Monthly Performance Trend
+        </div>
+        <div class="flt__card-body">
+            <canvas id="fleet_analytics_chart_monthly" height="80"></canvas>
+        </div>
+    </div>
+
+    <!-- COD vs Prepaid & Peak Hours -->
+    <div class="flt__two-col">
+        <div class="flt__card">
+            <div class="flt__card-header">
+                <i class="fa-solid fa-chart-pie"></i> COD vs Prepaid
+            </div>
+            <div class="flt__card-body">
+                <canvas id="fleet_analytics_chart_cod_prepaid"></canvas>
+                <div class="flt__chart-legend">
+                    <div class="flt__chart-legend__item">
+                        <span class="flt__chart-legend__label">COD Orders</span>
+                        <span class="flt__chart-legend__value flt__chart-legend__value--warning">{{ cod_count }}</span>
+                    </div>
+                    <div class="flt__chart-legend__item">
+                        <span class="flt__chart-legend__label">Prepaid Orders</span>
+                        <span class="flt__chart-legend__value flt__chart-legend__value--success">{{ prepaid_count }}</span>
+                    </div>
+                </div>
             </div>
         </div>
-
-        <!-- COD vs Prepaid & Peak Hours -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-6">
-                <section class="p-4 bg-white rounded shadow-sm h-100">
-                    <h5 class="fw-bold mb-3">
-                        <i class="fa-solid fa-chart-pie me-2"></i>
-                        COD vs Prepaid
-                    </h5>
-                    <canvas id="fleet_analytics_chart_cod_prepaid"></canvas>
-                    <div class="row text-center mt-3">
-                        <div class="col-6">
-                            <p class="text-muted mb-0 small">COD Orders</p>
-                            <p class="fw-bold fs-4 mb-0 text-warning">{{ cod_count }}</p>
-                        </div>
-                        <div class="col-6">
-                            <p class="text-muted mb-0 small">Prepaid Orders</p>
-                            <p class="fw-bold fs-4 mb-0 text-success">{{ prepaid_count }}</p>
-                        </div>
-                    </div>
-                </section>
+        <div class="flt__card">
+            <div class="flt__card-header">
+                <i class="fa-solid fa-clock"></i> Peak Delivery Hours
             </div>
-            <div class="col-md-6">
-                <section class="p-4 bg-white rounded shadow-sm h-100">
-                    <h5 class="fw-bold mb-3">
-                        <i class="fa-solid fa-clock me-2"></i>
-                        Peak Delivery Hours
-                    </h5>
-                    <div class="listing-container" style="box-shadow: none;">
-                        <table class="listing-table">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th class="text-end">Deliveries</th>
-                                    <th class="text-end">%</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for hour in peak_hours %}
-                                <tr>
-                                    <td class="fw-bold">{{ hour.hour }}</td>
-                                    <td class="text-end">{{ hour.deliveries }}</td>
-                                    <td class="text-end">
-                                        <span class="listing-status primary">
-                                            {% widthratio hour.deliveries cod_count|add:prepaid_count 100 %}%
-                                        </span>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr><td colspan="3" class="text-center text-muted py-3">No data available</td></tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
+            <div class="flt__card-body flt__card-body--flush">
+                <div class="listing-container">
+                    <table class="listing-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th class="text-end">Deliveries</th>
+                                <th class="text-end">%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for hour in peak_hours %}
+                            <tr>
+                                <td class="fw-bold">{{ hour.hour }}</td>
+                                <td class="text-end">{{ hour.deliveries }}</td>
+                                <td class="text-end">
+                                    <span class="listing-status primary">
+                                        {% widthratio hour.deliveries cod_count|add:prepaid_count 100 %}%
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-3">No data available</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
+    </div>
 
-        <!-- Delivery Categories & Speed Types -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-6">
-                <section class="p-4 bg-white rounded shadow-sm h-100">
-                    <h5 class="fw-bold mb-3">
-                        <i class="fa-solid fa-layer-group me-2"></i>
-                        Delivery Categories
-                    </h5>
-                    <div class="listing-container" style="box-shadow: none;">
+    <!-- Delivery Categories & Speed Types -->
+    <div class="flt__two-col">
+        <div class="flt__card">
+            <div class="flt__card-header">
+                <i class="fa-solid fa-layer-group"></i> Delivery Categories
+            </div>
+            <div class="flt__card-body flt__card-body--flush">
+                {% if delivery_categories %}
+                <div class="listing-container">
+                    <table class="listing-table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th class="text-end">Count</th>
+                                <th>Distribution</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for category in delivery_categories %}
+                            <tr>
+                                <td class="fw-bold">{{ category.dl_category|default:"Standard" }}</td>
+                                <td class="text-end">{{ category.count }}</td>
+                                <td>
+                                    <div class="flt__bar-mini">
+                                        <div class="flt__bar-mini__fill flt__bar-mini__fill--primary"
+                                             data-width="{% widthratio category.count delivery_categories.0.count 100 %}"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="flt__empty">
+                    <i class="fa-solid fa-layer-group"></i>
+                    <p>No category data available</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="flt__card">
+            <div class="flt__card-header">
+                <i class="fa-solid fa-gauge-high"></i> Delivery Speed Types
+            </div>
+            <div class="flt__card-body flt__card-body--flush">
+                {% if delivery_speeds %}
+                <div class="listing-container">
+                    <table class="listing-table">
+                        <thead>
+                            <tr>
+                                <th>Speed Type</th>
+                                <th class="text-end">Count</th>
+                                <th>Distribution</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for speed in delivery_speeds %}
+                            <tr>
+                                <td class="fw-bold">{{ speed.dl_speed|default:"Standard" }}</td>
+                                <td class="text-end">{{ speed.count }}</td>
+                                <td>
+                                    <div class="flt__bar-mini">
+                                        <div class="flt__bar-mini__fill flt__bar-mini__fill--success"
+                                             data-width="{% widthratio speed.count delivery_speeds.0.count 100 %}"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="flt__empty">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    <p>No speed data available</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Hourly Distribution Chart -->
+    <div class="flt__card">
+        <div class="flt__card-header">
+            <i class="fa-solid fa-chart-bar"></i> 24-Hour Delivery Distribution
+        </div>
+        <div class="flt__card-body">
+            <canvas id="fleet_analytics_chart_hourly" height="60"></canvas>
+        </div>
+    </div>
+
+    <!-- Insights & Recommendations -->
+    <div class="flt__card flt__card--accent">
+        <div class="flt__card-header">
+            <i class="fa-solid fa-lightbulb"></i> Performance Insights
+        </div>
+        <div class="flt__card-body">
+            <div class="flt__insights-grid">
+                <div class="flt__insight-panel">
+                    <h6 class="flt__insight-panel__title">
+                        <i class="fa-solid fa-trophy flt__insight-panel__icon flt__insight-panel__icon--gold"></i>
+                        Your Best Performance
+                    </h6>
+                    <ul class="flt__insight-list">
+                        {% if peak_hours %}
+                        <li>Most productive time: {{ peak_hours.0.hour }}</li>
+                        {% endif %}
+                        {% if cod_count > prepaid_count %}
+                        <li>Strong in COD collections ({{ cod_count }} orders)</li>
+                        {% endif %}
                         {% if delivery_categories %}
-                        <table class="listing-table">
-                            <thead>
-                                <tr>
-                                    <th>Category</th>
-                                    <th class="text-end">Count</th>
-                                    <th>Distribution</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for category in delivery_categories %}
-                                <tr>
-                                    <td class="fw-bold">{{ category.dl_category|default:"Standard" }}</td>
-                                    <td class="text-end">{{ category.count }}</td>
-                                    <td>
-                                        <div class="progress" style="height: 20px;">
-                                            <div class="progress-bar bg-primary"
-                                                 style="width: {% widthratio category.count delivery_categories.0.count 100 %}%">
-                                                {% widthratio category.count delivery_categories.0.count 100 %}%
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        {% else %}
-                        <div class="listing-empty">
-                            <i class="fa-solid fa-layer-group"></i>
-                            <p>No category data available</p>
-                        </div>
+                        <li>Top category: {{ delivery_categories.0.dl_category|default:"Standard" }} ({{ delivery_categories.0.count }} deliveries)</li>
                         {% endif %}
-                    </div>
-                </section>
-            </div>
-            <div class="col-md-6">
-                <section class="p-4 bg-white rounded shadow-sm h-100">
-                    <h5 class="fw-bold mb-3">
-                        <i class="fa-solid fa-gauge-high me-2"></i>
-                        Delivery Speed Types
-                    </h5>
-                    <div class="listing-container" style="box-shadow: none;">
-                        {% if delivery_speeds %}
-                        <table class="listing-table">
-                            <thead>
-                                <tr>
-                                    <th>Speed Type</th>
-                                    <th class="text-end">Count</th>
-                                    <th>Distribution</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for speed in delivery_speeds %}
-                                <tr>
-                                    <td class="fw-bold">{{ speed.dl_speed|default:"Standard" }}</td>
-                                    <td class="text-end">{{ speed.count }}</td>
-                                    <td>
-                                        <div class="progress" style="height: 20px;">
-                                            <div class="progress-bar bg-success"
-                                                 style="width: {% widthratio speed.count delivery_speeds.0.count 100 %}%">
-                                                {% widthratio speed.count delivery_speeds.0.count 100 %}%
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        {% else %}
-                        <div class="listing-empty">
-                            <i class="fa-solid fa-gauge-high"></i>
-                            <p>No speed data available</p>
-                        </div>
-                        {% endif %}
-                    </div>
-                </section>
+                    </ul>
+                </div>
+                <div class="flt__insight-panel">
+                    <h6 class="flt__insight-panel__title">
+                        <i class="fa-solid fa-chart-line flt__insight-panel__icon flt__insight-panel__icon--green"></i>
+                        Growth Opportunities
+                    </h6>
+                    <ul class="flt__insight-list">
+                        <li>Try to maintain consistency across all time periods</li>
+                        <li>Focus on improving success rates during off-peak hours</li>
+                        <li>Aim to diversify delivery categories for better earnings</li>
+                    </ul>
+                </div>
             </div>
         </div>
+    </div>
 
-        <!-- Hourly Distribution Chart -->
-        <div class="row g-3 mb-4">
-            <div class="col-12">
-                <section class="p-4 bg-white rounded shadow-sm">
-                    <h5 class="fw-bold mb-3">
-                        <i class="fa-solid fa-chart-bar me-2"></i>
-                        24-Hour Delivery Distribution
-                    </h5>
-                    <canvas id="fleet_analytics_chart_hourly" height="60"></canvas>
-                </section>
-            </div>
-        </div>
-
-        <!-- Insights & Recommendations -->
-        <div class="row g-3 mb-4">
-            <div class="col-12">
-                <section class="p-4 bg-white rounded shadow-sm border-start border-5 border-info">
-                    <h5 class="fw-bold mb-3">
-                        <i class="fa-solid fa-lightbulb me-2"></i>
-                        Performance Insights
-                    </h5>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="p-3 bg-light rounded">
-                                <h6 class="fw-bold mb-2">
-                                    <i class="fa-solid fa-trophy me-2 text-warning"></i>
-                                    Your Best Performance
-                                </h6>
-                                <ul class="mb-0 small">
-                                    {% if peak_hours %}
-                                    <li>Most productive time: {{ peak_hours.0.hour }}</li>
-                                    {% endif %}
-                                    {% if cod_count > prepaid_count %}
-                                    <li>Strong in COD collections ({{ cod_count }} orders)</li>
-                                    {% endif %}
-                                    {% if delivery_categories %}
-                                    <li>Top category: {{ delivery_categories.0.dl_category|default:"Standard" }} ({{ delivery_categories.0.count }} deliveries)</li>
-                                    {% endif %}
-                                </ul>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="p-3 bg-light rounded">
-                                <h6 class="fw-bold mb-2">
-                                    <i class="fa-solid fa-chart-line me-2 text-success"></i>
-                                    Growth Opportunities
-                                </h6>
-                                <ul class="mb-0 small">
-                                    <li>Try to maintain consistency across all time periods</li>
-                                    <li>Focus on improving success rates during off-peak hours</li>
-                                    <li>Aim to diversify delivery categories for better earnings</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="row g-3">
-            <div class="col-12">
-                <section class="p-3 bg-light rounded shadow-sm">
-                    <div class="d-flex gap-2 flex-wrap justify-content-center">
-                        <a href="{% url 'fleet:driver_performance' %}" class="btn btn-outline-primary">
-                            <i class="fa-solid fa-gauge-high me-2"></i>View Performance
-                        </a>
-                        <a href="{% url 'fleet:driver_reports' %}" class="btn btn-outline-primary">
-                            <i class="fa-solid fa-file-pdf me-2"></i>Download Reports
-                        </a>
-                        <a href="{% url 'fleet:fleet_dashboard' %}" class="btn btn-outline-secondary">
-                            <i class="fa-solid fa-arrow-left me-2"></i>Back to Dashboard
-                        </a>
-                    </div>
-                </section>
-            </div>
-        </div>
+    <!-- Quick Actions -->
+    <div class="flt__actions-bar">
+        <a href="{% url 'fleet:driver_performance' %}" class="flt__btn flt__btn--outline">
+            <i class="fa-solid fa-gauge-high me-1"></i>View Performance
+        </a>
+        <a href="{% url 'fleet:driver_reports' %}" class="flt__btn flt__btn--outline">
+            <i class="fa-solid fa-file-pdf me-1"></i>Download Reports
+        </a>
+        <a href="{% url 'fleet:fleet_dashboard' %}" class="flt__btn flt__btn--ghost">
+            <i class="fa-solid fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
     </div>
 </div>
 {% endblock content %}
@@ -391,6 +372,16 @@ new Chart(hourlyCtx, {
             }
         }
     }
+});
+
+// Animate mini bars on load
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.flt__bar-mini__fill').forEach(function(bar) {
+        var width = bar.getAttribute('data-width');
+        if (width) {
+            bar.style.width = width + '%';
+        }
+    });
 });
 </script>
 {% endblock extra_js %}

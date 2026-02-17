@@ -4,24 +4,16 @@
 
 {% block title %}Order {{ order.order_number }} - Workforce{% endblock %}
 
-{% block extra_css %}
-<link href="{% static 'workforce/css/workforce.css' %}?v=20260211b" rel="stylesheet" type="text/css" />
-{% endblock %}
-
 {% block content %}
 {% csrf_token %}
-<div class="flex-fill p-3">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h4 class="mb-1">
-                <i class="fa-solid fa-file-invoice me-2"></i>
-                Order Details
-            </h4>
+<div class="wod">
+    <!-- Hero Header -->
+    <div class="wod__hero">
+        <div class="wod__hero-content">
             <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-0">
+                <ol class="breadcrumb mb-2">
                     <li class="breadcrumb-item">
-                        <a href="{% url 'workforce:wf_dashboard' %}"
+                        <a href="{% url 'workforce:wf_dashboard' %}" class="wod__breadcrumb-link"
                            hx-get="{% url 'workforce:wf_dashboard' %}"
                            hx-target="#main-content"
                            hx-select="#main-content"
@@ -29,20 +21,24 @@
                            hx-push-url="true">Dashboard</a>
                     </li>
                     <li class="breadcrumb-item">
-                        <a href="{% url 'workforce:wf_orders_all' %}"
+                        <a href="{% url 'workforce:wf_orders_all' %}" class="wod__breadcrumb-link"
                            hx-get="{% url 'workforce:wf_orders_all' %}"
                            hx-target="#main-content"
                            hx-select="#main-content"
                            hx-swap="outerHTML"
                            hx-push-url="true">Orders</a>
                     </li>
-                    <li class="breadcrumb-item active">{{ order.order_number }}</li>
+                    <li class="breadcrumb-item active text-white-50">{{ order.order_number }}</li>
                 </ol>
             </nav>
+            <h1 class="wod__hero-title">
+                <i class="fa-solid fa-file-invoice me-2"></i>Order Details
+            </h1>
+            <p class="wod__hero-sub">Order {{ order.order_number }}</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{% url 'workforce:order_edit' order.id %}"
-               class="btn btn-primary btn-sm"
+               class="wod__btn wod__btn--light"
                hx-get="{% url 'workforce:order_edit' order.id %}"
                hx-target="#main-content"
                hx-select="#main-content"
@@ -52,7 +48,7 @@
             </a>
             {% if order.verification_status == 'pending' %}
             <button type="button"
-                    class="btn btn-success btn-sm"
+                    class="wod__btn wod__btn--success"
                     hx-post="{% url 'workforce:verify_order' order.id %}"
                     hx-confirm="Verify this order?">
                 <i class="fa-solid fa-check me-1"></i> Verify
@@ -60,7 +56,7 @@
             {% endif %}
             {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
             <button type="button"
-                    class="btn btn-info btn-sm"
+                    class="wod__btn wod__btn--info"
                     hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}"
                     hx-confirm="Publish this order?">
                 <i class="fa-solid fa-paper-plane me-1"></i> Publish
@@ -68,7 +64,7 @@
             {% endif %}
             {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
             <button type="button"
-                    class="btn btn-danger btn-sm"
+                    class="wod__btn wod__btn--danger"
                     hx-post="{% url 'workforce:cancel_order' order.id %}"
                     hx-confirm="Cancel this order?">
                 <i class="fa-solid fa-times me-1"></i> Cancel
@@ -77,45 +73,49 @@
         </div>
     </div>
 
-    <div class="row">
+    <div class="row g-3 p-3">
         <!-- Order Info -->
         <div class="col-lg-8">
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">
-                        <i class="fa-solid fa-info-circle me-2"></i>
-                        Order Information
-                    </h5>
+            <div class="wod__card">
+                <div class="wod__card-header wod__card-header--primary">
+                    <i class="fa-solid fa-info-circle me-2"></i>
+                    <span class="wod__section-label">Order Information</span>
                 </div>
-                <div class="card-body">
+                <div class="wod__card-body">
                     <div class="row g-3">
                         <div class="col-md-4">
-                            <label class="form-label text-muted small">Order Number</label>
-                            <p class="fw-bold mb-0">{{ order.order_number }}</p>
+                            <div class="wod__field">
+                                <span class="wod__field-label">Order Number</span>
+                                <span class="wod__field-value">{{ order.order_number }}</span>
+                            </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label text-muted small">Client Order Code</label>
-                            <p class="fw-bold mb-0">{{ order.client_order_code }}</p>
+                            <div class="wod__field">
+                                <span class="wod__field-label">Client Order Code</span>
+                                <span class="wod__field-value">{{ order.client_order_code }}</span>
+                            </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label text-muted small">Business Name</label>
-                            <p class="fw-bold mb-0 text-wrap">{{ order.business.business_name }}</p>
+                            <div class="wod__field">
+                                <span class="wod__field-label">Business Name</span>
+                                <span class="wod__field-value text-wrap">{{ order.business.business_name }}</span>
+                            </div>
                         </div>
                     </div>
                     <div class="row g-3 mt-2">
                         <div class="col-md-4">
-                            <label class="form-label text-muted small">Verification Status</label>
-                            <p class="mb-0">
+                            <div class="wod__field">
+                                <span class="wod__field-label">Verification Status</span>
                                 {% if order.verification_status == 'pending' %}
-                                <span class="badge bg-warning text-dark fs-6">Pending</span>
+                                <span class="wod__badge wod__badge--amber">Pending</span>
                                 {% elif order.verification_status == 'verified' %}
-                                <span class="badge bg-success fs-6">Verified</span>
+                                <span class="wod__badge wod__badge--green">Verified</span>
                                 {% elif order.verification_status == 'rejected' %}
-                                <span class="badge bg-danger fs-6">Rejected</span>
+                                <span class="wod__badge wod__badge--red">Rejected</span>
                                 {% else %}
-                                <span class="badge bg-secondary fs-6">{{ order.verification_status }}</span>
+                                <span class="wod__badge">{{ order.verification_status }}</span>
                                 {% endif %}
-                            </p>
+                            </div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label text-muted small">DMS Status</label>

@@ -1,34 +1,35 @@
 {% extends "business_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
-<!-- extra css -->
-{% block extra_css %}
-  <link href="{% static 'orders/css/orders.css' %}"
-        rel="stylesheet"
-        type="text/css" />
-{% endblock extra_css %}
+
 {% block content %}
-  <!-- orders_list_view.html -->
-  <div class="col-12" id="orders_successful_list_container_main">
-    <section class="d-none d-md-block "
-             id="orders_successful_list_section_desktop">
-      <div class="flex-fill pb-2">
-        <div class="p-3 col-12">
-          <div class="col-md-12 d-flex flex-row justify-content-between pb-md-4"
-               id="orders_successful_list_header">
-            <h1 class="h2 m-0" id="orders_successful_list_title">Successful Orders</h1>
-            <a class="btn btn-dark pe-3 text-white"
-               href="{% url 'orders:add_order' %}"
-               id="orders_successful_list_btn_add_orders">
-              <i class="fa fa-plus me-3"></i> Add Orders
-            </a>
-          </div>
-          {% include "orders/parts/order_list_view.html" %}
+<div class="osl" id="orders_successful_list_container_main">
+    <!-- Hero Header -->
+    <div class="osl__hero">
+        <div class="osl__hero-content">
+            <div class="osl__hero-left">
+                <h1 class="osl__title">
+                    <i class="fas fa-check-circle"></i>
+                    Successful Orders
+                </h1>
+                <p class="osl__subtitle">Orders completed successfully</p>
+            </div>
+            <div class="osl__hero-actions">
+                <a href="{% url 'orders:add_order' %}" class="osl__btn osl__btn--primary" id="orders_successful_list_btn_add_orders">
+                    <i class="fa fa-plus"></i> Add Orders
+                </a>
+            </div>
         </div>
-      </div>
+    </div>
+
+    <!-- Desktop Section -->
+    <section class="d-none d-md-block" id="orders_successful_list_section_desktop">
+        {% include "orders/parts/order_list_view.html" %}
     </section>
+
+    <!-- Mobile Section -->
     <section class="d-block d-md-none" id="orders_successful_list_section_mobile">
-      {% include "orders/parts/order_list_view_mob.html" %}
+        {% include "orders/parts/order_list_view_mob.html" %}
     </section>
-  </div>
+</div>
 {% endblock content %}

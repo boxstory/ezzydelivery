@@ -3,185 +3,147 @@
 
 {% block title %}Dispatch KPI Dashboard{% endblock %}
 
-{% block extra_css %}
-<style>
-    .kpi-card {
-        background: white;
-        border-radius: var(--brand-radius-md, 12px);
-        padding: 1.5rem;
-        text-align: center;
-        box-shadow: var(--brand-shadow-sm);
-        height: 100%;
-    }
-
-    .kpi-value {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: var(--brand-navy);
-    }
-
-    .kpi-label {
-        font-size: 0.85rem;
-        color: var(--brand-grey-600);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .kpi-card.primary { border-top: 4px solid var(--brand-primary); }
-    .kpi-card.success { border-top: 4px solid #28a745; }
-    .kpi-card.warning { border-top: 4px solid #ffc107; }
-    .kpi-card.info { border-top: 4px solid #17a2b8; }
-
-    .performance-bar {
-        height: 8px;
-        background: var(--brand-grey-200);
-        border-radius: 4px;
-        overflow: hidden;
-    }
-
-    .performance-bar-fill {
-        height: 100%;
-        border-radius: 4px;
-        transition: width 0.3s ease;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">
-            <i class="fa-solid fa-chart-line me-2"></i>KPI Dashboard
-        </h4>
-        <div>
-            <a href="{% url 'workforce:dispatch_dashboard' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
-            </a>
+<div class="dpk">
+    <!-- Hero Header -->
+    <div class="dpk__hero">
+        <div class="dpk__hero-inner">
+            <div class="dpk__hero-left">
+                <h1 class="dpk__hero-title">
+                    <i class="fa-solid fa-chart-line dpk__hero-icon"></i>
+                    KPI Dashboard
+                </h1>
+                <p class="dpk__hero-subtitle">Performance metrics and rider analytics</p>
+            </div>
+            <div class="dpk__hero-right">
+                <a href="{% url 'workforce:dispatch_dashboard' %}" class="dpk__back-btn">
+                    <i class="fa-solid fa-arrow-left me-1"></i>Back to Dashboard
+                </a>
+            </div>
         </div>
     </div>
 
     <!-- Date Filter -->
-    <div class="card mb-3">
-        <div class="card-body">
-            <form method="get" class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label">Date</label>
-                    <input type="date" name="date" class="form-control" value="{{ selected_date|date:'Y-m-d' }}">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Location</label>
-                    <select name="location" class="form-select">
-                        <option value="">All Locations</option>
-                        {% for loc in locations %}
-                        <option value="{{ loc.id }}" {% if request.GET.location == loc.id|stringformat:"s" %}selected{% endif %}>
-                            {{ loc.pickup_location_title }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fa-solid fa-filter me-1"></i> Apply
-                    </button>
-                </div>
-            </form>
-        </div>
+    <div class="dpk__filter-bar">
+        <form method="get" class="dpk__filter-form">
+            <div class="dpk__filter-group">
+                <label class="dpk__filter-label">Date</label>
+                <input type="date" name="date" class="dpk__filter-input" value="{{ selected_date|date:'Y-m-d' }}">
+            </div>
+            <div class="dpk__filter-group">
+                <label class="dpk__filter-label">Location</label>
+                <select name="location" class="dpk__filter-select">
+                    <option value="">All Locations</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc.id }}" {% if request.GET.location == loc.id|stringformat:"s" %}selected{% endif %}>
+                        {{ loc.pickup_location_title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="dpk__filter-actions">
+                <button type="submit" class="dpk__filter-btn">
+                    <i class="fa-solid fa-filter me-1"></i>Apply
+                </button>
+            </div>
+        </form>
     </div>
 
     <!-- Summary KPIs -->
-    <div class="row mb-4">
-        <div class="col-md-3 mb-3">
-            <div class="kpi-card primary">
-                <div class="kpi-value">{{ summary.total_orders|default:0 }}</div>
-                <div class="kpi-label">Total Orders</div>
+    <div class="dpk__kpi-grid">
+        <div class="dpk__kpi-card dpk__kpi-card--primary">
+            <div class="dpk__kpi-icon-wrap dpk__kpi-icon-wrap--primary">
+                <i class="fa-solid fa-box"></i>
             </div>
+            <div class="dpk__kpi-value">{{ summary.total_orders|default:0 }}</div>
+            <div class="dpk__kpi-label">Total Orders</div>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="kpi-card success">
-                <div class="kpi-value">{{ summary.batching_percentage|floatformat:1|default:0 }}%</div>
-                <div class="kpi-label">Batching Rate</div>
+        <div class="dpk__kpi-card dpk__kpi-card--success">
+            <div class="dpk__kpi-icon-wrap dpk__kpi-icon-wrap--success">
+                <i class="fa-solid fa-layer-group"></i>
             </div>
+            <div class="dpk__kpi-value">{{ summary.batching_percentage|floatformat:1|default:0 }}%</div>
+            <div class="dpk__kpi-label">Batching Rate</div>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="kpi-card warning">
-                <div class="kpi-value">{{ summary.sla_compliance|floatformat:1|default:0 }}%</div>
-                <div class="kpi-label">SLA Compliance</div>
+        <div class="dpk__kpi-card dpk__kpi-card--warning">
+            <div class="dpk__kpi-icon-wrap dpk__kpi-icon-wrap--warning">
+                <i class="fa-solid fa-stopwatch"></i>
             </div>
+            <div class="dpk__kpi-value">{{ summary.sla_compliance|floatformat:1|default:0 }}%</div>
+            <div class="dpk__kpi-label">SLA Compliance</div>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="kpi-card info">
-                <div class="kpi-value">{{ summary.avg_orders_per_hour|floatformat:1|default:0 }}</div>
-                <div class="kpi-label">Orders/Hour Avg</div>
+        <div class="dpk__kpi-card dpk__kpi-card--info">
+            <div class="dpk__kpi-icon-wrap dpk__kpi-icon-wrap--info">
+                <i class="fa-solid fa-gauge-high"></i>
             </div>
+            <div class="dpk__kpi-value">{{ summary.avg_orders_per_hour|floatformat:1|default:0 }}</div>
+            <div class="dpk__kpi-label">Orders/Hour Avg</div>
         </div>
     </div>
 
     <!-- Rider Performance Table -->
-    <div class="card">
-        <div class="card-header">
-            <h5 class="mb-0"><i class="fa-solid fa-users me-2"></i>Rider Performance</h5>
+    <div class="dpk__card">
+        <div class="dpk__card-header">
+            <i class="fa-solid fa-users dpk__card-header-icon"></i>
+            RIDER PERFORMANCE
         </div>
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
+        <div class="dpk__table-wrap">
+            <table class="dpk__table">
+                <thead class="dpk__table-head">
                     <tr>
-                        <th>Rider</th>
-                        <th>Location</th>
-                        <th>Total Orders</th>
-                        <th>Batched</th>
-                        <th>Single</th>
-                        <th>Batching %</th>
-                        <th>SLA Compliant</th>
-                        <th>SLA Breached</th>
-                        <th>SLA %</th>
-                        <th>Orders/Hour</th>
+                        <th class="dpk__th">Rider</th>
+                        <th class="dpk__th">Location</th>
+                        <th class="dpk__th">Total Orders</th>
+                        <th class="dpk__th">Batched</th>
+                        <th class="dpk__th">Single</th>
+                        <th class="dpk__th">Batching %</th>
+                        <th class="dpk__th">SLA Compliant</th>
+                        <th class="dpk__th">SLA Breached</th>
+                        <th class="dpk__th">SLA %</th>
+                        <th class="dpk__th">Orders/Hour</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for kpi in kpis %}
-                    <tr>
-                        <td>
-                            <a href="{% url 'workforce:dispatch_rider_kpi_detail' kpi.rider.id %}?date={{ selected_date|date:'Y-m-d' }}">
-                                <div class="d-flex align-items-center">
-                                    <div class="rider-avatar me-2" style="width: 32px; height: 32px; background: var(--brand-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600;">
-                                        {{ kpi.rider.driver_code|slice:":2" }}
-                                    </div>
-                                    <strong>{{ kpi.rider.driver_code }}</strong>
-                                </div>
+                    <tr class="dpk__tr">
+                        <td class="dpk__td">
+                            <a href="{% url 'workforce:dispatch_rider_kpi_detail' kpi.rider.id %}?date={{ selected_date|date:'Y-m-d' }}" class="dpk__rider-link">
+                                <div class="dpk__rider-avatar">{{ kpi.rider.driver_code|slice:":2" }}</div>
+                                <strong>{{ kpi.rider.driver_code }}</strong>
                             </a>
                         </td>
-                        <td>{{ kpi.pickup_location.pickup_location_title|truncatechars:15|default:"-" }}</td>
-                        <td><strong>{{ kpi.total_orders }}</strong></td>
-                        <td>{{ kpi.batched_orders }}</td>
-                        <td>{{ kpi.single_orders }}</td>
-                        <td>
-                            <div class="d-flex align-items-center gap-2">
+                        <td class="dpk__td">{{ kpi.pickup_location.pickup_location_title|truncatechars:15|default:"-" }}</td>
+                        <td class="dpk__td"><strong>{{ kpi.total_orders }}</strong></td>
+                        <td class="dpk__td">{{ kpi.batched_orders }}</td>
+                        <td class="dpk__td">{{ kpi.single_orders }}</td>
+                        <td class="dpk__td">
+                            <div class="dpk__perf-cell">
                                 <span>{{ kpi.batching_percentage|floatformat:0 }}%</span>
-                                <div class="performance-bar flex-grow-1" style="width: 60px;">
-                                    <div class="performance-bar-fill bg-success" style="width: {{ kpi.batching_percentage }}%;"></div>
+                                <div class="dpk__perf-bar">
+                                    <div class="dpk__perf-bar-fill dpk__perf-bar-fill--success" style="width: {{ kpi.batching_percentage }}%;"></div>
                                 </div>
                             </div>
                         </td>
-                        <td class="text-success">{{ kpi.sla_compliant_orders }}</td>
-                        <td class="text-danger">{{ kpi.sla_breached_orders }}</td>
-                        <td>
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="{% if kpi.sla_compliance_rate >= 90 %}text-success{% elif kpi.sla_compliance_rate >= 70 %}text-warning{% else %}text-danger{% endif %}">
+                        <td class="dpk__td dpk__td--success">{{ kpi.sla_compliant_orders }}</td>
+                        <td class="dpk__td dpk__td--danger">{{ kpi.sla_breached_orders }}</td>
+                        <td class="dpk__td">
+                            <div class="dpk__perf-cell">
+                                <span class="{% if kpi.sla_compliance_rate >= 90 %}dpk__td--success{% elif kpi.sla_compliance_rate >= 70 %}dpk__td--warning{% else %}dpk__td--danger{% endif %}">
                                     {{ kpi.sla_compliance_rate|floatformat:0 }}%
                                 </span>
-                                <div class="performance-bar flex-grow-1" style="width: 60px;">
-                                    <div class="performance-bar-fill {% if kpi.sla_compliance_rate >= 90 %}bg-success{% elif kpi.sla_compliance_rate >= 70 %}bg-warning{% else %}bg-danger{% endif %}"
+                                <div class="dpk__perf-bar">
+                                    <div class="dpk__perf-bar-fill {% if kpi.sla_compliance_rate >= 90 %}dpk__perf-bar-fill--success{% elif kpi.sla_compliance_rate >= 70 %}dpk__perf-bar-fill--warning{% else %}dpk__perf-bar-fill--danger{% endif %}"
                                          style="width: {{ kpi.sla_compliance_rate }}%;"></div>
                                 </div>
                             </div>
                         </td>
-                        <td>{{ kpi.orders_per_hour|floatformat:1 }}</td>
+                        <td class="dpk__td">{{ kpi.orders_per_hour|floatformat:1 }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="text-center text-muted py-4">
-                            No KPI data available for the selected date.
+                        <td colspan="10" class="dpk__empty-cell">
+                            <i class="fa-solid fa-chart-bar"></i>
+                            <p>No KPI data available for the selected date.</p>
                         </td>
                     </tr>
                     {% endfor %}

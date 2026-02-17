@@ -1,72 +1,76 @@
 {% extends "fleet_dashboard_base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+
 {% block content %}
-    <div class="flex-fill p-2" id="delivery_address_wrapper">
-        <div class="container" id="delivery_address_container">
-            <section class="py-5" id="delivery_address_section_main">
-                <div class="container">
-                    <div class="row justify-content-center">
-                        <div class="col-12 col-lg-6">
-                            <form action="" method="post" id="delivery_address_form_main">
-                                {% csrf_token %}
-                                {% if form.non_field_errors %}
-                                <div class="alert alert-danger mb-3" role="alert">
-                                    {% for error in form.non_field_errors %}
-                                    <div>{{ error }}</div>
-                                    {% endfor %}
-                                </div>
-                                {% endif %}
-                                {{ form|crispy }}
-                                <div class="form-group">
-                                    <button type="submit" class="btn btn-primary" id="delivery_address_btn_submit">
-                                        {% if form.instance.pk %}
-                                            Update
-                                        {% else %}
-                                            Create
-                                        {% endif %}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
+<div class="dla" id="delivery_address_wrapper">
+  <!-- Hero Header -->
+  <div class="dla__hero">
+    <div class="d-flex align-items-center gap-2">
+      <div class="dla__hero-icon">
+        <i class="fa-solid fa-map-location-dot"></i>
+      </div>
+      <div>
+        <h1 class="dla__hero-title">
+          {% if form.instance.pk %}Update{% else %}Create{% endif %} Address
+        </h1>
+        <p class="dla__hero-subtitle">
+          {% if form.instance.pk %}Edit delivery address details{% else %}Add a new delivery address{% endif %}
+        </p>
+      </div>
     </div>
+  </div>
+
+  <!-- Form Card -->
+  <div class="dla__card">
+    <div class="dla__card-header">
+      <i class="fa-solid fa-pen-to-square"></i> Address Details
+    </div>
+    <div class="dla__card-body">
+      <form action="" method="post" id="delivery_address_form_main">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="dla__alert">
+          {% for error in form.non_field_errors %}
+          <div><i class="fa-solid fa-circle-exclamation me-1"></i>{{ error }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="dla__form-fields">
+          {{ form|crispy }}
+        </div>
+
+        <button type="submit" class="dla__submit-btn" id="delivery_address_btn_submit">
+          <i class="fa-solid fa-{% if form.instance.pk %}save{% else %}plus{% endif %} me-2"></i>
+          {% if form.instance.pk %}Update Address{% else %}Create Address{% endif %}
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
 {% endblock content %}
+
 {% block extra_js %}
-    <!-- extra js -->
-    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-    <script>
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script>
   $("#zone_number").change(function () {
-    const url = $("#delivery_address_form").attr("get_zone_name"); // get the url of the `load_cities` view
+    const url = $("#delivery_address_form").attr("get_zone_name");
     console.log(url);
-    const zoneId = $(this).val(); // get the selected country ID from the HTML input
+    const zoneId = $(this).val();
     console.log(zoneId);
 
     $.ajax({
-      // initialize an AJAX request
-      url: url, // set the url of the request (= /persons/ajax/load-cities/ )
+      url: url,
       data: {
-        zone_number: zone_number, // add the country id to the GET parameters
+        zone_number: zone_number,
       },
       success: function (data) {
-        // `data` is the return of the `load_cities` view function
         console.log(data);
-        $("#zone_name").html(data); // replace the contents of the city input with the data that came from the server
-        /*
-
-                let html_data = '<option value="">---------</option>';
-                data.forEach(function (city) {
-                    html_data += `<option value="${city.id}">${city.name}</option>`
-                });
-                console.log(html_data);
-                $("#id_city").html(html_data);
-
-                */
+        $("#zone_name").html(data);
       },
     });
   });
-    </script>
+</script>
 {% endblock extra_js %}

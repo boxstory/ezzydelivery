@@ -3,143 +3,151 @@
 
 {% block title %}Orders by Seller - Ezzy Delivery{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
-<!-- Page Header -->
-<header class="page-header">
-    <div class="page-header-left">
-        <h2><i class="fa-solid fa-store me-1"></i>Orders by Seller</h2>
+<div class="obs">
+    <!-- Hero Header -->
+    <div class="obs__hero">
+        <div class="obs__hero-content">
+            <h1 class="obs__hero-title">
+                <i class="fa-solid fa-store me-2"></i>Orders by Seller
+            </h1>
+            <p class="obs__hero-sub">View order summaries grouped by seller</p>
+        </div>
     </div>
-</header>
-<div class="col-12 p-3">
 
-<!-- Search Section -->
-<div class="filter-section">
-    <form method="get" class="row g-3"
-          hx-get=""
-          hx-target="#main-content"
-          hx-select="#main-content"
-          hx-swap="outerHTML"
-          hx-push-url="true">
-        <div class="col-md-10">
-            <label for="searchInput" class="filter-label">
-                <i class="fa-solid fa-search me-2"></i>Search Sellers
-            </label>
-            <input type="text" id="searchInput" name="search" class="filter-input"
-                   placeholder="Search by business name, email, phone, code..." value="{{ search }}">
-        </div>
-        <div class="col-md-2">
-            <label class="filter-label invisible">Action</label>
-            <button type="submit" class="btn btn-primary w-100">
-                <i class="fa-solid fa-search me-2"></i>Search
-            </button>
-        </div>
-    </form>
+    <div class="p-3">
+        <!-- Search Section -->
+        <div class="obs__filter-card">
+            <div class="obs__filter-header">
+                <i class="fa-solid fa-search me-2 obs__icon-accent"></i>
+                <span class="obs__section-label">Search Sellers</span>
+            </div>
+            <form method="get" class="row g-3"
+                  hx-get=""
+                  hx-target="#main-content"
+                  hx-select="#main-content"
+                  hx-swap="outerHTML"
+                  hx-push-url="true">
+                <div class="col-md-10">
+                    <label for="searchInput" class="obs__field-label">
+                        <i class="fa-solid fa-search me-1"></i>Search
+                    </label>
+                    <input type="text" id="searchInput" name="search" class="obs__input"
+                           placeholder="Search by business name, email, phone, code..." value="{{ search }}">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="obs__btn obs__btn--primary w-100">
+                        <i class="fa-solid fa-search me-1"></i>Search
+                    </button>
+                </div>
+            </form>
 
-    <!-- Quick Seller Selection -->
-    {% if all_sellers %}
-    <div class="mt-3">
-        <label class="filter-label mb-2">
-            <i class="fa-solid fa-store me-2"></i>Quick Select Seller
-        </label>
-        <div class="d-flex flex-wrap gap-2">
-            {% for seller in all_sellers %}
-            <a href="?search={{ seller.business_name }}"
-               class="btn btn-sm {% if search == seller.business_name %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-               title="{{ seller.business_code }}">
-                {{ seller.business_name }}
-            </a>
-            {% endfor %}
-            {% if search %}
-            <a href="?" class="btn btn-sm btn-outline-danger" title="Clear filter">
-                <i class="fa-solid fa-times me-1"></i>Clear
-            </a>
+            <!-- Quick Seller Selection -->
+            {% if all_sellers %}
+            <div class="obs__quick-select">
+                <label class="obs__field-label mb-2">
+                    <i class="fa-solid fa-store me-1"></i>Quick Select Seller
+                </label>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for seller in all_sellers %}
+                    <a href="?search={{ seller.business_name }}"
+                       class="obs__pill {% if search == seller.business_name %}obs__pill--active{% endif %}"
+                       title="{{ seller.business_code }}">
+                        {{ seller.business_name }}
+                    </a>
+                    {% endfor %}
+                    {% if search %}
+                    <a href="?" class="obs__pill obs__pill--danger" title="Clear filter">
+                        <i class="fa-solid fa-times me-1"></i>Clear
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sellers with Orders Table -->
+        <div class="obs__card">
+            <div class="obs__card-header">
+                <i class="fa-solid fa-table me-2 obs__icon-accent"></i>
+                <span class="obs__section-label">Sellers</span>
+            </div>
+            {% if page_obj %}
+            <div class="table-responsive">
+                <table class="obs__table">
+                    <thead>
+                        <tr>
+                            <th class="obs__th">Business Name</th>
+                            <th class="obs__th">Contact</th>
+                            <th class="obs__th">Total Orders</th>
+                            <th class="obs__th">Pending</th>
+                            <th class="obs__th">Processing</th>
+                            <th class="obs__th">Completed</th>
+                            <th class="obs__th">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for business in page_obj %}
+                        <tr class="obs__row">
+                            <td class="obs__td">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="obs__icon-circle">
+                                        <i class="fa-solid fa-store"></i>
+                                    </span>
+                                    <div>
+                                        <span class="obs__td--bold">{{ business.business_name|default:"Unknown Business" }}</span>
+                                        <span class="obs__td--sub">{{ business.business_code|default:"N/A" }}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="obs__td">
+                                {% if business.business_email %}
+                                <div class="obs__contact-line"><i class="fa-solid fa-envelope me-1"></i>{{ business.business_email }}</div>
+                                {% endif %}
+                                {% if business.business_phone %}
+                                <div class="obs__contact-line"><i class="fa-solid fa-phone me-1"></i>{{ business.business_phone }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="obs__td">
+                                <span class="obs__count obs__count--primary">{{ business.total_orders|default:0 }}</span>
+                            </td>
+                            <td class="obs__td">
+                                <span class="obs__badge obs__badge--amber">{{ business.pending_orders|default:0 }}</span>
+                            </td>
+                            <td class="obs__td">
+                                <span class="obs__badge obs__badge--blue">{{ business.processing_orders|default:0 }}</span>
+                            </td>
+                            <td class="obs__td">
+                                <span class="obs__badge obs__badge--green">{{ business.completed_orders|default:0 }}</span>
+                            </td>
+                            <td class="obs__td">
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'workforce:wf_orders_all' %}?business={{ business.business_id }}"
+                                       class="obs__action-btn" title="View all orders">
+                                        <i class="fa-solid fa-list"></i>
+                                    </a>
+                                    <a href="{% url 'workforce:business_license_detail' business.business_id %}"
+                                       class="obs__action-btn obs__action-btn--secondary" title="View business details">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params %}
+
+            {% else %}
+            <div class="obs__empty">
+                <i class="fa-solid fa-box-open"></i>
+                <h3>No Orders Found</h3>
+                <p>{% if search %}No sellers with orders match your search criteria.{% else %}There are no orders from any sellers yet.{% endif %}</p>
+            </div>
             {% endif %}
         </div>
     </div>
-    {% endif %}
-</div>
-
-<!-- Sellers with Orders Table -->
-<div class="orders-table-container">
-    {% if page_obj %}
-    <table class="orders-table">
-        <thead>
-            <tr>
-                <th>Business Name</th>
-                <th>Contact</th>
-                <th>Total Orders</th>
-                <th>Pending</th>
-                <th>Processing</th>
-                <th>Completed</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for business in page_obj %}
-            <tr>
-                <td>
-                    <div class="d-flex align-items-center">
-                        <div class="driver-icon driver-icon-sm me-3">
-                            <i class="fa-solid fa-store text-brand-primary"></i>
-                        </div>
-                        <div>
-                            <strong>{{ business.business_name|default:"Unknown Business" }}</strong>
-                            <br>
-                            <small class="text-muted">{{ business.business_code|default:"N/A" }}</small>
-                        </div>
-                    </div>
-                </td>
-                <td>
-                    {% if business.business_email %}
-                    <div><i class="fa-solid fa-envelope me-2"></i>{{ business.business_email }}</div>
-                    {% endif %}
-                    {% if business.business_phone %}
-                    <div><i class="fa-solid fa-phone me-2"></i>{{ business.business_phone }}</div>
-                    {% endif %}
-                </td>
-                <td>
-                    <strong class="text-primary">{{ business.total_orders|default:0 }}</strong>
-                </td>
-                <td>
-                    <span class="badge bg-warning text-dark">{{ business.pending_orders|default:0 }}</span>
-                </td>
-                <td>
-                    <span class="badge bg-info">{{ business.processing_orders|default:0 }}</span>
-                </td>
-                <td>
-                    <span class="badge bg-success">{{ business.completed_orders|default:0 }}</span>
-                </td>
-                <td>
-                    <a href="{% url 'workforce:wf_orders_all' %}?business={{ business.business_id }}"
-                       class="btn btn-sm btn-outline-primary me-1"
-                       title="View all orders">
-                        <i class="fa-solid fa-list me-1"></i>View Orders
-                    </a>
-                    <a href="{% url 'workforce:business_license_detail' business.business_id %}"
-                       class="btn btn-sm btn-outline-secondary"
-                       title="View business details">
-                        <i class="fa-solid fa-eye me-1"></i>Details
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <!-- Pagination -->
-    {% include "includes/components/_pagination.html" with page_obj=page_obj filter_params=filter_params %}
-
-    {% else %}
-    <div class="empty-state">
-        <i class="fa-solid fa-box-open"></i>
-        <h3>No Orders Found</h3>
-        <p>{% if search %}No sellers with orders match your search criteria.{% else %}There are no orders from any sellers yet.{% endif %}</p>
-    </div>
-    {% endif %}
-</div>
 </div>
 {% endblock content %}

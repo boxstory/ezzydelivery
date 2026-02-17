@@ -5,202 +5,185 @@
 {% endblock extra_css %}
 
 {% block content %}
-<div class="flex-fill p-2">
-    <div class="col-12 py-2">
-        <!-- Page Header -->
-        <section class="m-0 p-0 mb-4" id="fleet_reports_section_header">
-            <div class="pt-3 pt-md-3 pb-0 text-dark">
-                <div class="text-center">
-                    <h3 class="fw-bolder text-uppercase" id="fleet_reports_header_title">
-                        <i class="fa-solid fa-file-pdf me-2"></i>Download Reports
-                        <br />
-                        <span class="fw-light text-lowercase h5">{{ driver.user.get_full_name }}</span>
-                    </h3>
-                </div>
+<div class="flt-reports">
+    <!-- Hero Banner -->
+    <div class="flt__hero" id="fleet_reports_section_header">
+        <div class="flt__hero-inner">
+            <div class="flt__hero-left">
+                <h1 class="flt__hero-title" id="fleet_reports_header_title">
+                    <i class="fa-solid fa-file-pdf"></i> Download Reports
+                </h1>
+                <p class="flt__hero-sub">{{ driver.user.get_full_name }}</p>
             </div>
-        </section>
-
-        <!-- Report Types -->
-        <div class="row g-3 mb-4">
-            {% for report in report_types %}
-            <div class="col-md-6">
-                <section class="p-4 bg-white rounded shadow-sm border h-100">
-                    <div class="d-flex align-items-start gap-3">
-                        <div class="flex-shrink-0">
-                            <div class="bg-primary bg-opacity-10 p-3 rounded-circle">
-                                <i class="fa-solid {{ report.icon }} fs-2 text-primary"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1">
-                            <h5 class="fw-bold mb-2">{{ report.name }}</h5>
-                            <p class="text-muted mb-3">{{ report.description }}</p>
-
-                            <!-- Date Range Selector -->
-                            <form method="post" action="{% url 'fleet:driver_reports' %}" class="mb-3">
-                                {% csrf_token %}
-                                <input type="hidden" name="report_type" value="{{ report.id }}">
-                                <div class="row g-2">
-                                    <div class="col-md-5">
-                                        <label class="form-label small fw-bold text-muted">From Date</label>
-                                        <input type="date" class="form-control form-control-sm" name="date_from" required>
-                                    </div>
-                                    <div class="col-md-5">
-                                        <label class="form-label small fw-bold text-muted">To Date</label>
-                                        <input type="date" class="form-control form-control-sm" name="date_to" required>
-                                    </div>
-                                    <div class="col-md-2 d-flex align-items-end">
-                                        <button type="submit" class="btn btn-primary btn-sm w-100">
-                                            <i class="fa-solid fa-download"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
-
-                            <!-- Quick Download Buttons -->
-                            <div class="d-flex gap-2 flex-wrap">
-                                <button type="button" class="btn btn-outline-primary btn-sm btn-quick-download" data-report-type="{{ report.id }}" data-days="7">
-                                    <i class="fa-solid fa-calendar-week me-1"></i>Last 7 Days
-                                </button>
-                                <button type="button" class="btn btn-outline-primary btn-sm btn-quick-download" data-report-type="{{ report.id }}" data-days="30">
-                                    <i class="fa-solid fa-calendar-days me-1"></i>Last 30 Days
-                                </button>
-                                <button type="button" class="btn btn-outline-primary btn-sm btn-quick-download" data-report-type="{{ report.id }}" data-days="90">
-                                    <i class="fa-solid fa-calendar me-1"></i>Last 90 Days
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            </div>
-            {% endfor %}
         </div>
+    </div>
 
-        <!-- Recent Settlements -->
-        {% if settlements %}
-        <div class="row g-3 mb-4">
-            <div class="col-12">
-                <div class="listing-container" id="fleet_reports_card_settlements">
-                    <div class="listing-header">
-                        <h6 class="listing-title"><i class="fa-solid fa-file-invoice text-primary"></i>Recent Settlement Reports</h6>
+    <!-- Report Types -->
+    <div class="flt__report-grid">
+        {% for report in report_types %}
+        <div class="flt__card">
+            <div class="flt__card-body">
+                <div class="flt__report-head">
+                    <div class="flt__report-icon">
+                        <i class="fa-solid {{ report.icon }}"></i>
                     </div>
-                    <table class="listing-table" id="fleet_reports_table_settlements">
-                        <thead id="fleet_reports_thead_settlements">
-                            <tr>
-                                <th>Settlement ID</th>
-                                <th>Period</th>
-                                <th class="text-end">Amount</th>
-                                <th>Paid Date</th>
-                                <th class="text-center">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for settlement in settlements %}
-                            <tr>
-                                <td><code>#{{ settlement.id }}</code></td>
-                                <td>{{ settlement.period_start|date:"M d" }} - {{ settlement.period_end|date:"M d, Y" }}</td>
-                                <td class="text-end fw-bold text-success">{{ settlement.amount|floatformat:2 }} QR</td>
-                                <td class="text-muted">{{ settlement.paid_at|date:"M d, Y" }}</td>
-                                <td class="text-center">
-                                    <button type="button" class="btn btn-sm btn-outline-primary btn-download-settlement" data-settlement-id="{{ settlement.id }}">
-                                        <i class="fa-solid fa-download me-1"></i>Download
-                                    </button>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                    <div class="flt__report-meta">
+                        <h5 class="flt__report-name">{{ report.name }}</h5>
+                        <p class="flt__report-desc">{{ report.description }}</p>
+                    </div>
+                </div>
+
+                <!-- Date Range Selector -->
+                <form method="post" action="{% url 'fleet:driver_reports' %}" class="flt__report-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="report_type" value="{{ report.id }}">
+                    <div class="flt__report-form__fields">
+                        <div class="flt__report-form__field">
+                            <label class="flt__form-label">From Date</label>
+                            <input type="date" class="flt__form-input" name="date_from" required>
+                        </div>
+                        <div class="flt__report-form__field">
+                            <label class="flt__form-label">To Date</label>
+                            <input type="date" class="flt__form-input" name="date_to" required>
+                        </div>
+                        <div class="flt__report-form__submit">
+                            <button type="submit" class="flt__btn flt__btn--primary flt__btn--icon">
+                                <i class="fa-solid fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Quick Download Buttons -->
+                <div class="flt__report-quick">
+                    <button type="button" class="flt__chip btn-quick-download" data-report-type="{{ report.id }}" data-days="7">
+                        <i class="fa-solid fa-calendar-week"></i> Last 7 Days
+                    </button>
+                    <button type="button" class="flt__chip btn-quick-download" data-report-type="{{ report.id }}" data-days="30">
+                        <i class="fa-solid fa-calendar-days"></i> Last 30 Days
+                    </button>
+                    <button type="button" class="flt__chip btn-quick-download" data-report-type="{{ report.id }}" data-days="90">
+                        <i class="fa-solid fa-calendar"></i> Last 90 Days
+                    </button>
                 </div>
             </div>
         </div>
-        {% endif %}
+        {% endfor %}
+    </div>
 
-        <!-- Report Format Options -->
-        <div class="row g-3 mb-4">
-            <div class="col-12">
-                <section class="p-4 bg-light rounded shadow-sm">
-                    <h5 class="fw-bold mb-3">
-                        <i class="fa-solid fa-file-export me-2"></i>
-                        Export Formats
-                    </h5>
-                    <p class="text-muted mb-3">All reports can be downloaded in the following formats:</p>
-                    <div class="row g-2">
-                        <div class="col-md-3">
-                            <div class="border rounded p-3 text-center bg-white">
-                                <i class="fa-solid fa-file-pdf fs-3 text-danger mb-2"></i>
-                                <p class="mb-0 fw-bold">PDF</p>
-                                <small class="text-muted">Printable format</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="border rounded p-3 text-center bg-white">
-                                <i class="fa-solid fa-file-excel fs-3 text-success mb-2"></i>
-                                <p class="mb-0 fw-bold">Excel</p>
-                                <small class="text-muted">Spreadsheet format</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="border rounded p-3 text-center bg-white">
-                                <i class="fa-solid fa-file-csv fs-3 text-primary mb-2"></i>
-                                <p class="mb-0 fw-bold">CSV</p>
-                                <small class="text-muted">Data export</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="border rounded p-3 text-center bg-white">
-                                <i class="fa-solid fa-file-lines fs-3 text-info mb-2"></i>
-                                <p class="mb-0 fw-bold">Text</p>
-                                <small class="text-muted">Simple format</small>
-                            </div>
-                        </div>
+    <!-- Recent Settlements -->
+    {% if settlements %}
+    <div class="flt__card" id="fleet_reports_card_settlements">
+        <div class="flt__card-header">
+            <i class="fa-solid fa-file-invoice"></i> Recent Settlement Reports
+        </div>
+        <div class="flt__card-body flt__card-body--flush">
+            <div class="listing-container">
+                <table class="listing-table" id="fleet_reports_table_settlements">
+                    <thead id="fleet_reports_thead_settlements">
+                        <tr>
+                            <th>Settlement ID</th>
+                            <th>Period</th>
+                            <th class="text-end">Amount</th>
+                            <th>Paid Date</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for settlement in settlements %}
+                        <tr>
+                            <td><code>#{{ settlement.id }}</code></td>
+                            <td>{{ settlement.period_start|date:"M d" }} - {{ settlement.period_end|date:"M d, Y" }}</td>
+                            <td class="text-end fw-bold text-success">{{ settlement.amount|floatformat:2 }} QR</td>
+                            <td class="text-muted">{{ settlement.paid_at|date:"M d, Y" }}</td>
+                            <td class="text-center">
+                                <button type="button" class="flt__btn flt__btn--sm flt__btn--outline btn-download-settlement" data-settlement-id="{{ settlement.id }}">
+                                    <i class="fa-solid fa-download me-1"></i>Download
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Export Formats -->
+    <div class="flt__card">
+        <div class="flt__card-header">
+            <i class="fa-solid fa-file-export"></i> Export Formats
+        </div>
+        <div class="flt__card-body">
+            <p class="flt__card-desc">All reports can be downloaded in the following formats:</p>
+            <div class="flt__format-grid">
+                <div class="flt__format-item">
+                    <div class="flt__format-item__icon flt__format-item__icon--danger">
+                        <i class="fa-solid fa-file-pdf"></i>
                     </div>
-                </section>
-            </div>
-        </div>
-
-        <!-- Help Section -->
-        <div class="row g-3">
-            <div class="col-12">
-                <section class="p-4 bg-white rounded shadow-sm border-start border-5 border-info">
-                    <h5 class="fw-bold mb-3">
-                        <i class="fa-solid fa-info-circle me-2"></i>
-                        Report Information
-                    </h5>
-                    <ul class="mb-0">
-                        <li class="mb-2">
-                            <strong>Earnings Report:</strong> Includes detailed breakdown of delivery fees, COD handling charges, bonuses, and deductions.
-                        </li>
-                        <li class="mb-2">
-                            <strong>Delivery Report:</strong> Complete list of all deliveries with timestamps, addresses, and status updates.
-                        </li>
-                        <li class="mb-2">
-                            <strong>Transaction Report:</strong> All financial transactions including COD collections, deposits, and settlements.
-                        </li>
-                        <li class="mb-0">
-                            <strong>Performance Report:</strong> Metrics including completion rates, customer ratings, and performance trends.
-                        </li>
-                    </ul>
-                </section>
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="row g-3 mt-3">
-            <div class="col-12">
-                <section class="p-3 bg-light rounded shadow-sm">
-                    <div class="d-flex gap-2 flex-wrap justify-content-center">
-                        <a href="{% url 'fleet:driver_performance' %}" class="btn btn-outline-primary">
-                            <i class="fa-solid fa-gauge-high me-2"></i>View Performance
-                        </a>
-                        <a href="{% url 'fleet:driver_analytics' %}" class="btn btn-outline-primary">
-                            <i class="fa-solid fa-chart-pie me-2"></i>View Analytics
-                        </a>
-                        <a href="{% url 'fleet:fleet_dashboard' %}" class="btn btn-outline-secondary">
-                            <i class="fa-solid fa-arrow-left me-2"></i>Back to Dashboard
-                        </a>
+                    <span class="flt__format-item__name">PDF</span>
+                    <span class="flt__format-item__desc">Printable format</span>
+                </div>
+                <div class="flt__format-item">
+                    <div class="flt__format-item__icon flt__format-item__icon--success">
+                        <i class="fa-solid fa-file-excel"></i>
                     </div>
-                </section>
+                    <span class="flt__format-item__name">Excel</span>
+                    <span class="flt__format-item__desc">Spreadsheet format</span>
+                </div>
+                <div class="flt__format-item">
+                    <div class="flt__format-item__icon flt__format-item__icon--primary">
+                        <i class="fa-solid fa-file-csv"></i>
+                    </div>
+                    <span class="flt__format-item__name">CSV</span>
+                    <span class="flt__format-item__desc">Data export</span>
+                </div>
+                <div class="flt__format-item">
+                    <div class="flt__format-item__icon flt__format-item__icon--info">
+                        <i class="fa-solid fa-file-lines"></i>
+                    </div>
+                    <span class="flt__format-item__name">Text</span>
+                    <span class="flt__format-item__desc">Simple format</span>
+                </div>
             </div>
         </div>
+    </div>
+
+    <!-- Help Section -->
+    <div class="flt__card flt__card--accent">
+        <div class="flt__card-header">
+            <i class="fa-solid fa-info-circle"></i> Report Information
+        </div>
+        <div class="flt__card-body">
+            <ul class="flt__info-list">
+                <li>
+                    <strong>Earnings Report:</strong> Includes detailed breakdown of delivery fees, COD handling charges, bonuses, and deductions.
+                </li>
+                <li>
+                    <strong>Delivery Report:</strong> Complete list of all deliveries with timestamps, addresses, and status updates.
+                </li>
+                <li>
+                    <strong>Transaction Report:</strong> All financial transactions including COD collections, deposits, and settlements.
+                </li>
+                <li>
+                    <strong>Performance Report:</strong> Metrics including completion rates, customer ratings, and performance trends.
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="flt__actions-bar">
+        <a href="{% url 'fleet:driver_performance' %}" class="flt__btn flt__btn--outline">
+            <i class="fa-solid fa-gauge-high me-1"></i>View Performance
+        </a>
+        <a href="{% url 'fleet:driver_analytics' %}" class="flt__btn flt__btn--outline">
+            <i class="fa-solid fa-chart-pie me-1"></i>View Analytics
+        </a>
+        <a href="{% url 'fleet:fleet_dashboard' %}" class="flt__btn flt__btn--ghost">
+            <i class="fa-solid fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
     </div>
 </div>
 {% endblock content %}

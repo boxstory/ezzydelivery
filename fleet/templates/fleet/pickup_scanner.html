@@ -3,319 +3,102 @@
 
 {% block title %}Pickup Scanner{% endblock %}
 
-{% block extra_css %}
-<link href="{% static 'fleet/css/fleet.css' %}" rel="stylesheet" type="text/css" />
-<style>
-  .scanner-container {
-    height: calc(100vh - 60px);
-    display: flex;
-    flex-direction: column;
-    background: #000;
-  }
-  .scanner-header {
-    background: var(--brand-primary, #1a73e8);
-    color: white;
-    padding: 12px 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .scanner-header__title {
-    font-weight: 600;
-    font-size: 16px;
-  }
-  .scanner-header__count {
-    background: rgba(255,255,255,0.2);
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 13px;
-  }
-  .camera-container {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-  }
-  #scanner-video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .scan-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-  }
-  .scan-frame {
-    width: 280px;
-    height: 280px;
-    border: 3px solid rgba(255,255,255,0.8);
-    border-radius: 20px;
-    position: relative;
-  }
-  .scan-frame::before,
-  .scan-frame::after {
-    content: '';
-    position: absolute;
-    width: 40px;
-    height: 40px;
-    border-color: var(--brand-success, #28a745);
-    border-style: solid;
-  }
-  .scan-frame::before {
-    top: -3px;
-    left: -3px;
-    border-width: 4px 0 0 4px;
-    border-radius: 20px 0 0 0;
-  }
-  .scan-frame::after {
-    top: -3px;
-    right: -3px;
-    border-width: 4px 4px 0 0;
-    border-radius: 0 20px 0 0;
-  }
-  .scan-line {
-    position: absolute;
-    left: 10px;
-    right: 10px;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--brand-success, #28a745), transparent);
-    animation: scan 2s linear infinite;
-  }
-  @keyframes scan {
-    0% { top: 10px; }
-    50% { top: calc(100% - 10px); }
-    100% { top: 10px; }
-  }
-  .scan-instructions {
-    position: absolute;
-    bottom: 20px;
-    left: 0;
-    right: 0;
-    text-align: center;
-    color: white;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-  }
-  .scan-instructions p {
-    margin: 0;
-    font-size: 14px;
-  }
-  .scanner-actions {
-    background: white;
-    padding: 16px;
-    border-radius: 20px 20px 0 0;
-    margin-top: -20px;
-    position: relative;
-    z-index: 10;
-  }
-  .manual-input {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-  .manual-input input {
-    flex: 1;
-    padding: 12px 16px;
-    border: 2px solid #e0e0e0;
-    border-radius: 10px;
-    font-size: 16px;
-  }
-  .manual-input input:focus {
-    border-color: var(--brand-primary, #1a73e8);
-    outline: none;
-  }
-  .manual-input button {
-    padding: 12px 20px;
-    background: var(--brand-primary, #1a73e8);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-weight: 600;
-  }
-  .pending-tasks {
-    max-height: 200px;
-    overflow-y: auto;
-  }
-  .pending-task-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 12px;
-    background: #f8f9fa;
-    border-radius: 8px;
-    margin-bottom: 8px;
-  }
-  .pending-task-item__info {
-    flex: 1;
-  }
-  .pending-task-item__number {
-    font-weight: 600;
-    font-size: 14px;
-  }
-  .pending-task-item__business {
-    font-size: 12px;
-    color: #666;
-  }
-  .pending-task-item__action {
-    padding: 6px 12px;
-    background: var(--brand-success, #28a745);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 12px;
-  }
-  .scan-result {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: white;
-    padding: 24px;
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-    text-align: center;
-    z-index: 1000;
-    min-width: 280px;
-    display: none;
-  }
-  .scan-result.show {
-    display: block;
-    animation: popIn 0.3s ease;
-  }
-  @keyframes popIn {
-    0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
-    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-  }
-  .scan-result__icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 16px;
-    font-size: 28px;
-  }
-  .scan-result__icon--success {
-    background: #d4edda;
-    color: var(--brand-success, #28a745);
-  }
-  .scan-result__icon--error {
-    background: #f8d7da;
-    color: var(--brand-danger, #dc3545);
-  }
-  .scan-result__title {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 8px;
-  }
-  .scan-result__message {
-    color: #666;
-    font-size: 14px;
-    margin-bottom: 16px;
-  }
-  .scan-result__actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-  }
-  .scan-result__actions .btn {
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-weight: 600;
-  }
-  .result-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.5);
-    z-index: 999;
-    display: none;
-  }
-  .result-overlay.show {
-    display: block;
-  }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="scanner-container">
-  <!-- Header -->
-  <div class="scanner-header">
-    <div>
-      <a href="{% url 'fleet:fleet_dashboard' %}" class="text-white text-decoration-none">
-        <i class="fa-solid fa-arrow-left me-2"></i>
-      </a>
-      <span class="scanner-header__title">Scan Pickup</span>
+<div class="pks" id="fleet_pickup_scanner_wrapper">
+  <!-- Hero Header -->
+  <div class="pks__hero">
+    <div class="d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <a href="{% url 'fleet:fleet_dashboard' %}" class="pks__back-btn">
+          <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <div>
+          <h1 class="pks__hero-title">Scan Pickup</h1>
+          <p class="pks__hero-subtitle">Scan QR/barcode or enter code manually</p>
+        </div>
+      </div>
+      <span class="pks__hero-badge">
+        <i class="fa-solid fa-clock me-1"></i>{{ pending_count }} pending
+      </span>
     </div>
-    <span class="scanner-header__count">{{ pending_count }} pending</span>
   </div>
 
-  <!-- Camera View -->
-  <div class="camera-container">
-    <video id="scanner-video" autoplay playsinline></video>
-    <div class="scan-overlay">
-      <div class="scan-frame">
-        <div class="scan-line"></div>
+  <!-- Camera Card -->
+  <div class="pks__camera-card">
+    <div class="pks__card-header">
+      <i class="fa-solid fa-camera"></i> Camera Scanner
+    </div>
+    <div class="pks__camera-body">
+      <video id="scanner-video" class="pks__video" autoplay playsinline></video>
+      <div class="pks__scan-overlay">
+        <div class="pks__scan-frame">
+          <div class="pks__scan-line"></div>
+        </div>
+      </div>
+      <div class="pks__scan-instructions">
+        <p><i class="fa-solid fa-qrcode me-2"></i>Point camera at QR code or barcode</p>
       </div>
     </div>
-    <div class="scan-instructions">
-      <p><i class="fa-solid fa-qrcode me-2"></i>Point camera at QR code or barcode</p>
-    </div>
   </div>
 
-  <!-- Actions Panel -->
-  <div class="scanner-actions">
-    <div class="manual-input">
-      <input type="text" id="manual-code" placeholder="Enter code manually...">
-      <button type="button" id="btn-manual-submit">
-        <i class="fa-solid fa-search"></i>
-      </button>
+  <!-- Manual Input Card -->
+  <div class="pks__input-card">
+    <div class="pks__card-header">
+      <i class="fa-solid fa-keyboard"></i> Manual Entry
     </div>
-
-    {% if pending_tasks %}
-    <p class="text-muted small mb-2">Or select from pending tasks:</p>
-    <div class="pending-tasks">
-      {% for task in pending_tasks %}
-      <div class="pending-task-item">
-        <div class="pending-task-item__info">
-          <div class="pending-task-item__number">#{{ task.dl_task_number }}</div>
-          <div class="pending-task-item__business">{{ task.order.business.business_name|default:"N/A" }}</div>
-        </div>
-        <button type="button" class="pending-task-item__action quick-pickup-btn" data-task-id="{{ task.id }}" data-task-number="{{ task.dl_task_number }}">
-          <i class="fa-solid fa-check me-1"></i>Pickup
+    <div class="pks__input-body">
+      <div class="d-flex gap-2">
+        <input type="text" id="manual-code" class="pks__input" placeholder="Enter code manually...">
+        <button type="button" id="btn-manual-submit" class="pks__submit-btn">
+          <i class="fa-solid fa-search"></i>
         </button>
       </div>
-      {% endfor %}
     </div>
-    {% else %}
-    <p class="text-muted text-center mb-0">
-      <i class="fa-solid fa-inbox me-2"></i>No pending tasks to pickup
-    </p>
-    {% endif %}
+  </div>
+
+  <!-- Pending Tasks Card -->
+  <div class="pks__tasks-card">
+    <div class="pks__card-header">
+      <i class="fa-solid fa-list-check"></i> Pending Pickups
+    </div>
+    <div class="pks__tasks-body">
+      {% if pending_tasks %}
+      <div class="pks__tasks-list">
+        {% for task in pending_tasks %}
+        <div class="pks__task-item">
+          <div class="pks__task-info">
+            <span class="pks__task-number">#{{ task.dl_task_number }}</span>
+            <span class="pks__task-business">{{ task.order.business.business_name|default:"N/A" }}</span>
+          </div>
+          <button type="button" class="pks__task-action quick-pickup-btn" data-task-id="{{ task.id }}" data-task-number="{{ task.dl_task_number }}">
+            <i class="fa-solid fa-check me-1"></i>Pickup
+          </button>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="pks__empty">
+        <i class="fa-solid fa-inbox"></i>
+        <p>No pending tasks to pickup</p>
+      </div>
+      {% endif %}
+    </div>
   </div>
 </div>
 
 <!-- Result Overlay -->
-<div class="result-overlay" id="result-overlay"></div>
+<div class="pks__result-overlay" id="result-overlay"></div>
 
 <!-- Scan Result Modal -->
-<div class="scan-result" id="scan-result">
-  <div class="scan-result__icon" id="result-icon">
+<div class="pks__result-modal" id="scan-result">
+  <div class="pks__result-icon" id="result-icon">
     <i class="fa-solid fa-check"></i>
   </div>
-  <div class="scan-result__title" id="result-title">Success!</div>
-  <div class="scan-result__message" id="result-message">Task pickup confirmed</div>
-  <div class="scan-result__actions">
-    <button type="button" class="btn btn-outline-secondary" id="btn-scan-more">Scan More</button>
-    <a href="#" class="btn btn-primary" id="btn-start-delivery">Start Delivery</a>
+  <div class="pks__result-title" id="result-title">Success!</div>
+  <div class="pks__result-message" id="result-message">Task pickup confirmed</div>
+  <div class="pks__result-actions">
+    <button type="button" class="pks__btn pks__btn--outline" id="btn-scan-more">Scan More</button>
+    <a href="#" class="pks__btn pks__btn--primary" id="btn-start-delivery">Start Delivery</a>
   </div>
 </div>
 {% endblock %}
@@ -353,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     } catch (err) {
       console.error('Camera error:', err);
-      document.querySelector('.scan-instructions p').innerHTML =
+      document.querySelector('.pks__scan-instructions p').innerHTML =
         '<i class="fa-solid fa-camera-slash me-2"></i>Camera not available. Use manual input.';
     }
   }
@@ -394,14 +177,14 @@ document.addEventListener('DOMContentLoaded', function() {
   // Show result modal
   function showResult(data) {
     if (data.success) {
-      resultIcon.className = 'scan-result__icon scan-result__icon--success';
+      resultIcon.className = 'pks__result-icon pks__result-icon--success';
       resultIcon.innerHTML = '<i class="fa-solid fa-check"></i>';
       resultTitle.textContent = 'Pickup Confirmed!';
       resultMessage.textContent = `Task #${data.task_number} from ${data.business}`;
       btnStartDelivery.href = data.redirect_url || '#';
-      btnStartDelivery.style.display = 'inline-block';
+      btnStartDelivery.style.display = 'inline-flex';
     } else {
-      resultIcon.className = 'scan-result__icon scan-result__icon--error';
+      resultIcon.className = 'pks__result-icon pks__result-icon--error';
       resultIcon.innerHTML = '<i class="fa-solid fa-times"></i>';
       resultTitle.textContent = 'Not Found';
       resultMessage.textContent = data.error || 'Could not find matching task';

@@ -6,260 +6,249 @@
 {% endblock extra_css %}
 
 {% block content %}
-<div class="flex-fill p-2">
-    <div class="col-12 py-2">
-        <!-- Page Header -->
-        <section class="m-0 p-0 mb-4" id="fleet_performance_section_header">
-            <div class="pt-3 pt-md-3 pb-0 text-dark">
-                <div class="text-center">
-                    <h3 class="fw-bolder text-uppercase" id="fleet_performance_header_title">
-                        <i class="fa-solid fa-gauge-high me-2"></i>My Performance
-                        <br />
-                        <span class="fw-light text-lowercase h5">{{ driver.user.get_full_name }}</span>
-                    </h3>
-                </div>
+<div class="flt-perf">
+    <!-- Hero Banner -->
+    <div class="flt__hero" id="fleet_performance_section_header">
+        <div class="flt__hero-inner">
+            <div class="flt__hero-left">
+                <h1 class="flt__hero-title" id="fleet_performance_header_title">
+                    <i class="fa-solid fa-gauge-high"></i> My Performance
+                </h1>
+                <p class="flt__hero-sub">{{ driver.user.get_full_name }}</p>
             </div>
-        </section>
-
-        <!-- Period Filter -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="bg-white rounded shadow-sm p-3 border" id="fleet_performance_card_filter">
-                    <form method="get" class="d-flex align-items-center gap-3 flex-wrap" id="fleet_performance_form_filter">
-                        <label class="fw-bold mb-0">
-                            <i class="fa-solid fa-calendar me-2"></i>Time Period:
-                        </label>
-                        <select name="period" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
-                            {% for value, label in period_options %}
-                            <option value="{{ value }}" {% if selected_period == value %}selected{% endif %}>
-                                {{ label }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </form>
+            <div class="flt__hero-right">
+                <div class="flt__hero-stat">
+                    <span class="flt__hero-stat__num">{{ performance_metrics.completion_rate|floatformat:1 }}%</span>
+                    <span class="flt__hero-stat__label">Completion</span>
+                </div>
+                <div class="flt__hero-stat flt__hero-stat--ok">
+                    <span class="flt__hero-stat__num">{{ performance_metrics.average_rating|floatformat:1 }}</span>
+                    <span class="flt__hero-stat__label">Rating</span>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Performance Overview Cards -->
-        <div class="row g-3 mb-4">
-            <div class="col-12 col-md-6 col-lg-3">
-                <section class="p-3 bg-white rounded shadow-sm border-start border-5 border-primary" id="fleet_performance_card_completion_rate">
-                    <p class="m-0 fw-bold fs-6 text-muted text-uppercase">Completion Rate</p>
-                    <p class="mb-0 mt-2 fs-2 fw-bold text-end text-primary">
-                        {{ performance_metrics.completion_rate|floatformat:1 }}%
-                    </p>
-                    <p class="mb-0 mt-1 small text-muted text-end">
-                        {{ performance_metrics.completed_tasks }} of {{ performance_metrics.total_tasks }} tasks
-                    </p>
-                </section>
+    <!-- Period Filter -->
+    <div class="flt__card" id="fleet_performance_card_filter">
+        <div class="flt__card-header">
+            <i class="fa-solid fa-calendar"></i> Time Period
+        </div>
+        <div class="flt__card-body">
+            <form method="get" class="d-flex align-items-center gap-3 flex-wrap" id="fleet_performance_form_filter">
+                <label class="flt__filter-label">
+                    <i class="fa-solid fa-calendar me-1"></i>Period:
+                </label>
+                <select name="period" class="flt__select" onchange="this.form.submit()">
+                    {% for value, label in period_options %}
+                    <option value="{{ value }}" {% if selected_period == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+    </div>
+
+    <!-- Performance Overview Cards -->
+    <div class="flt__stat-row">
+        <div class="flt__stat-card" id="fleet_performance_card_completion_rate">
+            <div class="flt__stat-card__icon flt__stat-card__icon--primary">
+                <i class="fa-solid fa-clipboard-check"></i>
             </div>
-            <div class="col-12 col-md-6 col-lg-3">
-                <section class="p-3 bg-white rounded shadow-sm border-start border-5 border-success">
-                    <p class="m-0 fw-bold fs-6 text-muted text-uppercase">COD Collection Rate</p>
-                    <p class="mb-0 mt-2 fs-2 fw-bold text-end text-success">
-                        {{ performance_metrics.cod_collection_rate|floatformat:1 }}%
-                    </p>
-                    <p class="mb-0 mt-1 small text-muted text-end">
-                        Efficient cash handling
-                    </p>
-                </section>
-            </div>
-            <div class="col-12 col-md-6 col-lg-3">
-                <section class="p-3 bg-white rounded shadow-sm border-start border-5 border-warning">
-                    <p class="m-0 fw-bold fs-6 text-muted text-uppercase">Average Rating</p>
-                    <p class="mb-0 mt-2 fs-2 fw-bold text-end text-warning">
-                        {{ performance_metrics.average_rating|floatformat:1 }}
-                    </p>
-                    <p class="mb-0 mt-1 small text-muted text-end">
-                        Based on {{ performance_metrics.total_reviews }} reviews
-                    </p>
-                </section>
-            </div>
-            <div class="col-12 col-md-6 col-lg-3">
-                <section class="p-3 bg-white rounded shadow-sm border-start border-5 border-info">
-                    <p class="m-0 fw-bold fs-6 text-muted text-uppercase">Total Earnings</p>
-                    <p class="mb-0 mt-2 fs-2 fw-bold text-end text-info">
-                        {{ stats.total_earnings|floatformat:0 }} QR
-                    </p>
-                    <p class="mb-0 mt-1 small text-muted text-end">
-                        In this period
-                    </p>
-                </section>
+            <div class="flt__stat-card__body">
+                <div class="flt__stat-card__value">{{ performance_metrics.completion_rate|floatformat:1 }}%</div>
+                <div class="flt__stat-card__label">Completion Rate</div>
+                <div class="flt__stat-card__sub">{{ performance_metrics.completed_tasks }} of {{ performance_metrics.total_tasks }} tasks</div>
             </div>
         </div>
+        <div class="flt__stat-card">
+            <div class="flt__stat-card__icon flt__stat-card__icon--success">
+                <i class="fa-solid fa-money-bill-wave"></i>
+            </div>
+            <div class="flt__stat-card__body">
+                <div class="flt__stat-card__value">{{ performance_metrics.cod_collection_rate|floatformat:1 }}%</div>
+                <div class="flt__stat-card__label">COD Collection Rate</div>
+                <div class="flt__stat-card__sub">Efficient cash handling</div>
+            </div>
+        </div>
+        <div class="flt__stat-card">
+            <div class="flt__stat-card__icon flt__stat-card__icon--warning">
+                <i class="fa-solid fa-star"></i>
+            </div>
+            <div class="flt__stat-card__body">
+                <div class="flt__stat-card__value">{{ performance_metrics.average_rating|floatformat:1 }}</div>
+                <div class="flt__stat-card__label">Average Rating</div>
+                <div class="flt__stat-card__sub">Based on {{ performance_metrics.total_reviews }} reviews</div>
+            </div>
+        </div>
+        <div class="flt__stat-card">
+            <div class="flt__stat-card__icon flt__stat-card__icon--info">
+                <i class="fa-solid fa-coins"></i>
+            </div>
+            <div class="flt__stat-card__body">
+                <div class="flt__stat-card__value">{{ stats.total_earnings|floatformat:0 }} QR</div>
+                <div class="flt__stat-card__label">Total Earnings</div>
+                <div class="flt__stat-card__sub">In this period</div>
+            </div>
+        </div>
+    </div>
 
-        <!-- Task Status Breakdown -->
-        <div class="row g-3 mb-4">
-            <div class="col-12">
-                <section class="p-4 bg-white rounded shadow-sm">
-                    <h5 class="fw-bold mb-3">
-                        <i class="fa-solid fa-chart-pie me-2"></i>
-                        Task Status Breakdown
-                    </h5>
-                    <div class="row text-center">
-                        <div class="col-6 col-md-3 mb-3">
-                            <div class="border rounded p-3 bg-light">
-                                <i class="fa-solid fa-clipboard-check fs-2 text-primary mb-2"></i>
-                                <h3 class="fw-bold mb-0">{{ performance_metrics.total_tasks }}</h3>
-                                <p class="text-muted small mb-0">Total Tasks</p>
-                            </div>
-                        </div>
-                        <div class="col-6 col-md-3 mb-3">
-                            <div class="border rounded p-3 bg-success bg-opacity-10">
-                                <i class="fa-solid fa-circle-check fs-2 text-success mb-2"></i>
-                                <h3 class="fw-bold mb-0">{{ performance_metrics.completed_tasks }}</h3>
-                                <p class="text-muted small mb-0">Completed</p>
-                            </div>
-                        </div>
-                        <div class="col-6 col-md-3 mb-3">
-                            <div class="border rounded p-3 bg-danger bg-opacity-10">
-                                <i class="fa-solid fa-circle-xmark fs-2 text-danger mb-2"></i>
-                                <h3 class="fw-bold mb-0">{{ performance_metrics.failed_tasks }}</h3>
-                                <p class="text-muted small mb-0">Failed</p>
-                            </div>
-                        </div>
-                        <div class="col-6 col-md-3 mb-3">
-                            <div class="border rounded p-3 bg-warning bg-opacity-10">
-                                <i class="fa-solid fa-spinner fs-2 text-warning mb-2"></i>
-                                <h3 class="fw-bold mb-0">{{ performance_metrics.in_progress }}</h3>
-                                <p class="text-muted small mb-0">In Progress</p>
-                            </div>
-                        </div>
+    <!-- Task Status Breakdown -->
+    <div class="flt__card">
+        <div class="flt__card-header">
+            <i class="fa-solid fa-chart-pie"></i> Task Status Breakdown
+        </div>
+        <div class="flt__card-body">
+            <div class="flt__breakdown-grid">
+                <div class="flt__breakdown-item">
+                    <div class="flt__breakdown-item__icon flt__breakdown-item__icon--primary">
+                        <i class="fa-solid fa-clipboard-check"></i>
                     </div>
-                </section>
-            </div>
-        </div>
-
-        <!-- Daily Performance (Last 7 Days) -->
-        <div class="row g-3 mb-4">
-            <div class="col-12">
-                <section class="p-4 bg-white rounded shadow-sm" id="fleet_performance_card_daily">
-                    <h5 class="fw-bold mb-3" id="fleet_performance_title_daily">
-                        <i class="fa-solid fa-chart-line me-2"></i>
-                        Daily Performance (Last 7 Days)
-                    </h5>
-                    <div class="listing-container" style="box-shadow: none;">
-                        <table class="listing-table" id="fleet_performance_table_daily">
-                            <thead id="fleet_performance_thead_daily">
-                                <tr>
-                                    <th>Date</th>
-                                    <th class="text-center">Total</th>
-                                    <th class="text-center">Completed</th>
-                                    <th class="text-center">Failed</th>
-                                    <th class="text-center">Success Rate</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for day in daily_stats %}
-                                <tr>
-                                    <td class="fw-bold">{{ day.date }}</td>
-                                    <td class="text-center">{{ day.total }}</td>
-                                    <td class="text-center">
-                                        <span class="listing-status success">{{ day.completed }}</span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="listing-status danger">{{ day.failed }}</span>
-                                    </td>
-                                    <td class="text-center">
-                                        {% if day.total > 0 %}
-                                        {% widthratio day.completed day.total 100 %}%
-                                        {% else %}
-                                        N/A
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr><td colspan="5" class="text-center text-muted py-3">No daily stats available</td></tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="flt__breakdown-item__num">{{ performance_metrics.total_tasks }}</div>
+                    <div class="flt__breakdown-item__label">Total Tasks</div>
+                </div>
+                <div class="flt__breakdown-item">
+                    <div class="flt__breakdown-item__icon flt__breakdown-item__icon--success">
+                        <i class="fa-solid fa-circle-check"></i>
                     </div>
-                </section>
+                    <div class="flt__breakdown-item__num">{{ performance_metrics.completed_tasks }}</div>
+                    <div class="flt__breakdown-item__label">Completed</div>
+                </div>
+                <div class="flt__breakdown-item">
+                    <div class="flt__breakdown-item__icon flt__breakdown-item__icon--danger">
+                        <i class="fa-solid fa-circle-xmark"></i>
+                    </div>
+                    <div class="flt__breakdown-item__num">{{ performance_metrics.failed_tasks }}</div>
+                    <div class="flt__breakdown-item__label">Failed</div>
+                </div>
+                <div class="flt__breakdown-item">
+                    <div class="flt__breakdown-item__icon flt__breakdown-item__icon--warning">
+                        <i class="fa-solid fa-spinner"></i>
+                    </div>
+                    <div class="flt__breakdown-item__num">{{ performance_metrics.in_progress }}</div>
+                    <div class="flt__breakdown-item__label">In Progress</div>
+                </div>
             </div>
         </div>
+    </div>
 
+    <!-- Daily Performance (Last 7 Days) -->
+    <div class="flt__card" id="fleet_performance_card_daily">
+        <div class="flt__card-header" id="fleet_performance_title_daily">
+            <i class="fa-solid fa-chart-line"></i> Daily Performance (Last 7 Days)
+        </div>
+        <div class="flt__card-body flt__card-body--flush">
+            <div class="listing-container">
+                <table class="listing-table" id="fleet_performance_table_daily">
+                    <thead id="fleet_performance_thead_daily">
+                        <tr>
+                            <th>Date</th>
+                            <th class="text-center">Total</th>
+                            <th class="text-center">Completed</th>
+                            <th class="text-center">Failed</th>
+                            <th class="text-center">Success Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for day in daily_stats %}
+                        <tr>
+                            <td class="fw-bold">{{ day.date }}</td>
+                            <td class="text-center">{{ day.total }}</td>
+                            <td class="text-center">
+                                <span class="listing-status success">{{ day.completed }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="listing-status danger">{{ day.failed }}</span>
+                            </td>
+                            <td class="text-center">
+                                {% if day.total > 0 %}
+                                {% widthratio day.completed day.total 100 %}%
+                                {% else %}
+                                N/A
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-3">No daily stats available</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet & Financial Row -->
+    <div class="flt__two-col">
         <!-- Wallet Performance -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-6">
-                <section class="p-4 bg-white rounded shadow-sm h-100">
-                    <h5 class="fw-bold mb-3">
-                        <i class="fa-solid fa-wallet me-2"></i>
-                        Wallet Status
-                    </h5>
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between mb-1">
-                            <span class="text-muted">Credit Usage</span>
-                            <span class="fw-bold">{{ wallet_status.usage_percentage|floatformat:1 }}%</span>
-                        </div>
-                        <div class="progress" style="height: 20px;">
-                            <div class="progress-bar {% if wallet_status.is_blocked %}bg-danger{% elif wallet_status.is_warning %}bg-warning{% else %}bg-success{% endif %}"
-                                 role="progressbar"
-                                 style="width: {{ wallet_status.usage_percentage }}%;">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row text-center mt-4">
-                        <div class="col-4">
-                            <p class="text-muted mb-0 small">Available Credit</p>
-                            <p class="fw-bold fs-5 mb-0 text-success">{{ wallet_status.available_credit }} QR</p>
-                        </div>
-                        <div class="col-4">
-                            <p class="text-muted mb-0 small">COD In Hand</p>
-                            <p class="fw-bold fs-5 mb-0 text-warning">{{ wallet_status.cod_in_hand }} QR</p>
-                        </div>
-                        <div class="col-4">
-                            <p class="text-muted mb-0 small">Pending Earnings</p>
-                            <p class="fw-bold fs-5 mb-0 text-primary">{{ wallet_status.pending_earnings }} QR</p>
-                        </div>
-                    </div>
-                </section>
+        <div class="flt__card">
+            <div class="flt__card-header">
+                <i class="fa-solid fa-wallet"></i> Wallet Status
             </div>
-            <div class="col-md-6">
-                <section class="p-4 bg-white rounded shadow-sm h-100">
-                    <h5 class="fw-bold mb-3">
-                        <i class="fa-solid fa-sack-dollar me-2"></i>
-                        Financial Summary
-                    </h5>
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
-                            <span class="text-muted">Total COD Collected</span>
-                            <span class="fw-bold fs-5 text-warning">{{ stats.total_cod_collected|floatformat:2 }} QR</span>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
-                            <span class="text-muted">Total Earnings</span>
-                            <span class="fw-bold fs-5 text-success">{{ stats.total_earnings|floatformat:2 }} QR</span>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="text-muted">Successful Deliveries</span>
-                            <span class="fw-bold fs-5 text-primary">{{ stats.successful_deliveries }}</span>
-                        </div>
+            <div class="flt__card-body">
+                <div class="flt__progress-row">
+                    <span class="flt__progress-row__label">Credit Usage</span>
+                    <span class="flt__progress-row__value">{{ wallet_status.usage_percentage|floatformat:1 }}%</span>
+                </div>
+                <div class="flt__progress-bar">
+                    <div class="flt__progress-bar__fill {% if wallet_status.is_blocked %}flt__progress-bar__fill--danger{% elif wallet_status.is_warning %}flt__progress-bar__fill--warning{% else %}flt__progress-bar__fill--success{% endif %}"
+                         data-width="{{ wallet_status.usage_percentage }}"></div>
+                </div>
+                <div class="flt__wallet-stats">
+                    <div class="flt__wallet-stat">
+                        <span class="flt__wallet-stat__label">Available Credit</span>
+                        <span class="flt__wallet-stat__value flt__wallet-stat__value--success">{{ wallet_status.available_credit }} QR</span>
                     </div>
-                </section>
+                    <div class="flt__wallet-stat">
+                        <span class="flt__wallet-stat__label">COD In Hand</span>
+                        <span class="flt__wallet-stat__value flt__wallet-stat__value--warning">{{ wallet_status.cod_in_hand }} QR</span>
+                    </div>
+                    <div class="flt__wallet-stat">
+                        <span class="flt__wallet-stat__label">Pending Earnings</span>
+                        <span class="flt__wallet-stat__value flt__wallet-stat__value--primary">{{ wallet_status.pending_earnings }} QR</span>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="row g-3">
-            <div class="col-12">
-                <section class="p-3 bg-light rounded shadow-sm">
-                    <div class="d-flex gap-2 flex-wrap justify-content-center">
-                        <a href="{% url 'fleet:driver_analytics' %}" class="btn btn-primary">
-                            <i class="fa-solid fa-chart-pie me-2"></i>View Analytics
-                        </a>
-                        <a href="{% url 'fleet:driver_reports' %}" class="btn btn-outline-primary">
-                            <i class="fa-solid fa-file-pdf me-2"></i>Download Reports
-                        </a>
-                        <a href="{% url 'fleet:driver_earnings' %}" class="btn btn-outline-success">
-                            <i class="fa-solid fa-coins me-2"></i>View Earnings
-                        </a>
-                        <a href="{% url 'fleet:fleet_dashboard' %}" class="btn btn-outline-secondary">
-                            <i class="fa-solid fa-arrow-left me-2"></i>Back to Dashboard
-                        </a>
-                    </div>
-                </section>
+        <!-- Financial Summary -->
+        <div class="flt__card">
+            <div class="flt__card-header">
+                <i class="fa-solid fa-sack-dollar"></i> Financial Summary
+            </div>
+            <div class="flt__card-body">
+                <div class="flt__field">
+                    <span class="flt__field__label">Total COD Collected</span>
+                    <span class="flt__field__value flt__field__value--warning">{{ stats.total_cod_collected|floatformat:2 }} QR</span>
+                </div>
+                <div class="flt__field">
+                    <span class="flt__field__label">Total Earnings</span>
+                    <span class="flt__field__value flt__field__value--success">{{ stats.total_earnings|floatformat:2 }} QR</span>
+                </div>
+                <div class="flt__field flt__field--no-border">
+                    <span class="flt__field__label">Successful Deliveries</span>
+                    <span class="flt__field__value flt__field__value--primary">{{ stats.successful_deliveries }}</span>
+                </div>
             </div>
         </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="flt__actions-bar">
+        <a href="{% url 'fleet:driver_analytics' %}" class="flt__btn flt__btn--primary">
+            <i class="fa-solid fa-chart-pie me-1"></i>View Analytics
+        </a>
+        <a href="{% url 'fleet:driver_reports' %}" class="flt__btn flt__btn--outline">
+            <i class="fa-solid fa-file-pdf me-1"></i>Download Reports
+        </a>
+        <a href="{% url 'fleet:driver_earnings' %}" class="flt__btn flt__btn--outline-success">
+            <i class="fa-solid fa-coins me-1"></i>View Earnings
+        </a>
+        <a href="{% url 'fleet:fleet_dashboard' %}" class="flt__btn flt__btn--ghost">
+            <i class="fa-solid fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
     </div>
 </div>
 {% endblock content %}
@@ -270,5 +259,15 @@
 setInterval(function() {
     location.reload();
 }, 300000);
+
+// Animate progress bars on load
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.flt__progress-bar__fill').forEach(function(bar) {
+        var width = bar.getAttribute('data-width');
+        if (width) {
+            bar.style.width = width + '%';
+        }
+    });
+});
 </script>
 {% endblock extra_js %}

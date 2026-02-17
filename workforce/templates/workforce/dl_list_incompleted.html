@@ -1,57 +1,85 @@
 {% extends "wf_dashboard_base.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
-<!-- extra css -->
-{% block extra_css %}
-<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
-{% endblock extra_css %}
-{% block content %}
-<div class="col-12 p-3">
-<div class="col-md-10 col-lg-10 col-12 p-0">
 
-    <table class="table table-hover  ">
-        <thead>
-            <tr>
-                <th scope="col">DL_Code</th>
-                <th scope="col">C_Code</th>
-                <th scope="col">Name</th>
-                <th scope="col">Mobile</th>
-                <th scope="col">C_status</th>
-                <th scope="col">DMS_status</th>
-            </tr>
-        </thead>
-        <tbody>{% if items_page %}
-            {% for order in items_page %}
-            <tr>
-                <th scope="row" class="border-right border-bottom-0">{{ order.dl_task}}</th>
-                <td class="border-right border-bottom-0">{{ order.client_order_code }}</td>
-                <td class="border-right border-bottom-0">{{ order.customer_name }}</td>
-                <td class="border-right border-bottom-0">{{ order.customer_phone }}</td>
-                <td class="border-right border-bottom-0">{{ order.order_status }}</td>
-                <td class="border-right border-bottom-0">{{ order.dl_task.dl_task_status_dms }}</td>
-            </tr>
-            <tr>
-                <td></td>
-                <td colspan="2">
-                    <i class="fa-solid fa-location-pin" style="color: #008000;"></i>
-                    {{ order.pickup_location }}
-                </td>
-                <td colspan="2">
-                    <i class="fa-solid fa-location-pin" style="color: #ff0000;"></i>
-                    {{ order.customer_address }}
-                </td>
-                <td>{{ order.dl_task.dl_task_status_dms }}</td>
-            </tr> {% endfor %}
-        </tbody>
-    </table>
-    {% include "includes/components/_pagination.html" with page_obj=items_page filter_params=filter_params %}
-    {% else %}
-    <p>No items found.</p>
-    {% endif %}
-</div>
+{% block content %}
+<div class="dli">
+    <!-- Hero Header -->
+    <div class="dli__hero">
+        <div class="dli__hero-content">
+            <h1 class="dli__hero-title">
+                <i class="fa-solid fa-truck-clock me-2"></i>Incompleted Deliveries
+            </h1>
+            <p class="dli__hero-sub">Delivery tasks pending completion</p>
+        </div>
+    </div>
+
+    <!-- Deliveries Table -->
+    <div class="dli__card">
+        <div class="dli__card-header">
+            <i class="fa-solid fa-list me-2 dli__icon-accent"></i>
+            <span class="dli__section-label">Delivery Tasks</span>
+        </div>
+        {% if items_page %}
+        <div class="table-responsive">
+            <table class="dli__table">
+                <thead>
+                    <tr>
+                        <th class="dli__th">DL Code</th>
+                        <th class="dli__th">Client Code</th>
+                        <th class="dli__th">Customer</th>
+                        <th class="dli__th">Mobile</th>
+                        <th class="dli__th">Status</th>
+                        <th class="dli__th">DMS Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in items_page %}
+                    <tr class="dli__row">
+                        <td class="dli__td dli__td--bold">{{ order.dl_task }}</td>
+                        <td class="dli__td">{{ order.client_order_code }}</td>
+                        <td class="dli__td">{{ order.customer_name }}</td>
+                        <td class="dli__td">{{ order.customer_phone }}</td>
+                        <td class="dli__td">
+                            <span class="dli__badge dli__badge--amber">{{ order.order_status }}</span>
+                        </td>
+                        <td class="dli__td">
+                            <span class="dli__badge dli__badge--blue">{{ order.dl_task.dl_task_status_dms }}</span>
+                        </td>
+                    </tr>
+                    <tr class="dli__row-detail">
+                        <td class="dli__td"></td>
+                        <td class="dli__td" colspan="2">
+                            <span class="dli__location dli__location--pickup">
+                                <i class="fa-solid fa-location-pin"></i>
+                                {{ order.pickup_location }}
+                            </span>
+                        </td>
+                        <td class="dli__td" colspan="2">
+                            <span class="dli__location dli__location--drop">
+                                <i class="fa-solid fa-location-pin"></i>
+                                {{ order.customer_address }}
+                            </span>
+                        </td>
+                        <td class="dli__td">{{ order.dl_task.dl_task_status_dms }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "includes/components/_pagination.html" with page_obj=items_page filter_params=filter_params %}
+        {% else %}
+        <div class="dli__empty">
+            <i class="fa-solid fa-inbox"></i>
+            <h3>No Incompleted Deliveries</h3>
+            <p>All delivery tasks are up to date.</p>
+        </div>
+        {% endif %}
+    </div>
 </div>
 {% endblock content %}
+
 {% block extra_js %}
 <script type="text/javascript" language="JavaScript" charset="UTF-8"
-    src="{%static 'orders/js/orders_main.js' %}"></script>
+    src="{% static 'orders/js/orders_main.js' %}"></script>
 {% endblock extra_js %}

@@ -1,50 +1,72 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
-{% block content %}
-<div class="p-2 col-12 col-lg-10 col-md-10" id="orders_upload_review_container_main">
-  <div class=" align-content-center">
-    <h1 id="orders_upload_review_header_title">Review Data</h1>
-    <form method="post" id="orders_upload_review_form_main">
-      {% csrf_token %}
-      <div class="table-responsive">
-        <table class="table table-striped table-hover" id="orders_upload_review_table_data">
-          <thead class="table-secondary" id="orders_upload_review_thead">
-            <tr>
-              {% for key in data.0.keys %}
-              <th>{{ key }}</th>
-              {% endfor %}
-            </tr>
-          </thead>
-          <tbody id="orders_upload_review_tbody">
-            {% for row in data %}
-            <tr>
-              {% for value in row.values %}
-              <td>
-                <input type="text" name="data[{{ forloop.counter0 }}][{{ key }}]" value="{{ value }}"
-                  class="form-control">
-              </td>
-              {% endfor %}
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <div class="d-grid ">
-        <button type="submit" class="btn btn-dark btn-sm" id="orders_upload_review_btn_submit">Submit Orders</button>
-      </div>
-    </form>
-    {% if messages %}
-    <ul>
-      {% for message in messages %}
-      <li>{{ message }}</li>
-      {% endfor %}
-    </ul>
-    {% endif %}
 
-  </div>
+{% block content %}
+<div class="our" id="orders_upload_review_container_main">
+    <!-- Hero Header -->
+    <div class="our__hero">
+        <div class="our__hero-content">
+            <div class="our__hero-left">
+                <h1 class="our__title">
+                    <i class="fas fa-search-plus"></i>
+                    Review Data
+                </h1>
+                <p class="our__subtitle">Review and confirm imported order data before submitting</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Review Card -->
+    <div class="our__card">
+        <div class="our__card-header">
+            <i class="fas fa-table"></i>
+            <span>Upload Preview</span>
+            {% if data %}<span class="our__count">{{ data|length }} rows</span>{% endif %}
+        </div>
+        <form method="post" id="orders_upload_review_form_main">
+            {% csrf_token %}
+            <div class="our__table-wrap">
+                <table class="our__table" id="orders_upload_review_table_data">
+                    <thead>
+                        <tr>
+                            {% for key in data.0.keys %}
+                            <th class="our__th">{{ key }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody id="orders_upload_review_tbody">
+                        {% for row in data %}
+                        <tr class="our__row">
+                            {% for value in row.values %}
+                            <td class="our__td">
+                                <input type="text" name="data[{{ forloop.counter0 }}][{{ key }}]" value="{{ value }}" class="our__input">
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="our__submit-row">
+                <button type="submit" class="our__btn our__btn--primary" id="orders_upload_review_btn_submit">
+                    <i class="fas fa-check"></i> Submit Orders
+                </button>
+            </div>
+        </form>
+
+        {% if messages %}
+        <div class="our__messages">
+            {% for message in messages %}
+            <div class="our__message our__message--{{ message.tags }}">
+                <i class="fas fa-info-circle"></i> {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
 </div>
 {% endblock content %}
-{% block extra_js %}
 
+{% block extra_js %}
 {% endblock extra_js %}

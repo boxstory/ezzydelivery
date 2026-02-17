@@ -4,150 +4,169 @@
 {% block title %}Edit Config - {{ config.pickup_location.pickup_location_title }}{% endblock %}
 
 {% block content %}
-<div id="workforce_base_container_main" class="flex-fill p-2 pt-3">
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">
-            <i class="fa-solid fa-sliders me-2"></i>Edit Configuration
-        </h4>
-        <a href="{% url 'workforce:dispatch_config_list' %}" class="btn btn-outline-secondary btn-sm">
-            <i class="fa-solid fa-arrow-left me-1"></i> Back to Configs
-        </a>
+<div class="dpf">
+    <!-- Hero Header -->
+    <div class="dpf__hero">
+        <div class="dpf__hero-inner">
+            <div class="dpf__hero-left">
+                <h1 class="dpf__hero-title">
+                    <i class="fa-solid fa-sliders dpf__hero-icon"></i>
+                    Edit Configuration
+                </h1>
+                <p class="dpf__hero-subtitle">{{ config.pickup_location.pickup_location_title }}</p>
+            </div>
+            <div class="dpf__hero-right">
+                <a href="{% url 'workforce:dispatch_config_list' %}" class="dpf__back-btn">
+                    <i class="fa-solid fa-arrow-left me-1"></i>Back to Configs
+                </a>
+            </div>
+        </div>
     </div>
 
-    <div class="row">
+    <div class="row g-3">
+        <!-- Form Column -->
         <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0">{{ config.pickup_location.pickup_location_title }}</h6>
-                </div>
-                <div class="card-body">
+            <div class="dpf__card">
+                <div class="dpf__card-body">
                     <form method="post">
                         {% csrf_token %}
 
                         {% if form.errors %}
-                        <div class="alert alert-danger">
+                        <div class="dpf__alert dpf__alert--error">
+                            <i class="fa-solid fa-exclamation-triangle me-2"></i>
                             <strong>Please correct the errors below.</strong>
                         </div>
                         {% endif %}
 
-                        <h6 class="text-muted mb-3">Batching Settings</h6>
-
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label for="id_max_batch_size" class="form-label">Max Batch Size</label>
-                                <input type="number" name="max_batch_size" id="id_max_batch_size"
-                                       class="form-control" min="1" max="5"
-                                       value="{{ form.max_batch_size.value|default:config.max_batch_size }}">
-                                <small class="text-muted">Maximum orders per batch</small>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="id_hold_window_seconds" class="form-label">Hold Window (sec)</label>
-                                <input type="number" name="hold_window_seconds" id="id_hold_window_seconds"
-                                       class="form-control" min="60" max="600"
-                                       value="{{ form.hold_window_seconds.value|default:config.hold_window_seconds }}">
-                                <small class="text-muted">Initial wait time for batching</small>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="id_max_hold_seconds" class="form-label">Max Hold (sec)</label>
-                                <input type="number" name="max_hold_seconds" id="id_max_hold_seconds"
-                                       class="form-control" min="120" max="900"
-                                       value="{{ form.max_hold_seconds.value|default:config.max_hold_seconds }}">
-                                <small class="text-muted">Maximum wait before release</small>
-                            </div>
-                        </div>
-
-                        <hr>
-                        <h6 class="text-muted mb-3">SLA Settings</h6>
-
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label for="id_sla_minutes" class="form-label">SLA Target (min)</label>
-                                <input type="number" name="sla_minutes" id="id_sla_minutes"
-                                       class="form-control" min="30" max="180"
-                                       value="{{ form.sla_minutes.value|default:config.sla_minutes }}">
-                                <small class="text-muted">Delivery time target</small>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="id_sla_buffer_minutes" class="form-label">SLA Buffer (min)</label>
-                                <input type="number" name="sla_buffer_minutes" id="id_sla_buffer_minutes"
-                                       class="form-control" min="5" max="30"
-                                       value="{{ form.sla_buffer_minutes.value|default:config.sla_buffer_minutes }}">
-                                <small class="text-muted">Release if less time remaining</small>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="id_max_orders_per_rider" class="form-label">Max Orders/Rider</label>
-                                <input type="number" name="max_orders_per_rider" id="id_max_orders_per_rider"
-                                       class="form-control" min="1" max="5"
-                                       value="{{ form.max_orders_per_rider.value|default:config.max_orders_per_rider }}">
-                                <small class="text-muted">Active order limit per rider</small>
-                            </div>
-                        </div>
-
-                        <hr>
-                        <h6 class="text-muted mb-3">Peak Hours</h6>
-
-                        <div class="row mb-3">
-                            <div class="col-md-3">
-                                <label for="id_peak_start_1" class="form-label">Lunch Peak Start</label>
-                                <input type="time" name="peak_start_1" id="id_peak_start_1"
-                                       class="form-control"
-                                       value="{{ config.peak_start_1|time:'H:i' }}">
-                            </div>
-                            <div class="col-md-3">
-                                <label for="id_peak_end_1" class="form-label">Lunch Peak End</label>
-                                <input type="time" name="peak_end_1" id="id_peak_end_1"
-                                       class="form-control"
-                                       value="{{ config.peak_end_1|time:'H:i' }}">
-                            </div>
-                            <div class="col-md-3">
-                                <label for="id_peak_start_2" class="form-label">Dinner Peak Start</label>
-                                <input type="time" name="peak_start_2" id="id_peak_start_2"
-                                       class="form-control"
-                                       value="{{ config.peak_start_2|time:'H:i' }}">
-                            </div>
-                            <div class="col-md-3">
-                                <label for="id_peak_end_2" class="form-label">Dinner Peak End</label>
-                                <input type="time" name="peak_end_2" id="id_peak_end_2"
-                                       class="form-control"
-                                       value="{{ config.peak_end_2|time:'H:i' }}">
-                            </div>
-                        </div>
-
-                        <hr>
-                        <h6 class="text-muted mb-3">Feature Flags</h6>
-
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" name="batching_enabled"
-                                           id="id_batching_enabled" {% if config.batching_enabled %}checked{% endif %}>
-                                    <label class="form-check-label" for="id_batching_enabled">
-                                        <strong>Batching Enabled</strong>
-                                        <br><small class="text-muted">Enable order batching for this location</small>
-                                    </label>
+                        <!-- Batching Settings -->
+                        <div class="dpf__section">
+                            <h3 class="dpf__section-title">
+                                <i class="fa-solid fa-boxes-stacked dpf__section-icon"></i>
+                                BATCHING SETTINGS
+                            </h3>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="id_max_batch_size" class="dpf__label">Max Batch Size</label>
+                                    <input type="number" name="max_batch_size" id="id_max_batch_size"
+                                           class="dpf__input" min="1" max="5"
+                                           value="{{ form.max_batch_size.value|default:config.max_batch_size }}">
+                                    <span class="dpf__hint">Maximum orders per batch</span>
                                 </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" name="auto_assignment_enabled"
-                                           id="id_auto_assignment_enabled" {% if config.auto_assignment_enabled %}checked{% endif %}>
-                                    <label class="form-check-label" for="id_auto_assignment_enabled">
-                                        <strong>Auto-Assignment Enabled</strong>
-                                        <br><small class="text-muted">Automatically assign batches to riders</small>
-                                    </label>
+                                <div class="col-md-4">
+                                    <label for="id_hold_window_seconds" class="dpf__label">Hold Window (sec)</label>
+                                    <input type="number" name="hold_window_seconds" id="id_hold_window_seconds"
+                                           class="dpf__input" min="60" max="600"
+                                           value="{{ form.hold_window_seconds.value|default:config.hold_window_seconds }}">
+                                    <span class="dpf__hint">Initial wait time for batching</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="id_max_hold_seconds" class="dpf__label">Max Hold (sec)</label>
+                                    <input type="number" name="max_hold_seconds" id="id_max_hold_seconds"
+                                           class="dpf__input" min="120" max="900"
+                                           value="{{ form.max_hold_seconds.value|default:config.max_hold_seconds }}">
+                                    <span class="dpf__hint">Maximum wait before release</span>
                                 </div>
                             </div>
                         </div>
 
-                        <hr>
+                        <!-- SLA Settings -->
+                        <div class="dpf__section">
+                            <h3 class="dpf__section-title">
+                                <i class="fa-solid fa-stopwatch dpf__section-icon"></i>
+                                SLA SETTINGS
+                            </h3>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="id_sla_minutes" class="dpf__label">SLA Target (min)</label>
+                                    <input type="number" name="sla_minutes" id="id_sla_minutes"
+                                           class="dpf__input" min="30" max="180"
+                                           value="{{ form.sla_minutes.value|default:config.sla_minutes }}">
+                                    <span class="dpf__hint">Delivery time target</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="id_sla_buffer_minutes" class="dpf__label">SLA Buffer (min)</label>
+                                    <input type="number" name="sla_buffer_minutes" id="id_sla_buffer_minutes"
+                                           class="dpf__input" min="5" max="30"
+                                           value="{{ form.sla_buffer_minutes.value|default:config.sla_buffer_minutes }}">
+                                    <span class="dpf__hint">Release if less time remaining</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="id_max_orders_per_rider" class="dpf__label">Max Orders/Rider</label>
+                                    <input type="number" name="max_orders_per_rider" id="id_max_orders_per_rider"
+                                           class="dpf__input" min="1" max="5"
+                                           value="{{ form.max_orders_per_rider.value|default:config.max_orders_per_rider }}">
+                                    <span class="dpf__hint">Active order limit per rider</span>
+                                </div>
+                            </div>
+                        </div>
 
-                        <div class="d-flex justify-content-end gap-2">
-                            <a href="{% url 'workforce:dispatch_config_list' %}" class="btn btn-outline-secondary">
-                                Cancel
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fa-solid fa-save me-1"></i> Save Configuration
+                        <!-- Peak Hours -->
+                        <div class="dpf__section">
+                            <h3 class="dpf__section-title">
+                                <i class="fa-solid fa-clock dpf__section-icon"></i>
+                                PEAK HOURS
+                            </h3>
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label for="id_peak_start_1" class="dpf__label">Lunch Peak Start</label>
+                                    <input type="time" name="peak_start_1" id="id_peak_start_1"
+                                           class="dpf__input" value="{{ config.peak_start_1|time:'H:i' }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="id_peak_end_1" class="dpf__label">Lunch Peak End</label>
+                                    <input type="time" name="peak_end_1" id="id_peak_end_1"
+                                           class="dpf__input" value="{{ config.peak_end_1|time:'H:i' }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="id_peak_start_2" class="dpf__label">Dinner Peak Start</label>
+                                    <input type="time" name="peak_start_2" id="id_peak_start_2"
+                                           class="dpf__input" value="{{ config.peak_start_2|time:'H:i' }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="id_peak_end_2" class="dpf__label">Dinner Peak End</label>
+                                    <input type="time" name="peak_end_2" id="id_peak_end_2"
+                                           class="dpf__input" value="{{ config.peak_end_2|time:'H:i' }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Feature Flags -->
+                        <div class="dpf__section">
+                            <h3 class="dpf__section-title">
+                                <i class="fa-solid fa-toggle-on dpf__section-icon"></i>
+                                FEATURE FLAGS
+                            </h3>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="dpf__toggle">
+                                        <input type="checkbox" name="batching_enabled" class="dpf__toggle-input"
+                                               {% if config.batching_enabled %}checked{% endif %}>
+                                        <span class="dpf__toggle-slider"></span>
+                                        <span class="dpf__toggle-text">
+                                            <strong>Batching Enabled</strong>
+                                            <span class="dpf__hint">Enable order batching for this location</span>
+                                        </span>
+                                    </label>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="dpf__toggle">
+                                        <input type="checkbox" name="auto_assignment_enabled" class="dpf__toggle-input"
+                                               {% if config.auto_assignment_enabled %}checked{% endif %}>
+                                        <span class="dpf__toggle-slider"></span>
+                                        <span class="dpf__toggle-text">
+                                            <strong>Auto-Assignment Enabled</strong>
+                                            <span class="dpf__hint">Automatically assign batches to riders</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="dpf__form-actions">
+                            <a href="{% url 'workforce:dispatch_config_list' %}" class="dpf__cancel-btn">Cancel</a>
+                            <button type="submit" class="dpf__submit-btn">
+                                <i class="fa-solid fa-save me-1"></i>Save Configuration
                             </button>
                         </div>
                     </form>
@@ -155,35 +174,30 @@
             </div>
         </div>
 
+        <!-- Help Column -->
         <div class="col-lg-4">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fa-solid fa-info-circle me-2"></i>Configuration Help</h6>
+            <div class="dpf__card">
+                <div class="dpf__card-header">
+                    <i class="fa-solid fa-circle-question dpf__card-header-icon"></i>
+                    CONFIGURATION HELP
                 </div>
-                <div class="card-body">
-                    <h6>Batching Logic</h6>
-                    <p class="small text-muted">
-                        When an order is verified, it enters the batching system. If a matching order
-                        (same store + zone) exists in holding, they're batched together. Otherwise,
-                        a hold window starts to wait for a match.
-                    </p>
-
-                    <h6>Hold Window</h6>
-                    <p class="small text-muted">
-                        The initial wait time after the first order. If no match arrives, the batch
-                        is released as a single order delivery.
-                    </p>
-
-                    <h6>SLA Buffer</h6>
-                    <p class="small text-muted">
-                        If an order's remaining SLA time falls below this buffer, it's force-released
-                        to prevent SLA breaches.
-                    </p>
-
-                    <h6>Peak Hours</h6>
-                    <p class="small text-muted">
-                        During peak hours, the system may adjust hold windows for faster throughput.
-                    </p>
+                <div class="dpf__card-body">
+                    <div class="dpf__help-item">
+                        <h4 class="dpf__help-title">Batching Logic</h4>
+                        <p class="dpf__help-text">When an order is verified, it enters the batching system. If a matching order (same store + zone) exists in holding, they are batched together. Otherwise, a hold window starts to wait for a match.</p>
+                    </div>
+                    <div class="dpf__help-item">
+                        <h4 class="dpf__help-title">Hold Window</h4>
+                        <p class="dpf__help-text">The initial wait time after the first order. If no match arrives, the batch is released as a single order delivery.</p>
+                    </div>
+                    <div class="dpf__help-item">
+                        <h4 class="dpf__help-title">SLA Buffer</h4>
+                        <p class="dpf__help-text">If an order's remaining SLA time falls below this buffer, it is force-released to prevent SLA breaches.</p>
+                    </div>
+                    <div class="dpf__help-item">
+                        <h4 class="dpf__help-title">Peak Hours</h4>
+                        <p class="dpf__help-text">During peak hours, the system may adjust hold windows for faster throughput.</p>
+                    </div>
                 </div>
             </div>
         </div>

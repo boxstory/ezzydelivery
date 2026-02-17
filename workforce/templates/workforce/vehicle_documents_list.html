@@ -3,184 +3,173 @@
 
 {% block title %}Vehicle Documents - Ezzy Delivery{% endblock title %}
 
-{% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'workforce/css/workforce.css' %}" />
-{% endblock extra_css %}
-
 {% block content %}
 <div class="col-12 p-3">
-<!-- Page Title -->
-<h1 class="page-title">
-    <i class="fa-solid fa-car me-2"></i>Vehicle Documents
-</h1>
-
-<!-- Filter and View Toggle Section -->
-<div class="filter-section">
-    <div class="filter-row">
-        <div class="filter-search-group">
-            <label for="searchInput" class="filter-label">
-                <i class="fa-solid fa-search me-2"></i>Search Vehicles
-            </label>
-            <input type="text" id="searchInput" class="filter-input" placeholder="Search by vehicle number, model, driver name..." value="{{ search_query }}">
-        </div>
-        <div class="filter-toggle-group">
-            <button type="button" data-view="card" id="cardViewBtn" class="view-toggle-btn {% if view_type == 'card' %}active{% endif %}" aria-pressed="{% if view_type == 'card' %}true{% else %}false{% endif %}">
-                <i class="fa-solid fa-grip" aria-hidden="true"></i>
-                Card
-            </button>
-            <button type="button" data-view="table" id="tableViewBtn" class="view-toggle-btn {% if view_type == 'table' %}active{% endif %}" aria-pressed="{% if view_type == 'table' %}true{% else %}false{% endif %}">
-                <i class="fa-solid fa-list" aria-hidden="true"></i>
-                Table
-            </button>
-        </div>
+  <!-- Hero Header -->
+  <div class="vdl__hero">
+    <div class="vdl__hero-content">
+      <h1 class="vdl__hero-title">
+        <i class="fa-solid fa-car vdl__hero-icon"></i>Vehicle Documents
+      </h1>
+      <p class="vdl__hero-subtitle">Manage vehicle registration and documentation records</p>
     </div>
-</div>
+  </div>
 
-<!-- Card View -->
-<div id="cardView" class="driver-grid {% if view_type != 'card' %}d-none{% endif %}">
+  <!-- Filter Bar -->
+  <div class="vdl__filter-bar">
+    <div class="vdl__filter-search">
+      <label for="searchInput" class="vdl__filter-label">
+        <i class="fa-solid fa-search"></i> Search Vehicles
+      </label>
+      <input type="text" id="searchInput" class="form-control vdl__filter-input" placeholder="Search by vehicle number, model, driver name..." value="{{ search_query }}">
+    </div>
+    <div class="vdl__view-toggle">
+      <button type="button" data-view="card" id="cardViewBtn" class="vdl__toggle-btn {% if view_type == 'card' %}vdl__toggle-btn--active{% endif %}" aria-pressed="{% if view_type == 'card' %}true{% else %}false{% endif %}">
+        <i class="fa-solid fa-grip"></i> Card
+      </button>
+      <button type="button" data-view="table" id="tableViewBtn" class="vdl__toggle-btn {% if view_type == 'table' %}vdl__toggle-btn--active{% endif %}" aria-pressed="{% if view_type == 'table' %}true{% else %}false{% endif %}">
+        <i class="fa-solid fa-list"></i> Table
+      </button>
+    </div>
+  </div>
+
+  <!-- Card View -->
+  <div id="cardView" class="vdl__card-grid {% if view_type != 'card' %}d-none{% endif %}">
     {% if vehicles %}
-        {% for vehicle in vehicles %}
-        <div class="driver-card" data-search-text="{{ vehicle.vehicle_no|lower }} {{ vehicle.vehicle_type|lower }} {{ vehicle.vehicle_model|lower }} {{ vehicle.driver.user.first_name|default:''|lower }} {{ vehicle.driver.user.last_name|default:''|lower }}">
-            <div class="driver-card-header">
-                <div class="driver-icon">
-                    <i class="fa-solid fa-car"></i>
-                </div>
-                <div class="driver-info">
-                    <h3>{{ vehicle.vehicle_no|default:"N/A" }}</h3>
-                    <p>{{ vehicle.vehicle_type|default:"N/A"|title }}</p>
-                </div>
-            </div>
-            <div class="driver-details">
-                <div class="detail-row">
-                    <i class="fa-solid fa-user"></i>
-                    <span>{{ vehicle.driver.user.first_name|default:"Unknown" }} {{ vehicle.driver.user.last_name|default:"" }}</span>
-                </div>
-                {% if vehicle.vehicle_model %}
-                <div class="detail-row">
-                    <i class="fa-solid fa-circle-info"></i>
-                    <span>{{ vehicle.vehicle_model }}</span>
-                </div>
-                {% endif %}
-                {% if vehicle.vehicle_color %}
-                <div class="detail-row">
-                    <i class="fa-solid fa-palette"></i>
-                    <span>{{ vehicle.vehicle_color }}</span>
-                </div>
-                {% endif %}
-                <div class="detail-row">
-                    <i class="fa-solid fa-circle-info"></i>
-                    <span class="status-badge {% if vehicle.vehicle_status == 'active' %}status-active{% else %}status-inactive{% endif %}">
-                        {{ vehicle.vehicle_status|title }}
-                    </span>
-                </div>
-                <div class="detail-row">
-                    <i class="fa-solid fa-clock"></i>
-                    <span>{{ vehicle.created_at|date:"d M Y" }}</span>
-                </div>
-            </div>
-            <div class="driver-card-actions">
-                <a href="{% url 'workforce:vehicle_document_detail' vehicle.driver.driver_id %}" class="btn-view-details">
-                    <i class="fa-solid fa-eye"></i>
-                    View Details
-                </a>
-            </div>
-        </div>
-        {% endfor %}
-    {% else %}
-        <div class="empty-state full-width">
+      {% for vehicle in vehicles %}
+      <div class="vdl__card" data-search-text="{{ vehicle.vehicle_no|lower }} {{ vehicle.vehicle_type|lower }} {{ vehicle.vehicle_model|lower }} {{ vehicle.driver.user.first_name|default:''|lower }} {{ vehicle.driver.user.last_name|default:''|lower }}">
+        <div class="vdl__card-top">
+          <div class="vdl__card-avatar">
             <i class="fa-solid fa-car"></i>
-            <h3>No Vehicles Found</h3>
-            <p>{% if search_query %}No vehicles match your search criteria.{% else %}There are no vehicle documents available.{% endif %}</p>
+          </div>
+          <div class="vdl__card-info">
+            <h3 class="vdl__card-name">{{ vehicle.vehicle_no|default:"N/A" }}</h3>
+            <p class="vdl__card-type">{{ vehicle.vehicle_type|default:"N/A"|title }}</p>
+          </div>
         </div>
-    {% endif %}
-</div>
-
-<!-- Table View -->
-<div id="tableView" class="orders-table-container {% if view_type != 'table' %}d-none{% endif %}">
-    {% if vehicles %}
-    <table class="orders-table">
-        <thead>
-            <tr>
-                <th>Vehicle Number</th>
-                <th>Type</th>
-                <th>Model</th>
-                <th>Color</th>
-                <th>Driver</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for vehicle in vehicles %}
-            <tr data-search-text="{{ vehicle.vehicle_no|lower }} {{ vehicle.vehicle_type|lower }} {{ vehicle.vehicle_model|lower }} {{ vehicle.driver.user.first_name|default:''|lower }} {{ vehicle.driver.user.last_name|default:''|lower }}">
-                <td><strong>{{ vehicle.vehicle_no|default:"N/A" }}</strong></td>
-                <td>{{ vehicle.vehicle_type|default:"N/A"|title }}</td>
-                <td>{{ vehicle.vehicle_model|default:"N/A" }}</td>
-                <td>{{ vehicle.vehicle_color|default:"N/A" }}</td>
-                <td>{{ vehicle.driver.user.first_name|default:"Unknown" }} {{ vehicle.driver.user.last_name|default:"" }}</td>
-                <td>
-                    <span class="status-badge {% if vehicle.vehicle_status == 'active' %}status-active{% else %}status-inactive{% endif %}">
-                        {{ vehicle.vehicle_status|title }}
-                    </span>
-                </td>
-                <td>{{ vehicle.created_at|date:"d M Y" }}</td>
-                <td>
-                    <a href="{% url 'workforce:vehicle_document_detail' vehicle.driver.driver_id %}" class="btn-view-small">
-                        <i class="fa-solid fa-eye"></i>
-                        View
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+        <div class="vdl__card-details">
+          <div class="vdl__detail-row">
+            <i class="fa-solid fa-user"></i>
+            <span>{{ vehicle.driver.user.first_name|default:"Unknown" }} {{ vehicle.driver.user.last_name|default:"" }}</span>
+          </div>
+          {% if vehicle.vehicle_model %}
+          <div class="vdl__detail-row">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>{{ vehicle.vehicle_model }}</span>
+          </div>
+          {% endif %}
+          {% if vehicle.vehicle_color %}
+          <div class="vdl__detail-row">
+            <i class="fa-solid fa-palette"></i>
+            <span>{{ vehicle.vehicle_color }}</span>
+          </div>
+          {% endif %}
+          <div class="vdl__detail-row">
+            <i class="fa-solid fa-circle-info"></i>
+            <span class="vdl__status-badge vdl__status-badge--{{ vehicle.vehicle_status }}">
+              {{ vehicle.vehicle_status|title }}
+            </span>
+          </div>
+          <div class="vdl__detail-row">
+            <i class="fa-solid fa-clock"></i>
+            <span>{{ vehicle.created_at|date:"d M Y" }}</span>
+          </div>
+        </div>
+        <div class="vdl__card-footer">
+          <a href="{% url 'workforce:vehicle_document_detail' vehicle.driver.driver_id %}" class="vdl__view-btn">
+            <i class="fa-solid fa-eye"></i> View Details
+          </a>
+        </div>
+      </div>
+      {% endfor %}
     {% else %}
-    <div class="empty-state">
+      <div class="vdl__empty">
         <i class="fa-solid fa-car"></i>
         <h3>No Vehicles Found</h3>
         <p>{% if search_query %}No vehicles match your search criteria.{% else %}There are no vehicle documents available.{% endif %}</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Table View -->
+  <div id="tableView" class="{% if view_type != 'table' %}d-none{% endif %}">
+    {% if vehicles %}
+    <div class="vdl__table-card">
+      <table class="vdl__table">
+        <thead>
+          <tr>
+            <th>Vehicle Number</th>
+            <th>Type</th>
+            <th>Model</th>
+            <th>Color</th>
+            <th>Driver</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for vehicle in vehicles %}
+          <tr data-search-text="{{ vehicle.vehicle_no|lower }} {{ vehicle.vehicle_type|lower }} {{ vehicle.vehicle_model|lower }} {{ vehicle.driver.user.first_name|default:''|lower }} {{ vehicle.driver.user.last_name|default:''|lower }}">
+            <td><strong>{{ vehicle.vehicle_no|default:"N/A" }}</strong></td>
+            <td>{{ vehicle.vehicle_type|default:"N/A"|title }}</td>
+            <td>{{ vehicle.vehicle_model|default:"N/A" }}</td>
+            <td>{{ vehicle.vehicle_color|default:"N/A" }}</td>
+            <td>{{ vehicle.driver.user.first_name|default:"Unknown" }} {{ vehicle.driver.user.last_name|default:"" }}</td>
+            <td>
+              <span class="vdl__status-badge vdl__status-badge--{{ vehicle.vehicle_status }}">
+                {{ vehicle.vehicle_status|title }}
+              </span>
+            </td>
+            <td>{{ vehicle.created_at|date:"d M Y" }}</td>
+            <td>
+              <a href="{% url 'workforce:vehicle_document_detail' vehicle.driver.driver_id %}" class="vdl__action-btn">
+                <i class="fa-solid fa-eye"></i> View
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="vdl__empty">
+      <i class="fa-solid fa-car"></i>
+      <h3>No Vehicles Found</h3>
+      <p>{% if search_query %}No vehicles match your search criteria.{% else %}There are no vehicle documents available.{% endif %}</p>
     </div>
     {% endif %}
-</div>
+  </div>
 
-<!-- Pagination -->
-{% include "includes/components/_pagination.html" with page_obj=vehicles filter_params=filter_params %}
-
+  <!-- Pagination -->
+  {% include "includes/components/_pagination.html" with page_obj=vehicles filter_params=filter_params %}
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        let searchTimeout;
-        const searchInput = document.getElementById('searchInput');
+        var searchTimeout;
+        var searchInput = document.getElementById('searchInput');
 
-        // Search functionality
         if (searchInput) {
             searchInput.addEventListener('input', function() {
                 clearTimeout(searchTimeout);
-                const searchTerm = this.value;
-
-                searchTimeout = setTimeout(() => {
-                    const url = new URL(window.location);
-                    if (searchTerm) {
-                        url.searchParams.set('search', searchTerm);
-                    } else {
-                        url.searchParams.delete('search');
-                    }
+                var searchTerm = this.value;
+                searchTimeout = setTimeout(function() {
+                    var url = new URL(window.location);
+                    if (searchTerm) { url.searchParams.set('search', searchTerm); }
+                    else { url.searchParams.delete('search'); }
                     url.searchParams.set('page', '1');
                     window.location.href = url.toString();
                 }, 500);
             });
         }
 
-        // View toggle functionality using event delegation
-        document.querySelectorAll('.view-toggle-btn[data-view]').forEach(function(btn) {
+        document.querySelectorAll('.vdl__toggle-btn[data-view]').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                const viewType = this.dataset.view;
-                const url = new URL(window.location);
-                url.searchParams.set('view', viewType);
+                var url = new URL(window.location);
+                url.searchParams.set('view', this.dataset.view);
                 url.searchParams.set('page', '1');
                 window.location.href = url.toString();
             });

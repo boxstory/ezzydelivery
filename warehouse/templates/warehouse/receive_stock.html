@@ -3,68 +3,54 @@
 
 {% block title %}Receive Stock{% endblock %}
 
-
-
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    let rowCounter = 1;
+    var rowCounter = 1;
 
-    // Add new product row
     document.getElementById('add-product-row').addEventListener('click', function() {
-        const tbody = document.getElementById('products-tbody');
-        const newRow = createProductRow(rowCounter++);
+        var tbody = document.getElementById('products-tbody');
+        var newRow = createProductRow(rowCounter++);
         tbody.appendChild(newRow);
         updateRowNumbers();
     });
 
-    // Remove product row
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('remove-row-btn') || e.target.closest('.remove-row-btn')) {
-            const btn = e.target.classList.contains('remove-row-btn') ? e.target : e.target.closest('.remove-row-btn');
-            const row = btn.closest('tr');
-            row.remove();
+            var btn = e.target.classList.contains('remove-row-btn') ? e.target : e.target.closest('.remove-row-btn');
+            btn.closest('tr').remove();
             updateRowNumbers();
         }
     });
 
-    // Load storage locations when warehouse changes
-    const warehouseSelect = document.getElementById('warehouse');
-    const locationSelect = document.getElementById('location');
+    var warehouseSelect = document.getElementById('warehouse');
+    var locationSelect = document.getElementById('location');
 
     warehouseSelect.addEventListener('change', function() {
-        const warehouseId = this.value;
-
+        var warehouseId = this.value;
         if (!warehouseId) {
             locationSelect.innerHTML = '<option value="">Default Location</option>';
             locationSelect.disabled = true;
             return;
         }
-
         locationSelect.innerHTML = '<option value="">Loading...</option>';
         locationSelect.disabled = true;
-
-        // Fetch storage locations for selected warehouse
-        fetch(`/workforce/warehouse/api/warehouses/${warehouseId}/storage-locations/`)
-            .then(response => response.json())
-            .then(data => {
+        fetch('/workforce/warehouse/api/warehouses/' + warehouseId + '/storage-locations/')
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 locationSelect.innerHTML = '<option value="">Default Location</option>';
-
                 if (data.length > 0) {
-                    data.forEach(location => {
-                        const option = document.createElement('option');
+                    data.forEach(function(location) {
+                        var option = document.createElement('option');
                         option.value = location.id;
                         option.textContent = location.name;
-                        if (location.is_default) {
-                            option.textContent += ' (Default)';
-                        }
+                        if (location.is_default) option.textContent += ' (Default)';
                         locationSelect.appendChild(option);
                     });
                 }
-
                 locationSelect.disabled = false;
             })
-            .catch(error => {
+            .catch(function(error) {
                 console.error('Error loading locations:', error);
                 locationSelect.innerHTML = '<option value="">Error loading locations</option>';
                 locationSelect.disabled = true;
@@ -72,226 +58,153 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function createProductRow(index) {
-        const tr = document.createElement('tr');
-        tr.className = 'product-row';
-        tr.innerHTML = `
-            <td class="text-center align-middle">
-                <span class="row-number badge bg-secondary">${index}</span>
-            </td>
-            <td>
-                <select name="products[]" class="form-select" required>
-                    <option value="">Select Product</option>
-                    {% for p in products %}
-                    <option value="{{ p.id }}">{{ p.item_name }} {% if p.item_sku %}({{ p.item_sku }}){% endif %}</option>
-                    {% endfor %}
-                </select>
-            </td>
-            <td>
-                <input type="number" name="quantities[]" class="form-control" min="1" required placeholder="0">
-            </td>
-            <td class="text-center align-middle">
-                <button type="button" class="btn btn-sm btn-outline-danger remove-row-btn remove-product-btn">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </td>
-        `;
+        var tr = document.createElement('tr');
+        tr.className = 'wrs__product-row';
+        tr.innerHTML = '<td class="wh__td wh__td--center"><span class="wrs__row-num">' + index + '</span></td>' +
+            '<td class="wh__td"><select name="products[]" class="wha__select" required><option value="">Select Product</option>{% for p in products %}<option value="{{ p.id }}">{{ p.item_name }} {% if p.item_sku %}({{ p.item_sku }}){% endif %}</option>{% endfor %}</select></td>' +
+            '<td class="wh__td"><input type="number" name="quantities[]" class="wha__input" min="1" required placeholder="0"></td>' +
+            '<td class="wh__td wh__td--center"><button type="button" class="wh__action-btn wh__action-btn--danger remove-row-btn"><i class="fas fa-trash"></i></button></td>';
         return tr;
     }
 
     function updateRowNumbers() {
-        const rows = document.querySelectorAll('#products-tbody tr');
-        rows.forEach((row, index) => {
-            const badge = row.querySelector('.row-number');
-            if (badge) {
-                badge.textContent = index + 1;
-            }
+        var rows = document.querySelectorAll('#products-tbody tr');
+        rows.forEach(function(row, index) {
+            var badge = row.querySelector('.wrs__row-num');
+            if (badge) badge.textContent = index + 1;
         });
-
-        // Show/hide remove buttons based on row count
-        const removeButtons = document.querySelectorAll('.remove-row-btn');
+        var removeButtons = document.querySelectorAll('.remove-row-btn');
         if (rows.length === 1) {
-            removeButtons.forEach(btn => btn.style.display = 'none');
+            removeButtons.forEach(function(btn) { btn.style.display = 'none'; });
         } else {
-            removeButtons.forEach(btn => btn.style.display = 'inline-block');
+            removeButtons.forEach(function(btn) { btn.style.display = 'inline-flex'; });
         }
     }
 
-    // Initialize row numbers on load
     updateRowNumbers();
 });
 </script>
 {% endblock %}
 
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
 <link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
-<style>
-.product-row {
-    transition: all 0.3s ease;
-}
-.product-row:hover {
-    background-color: #f8f9fa;
-}
-.remove-product-btn {
-    opacity: 0.7;
-    transition: opacity 0.2s;
-}
-.remove-product-btn:hover {
-    opacity: 1;
-}
-.add-product-btn {
-    border: 2px dashed #0d6efd;
-    background: #f8f9ff;
-    transition: all 0.2s;
-}
-.add-product-btn:hover {
-    background: #e7f1ff;
-    border-color: #0a58ca;
-}
-.table-wrapper {
-    max-height: 500px;
-    overflow-y: auto;
-}
-</style>
 
-<div class="container-fluid py-4">
-    <!-- Page Header with Breadcrumb -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-2">
-                    <li class="breadcrumb-item"><a href="{% url 'workforce:wf_dashboard' %}" class="text-decoration-none">Workforce</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'warehouse:dashboard' %}" class="text-decoration-none">Warehouse</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Receive Stock</li>
-                </ol>
-            </nav>
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 class="h3 mb-1 fw-bold">
-                        <i class="fas fa-truck-loading text-primary me-2"></i>Receive Stock
-                    </h1>
-                    <p class="text-muted mb-0">Add new inventory to your warehouse</p>
-                </div>
-            </div>
+<div class="wh">
+    <!-- Breadcrumb -->
+    <div class="wh__breadcrumb">
+        <a href="{% url 'workforce:wf_dashboard' %}">Workforce</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <a href="{% url 'warehouse:dashboard' %}">Warehouse</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <span class="wh__breadcrumb-active">Receive Stock</span>
+    </div>
+
+    <!-- Hero Header -->
+    <div class="wrs__hero">
+        <div class="wrs__hero-icon"><i class="fas fa-truck-loading"></i></div>
+        <div>
+            <h1 class="wrs__hero-title">Receive Stock</h1>
+            <p class="wrs__hero-subtitle">Add new inventory to your warehouse</p>
         </div>
     </div>
 
-    <div class="row">
+    <div class="wrs__layout">
         <!-- Main Form -->
-        <div class="col-lg-9">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 border-0">
-                    <h5 class="mb-0 fw-semibold"><i class="fas fa-file-invoice text-secondary me-2"></i>Stock Receipt Form</h5>
+        <div class="wrs__main">
+            <div class="wh__card">
+                <div class="wh__card-header">
+                    <div class="wh__card-header-left">
+                        <i class="fas fa-file-invoice"></i>
+                        <span>STOCK RECEIPT FORM</span>
+                    </div>
                 </div>
-                <div class="card-body">
+                <div class="wh__card-body">
                     <form method="POST" id="receive-stock-form">
                         {% csrf_token %}
 
-                        <!-- Warehouse and Location Selection -->
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-6">
-                                <label for="warehouse" class="form-label fw-medium">
-                                    <i class="fas fa-warehouse text-muted me-1"></i>Warehouse <span class="text-danger">*</span>
-                                </label>
-                                <select name="warehouse" id="warehouse" class="form-select form-select-lg" required>
+                        <div class="wha__row">
+                            <div class="wha__field">
+                                <label for="warehouse" class="wha__label"><i class="fas fa-warehouse"></i> Warehouse <span class="wha__required">*</span></label>
+                                <select name="warehouse" id="warehouse" class="wha__select" required>
                                     <option value="">Select Warehouse</option>
                                     {% for wh in warehouses %}
                                     <option value="{{ wh.id }}">{{ wh.name }} ({{ wh.code }})</option>
                                     {% endfor %}
                                 </select>
                             </div>
-
-                            <div class="col-md-6">
-                                <label for="location" class="form-label fw-medium">
-                                    <i class="fas fa-location-dot text-muted me-1"></i>Storage Location
-                                </label>
-                                <select name="location" id="location" class="form-select form-select-lg">
+                            <div class="wha__field">
+                                <label for="location" class="wha__label"><i class="fas fa-location-dot"></i> Storage Location</label>
+                                <select name="location" id="location" class="wha__select">
                                     <option value="">Default Location</option>
                                 </select>
-                                <div class="form-text"><i class="fas fa-info-circle me-1"></i>Applies to all products below</div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <label for="reference" class="form-label fw-medium">
-                                    <i class="fas fa-receipt text-muted me-1"></i>Reference / PO Number
-                                </label>
-                                <input type="text" class="form-control form-control-lg" id="reference" name="reference" placeholder="e.g., PO-12345">
-                            </div>
-
-                            <div class="col-md-6">
-                                <label for="notes" class="form-label fw-medium">
-                                    <i class="fas fa-sticky-note text-muted me-1"></i>Notes
-                                </label>
-                                <input type="text" class="form-control form-control-lg" id="notes" name="notes" placeholder="Supplier info, condition notes, etc.">
+                                <span class="wha__hint"><i class="fas fa-info-circle"></i> Applies to all products below</span>
                             </div>
                         </div>
 
-                        <hr class="my-4">
+                        <div class="wha__row">
+                            <div class="wha__field">
+                                <label for="reference" class="wha__label"><i class="fas fa-receipt"></i> Reference / PO Number</label>
+                                <input type="text" class="wha__input" id="reference" name="reference" placeholder="e.g., PO-12345">
+                            </div>
+                            <div class="wha__field">
+                                <label for="notes" class="wha__label"><i class="fas fa-sticky-note"></i> Notes</label>
+                                <input type="text" class="wha__input" id="notes" name="notes" placeholder="Supplier info, condition notes, etc.">
+                            </div>
+                        </div>
+
+                        <div class="wha__divider"></div>
 
                         <!-- Products Table -->
-                        <div class="mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <label class="form-label fw-medium mb-0">
-                                    <i class="fas fa-boxes text-muted me-1"></i>Products to Receive <span class="text-danger">*</span>
-                                </label>
-                                <button type="button" id="add-product-row" class="btn btn-sm btn-outline-primary add-product-btn">
-                                    <i class="fas fa-plus me-1"></i>Add Product Row
-                                </button>
-                            </div>
-
-                            <div class="table-responsive table-wrapper">
-                                <table class="table table-bordered table-hover align-middle mb-0">
-                                    <thead class="table-light sticky-top">
-                                        <tr>
-                                            <th width="50" class="text-center">#</th>
-                                            <th>Product</th>
-                                            <th width="150">Quantity</th>
-                                            <th width="80" class="text-center">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="products-tbody">
-                                        <!-- Initial Row -->
-                                        <tr class="product-row">
-                                            <td class="text-center align-middle">
-                                                <span class="row-number badge bg-secondary">1</span>
-                                            </td>
-                                            <td>
-                                                <select name="products[]" class="form-select" required>
-                                                    <option value="">Select Product</option>
-                                                    {% for p in products %}
-                                                    <option value="{{ p.id }}">{{ p.item_name }} {% if p.item_sku %}({{ p.item_sku }}){% endif %}</option>
-                                                    {% endfor %}
-                                                </select>
-                                            </td>
-                                            <td>
-                                                <input type="number" name="quantities[]" class="form-control" min="1" required placeholder="0">
-                                            </td>
-                                            <td class="text-center align-middle">
-                                                <button type="button" class="btn btn-sm btn-outline-danger remove-row-btn remove-product-btn">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="form-text mt-2">
-                                <i class="fas fa-info-circle me-1"></i>Click "Add Product Row" to receive multiple products at once
-                            </div>
+                        <div class="wrs__products-header">
+                            <div class="wha__section-label"><i class="fas fa-boxes wha__section-icon"></i> PRODUCTS TO RECEIVE <span class="wha__required">*</span></div>
+                            <button type="button" id="add-product-row" class="wh__btn wh__btn--secondary wrs__add-btn">
+                                <i class="fas fa-plus"></i> Add Product Row
+                            </button>
                         </div>
 
-                        <hr class="my-4">
+                        <div class="wh__table-wrap wrs__table-wrap">
+                            <table class="wh__table">
+                                <thead>
+                                    <tr>
+                                        <th class="wh__th wh__th--center" width="50">#</th>
+                                        <th class="wh__th">Product</th>
+                                        <th class="wh__th" width="150">Quantity</th>
+                                        <th class="wh__th wh__th--center" width="80">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="products-tbody">
+                                    <tr class="wrs__product-row">
+                                        <td class="wh__td wh__td--center"><span class="wrs__row-num">1</span></td>
+                                        <td class="wh__td">
+                                            <select name="products[]" class="wha__select" required>
+                                                <option value="">Select Product</option>
+                                                {% for p in products %}
+                                                <option value="{{ p.id }}">{{ p.item_name }} {% if p.item_sku %}({{ p.item_sku }}){% endif %}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td class="wh__td">
+                                            <input type="number" name="quantities[]" class="wha__input" min="1" required placeholder="0">
+                                        </td>
+                                        <td class="wh__td wh__td--center">
+                                            <button type="button" class="wh__action-btn wh__action-btn--danger remove-row-btn">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <span class="wha__hint"><i class="fas fa-info-circle"></i> Click "Add Product Row" to receive multiple products at once</span>
 
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg px-4">
-                                <i class="fas fa-check me-2"></i>Receive All Products
+                        <div class="wha__divider"></div>
+
+                        <div class="wha__actions">
+                            <button type="submit" class="wh__btn wh__btn--primary">
+                                <i class="fas fa-check"></i> Receive All Products
                             </button>
-                            <a href="{% url 'warehouse:inventory_list' %}" class="btn btn-outline-secondary btn-lg"
-                               hx-get="{% url 'warehouse:inventory_list' %}"
-                               hx-target="#main-content"
-                               hx-select="#main-content"
-                               hx-swap="outerHTML"
-                               hx-push-url="true">
+                            <a href="{% url 'warehouse:inventory_list' %}" class="wh__btn wh__btn--secondary"
+                               hx-get="{% url 'warehouse:inventory_list' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                                 Cancel
                             </a>
                         </div>
@@ -300,40 +213,27 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </div>
 
-        <!-- Quick Tips Sidebar -->
-        <div class="col-lg-3">
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-info bg-opacity-10 border-0 py-3">
-                    <h6 class="mb-0 fw-semibold text-info"><i class="fas fa-lightbulb me-2"></i>Quick Tips</h6>
+        <!-- Tips Sidebar -->
+        <div class="wrs__aside">
+            <div class="wh__card">
+                <div class="wh__card-header wrs__tips-header">
+                    <div class="wh__card-header-left">
+                        <i class="fas fa-lightbulb"></i>
+                        <span>QUICK TIPS</span>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <ul class="list-unstyled mb-0 small">
-                        <li class="mb-3 d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-2">1</span>
-                            <span>Select warehouse and location (applies to all products)</span>
-                        </li>
-                        <li class="mb-3 d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-2">2</span>
-                            <span>Add product rows using the "+ Add Product Row" button</span>
-                        </li>
-                        <li class="mb-3 d-flex align-items-start">
-                            <span class="badge bg-primary rounded-circle me-2">3</span>
-                            <span>Select products and enter quantities</span>
-                        </li>
-                        <li class="d-flex align-items-start">
-                            <span class="badge bg-success rounded-circle me-2">✓</span>
-                            <span>Submit once to receive all products</span>
-                        </li>
-                    </ul>
+                <div class="wh__card-body">
+                    <div class="wh__step"><span class="wh__step-number">1</span><div><div class="wh__step-desc">Select warehouse and location (applies to all products)</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number">2</span><div><div class="wh__step-desc">Add product rows using the "+ Add Product Row" button</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number">3</span><div><div class="wh__step-desc">Select products and enter quantities</div></div></div>
+                    <div class="wh__step"><span class="wh__step-number wh__step-number--success">&#10003;</span><div><div class="wh__step-desc">Submit once to receive all products</div></div></div>
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm bg-light">
-                <div class="card-body text-center py-4">
-                    <i class="fas fa-boxes fa-3x text-primary mb-3"></i>
-                    <h6 class="fw-semibold">Multiple Products</h6>
-                    <p class="text-muted small mb-0">You can now receive multiple products in a single submission!</p>
-                </div>
+            <div class="wrs__info-card">
+                <div class="wrs__info-icon"><i class="fas fa-boxes"></i></div>
+                <h6 class="wrs__info-title">Multiple Products</h6>
+                <p class="wrs__info-text">You can now receive multiple products in a single submission!</p>
             </div>
         </div>
     </div>

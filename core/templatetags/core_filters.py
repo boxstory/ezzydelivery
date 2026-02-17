@@ -2,6 +2,7 @@
 from django import template
 
 from datetime import datetime, timedelta
+from django.utils import timezone
 
 register = template.Library()
 
@@ -22,7 +23,7 @@ def get_field(obj, field_name):
 
 @register.filter
 def days_ago(days):
-    return (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+    return (timezone.localtime() - timedelta(days=days)).strftime('%Y-%m-%d')
 
 
 @register.filter

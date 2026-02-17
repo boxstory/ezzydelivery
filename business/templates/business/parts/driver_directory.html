@@ -1,59 +1,114 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
 {% block content %}
-    <div class="flex-fill pb-2" id="client_driver_directory_container_main">
-        <div class="p-3 col-12 ">
-            <div class="h4 p-3 " id="client_driver_directory_section_header">
-                <h2 id="client_driver_directory_title_main">list of Driver Contacts</h2>
-            </div>
-            <table class="table table-striped table-responsive table-hover my-3" id="client_driver_directory_table_drivers">
-                <thead id="client_driver_directory_thead">
-                    <tr class="table-dark">
-                        <th>Name</th>
-                        <th>Code</th>
-                        <th>Mob No</th>
-                        <th>Status</th>
-                        <th class=" text-center">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="client_driver_directory_tbody">
-                    {% if contacts %}
-                        {% for contact in contacts %}
-                            <tr>
-                                <td>{{ contact.driver.user }}</td>
-                                <td>{{ contact.driver.driver_code }}</td>
-                                <td>
-                                    {{ contact.driver.driver_phone }}<a href="https://wa.me/974{{ contact.driver.driver_phone }}"
-   class="btn pe-3 text-dark p-0 ms-3"><i class="fa-xl fa-brands fa-whatsapp"></i></a>
-                                </td>
-                                <td>{{ contact.driver.driver_status }}</td>
-                                <td class="p-0 text-center">
-                                    <a href="/fleet/{{ contact.driver_id }}/"
-                                       class="btn px-3 text-dark p-0"
-                                       title="View Profile"><i class="fa-solid fa-address-card fa-xl"></i></i></a>
-                                    <a class="btn px-3 text-dark"
-                                       hx-confirm="Are you sure you wish to delete?"
-                                       href="{% url 'business:driver_directory_delete' contact.id %}"
-                                       title="Delete"><i class="fa fa-lg fa-trash"></i></a>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="5" class="py-2">No Drivers Added</td>
-                        </tr>
-                    {% endif %}
-                    <tr>
-                        <td colspan="5" class="py-2">
-                            <a class="btn pe-3 text-dark w-100"
-                               hx-confirm="Are you sure you wish to delete?"
-                               href="{% url 'fleet:fleets' %}">
-                                <i class="fa fa-lg fa-search me-3"></i> Search Drivers
-                            </a>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+<div class="bdd" id="business_driver_directory_container_main">
+
+  <!-- Hero Banner -->
+  <div class="bdd__hero">
+    <div class="d-flex align-items-center gap-3">
+      <div class="bdd__hero-icon">
+        <i class="fa-solid fa-address-book"></i>
+      </div>
+      <div>
+        <h1 class="bdd__hero-title">Driver Directory</h1>
+        <p class="bdd__hero-sub">Manage your fleet driver contacts</p>
+      </div>
     </div>
+    <a href="{% url 'fleet:fleets' %}" class="bdd__hero-action">
+      <i class="fa-solid fa-magnifying-glass"></i> Search Drivers
+    </a>
+  </div>
+
+  <!-- Driver Table Card -->
+  <div class="bdd__card" id="business_driver_directory_card_list">
+    <div class="bdd__card-header">
+      <i class="fa-solid fa-users"></i>
+      <span>DRIVER CONTACTS</span>
+      {% if contacts %}
+        <span class="bdd__badge bdd__badge--info ms-auto">{{ contacts|length }} driver{{ contacts|length|pluralize }}</span>
+      {% endif %}
+    </div>
+
+    {% if contacts %}
+    <div class="bdd__table-wrap">
+      <table class="bdd__table" id="business_driver_directory_table_drivers">
+        <thead>
+          <tr>
+            <th class="bdd__th">Name</th>
+            <th class="bdd__th">Code</th>
+            <th class="bdd__th">Mobile</th>
+            <th class="bdd__th">Status</th>
+            <th class="bdd__th bdd__th--center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for contact in contacts %}
+          <tr class="bdd__row">
+            <td class="bdd__td">
+              <div class="d-flex align-items-center gap-2">
+                <div class="bdd__driver-avatar">
+                  <i class="fa-solid fa-user"></i>
+                </div>
+                <span class="bdd__driver-name">{{ contact.driver.user }}</span>
+              </div>
+            </td>
+            <td class="bdd__td">
+              <span class="bdd__code">{{ contact.driver.driver_code }}</span>
+            </td>
+            <td class="bdd__td">
+              <div class="d-flex align-items-center gap-2">
+                <span class="bdd__phone">{{ contact.driver.driver_phone }}</span>
+                <a href="https://wa.me/974{{ contact.driver.driver_phone }}"
+                   class="bdd__icon-btn bdd__icon-btn--whatsapp"
+                   title="WhatsApp">
+                  <i class="fa-brands fa-whatsapp"></i>
+                </a>
+              </div>
+            </td>
+            <td class="bdd__td">
+              {% if contact.driver.driver_status == 'active' %}
+                <span class="bdd__badge bdd__badge--success"><i class="fa-solid fa-circle-check"></i> Active</span>
+              {% elif contact.driver.driver_status == 'inactive' %}
+                <span class="bdd__badge bdd__badge--muted"><i class="fa-solid fa-circle-minus"></i> Inactive</span>
+              {% elif contact.driver.driver_status == 'pending' %}
+                <span class="bdd__badge bdd__badge--warning"><i class="fa-solid fa-clock"></i> Pending</span>
+              {% else %}
+                <span class="bdd__badge bdd__badge--muted">{{ contact.driver.driver_status }}</span>
+              {% endif %}
+            </td>
+            <td class="bdd__td bdd__td--center">
+              <div class="d-flex align-items-center justify-content-center gap-1">
+                <a href="/fleet/{{ contact.driver_id }}/"
+                   class="bdd__icon-btn bdd__icon-btn--view"
+                   title="View Profile">
+                  <i class="fa-solid fa-address-card"></i>
+                </a>
+                <a href="{% url 'business:driver_directory_delete' contact.id %}"
+                   class="bdd__icon-btn bdd__icon-btn--delete"
+                   hx-confirm="Are you sure you wish to delete?"
+                   title="Delete">
+                  <i class="fa-solid fa-trash"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <!-- Empty State -->
+    <div class="bdd__empty">
+      <div class="bdd__empty-icon">
+        <i class="fa-solid fa-users-slash"></i>
+      </div>
+      <h3 class="bdd__empty-title">No Drivers Added</h3>
+      <p class="bdd__empty-text">Your driver directory is empty. Search for drivers to add them to your contacts.</p>
+      <a href="{% url 'fleet:fleets' %}" class="bdd__btn">
+        <i class="fa-solid fa-magnifying-glass"></i> Search Drivers
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
 {% endblock content %}

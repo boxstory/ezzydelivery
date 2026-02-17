@@ -13,31 +13,31 @@
 <div class="d-md-none pwa-page">
   <div class="pwa-section-header">
     <h3 class="pwa-section-title">COD Submission</h3>
-    <a href="{% url 'fleet:cod_collection' %}" class="pwa-text-muted" style="font-size: 0.85rem;">
+    <a href="{% url 'fleet:cod_collection' %}" class="pwa-text-muted csb__back-link">
       <i class="fa-solid fa-arrow-left me-1"></i>Back
     </a>
   </div>
 
   <!-- COD Summary Card -->
   {% if wallet_status %}
-  <div class="mb-4" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 16px; padding: 20px; color: white;">
+  <div class="csb__summary-card mb-4">
     <div class="d-flex justify-content-between align-items-start mb-2">
       <div>
-        <p style="opacity: 0.9; font-size: 0.85rem; margin-bottom: 4px;">COD in Hand</p>
-        <h2 style="font-size: 2rem; font-weight: 700; margin: 0;">{{ cod_in_hand_total|floatformat:0 }} QR</h2>
+        <p class="csb__summary-label">COD in Hand</p>
+        <h2 class="csb__summary-amount">{{ cod_in_hand_total|floatformat:0 }} QR</h2>
       </div>
-      <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-        <i class="fa-solid fa-hand-holding-dollar" style="font-size: 1.5rem;"></i>
+      <div class="csb__summary-icon">
+        <i class="fa-solid fa-hand-holding-dollar"></i>
       </div>
     </div>
-    <div class="d-flex flex-wrap gap-2" style="font-size: 0.85rem;">
-      <div style="background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 8px;">
+    <div class="d-flex flex-wrap gap-2">
+      <div class="csb__summary-chip">
         <i class="fa-solid fa-wallet me-1"></i>Wallet: {{ wallet_status.wallet_balance|default:0|floatformat:0 }} QR
       </div>
-      <div style="background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 8px;">
+      <div class="csb__summary-chip">
         <i class="fa-solid fa-shield-halved me-1"></i>Limit: {{ wallet_status.credit_limit|default:0|floatformat:0 }} QR
       </div>
-      <div style="background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 8px;">
+      <div class="csb__summary-chip">
         <i class="fa-solid fa-receipt me-1"></i>{{ cod_in_hand_list|length }} orders
       </div>
     </div>
@@ -50,51 +50,51 @@
     <h4 class="pwa-section-title">Pending COD Orders</h4>
     <div class="d-flex align-items-center gap-1">
       <input type="checkbox" class="form-check-input" id="mob-sub-select-all">
-      <span class="pwa-text-muted" style="font-size: 0.75rem;">Select All</span>
+      <span class="csb__select-label">Select All</span>
     </div>
   </div>
 
   <!-- Mobile Action Bar -->
-  <div class="mb-2 p-2 rounded" id="mob-sub-action-bar" style="background: #fffbeb; display: none;">
+  <div class="csb__action-bar mb-2" id="mob-sub-action-bar">
     <div class="d-flex justify-content-between align-items-center">
       <div>
-        <span class="text-muted" style="font-size: 0.8rem;"><span id="mob-sub-selected-num">0</span> selected</span>
-        <span class="fw-semibold ms-2" style="color: #d97706; font-size: 0.8rem;" id="mob-sub-selected-total"></span>
+        <span class="csb__action-count"><span id="mob-sub-selected-num">0</span> selected</span>
+        <span class="csb__action-total ms-2" id="mob-sub-selected-total"></span>
       </div>
     </div>
   </div>
 
   <div class="pwa-transaction-list mb-4">
     {% for delivery in cod_in_hand_list %}
-    <div class="pwa-transaction-item pwa-fade-in" style="animation-delay: {{ forloop.counter0 }}50ms; border-left: 4px solid #f59e0b;" data-delivery-id="{{ delivery.id }}" data-amount="{{ delivery.cod_collected_amount|default:0 }}">
-      <div class="me-2" style="flex-shrink: 0;">
+    <div class="pwa-transaction-item pwa-fade-in csb__order-item" data-delivery-id="{{ delivery.id }}" data-amount="{{ delivery.cod_collected_amount|default:0 }}">
+      <div class="me-2 flex-shrink-0">
         <input type="checkbox" class="form-check-input mob-sub-checkbox" value="{{ delivery.id }}">
       </div>
-      <div class="pwa-transaction-item__icon" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
-        <i class="fa-solid fa-store" style="color: #d97706;"></i>
+      <div class="pwa-transaction-item__icon csb__order-icon">
+        <i class="fa-solid fa-store csb__order-icon-inner"></i>
       </div>
       <div class="pwa-transaction-item__details">
         <div class="pwa-transaction-item__title">{{ delivery.order.business.business_name|default:"Order"|truncatechars:25 }}</div>
         <div class="pwa-transaction-item__subtitle">
-          <span style="background: #f3f4f6; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 0.7rem;">{{ delivery.dl_task_number }}</span>
+          <span class="csb__task-code">{{ delivery.dl_task_number }}</span>
         </div>
         <div class="pwa-transaction-item__date">
           <i class="fa-regular fa-clock me-1"></i>{{ delivery.completed_at|date:"d M, H:i"|default:"-" }}
         </div>
       </div>
-      <div class="pwa-transaction-item__amount" style="color: #d97706; font-weight: 700; font-size: 1rem;">
-        {{ delivery.cod_collected_amount|default:0|floatformat:0 }} <span style="font-size: 0.75rem;">QR</span>
+      <div class="csb__order-amount">
+        {{ delivery.cod_collected_amount|default:0|floatformat:0 }} <span class="csb__order-currency">QR</span>
       </div>
     </div>
     {% endfor %}
   </div>
   {% else %}
-  <div class="text-center py-5 mb-4" style="background: #f0fdf4; border-radius: 16px;">
-    <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
-      <i class="fa-solid fa-check text-success" style="font-size: 1.5rem;"></i>
+  <div class="csb__empty-state mb-4">
+    <div class="csb__empty-icon csb__empty-icon--success">
+      <i class="fa-solid fa-check"></i>
     </div>
-    <h5 class="text-success mb-1" style="font-size: 1rem;">All Settled!</h5>
-    <p class="text-muted mb-0" style="font-size: 0.85rem;">No pending COD to submit</p>
+    <h5 class="csb__empty-title">All Settled!</h5>
+    <p class="csb__empty-text">No pending COD to submit</p>
   </div>
   {% endif %}
 
@@ -102,32 +102,32 @@
   {% if recent_submissions %}
   <div class="pwa-section-header">
     <h4 class="pwa-section-title">Recent Submissions</h4>
-    <span class="pwa-text-muted" style="font-size: 0.75rem;">Last {{ recent_submissions|length }}</span>
+    <span class="csb__count-badge">Last {{ recent_submissions|length }}</span>
   </div>
   <div class="pwa-transaction-list mb-4">
     {% for txn in recent_submissions %}
-    <div class="pwa-transaction-item pwa-fade-in" style="animation-delay: {{ forloop.counter0 }}50ms; border-left: 4px solid #10b981;">
-      <div class="pwa-transaction-item__icon" style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);">
-        <i class="fa-solid fa-arrow-right-from-bracket" style="color: #059669;"></i>
+    <div class="pwa-transaction-item pwa-fade-in csb__submission-item">
+      <div class="pwa-transaction-item__icon csb__submission-icon">
+        <i class="fa-solid fa-arrow-right-from-bracket csb__submission-icon-inner"></i>
       </div>
       <div class="pwa-transaction-item__details">
         <div class="pwa-transaction-item__title">
-          <span style="font-family: monospace; font-size: 0.8rem; color: #059669;">{{ txn.transaction_code }}</span>
+          <span class="csb__txn-code">{{ txn.transaction_code }}</span>
         </div>
         <div class="pwa-transaction-item__subtitle">
           {% if txn.payment_method %}
-          <span style="background: #f0fdf4; color: #059669; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; text-transform: capitalize;">{{ txn.payment_method }}</span>
+          <span class="csb__method-badge">{{ txn.payment_method }}</span>
           {% endif %}
           {% if txn.reference_number %}
-          <span class="text-muted" style="font-size: 0.7rem;">Ref: {{ txn.reference_number|truncatechars:20 }}</span>
+          <span class="csb__ref-text">Ref: {{ txn.reference_number|truncatechars:20 }}</span>
           {% endif %}
         </div>
         <div class="pwa-transaction-item__date">
           <i class="fa-regular fa-clock me-1"></i>{{ txn.created_at|date:"d M Y, H:i" }}
         </div>
       </div>
-      <div class="pwa-transaction-item__amount" style="color: #059669; font-weight: 700; font-size: 1rem;">
-        {{ txn.amount|floatformat:0 }} <span style="font-size: 0.75rem;">QR</span>
+      <div class="csb__submission-amount">
+        {{ txn.amount|floatformat:0 }} <span class="csb__order-currency">QR</span>
       </div>
     </div>
     {% endfor %}
@@ -143,12 +143,12 @@
       {% csrf_token %}
       <input type="hidden" name="delivery_ids" id="mob-delivery-ids" value="">
       <div class="mb-3">
-        <label for="mob-amount" class="form-label fw-semibold" style="font-size: 0.85rem;">Amount (QR)</label>
-        <input type="number" class="form-control" id="mob-amount" name="amount" step="0.01" min="0" max="{{ cod_in_hand_total }}" placeholder="0.00" required style="font-size: 1.2rem; font-weight: 600; text-align: center; padding: 12px;">
+        <label for="mob-amount" class="csb__form-label">Amount (QR)</label>
+        <input type="number" class="form-control csb__amount-input" id="mob-amount" name="amount" step="0.01" min="0" max="{{ cod_in_hand_total }}" placeholder="0.00" required>
         <small class="text-muted">Maximum: {{ cod_in_hand_total|floatformat:2 }} QR</small>
       </div>
       <div class="mb-3">
-        <label for="mob-payment-method" class="form-label fw-semibold" style="font-size: 0.85rem;">Payment Method</label>
+        <label for="mob-payment-method" class="csb__form-label">Payment Method</label>
         <select class="form-select" id="mob-payment-method" name="payment_method">
           <option value="cash">Cash</option>
           <option value="bank">Bank Transfer</option>
@@ -157,14 +157,14 @@
         </select>
       </div>
       <div class="mb-3">
-        <label for="mob-reference" class="form-label fw-semibold" style="font-size: 0.85rem;">Reference Number <span class="text-muted fw-normal">(Optional)</span></label>
+        <label for="mob-reference" class="csb__form-label">Reference Number <span class="text-muted fw-normal">(Optional)</span></label>
         <input type="text" class="form-control" id="mob-reference" name="reference_number" placeholder="e.g. Bank transfer ref, receipt no.">
       </div>
       <div class="mb-3">
-        <label for="mob-notes" class="form-label fw-semibold" style="font-size: 0.85rem;">Notes (Optional)</label>
+        <label for="mob-notes" class="csb__form-label">Notes (Optional)</label>
         <textarea class="form-control" id="mob-notes" name="notes" rows="2" placeholder="Any additional notes..."></textarea>
       </div>
-      <button type="submit" class="btn btn-success w-100 py-3" style="border-radius: 12px; font-weight: 600;">
+      <button type="submit" class="csb__submit-btn w-100">
         <i class="fa-solid fa-hand-holding-dollar me-2"></i>Submit COD
       </button>
     </form>
@@ -177,10 +177,10 @@
     <div class="col-12">
       <div class="d-flex justify-content-between align-items-center">
         <div>
-          <h1 class="h3 mb-0">COD Submission</h1>
-          <p class="text-muted mb-0">Submit your collected cash on delivery amounts</p>
+          <h1 class="csb__page-title">COD Submission</h1>
+          <p class="csb__page-subtitle">Submit your collected cash on delivery amounts</p>
         </div>
-        <a href="{% url 'fleet:cod_collection' %}" class="btn btn-outline-secondary">
+        <a href="{% url 'fleet:cod_collection' %}" class="csb__back-btn-desk">
           <i class="fa-solid fa-arrow-left me-1"></i>Back to COD Collection
         </a>
       </div>
@@ -190,37 +190,51 @@
   {% if wallet_status %}
   <div class="row mb-4">
     <div class="col-12 mb-2">
-      <div class="card border-0 shadow-sm">
-        <div class="card-body py-3">
-          <div class="row g-3">
-            <div class="col-3">
-              <div class="d-flex align-items-center mb-1">
-                <i class="fa-solid fa-hand-holding-dollar me-2" style="color: #d97706;"></i>
-                <span class="text-muted" style="font-size: 0.8rem;">COD in Hand</span>
+      <div class="csb__stats-bar">
+        <div class="row g-3">
+          <div class="col-3">
+            <div class="csb__stat">
+              <div class="csb__stat__icon csb__stat__icon--amber">
+                <i class="fa-solid fa-hand-holding-dollar"></i>
               </div>
-              <h4 class="mb-0 fw-bold" style="color: #d97706;">{{ cod_in_hand_total|floatformat:0 }} <span style="font-size: 0.75rem; font-weight: 500;">QR</span></h4>
+              <div>
+                <span class="csb__stat__label">COD in Hand</span>
+                <span class="csb__stat__value csb__stat__value--amber">{{ cod_in_hand_total|floatformat:0 }} <span class="csb__stat__unit">QR</span></span>
+              </div>
             </div>
-            <div class="col-3">
-              <div class="d-flex align-items-center mb-1">
-                <i class="fa-solid fa-receipt me-2" style="color: #f59e0b;"></i>
-                <span class="text-muted" style="font-size: 0.8rem;">Pending Orders</span>
+          </div>
+          <div class="col-3">
+            <div class="csb__stat">
+              <div class="csb__stat__icon csb__stat__icon--warning">
+                <i class="fa-solid fa-receipt"></i>
               </div>
-              <h4 class="mb-0 fw-bold text-warning">{{ cod_in_hand_list|length }} <span style="font-size: 0.75rem; font-weight: 500;">Orders</span></h4>
+              <div>
+                <span class="csb__stat__label">Pending Orders</span>
+                <span class="csb__stat__value csb__stat__value--warning">{{ cod_in_hand_list|length }} <span class="csb__stat__unit">Orders</span></span>
+              </div>
             </div>
-            <div class="col-3">
-              <div class="d-flex align-items-center mb-1">
-                <i class="fa-solid fa-wallet me-2" style="color: #3b82f6;"></i>
-                <span class="text-muted" style="font-size: 0.8rem;">Wallet Balance</span>
+          </div>
+          <div class="col-3">
+            <div class="csb__stat">
+              <div class="csb__stat__icon csb__stat__icon--info">
+                <i class="fa-solid fa-wallet"></i>
               </div>
-              <h4 class="mb-0 fw-bold" style="color: #3b82f6;">{{ wallet_status.wallet_balance|default:0|floatformat:0 }} <span style="font-size: 0.75rem; font-weight: 500;">QR</span></h4>
-              <div class="text-muted" style="font-size: 0.75rem;">Limit: {{ wallet_status.credit_limit|default:0|floatformat:0 }} QR</div>
+              <div>
+                <span class="csb__stat__label">Wallet Balance</span>
+                <span class="csb__stat__value csb__stat__value--info">{{ wallet_status.wallet_balance|default:0|floatformat:0 }} <span class="csb__stat__unit">QR</span></span>
+                <span class="csb__stat__sub">Limit: {{ wallet_status.credit_limit|default:0|floatformat:0 }} QR</span>
+              </div>
             </div>
-            <div class="col-3">
-              <div class="d-flex align-items-center mb-1">
-                <i class="fa-solid fa-clock me-2" style="color: #8b5cf6;"></i>
-                <span class="text-muted" style="font-size: 0.8rem;">Pending Earnings</span>
+          </div>
+          <div class="col-3">
+            <div class="csb__stat">
+              <div class="csb__stat__icon csb__stat__icon--purple">
+                <i class="fa-solid fa-clock"></i>
               </div>
-              <h4 class="mb-0 fw-bold" style="color: #8b5cf6;">{{ wallet_status.pending_earnings|default:0|floatformat:0 }} <span style="font-size: 0.75rem; font-weight: 500;">QR</span></h4>
+              <div>
+                <span class="csb__stat__label">Pending Earnings</span>
+                <span class="csb__stat__value csb__stat__value--purple">{{ wallet_status.pending_earnings|default:0|floatformat:0 }} <span class="csb__stat__unit">QR</span></span>
+              </div>
             </div>
           </div>
         </div>
@@ -241,14 +255,14 @@
         <div class="listing-selection-bar">
           <input type="checkbox" class="form-check-input" id="desk-select-all">
           <span class="listing-selection-count"><span id="desk-selected-num">0</span> selected</span>
-          <span id="desk-selected-total" class="listing-selection-total" style="display: none;">
+          <span id="desk-selected-total" class="listing-selection-total csb__desk-total-hidden">
             Total: <span id="desk-selected-amount">0</span> QR
           </span>
         </div>
         <table class="listing-table">
           <thead>
             <tr>
-              <th style="width: 30px;"></th>
+              <th class="csb__col-check"></th>
               <th>Business</th>
               <th>DL#</th>
               <th>Customer</th>
@@ -288,29 +302,27 @@
 
     <!-- Submission Form -->
     <div class="col-lg-5 mb-4">
-      <div class="card border-0 shadow" style="border-radius: 16px; overflow: hidden;">
-        <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-          <div class="d-flex align-items-center">
-            <div class="me-3" style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-              <i class="fa-solid fa-paper-plane text-white"></i>
-            </div>
-            <div>
-              <h5 class="mb-0 text-white fw-bold">Submit COD</h5>
-              <small class="text-white" style="opacity: 0.9;">Enter amount or select orders</small>
-            </div>
+      <div class="csb__form-card">
+        <div class="csb__form-card__header">
+          <div class="csb__form-card__icon">
+            <i class="fa-solid fa-paper-plane"></i>
+          </div>
+          <div>
+            <h5 class="csb__form-card__title">Submit COD</h5>
+            <small class="csb__form-card__subtitle">Enter amount or select orders</small>
           </div>
         </div>
-        <div class="card-body p-4">
+        <div class="csb__form-card__body">
           <form method="POST" id="desk-cod-form">
             {% csrf_token %}
             <input type="hidden" name="delivery_ids" id="desk-delivery-ids" value="">
             <div class="mb-3">
-              <label for="desk-amount" class="form-label fw-semibold">Amount (QR)</label>
-              <input type="number" class="form-control form-control-lg" id="desk-amount" name="amount" step="0.01" min="0" max="{{ cod_in_hand_total }}" placeholder="0.00" required style="font-size: 1.3rem; font-weight: 600; text-align: center;">
+              <label for="desk-amount" class="csb__form-label">Amount (QR)</label>
+              <input type="number" class="form-control form-control-lg csb__amount-input" id="desk-amount" name="amount" step="0.01" min="0" max="{{ cod_in_hand_total }}" placeholder="0.00" required>
               <small class="text-muted">Maximum: {{ cod_in_hand_total|floatformat:2 }} QR</small>
             </div>
             <div class="mb-3">
-              <label for="desk-payment-method" class="form-label fw-semibold">Payment Method</label>
+              <label for="desk-payment-method" class="csb__form-label">Payment Method</label>
               <select class="form-select" id="desk-payment-method" name="payment_method">
                 <option value="cash"><i class="fa-solid fa-money-bill"></i> Cash</option>
                 <option value="bank">Bank Transfer</option>
@@ -319,14 +331,14 @@
               </select>
             </div>
             <div class="mb-3">
-              <label for="desk-reference" class="form-label fw-semibold">Reference Number <span class="text-muted fw-normal">(Optional)</span></label>
+              <label for="desk-reference" class="csb__form-label">Reference Number <span class="text-muted fw-normal">(Optional)</span></label>
               <input type="text" class="form-control" id="desk-reference" name="reference_number" placeholder="e.g. Bank transfer ref, receipt no.">
             </div>
             <div class="mb-4">
-              <label for="desk-notes" class="form-label fw-semibold">Notes <span class="text-muted fw-normal">(Optional)</span></label>
+              <label for="desk-notes" class="csb__form-label">Notes <span class="text-muted fw-normal">(Optional)</span></label>
               <textarea class="form-control" id="desk-notes" name="notes" rows="2" placeholder="Any additional notes..."></textarea>
             </div>
-            <button type="submit" class="btn btn-success w-100 py-2" style="font-weight: 600;">
+            <button type="submit" class="csb__submit-btn w-100">
               <i class="fa-solid fa-hand-holding-dollar me-2"></i>Submit COD
             </button>
           </form>
@@ -357,7 +369,7 @@
           <tbody>
             {% for txn in recent_submissions %}
             <tr>
-              <td><code style="color: #059669;">{{ txn.transaction_code }}</code></td>
+              <td><code class="csb__txn-code">{{ txn.transaction_code }}</code></td>
               <td>
                 {% if txn.payment_method == 'cash' %}
                 <span class="listing-status warning"><i class="fa-solid fa-money-bill"></i></span> Cash
@@ -370,7 +382,7 @@
                 {% else %}-{% endif %}
               </td>
               <td>{% if txn.reference_number %}<code>{{ txn.reference_number|truncatechars:20 }}</code>{% else %}-{% endif %}</td>
-              <td>{{ txn.created_at|date:"d M" }}<br><span class="text-muted" style="font-size: 0.65rem;">{{ txn.created_at|time:"H:i" }}</span></td>
+              <td>{{ txn.created_at|date:"d M" }}<br><span class="csb__time-sub">{{ txn.created_at|time:"H:i" }}</span></td>
               <td class="text-end fw-bold text-success">{{ txn.amount|floatformat:0 }} QR</td>
             </tr>
             {% endfor %}
@@ -454,16 +466,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     mobCheckboxes.forEach(function(cb) {
       const item = cb.closest('.pwa-transaction-item');
-      item.style.background = '';
-      item.style.borderLeftColor = '#f59e0b';
+      item.classList.remove('csb__order-item--selected');
     });
 
     checked.forEach(function(cb) {
       const item = cb.closest('.pwa-transaction-item');
       total += parseFloat(item.dataset.amount) || 0;
       ids.push(cb.value);
-      item.style.background = 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)';
-      item.style.borderLeftColor = '#059669';
+      item.classList.add('csb__order-item--selected');
     });
 
     if (mobSelectedNum) mobSelectedNum.textContent = count;

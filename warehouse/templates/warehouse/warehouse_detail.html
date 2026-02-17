@@ -3,330 +3,181 @@
 
 {% block title %}{{ warehouse.name }}{% endblock %}
 
-
-
 {% block content %}
-<!-- CSS for HTMX compatibility - loaded inside content -->
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse-detail-enhanced.css' %}" type="text/css" />
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
 
-<div class="container-fluid py-4">
-
-  <!-- Breadcrumb -->
-  <nav aria-label="breadcrumb" class="mb-3">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item">
-        <a href="{% url 'warehouse:warehouse_list' %}">
-          <i class="fa-solid fa-warehouse me-1"></i>
-          Warehouses
-        </a>
-      </li>
-      <li class="breadcrumb-item active">{{ warehouse.name }}</li>
-    </ol>
-  </nav>
-
-  <!-- Page Header -->
-  <div class="warehouse-detail-header">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-      <div>
-        <h1>
-          <i class="fa-solid fa-warehouse me-2"></i>
-          {{ warehouse.name }}
-        </h1>
-        <p class="warehouse-detail-code mb-0">
-          <i class="fa-solid fa-barcode me-1"></i>
-          {{ warehouse.code }}
-        </p>
-      </div>
-      <div>
-        {% if warehouse.is_active %}
-        <span class="warehouse-status-badge warehouse-status-badge--active">
-          <i class="fa-solid fa-check-circle me-1"></i>
-          Active
-        </span>
-        {% else %}
-        <span class="warehouse-status-badge warehouse-status-badge--inactive">
-          <i class="fa-solid fa-circle me-1"></i>
-          Inactive
-        </span>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <!-- Warehouse Rack Labeling Image -->
-  <div class="warehouse-rack-image-card">
-    <div class="warehouse-rack-image-header">
-      <h5>
-        <i class="fa-solid fa-tags me-2"></i>
-        Warehouse Rack Labeling System
-      </h5>
-    </div>
-    <div class="warehouse-rack-image-body">
-      <div class="warehouse-rack-image-wrapper" id="rackImageWrapper">
-        <img
-          src="{% static 'warehouse/img/What-is-warehouse-rack-labelling-writing.jpg' %}"
-          alt="Warehouse Rack Labeling"
-          class="warehouse-rack-image"
-          onerror="document.getElementById('rackImageWrapper').classList.add('warehouse-rack-image-wrapper-hidden')">
-      </div>
-      <p class="warehouse-rack-image-caption">
-        Professional rack labeling ensures efficient inventory tracking and quick location identification
-      </p>
-    </div>
-  </div>
-
-  <!-- Warehouse Info & Stats -->
-  <div class="row mb-4">
-
-    <!-- Warehouse Details Card -->
-    <div class="col-md-6 mb-4">
-      <div class="warehouse-info-card">
-        <div class="warehouse-info-card-header">
-          <h5>
-            <i class="fa-solid fa-circle-info"></i>
-            Warehouse Details
-          </h5>
-        </div>
-        <div class="warehouse-info-card-body">
-          <div class="warehouse-detail-item">
-            <label class="warehouse-detail-label">
-              <i class="fa-solid fa-location-dot me-1"></i>
-              Address
-            </label>
-            <div class="warehouse-detail-value">
-              {{ warehouse.address|default:"Not specified" }}
-            </div>
-          </div>
-
-          <div class="warehouse-detail-item">
-            <label class="warehouse-detail-label">
-              <i class="fa-solid fa-calendar me-1"></i>
-              Created Date
-            </label>
-            <div class="warehouse-detail-value">
-              {{ warehouse.created_at|date:"d M Y H:i" }}
-            </div>
-          </div>
-        </div>
-      </div>
+<div class="wh">
+    <!-- Breadcrumb -->
+    <div class="wh__breadcrumb">
+        <a href="{% url 'warehouse:warehouse_list' %}"><i class="fa-solid fa-warehouse"></i> Warehouses</a>
+        <span class="wh__breadcrumb-sep">/</span>
+        <span class="wh__breadcrumb-active">{{ warehouse.name }}</span>
     </div>
 
-    <!-- Stock Summary Card -->
-    <div class="col-md-6 mb-4">
-      <div class="warehouse-info-card">
-        <div class="warehouse-info-card-header">
-          <h5>
-            <i class="fa-solid fa-chart-line"></i>
-            Stock Summary
-          </h5>
-        </div>
-        <div class="warehouse-info-card-body">
-          <div class="warehouse-stock-stats">
-            <div class="warehouse-stock-stat">
-              <div class="warehouse-stock-stat-value">
-                {{ stock_summary.total_on_hand|default:0 }}
-              </div>
-              <div class="warehouse-stock-stat-label">
-                <i class="fa-solid fa-boxes-stacked me-1"></i>
-                Total On Hand
-              </div>
+    <!-- Hero Header -->
+    <div class="whdt__hero">
+        <div class="whdt__hero-left">
+            <div class="whdt__hero-icon"><i class="fa-solid fa-warehouse"></i></div>
+            <div>
+                <h1 class="whdt__hero-title">{{ warehouse.name }}</h1>
+                <p class="whdt__hero-code"><i class="fa-solid fa-barcode"></i> {{ warehouse.code }}</p>
             </div>
-
-            <div class="warehouse-stock-stat">
-              <div class="warehouse-stock-stat-value">
-                {{ stock_summary.total_reserved|default:0 }}
-              </div>
-              <div class="warehouse-stock-stat-label">
-                <i class="fa-solid fa-lock me-1"></i>
-                Reserved
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
+        <div>
+            {% if warehouse.is_active %}
+            <span class="wh__badge wh__badge--success"><i class="fa-solid fa-check-circle"></i> Active</span>
+            {% else %}
+            <span class="wh__badge wh__badge--muted"><i class="fa-solid fa-circle"></i> Inactive</span>
+            {% endif %}
+        </div>
     </div>
 
-  </div>
-
-  <!-- Storage Locations -->
-  <div class="row mb-4">
-    <div class="col-12">
-      <div class="warehouse-locations-card">
-
-        <div class="warehouse-locations-header">
-          <h5 class="warehouse-locations-title">
-            <i class="fa-solid fa-map-location-dot me-2"></i>
-            Storage Locations
-            <span class="warehouse-locations-count">{{ locations|length }}</span>
-          </h5>
-          <a href="{% url 'warehouse:location_add' %}?warehouse={{ warehouse.pk }}"
-             class="btn btn-primary">
-            <i class="fa-solid fa-plus me-1"></i>Add Location
-          </a>
+    <!-- Rack Labeling Image -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left">
+                <i class="fa-solid fa-tags"></i>
+                <span>WAREHOUSE RACK LABELING SYSTEM</span>
+            </div>
         </div>
-
-        <div class="table-responsive">
-          <table class="warehouse-locations-table">
-            <thead>
-              <tr>
-                <th>
-                  <i class="fa-solid fa-barcode me-1"></i>
-                  Code
-                </th>
-                <th>
-                  <i class="fa-solid fa-tag me-1"></i>
-                  Name
-                </th>
-                <th>
-                  <i class="fa-solid fa-layer-group me-1"></i>
-                  Type
-                </th>
-                <th>
-                  <i class="fa-solid fa-sitemap me-1"></i>
-                  Parent
-                </th>
-                <th>
-                  <i class="fa-solid fa-toggle-on me-1"></i>
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for loc in locations %}
-              <tr>
-                <td>
-                  <code>{{ loc.code }}</code>
-                </td>
-                <td>{{ loc.name }}</td>
-                <td>{{ loc.get_location_type_display }}</td>
-                <td>
-                  {% if loc.parent %}
-                  <code>{{ loc.parent.code }}</code>
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
-                </td>
-                <td>
-                  {% if loc.is_active %}
-                  <span class="warehouse-status-badge warehouse-status-badge--success">
-                    <i class="fa-solid fa-check-circle me-1"></i>
-                    Active
-                  </span>
-                  {% else %}
-                  <span class="warehouse-status-badge warehouse-status-badge--secondary">
-                    <i class="fa-solid fa-circle me-1"></i>
-                    Inactive
-                  </span>
-                  {% endif %}
-                </td>
-              </tr>
-              {% empty %}
-              <tr>
-                <td colspan="5" class="warehouse-locations-empty">
-                  <i class="fa-solid fa-map-location"></i>
-                  <p class="mb-0 mt-2">No storage locations defined yet</p>
-                  <small class="text-muted">Click "Add Location" to create your first storage location</small>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="wh__card-body">
+            <div class="whdt__rack-img-wrap" id="rackImageWrapper">
+                <img src="{% static 'warehouse/img/What-is-warehouse-rack-labelling-writing.jpg' %}"
+                     alt="Warehouse Rack Labeling" class="wh__guide-img"
+                     onerror="document.getElementById('rackImageWrapper').style.display='none'">
+            </div>
+            <p class="whdt__rack-caption">Professional rack labeling ensures efficient inventory tracking and quick location identification</p>
         </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- Quick Tips & Workflow -->
-  <div class="row">
-
-    <!-- Quick Tips -->
-    <div class="col-lg-6 mb-4">
-      <div class="warehouse-tips-card">
-        <div class="warehouse-tips-header warehouse-tips-header--info">
-          <h6>
-            <i class="fa-solid fa-lightbulb"></i>
-            Quick Tips
-          </h6>
-        </div>
-        <div class="warehouse-tips-body">
-          <div class="warehouse-tip-item">
-            <i class="fa-solid fa-check-circle warehouse-tip-icon"></i>
-            <span class="warehouse-tip-text">
-              <strong>Storage Locations:</strong> Organize inventory by creating zones, aisles, racks, and bins for better tracking
-            </span>
-          </div>
-
-          <div class="warehouse-tip-item">
-            <i class="fa-solid fa-check-circle warehouse-tip-icon"></i>
-            <span class="warehouse-tip-text">
-              <strong>Location Types:</strong> Use hierarchical structure (Zone → Aisle → Rack → Bin) for efficient organization
-            </span>
-          </div>
-
-          <div class="warehouse-tip-item">
-            <i class="fa-solid fa-check-circle warehouse-tip-icon"></i>
-            <span class="warehouse-tip-text">
-              <strong>Stock Summary:</strong> View total on-hand and reserved quantities across all storage locations
-            </span>
-          </div>
-
-          <div class="warehouse-tip-item">
-            <i class="fa-solid fa-check-circle warehouse-tip-icon"></i>
-            <span class="warehouse-tip-text">
-              <strong>Add Locations:</strong> Create locations before receiving stock to ensure proper inventory tracking
-            </span>
-          </div>
-        </div>
-      </div>
     </div>
 
-    <!-- Workflow -->
-    <div class="col-lg-6 mb-4">
-      <div class="warehouse-tips-card">
-        <div class="warehouse-tips-header warehouse-tips-header--primary">
-          <h6>
-            <i class="fa-solid fa-route"></i>
-            Warehouse Setup Workflow
-          </h6>
+    <!-- Info & Stats Row -->
+    <div class="whdt__info-grid">
+        <!-- Warehouse Details -->
+        <div class="wh__card">
+            <div class="wh__card-header">
+                <div class="wh__card-header-left">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>WAREHOUSE DETAILS</span>
+                </div>
+            </div>
+            <div class="wh__card-body">
+                <div class="whdt__field">
+                    <span class="whdt__field-label"><i class="fa-solid fa-location-dot"></i> Address</span>
+                    <span class="whdt__field-value">{{ warehouse.address|default:"Not specified" }}</span>
+                </div>
+                <div class="whdt__field">
+                    <span class="whdt__field-label"><i class="fa-solid fa-calendar"></i> Created Date</span>
+                    <span class="whdt__field-value">{{ warehouse.created_at|date:"d M Y H:i" }}</span>
+                </div>
+            </div>
         </div>
-        <div class="warehouse-tips-body">
-          <div class="warehouse-workflow-step">
-            <span class="warehouse-workflow-number">1</span>
-            <div class="warehouse-workflow-content">
-              <strong>Create Storage Locations</strong>
-              <small>Set up zones, aisles, racks, and bins to organize inventory</small>
-            </div>
-          </div>
 
-          <div class="warehouse-workflow-step">
-            <span class="warehouse-workflow-number">2</span>
-            <div class="warehouse-workflow-content">
-              <strong>Receive Stock</strong>
-              <small>Add incoming inventory and assign to specific locations</small>
+        <!-- Stock Summary -->
+        <div class="wh__card">
+            <div class="wh__card-header">
+                <div class="wh__card-header-left">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>STOCK SUMMARY</span>
+                </div>
             </div>
-          </div>
-
-          <div class="warehouse-workflow-step">
-            <span class="warehouse-workflow-number">3</span>
-            <div class="warehouse-workflow-content">
-              <strong>Monitor Stock Levels</strong>
-              <small>Track inventory levels and get low stock alerts</small>
+            <div class="wh__card-body">
+                <div class="whdt__stock-grid">
+                    <div class="whdt__stock-stat">
+                        <div class="whdt__stock-value">{{ stock_summary.total_on_hand|default:0 }}</div>
+                        <div class="whdt__stock-label"><i class="fa-solid fa-boxes-stacked"></i> Total On Hand</div>
+                    </div>
+                    <div class="whdt__stock-stat">
+                        <div class="whdt__stock-value">{{ stock_summary.total_reserved|default:0 }}</div>
+                        <div class="whdt__stock-label"><i class="fa-solid fa-lock"></i> Reserved</div>
+                    </div>
+                </div>
             </div>
-          </div>
-
-          <div class="warehouse-workflow-step">
-            <span class="warehouse-workflow-number">4</span>
-            <div class="warehouse-workflow-content">
-              <strong>Perform Cycle Counts</strong>
-              <small>Regular physical counts ensure inventory accuracy</small>
-            </div>
-          </div>
         </div>
-      </div>
     </div>
 
-  </div>
+    <!-- Storage Locations -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left">
+                <i class="fa-solid fa-map-location-dot"></i>
+                <span>STORAGE LOCATIONS</span>
+                <span class="wh__count-badge">{{ locations|length }}</span>
+            </div>
+            <a href="{% url 'warehouse:location_add' %}?warehouse={{ warehouse.pk }}" class="wh__btn wh__btn--primary">
+                <i class="fa-solid fa-plus"></i> Add Location
+            </a>
+        </div>
+        <div class="wh__table-wrap">
+            <table class="wh__table">
+                <thead>
+                    <tr>
+                        <th class="wh__th"><i class="fa-solid fa-barcode"></i> Code</th>
+                        <th class="wh__th"><i class="fa-solid fa-tag"></i> Name</th>
+                        <th class="wh__th"><i class="fa-solid fa-layer-group"></i> Type</th>
+                        <th class="wh__th"><i class="fa-solid fa-sitemap"></i> Parent</th>
+                        <th class="wh__th"><i class="fa-solid fa-toggle-on"></i> Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for loc in locations %}
+                    <tr>
+                        <td class="wh__td"><span class="wh__code">{{ loc.code }}</span></td>
+                        <td class="wh__td">{{ loc.name }}</td>
+                        <td class="wh__td">{{ loc.get_location_type_display }}</td>
+                        <td class="wh__td">
+                            {% if loc.parent %}
+                            <span class="wh__code">{{ loc.parent.code }}</span>
+                            {% else %}
+                            <span class="wh__muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="wh__td">
+                            {% if loc.is_active %}
+                            <span class="wh__badge wh__badge--success"><i class="fa-solid fa-check-circle"></i> Active</span>
+                            {% else %}
+                            <span class="wh__badge wh__badge--muted"><i class="fa-solid fa-circle"></i> Inactive</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="wh__empty">
+                            <i class="fa-solid fa-map-location"></i>
+                            <p>No storage locations defined yet</p>
+                            <p>Click "Add Location" to create your first storage location</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 
+    <!-- Tips & Workflow -->
+    <div class="wh__help-grid">
+        <div class="wh__help-card">
+            <div class="wh__help-header wh__help-header--tips">
+                <i class="fa-solid fa-lightbulb"></i> QUICK TIPS
+            </div>
+            <div class="wh__help-body">
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span><strong>Storage Locations:</strong> Organize inventory by creating zones, aisles, racks, and bins for better tracking</span></div>
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span><strong>Location Types:</strong> Use hierarchical structure (Zone > Aisle > Rack > Bin) for efficient organization</span></div>
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span><strong>Stock Summary:</strong> View total on-hand and reserved quantities across all storage locations</span></div>
+                <div class="wh__tip"><i class="fa-solid fa-check-circle"></i> <span><strong>Add Locations:</strong> Create locations before receiving stock to ensure proper inventory tracking</span></div>
+            </div>
+        </div>
+
+        <div class="wh__help-card">
+            <div class="wh__help-header wh__help-header--workflow">
+                <i class="fa-solid fa-route"></i> WAREHOUSE SETUP WORKFLOW
+            </div>
+            <div class="wh__help-body">
+                <div class="wh__step"><span class="wh__step-number">1</span><div><div class="wh__step-title">Create Storage Locations</div><div class="wh__step-desc">Set up zones, aisles, racks, and bins to organize inventory</div></div></div>
+                <div class="wh__step"><span class="wh__step-number">2</span><div><div class="wh__step-title">Receive Stock</div><div class="wh__step-desc">Add incoming inventory and assign to specific locations</div></div></div>
+                <div class="wh__step"><span class="wh__step-number">3</span><div><div class="wh__step-title">Monitor Stock Levels</div><div class="wh__step-desc">Track inventory levels and get low stock alerts</div></div></div>
+                <div class="wh__step"><span class="wh__step-number">4</span><div><div class="wh__step-title">Perform Cycle Counts</div><div class="wh__step-desc">Regular physical counts ensure inventory accuracy</div></div></div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

@@ -296,7 +296,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Qatar'
 
 USE_I18N = True
 
@@ -445,22 +445,19 @@ REST_FRAMEWORK = {
 import mimetypes
 mimetypes.add_type("application/javascript", ".js", True)
 
-DEBUG_TOOLBAR_PATCH_SETTINGS = False
-
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
 
 def show_toolbar(request):
-    if DEBUG:
-        return True
-    
+    return DEBUG
+
 DEBUG_TOOLBAR_CONFIG = {
-'INTERCEPT_REDIRECTS': False,
-"SHOW_TOOLBAR_CALLBACK": show_toolbar,
-'INSERT_BEFORE': '</head>',
-'INTERCEPT_REDIRECTS': False,
-'RENDER_PANELS': True,
+    'SHOW_TOOLBAR_CALLBACK': show_toolbar,
+    'RENDER_PANELS': False,
+    'DISABLE_PANELS': {
+        'debug_toolbar.panels.redirects.RedirectsPanel',
+    },
 }
 
 
