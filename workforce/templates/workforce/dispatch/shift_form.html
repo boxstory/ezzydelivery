@@ -30,25 +30,20 @@
         <div class="col-lg-8">
             <div class="dpsf__card">
                 <div class="dpsf__card-body">
-                    <form method="post">
+                    <form method="post" novalidate>
                         {% csrf_token %}
 
                         {% if form.errors %}
                         <div class="dpsf__alert dpsf__alert--error">
                             <i class="fa-solid fa-exclamation-triangle me-2"></i>
-                            <div>
-                                <strong>Please correct the errors below:</strong>
-                                <ul class="dpsf__error-list">
-                                    {% for field in form %}
-                                        {% for error in field.errors %}
-                                        <li>{{ field.label }}: {{ error }}</li>
-                                        {% endfor %}
-                                    {% endfor %}
-                                    {% for error in form.non_field_errors %}
-                                    <li>{{ error }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
+                            Please fill in all required fields highlighted below.
+                            {% if form.non_field_errors %}
+                            <ul class="dpsf__error-list mb-0 mt-2">
+                                {% for error in form.non_field_errors %}
+                                <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
                         </div>
                         {% endif %}
 

@@ -2,110 +2,197 @@
 
 {% block extra_css %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'core/css/core_join.css' %}?v=20260214c" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/core_join.css' %}?v=20260218a" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
 {% block content %}
-<section class="h-100 bg-light-grey" id="core_join_section_main">
+<section class="h-100" id="core_join_section_main">
     <div class="p-3">
-        <!-- file path section -->
+        <!-- Breadcrumb -->
         {% include "core/parts/filepath.html" %}
-        <div class="row">
-            <!-- profile left side section -->
+
+        <div class="row g-4">
+            <!-- Profile Sidebar -->
             {% include "core/parts/dashboard_sidebar_profile.html" %}
-            <!-- profile join form section -->
+
+            <!-- Main Content -->
             <div class="col-lg-8">
-                <div class="role-selection-card" id="core_join_card_role_selection">
-                    {% if form.errors %}
-                    <div class="alert alert-danger">
-                        {% for field in form %}
-                            {% for error in field.errors %}
-                                <div><i class="fas fa-exclamation-circle me-2"></i>{{ error }}</div>
-                            {% endfor %}
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    {% if profile.is_business or profile.is_driver %}
-                        <!-- Already Selected Role Display -->
-                        <div class="selected-role-container">
-                            <div class="selected-role-badge">
-                                <i class="fas fa-check-circle me-2"></i>Active Role
-                            </div>
-
-                            <div class="selected-role-icon">
-                                {% if profile.is_business %}
-                                <i class="fas fa-building"></i>
-                                {% else %}
-                                <i class="fas fa-car"></i>
-                                {% endif %}
-                            </div>
-
-                            <h2 class="selected-role-title">
-                                {% if profile.is_business %}
-                                Business Admin
-                                {% else %}
-                                Driver Partner
-                                {% endif %}
-                            </h2>
-
-                            <p class="selected-role-description">
-                                {% if profile.is_business %}
-                                You're registered as a Business Administrator. Manage your business operations, orders, and team from your dashboard.
-                                {% else %}
-                                You're registered as a Driver Partner. Access your delivery tasks, earnings, and performance metrics from your dashboard.
-                                {% endif %}
-                            </p>
-
-                            <a href="/dashboard/" class="dashboard-button" id="core_join_btn_go_dashboard">
-                                <i class="fas fa-tachometer-alt"></i>
-                                <span>Go To Dashboard</span>
-                            </a>
-                        </div>
-
-                    {% else %}
-                        <!-- Role Selection Interface -->
-                        <div class="role-selection-header">
-                            <h1 class="role-selection-title">Choose Your Role</h1>
-                            <p class="role-selection-subtitle">Select how you'd like to use EzzyDelivery platform</p>
-                        </div>
-
-                        <div class="role-options">
-                            <!-- Business Admin Option -->
-                            <a href="{% url 'core:join_business' %}" class="role-card" id="core_join_link_business">
-                                <div class="role-card-icon">
-                                    <i class="fas fa-building"></i>
-                                </div>
-                                <h3 class="role-card-title">Business Admin</h3>
-                                <p class="role-card-description">
-                                    Manage your business, create orders, track deliveries, and oversee your entire delivery operations.
-                                </p>
-                                <button class="role-card-button" id="core_join_btn_business_admin">
-                                    <i class="fas fa-arrow-right"></i>
-                                    <span>Register as Business</span>
-                                </button>
-                            </a>
-
-                            <!-- Driver Option -->
-                            <a href="{% url 'core:join_driver' %}" class="role-card" id="core_join_link_driver">
-                                <div class="role-card-icon">
-                                    <i class="fas fa-car"></i>
-                                </div>
-                                <h3 class="role-card-title">Driver Partner</h3>
-                                <p class="role-card-description">
-                                    Join our delivery fleet, accept tasks, earn money, and track your performance and earnings.
-                                </p>
-                                <button class="role-card-button" id="core_join_btn_driver">
-                                    <i class="fas fa-arrow-right"></i>
-                                    <span>Join as Driver</span>
-                                </button>
-                            </a>
-                        </div>
-                    {% endif %}
+                {% if form.errors %}
+                <div class="jnp__alert">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Please fill in all required fields highlighted below.</span>
+                    <button type="button" class="jnp__alert-close" data-bs-dismiss="alert" aria-label="Close">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
+                {% endif %}
+
+                {% if profile.is_business or profile.is_driver %}
+                <!-- ========== ACTIVE ROLE STATE ========== -->
+                <div class="jnp__card" id="core_join_card_role_selection">
+                    <!-- Navy Hero Banner -->
+                    <div class="jnp__hero">
+                        <div class="jnp__hero-badge">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Active Role</span>
+                        </div>
+                        <div class="jnp__hero-icon">
+                            {% if profile.is_business %}
+                            <i class="fas fa-building"></i>
+                            {% else %}
+                            <i class="fas fa-car"></i>
+                            {% endif %}
+                        </div>
+                        <h1 class="jnp__hero-title">
+                            {% if profile.is_business %}Business Admin{% else %}Driver Partner{% endif %}
+                        </h1>
+                        <p class="jnp__hero-subtitle">
+                            {% if profile.is_business %}
+                            You're registered as a Business Administrator. Manage your business operations, orders, and team.
+                            {% else %}
+                            You're registered as a Driver Partner. Access your delivery tasks, earnings, and performance.
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="jnp__stats">
+                        {% if profile.is_business %}
+                        <div class="jnp__stat">
+                            <div class="jnp__stat-icon">
+                                <i class="fas fa-box"></i>
+                            </div>
+                            <span class="jnp__stat-label">Orders</span>
+                        </div>
+                        <div class="jnp__stat">
+                            <div class="jnp__stat-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <span class="jnp__stat-label">Team</span>
+                        </div>
+                        <div class="jnp__stat">
+                            <div class="jnp__stat-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <span class="jnp__stat-label">Analytics</span>
+                        </div>
+                        {% else %}
+                        <div class="jnp__stat">
+                            <div class="jnp__stat-icon">
+                                <i class="fas fa-route"></i>
+                            </div>
+                            <span class="jnp__stat-label">Deliveries</span>
+                        </div>
+                        <div class="jnp__stat">
+                            <div class="jnp__stat-icon">
+                                <i class="fas fa-wallet"></i>
+                            </div>
+                            <span class="jnp__stat-label">Earnings</span>
+                        </div>
+                        <div class="jnp__stat">
+                            <div class="jnp__stat-icon">
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <span class="jnp__stat-label">Rating</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- CTA Button -->
+                    <div class="jnp__cta">
+                        <a href="/dashboard/" class="jnp__btn jnp__btn--primary" id="core_join_btn_go_dashboard">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>Go To Dashboard</span>
+                            <i class="fas fa-arrow-right jnp__btn-arrow"></i>
+                        </a>
+                    </div>
+                </div>
+
+                {% else %}
+                <!-- ========== ROLE SELECTION STATE ========== -->
+                <div class="jnp__card" id="core_join_card_role_selection">
+                    <!-- Hero Header -->
+                    <div class="jnp__hero jnp__hero--select">
+                        <div class="jnp__hero-eyebrow">
+                            <i class="fas fa-sparkles"></i>
+                            <span>Get Started</span>
+                        </div>
+                        <h1 class="jnp__hero-title">Choose Your Role</h1>
+                        <p class="jnp__hero-subtitle">Select how you'd like to use EzzyDelivery platform</p>
+                    </div>
+
+                    <!-- Role Cards -->
+                    <div class="jnp__roles">
+                        <!-- Business Admin -->
+                        <a href="{% url 'core:join_business' %}" class="jnp__role" id="core_join_link_business">
+                            <div class="jnp__role-accent"></div>
+                            <div class="jnp__role-icon">
+                                <i class="fas fa-building"></i>
+                            </div>
+                            <div class="jnp__role-content">
+                                <h3 class="jnp__role-title">Business Admin</h3>
+                                <p class="jnp__role-desc">
+                                    Manage your business, create orders, track deliveries, and oversee your entire operations.
+                                </p>
+                                <ul class="jnp__role-features">
+                                    <li><i class="fas fa-check"></i> Order management</li>
+                                    <li><i class="fas fa-check"></i> Driver fleet control</li>
+                                    <li><i class="fas fa-check"></i> Real-time tracking</li>
+                                </ul>
+                            </div>
+                            <div class="jnp__role-action">
+                                <span class="jnp__role-btn" id="core_join_btn_business_admin">
+                                    Register as Business
+                                    <i class="fas fa-arrow-right"></i>
+                                </span>
+                            </div>
+                        </a>
+
+                        <!-- Driver Partner -->
+                        <a href="{% url 'core:join_driver' %}" class="jnp__role" id="core_join_link_driver">
+                            <div class="jnp__role-accent"></div>
+                            <div class="jnp__role-icon jnp__role-icon--driver">
+                                <i class="fas fa-car"></i>
+                            </div>
+                            <div class="jnp__role-content">
+                                <h3 class="jnp__role-title">Driver Partner</h3>
+                                <p class="jnp__role-desc">
+                                    Join our delivery fleet, accept tasks, earn money, and track your performance.
+                                </p>
+                                <ul class="jnp__role-features">
+                                    <li><i class="fas fa-check"></i> Flexible schedule</li>
+                                    <li><i class="fas fa-check"></i> Competitive pay</li>
+                                    <li><i class="fas fa-check"></i> Performance bonuses</li>
+                                </ul>
+                            </div>
+                            <div class="jnp__role-action">
+                                <span class="jnp__role-btn" id="core_join_btn_driver">
+                                    Join as Driver
+                                    <i class="fas fa-arrow-right"></i>
+                                </span>
+                            </div>
+                        </a>
+                    </div>
+
+                    <!-- Trust Indicators -->
+                    <div class="jnp__trust">
+                        <div class="jnp__trust-item">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Secure Platform</span>
+                        </div>
+                        <div class="jnp__trust-item">
+                            <i class="fas fa-bolt"></i>
+                            <span>Quick Setup</span>
+                        </div>
+                        <div class="jnp__trust-item">
+                            <i class="fas fa-headset"></i>
+                            <span>24/7 Support</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </section>
-
 {% endblock content %}

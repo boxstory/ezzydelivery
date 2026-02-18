@@ -10,7 +10,7 @@
                     <br>
                     <div class="row">
                         <div class="col-12 ">
-                            <form id="core_driver_job_form_apply" method="POST">
+                            <form id="core_driver_job_form_apply" method="POST" novalidate>
                                 {% csrf_token %}
                                 <div class="row g-3">
                                     <div class="col-12 mt-md-4 mt-3">{{ driverjobform.full_name | as_crispy_field }}</div>
@@ -25,14 +25,11 @@
                                     <div class="col-lg-6 m-2 ">{{ driverjobform.licence | as_crispy_field }}</div>
                                     <div class="col-lg-6 m-2 ">{{ driverjobform.own_vehicle | as_crispy_field }}</div>
                                 </div>
-                                {% if form.driverjobform.errors %}
-                                    <ol>
-                                        {% for error in form.driverjobform.errors %}
-                                            <li>
-                                                <strong>{{ error|escape }}</strong>
-                                            </li>
-                                        {% endfor %}
-                                    </ol>
+                                {% if driverjobform.errors %}
+                                <div class="alert alert-danger alert-dismissible fade show">
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    Please fill in all required fields highlighted below.
+                                </div>
                                 {% endif %}
                                 <button id="core_driver_job_btn_submit" class="w-100 btn btn-dark btn-lg" type="submit" value="submit">JOIN AS DRIVER</button>
                             </form>

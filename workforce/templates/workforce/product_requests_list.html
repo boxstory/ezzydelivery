@@ -127,14 +127,14 @@
             <td>{{ req.created_at|date:"d M Y" }}</td>
             <td>
               {% if req.status == 'pending' %}
-              <form method="POST" action="{% url 'workforce:approve_product_request' req.id req.request_type %}" class="d-inline">
+              <form method="POST" action="{% url 'workforce:approve_product_request' req.id req.request_type %}" class="d-inline" novalidate>
                 {% csrf_token %}
                 <button type="submit" class="prl__action-btn prl__action-btn--approve" title="Approve Request">
                   <i class="fa-solid fa-check"></i>
                 </button>
               </form>
               {% elif req.status == 'approved' %}
-              <form method="POST" action="{% url 'workforce:complete_product_request' req.id req.request_type %}" class="d-inline">
+              <form method="POST" action="{% url 'workforce:complete_product_request' req.id req.request_type %}" class="d-inline" novalidate>
                 {% csrf_token %}
                 <button type="submit" class="prl__action-btn prl__action-btn--complete" title="Mark as Completed">
                   <i class="fa-solid fa-check-double"></i>

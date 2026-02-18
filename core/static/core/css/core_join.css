@@ -1,236 +1,458 @@
 /**
  * CORE APP - JOIN/REGISTRATION STYLES
- * Professional Design System using Brand Kit Pro Variables
- * Mobile-First, WCAG 2.1 AA Accessible
+ * Premium Designer System using Brand Kit Tokens
+ * BEM: jnp__ = Join Page
  */
 
 /* ============================================================================
-   ROLE SELECTION PAGE - /join_us/
+   PAGE CONTAINER
    ============================================================================ */
 
 #core_join_section_main {
-    background: linear-gradient(135deg, var(--ez-grey-50) 0%, var(--ez-white) 100%);
+    background: linear-gradient(180deg, var(--brand-grey-100) 0%, var(--brand-grey-200) 100%);
     min-height: 100vh;
-    padding: var(--ez-space-6) 0;
 }
 
-/* Role Selection Card Container */
-#core_join_card_role_selection {
-    background: var(--ez-white);
-    border-radius: var(--ez-card-radius);
-    padding: var(--ez-space-10);
-    box-shadow: var(--ez-shadow-xl);
-    border: 1px solid var(--ez-grey-200);
+/* ============================================================================
+   ALERT
+   ============================================================================ */
+
+.jnp__alert {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.75rem 1rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-left: 3px solid #dc2626;
+    border-radius: var(--brand-radius-sm);
+    margin-bottom: 1rem;
+    font-size: 0.8125rem;
+    color: #dc2626;
+    font-weight: 500;
 }
 
-/* Role Selection Header */
-.role-selection-header {
-    text-align: center;
-    margin-bottom: var(--ez-space-10);
+.jnp__alert i:first-child {
+    font-size: 0.875rem;
+    flex-shrink: 0;
 }
 
-.role-selection-title {
-    font-size: var(--ez-font-3xl);
-    font-weight: var(--ez-font-weight-extrabold);
-    color: var(--ez-navy-500);
-    margin-bottom: var(--ez-space-3);
-    background: linear-gradient(135deg, var(--ez-navy-500) 0%, var(--ez-primary-500) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-.role-selection-subtitle {
-    font-size: var(--ez-font-lg);
-    color: var(--ez-grey-600);
-    font-weight: var(--ez-font-weight-normal);
-}
-
-/* Role Options Grid */
-.role-options {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: var(--ez-space-8);
-    margin-top: var(--ez-space-8);
-}
-
-/* Individual Role Card */
-.role-card {
-    background: var(--ez-white);
-    border: 2px solid var(--ez-grey-200);
-    border-radius: var(--ez-radius-xl);
-    padding: var(--ez-space-8);
-    text-align: center;
-    transition: var(--ez-transition-base);
+.jnp__alert-close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #dc2626;
     cursor: pointer;
-    text-decoration: none;
+    padding: 0.25rem;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.jnp__alert-close:hover {
+    opacity: 1;
+}
+
+/* ============================================================================
+   MAIN CARD CONTAINER
+   ============================================================================ */
+
+.jnp__card {
+    background: #fff;
+    border-radius: var(--brand-radius-md);
+    border: 1px solid var(--brand-grey-200);
+    overflow: hidden;
+    box-shadow: var(--brand-shadow-md);
+}
+
+/* ============================================================================
+   HERO BANNER (Navy Gradient)
+   ============================================================================ */
+
+.jnp__hero {
+    background: linear-gradient(135deg, var(--brand-navy) 0%, var(--brand-navy-light) 100%);
+    color: #fff;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    position: relative;
+}
+
+.jnp__hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 20%, rgba(247, 192, 0, 0.08) 0%, transparent 60%),
+                radial-gradient(circle at 70% 80%, rgba(247, 192, 0, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+/* Hero for Role Selection (gradient variation) */
+.jnp__hero--select {
+    padding: 2.5rem 1.5rem 2rem;
+}
+
+/* Hero Eyebrow */
+.jnp__hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--brand-primary);
+    margin-bottom: 0.75rem;
+    background: rgba(247, 192, 0, 0.12);
+    padding: 0.3rem 0.75rem;
+    border-radius: 2rem;
+}
+
+/* Hero Badge (Active Role) */
+.jnp__hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+    color: #15803d;
+    padding: 0.375rem 0.875rem;
+    border-radius: 2rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 1.25rem;
+    position: relative;
+}
+
+/* Hero Icon (Active Role) */
+.jnp__hero-icon {
+    width: 4.5rem;
+    height: 4.5rem;
+    margin: 0 auto 1.25rem;
+    background: rgba(247, 192, 0, 0.15);
+    border: 2px solid rgba(247, 192, 0, 0.3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.jnp__hero-icon i {
+    font-size: 1.75rem;
+    color: var(--brand-primary);
+}
+
+/* Hero Title */
+.jnp__hero-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem;
+    color: #fff;
+    position: relative;
+}
+
+/* Hero Subtitle */
+.jnp__hero-subtitle {
+    font-size: 0.8125rem;
+    opacity: 0.8;
+    margin: 0 auto;
+    max-width: 28rem;
+    line-height: 1.5;
+    position: relative;
+}
+
+/* ============================================================================
+   QUICK STATS ROW (Active Role State)
+   ============================================================================ */
+
+.jnp__stats {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--brand-grey-200);
+    background: var(--brand-grey-100);
+}
+
+.jnp__stat {
     display: flex;
     flex-direction: column;
     align-items: center;
+    gap: 0.375rem;
+}
+
+.jnp__stat-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    background: #fff;
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.jnp__stat-icon i {
+    font-size: 0.875rem;
+    color: var(--brand-navy);
+}
+
+.jnp__stat:hover .jnp__stat-icon {
+    background: var(--brand-navy);
+    border-color: var(--brand-navy);
+}
+
+.jnp__stat:hover .jnp__stat-icon i {
+    color: var(--brand-primary);
+}
+
+.jnp__stat-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500);
+}
+
+/* ============================================================================
+   CTA SECTION (Dashboard Button)
+   ============================================================================ */
+
+.jnp__cta {
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.jnp__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--brand-radius-sm);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.jnp__btn--primary {
+    background: var(--brand-navy);
+    color: #fff;
+}
+
+.jnp__btn--primary:hover {
+    background: var(--brand-navy-light);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: var(--brand-shadow-md);
+}
+
+.jnp__btn-arrow {
+    font-size: 0.75rem;
+    transition: transform 0.2s ease;
+}
+
+.jnp__btn--primary:hover .jnp__btn-arrow {
+    transform: translateX(3px);
+}
+
+/* ============================================================================
+   ROLE SELECTION CARDS
+   ============================================================================ */
+
+.jnp__roles {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    padding: 1.5rem;
+}
+
+.jnp__role {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
 }
 
-.role-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: var(--ez-gradient-primary);
+.jnp__role:hover {
+    border-color: var(--brand-primary);
+    transform: translateY(-4px);
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 31, 63, 0.12);
+    color: inherit;
+    text-decoration: none;
+}
+
+/* Top accent bar */
+.jnp__role-accent {
+    height: 3px;
+    background: linear-gradient(90deg, var(--brand-primary), var(--brand-navy));
     transform: scaleX(0);
-    transition: var(--ez-transition-base);
+    transform-origin: left;
+    transition: transform 0.3s ease;
 }
 
-.role-card:hover {
-    border-color: var(--ez-primary-500);
-    transform: translateY(-8px);
-    box-shadow: var(--ez-shadow-glow-yellow);
-}
-
-.role-card:hover::before {
+.jnp__role:hover .jnp__role-accent {
     transform: scaleX(1);
 }
 
-/* Role Card Icon */
-.role-card-icon {
-    width: 100px;
-    height: 100px;
-    margin: 0 auto var(--ez-space-6);
-    background: var(--ez-grey-100);
-    border-radius: var(--ez-radius-full);
+/* Role Icon */
+.jnp__role-icon {
+    width: 3.5rem;
+    height: 3.5rem;
+    margin: 1.5rem auto 0;
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+    border: 1px solid #fde68a;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: var(--ez-transition-base);
+    transition: all 0.2s ease;
 }
 
-.role-card:hover .role-card-icon {
-    background: var(--ez-gradient-primary);
-    transform: scale(1.1) rotate(5deg);
-    box-shadow: var(--ez-shadow-glow-yellow);
+.jnp__role-icon i {
+    font-size: 1.25rem;
+    color: var(--brand-navy);
+    transition: all 0.2s ease;
 }
 
-.role-card-icon i {
-    font-size: var(--ez-font-4xl);
-    color: var(--ez-grey-600);
-    transition: var(--ez-transition-base);
+.jnp__role-icon--driver {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border-color: #93c5fd;
 }
 
-.role-card:hover .role-card-icon i {
-    color: var(--ez-navy-500);
-}
-
-/* Role Card Text */
-.role-card-title {
-    font-size: var(--ez-font-2xl);
-    font-weight: var(--ez-font-weight-bold);
-    color: var(--ez-navy-500);
-    margin-bottom: var(--ez-space-3);
-}
-
-.role-card-description {
-    font-size: var(--ez-font-base);
-    color: var(--ez-grey-600);
-    line-height: var(--ez-line-height-relaxed);
-    margin-bottom: var(--ez-space-6);
-}
-
-/* Role Card Button */
-.role-card-button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--ez-space-2);
-    background: var(--ez-gradient-primary);
-    color: var(--ez-navy-500);
-    padding: var(--ez-space-4) var(--ez-space-8);
-    border-radius: var(--ez-radius-lg);
-    font-weight: var(--ez-font-weight-bold);
-    font-size: var(--ez-font-base);
-    border: none;
-    transition: var(--ez-transition-base);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.role-card:hover .role-card-button {
+.jnp__role:hover .jnp__role-icon {
+    background: var(--brand-navy);
+    border-color: var(--brand-navy);
     transform: scale(1.05);
-    box-shadow: var(--ez-shadow-lg);
 }
 
-/* Selected Role Display */
-.selected-role-container {
+.jnp__role:hover .jnp__role-icon i {
+    color: var(--brand-primary);
+}
+
+/* Role Content */
+.jnp__role-content {
+    padding: 1rem 1.25rem 0;
     text-align: center;
-    padding: var(--ez-space-12) var(--ez-space-8);
+    flex: 1;
 }
 
-.selected-role-badge {
-    display: inline-block;
-    background: var(--ez-gradient-primary);
-    color: var(--ez-navy-500);
-    padding: var(--ez-space-3) var(--ez-space-6);
-    border-radius: var(--ez-radius-full);
-    font-size: var(--ez-font-sm);
-    font-weight: var(--ez-font-weight-bold);
-    margin-bottom: var(--ez-space-6);
-    text-transform: uppercase;
-    letter-spacing: 1px;
+.jnp__role-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--brand-grey-800);
+    margin: 0 0 0.375rem;
 }
 
-.selected-role-icon {
-    width: 120px;
-    height: 120px;
-    margin: 0 auto var(--ez-space-6);
-    background: var(--ez-gradient-primary);
-    border-radius: var(--ez-radius-full);
+.jnp__role-desc {
+    font-size: 0.75rem;
+    color: var(--brand-grey-500);
+    line-height: 1.5;
+    margin: 0 0 0.75rem;
+}
+
+/* Feature checklist */
+.jnp__role-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+    text-align: left;
+}
+
+.jnp__role-features li {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.7rem;
+    color: var(--brand-grey-600);
+    padding: 0.2rem 0;
+}
+
+.jnp__role-features li i {
+    font-size: 0.55rem;
+    color: #15803d;
+    width: 0.75rem;
+    flex-shrink: 0;
+}
+
+/* Role Action (bottom button) */
+.jnp__role-action {
+    padding: 0 1.25rem 1.25rem;
+    margin-top: auto;
+}
+
+.jnp__role-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: var(--ez-shadow-glow-yellow);
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.625rem 1rem;
+    background: var(--brand-grey-100);
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--brand-grey-700);
+    transition: all 0.2s ease;
 }
 
-.selected-role-icon i {
-    font-size: var(--ez-font-5xl);
-    color: var(--ez-navy-500);
+.jnp__role-btn i {
+    font-size: 0.65rem;
+    transition: transform 0.2s ease;
 }
 
-.selected-role-title {
-    font-size: var(--ez-font-4xl);
-    font-weight: var(--ez-font-weight-extrabold);
-    color: var(--ez-navy-500);
-    margin-bottom: var(--ez-space-4);
+.jnp__role:hover .jnp__role-btn {
+    background: var(--brand-navy);
+    border-color: var(--brand-navy);
+    color: #fff;
 }
 
-.selected-role-description {
-    font-size: var(--ez-font-lg);
-    color: var(--ez-grey-600);
-    max-width: 600px;
-    margin: 0 auto var(--ez-space-8);
-    line-height: var(--ez-line-height-relaxed);
+.jnp__role:hover .jnp__role-btn i {
+    transform: translateX(3px);
 }
 
-.dashboard-button {
-    display: inline-flex;
+/* Active state (keyboard/touch) */
+.jnp__role:active {
+    transform: translateY(-2px) scale(0.99);
+}
+
+/* ============================================================================
+   TRUST INDICATORS
+   ============================================================================ */
+
+.jnp__trust {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--brand-grey-200);
+    background: var(--brand-grey-100);
+}
+
+.jnp__trust-item {
+    display: flex;
     align-items: center;
-    gap: var(--ez-space-3);
-    background: var(--ez-gradient-primary);
-    color: var(--ez-navy-500);
-    padding: var(--ez-space-5) var(--ez-space-10);
-    border-radius: var(--ez-radius-lg);
-    font-weight: var(--ez-font-weight-bold);
-    font-size: var(--ez-font-lg);
-    text-decoration: none;
-    transition: var(--ez-transition-base);
+    gap: 0.375rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--brand-grey-500);
     text-transform: uppercase;
-    letter-spacing: 1px;
-    box-shadow: var(--ez-shadow-lg);
+    letter-spacing: 0.04em;
 }
 
-.dashboard-button:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--ez-shadow-glow-yellow);
-    color: var(--ez-navy-500);
+.jnp__trust-item i {
+    font-size: 0.7rem;
+    color: var(--brand-primary);
 }
 
 /* ============================================================================
@@ -238,17 +460,16 @@
    ============================================================================ */
 
 #core_join_business_section_main {
-    background: linear-gradient(135deg, var(--ez-grey-50) 0%, var(--ez-white) 100%);
+    background: linear-gradient(180deg, var(--brand-grey-100) 0%, var(--brand-grey-200) 100%);
     min-height: 100vh;
-    padding: var(--ez-space-6) 0;
 }
 
 #core_join_card_business {
-    background: var(--ez-white);
-    border: 1px solid var(--ez-grey-200);
-    border-radius: var(--ez-card-radius);
-    padding: var(--ez-space-8);
-    box-shadow: var(--ez-shadow-xl);
+    background: #fff;
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-md);
+    padding: 2rem;
+    box-shadow: var(--brand-shadow-md);
 }
 
 #core_join_form_business {
@@ -256,22 +477,22 @@
 }
 
 #core_join_btn_business_submit {
-    background: var(--ez-gradient-primary);
+    background: var(--brand-navy);
     border: none;
-    color: var(--ez-navy-500);
-    font-weight: var(--ez-font-weight-bold);
-    padding: var(--ez-space-5) var(--ez-space-8);
-    border-radius: var(--ez-radius-lg);
-    font-size: var(--ez-font-lg);
+    color: #fff;
+    font-weight: 600;
+    padding: 0.75rem 2rem;
+    border-radius: var(--brand-radius-sm);
+    font-size: 0.875rem;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    box-shadow: var(--ez-shadow-md);
-    transition: var(--ez-transition-base);
+    letter-spacing: 0.04em;
+    transition: all 0.2s ease;
 }
 
 #core_join_btn_business_submit:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--ez-shadow-glow-yellow);
+    background: var(--brand-navy-light);
+    transform: translateY(-1px);
+    box-shadow: var(--brand-shadow-md);
 }
 
 /* ============================================================================
@@ -280,9 +501,9 @@
 
 /* Hero Section */
 .driver-hero {
-    background: var(--ez-gradient-navy);
-    color: var(--ez-white);
-    padding: var(--ez-space-12) 0;
+    background: linear-gradient(135deg, var(--brand-navy) 0%, var(--brand-navy-light) 100%);
+    color: #fff;
+    padding: 3rem 0;
     position: relative;
     overflow: hidden;
 }
@@ -290,12 +511,9 @@
 .driver-hero::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-    opacity: 0.1;
+    inset: 0;
+    background: radial-gradient(circle at 30% 20%, rgba(247, 192, 0, 0.08) 0%, transparent 60%);
+    pointer-events: none;
 }
 
 .hero-content {
@@ -305,124 +523,134 @@
 }
 
 .hero-icon {
-    width: 100px;
-    height: 100px;
-    background: var(--ez-gradient-primary);
-    border-radius: var(--ez-radius-full);
+    width: 5rem;
+    height: 5rem;
+    background: rgba(247, 192, 0, 0.15);
+    border: 2px solid rgba(247, 192, 0, 0.3);
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto var(--ez-space-6);
-    box-shadow: var(--ez-shadow-glow-yellow);
+    margin: 0 auto 1.25rem;
 }
 
 .hero-icon i {
-    font-size: var(--ez-font-4xl);
-    color: var(--ez-navy-500);
+    font-size: 1.75rem;
+    color: var(--brand-primary);
 }
 
 .hero-title {
-    font-size: var(--ez-font-4xl);
-    font-weight: var(--ez-font-weight-extrabold);
-    margin-bottom: var(--ez-space-4);
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
 }
 
 .hero-subtitle {
-    font-size: var(--ez-font-lg);
+    font-size: 0.875rem;
     margin-bottom: 0;
-    opacity: 0.95;
+    opacity: 0.85;
 }
 
 /* Stats Bar */
 .stats-bar {
-    background: var(--ez-white);
-    border-radius: var(--ez-radius-xl);
-    padding: var(--ez-space-8);
-    box-shadow: var(--ez-shadow-xl);
-    margin-top: calc(var(--ez-space-8) * -1);
+    background: #fff;
+    border-radius: var(--brand-radius-md);
+    padding: 1.5rem;
+    box-shadow: var(--brand-shadow-md);
+    margin-top: -1.5rem;
     position: relative;
     z-index: 2;
+    border: 1px solid var(--brand-grey-200);
 }
 
 .stat-item {
     text-align: center;
-    padding: var(--ez-space-4);
+    padding: 0.75rem;
 }
 
 .stat-icon {
-    width: 60px;
-    height: 60px;
-    background: var(--ez-gradient-primary);
-    border-radius: var(--ez-radius-full);
+    width: 2.75rem;
+    height: 2.75rem;
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+    border: 1px solid #fde68a;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto var(--ez-space-4);
-    box-shadow: var(--ez-shadow-sm);
+    margin: 0 auto 0.5rem;
 }
 
 .stat-icon i {
-    font-size: var(--ez-font-2xl);
-    color: var(--ez-navy-500);
+    font-size: 1rem;
+    color: var(--brand-navy);
 }
 
 .stat-number {
-    font-size: var(--ez-font-3xl);
-    font-weight: var(--ez-font-weight-extrabold);
-    color: var(--ez-navy-500);
-    margin-bottom: var(--ez-space-2);
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--brand-grey-800);
+    margin-bottom: 0.25rem;
     display: block;
 }
 
 .stat-label {
-    color: var(--ez-grey-600);
-    font-weight: var(--ez-font-weight-semibold);
-    font-size: var(--ez-font-sm);
+    color: var(--brand-grey-500);
+    font-weight: 600;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
     display: block;
 }
 
 /* Content Wrapper */
 .content-wrapper {
-    padding: var(--ez-space-10) 0;
+    padding: 2rem 0;
 }
 
 /* Benefits Card */
 .benefits-card {
-    background: var(--ez-white);
-    border-radius: var(--ez-card-radius);
-    padding: var(--ez-space-8);
-    box-shadow: var(--ez-shadow-lg);
-    border: 1px solid var(--ez-grey-200);
+    background: #fff;
+    border-radius: var(--brand-radius-md);
+    padding: 1.5rem;
+    box-shadow: var(--brand-shadow-sm);
+    border: 1px solid var(--brand-grey-200);
     height: 100%;
 }
 
 .benefits-card h3 {
-    font-size: var(--ez-font-2xl);
-    font-weight: var(--ez-font-weight-bold);
-    color: var(--ez-navy-500);
-    margin-bottom: var(--ez-space-6);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500);
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--brand-grey-200);
+    margin-bottom: 1rem;
 }
 
 .benefit-item {
     display: flex;
     align-items: flex-start;
-    gap: var(--ez-space-4);
-    padding: var(--ez-space-4);
-    border-radius: var(--ez-radius-md);
-    transition: var(--ez-transition-base);
-    margin-bottom: var(--ez-space-4);
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-radius: var(--brand-radius-sm);
+    transition: all 0.2s ease;
+    margin-bottom: 0.25rem;
 }
 
 .benefit-item:hover {
-    background: var(--ez-grey-50);
+    background: var(--brand-grey-100);
+    padding-left: 0.5rem;
 }
 
 .benefit-icon {
-    width: 48px;
-    height: 48px;
-    background: var(--ez-gradient-primary);
-    border-radius: var(--ez-radius-lg);
+    width: 2.25rem;
+    height: 2.25rem;
+    background: var(--brand-navy);
+    border-radius: var(--brand-radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -430,114 +658,131 @@
 }
 
 .benefit-icon i {
-    font-size: var(--ez-font-xl);
-    color: var(--ez-navy-500);
+    font-size: 0.8125rem;
+    color: var(--brand-primary);
 }
 
 .benefit-content h4 {
-    font-size: var(--ez-font-lg);
-    font-weight: var(--ez-font-weight-bold);
-    color: var(--ez-navy-500);
-    margin-bottom: var(--ez-space-1);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-800);
+    margin-bottom: 0.125rem;
 }
 
 .benefit-content p {
-    font-size: var(--ez-font-sm);
-    color: var(--ez-grey-600);
+    font-size: 0.75rem;
+    color: var(--brand-grey-500);
     margin: 0;
-    line-height: var(--ez-line-height-normal);
+    line-height: 1.4;
 }
 
 /* Form Card */
 .form-card {
-    background: var(--ez-white);
-    border-radius: var(--ez-card-radius);
-    padding: var(--ez-space-8);
-    box-shadow: var(--ez-shadow-lg);
-    border: 1px solid var(--ez-grey-200);
+    background: #fff;
+    border-radius: var(--brand-radius-md);
+    padding: 1.5rem;
+    box-shadow: var(--brand-shadow-sm);
+    border: 1px solid var(--brand-grey-200);
 }
 
 .form-card h3 {
-    font-size: var(--ez-font-2xl);
-    font-weight: var(--ez-font-weight-bold);
-    color: var(--ez-navy-500);
-    margin-bottom: var(--ez-space-6);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500);
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--brand-grey-200);
+    margin-bottom: 1rem;
 }
 
 /* Requirements Section */
 .requirements-section {
-    background: var(--ez-grey-50);
-    border-radius: var(--ez-radius-lg);
-    padding: var(--ez-space-6);
-    margin-top: var(--ez-space-8);
+    background: var(--brand-grey-100);
+    border-radius: var(--brand-radius-sm);
+    padding: 1rem 1.25rem;
+    margin-top: 1.5rem;
+    border-left: 3px solid var(--brand-primary);
 }
 
 .requirements-section h4 {
-    font-size: var(--ez-font-lg);
-    font-weight: var(--ez-font-weight-bold);
-    color: var(--ez-navy-500);
-    margin-bottom: var(--ez-space-4);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500);
+    margin-bottom: 0.75rem;
 }
 
 .requirement-item {
     display: flex;
     align-items: center;
-    gap: var(--ez-space-3);
-    padding: var(--ez-space-2) 0;
-    font-size: var(--ez-font-base);
-    color: var(--ez-grey-700);
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+    font-size: 0.8125rem;
+    color: var(--brand-grey-700);
 }
 
 .requirement-item i {
-    color: var(--ez-success);
-    font-size: var(--ez-font-lg);
+    color: #15803d;
+    font-size: 0.75rem;
 }
 
 /* FAQ Section */
 .faq-section {
-    background: var(--ez-white);
-    border-radius: var(--ez-card-radius);
-    padding: var(--ez-space-8);
-    box-shadow: var(--ez-shadow-lg);
-    margin-top: var(--ez-space-10);
+    background: #fff;
+    border-radius: var(--brand-radius-md);
+    padding: 1.5rem;
+    box-shadow: var(--brand-shadow-sm);
+    border: 1px solid var(--brand-grey-200);
+    margin-top: 1.5rem;
 }
 
 .faq-section h3 {
-    font-size: var(--ez-font-2xl);
-    font-weight: var(--ez-font-weight-bold);
-    color: var(--ez-navy-500);
-    margin-bottom: var(--ez-space-6);
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500);
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--brand-grey-200);
+    margin-bottom: 1rem;
 }
 
 .faq-item {
-    border: 1px solid var(--ez-grey-200);
-    border-radius: var(--ez-radius-lg);
-    margin-bottom: var(--ez-space-4);
+    border: 1px solid var(--brand-grey-200);
+    border-radius: var(--brand-radius-sm);
+    margin-bottom: 0.5rem;
     overflow: hidden;
-    transition: var(--ez-transition-base);
+    transition: all 0.2s ease;
 }
 
 .faq-item:hover {
-    border-color: var(--ez-primary-500);
-    box-shadow: var(--ez-shadow-sm);
+    border-color: var(--brand-primary);
 }
 
 .faq-question {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--ez-space-5);
+    padding: 0.75rem 1rem;
     cursor: pointer;
-    background: var(--ez-white);
-    font-weight: var(--ez-font-weight-semibold);
-    color: var(--ez-navy-500);
-    font-size: var(--ez-font-base);
+    background: #fff;
+    font-weight: 600;
+    color: var(--brand-grey-800);
+    font-size: 0.8125rem;
 }
 
 .faq-toggle {
-    width: 24px;
-    height: 24px;
+    width: 1.25rem;
+    height: 1.25rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -545,8 +790,9 @@
 }
 
 .faq-toggle i {
-    transition: var(--ez-transition-base);
-    color: var(--ez-primary-500);
+    transition: transform 0.2s ease;
+    color: var(--brand-primary);
+    font-size: 0.75rem;
 }
 
 .faq-item.active .faq-toggle i {
@@ -556,17 +802,17 @@
 .faq-answer {
     max-height: 0;
     overflow: hidden;
-    transition: max-height var(--ez-transition-base);
-    background: var(--ez-grey-50);
-    padding: 0 var(--ez-space-5);
-    font-size: var(--ez-font-base);
-    color: var(--ez-grey-700);
-    line-height: var(--ez-line-height-relaxed);
+    transition: max-height 0.3s ease;
+    background: var(--brand-grey-100);
+    padding: 0 1rem;
+    font-size: 0.8125rem;
+    color: var(--brand-grey-600);
+    line-height: 1.6;
 }
 
 .faq-item.active .faq-answer {
     max-height: 500px;
-    padding: var(--ez-space-5);
+    padding: 0.75rem 1rem;
 }
 
 /* ============================================================================
@@ -575,122 +821,144 @@
 
 /* Tablet */
 @media (max-width: 992px) {
-    .role-options {
+    .jnp__roles {
         grid-template-columns: 1fr;
-        gap: var(--ez-space-6);
+    }
+
+    .jnp__stats {
+        gap: 1.5rem;
+    }
+
+    .driver-hero {
+        padding: 2rem 0;
     }
 
     .hero-title {
-        font-size: var(--ez-font-3xl);
-    }
-
-    .stats-bar {
-        padding: var(--ez-space-6);
-    }
-
-    .benefits-card,
-    .form-card {
-        margin-bottom: var(--ez-space-6);
+        font-size: 1.5rem;
     }
 }
 
 /* Mobile */
 @media (max-width: 768px) {
-    #core_join_section_main,
-    #core_join_business_section_main {
-        padding: var(--ez-space-4) 0;
+    #core_join_section_main {
+        padding-top: 0;
     }
 
-    #core_join_card_role_selection,
-    #core_join_card_business {
-        padding: var(--ez-space-6);
-        border-radius: var(--ez-radius-lg);
+    .jnp__hero {
+        padding: 1.5rem 1rem;
     }
 
-    .role-selection-title {
-        font-size: var(--ez-font-2xl);
+    .jnp__hero--select {
+        padding: 2rem 1rem 1.5rem;
     }
 
-    .role-card {
-        padding: var(--ez-space-6);
+    .jnp__hero-title {
+        font-size: 1.25rem;
     }
 
-    .role-card-icon {
-        width: 80px;
-        height: 80px;
+    .jnp__roles {
+        padding: 1rem;
     }
 
-    .role-card-icon i {
-        font-size: var(--ez-font-3xl);
+    .jnp__trust {
+        gap: 0.75rem;
+        padding: 0.875rem 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .jnp__trust-item {
+        font-size: 0.6rem;
+    }
+
+    .jnp__stats {
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    .jnp__cta {
+        padding: 1rem;
     }
 
     .hero-title {
-        font-size: var(--ez-font-2xl);
+        font-size: 1.25rem;
     }
 
     .hero-subtitle {
-        font-size: var(--ez-font-base);
+        font-size: 0.8125rem;
     }
 
     .stats-bar {
-        padding: var(--ez-space-5);
-        margin-top: calc(var(--ez-space-6) * -1);
+        padding: 1rem 0.75rem;
     }
 
     .stat-number {
-        font-size: var(--ez-font-2xl);
+        font-size: 1.125rem;
     }
 
     .benefits-card,
     .form-card,
     .faq-section {
-        padding: var(--ez-space-5);
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    #core_join_card_business {
+        padding: 1.25rem;
     }
 }
 
 /* Small Mobile */
 @media (max-width: 576px) {
-    #core_join_card_role_selection,
-    #core_join_card_business {
-        padding: var(--ez-space-4);
+    .jnp__hero-icon {
+        width: 3.5rem;
+        height: 3.5rem;
     }
 
-    .role-selection-title {
-        font-size: var(--ez-font-xl);
+    .jnp__hero-icon i {
+        font-size: 1.375rem;
     }
 
-    .selected-role-title {
-        font-size: var(--ez-font-2xl);
+    .jnp__role-icon {
+        width: 3rem;
+        height: 3rem;
     }
 
-    .hero-icon,
-    .selected-role-icon {
-        width: 80px;
-        height: 80px;
+    .jnp__role-icon i {
+        font-size: 1rem;
     }
 
-    .hero-icon i,
-    .selected-role-icon i {
-        font-size: var(--ez-font-3xl);
+    .jnp__role-content {
+        padding: 0.75rem 1rem 0;
+    }
+
+    .hero-icon {
+        width: 4rem;
+        height: 4rem;
+    }
+
+    .hero-icon i {
+        font-size: 1.375rem;
     }
 }
 
 /* ============================================================================
-   ACCESSIBILITY ENHANCEMENTS
+   ACCESSIBILITY
    ============================================================================ */
 
-.role-card:focus-visible,
-.dashboard-button:focus-visible,
-.faq-item:focus-visible {
-    outline: 2px solid var(--ez-primary-500);
+.jnp__role:focus-visible,
+.jnp__btn:focus-visible {
+    outline: 2px solid var(--brand-primary);
     outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .role-card,
-    .role-card-icon,
-    .benefit-item,
-    .faq-item,
+    .jnp__role,
+    .jnp__role-icon,
+    .jnp__role-accent,
+    .jnp__role-btn,
+    .jnp__stat-icon,
+    .jnp__btn,
     .faq-toggle i {
         transition: none;
     }

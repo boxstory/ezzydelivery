@@ -9,7 +9,7 @@
         <div class="p-3">
             {% include "core/parts/filepath.html" %}
             <div class="row">
-                <form id="core_profile_add_form_main" method="POST">
+                <form id="core_profile_add_form_main" method="POST" novalidate>
                     {% csrf_token %}
                     <div class="row">
                         {% include "core/parts/profile_card_details.html" with card_id="core_profile_add_card_picture" show_upload_placeholder=True upload_field=profileaddform.profile_pic show_dashboard_button=True %}
@@ -17,10 +17,9 @@
                             <div class="card mb-4" id="core_profile_add_card_info">
                                 <div class="card-body">
                                     {% if profileaddform.errors %}
-                                        <div class="alert alert-danger">
-                                            <ul>
-                                                {% for error in profileaddform.errors.all %}<li>{{ error }}</li>{% endfor %}
-                                            </ul>
+                                        <div class="alert alert-danger alert-dismissible fade show">
+                                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                            Please fill in all required fields highlighted below.
                                         </div>
                                     {% endif %}
                                     <div class="row">

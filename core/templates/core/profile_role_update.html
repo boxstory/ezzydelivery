@@ -22,18 +22,12 @@
                 <div class="card-body bg-light " id="core_role_update_card_form">
                     <!-- join buttons -->
                     {% if form.errors %}
-
-                    <!-- For each field in form -->
-                    {% for field in form %}
-                    <!-- For each error in field -->
-                    {% for error in field.errors %}
-                    <!-- Output error text message only -->
-                    <div>{{error}}</div>
-                    {% endfor %}
-                    {% endfor %}
-
+                    <div class="alert alert-danger alert-dismissible fade show">
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        Please fill in all required fields highlighted below.
+                    </div>
                     {% endif %}
-                    <form id="core_role_update_form_main" method="POST" name="prodile_role_update" enctype="multipart/form-data">{% csrf_token %}
+                    <form id="core_role_update_form_main" method="POST" name="prodile_role_update" enctype="multipart/form-data" novalidate>{% csrf_token %}
                         <div class="row g-3">
                             {{ form | crispy }}
 

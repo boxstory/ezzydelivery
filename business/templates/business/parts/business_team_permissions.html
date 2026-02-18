@@ -59,7 +59,7 @@
           <span>CURRENT ROLE</span>
         </div>
         <div class="btp__card-body">
-          <form method="POST">
+          <form method="POST" novalidate>
             {% csrf_token %}
             <input type="hidden" name="action" value="change_role">
             <div class="mb-3">
@@ -106,7 +106,7 @@
           <p class="btp__reset-text">
             Remove all custom permission overrides and restore to role defaults.
           </p>
-          <form method="POST" onsubmit="return confirm('Reset all custom permissions to role defaults?');">
+          <form method="POST" onsubmit="return confirm('Reset all custom permissions to role defaults?');" novalidate>
             {% csrf_token %}
             <input type="hidden" name="action" value="reset">
             <button type="submit" class="btp__btn btp__btn--warning w-100" id="business_team_permissions_btn_reset">
@@ -191,7 +191,7 @@
                     {% endif %}
                   </span>
                   <span class="btp__perm-cell btp__perm-cell--action">
-                    <form method="POST" class="d-inline">
+                    <form method="POST" class="d-inline" novalidate>
                       {% csrf_token %}
                       <input type="hidden" name="permission_code" value="{{ perm.code }}">
                       {% if perm.is_effective %}

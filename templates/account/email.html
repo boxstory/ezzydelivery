@@ -11,7 +11,7 @@
     {% if user.emailaddress_set.all %}
     <p id="account_email_message_intro">{% trans 'The following e-mail addresses are associated with your account:' %}</p>
 
-    <form id="account_email_form_list" action="{% url 'account_email' %}" class="email_list" method="post">
+    <form id="account_email_form_list" action="{% url 'account_email' %}" class="email_list" method="post" novalidate>
       {% csrf_token %}
       <fieldset class="blockLabels">
 
@@ -51,7 +51,7 @@
     {% if can_add_email %}
     <h2 id="account_email_title_add">{% trans "Add E-mail Address" %}</h2>
 
-    <form id="account_email_form_add" method="post" action="{% url 'account_email' %}" class="add_email">
+    <form id="account_email_form_add" method="post" action="{% url 'account_email' %}" class="add_email" novalidate>
       {% csrf_token %}
       {{ form.as_p }}
       <button id="account_email_btn_add" name="action_add" type="submit">{% trans "Add E-mail" %}</button>

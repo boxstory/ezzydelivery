@@ -575,6 +575,11 @@ def profile(request, pk):
 @login_required(login_url='/accounts/login/')
 def profile_add(request):
     """Add new user profile"""
+    # Redirect if user already has a profile to prevent duplicate key error
+    if core_models.Profile.objects.filter(user_id=request.user.id).exists():
+        messages.info(request, 'You already have a profile.')
+        return redirect('core:profile', pk=request.user.id)
+
     if request.method == 'POST':
         profileaddform = core_forms.ProfileForm(request.POST, request.FILES)
         profileaddform.fields['first_name'].widget.attrs['value'] = request.user.first_name or None

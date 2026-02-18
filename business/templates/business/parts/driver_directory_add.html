@@ -14,22 +14,20 @@
                   hx-post="{% url 'business:driver_directory_add' %}"
                   hx-target="#client_driver_add_container_main"
                   hx-swap="outerHTML"
-                  id="client_driver_add_form_main">
+                  id="client_driver_add_form_main" novalidate>
                 {% csrf_token %}
 
                 {% if form.errors %}
-                <div class="alert alert-danger" role="alert">
-                    <strong>Please correct the errors below:</strong>
-                    <ul class="mb-0">
-                    {% for field in form %}
-                        {% for error in field.errors %}
-                        <li>{{ field.label }}: {{ error }}</li>
-                        {% endfor %}
-                    {% endfor %}
-                    {% for error in form.non_field_errors %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    Please fill in all required fields highlighted below.
+                    {% if form.non_field_errors %}
+                    <ul class="mb-0 mt-2">
+                        {% for error in form.non_field_errors %}
                         <li>{{ error }}</li>
-                    {% endfor %}
+                        {% endfor %}
                     </ul>
+                    {% endif %}
                 </div>
                 {% endif %}
 

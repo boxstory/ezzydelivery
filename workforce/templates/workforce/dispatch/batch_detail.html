@@ -120,7 +120,7 @@
                 </div>
                 <div class="dpb__card-body">
                     {% if batch.status == 'holding' %}
-                    <form method="post" action="{% url 'workforce:dispatch_batch_release' batch.id %}">
+                    <form method="post" action="{% url 'workforce:dispatch_batch_release' batch.id %}" novalidate>
                         {% csrf_token %}
                         <button type="submit" class="dpb__action-btn dpb__action-btn--warning"
                                 onclick="return confirm('Release this batch immediately?')">
@@ -129,7 +129,7 @@
                     </form>
                     {% endif %}
                     {% if batch.status in 'pending,holding,ready' %}
-                    <form method="post" action="{% url 'workforce:dispatch_batch_cancel' batch.id %}">
+                    <form method="post" action="{% url 'workforce:dispatch_batch_cancel' batch.id %}" novalidate>
                         {% csrf_token %}
                         <button type="submit" class="dpb__action-btn dpb__action-btn--danger"
                                 onclick="return confirm('Cancel this batch? Orders will be unassigned.')">

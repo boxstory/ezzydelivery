@@ -772,56 +772,66 @@ body .select2-container--default .select2-results__option--selected {
 }
 
 /* ============================================
-   ERROR STATES
-   High specificity to override default styles
+   ERROR STATES - GLOBAL
+   Works on ALL forms across the entire project
    ============================================ */
 
-.form-card-body .form-control.is-invalid,
-.form-card-body .form-select.is-invalid,
-.form-card-body input.is-invalid,
-.form-card-body select.is-invalid,
-.form-card-body textarea.is-invalid,
-.form-card-body .error,
-.form-container .form-control.is-invalid,
-.form-container .form-select.is-invalid,
-.form-container input.is-invalid,
-.form-container select.is-invalid,
-.form-container textarea.is-invalid,
-.form-container .error {
-  border-color: #ef4444;
+/* Global red border for invalid fields */
+.form-control.is-invalid,
+.form-select.is-invalid,
+input.is-invalid,
+select.is-invalid,
+textarea.is-invalid,
+.error {
+  border-color: #dc3545;
 }
 
-.form-card-body .form-control.is-invalid:focus,
-.form-card-body .form-select.is-invalid:focus,
-.form-card-body input.is-invalid:focus,
-.form-card-body select.is-invalid:focus,
-.form-card-body textarea.is-invalid:focus,
-.form-card-body .error:focus,
-.form-container .form-control.is-invalid:focus,
-.form-container .form-select.is-invalid:focus,
-.form-container input.is-invalid:focus,
-.form-container select.is-invalid:focus,
-.form-container textarea.is-invalid:focus,
-.form-container .error:focus {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 0.25rem rgba(239, 68, 68, 0.12);
+.form-control.is-invalid:focus,
+.form-select.is-invalid:focus,
+input.is-invalid:focus,
+select.is-invalid:focus,
+textarea.is-invalid:focus,
+.error:focus {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.1875rem rgba(220, 53, 69, 0.15);
 }
 
+/* Global inline error message styling */
 .invalid-feedback,
 .error-message {
-  color: #dc2626;
-  font-size: 0.8125rem;
-  margin-top: 0.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
+  display: block;
+  color: #dc3545;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
   font-weight: 500;
 }
 
-.invalid-feedback::before,
-.error-message::before {
-  content: "⚠";
-  font-size: .75rem;
+/* Django default errorlist styling - global */
+ul.errorlist {
+  color: #dc3545;
+  font-size: 0.875rem;
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0 0 0;
+}
+
+ul.errorlist li {
+  margin-bottom: 0.125rem;
+}
+
+/* text-danger error divs used in some templates */
+.text-danger.small {
+  color: #dc3545;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+/* Order update error class */
+.ou__error {
+  color: #dc3545;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
 }
 
 /* ============================================

@@ -31,7 +31,7 @@
   </div>
 
   <!-- Mobile Form -->
-  <form method="POST" id="orders_add_form_mobile">
+  <form method="POST" id="orders_add_form_mobile" novalidate>
     {% csrf_token %}
     <!-- Hidden fields -->
     <input type="hidden" name="order_status" value="to_review">
@@ -178,7 +178,7 @@
 
   <!-- Form View (Default) -->
   <div class="order-add-form-container" id="form_view_container">
-    <form method="POST" id="orders_add_form_main" class="order-form">
+    <form method="POST" id="orders_add_form_main" class="order-form" novalidate>
       {% csrf_token %}
 
       {% if form.non_field_errors %}
@@ -381,7 +381,7 @@
           </span>
         </div>
 
-        <form method="POST" id="bulk_orders_form" action="{% url 'orders:add_order_bulk' %}">
+        <form method="POST" id="bulk_orders_form" action="{% url 'orders:add_order_bulk' %}" novalidate>
           {% csrf_token %}
           <div class="excel-table-wrapper">
             <table class="excel-table" id="orders_excel_table">

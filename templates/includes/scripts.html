@@ -12,3 +12,54 @@
 <script type="text/javascript" src="{% static 'webpages/js/base.js' %}"></script>
 <script type="text/javascript" src="{% static 'webpages/js/script.js' %}"></script>
 <script type="text/javascript" src="{% static 'webpages/js/home.js' %}"></script>
+
+<!-- Universal form validation: add red borders + inline errors for all forms -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Find all errorlist elements (Django's default error rendering)
+    document.querySelectorAll('.errorlist').forEach(function(errorList) {
+        // Style the errorlist as inline feedback
+        errorList.style.color = '#dc3545';
+        errorList.style.fontSize = '0.875rem';
+        errorList.style.listStyle = 'none';
+        errorList.style.padding = '0';
+        errorList.style.marginTop = '0.25rem';
+
+        // Find the related input/select/textarea and add is-invalid class
+        var parent = errorList.parentElement;
+        if (parent) {
+            var input = parent.querySelector('input, select, textarea');
+            if (input && !input.classList.contains('is-invalid')) {
+                input.classList.add('is-invalid');
+            }
+            // Also check previous sibling (errorlist sometimes comes after the field)
+            var prev = errorList.previousElementSibling;
+            if (prev && (prev.tagName === 'INPUT' || prev.tagName === 'SELECT' || prev.tagName === 'TEXTAREA')) {
+                prev.classList.add('is-invalid');
+            }
+        }
+    });
+
+    // Also handle .text-danger.small error divs used in some templates
+    document.querySelectorAll('.text-danger.small').forEach(function(errDiv) {
+        var parent = errDiv.parentElement;
+        if (parent) {
+            var input = parent.querySelector('input, select, textarea');
+            if (input && !input.classList.contains('is-invalid')) {
+                input.classList.add('is-invalid');
+            }
+        }
+    });
+
+    // Handle ou__error class used in order_update
+    document.querySelectorAll('.ou__error').forEach(function(errDiv) {
+        var parent = errDiv.parentElement;
+        if (parent) {
+            var input = parent.querySelector('input, select, textarea');
+            if (input && !input.classList.contains('is-invalid')) {
+                input.classList.add('is-invalid');
+            }
+        }
+    });
+});
+</script>
