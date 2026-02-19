@@ -132,31 +132,35 @@ def business_dashboard(request):
             business=business.business_id
         ).select_related('business', 'pickup_location', 'address_verified_by', 'verified_by').order_by('-id')[:10]
 
-        # Calculate real statistics
+        # Calculate real statistics - single aggregate query instead of 5 separate queries
         all_orders = orders_models.Order.objects.filter(business=business.business_id)
         from datetime import date
+        from django.db.models import Count, Case, When, IntegerField
+
         today = date.today()
 
-        # Total orders count
-        total_orders = all_orders.count()
+        order_stats = all_orders.aggregate(
+            total=Count('id'),
+            delivered=Count(Case(
+                When(order_status__in=['delivered', 'fulfilled'], then=1),
+                output_field=IntegerField()
+            )),
+            pending=Count(Case(
+                When(~Q(order_status__in=['delivered', 'fulfilled', 'cancelled']), then=1),
+                output_field=IntegerField()
+            )),
+            cod_total=Sum('cod_amount'),
+            cod_collected=Sum(Case(
+                When(order_status__in=['delivered', 'fulfilled'], then='cod_amount'),
+                default=0,
+            )),
+        )
 
-        # Delivered orders (order_status synced from delivery task via signal)
-        delivered_count = all_orders.filter(
-            order_status__in=['delivered', 'fulfilled']
-        ).count()
-
-        # COD calculations
-        cod_amount_total = all_orders.aggregate(total=Sum('cod_amount'))['total'] or 0
-
-        # COD collected (from delivered/fulfilled orders)
-        cod_collected = all_orders.filter(
-            order_status__in=['delivered', 'fulfilled']
-        ).aggregate(total=Sum('cod_amount'))['total'] or 0
-
-        # Pending orders (active orders not yet delivered or cancelled)
-        pending_count = all_orders.exclude(
-            order_status__in=['delivered', 'fulfilled', 'cancelled']
-        ).count()
+        total_orders = order_stats['total']
+        delivered_count = order_stats['delivered']
+        pending_count = order_stats['pending']
+        cod_amount_total = order_stats['cod_total'] or 0
+        cod_collected = order_stats['cod_collected'] or 0
 
         # Get delivery tasks for this business
         delivery_tasks = delivery_models.DeliveryTask.objects.filter(business=business.business_id)
@@ -1921,13 +1925,15 @@ def inbound_requests_list(request):
     if status_filter:
         requests_qs = requests_qs.filter(status=status_filter)
 
-    # Stats
-    stats = {
-        'pending': InboundProductRequest.objects.filter(business=business, status='pending').count(),
-        'approved': InboundProductRequest.objects.filter(business=business, status='approved').count(),
-        'completed': InboundProductRequest.objects.filter(business=business, status='completed').count(),
-        'total': InboundProductRequest.objects.filter(business=business).count(),
-    }
+    # Stats - single aggregate query instead of 4 separate COUNT queries
+    from django.db.models import Count, Case, When, IntegerField
+    stats_agg = InboundProductRequest.objects.filter(business=business).aggregate(
+        total=Count('id'),
+        pending=Count(Case(When(status='pending', then=1), output_field=IntegerField())),
+        approved=Count(Case(When(status='approved', then=1), output_field=IntegerField())),
+        completed=Count(Case(When(status='completed', then=1), output_field=IntegerField())),
+    )
+    stats = stats_agg
 
     # Pagination
     paginator = Paginator(requests_qs, 20)
@@ -1978,13 +1984,15 @@ def outbound_requests_list(request):
     if status_filter:
         requests_qs = requests_qs.filter(status=status_filter)
 
-    # Stats
-    stats = {
-        'pending': OutboundProductRequest.objects.filter(business=business, status='pending').count(),
-        'approved': OutboundProductRequest.objects.filter(business=business, status='approved').count(),
-        'completed': OutboundProductRequest.objects.filter(business=business, status='completed').count(),
-        'total': OutboundProductRequest.objects.filter(business=business).count(),
-    }
+    # Stats - single aggregate query instead of 4 separate COUNT queries
+    from django.db.models import Count, Case, When, IntegerField
+    stats_agg = OutboundProductRequest.objects.filter(business=business).aggregate(
+        total=Count('id'),
+        pending=Count(Case(When(status='pending', then=1), output_field=IntegerField())),
+        approved=Count(Case(When(status='approved', then=1), output_field=IntegerField())),
+        completed=Count(Case(When(status='completed', then=1), output_field=IntegerField())),
+    )
+    stats = stats_agg
 
     # Pagination
     paginator = Paginator(requests_qs, 20)

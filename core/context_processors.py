@@ -80,6 +80,9 @@ def get_cached_business(request):
             request._cached_user_business = business
             return business
 
+        # Cache None so get_user_business_access skips the duplicate owner query
+        request._cached_user_business = None
+
         # Check if user is a team member (not just owner)
         from business.decorators import get_user_business_access
         team_business, access_type, team_profile = get_user_business_access(request.user, request)

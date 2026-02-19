@@ -59,6 +59,25 @@ def get_zone_from_address(address):
         return str(address)[:30]
 
 
+# Module-level zone cache to avoid N+1 queries (zones rarely change)
+_zone_cache = {}
+_zone_cache_loaded = False
+
+
+def _get_zone_map():
+    """Load all zones into a dict once, reuse across template renders."""
+    global _zone_cache, _zone_cache_loaded
+    if not _zone_cache_loaded:
+        from delivery.models import ZoneName
+        _zone_cache = {
+            z.zone_number: z.zone_name
+            for z in ZoneName.objects.all()
+            if z.zone_name
+        }
+        _zone_cache_loaded = True
+    return _zone_cache
+
+
 @register.simple_tag
 def get_zone_display(order):
     """
@@ -78,11 +97,10 @@ def get_zone_display(order):
         if hasattr(order, 'dl_zone') and order.dl_zone:
             try:
                 zone_number = int(order.dl_zone)
-                from delivery.models import ZoneName
-
-                zone = ZoneName.objects.filter(zone_number=zone_number).first()
-                if zone and zone.zone_name:
-                    return zone.zone_name
+                zone_map = _get_zone_map()
+                zone_name = zone_map.get(zone_number)
+                if zone_name:
+                    return zone_name
                 else:
                     return f"Zone {zone_number}"
             except (ValueError, Exception):

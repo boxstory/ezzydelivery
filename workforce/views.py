@@ -183,22 +183,32 @@ def wf_dashboard(request):
 
     today = timezone.now().date()
 
-    # Order Statistics
-    total_orders = Order.objects.count()
-    orders_today = Order.objects.filter(order_date=today).count()
-    not_published = Order.objects.filter(task_created=False).exclude(
-        order_status__in=['cancelled', 'delivered', 'fulfilled']
-    ).count()
-    published_orders = Order.objects.filter(task_created=True).count()
-
-    # Location reconfirmation needed (orders with verification issues)
-    loc_reconfirm = Order.objects.filter(
-        Q(verification_status='pending') | Q(verification_status='needs_review')
-    ).count()
+    # Order Statistics - single aggregate query instead of 5 separate counts
+    from django.db.models import Case, When, IntegerField
+    order_stats = Order.objects.aggregate(
+        total=Count('id'),
+        today=Count(Case(When(order_date=today, then=1), output_field=IntegerField())),
+        not_published=Count(Case(When(
+            task_created=False,
+            then=Case(When(
+                ~Q(order_status__in=['cancelled', 'delivered', 'fulfilled']),
+                then=1
+            ), output_field=IntegerField())
+        ), output_field=IntegerField())),
+        published=Count(Case(When(task_created=True, then=1), output_field=IntegerField())),
+        loc_reconfirm=Count(Case(When(
+            verification_status__in=['pending', 'needs_review'], then=1
+        ), output_field=IntegerField())),
+    )
+    total_orders = order_stats['total']
+    orders_today = order_stats['today']
+    not_published = order_stats['not_published']
+    published_orders = order_stats['published']
+    loc_reconfirm = order_stats['loc_reconfirm']
 
     # Follow up count - tasks that need attention
     follow_up_count = DeliveryTask.objects.filter(
-        Q(dl_task_status='failed') | Q(dl_task_status='rescheduled') | Q(dl_task_status='customer_unavailable')
+        dl_task_status__in=['failed', 'rescheduled', 'customer_unavailable']
     ).count()
 
     # User Verification pending
@@ -206,16 +216,22 @@ def wf_dashboard(request):
         verification_status='pending'
     ).count()
 
-    # Driver and Seller counts
-    active_drivers = Driver.objects.filter(driver_status='Approved').count()
-    pending_drivers = Driver.objects.filter(driver_status='Pending on Review').count()
-    active_sellers = Business.objects.filter(business_status='Approved').count()
-    pending_sellers = Business.objects.filter(business_status='Pending on Review').count()
+    # Driver and Seller counts - 2 aggregate queries instead of 4 separate counts
+    driver_stats = Driver.objects.aggregate(
+        active=Count(Case(When(driver_status='Approved', then=1), output_field=IntegerField())),
+        pending=Count(Case(When(driver_status='Pending on Review', then=1), output_field=IntegerField())),
+        cod_in_hand=Sum('wallet_balance'),
+    )
+    active_drivers = driver_stats['active']
+    pending_drivers = driver_stats['pending']
+    cod_in_hand = driver_stats['cod_in_hand'] or 0
 
-    # COD in hand (sum of driver wallet balances)
-    cod_in_hand = Driver.objects.aggregate(
-        total=Sum('wallet_balance')
-    )['total'] or 0
+    seller_stats = Business.objects.aggregate(
+        active=Count(Case(When(business_status='Approved', then=1), output_field=IntegerField())),
+        pending=Count(Case(When(business_status='Pending on Review', then=1), output_field=IntegerField())),
+    )
+    active_sellers = seller_stats['active']
+    pending_sellers = seller_stats['pending']
 
     # Recent orders (last 10 updated)
     orders = Order.objects.select_related('business').order_by('-updated_at')[:10]
@@ -687,8 +703,11 @@ def submit_to_task(request, order_id):
     from django.utils import timezone
     from orders.signals import _create_delivery_task_from_order
     
-    order = get_object_or_404(orders_models.Order, id=order_id)
-    
+    order = get_object_or_404(
+        orders_models.Order.objects.select_related('business'),
+        id=order_id
+    )
+
     # Check if order is verified
     if order.verification_status != 'verified':
         from django.contrib import messages
@@ -714,8 +733,11 @@ def verify_order_address(request, order_id):
     """Verify order address - workforce view"""
     from django.utils import timezone
     from orders.models import AddressVerification, OrderVerificationLog
-    
-    order = get_object_or_404(orders_models.Order, id=order_id)
+
+    order = get_object_or_404(
+        orders_models.Order.objects.select_related('business'),
+        id=order_id
+    )
     
     if request.method == 'POST':
         verified_address = request.POST.get('verified_address', order.customer_address)
@@ -813,7 +835,10 @@ def verify_order(request, order_id):
     from orders.models import OrderVerificationLog
     from orders.signals import _create_delivery_task_from_order
 
-    order = get_object_or_404(orders_models.Order, id=order_id)
+    order = get_object_or_404(
+        orders_models.Order.objects.select_related('business'),
+        id=order_id
+    )
 
     if request.method == 'POST':
         verification_notes = request.POST.get('verification_notes', '')
@@ -1840,7 +1865,10 @@ def order_detail(request, order_id):
 def cancel_order(request, order_id):
     """Cancel an order"""
     try:
-        order = get_object_or_404(orders_models.Order, id=order_id)
+        order = get_object_or_404(
+            orders_models.Order.objects.select_related('business'),
+            id=order_id
+        )
 
         if order.order_status == 'published':
             return JsonResponse({
@@ -1896,7 +1924,10 @@ def cancel_order(request, order_id):
 def assign_driver_to_order(request, order_id):
     """Assign a driver to an order (from AI suggest result)"""
     try:
-        order = get_object_or_404(orders_models.Order, id=order_id)
+        order = get_object_or_404(
+            orders_models.Order.objects.select_related('business'),
+            id=order_id
+        )
         data = json.loads(request.body)
         driver_id = data.get('driver_id')
 
@@ -1984,7 +2015,10 @@ def assign_driver_to_order(request, order_id):
 def update_order_zone(request, order_id):
     """Update order delivery zone (from AI parse result)"""
     try:
-        order = get_object_or_404(orders_models.Order, id=order_id)
+        order = get_object_or_404(
+            orders_models.Order.objects.select_related('business'),
+            id=order_id
+        )
         data = json.loads(request.body)
         zone_number = data.get('zone_number')
         street_number = data.get('street_number')
@@ -2073,7 +2107,10 @@ def update_order_zone(request, order_id):
 def publish_order_to_delivery(request, order_id):
     """AJAX endpoint to publish order to delivery"""
     try:
-        order = get_object_or_404(orders_models.Order, id=order_id)
+        order = get_object_or_404(
+            orders_models.Order.objects.select_related('business'),
+            id=order_id
+        )
 
         # Update order status to published
         order.order_status = 'published'
@@ -2124,7 +2161,10 @@ def update_order_status(request, order_id):
     ]
 
     try:
-        order = get_object_or_404(orders_models.Order, id=order_id)
+        order = get_object_or_404(
+            orders_models.Order.objects.select_related('business'),
+            id=order_id
+        )
 
         # Parse JSON body
         data = json.loads(request.body)

@@ -590,6 +590,10 @@ def profile(request, pk):
         user_id=target_user_id
     )
 
+    # Cache on request so context processor doesn't re-fetch
+    if is_own_profile:
+        request._cached_profile = profile
+
     # Get profile picture from prefetch cache if possible
     profile_picture = profile.profile_picture.first()
 
