@@ -44,6 +44,7 @@ from crispy_forms.layout import Layout, Field
 from core import models as core_models
 from fleet import models as fleet_models
 from business import models as business_models
+from business.permissions import BusinessPermissions, ROLE_PERMISSIONS
 
 # Local aliases for commonly used models
 Business = business_models.Business
@@ -643,16 +644,31 @@ class TeamMemberAddForm(forms.ModelForm):
     Views:
         business.views.business_teams_add
     """
-    # Replace user select with text input for email/ID lookup
+    # Replace user select with text input for email/ID/EZZY code lookup
     user_identifier = forms.CharField(
         max_length=150,
-        label='User Email or ID',
+        label='User Email, EZZY ID, or User ID',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Enter user email address or user ID',
+            'placeholder': 'e.g. user@email.com or EZZY2026XXXXXX',
             'autocomplete': 'off'
         }),
-        help_text='Enter the email address or user ID of the person you want to add.'
+        help_text='Enter the email address, EZZY ID (e.g. EZZY2026XXXXXX), or numeric user ID.'
+    )
+
+    permissions = forms.MultipleChoiceField(
+        required=False,
+        choices=BusinessPermissions.PERMISSION_CHOICES,
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        label='Permissions',
+        help_text='Select permissions for this team member. Leave empty to use role defaults.',
+    )
+
+    accept_terms = forms.BooleanField(
+        required=True,
+        label='I agree to the terms and conditions',
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        error_messages={'required': 'You must accept the terms and conditions to add a team member.'},
     )
 
     class Meta:
@@ -672,8 +688,8 @@ class TeamMemberAddForm(forms.ModelForm):
     def __init__(self, *args, business=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.business = business
-        # Reorder fields so user_identifier comes first
-        field_order = ['user_identifier', 'team_name', 'team_email', 'team_role']
+        # Reorder fields so user_identifier comes first, permissions and terms last
+        field_order = ['user_identifier', 'team_name', 'team_email', 'team_role', 'permissions', 'accept_terms']
         self.order_fields(field_order)
 
     def clean_user_identifier(self):
@@ -683,11 +699,11 @@ class TeamMemberAddForm(forms.ModelForm):
         if not identifier:
             raise forms.ValidationError('Please enter a user email or ID.')
 
-        # Try to find user by email first, then by ID
+        # Try to find user by email, EZZY code, or numeric ID
         user = None
 
-        # Check if it looks like an email
         if '@' in identifier:
+            # Lookup by email
             try:
                 user = User.objects.get(email__iexact=identifier)
             except User.DoesNotExist:
@@ -695,15 +711,27 @@ class TeamMemberAddForm(forms.ModelForm):
                     f'No user found with email "{identifier}". '
                     'Please check the email address and try again.'
                 )
+        elif identifier.upper().startswith('EZZY'):
+            # Lookup by EZZY user number
+            try:
+                profile = core_models.Profile.objects.select_related('user').get(
+                    user_number__iexact=identifier
+                )
+                user = profile.user
+            except core_models.Profile.DoesNotExist:
+                raise forms.ValidationError(
+                    f'No user found with EZZY ID "{identifier.upper()}". '
+                    'Please check the ID and try again.'
+                )
         else:
-            # Try as user ID
+            # Try as numeric user ID
             try:
                 user_id = int(identifier)
                 user = User.objects.get(id=user_id)
             except (ValueError, User.DoesNotExist):
                 raise forms.ValidationError(
-                    f'No user found with ID "{identifier}". '
-                    'Please enter a valid email address or user ID.'
+                    f'No user found with "{identifier}". '
+                    'Please enter a valid email, EZZY ID, or numeric user ID.'
                 )
 
         # Check if user is already a team member
@@ -720,6 +748,36 @@ class TeamMemberAddForm(forms.ModelForm):
                 raise forms.ValidationError(
                     'You cannot add the business owner as a team member.'
                 )
+
+        # Check if user has a fully completed profile (100%)
+        try:
+            profile = user.profile
+            completion = profile.get_profile_completion_percentage()
+            if completion < 100:
+                field_labels = {
+                    'username': 'Username', 'first_name': 'First Name',
+                    'last_name': 'Last Name', 'email': 'Email',
+                    'phone': 'Phone', 'whatsapp': 'WhatsApp',
+                    'zone_name': 'Zone/Area', 'address': 'Address',
+                    'nationlity': 'Nationality', 'date_of_birth': 'Date of Birth',
+                }
+                missing = [label for field, label in field_labels.items() if not getattr(profile, field, None)]
+                msg = (
+                    f'User "{user.username}" profile is {completion}% complete. '
+                    f'100% is required to be added as a team member.'
+                )
+                if missing:
+                    msg += f' Missing: {", ".join(missing)}.'
+                raise forms.ValidationError(msg)
+            # Auto-fix: mark profile as completed if 100% but flag was not set
+            if not profile.is_profile_completed:
+                profile.is_profile_completed = True
+                profile.save(update_fields=['is_profile_completed'])
+        except core_models.Profile.DoesNotExist:
+            raise forms.ValidationError(
+                f'User "{user.username}" does not have a profile. '
+                'They must sign up and complete their profile at ezzydelivery.qa first.'
+            )
 
         # Store the user object for later use in the view
         self.cleaned_user = user

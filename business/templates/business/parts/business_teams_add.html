@@ -36,8 +36,68 @@
             </div>
             {% endif %}
             <div class="form-card-body">
-                {{ form | crispy }}
+                {% for field in form %}
+                    {% if field.name != 'accept_terms' and field.name != 'permissions' %}
+                    <div class="mb-3">
+                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                        {{ field }}
+                        {% if field.help_text %}<small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+                        {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                    {% endif %}
+                {% endfor %}
             </div>
+
+            <!-- Permissions -->
+            <div class="form-card-body border-top pt-3">
+                <h6 class="mb-1"><i class="fa-solid fa-shield-halved"></i> Permissions</h6>
+                <small class="form-text text-muted d-block mb-3">Select additional permissions for this member. Each role comes with default permissions — check extras as needed.</small>
+                {% for error in form.permissions.errors %}<div class="text-danger small mb-2">{{ error }}</div>{% endfor %}
+                <div class="row g-3">
+                    {% for group_name, group_perms in permission_groups.items %}
+                    <div class="col-12 col-md-6">
+                        <div class="p-2 rounded border">
+                            <h6 class="mb-2 small fw-bold text-uppercase" style="color: var(--brand-primary, #0d6efd);">
+                                <i class="fa-solid fa-folder me-1"></i>{{ group_name }}
+                            </h6>
+                            {% for perm_code, perm_label in group_perms %}
+                            <div class="form-check mb-1">
+                                <input class="form-check-input" type="checkbox" name="permissions" value="{{ perm_code }}" id="perm_{{ perm_code }}"
+                                    {% if perm_code in form.permissions.value %}checked{% endif %}>
+                                <label class="form-check-label small" for="perm_{{ perm_code }}">{{ perm_label }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Terms & Conditions -->
+            <div class="form-card-body border-top pt-3">
+                <div class="p-3 rounded" style="background: var(--brand-light, #f8f9fa);">
+                    <h6 class="mb-2"><i class="fa-solid fa-file-contract"></i> Terms & Conditions</h6>
+                    <div class="small mb-3" style="max-height: 200px; overflow-y: auto; padding: 10px; background: #fff; border: 1px solid var(--brand-border, #dee2e6); border-radius: 6px;">
+                        <p class="mb-2"><strong>By adding a team member, you acknowledge and agree to the following:</strong></p>
+                        <ol class="mb-0 ps-3">
+                            <li class="mb-1"><strong>Access & Responsibility</strong> — You are granting this person access to your business data on EzzyDelivery. You are responsible for their actions within your business account.</li>
+                            <li class="mb-1"><strong>Data Sharing</strong> — The team member will be able to view business information including orders, customers, and reports based on their assigned role.</li>
+                            <li class="mb-1"><strong>Confidentiality</strong> — You must ensure the team member keeps all business data confidential and does not share it with unauthorized parties.</li>
+                            <li class="mb-1"><strong>Permission Management</strong> — You can modify or revoke the team member's access at any time. It is your responsibility to keep permissions up to date.</li>
+                            <li class="mb-1"><strong>Account Security</strong> — Each team member must use their own account. Sharing login credentials is strictly prohibited.</li>
+                            <li class="mb-0"><strong>Compliance</strong> — Both you and the team member must comply with EzzyDelivery's Terms of Service and Privacy Policy.</li>
+                        </ol>
+                    </div>
+                    <div class="form-check">
+                        {{ form.accept_terms }}
+                        <label class="form-check-label" for="{{ form.accept_terms.id_for_label }}">
+                            I have read and agree to the above terms and conditions
+                        </label>
+                        {% for error in form.accept_terms.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                </div>
+            </div>
+
             <div class="form-card-footer">
                 <a href="{% url 'business:business_teams' business.business_id %}" class="btn-cancel" id="client_teams_add_btn_back">
                     <i class="fa-solid fa-xmark"></i>
@@ -51,15 +111,40 @@
         </form>
     </div>
 
-    <!-- Info Note -->
+    <!-- Help Section -->
     <div class="form-info-note">
         <div class="form-info-note-title">
             <i class="fa-solid fa-circle-info"></i>
-            How it works
+            How to Add a Team Member
         </div>
-        <p class="form-info-note-text">
-            Enter the email address or user ID of the person you want to add. They must already have an account on EzzyDelivery. Team members will have access to manage orders and view business data based on their assigned role.
-        </p>
+        <div class="form-info-note-text">
+            <p class="mb-2"><strong>Step 1:</strong> Find the person you want to add using one of these:</p>
+            <ul class="mb-2 ps-3">
+                <li><strong>Email</strong> — Their registered email (e.g. <code>john@example.com</code>)</li>
+                <li><strong>EZZY ID</strong> — Their unique code (e.g. <code>EZZY2026303473</code>), found on their profile</li>
+                <li><strong>User ID</strong> — Their numeric user ID</li>
+            </ul>
+            <p class="mb-2"><strong>Step 2:</strong> Choose a role for the member:</p>
+            <ul class="mb-2 ps-3">
+                <li><strong>Manager</strong> — Full access to orders, products, customers, reports</li>
+                <li><strong>Staff</strong> — Can create and edit orders and products</li>
+                <li><strong>Viewer</strong> — Read-only access to business data</li>
+            </ul>
+            <p class="mb-2"><strong>Requirements:</strong> The person must have an EzzyDelivery account with a <strong>fully completed profile (100%)</strong>. Their profile must include:</p>
+            <ul class="mb-2 ps-3">
+                <li>Username</li>
+                <li>First name &amp; Last name</li>
+                <li>Email address</li>
+                <li>Phone number</li>
+                <li>WhatsApp number</li>
+                <li>Zone / Area</li>
+                <li>Address</li>
+                <li>Nationality</li>
+                <li>Date of birth</li>
+            </ul>
+            <p class="mb-2"><strong>After adding:</strong> The team member will be in <strong>pending</strong> status. A staff member must verify and activate their team membership before they can access the business dashboard.</p>
+            <p class="mb-0">Ask them to sign up and complete their profile at <strong>ezzydelivery.qa</strong> first.</p>
+        </div>
     </div>
 </div>
 {% endblock content %}

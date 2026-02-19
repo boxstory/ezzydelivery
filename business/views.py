@@ -1175,11 +1175,27 @@ def business_teams_add(request, business_id):
             team_member.business_id = business_id
             team_member.invited_by = request.user
             team_member.invited_at = timezone.now()
-            team_member.team_status = 'active'  # Direct add = immediate access
+            team_member.team_status = 'pending'  # Requires staff verification before access
+            team_member.team_verifed = False
             team_member.save()
 
+            # Save custom permissions if selected
+            selected_permissions = form.cleaned_data.get('permissions', [])
+            if selected_permissions:
+                from business.permissions import ROLE_PERMISSIONS
+                role_defaults = set(ROLE_PERMISSIONS.get(team_member.team_role, []))
+                for perm_code in selected_permissions:
+                    # Only create custom permission if it's NOT already in role defaults
+                    if perm_code not in role_defaults:
+                        business_models.BusinessTeamPermission.objects.create(
+                            team_member=team_member,
+                            permission_code=perm_code,
+                            is_granted=True,
+                            granted_by=request.user,
+                        )
+
             logger.info(f'Team member {team_member.id} added by user {request.user.id} for business_id={business_id}')
-            messages.success(request, f"Team member '{team_member.team_name or user.username}' added successfully.")
+            messages.success(request, f"Team member '{team_member.team_name or user.username}' added successfully. They will get dashboard access after staff verification.")
             return redirect("business:business_teams", business_id)
         else:
             logger.warning(f'Team profile form invalid: {form.errors}')
@@ -1190,6 +1206,7 @@ def business_teams_add(request, business_id):
         'form': form,
         'form_title': 'Add Team Member',
         'role_choices': TeamRoles.ROLE_CHOICES,
+        'permission_groups': BusinessPermissions.PERMISSION_GROUPS,
     }
     return render(request, 'business/parts/business_teams_add.html', context)
 

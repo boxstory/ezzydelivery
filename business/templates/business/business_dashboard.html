@@ -3,7 +3,7 @@
 {% load crispy_forms_tags %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'business/css/business-dashboard-pro.css' %}">
+<link rel="stylesheet" href="{% static 'business/css/business-dashboard-pro.css' %}?v=20260218a">
 <!-- Dashboard styles now in business-dashboard-pro.css for HTMX compatibility -->
 {% endblock extra_css %}
 
@@ -303,11 +303,21 @@
        ============================================ -->
   <div class="d-none d-md-block">
 
-    <!-- Dashboard Header -->
+    <!-- Dashboard Header - Navy Hero -->
     <div class="dashboard-header" id="client_dashboard_header_main">
-      <h1 class="h3 text-center" id="client_dashboard_title_business">
-        {{ business.business_name }} - Dashboard
-      </h1>
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="bdb__hero-badge">
+            <i class="fas fa-building"></i>
+            <span>Business Dashboard</span>
+          </div>
+          <h1 id="client_dashboard_title_business">{{ business.business_name }}</h1>
+          <p class="bdb__hero-subtitle">Overview &amp; Analytics</p>
+        </div>
+        <a href="{% url 'orders:add_order' %}" class="btn btn-sm d-flex align-items-center gap-1" style="background: rgba(247,192,0,0.15); color: var(--brand-primary); border: 1px solid rgba(247,192,0,0.3); border-radius: 2rem; padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600;">
+          <i class="fas fa-plus"></i> New Order
+        </a>
+      </div>
     </div>
 
     <!-- Stats -->

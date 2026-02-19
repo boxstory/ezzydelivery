@@ -122,9 +122,20 @@
                 <i class="fa-solid fa-car"></i> Driver: {{ data.driver.driver_status }}
             </span>
             {% endif %}
+            {% for tm in data.team_memberships %}
+            <span class="uvl__scope {% if tm.team_status == 'active' and tm.team_verifed %}uvl__scope--ok{% elif tm.team_status == 'pending' %}uvl__scope--warn{% else %}uvl__scope--neutral{% endif %}">
+                <i class="fa-solid fa-users"></i> Team: {{ tm.business.business_name|truncatechars:20 }}
+                <small>({{ tm.team_role|title }} — {% if tm.team_verifed %}Verified{% else %}{{ tm.team_status|title }}{% endif %})</small>
+            </span>
+            {% endfor %}
             <span class="uvl__scope uvl__scope--neutral">
                 <i class="fa-solid fa-at"></i> {{ data.profile.username|default_if_none:"—" }}
             </span>
+            {% if data.profile.user_number %}
+            <span class="uvl__scope uvl__scope--neutral">
+                <i class="fa-solid fa-id-badge"></i> {{ data.profile.user_number }}
+            </span>
+            {% endif %}
         </div>
 
         <!-- Profile Completion Bar -->
@@ -141,7 +152,44 @@
             </div>
         </div>
 
-        <!-- Details Sections -->
+        <!-- Personal Details -->
+        <div class="uvl__section-head"><i class="fa-solid fa-user-circle"></i> Personal Details</div>
+        <div class="row g-0">
+            <div class="col-sm-6 uvl__col-left">
+                <div class="uvl__fields">
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Nationality</span>
+                        <span class="uvl__field__value">{{ data.profile.nationlity|default:"—" }}</span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Date of Birth</span>
+                        <span class="uvl__field__value">{{ data.profile.date_of_birth|default:"—" }}</span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">WhatsApp</span>
+                        <span class="uvl__field__value">{{ data.profile.whatsapp|default:"—" }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 uvl__col-right">
+                <div class="uvl__fields">
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Zone</span>
+                        <span class="uvl__field__value">{{ data.profile.zone_name|default:"—" }}</span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Address</span>
+                        <span class="uvl__field__value">{{ data.profile.address|default:"—" }}</span>
+                    </div>
+                    <div class="uvl__field">
+                        <span class="uvl__field__label">Joined</span>
+                        <span class="uvl__field__value">{{ data.profile.created_at|date:"M d, Y" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Role Details Sections -->
         <div class="row g-0">
             {% if data.business %}
             <!-- Business Details -->
@@ -265,6 +313,19 @@
         <!-- Action Buttons -->
         {% if data.profile.verification_status != 'verified' %}
         <div class="uvl__actions">
+            {% if data.business %}
+            <a href="{% url 'workforce:seller_detail' data.business.business_id %}" class="uvl__btn uvl__btn--detail">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> View Full Details
+            </a>
+            {% elif data.driver %}
+            <a href="{% url 'workforce:driver_detail' data.driver.driver_id %}" class="uvl__btn uvl__btn--detail">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> View Full Details
+            </a>
+            {% else %}
+            <a href="{% url 'core:profile' data.profile.user_id %}" class="uvl__btn uvl__btn--detail" target="_blank">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> View Profile
+            </a>
+            {% endif %}
             <button type="button" class="uvl__btn uvl__btn--verify" data-action="verify"
                 data-profile-id="{{ data.profile.id }}"
                 data-user-name="{{ data.user.first_name }} {{ data.user.last_name }}"
@@ -285,8 +346,23 @@
             </button>
         </div>
         {% else %}
-        <div class="uvl__verified-bar">
-            <i class="fa-solid fa-circle-check"></i> This user has been verified
+        <div class="uvl__actions">
+            {% if data.business %}
+            <a href="{% url 'workforce:seller_detail' data.business.business_id %}" class="uvl__btn uvl__btn--detail">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> View Full Details
+            </a>
+            {% elif data.driver %}
+            <a href="{% url 'workforce:driver_detail' data.driver.driver_id %}" class="uvl__btn uvl__btn--detail">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> View Full Details
+            </a>
+            {% else %}
+            <a href="{% url 'core:profile' data.profile.user_id %}" class="uvl__btn uvl__btn--detail" target="_blank">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> View Profile
+            </a>
+            {% endif %}
+            <div class="uvl__verified-bar">
+                <i class="fa-solid fa-circle-check"></i> This user has been verified
+            </div>
         </div>
         {% endif %}
     </div>

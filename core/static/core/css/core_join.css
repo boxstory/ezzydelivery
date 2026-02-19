@@ -13,6 +13,12 @@
     min-height: 100vh;
 }
 
+/* Sidebar sticky on lg+ */
+.jnp__sidebar-wrap {
+    position: sticky;
+    top: 1.5rem;
+}
+
 /* ============================================================================
    ALERT
    ============================================================================ */
@@ -819,27 +825,60 @@
    RESPONSIVE DESIGN
    ============================================================================ */
 
-/* Tablet */
-@media (max-width: 992px) {
-    .jnp__roles {
-        grid-template-columns: 1fr;
-    }
-
-    .jnp__stats {
-        gap: 1.5rem;
-    }
-
-    .driver-hero {
-        padding: 2rem 0;
-    }
-
-    .hero-title {
-        font-size: 1.5rem;
+/* Large desktop: constrain card width for ultra-wide */
+@media (min-width: 1400px) {
+    .jnp__card {
+        max-width: 52rem;
     }
 }
 
-/* Mobile */
-@media (max-width: 768px) {
+/* Desktop lg: side-by-side role cards */
+@media (min-width: 992px) {
+    .jnp__roles {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.25rem;
+        padding: 1.75rem;
+    }
+
+    .jnp__hero--select {
+        padding: 2.5rem 2rem 2rem;
+    }
+
+    .jnp__trust {
+        gap: 2rem;
+    }
+}
+
+/* md screens (768-991px): stacked sidebar + content, side-by-side role cards */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .jnp__sidebar-wrap {
+        position: static;
+    }
+
+    .jnp__roles {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        padding: 1.5rem;
+    }
+
+    .jnp__card {
+        max-width: 44rem;
+        margin: 0 auto;
+    }
+}
+
+/* Tablet and below */
+@media (max-width: 767.98px) {
+    .jnp__sidebar-wrap {
+        position: static;
+    }
+
+    .jnp__roles {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+
     #core_join_section_main {
         padding-top: 0;
     }
@@ -854,10 +893,6 @@
 
     .jnp__hero-title {
         font-size: 1.25rem;
-    }
-
-    .jnp__roles {
-        padding: 1rem;
     }
 
     .jnp__trust {
@@ -878,6 +913,10 @@
 
     .jnp__cta {
         padding: 1rem;
+    }
+
+    .driver-hero {
+        padding: 2rem 0;
     }
 
     .hero-title {

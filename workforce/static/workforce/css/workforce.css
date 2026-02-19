@@ -76,29 +76,15 @@
 }
 
 /* ---------- BREADCRUMB STYLES ---------- */
+/* Bootstrap 5 provides base .breadcrumb layout — only override colors */
 .breadcrumb {
-    display: flex;
-    flex-wrap: wrap;
     padding: 0;
     margin-bottom: 0;
-    list-style: none;
     background-color: transparent;
 }
 
-.breadcrumb-item {
-    display: flex;
-    align-items: center;
-}
-
-.breadcrumb-item + .breadcrumb-item {
-    padding-left: 0.5rem;
-}
-
 .breadcrumb-item + .breadcrumb-item::before {
-    display: inline-block;
-    padding-right: 0.5rem;
     color: var(--brand-grey-500);
-    content: "/";
 }
 
 .breadcrumb-item a {
@@ -1027,10 +1013,12 @@
 .uvl__btn--review:hover { background: var(--brand-primary, #f7c000); border-color: var(--brand-primary, #f7c000); color: var(--brand-grey-800, #1f1f1f); transform: translateY(-1px); box-shadow: 0 3px 8px rgba(247, 192, 0, 0.25); }
 .uvl__btn--reject { background: #fff; color: #dc2626; border: 1px solid #fecaca; }
 .uvl__btn--reject:hover { background: #fef2f2; border-color: #ef4444; transform: translateY(-1px); box-shadow: 0 3px 8px rgba(239, 68, 68, 0.15); }
+.uvl__btn--detail { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.uvl__btn--detail:hover { background: #2563eb; color: #fff; border-color: #2563eb; transform: translateY(-1px); box-shadow: 0 3px 8px rgba(37, 99, 235, 0.3); }
 .uvl__btn:active { transform: scale(0.97); }
 
 /* Verified Bar */
-.uvl__verified-bar { display: flex; align-items: center; justify-content: center; gap: 0.375rem; padding: 0.625rem 1rem; border-top: 1px solid var(--brand-grey-200, #f0f0f0); background: #f0fdf4; color: #15803d; font-size: 0.75rem; font-weight: 600; }
+.uvl__verified-bar { display: flex; align-items: center; gap: 0.375rem; padding: 0.625rem 1rem; background: #f0fdf4; color: #15803d; font-size: 0.75rem; font-weight: 600; flex: 1; justify-content: center; border-radius: 0.5rem; }
 
 /* Empty State */
 .uvl__empty { text-align: center; padding: 3rem 1.5rem; }
@@ -2241,61 +2229,16 @@
 }
 
 /* ---------- UTILITY CLASSES ---------- */
-.d-flex-center {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
-.d-flex-between {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.gap-sm {
-    gap: var(--spacing-sm);
-}
-
-.gap-md {
-    gap: var(--spacing-md);
-}
-
-.gap-lg {
-    gap: var(--spacing-lg);
-}
-
-/* Display toggle utilities */
-.is-hidden {
-    display: none;
-}
-
-.is-visible {
-    display: block;
-}
-
-.is-visible-flex {
-    display: flex;
-}
-
-/* Print-specific visibility utilities */
-.print-hidden {
-    /* Hidden only when printing - no !important needed */
-}
-
-/* Mobile-specific visibility utilities */
-.is-hidden-mobile {
-    /* Hidden on mobile - applied via media query below */
-}
+/* REMOVED: .d-flex-center → use Bootstrap: d-flex align-items-center gap-2 */
+/* REMOVED: .d-flex-between → use Bootstrap: d-flex justify-content-between align-items-center */
+/* REMOVED: .gap-sm/md/lg → use Bootstrap: gap-1 through gap-5 */
+/* REMOVED: .is-hidden → use Bootstrap: d-none */
+/* REMOVED: .is-visible → use Bootstrap: d-block */
+/* REMOVED: .is-visible-flex → use Bootstrap: d-flex */
+/* REMOVED: .is-hidden-mobile → use Bootstrap: d-none d-md-block */
 
 @media print {
     .print-hidden {
-        display: none;
-    }
-}
-
-@media (max-width: 767px) {
-    .is-hidden-mobile {
         display: none;
     }
 }
@@ -11644,4 +11587,5 @@
     color: var(--brand-grey-700, #333);
     margin: 0;
 }
+
 

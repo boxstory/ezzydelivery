@@ -242,8 +242,20 @@ def join_business(request):
 
     form = business_forms.businessRegisterForm()
     logger.debug("Loading business register form")
+
+    # Get profile picture for sidebar
+    try:
+        profile_picture = core_models.ProfilePicture.objects.get(user_id=request.user.id)
+    except core_models.ProfilePicture.DoesNotExist:
+        profile_picture = core_models.ProfilePicture.objects.create(
+            user=request.user, profile=profile
+        )
+
     context = {
         'form': form,
+        'profile': profile,
+        'profile_picture': profile_picture,
+        'completion_percentage': profile.get_profile_completion_percentage(),
     }
     return render(request, 'core/join_us_business.html', context)
 
@@ -359,9 +371,19 @@ def update_driver(request):
         logger.warning(f"Invalid driver update form for user {request.user.id}")
         messages.error(request, "Please correct the errors below.")
 
+    # Get profile picture for sidebar
+    try:
+        profile_picture = core_models.ProfilePicture.objects.get(user_id=request.user.id)
+    except core_models.ProfilePicture.DoesNotExist:
+        profile_picture = core_models.ProfilePicture.objects.create(
+            user=request.user, profile=profile
+        )
+
     context = {
         'driverjoinform': driverjoinform,
         'profile': profile,
+        'profile_picture': profile_picture,
+        'completion_percentage': profile.get_profile_completion_percentage(),
     }
     return render(request, 'core/update_driver.html', context)
 
@@ -515,6 +537,19 @@ def main_dashboard(request):
                 return redirect('business:business_dashboard')
             elif profile.is_driver:
                 return redirect('fleet:fleet_dashboard')
+            else:
+                # Check if user is a verified team member of any business
+                from business.decorators import get_user_business_access
+                business, access_type, team_profile = get_user_business_access(request.user, request)
+                if business and access_type == 'team_member':
+                    if team_profile and team_profile.team_verifed and team_profile.team_status == 'active':
+                        return redirect('business:business_dashboard')
+                    elif team_profile and team_profile.team_status == 'pending':
+                        messages.info(request, "Your team membership is pending staff verification. Please wait for approval.")
+                        return render(request, 'core/verification_pending.html', {'profile': profile})
+                    else:
+                        messages.warning(request, "Your team membership is not active. Please contact the business owner.")
+                        return redirect('core:profile_complete_update')
 
         # Default fallback
         messages.warning(request, "Please complete your profile setup.")
@@ -541,17 +576,25 @@ def profile_view(request):
 @login_required(login_url='/accounts/login/')
 def profile(request, pk):
     """Display user profile"""
+    # Staff can view any user's profile; regular users can only view their own
+    target_user_id = pk
+    is_own_profile = (target_user_id == request.user.id)
+
+    if not is_own_profile and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to view this profile.')
+        return redirect('core:profile', pk=request.user.id)
+
     # Optimized query with select_related and prefetch_related
     profile = get_object_or_404(
-        core_models.Profile.objects.select_related('user').prefetch_related('profile_picture'), 
-        user_id=request.user.id
+        core_models.Profile.objects.select_related('user').prefetch_related('profile_picture'),
+        user_id=target_user_id
     )
 
     # Get profile picture from prefetch cache if possible
     profile_picture = profile.profile_picture.first()
-    
-    if not profile_picture:
-        # Create default profile picture if somehow missing
+
+    if not profile_picture and is_own_profile:
+        # Create default profile picture only for own profile
         profile_picture = core_models.ProfilePicture(
             user=request.user,
             profile=profile,
@@ -566,7 +609,8 @@ def profile(request, pk):
     context = {
         "profile": profile,
         "profile_picture": profile_picture,
-        "completion_percentage": completion_percentage
+        "completion_percentage": completion_percentage,
+        "is_own_profile": is_own_profile,
     }
 
     return render(request, 'core/profile.html', context)
@@ -656,7 +700,7 @@ def profile_picture_update(request):
             try:
                 profile_pic = form.save(commit=False)
                 profile_pic.user_id = request.user.id
-                profile_pic.profile_id = request.user.id
+                profile_pic.profile = profile
                 profile_pic.path = f'core/user/{username}'
                 profile_pic.save()
 
@@ -781,8 +825,11 @@ def profile_complete_update(request):
             # Check if profile is complete
             completion_percentage = profile.get_profile_completion_percentage()
 
+            # Mark profile as completed when 100%
+            if completion_percentage == 100:
+                profile.is_profile_completed = True
+
             if action == 'save':
-                # Partial save
                 profile.save()
                 messages.success(request, f"Profile saved successfully! ({completion_percentage}% complete)")
                 return redirect('core:profile_complete_update')
@@ -790,7 +837,6 @@ def profile_complete_update(request):
             elif action == 'register_business' or action == 'join_driver':
                 # Check if profile is 100% complete
                 if completion_percentage == 100:
-                    profile.is_profile_completed = True
 
                     if action == 'register_business':
                         profile.is_business = True

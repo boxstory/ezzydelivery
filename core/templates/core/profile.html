@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'core/css/core_dashboard.css' %}?v=20260214c" rel="stylesheet" type="text/css" />
+<link href="{% static 'core/css/core_dashboard.css' %}?v=20260218a" rel="stylesheet" type="text/css" />
 <link href="{% static 'core/css/profile-mobile.css' %}?v=20260214b" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 
@@ -25,7 +25,7 @@
             <!-- Profile Content - Main Information -->
             <div class="col-12 col-lg-8 col-xl-9">
                 <div class="card mb-4" id="core_profile_card_info">
-                    <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0">
+                    <div class="card-header">
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                             <div>
                                 <h4 class="mb-1 fw-bold">Profile Information</h4>
@@ -126,9 +126,8 @@
                                     <p class="mb-2 mb-sm-0 fw-semibold">WhatsApp</p>
                                 </div>
                                 <div class="col-12 col-sm-8 col-lg-9">
-                                    <p class="text-muted mb-0 d-flex align-items-center gap-2">
-                                        <i class="fab fa-whatsapp text-success"></i>
-                                        <span>{{ profile.whatsapp|default:"—" }}</span>
+                                    <p class="text-muted mb-0">
+                                        {{ profile.whatsapp|default:"—" }}
                                     </p>
                                 </div>
                             </div>
@@ -140,9 +139,8 @@
                                     <p class="mb-2 mb-sm-0 fw-semibold">Instagram</p>
                                 </div>
                                 <div class="col-12 col-sm-8 col-lg-9">
-                                    <p class="text-muted mb-0 d-flex align-items-center gap-2">
-                                        <i class="fab fa-instagram text-danger"></i>
-                                        <span>{{ profile.instagram|default:"—" }}</span>
+                                    <p class="text-muted mb-0">
+                                        {{ profile.instagram|default:"—" }}
                                     </p>
                                 </div>
                             </div>
@@ -191,6 +189,23 @@
                             </a>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Update Modal (outside sticky container to avoid z-index issues) -->
+    <div class="modal fade" id="updatePhotoModal" tabindex="-1" aria-labelledby="updatePhotoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="updatePhotoModalLabel">
+                        <i class="fas fa-camera me-2"></i>Update Profile Picture
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% include "core/parts/profile_picture_update.html" %}
                 </div>
             </div>
         </div>

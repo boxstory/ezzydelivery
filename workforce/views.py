@@ -1818,6 +1818,7 @@ def order_detail(request, order_id):
         'verification_logs': verification_logs,
         'delivery_task': delivery_task,
         'status_history': status_history,
+        'timeline_count': status_history.count(),
     }
 
     # Check if this is being loaded in a panel (via HTMX)
@@ -2609,6 +2610,15 @@ def user_verification_list(request):
         d.user_id: d for d in fleet_models.Driver.objects.filter(user_id__in=user_ids)
     }
 
+    # Bulk fetch team memberships
+    from collections import defaultdict
+    team_memberships_by_user = defaultdict(list)
+    team_profiles = business_models.BusinessTeamProfile.objects.select_related('business').filter(
+        user_id__in=user_ids
+    )
+    for tp in team_profiles:
+        team_memberships_by_user[tp.user_id].append(tp)
+
     # Build verification data efficiently
     verification_data = []
     for profile in profile_list:
@@ -2617,6 +2627,7 @@ def user_verification_list(request):
             'business': businesses_by_user.get(profile.user_id) if profile.is_business else None,
             'driver': drivers_by_user.get(profile.user_id) if profile.is_driver else None,
             'user': profile.user,
+            'team_memberships': team_memberships_by_user.get(profile.user_id, []),
         }
         verification_data.append(data)
 
@@ -2659,9 +2670,11 @@ def update_verification_status(request, profile_id):
         if new_status == 'verified':
             profile.verified_at = timezone.now()
             profile.rejection_reason = None
+            profile.is_profile_completed = True
 
             # Update business or driver status to active
             if profile.is_business:
+                profile.is_business_profile_completed = True
                 try:
                     from business import models as business_models
                     business = business_models.Business.objects.get(user=profile.user)
@@ -2671,6 +2684,7 @@ def update_verification_status(request, profile_id):
                     pass
 
             if profile.is_driver:
+                profile.is_driver_profile_completed = True
                 try:
                     driver = fleet_models.Driver.objects.get(user=profile.user)
                     driver.driver_status = 'Approved'

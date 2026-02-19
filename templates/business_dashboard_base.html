@@ -5,8 +5,6 @@
   <head>
     {% include "includes/head.html" %}
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@2.0.3"></script>
 
     <!-- Favicon -->
     <link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
@@ -27,7 +25,7 @@
     <link rel="stylesheet" href="{% static 'orders/css/orders.css' %}?v=20260216b">
     <link rel="stylesheet" href="{% static 'product/css/product.css' %}?v=20260216a">
     <link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260216b">
-    <link rel="stylesheet" href="{% static 'business/css/business.css' %}?v=20260216b">
+    <link rel="stylesheet" href="{% static 'business/css/business.css' %}?v=20260218a">
 
     <!-- Mobile PWA CSS -->
     <link rel="stylesheet" href="{% static 'fleet/css/fleet-mobile.css' %}?v=20260208b">
@@ -125,9 +123,15 @@
         });
       }
 
+      // Ensure content is always visible on page load
+      document.addEventListener('DOMContentLoaded', function() {
+        var target = document.getElementById('main-content');
+        if (target) { target.style.opacity = '1'; }
+      });
+
       // Loading indicator for HTMX requests
       document.body.addEventListener('htmx:beforeRequest', function(evt) {
-        const target = document.getElementById('main-content');
+        var target = document.getElementById('main-content');
         if (target) {
           target.style.opacity = '0.5';
           target.style.transition = 'opacity 0.2s ease';
@@ -135,18 +139,26 @@
       });
 
       document.body.addEventListener('htmx:afterRequest', function(evt) {
-        const target = document.getElementById('main-content');
-        if (target) {
-          target.style.opacity = '1';
-        }
+        var target = document.getElementById('main-content');
+        if (target) { target.style.opacity = '1'; }
       });
 
-      // Handle HTMX errors - fall back to normal navigation
+      // Also reset on settle and swap to catch all cases
+      document.body.addEventListener('htmx:afterSettle', function(evt) {
+        var target = document.getElementById('main-content');
+        if (target) { target.style.opacity = '1'; }
+      });
+
+      // Handle HTMX errors - reset opacity and fall back to normal navigation
       document.body.addEventListener('htmx:responseError', function(evt) {
+        var target = document.getElementById('main-content');
+        if (target) { target.style.opacity = '1'; }
         var path = evt.detail.pathInfo && evt.detail.pathInfo.requestPath;
         if (path) { window.location.href = path; }
       });
       document.body.addEventListener('htmx:sendError', function(evt) {
+        var target = document.getElementById('main-content');
+        if (target) { target.style.opacity = '1'; }
         var path = evt.detail.pathInfo && evt.detail.pathInfo.requestPath;
         if (path) { window.location.href = path; }
       });

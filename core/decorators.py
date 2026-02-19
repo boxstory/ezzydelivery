@@ -163,12 +163,21 @@ def business_required(view_func=None, redirect_url=None):
             from business.decorators import get_user_business_access
             business, access_type, team_profile = get_user_business_access(request.user, request)
 
-            if business and access_type in ('owner', 'team_member'):
-                # Inject business context into request for convenience
+            if business and access_type == 'owner':
                 request.current_business = business
                 request.access_type = access_type
                 request.team_profile = team_profile
                 return view_func(request, *args, **kwargs)
+
+            if business and access_type == 'team_member' and team_profile:
+                if team_profile.team_verifed and team_profile.team_status == 'active':
+                    request.current_business = business
+                    request.access_type = access_type
+                    request.team_profile = team_profile
+                    return view_func(request, *args, **kwargs)
+                else:
+                    messages.warning(request, "Your team membership is pending staff verification.")
+                    return redirect(redirect_url or 'core:main_dashboard')
 
             logger.warning(
                 f"Non-business user {request.user.id} attempted to access {view_func.__name__}"

@@ -32,27 +32,20 @@ a:focus-visible {
     padding: 1rem 1.5rem;
     margin-bottom: 1.5rem;
     box-shadow: var(--brand-shadow-sm);
+    overflow-x: auto;
 }
 
+/* Bootstrap 5 provides base .breadcrumb layout — only override colors/spacing */
 .breadcrumb {
     margin-bottom: 0;
     background: transparent;
     padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
     gap: 0.5rem;
-}
-
-.breadcrumb-item {
-    display: inline-flex;
-    align-items: center;
+    flex-wrap: nowrap;
 }
 
 .breadcrumb-item + .breadcrumb-item::before {
-    content: "/";
     color: var(--brand-grey-600);
-    padding: 0 0.5rem;
     font-weight: 600;
 }
 
@@ -1379,17 +1372,30 @@ select.is-invalid:focus {
     display: none;
 }
 
-/* Social icon hover effects */
-.social-icon.whatsapp:hover {
-    background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
-    color: white;
-    border-color: #25d366;
+/* Social icon base styles */
+.social-icon {
+    width: 50px !important;
+    height: 50px !important;
+    min-width: 50px;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    position: relative;
 }
 
-.social-icon.instagram:hover {
-    background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
-    color: white;
-    border-color: #bc1888;
+/* Social icon - no hover effects */
+#core_dashboard_sidebar_profile_card .social-icon,
+#core_dashboard_sidebar_profile_card .social-icon:hover,
+#core_dashboard_sidebar_profile_card .social-icon:focus,
+#core_dashboard_sidebar_profile_card .social-icon:active {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #6c757d !important;
+    border-color: #dee2e6 !important;
+    transform: none !important;
+    box-shadow: none !important;
 }
 
 /* Progress Bar - Custom styling for completion percentage */
@@ -1499,126 +1505,7 @@ select.is-invalid:focus {
 }
 
 /* ---------- PROFILE ---------- */
-/* Profile Info Card Styling */
-#core_profile_card_info {
-    border: none;
-    border-radius: var(--brand-radius-xl);
-    box-shadow: var(--brand-shadow-lg);
-    background: var(--brand-white);
-}
-
-#core_profile_card_info .card-body {
-    padding: var(--spacing-2xl);
-}
-
-#core_profile_card_info .row {
-    padding: var(--spacing-md) 0;
-}
-
-#core_profile_card_info p:not(.text-muted) {
-    font-weight: var(--brand-font-weight-semibold);
-    color: var(--brand-grey-700);
-    font-size: var(--brand-font-size-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.0312rem;
-}
-
-#core_profile_card_info .text-muted {
-    color: var(--brand-grey-800) !important;
-    font-weight: var(--brand-font-weight-medium);
-    font-size: var(--brand-font-size-base);
-}
-
-#core_profile_card_info hr {
-    border-top: 0.125rem solid var(--brand-grey-100);
-    margin: var(--spacing-md) 0;
-}
-
-/* Edit Button Styling */
-#core_profile_section_main .btn-dark {
-    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-    border: 0.125rem solid transparent;
-    color: var(--brand-grey-800);
-    font-weight: var(--brand-font-weight-heavy);
-    padding: var(--spacing-md) var(--spacing-2xl);
-    border-radius: var(--brand-radius-md);
-    transition: all 0.3s ease;
-    box-shadow: var(--brand-shadow-lg);
-    text-transform: uppercase;
-    letter-spacing: 0.0625rem;
-}
-
-#core_profile_section_main .btn-dark:hover {
-    transform: translateY(-0.1875rem);
-    box-shadow: 0 0.75rem 1.875rem rgba(255, 211, 59, 0.5);
-    background: linear-gradient(135deg, var(--brand-primary-dark) 0%, var(--brand-primary) 100%);
-    color: var(--brand-grey-900);
-}
-
-/* Responsive Media Queries */
-@media (max-width: 991px) {
-    /* Tablet and below - Stack sidebar and content */
-    #core_profile_section_main .p-3 {
-        padding: 1.5rem 1rem;
-    }
-
-    #core_profile_card_info .card-body {
-        padding: var(--spacing-lg);
-    }
-}
-
-@media (max-width: 767px) {
-    /* Mobile - Adjust spacing and typography */
-    #core_profile_card_info .card-body {
-        padding: var(--spacing-md);
-    }
-
-    #core_profile_card_info .row {
-        padding: var(--spacing-sm) 0;
-    }
-
-    /* Stack label and value on mobile */
-    #core_profile_card_info .row > div {
-        margin-bottom: 0.5rem;
-    }
-
-    #core_profile_card_info .row > div:last-child {
-        margin-bottom: 0;
-    }
-
-    /* Make font sizes smaller on mobile */
-    #core_profile_card_info p:not(.text-muted) {
-        font-size: var(--brand-font-size-xs);
-    }
-
-    #core_profile_card_info .text-muted {
-        font-size: var(--brand-font-size-sm);
-    }
-
-    /* Full width button on mobile */
-    #core_profile_section_main .btn-warning {
-        width: 100%;
-    }
-}
-
-@media (max-width: 575px) {
-    /* Extra small devices */
-    #core_profile_section_main .p-3 {
-        padding: 1rem 0.5rem;
-    }
-
-    #core_profile_card_info {
-        border-radius: var(--brand-radius-md);
-    }
-
-    #core_profile_card_info .card-body {
-        padding: var(--spacing-sm);
-    }
-
-    #core_profile_card_info hr {
-        margin: var(--spacing-sm) 0;
-    }
-}
+/* Profile Info Card styles moved to core_dashboard.css */
 
 /* ---------- ROLE SELECTION ---------- */
 /* Styles moved to core_join.css with BEM naming (jnp__*) */
@@ -1985,7 +1872,6 @@ select.is-invalid:focus {
     .status-message {
     }
 }
-/* Global tbody and card-body font size */
+/* Global tbody font size for data tables */
 tbody, tbody td, tbody th { font-size: .75rem !important; }
-.card-body, .card-body p, .card-body span, .card-body div { font-size: .75rem !important; }
 
