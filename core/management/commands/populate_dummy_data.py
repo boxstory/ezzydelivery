@@ -756,7 +756,7 @@ class Command(BaseCommand):
                     task_status=random.choice(task_statuses),
                     pickup_location=random.choice(business_pickups),
                     task_created=order_status in ['publish', 'delivered', 'fulfilled'],
-                    cod_status_by_client='include' if cod_amount > 0 else 'no_cod',
+                    cod_status_by_client='pending' if cod_amount > 0 else 'no_cod',
                     cod_status_by_staff='not_collected' if cod_amount > 0 else None,
                     cod_amount=cod_amount,
                     dl_included=True,

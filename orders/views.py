@@ -864,7 +864,7 @@ def add_order_bulk(request):
                 dl_street=order_data.get('dl_street', '0'),
                 dl_building=order_data.get('dl_building', '0'),
                 customer_address=order_data.get('customer_address', ''),
-                cod_status_by_client=order_data.get('cod_status_by_client', 'no_cod'),
+                cod_status_by_client=order_data.get('cod_status_by_client', 'no_cod') if order_data.get('cod_status_by_client') != 'include' else 'pending',
                 cod_amount=order_data.get('cod_amount') or 0,
                 order_notes=order_data.get('order_notes', ''),
                 order_status=order_data.get('order_status', 'to_review'),

@@ -53,7 +53,13 @@ TASK_STATUS_BY_STAFF = [
 
 COD_STATUS_BY_CLIENT = [
         ('no_cod', 'No COD'),
-        ('include', 'Include'),
+        ('pending', 'COD Pending'),
+        ('collected', 'Collected by Driver'),
+        ('received_by_company', 'Received by Company'),
+        ('invoiced', 'Invoiced'),
+        ('settled', 'Settled with Business'),
+        ('online_paid', 'Paid Online to Seller'),
+        ('disputed', 'Disputed'),
     ]
 
 COD_STATUS_BY_STAFF = [

@@ -196,17 +196,12 @@
                     </div>
                     <div class="woe__card-body">
                         <div class="mb-3">
-                            <label class="woe__form-label">COD Status</label>
-                            <div class="d-flex gap-3">
+                            <label class="woe__form-label" for="cod_status_by_client">COD Status</label>
+                            <select class="woe__form-input" id="cod_status_by_client" name="cod_status_by_client">
                                 {% for value, label in cod_statuses %}
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="cod_status_by_client"
-                                           id="cod_{{ value }}" value="{{ value }}"
-                                           {% if order.cod_status_by_client == value %}checked{% endif %}>
-                                    <label class="form-check-label" for="cod_{{ value }}">{{ label }}</label>
-                                </div>
+                                <option value="{{ value }}" {% if order.cod_status_by_client == value %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
-                            </div>
+                            </select>
                         </div>
                         <div class="mb-3">
                             <label for="cod_amount" class="woe__form-label">COD Amount (QAR)</label>

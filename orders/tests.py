@@ -94,7 +94,7 @@ class OrderModelTestCase(TestCase):
             dl_building=100,
             dl_street=10,
             cod_amount=100,
-            cod_status_by_client='include',
+            cod_status_by_client='pending',
             pickup_location=self.pickup_location
         )
 
@@ -767,12 +767,12 @@ class OrderCODTestCase(TestCase):
             dl_building=6000,
             dl_street=600,
             cod_amount=250,
-            cod_status_by_client='include',
+            cod_status_by_client='pending',
             pickup_location=self.pickup_location
         )
 
         self.assertEqual(order.cod_amount, 250)
-        self.assertEqual(order.cod_status_by_client, 'include')
+        self.assertEqual(order.cod_status_by_client, 'pending')
 
     def test_cod_status_transitions(self):
         """Test COD status transitions"""
@@ -786,7 +786,7 @@ class OrderCODTestCase(TestCase):
             dl_building=6100,
             dl_street=610,
             cod_amount=150,
-            cod_status_by_client='include',
+            cod_status_by_client='pending',
             pickup_location=self.pickup_location
         )
 

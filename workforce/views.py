@@ -5505,7 +5505,7 @@ def seller_detail(request, business_id):
     # Get COD statistics
     cod_stats = orders_models.Order.objects.filter(
         business=business,
-        cod_status_by_client='include'
+        cod_amount__gt=0
     ).aggregate(
         total_cod_orders=Count('id'),
         total_cod_amount=Sum('cod_amount'),
@@ -5918,7 +5918,7 @@ def driver_detail(request, driver_id):
     # Get COD statistics
     cod_stats = delivery_models.DeliveryTask.objects.filter(
         driver=driver,
-        order__cod_status_by_client='include'
+        order__cod_amount__gt=0
     ).aggregate(
         total_cod_tasks=Count('id'),
         total_cod_amount=Sum('order__cod_amount'),
@@ -6097,7 +6097,7 @@ def fulfilled_orders_list(request):
     # Calculate total COD collected
     from django.db.models import Sum
     total_cod = orders.filter(
-        cod_status_by_client='include'
+        cod_amount__gt=0
     ).aggregate(total=Sum('cod_amount'))['total'] or 0
 
     # Paginate
@@ -6481,7 +6481,11 @@ def order_edit(request, order_id):
             # COD details
             cod_amount = request.POST.get('cod_amount', '0')
             order.cod_amount = int(cod_amount) if cod_amount and cod_amount.isdigit() else 0
-            order.cod_status_by_client = request.POST.get('cod_status_by_client', order.cod_status_by_client)
+            cod_status = request.POST.get('cod_status_by_client')
+            if cod_status:
+                order.cod_status_by_client = cod_status
+            elif order.cod_amount > 0 and order.cod_status_by_client == 'no_cod':
+                order.cod_status_by_client = 'pending'
 
             # Delivery amount
             dl_amount = request.POST.get('dl_amount', '0')

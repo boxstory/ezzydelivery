@@ -303,7 +303,7 @@ class SearchBusinessOrdersTool(BaseTool):
 
         if cod_status:
             if cod_status == 'no_cod':
-                queryset = queryset.filter(Q(cod_amount=0) | Q(cod_status_by_client='no_cod'))
+                queryset = queryset.filter(cod_amount=0)
             else:
                 queryset = queryset.filter(cod_status_by_staff=cod_status)
 

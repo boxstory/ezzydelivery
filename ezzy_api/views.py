@@ -1866,7 +1866,7 @@ def _create_order_from_shopify(shopify_order, business):
             customer_phone=shipping_address.phone if shipping_address else '',
             customer_address=f"{shipping_address.address1 or ''} {shipping_address.city or ''} {shipping_address.province or ''}".strip() if shipping_address else '',
             cod_amount=int(float(shopify_order.total_price) * 100) if shopify_order.financial_status == 'pending' else 0,
-            cod_status_by_client='include' if shopify_order.financial_status == 'pending' else 'no_cod',
+            cod_status_by_client='pending' if shopify_order.financial_status == 'pending' else 'online_paid',
             order_status='to_review',
             order_date=datetime.strptime(shopify_order.created_at[:10], '%Y-%m-%d').date() if shopify_order.created_at else timezone.now().date()
         )
@@ -2017,7 +2017,7 @@ def _create_order_from_woocommerce(order_data, business):
             customer_phone=billing.get('phone', ''),
             customer_address=f"{shipping.get('address_1', '')} {shipping.get('city', '')} {shipping.get('state', '')}".strip(),
             cod_amount=int(float(order_data.get('total', 0)) * 100) if order_data.get('payment_method') == 'cod' else 0,
-            cod_status_by_client='include' if order_data.get('payment_method') == 'cod' else 'no_cod',
+            cod_status_by_client='pending' if order_data.get('payment_method') == 'cod' else 'online_paid',
             order_status='to_review',
             order_date=datetime.strptime(order_data.get('date_created', '')[:10], '%Y-%m-%d').date() if order_data.get('date_created') else timezone.now().date()
         )

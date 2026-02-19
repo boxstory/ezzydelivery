@@ -413,7 +413,7 @@ class Command(BaseCommand):
             ('cancelled', 'dl_task_listed'),
         ]
 
-        cod_statuses = ['no_cod', 'include', 'include', 'include', 'include']
+        cod_statuses = ['no_cod', 'pending', 'pending', 'pending', 'collected']
 
         orders = []
         for i in range(20):
@@ -440,8 +440,8 @@ class Command(BaseCommand):
                     'task_status': task_status,
                     'pickup_location': random.choice(pickup_locations),
                     'cod_status_by_client': cod_status,
-                    'cod_status_by_staff': 'not_collected' if cod_status == 'include' else 'not_collected',
-                    'cod_amount': total_amount if cod_status == 'include' else 0,
+                    'cod_status_by_staff': 'not_collected' if cod_status != 'no_cod' else 'not_collected',
+                    'cod_amount': total_amount if cod_status != 'no_cod' else 0,
                     'dl_amount': 25,  # Standard delivery fee
                     'dl_included': True,
                     'customer_name': customer_name,
@@ -527,8 +527,8 @@ class Command(BaseCommand):
                     'dl_price': 25,
                     'driver_earnings': Decimal('15.00') if task_status == 'delivered' else Decimal('0.00'),
                     'company_commission': Decimal('10.00') if task_status == 'delivered' else Decimal('0.00'),
-                    'cod_collected': task_status == 'delivered' and order.cod_status_by_client == 'include',
-                    'cod_collected_amount': Decimal(str(order.cod_amount)) if task_status == 'delivered' and order.cod_status_by_client == 'include' else Decimal('0.00'),
+                    'cod_collected': task_status == 'delivered' and order.cod_amount > 0,
+                    'cod_collected_amount': Decimal(str(order.cod_amount)) if task_status == 'delivered' and order.cod_amount > 0 else Decimal('0.00'),
                     'completed_at': timezone.now() if task_status == 'delivered' else None,
                 }
             )

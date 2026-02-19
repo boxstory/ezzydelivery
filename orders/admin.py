@@ -26,7 +26,8 @@ class OrderAdmin(ImportExportModelAdmin):
                       'dl_zone', 'dl_street', 'dl_building')
         }),
         ('COD & Delivery', {
-            'fields': ('cod_status_by_client', 'cod_status_by_staff', 'cod_amount', 'dl_included', 'dl_amount', 'pickup_location')
+            'fields': ('cod_status_by_client', 'cod_status_by_staff', 'cod_amount', 'dl_included', 'dl_amount', 'pickup_location'),
+            'description': 'COD Status by Client tracks the payment lifecycle: no_cod → pending → collected → received_by_company → invoiced → settled'
         }),
         ('Metadata', {
             'fields': ('original_order_data', 'task_created', 'created_at', 'updated_at')

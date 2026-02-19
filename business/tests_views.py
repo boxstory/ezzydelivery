@@ -77,7 +77,7 @@ class BusinessTestMixin:
             customer_address='123 Test St',
             dl_zone=1, dl_street=10, dl_building=5,
             cod_amount=cod,
-            cod_status_by_client='include' if cod else 'no_cod',
+            cod_status_by_client='pending' if cod else 'no_cod',
             order_status=status,
             pickup_location=pickup_location)
 

@@ -58,10 +58,7 @@ ORDER_STATUS = [
     ('cancelled', 'Cancelled'),
 ]
 
-COD_STATUS_BY_CLIENT = [
-    ('no_cod', 'No COD'),
-    ('include', 'Include'),
-]
+COD_STATUS_BY_CLIENT = orders_models.COD_STATUS_BY_CLIENT
 
 
 # =============================================================================
@@ -94,7 +91,7 @@ class AddOrderForm(forms.ModelForm):
             - customer_address: Full address text
 
         COD (Cash on Delivery):
-            - cod_status_by_client: no_cod or include
+            - cod_status_by_client: COD status tracking
             - cod_amount: Amount to collect
 
         Pickup:
@@ -160,8 +157,8 @@ class AddOrderForm(forms.ModelForm):
             self.fields['dl_street'].initial = '0'
             self.fields['dl_zone'].initial = '0'
 
-            self.fields['cod_status_by_client'].widget = forms.RadioSelect(
-                choices=COD_STATUS_BY_CLIENT, attrs={'checked': 'checked'})
+            self.fields['cod_status_by_client'].widget = forms.Select(
+                choices=COD_STATUS_BY_CLIENT, attrs={'class': 'form-control'})
 
         # Access the form data to filter pickup_location choices
         # Show fulfillment stores first when fulfillment service is enabled
@@ -490,8 +487,8 @@ class UpdateOrderForm(forms.ModelForm):
                 self.fields['task_created'].widget = forms.CheckboxInput(
                     attrs={'class': 'form-check-input '})
 
-            self.fields['cod_status_by_client'].widget = forms.RadioSelect(
-                choices=COD_STATUS_BY_CLIENT)
+            self.fields['cod_status_by_client'].widget = forms.Select(
+                choices=COD_STATUS_BY_CLIENT, attrs={'class': 'form-control'})
             # @todo: need to specify business only products
 
 

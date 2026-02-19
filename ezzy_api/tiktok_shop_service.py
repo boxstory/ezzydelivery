@@ -383,7 +383,7 @@ def create_order_from_tiktok(tiktok_order: dict, business) -> 'Order':
         customer_address=recipient.get('full_address', ''),
         dl_zone=recipient.get('district', '0'),
         order_status=status_map.get(tiktok_status, 'to_review'),
-        cod_status_by_client='include' if is_cod else 'no_cod',
+        cod_status_by_client='pending' if is_cod else 'no_cod',
         cod_amount=total_amount if is_cod else 0,
         order_notes=f'TikTok Shop Order #{tiktok_order_id}',
     )
