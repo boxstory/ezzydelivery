@@ -4,318 +4,96 @@
 {% block title %}Edit Polygon - Zone {{ zone.zone_number }}{% endblock title %}
 
 {% block extra_css %}
-<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<!-- Leaflet Draw CSS -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
-<style>
-  #polygon-map {
-    height: calc(100vh - 250px);
-    min-height: 500px;
-    width: 100%;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  }
-
-  .editor-container {
-    padding: 20px;
-  }
-
-  .editor-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .editor-header h1 {
-    font-size: 24px;
-    font-weight: 700;
-    color: #001f3f;
-    margin: 0;
-  }
-
-  .editor-actions {
-    display: flex;
-    gap: 8px;
-  }
-
-  .btn-save {
-    background: #10b981;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .btn-save:hover {
-    background: #059669;
-  }
-
-  .btn-cancel {
-    background: #6b7280;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .btn-cancel:hover {
-    background: #4b5563;
-  }
-
-  .btn-refetch {
-    background: #3b82f6;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .btn-refetch:hover {
-    background: #2563eb;
-  }
-
-  .zone-info {
-    background: #f8f9fa;
-    padding: 12px 16px;
-    border-radius: 8px;
-    margin-bottom: 16px;
-  }
-
-  .zone-info h2 {
-    margin: 0 0 8px 0;
-    font-size: 18px;
-    color: #001f3f;
-  }
-
-  .zone-info p {
-    margin: 0;
-    color: #666;
-    font-size: 14px;
-  }
-
-  .instructions {
-    background: #fef3c7;
-    border: 1px solid #f59e0b;
-    padding: 12px 16px;
-    border-radius: 8px;
-    margin-bottom: 16px;
-  }
-
-  .instructions h4 {
-    margin: 0 0 8px 0;
-    color: #92400e;
-    font-size: 14px;
-  }
-
-  .instructions ul {
-    margin: 0;
-    padding-left: 20px;
-    color: #92400e;
-    font-size: 13px;
-  }
-
-  .status-bar {
-    background: white;
-    padding: 8px 16px;
-    border-radius: 8px;
-    margin-top: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-
-  .status-bar .points-count {
-    font-weight: 600;
-    color: #001f3f;
-  }
-
-  .status-bar .coords {
-    font-size: 12px;
-    color: #666;
-    font-family: monospace;
-  }
-
-  .neighbour-polygon {
-    fill: #6b7280;
-    fill-opacity: 0.1;
-    stroke: #6b7280;
-    stroke-width: 1;
-  }
-
-  .polygon-toggles {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 12px;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .polygon-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: white;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    cursor: pointer;
-  }
-
-  .polygon-toggle input {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-  }
-
-  .polygon-toggle label {
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    margin: 0;
-  }
-
-  .color-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    display: inline-block;
-  }
-
-  .color-dot--neighbour { background: #f59e0b; }
-  .color-dot--other { background: #6b7280; }
-  .color-dot--current { background: #001f3f; }
-
-  .polygon-legend {
-    background: white;
-    padding: 12px 16px;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    font-size: 12px;
-  }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-  }
-
-  .legend-item:last-child {
-    margin-bottom: 0;
-  }
-
-  .proximity-status {
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  .proximity-status.ok {
-    color: #10b981;
-  }
-
-  .proximity-status.warning {
-    color: #f59e0b;
-  }
-
-  .proximity-status.error {
-    color: #ef4444;
-  }
-
-  .proximity-marker {
-    background: #ef4444;
-    border: 2px solid white;
-    border-radius: 50%;
-    width: 12px;
-    height: 12px;
-  }
-</style>
+<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260219a">
 {% endblock extra_css %}
 
 {% block content %}
-<div class="editor-container">
-  <!-- Header -->
-  <div class="editor-header">
-    <h1><i class="fas fa-draw-polygon me-2"></i>Edit Zone Polygon</h1>
-    <div class="editor-actions">
-      <button class="btn-refetch" onclick="refetchFromQNAS()">
-        <i class="fas fa-download me-1"></i> Re-fetch from QNAS
+<div class="zpe">
+  <!-- Hero -->
+  <div class="zpe__hero">
+    <div class="d-flex align-items-center gap-2">
+      <div class="zpe__hero-icon">
+        <i class="fa-solid fa-draw-polygon"></i>
+      </div>
+      <div>
+        <h1 class="zpe__hero-title">Edit Zone Polygon</h1>
+        <p class="zpe__hero-sub">Draw or edit the boundary for Zone {{ zone.zone_number }}</p>
+      </div>
+    </div>
+    <div class="zpe__hero-actions">
+      <button class="zpe__hero-btn zpe__hero-btn--refetch" onclick="refetchFromQNAS()">
+        <i class="fa-solid fa-download"></i> Re-fetch QNAS
       </button>
-      <button class="btn-cancel" onclick="window.location.href='{% url 'delivery:zone_map' %}'">
-        <i class="fas fa-times me-1"></i> Cancel
+      <button class="zpe__hero-btn zpe__hero-btn--cancel" onclick="window.location.href='{% url 'delivery:zone_map' %}'">
+        <i class="fa-solid fa-xmark"></i> Cancel
       </button>
-      <button class="btn-save" onclick="savePolygon()">
-        <i class="fas fa-save me-1"></i> Save Polygon
+      <button class="zpe__hero-btn zpe__hero-btn--save" onclick="savePolygon()">
+        <i class="fa-solid fa-floppy-disk"></i> Save Polygon
       </button>
     </div>
   </div>
 
   <!-- Zone Info -->
-  <div class="zone-info">
-    <h2>Zone {{ zone.zone_number }} - {{ zone.zone_name }}</h2>
-    <p>
-      {% if zone.zone_name_arabic %}{{ zone.zone_name_arabic }} | {% endif %}
-      Current: {{ zone.polygon|length|default:0 }} points
-    </p>
+  <div class="zpe__info">
+    <span class="zpe__info-badge">{{ zone.zone_number }}</span>
+    <div>
+      <div class="zpe__info-name">{{ zone.zone_name }}</div>
+      <div class="zpe__info-meta">
+        {% if zone.zone_name_arabic %}{{ zone.zone_name_arabic }} | {% endif %}
+        Current: {{ zone.polygon|length|default:0 }} points
+      </div>
+    </div>
   </div>
 
   <!-- Quick Actions -->
-  <div class="quick-actions mb-3">
-    <button class="btn btn-outline-primary me-2" onclick="startDrawing()">
-      <i class="fas fa-draw-polygon me-1"></i> Draw New Polygon
+  <div class="zpe__quick">
+    <button class="zpe__quick-btn zpe__quick-btn--draw" onclick="startDrawing()">
+      <i class="fa-solid fa-draw-polygon"></i> Draw New Polygon
     </button>
-    <button class="btn btn-outline-warning me-2" onclick="startEditing()">
-      <i class="fas fa-edit me-1"></i> Edit Points
+    <button class="zpe__quick-btn zpe__quick-btn--edit" onclick="startEditing()">
+      <i class="fa-solid fa-pen-to-square"></i> Edit Points
     </button>
-    <button class="btn btn-outline-danger me-2" onclick="clearPolygon()">
-      <i class="fas fa-trash me-1"></i> Clear All
+    <button class="zpe__quick-btn zpe__quick-btn--clear" onclick="clearPolygon()">
+      <i class="fa-solid fa-trash-can"></i> Clear All
     </button>
-    <button class="btn btn-outline-secondary" onclick="undoLast()">
-      <i class="fas fa-undo me-1"></i> Undo
+    <button class="zpe__quick-btn zpe__quick-btn--undo" onclick="undoLast()">
+      <i class="fa-solid fa-rotate-left"></i> Undo
     </button>
   </div>
 
   <!-- Polygon Visibility Toggles -->
-  <div class="polygon-toggles">
-    <div class="polygon-toggle">
+  <div class="zpe__toggles">
+    <div class="zpe__toggle">
       <input type="checkbox" id="show-neighbours" checked onchange="togglePolygons()">
-      <span class="color-dot color-dot--neighbour"></span>
+      <span class="zpe__color-dot zpe__color-dot--neighbour"></span>
       <label for="show-neighbours">Neighbour Zones</label>
     </div>
-    <div class="polygon-toggle">
+    <div class="zpe__toggle">
       <input type="checkbox" id="show-others" checked onchange="togglePolygons()">
-      <span class="color-dot color-dot--other"></span>
+      <span class="zpe__color-dot zpe__color-dot--other"></span>
       <label for="show-others">Other Zones</label>
     </div>
-    <div class="polygon-legend">
-      <div class="legend-item">
-        <span class="color-dot color-dot--current"></span>
+    <div class="zpe__legend">
+      <div class="zpe__legend-item">
+        <span class="zpe__color-dot zpe__color-dot--current"></span>
         <span>Current Zone (Editing)</span>
       </div>
-      <div class="legend-item">
-        <span class="color-dot color-dot--neighbour"></span>
+      <div class="zpe__legend-item">
+        <span class="zpe__color-dot zpe__color-dot--neighbour"></span>
         <span>Neighbour Zones (within 2.5km)</span>
       </div>
-      <div class="legend-item">
-        <span class="color-dot color-dot--other"></span>
+      <div class="zpe__legend-item">
+        <span class="zpe__color-dot zpe__color-dot--other"></span>
         <span>Other Zones</span>
       </div>
     </div>
   </div>
 
   <!-- Instructions -->
-  <div class="instructions">
-    <h4><i class="fas fa-info-circle me-1"></i> How to Edit</h4>
+  <div class="zpe__instructions">
+    <h4 class="zpe__instructions-title"><i class="fa-solid fa-circle-info me-1"></i> How to Edit</h4>
     <ul>
       <li><strong>Draw New:</strong> Click "Draw New Polygon" then click on map to add points, double-click to finish</li>
       <li><strong>Edit Points:</strong> Click "Edit Points" then drag markers to move them</li>
@@ -326,24 +104,22 @@
   </div>
 
   <!-- Map -->
-  <div id="polygon-map"></div>
+  <div id="polygon-map" class="zpe__map"></div>
 
   <!-- Status Bar -->
-  <div class="status-bar">
-    <span class="points-count">Points: <span id="point-count">0</span></span>
-    <button class="btn btn-sm btn-outline-warning ms-3" onclick="checkProximityIssues()">
-      <i class="fas fa-exclamation-triangle me-1"></i> Check Proximity
+  <div class="zpe__status">
+    <span class="zpe__status-points">Points: <span id="point-count">0</span></span>
+    <button class="znl__btn znl__btn--clear" onclick="checkProximityIssues()">
+      <i class="fa-solid fa-triangle-exclamation me-1"></i> Check Proximity
     </button>
-    <span class="proximity-status ms-2" id="proximity-status"></span>
-    <span class="coords">Mouse: <span id="mouse-coords">-</span></span>
+    <span class="zpe__prox" id="proximity-status"></span>
+    <span class="zpe__status-coords">Mouse: <span id="mouse-coords">-</span></span>
   </div>
 </div>
 {% endblock content %}
 
 {% block extra_js %}
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- Leaflet Draw JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script>
   // Zone data
@@ -357,86 +133,59 @@
   // Initialize map
   const map = L.map('polygon-map').setView([centerLat, centerLng], 14);
 
-  // Add OpenStreetMap tiles
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19
   }).addTo(map);
 
-  // Feature group for editable layers
   const drawnItems = new L.FeatureGroup();
   map.addLayer(drawnItems);
 
-  // Feature groups for reference polygons
   const neighbourPolygons = new L.FeatureGroup();
   const otherPolygons = new L.FeatureGroup();
   map.addLayer(neighbourPolygons);
   map.addLayer(otherPolygons);
 
-  // Draw control
   const drawControl = new L.Control.Draw({
     edit: {
       featureGroup: drawnItems,
-      poly: {
-        allowIntersection: false
-      }
+      poly: { allowIntersection: false }
     },
     draw: {
       polygon: {
         allowIntersection: false,
         showArea: true,
-        shapeOptions: {
-          color: '#001f3f',
-          fillColor: '#001f3f',
-          fillOpacity: 0.3
-        }
+        shapeOptions: { color: '#001f3f', fillColor: '#001f3f', fillOpacity: 0.3 }
       },
-      polyline: false,
-      rectangle: false,
-      circle: false,
-      marker: false,
-      circlemarker: false
+      polyline: false, rectangle: false, circle: false, marker: false, circlemarker: false
     }
   });
   map.addControl(drawControl);
 
-  // Draw ALL zone polygons (non-editable, for reference)
   allPolygonsData.forEach(zone => {
     if (zone.polygon && zone.polygon.length >= 3) {
-      // Different colors for neighbours vs other zones
       const isNeighbour = zone.is_neighbour;
       const color = isNeighbour ? '#f59e0b' : '#6b7280';
       const weight = isNeighbour ? 2 : 1;
       const fillOpacity = isNeighbour ? 0.15 : 0.08;
 
       const poly = L.polygon(zone.polygon, {
-        color: color,
-        weight: weight,
-        fillColor: color,
-        fillOpacity: fillOpacity,
-        interactive: true
+        color, weight, fillColor: color, fillOpacity, interactive: true
       });
 
       poly.bindTooltip(`Zone ${zone.zone_number}: ${zone.name}${isNeighbour ? ' (Neighbour)' : ''}`, {
-        permanent: false,
-        direction: 'center'
+        permanent: false, direction: 'center'
       });
 
-      // Add to appropriate layer group
-      if (isNeighbour) {
-        neighbourPolygons.addLayer(poly);
-      } else {
-        otherPolygons.addLayer(poly);
-      }
+      if (isNeighbour) { neighbourPolygons.addLayer(poly); }
+      else { otherPolygons.addLayer(poly); }
     }
   });
 
-  // Minimum distance threshold in meters (points closer than this will trigger warning)
   const MIN_DISTANCE_METERS = 20;
 
-  // Calculate distance between two points in meters using Haversine formula
   function getDistanceMeters(lat1, lng1, lat2, lng2) {
-    const R = 6371000; // Earth's radius in meters
+    const R = 6371000;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLng = (lng2 - lng1) * Math.PI / 180;
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -446,95 +195,56 @@
     return R * c;
   }
 
-  // Find minimum distance from a point to a line segment
   function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    if (dx === 0 && dy === 0) {
-      return getDistanceMeters(px, py, x1, y1);
-    }
+    const dx = x2 - x1, dy = y2 - y1;
+    if (dx === 0 && dy === 0) return getDistanceMeters(px, py, x1, y1);
     const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
-    const nearestX = x1 + t * dx;
-    const nearestY = y1 + t * dy;
-    return getDistanceMeters(px, py, nearestX, nearestY);
+    return getDistanceMeters(px, py, x1 + t * dx, y1 + t * dy);
   }
 
-  // Check if a point is too close to any other polygon
   function checkPointProximity(lat, lng) {
     let tooClose = [];
-
     allPolygonsData.forEach(zone => {
       if (zone.polygon && zone.polygon.length >= 3) {
-        // Check distance to each edge of the polygon
         for (let i = 0; i < zone.polygon.length; i++) {
           const p1 = zone.polygon[i];
           const p2 = zone.polygon[(i + 1) % zone.polygon.length];
           const dist = pointToSegmentDistance(lat, lng, p1[0], p1[1], p2[0], p2[1]);
           if (dist < MIN_DISTANCE_METERS) {
-            tooClose.push({
-              zone_number: zone.zone_number,
-              name: zone.name,
-              distance: Math.round(dist)
-            });
-            break; // Only report once per zone
+            tooClose.push({ zone_number: zone.zone_number, name: zone.name, distance: Math.round(dist) });
+            break;
           }
         }
       }
     });
-
     return tooClose;
   }
 
-  // Check entire polygon for proximity issues
   function validatePolygonProximity(polygon) {
     let issues = [];
-
     polygon.forEach((point, index) => {
       const nearby = checkPointProximity(point[0], point[1]);
       nearby.forEach(zone => {
-        issues.push({
-          pointIndex: index + 1,
-          zone_number: zone.zone_number,
-          name: zone.name,
-          distance: zone.distance
-        });
+        issues.push({ pointIndex: index + 1, zone_number: zone.zone_number, name: zone.name, distance: zone.distance });
       });
     });
-
     return issues;
   }
 
-  // Toggle polygon visibility
   function togglePolygons() {
     const showNeighbours = document.getElementById('show-neighbours').checked;
     const showOthers = document.getElementById('show-others').checked;
-
-    if (showNeighbours) {
-      map.addLayer(neighbourPolygons);
-    } else {
-      map.removeLayer(neighbourPolygons);
-    }
-
-    if (showOthers) {
-      map.addLayer(otherPolygons);
-    } else {
-      map.removeLayer(otherPolygons);
-    }
+    if (showNeighbours) { map.addLayer(neighbourPolygons); } else { map.removeLayer(neighbourPolygons); }
+    if (showOthers) { map.addLayer(otherPolygons); } else { map.removeLayer(otherPolygons); }
   }
 
-  // Load current polygon
   let editablePolygon = null;
 
   function loadPolygon(polygonData) {
-    // Clear existing
     drawnItems.clearLayers();
-
     if (polygonData && polygonData.length >= 3) {
       editablePolygon = L.polygon(polygonData, {
-        color: '#001f3f',
-        weight: 3,
-        fillColor: '#001f3f',
-        fillOpacity: 0.3
+        color: '#001f3f', weight: 3, fillColor: '#001f3f', fillOpacity: 0.3
       });
       drawnItems.addLayer(editablePolygon);
       map.fitBounds(editablePolygon.getBounds(), { padding: [50, 50] });
@@ -544,18 +254,14 @@
 
   loadPolygon(currentPolygon);
 
-  // Update point count
   function updatePointCount() {
     let count = 0;
     drawnItems.eachLayer(layer => {
-      if (layer instanceof L.Polygon) {
-        count = layer.getLatLngs()[0].length;
-      }
+      if (layer instanceof L.Polygon) { count = layer.getLatLngs()[0].length; }
     });
     document.getElementById('point-count').textContent = count;
   }
 
-  // Handle draw events
   map.on(L.Draw.Event.CREATED, function(e) {
     drawnItems.clearLayers();
     drawnItems.addLayer(e.layer);
@@ -563,125 +269,82 @@
     updatePointCount();
   });
 
-  map.on(L.Draw.Event.EDITED, function(e) {
-    updatePointCount();
-  });
+  map.on(L.Draw.Event.EDITED, function(e) { updatePointCount(); });
+  map.on(L.Draw.Event.DELETED, function(e) { updatePointCount(); });
 
-  map.on(L.Draw.Event.DELETED, function(e) {
-    updatePointCount();
-  });
-
-  // Mouse position
   map.on('mousemove', function(e) {
     document.getElementById('mouse-coords').textContent =
       `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
   });
 
-  // Save polygon
   function savePolygon() {
     let polygon = [];
-
     drawnItems.eachLayer(layer => {
       if (layer instanceof L.Polygon) {
-        const latlngs = layer.getLatLngs()[0];
-        polygon = latlngs.map(ll => [ll.lat, ll.lng]);
+        polygon = layer.getLatLngs()[0].map(ll => [ll.lat, ll.lng]);
       }
     });
 
-    if (polygon.length < 3) {
-      alert('Please draw a polygon with at least 3 points');
-      return;
-    }
+    if (polygon.length < 3) { alert('Please draw a polygon with at least 3 points'); return; }
 
-    // Check for proximity issues
     const proximityIssues = validatePolygonProximity(polygon);
     if (proximityIssues.length > 0) {
-      // Group issues by zone
       const issuesByZone = {};
       proximityIssues.forEach(issue => {
-        if (!issuesByZone[issue.zone_number]) {
-          issuesByZone[issue.zone_number] = {
-            name: issue.name,
-            points: []
-          };
-        }
+        if (!issuesByZone[issue.zone_number]) { issuesByZone[issue.zone_number] = { name: issue.name, points: [] }; }
         issuesByZone[issue.zone_number].points.push(`Point ${issue.pointIndex} (${issue.distance}m)`);
       });
-
       let warningMsg = `WARNING: Some points are very close to other zone boundaries (< ${MIN_DISTANCE_METERS}m):\n\n`;
       Object.entries(issuesByZone).forEach(([zoneNum, data]) => {
-        warningMsg += `Zone ${zoneNum} (${data.name}):\n`;
-        warningMsg += `  ${data.points.join(', ')}\n`;
+        warningMsg += `Zone ${zoneNum} (${data.name}):\n  ${data.points.join(', ')}\n`;
       });
       warningMsg += `\nThis may cause overlapping or gaps between zones.\nDo you still want to save?`;
-
-      if (!confirm(warningMsg)) {
-        return;
-      }
+      if (!confirm(warningMsg)) return;
     }
 
-    // Ensure polygon is closed
-    if (polygon[0][0] !== polygon[polygon.length-1][0] ||
-        polygon[0][1] !== polygon[polygon.length-1][1]) {
+    if (polygon[0][0] !== polygon[polygon.length-1][0] || polygon[0][1] !== polygon[polygon.length-1][1]) {
       polygon.push([...polygon[0]]);
     }
 
-    // Send to server
     fetch(`/delivery/zones/save-polygon/${zoneNumber}/`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': '{{ csrf_token }}'
-      },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
       body: JSON.stringify({ polygon: polygon })
     })
     .then(response => response.json())
     .then(data => {
-      if (data.success) {
-        alert(`Polygon saved successfully!\n${data.message}`);
-        window.location.href = '{% url "delivery:zone_map" %}';
-      } else {
-        alert(`Error: ${data.error}`);
-      }
+      if (data.success) { alert(`Polygon saved successfully!\n${data.message}`); window.location.href = '{% url "delivery:zone_map" %}'; }
+      else { alert(`Error: ${data.error}`); }
     })
-    .catch(error => {
-      alert(`Error saving polygon: ${error}`);
-    });
+    .catch(error => { alert(`Error saving polygon: ${error}`); });
   }
 
-  // Store proximity warning markers
   const proximityMarkers = [];
 
-  // Check and display proximity issues visually
   function checkProximityIssues() {
-    // Clear existing markers
     proximityMarkers.forEach(m => map.removeLayer(m));
     proximityMarkers.length = 0;
 
     let polygon = [];
     drawnItems.eachLayer(layer => {
-      if (layer instanceof L.Polygon) {
-        const latlngs = layer.getLatLngs()[0];
-        polygon = latlngs.map(ll => [ll.lat, ll.lng]);
-      }
+      if (layer instanceof L.Polygon) { polygon = layer.getLatLngs()[0].map(ll => [ll.lat, ll.lng]); }
     });
 
     if (polygon.length < 3) {
       document.getElementById('proximity-status').textContent = 'No polygon drawn';
-      document.getElementById('proximity-status').className = 'proximity-status warning';
+      document.getElementById('proximity-status').className = 'zpe__prox zpe__prox--warning';
       return;
     }
 
     const issues = validatePolygonProximity(polygon);
 
     if (issues.length === 0) {
-      document.getElementById('proximity-status').innerHTML = '<i class="fas fa-check-circle me-1"></i>All points OK';
-      document.getElementById('proximity-status').className = 'proximity-status ok';
+      document.getElementById('proximity-status').innerHTML = '<i class="fa-solid fa-circle-check me-1"></i>All points OK';
+      document.getElementById('proximity-status').className = 'zpe__prox zpe__prox--ok';
     } else {
-      document.getElementById('proximity-status').innerHTML = `<i class="fas fa-exclamation-triangle me-1"></i>${issues.length} points too close`;
-      document.getElementById('proximity-status').className = 'proximity-status error';
+      document.getElementById('proximity-status').innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i>${issues.length} points too close`;
+      document.getElementById('proximity-status').className = 'zpe__prox zpe__prox--error';
 
-      // Add visual markers for problem points
       const uniquePoints = new Set();
       issues.forEach(issue => {
         const pointKey = `${issue.pointIndex}`;
@@ -689,26 +352,17 @@
           uniquePoints.add(pointKey);
           const point = polygon[issue.pointIndex - 1];
           const marker = L.circleMarker([point[0], point[1]], {
-            radius: 8,
-            color: '#ef4444',
-            fillColor: '#ef4444',
-            fillOpacity: 0.8,
-            weight: 2
+            radius: 8, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.8, weight: 2
           }).addTo(map);
-          marker.bindTooltip(`Point ${issue.pointIndex}: Too close to Zone ${issue.zone_number} (${issue.distance}m)`, {
-            permanent: false
-          });
+          marker.bindTooltip(`Point ${issue.pointIndex}: Too close to Zone ${issue.zone_number} (${issue.distance}m)`, { permanent: false });
           proximityMarkers.push(marker);
         }
       });
 
-      // Show alert with details
       let msg = `Found ${issues.length} proximity issues:\n\n`;
       const groupedByPoint = {};
       issues.forEach(issue => {
-        if (!groupedByPoint[issue.pointIndex]) {
-          groupedByPoint[issue.pointIndex] = [];
-        }
+        if (!groupedByPoint[issue.pointIndex]) { groupedByPoint[issue.pointIndex] = []; }
         groupedByPoint[issue.pointIndex].push(`Zone ${issue.zone_number} (${issue.distance}m)`);
       });
       Object.entries(groupedByPoint).forEach(([point, zones]) => {
@@ -718,81 +372,49 @@
     }
   }
 
-  // Re-fetch from QNAS
   function refetchFromQNAS() {
-    if (!confirm('This will replace the current polygon with data from QNAS. Continue?')) {
-      return;
-    }
-
-    fetch(`/api/qnas/get-zone-polygon/${zoneNumber}/`, {
-      method: 'GET',
-      credentials: 'include'
-    })
+    if (!confirm('This will replace the current polygon with data from QNAS. Continue?')) return;
+    fetch(`/api/qnas/get-zone-polygon/${zoneNumber}/`, { method: 'GET', credentials: 'include' })
     .then(response => response.json())
     .then(data => {
       if (data.status === 'success' && data.coordinates) {
         const polygon = data.coordinates.map(c => [c.lat, c.lng]);
         loadPolygon(polygon);
         alert(`Loaded ${polygon.length} points from QNAS`);
-      } else {
-        alert(`Could not fetch from QNAS: ${data.message || 'Unknown error'}`);
-      }
+      } else { alert(`Could not fetch from QNAS: ${data.message || 'Unknown error'}`); }
     })
-    .catch(error => {
-      alert(`Error fetching from QNAS: ${error}`);
-    });
+    .catch(error => { alert(`Error fetching from QNAS: ${error}`); });
   }
 
-  // Initial point count
   updatePointCount();
 
-  // Polygon history for undo
   let polygonHistory = [];
-  if (currentPolygon && currentPolygon.length > 0) {
-    polygonHistory.push([...currentPolygon]);
-  }
+  if (currentPolygon && currentPolygon.length > 0) { polygonHistory.push([...currentPolygon]); }
 
-  // Save current state to history
   function saveToHistory() {
     let polygon = [];
     drawnItems.eachLayer(layer => {
-      if (layer instanceof L.Polygon) {
-        const latlngs = layer.getLatLngs()[0];
-        polygon = latlngs.map(ll => [ll.lat, ll.lng]);
-      }
+      if (layer instanceof L.Polygon) { polygon = layer.getLatLngs()[0].map(ll => [ll.lat, ll.lng]); }
     });
     if (polygon.length > 0) {
       polygonHistory.push([...polygon]);
-      if (polygonHistory.length > 20) polygonHistory.shift(); // Keep last 20
+      if (polygonHistory.length > 20) polygonHistory.shift();
     }
   }
 
-  // Start drawing new polygon
   function startDrawing() {
     saveToHistory();
     drawnItems.clearLayers();
     new L.Draw.Polygon(map, drawControl.options.draw.polygon).enable();
   }
 
-  // Start editing existing polygon
   function startEditing() {
-    if (drawnItems.getLayers().length === 0) {
-      alert('No polygon to edit. Draw one first.');
-      return;
-    }
+    if (drawnItems.getLayers().length === 0) { alert('No polygon to edit. Draw one first.'); return; }
     saveToHistory();
-
-    // Enable edit mode
-    drawnItems.eachLayer(layer => {
-      if (layer.editing) {
-        layer.editing.enable();
-      }
-    });
-
+    drawnItems.eachLayer(layer => { if (layer.editing) { layer.editing.enable(); } });
     alert('Edit mode enabled. Drag points to move them. Click "Save Polygon" when done.');
   }
 
-  // Clear all polygons
   function clearPolygon() {
     if (!confirm('Clear the polygon? This cannot be undone.')) return;
     saveToHistory();
@@ -801,20 +423,13 @@
     updatePointCount();
   }
 
-  // Undo last action
   function undoLast() {
-    if (polygonHistory.length < 2) {
-      alert('Nothing to undo');
-      return;
-    }
-    polygonHistory.pop(); // Remove current
+    if (polygonHistory.length < 2) { alert('Nothing to undo'); return; }
+    polygonHistory.pop();
     const previous = polygonHistory[polygonHistory.length - 1];
     loadPolygon(previous);
   }
 
-  // Save state after edits
-  map.on(L.Draw.Event.EDITSTOP, function(e) {
-    saveToHistory();
-  });
+  map.on(L.Draw.Event.EDITSTOP, function(e) { saveToHistory(); });
 </script>
 {% endblock extra_js %}

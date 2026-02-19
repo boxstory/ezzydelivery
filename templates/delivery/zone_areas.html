@@ -4,254 +4,40 @@
 {% block title %}Zone Areas{% endblock title %}
 
 {% block extra_css %}
-<style>
-  .zone-areas-container {
-    padding: 20px;
-  }
-
-  .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .page-header h1 {
-    font-size: 24px;
-    font-weight: 700;
-    color: #001f3f;
-    margin: 0;
-  }
-
-  .stats-row {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-  }
-
-  .stat-card {
-    background: white;
-    padding: 16px 24px;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    text-align: center;
-    min-width: 150px;
-  }
-
-  .stat-card__value {
-    font-size: 28px;
-    font-weight: 700;
-    color: #001f3f;
-  }
-
-  .stat-card__label {
-    font-size: 12px;
-    color: #666;
-    text-transform: uppercase;
-    margin-top: 4px;
-  }
-
-  .filters-row {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .search-box {
-    flex: 1;
-    min-width: 250px;
-  }
-
-  .search-box input {
-    width: 100%;
-    padding: 10px 16px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 14px;
-  }
-
-  .search-box input:focus {
-    outline: none;
-    border-color: #001f3f;
-  }
-
-  .filter-select {
-    padding: 10px 16px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 14px;
-    min-width: 200px;
-    background: white;
-  }
-
-  .filter-select:focus {
-    outline: none;
-    border-color: #001f3f;
-  }
-
-  .areas-table {
-    width: 100%;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    overflow: hidden;
-  }
-
-  .areas-table table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  .areas-table th {
-    background: #f8f9fa;
-    padding: 12px 16px;
-    text-align: left;
-    font-weight: 600;
-    color: #001f3f;
-    font-size: 13px;
-    text-transform: uppercase;
-    border-bottom: 2px solid #e5e7eb;
-  }
-
-  .areas-table td {
-    padding: 12px 16px;
-    border-bottom: 1px solid #e5e7eb;
-    font-size: 14px;
-  }
-
-  .areas-table tr:hover {
-    background: #f8f9fa;
-  }
-
-  .zone-badge {
-    display: inline-block;
-    background: #001f3f;
-    color: white;
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  .arabic-text {
-    font-family: 'Noto Sans Arabic', sans-serif;
-    direction: rtl;
-    color: #666;
-    font-size: 13px;
-  }
-
-  .coords {
-    font-family: monospace;
-    font-size: 12px;
-    color: #666;
-  }
-
-  .status-active {
-    color: #10b981;
-    font-weight: 600;
-  }
-
-  .status-inactive {
-    color: #ef4444;
-    font-weight: 600;
-  }
-
-  .pagination-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 20px;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .pagination-info {
-    font-size: 14px;
-    color: #666;
-  }
-
-  .pagination-links {
-    display: flex;
-    gap: 4px;
-  }
-
-  .pagination-links a,
-  .pagination-links span {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-    text-decoration: none;
-    color: #001f3f;
-  }
-
-  .pagination-links a:hover {
-    background: #f8f9fa;
-  }
-
-  .pagination-links .current {
-    background: #001f3f;
-    color: white;
-    border-color: #001f3f;
-  }
-
-  .btn-clear {
-    background: #f3f4f6;
-    border: 1px solid #ddd;
-    padding: 10px 16px;
-    border-radius: 6px;
-    font-size: 14px;
-    cursor: pointer;
-  }
-
-  .btn-clear:hover {
-    background: #e5e7eb;
-  }
-
-  .empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: #666;
-  }
-
-  .empty-state i {
-    font-size: 48px;
-    margin-bottom: 16px;
-    opacity: 0.5;
-  }
-</style>
+<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260219a">
 {% endblock extra_css %}
 
 {% block content %}
-<div class="zone-areas-container">
-  <!-- Header -->
-  <div class="page-header">
-    <h1><i class="fas fa-location-dot me-2"></i>Zone Areas</h1>
+<div class="zna">
+  <!-- Hero -->
+  <div class="zna__hero">
+    <div class="zna__hero-icon">
+      <i class="fa-solid fa-location-dot"></i>
+    </div>
+    <div>
+      <h1 class="zna__hero-title">Zone Areas</h1>
+      <p class="zna__hero-sub">Browse all delivery areas and their zone assignments</p>
+    </div>
   </div>
 
   <!-- Stats -->
-  <div class="stats-row">
-    <div class="stat-card">
-      <div class="stat-card__value">{{ total_areas }}</div>
-      <div class="stat-card__label">Total Areas</div>
+  <div class="zna__stats">
+    <div class="zna__stat">
+      <div class="zna__stat-val">{{ total_areas }}</div>
+      <div class="zna__stat-lbl">Total Areas</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-card__value">{{ total_zones_with_areas }}</div>
-      <div class="stat-card__label">Zones with Areas</div>
+    <div class="zna__stat">
+      <div class="zna__stat-val">{{ total_zones_with_areas }}</div>
+      <div class="zna__stat-lbl">Zones with Areas</div>
     </div>
   </div>
 
   <!-- Filters -->
-  <form method="get" class="filters-row">
-    <div class="search-box">
+  <form method="get" class="zna__filters">
+    <div class="zna__search">
       <input type="text" name="search" placeholder="Search areas, zones..." value="{{ search }}">
     </div>
-    <select name="zone" class="filter-select" onchange="this.form.submit()">
+    <select name="zone" class="zna__select" onchange="this.form.submit()">
       <option value="">All Zones</option>
       {% for zone in zones %}
         <option value="{{ zone.zone_number }}" {% if zone_filter == zone.zone_number|stringformat:"s" %}selected{% endif %}>
@@ -259,20 +45,20 @@
         </option>
       {% endfor %}
     </select>
-    <button type="submit" class="btn btn-primary">
-      <i class="fas fa-search me-1"></i> Search
+    <button type="submit" class="znl__btn znl__btn--primary">
+      <i class="fa-solid fa-magnifying-glass"></i> Search
     </button>
     {% if search or zone_filter %}
-      <a href="{% url 'delivery:zone_areas' %}" class="btn-clear">
-        <i class="fas fa-times me-1"></i> Clear
+      <a href="{% url 'delivery:zone_areas' %}" class="znl__btn znl__btn--clear">
+        <i class="fa-solid fa-xmark"></i> Clear
       </a>
     {% endif %}
   </form>
 
   <!-- Table -->
-  <div class="areas-table">
+  <div class="zna__table-card">
     {% if areas %}
-      <table>
+      <table class="zna__table">
         <thead>
           <tr>
             <th>Zone</th>
@@ -286,29 +72,29 @@
           {% for area in areas %}
             <tr>
               <td>
-                <span class="zone-badge">{{ area.zone.zone_number }}</span>
+                <span class="zna__zone-badge">{{ area.zone.zone_number }}</span>
                 <span class="ms-2">{{ area.zone.zone_name }}</span>
               </td>
               <td><strong>{{ area.area_name }}</strong></td>
               <td>
                 {% if area.area_name_arabic %}
-                  <span class="arabic-text">{{ area.area_name_arabic }}</span>
+                  <span class="zna__arabic">{{ area.area_name_arabic }}</span>
                 {% else %}
                   <span class="text-muted">-</span>
                 {% endif %}
               </td>
               <td>
                 {% if area.latitude and area.longitude %}
-                  <span class="coords">{{ area.latitude }}, {{ area.longitude }}</span>
+                  <span class="zna__coords">{{ area.latitude }}, {{ area.longitude }}</span>
                 {% else %}
                   <span class="text-muted">-</span>
                 {% endif %}
               </td>
               <td>
                 {% if area.is_active %}
-                  <span class="status-active"><i class="fas fa-check-circle me-1"></i>Active</span>
+                  <span class="zna__status zna__status--active"><i class="fa-solid fa-circle-check me-1"></i>Active</span>
                 {% else %}
-                  <span class="status-inactive"><i class="fas fa-times-circle me-1"></i>Inactive</span>
+                  <span class="zna__status zna__status--inactive"><i class="fa-solid fa-circle-xmark me-1"></i>Inactive</span>
                 {% endif %}
               </td>
             </tr>
@@ -316,8 +102,8 @@
         </tbody>
       </table>
     {% else %}
-      <div class="empty-state">
-        <i class="fas fa-map-marker-alt"></i>
+      <div class="zna__empty">
+        <i class="fa-solid fa-map-location-dot"></i>
         <p>No areas found{% if search or zone_filter %} matching your criteria{% endif %}.</p>
       </div>
     {% endif %}
@@ -325,20 +111,20 @@
 
   <!-- Pagination -->
   {% if areas.has_other_pages %}
-    <div class="pagination-row">
-      <div class="pagination-info">
+    <div class="zna__pager">
+      <div class="zna__pager-info">
         Showing {{ areas.start_index }}-{{ areas.end_index }} of {{ areas.paginator.count }} areas
       </div>
-      <div class="pagination-links">
+      <div class="zna__pager-links">
         {% if areas.has_previous %}
           <a href="?page={{ areas.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}">
-            <i class="fas fa-chevron-left"></i>
+            <i class="fa-solid fa-chevron-left"></i>
           </a>
         {% endif %}
 
         {% for num in areas.paginator.page_range %}
           {% if areas.number == num %}
-            <span class="current">{{ num }}</span>
+            <span class="zna__pager--active">{{ num }}</span>
           {% elif num > areas.number|add:'-3' and num < areas.number|add:'3' %}
             <a href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}">{{ num }}</a>
           {% endif %}
@@ -346,7 +132,7 @@
 
         {% if areas.has_next %}
           <a href="?page={{ areas.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if zone_filter %}&zone={{ zone_filter }}{% endif %}">
-            <i class="fas fa-chevron-right"></i>
+            <i class="fa-solid fa-chevron-right"></i>
           </a>
         {% endif %}
       </div>

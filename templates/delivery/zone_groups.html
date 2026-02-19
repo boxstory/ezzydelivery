@@ -4,303 +4,91 @@
 {% block title %}Zone Groups{% endblock title %}
 
 {% block extra_css %}
-<style>
-  .zone-groups-container {
-    padding: 20px;
-  }
-
-  .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .page-header h1 {
-    font-size: 24px;
-    font-weight: 700;
-    color: #001f3f;
-    margin: 0;
-  }
-
-  .stats-row {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-  }
-
-  .stat-card {
-    background: white;
-    padding: 16px 24px;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    text-align: center;
-    min-width: 140px;
-  }
-
-  .stat-card__value {
-    font-size: 28px;
-    font-weight: 700;
-    color: #001f3f;
-  }
-
-  .stat-card__label {
-    font-size: 12px;
-    color: #666;
-    text-transform: uppercase;
-    margin-top: 4px;
-  }
-
-  .filters-row {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .search-box {
-    flex: 1;
-    min-width: 250px;
-    max-width: 400px;
-  }
-
-  .search-box input {
-    width: 100%;
-    padding: 10px 16px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 14px;
-  }
-
-  .groups-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 20px;
-  }
-
-  .group-card {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    overflow: hidden;
-  }
-
-  .group-card__header {
-    padding: 16px 20px;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .group-card__title {
-    font-size: 18px;
-    font-weight: 700;
-    color: #001f3f;
-    margin: 0;
-  }
-
-  .group-card__badge {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  .group-card__badge--active {
-    background: #d1fae5;
-    color: #065f46;
-  }
-
-  .group-card__badge--inactive {
-    background: #fee2e2;
-    color: #991b1b;
-  }
-
-  .group-card__body {
-    padding: 16px 20px;
-  }
-
-  .group-card__description {
-    color: #666;
-    font-size: 14px;
-    margin-bottom: 16px;
-  }
-
-  .group-card__stats {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 16px;
-  }
-
-  .group-stat {
-    text-align: center;
-  }
-
-  .group-stat__value {
-    font-size: 24px;
-    font-weight: 700;
-    color: #001f3f;
-  }
-
-  .group-stat__label {
-    font-size: 11px;
-    color: #666;
-    text-transform: uppercase;
-  }
-
-  .group-card__zones {
-    border-top: 1px solid #e5e7eb;
-    padding-top: 16px;
-  }
-
-  .group-card__zones-label {
-    font-size: 12px;
-    color: #666;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-    font-weight: 600;
-  }
-
-  .zone-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .zone-chip {
-    display: inline-block;
-    background: #f3f4f6;
-    color: #374151;
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-  }
-
-  .zone-chip__number {
-    background: #001f3f;
-    color: white;
-    padding: 2px 6px;
-    border-radius: 3px;
-    margin-right: 4px;
-    font-weight: 700;
-  }
-
-  .zone-chip--more {
-    background: #e5e7eb;
-    color: #6b7280;
-    font-style: italic;
-  }
-
-  .empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: #666;
-    background: white;
-    border-radius: 8px;
-  }
-
-  .empty-state i {
-    font-size: 48px;
-    margin-bottom: 16px;
-    opacity: 0.5;
-  }
-
-  .btn-clear {
-    background: #f3f4f6;
-    border: 1px solid #ddd;
-    padding: 10px 16px;
-    border-radius: 6px;
-    font-size: 14px;
-    cursor: pointer;
-    text-decoration: none;
-    color: #374151;
-  }
-</style>
+<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260219a">
 {% endblock extra_css %}
 
 {% block content %}
-<div class="zone-groups-container">
-  <!-- Header -->
-  <div class="page-header">
-    <h1><i class="fas fa-layer-group me-2"></i>Zone Groups</h1>
+<div class="zng">
+  <!-- Hero -->
+  <div class="zng__hero">
+    <div class="zng__hero-icon">
+      <i class="fa-solid fa-layer-group"></i>
+    </div>
+    <div>
+      <h1 class="zng__hero-title">Zone Groups</h1>
+      <p class="zng__hero-sub">Organize delivery zones into logical groups</p>
+    </div>
   </div>
 
   <!-- Stats -->
-  <div class="stats-row">
-    <div class="stat-card">
-      <div class="stat-card__value">{{ total_groups }}</div>
-      <div class="stat-card__label">Total Groups</div>
+  <div class="zng__stats">
+    <div class="zng__stat">
+      <div class="zng__stat-val">{{ total_groups }}</div>
+      <div class="zng__stat-lbl">Total Groups</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-card__value">{{ active_groups }}</div>
-      <div class="stat-card__label">Active Groups</div>
+    <div class="zng__stat">
+      <div class="zng__stat-val">{{ active_groups }}</div>
+      <div class="zng__stat-lbl">Active Groups</div>
     </div>
   </div>
 
   <!-- Filters -->
-  <form method="get" class="filters-row">
-    <div class="search-box">
+  <form method="get" class="zng__filters">
+    <div class="zng__search">
       <input type="text" name="search" placeholder="Search groups..." value="{{ search }}">
     </div>
-    <button type="submit" class="btn btn-primary">
-      <i class="fas fa-search me-1"></i> Search
+    <button type="submit" class="znl__btn znl__btn--primary">
+      <i class="fa-solid fa-magnifying-glass"></i> Search
     </button>
     {% if search %}
-      <a href="{% url 'delivery:zone_groups' %}" class="btn-clear">
-        <i class="fas fa-times me-1"></i> Clear
+      <a href="{% url 'delivery:zone_groups' %}" class="znl__btn znl__btn--clear">
+        <i class="fa-solid fa-xmark"></i> Clear
       </a>
     {% endif %}
   </form>
 
   <!-- Groups Grid -->
   {% if groups %}
-    <div class="groups-grid">
+    <div class="zng__grid">
       {% for group in groups %}
-        <div class="group-card">
-          <div class="group-card__header">
-            <h3 class="group-card__title">{{ group.name }}</h3>
+        <div class="zng__card">
+          <div class="zng__card-head">
+            <h3 class="zng__card-title">{{ group.name }}</h3>
             {% if group.is_active %}
-              <span class="group-card__badge group-card__badge--active">Active</span>
+              <span class="zng__badge zng__badge--active">Active</span>
             {% else %}
-              <span class="group-card__badge group-card__badge--inactive">Inactive</span>
+              <span class="zng__badge zng__badge--inactive">Inactive</span>
             {% endif %}
           </div>
-          <div class="group-card__body">
+          <div class="zng__card-body">
             {% if group.description %}
-              <p class="group-card__description">{{ group.description }}</p>
+              <p class="zng__card-desc">{{ group.description }}</p>
             {% endif %}
 
-            <div class="group-card__stats">
-              <div class="group-stat">
-                <div class="group-stat__value">{{ group.zone_count }}</div>
-                <div class="group-stat__label">Zones</div>
+            <div class="zng__card-stats">
+              <div class="zng__card-stat">
+                <div class="zng__card-stat-val">{{ group.zone_count }}</div>
+                <div class="zng__card-stat-lbl">Zones</div>
               </div>
-              <div class="group-stat">
-                <div class="group-stat__value">{{ group.display_order }}</div>
-                <div class="group-stat__label">Display Order</div>
+              <div class="zng__card-stat">
+                <div class="zng__card-stat-val">{{ group.display_order }}</div>
+                <div class="zng__card-stat-lbl">Display Order</div>
               </div>
             </div>
 
-            <div class="group-card__zones">
-              <div class="group-card__zones-label">Zones in this group</div>
-              <div class="zone-chips">
+            <div class="zng__zones">
+              <div class="zng__zones-head">Zones in this group</div>
+              <div class="zng__chips">
                 {% for zone in group.zones.all|slice:":10" %}
-                  <span class="zone-chip">
-                    <span class="zone-chip__number">{{ zone.zone_number }}</span>
+                  <span class="zng__chip">
+                    <span class="zng__chip-num">{{ zone.zone_number }}</span>
                     {{ zone.zone_name|truncatechars:15 }}
                   </span>
                 {% empty %}
                   <span class="text-muted">No zones assigned</span>
                 {% endfor %}
                 {% if group.zone_count > 10 %}
-                  <span class="zone-chip zone-chip--more">+{{ group.zone_count|add:"-10" }} more</span>
+                  <span class="zng__chip zng__chip--more">+{{ group.zone_count|add:"-10" }} more</span>
                 {% endif %}
               </div>
             </div>
@@ -309,8 +97,8 @@
       {% endfor %}
     </div>
   {% else %}
-    <div class="empty-state">
-      <i class="fas fa-layer-group"></i>
+    <div class="zng__empty">
+      <i class="fa-solid fa-layer-group"></i>
       <p>No zone groups found{% if search %} matching "{{ search }}"{% endif %}.</p>
     </div>
   {% endif %}

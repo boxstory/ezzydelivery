@@ -1,414 +1,154 @@
 {% extends "wf_dashboard_base.html" %}
 {% load static %}
 
-{% block title %}Zone Map - {% endblock title %}
+{% block title %}Zone Map{% endblock title %}
 
 {% block extra_css %}
-<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>
-  #zone-map {
-    height: calc(100vh - 200px);
-    min-height: 500px;
-    width: 100%;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  }
-
-  .zone-map-container {
-    padding: 20px;
-  }
-
-  .map-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .map-header h1 {
-    font-size: 24px;
-    font-weight: 700;
-    color: #001f3f;
-    margin: 0;
-  }
-
-  .map-stats {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-
-  .map-stat {
-    background: white;
-    padding: 8px 16px;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    text-align: center;
-  }
-
-  .map-stat__value {
-    font-size: 20px;
-    font-weight: 700;
-    color: #001f3f;
-  }
-
-  .map-stat__label {
-    font-size: 11px;
-    color: #666;
-    text-transform: uppercase;
-  }
-
-  .map-controls {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-    flex-wrap: wrap;
-  }
-
-  .map-control-btn {
-    padding: 8px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    border: 1px solid #ddd;
-    background: white;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .map-control-btn:hover {
-    border-color: #001f3f;
-    color: #001f3f;
-  }
-
-  .map-control-btn.active {
-    background: #001f3f;
-    color: white;
-    border-color: #001f3f;
-  }
-
-  .map-legend {
-    position: absolute;
-    bottom: 30px;
-    right: 10px;
-    background: white;
-    padding: 12px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    z-index: 1000;
-    font-size: 12px;
-    max-width: 200px;
-  }
-
-  .map-legend h4 {
-    margin: 0 0 8px 0;
-    font-size: 13px;
-    font-weight: 600;
-    color: #333;
-  }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
-  }
-
-  .legend-color {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    border: 2px solid white;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-  }
-
-  /* Custom marker styles */
-  .zone-marker {
-    background: #001f3f;
-    color: white;
-    border-radius: 50%;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    font-weight: 700;
-    border: 2px solid white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-  }
-
-  .leaflet-popup-content {
-    margin: 12px;
-    min-width: 180px;
-  }
-
-  .zone-popup {
-    text-align: left;
-  }
-
-  .zone-popup__title {
-    font-size: 16px;
-    font-weight: 700;
-    color: #001f3f;
-    margin-bottom: 4px;
-  }
-
-  .zone-popup__arabic {
-    font-size: 14px;
-    color: #666;
-    margin-bottom: 8px;
-    direction: rtl;
-  }
-
-  .zone-popup__info {
-    font-size: 12px;
-    color: #333;
-    margin-bottom: 4px;
-  }
-
-  .zone-popup__neighbours {
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid #eee;
-  }
-
-  .zone-popup__neighbours-title {
-    font-size: 11px;
-    font-weight: 600;
-    color: #666;
-    margin-bottom: 4px;
-  }
-
-  .zone-popup__neighbour-list {
-    font-size: 11px;
-    color: #888;
-  }
-
-  .zone-popup__actions {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid #eee;
-  }
-
-  .zone-popup__btn {
-    display: inline-block;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    text-decoration: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .zone-popup__btn--edit {
-    background: #001f3f;
-    color: white;
-  }
-
-  .zone-popup__btn--edit:hover {
-    background: #003366;
-    color: white;
-  }
-
-  /* Group filter pills */
-  .group-filters {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-    padding: 12px;
-    background: #f8f9fa;
-    border-radius: 8px;
-  }
-
-  .group-filter {
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    border: 1px solid #ddd;
-    background: white;
-    border-radius: 16px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .group-filter:hover {
-    border-color: #001f3f;
-  }
-
-  .group-filter.active {
-    background: #001f3f;
-    color: white;
-    border-color: #001f3f;
-  }
-
-  /* Responsive */
-  @media (max-width: 768px) {
-    #zone-map {
-      height: calc(100vh - 280px);
-      min-height: 400px;
-    }
-
-    .map-header {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .map-stats {
-      width: 100%;
-    }
-
-    .map-stat {
-      flex: 1;
-      min-width: 80px;
-    }
-  }
-</style>
+<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260219a">
 {% endblock extra_css %}
 
 {% block content %}
-<div class="zone-map-container">
-  <!-- Header -->
-  <div class="map-header">
-    <h1><i class="fas fa-map-marked-alt me-2"></i>Qatar Zone Map</h1>
-    <div class="map-stats">
-      <div class="map-stat">
-        <div class="map-stat__value">{{ total_zones }}</div>
-        <div class="map-stat__label">Total Zones</div>
+<div class="znm">
+  <!-- Hero -->
+  <div class="znm__hero">
+    <div class="d-flex align-items-center gap-2">
+      <div class="znm__hero-icon">
+        <i class="fa-solid fa-map-location-dot"></i>
       </div>
-      <div class="map-stat">
-        <div class="map-stat__value text-success">{{ zones_with_coords }}</div>
-        <div class="map-stat__label">With Coords</div>
+      <div>
+        <h1 class="znm__hero-title">Qatar Zone Map</h1>
+        <p class="znm__hero-sub">Interactive map of all delivery zones</p>
       </div>
-      <div class="map-stat">
-        <div class="map-stat__value text-warning">{{ zones_without_coords }}</div>
-        <div class="map-stat__label">Missing</div>
+    </div>
+    <div class="znm__stats">
+      <div class="znm__stat">
+        <div class="znm__stat-val">{{ total_zones }}</div>
+        <div class="znm__stat-lbl">Total Zones</div>
+      </div>
+      <div class="znm__stat">
+        <div class="znm__stat-val znm__stat-val--success">{{ zones_with_coords }}</div>
+        <div class="znm__stat-lbl">With Coords</div>
+      </div>
+      <div class="znm__stat">
+        <div class="znm__stat-val znm__stat-val--warning">{{ zones_without_coords }}</div>
+        <div class="znm__stat-lbl">Missing</div>
       </div>
     </div>
   </div>
 
   <!-- Map Controls -->
-  <div class="map-controls">
-    <button class="map-control-btn active" id="btn-markers" onclick="toggleMarkers()">
-      <i class="fas fa-map-marker-alt me-1"></i> Markers
+  <div class="znm__controls">
+    <button class="znm__ctrl-btn active" id="btn-markers" onclick="toggleMarkers()">
+      <i class="fa-solid fa-map-pin"></i> Markers
     </button>
-    <button class="map-control-btn" id="btn-polygons" onclick="togglePolygons()">
-      <i class="fas fa-draw-polygon me-1"></i> Polygons
+    <button class="znm__ctrl-btn" id="btn-polygons" onclick="togglePolygons()">
+      <i class="fa-solid fa-draw-polygon"></i> Polygons
     </button>
-    <button class="map-control-btn" id="btn-neighbours" onclick="toggleNeighbourLines()">
-      <i class="fas fa-project-diagram me-1"></i> Show Neighbours
+    <button class="znm__ctrl-btn" id="btn-neighbours" onclick="toggleNeighbourLines()">
+      <i class="fa-solid fa-diagram-project"></i> Neighbours
     </button>
-    <button class="map-control-btn" id="btn-labels" onclick="toggleLabels()">
-      <i class="fas fa-tags me-1"></i> Labels
+    <button class="znm__ctrl-btn" id="btn-labels" onclick="toggleLabels()">
+      <i class="fa-solid fa-tags"></i> Labels
     </button>
-    <button class="map-control-btn" onclick="resetView()">
-      <i class="fas fa-compress-arrows-alt me-1"></i> Reset View
+    <button class="znm__ctrl-btn" onclick="resetView()">
+      <i class="fa-solid fa-compress"></i> Reset View
     </button>
   </div>
 
   <!-- Zone Group Filters -->
-  <div class="group-filters">
-    <span class="group-filter active" data-group="all" onclick="filterByGroup('all', this)">All Zones</span>
+  <div class="znm__group-bar">
+    <span class="znm__group-pill active" data-group="all" onclick="filterByGroup('all', this)">All Zones</span>
     {% for group in zone_groups %}
-    <span class="group-filter" data-group="{{ group.name }}" onclick="filterByGroup('{{ group.name }}', this)">
+    <span class="znm__group-pill" data-group="{{ group.name }}" onclick="filterByGroup('{{ group.name }}', this)">
       {{ group.name }} ({{ group.zone_count }})
     </span>
     {% endfor %}
   </div>
 
   <!-- Map Container -->
-  <div style="position: relative;">
-    <div id="zone-map"></div>
+  <div class="znm__map-wrap">
+    <div id="zone-map" class="znm__map"></div>
 
     <!-- Legend -->
-    <div class="map-legend">
-      <h4><i class="fas fa-info-circle me-1"></i> Legend</h4>
-      <div class="legend-item">
-        <div class="legend-color" style="background: #001f3f;"></div>
+    <div class="znm__legend">
+      <h4 class="znm__legend-title"><i class="fa-solid fa-circle-info me-1"></i> Legend</h4>
+      <div class="znm__legend-item">
+        <div class="znm__legend-dot" style="background: #001f3f;"></div>
         <span>Zone Marker</span>
       </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background: #10b981;"></div>
+      <div class="znm__legend-item">
+        <div class="znm__legend-dot" style="background: #10b981;"></div>
         <span>Selected Zone</span>
       </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background: #f59e0b;"></div>
+      <div class="znm__legend-item">
+        <div class="znm__legend-dot" style="background: #f59e0b;"></div>
         <span>Neighbour Zone</span>
       </div>
-      <div class="legend-item" id="legend-polygons" style="display: none;">
-        <div style="width: 16px; height: 16px; background: rgba(0,31,63,0.2); border: 2px solid #001f3f; border-radius: 2px;"></div>
+      <div class="znm__legend-item" id="legend-polygons" style="display: none;">
+        <div class="znm__legend-box" style="background: rgba(0,31,63,0.2); border: 2px solid #001f3f;"></div>
         <span>Zone Boundary</span>
       </div>
-      <div class="legend-item" id="legend-neighbours" style="display: none;">
-        <div style="width: 20px; height: 2px; background: #f59e0b;"></div>
+      <div class="znm__legend-item" id="legend-neighbours" style="display: none;">
+        <div class="znm__legend-line" style="background: #f59e0b;"></div>
         <span>Neighbour Link</span>
       </div>
     </div>
   </div>
 
   <!-- Zone List Table -->
-  <div class="card mt-4">
-    <div class="card-header bg-navy text-white">
-      <h5 class="mb-0"><i class="fas fa-list me-2"></i>Zone List</h5>
+  <div class="znm__table-card">
+    <div class="znm__table-head">
+      <i class="fa-solid fa-list"></i> Zone List
     </div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover table-sm mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>Zone #</th>
-              <th>Name</th>
-              <th>Arabic</th>
-              <th>Latitude</th>
-              <th>Longitude</th>
-              <th>Polygon</th>
-              <th>Neighbours</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for zone in zones %}
-            <tr id="zone-row-{{ zone.zone_number }}">
-              <td><strong>{{ zone.zone_number }}</strong></td>
-              <td>{{ zone.zone_name }}</td>
-              <td style="direction: rtl;">{{ zone.zone_name_arabic|default:"-" }}</td>
-              <td><small>{{ zone.latitude|floatformat:5 }}</small></td>
-              <td><small>{{ zone.longitude|floatformat:5 }}</small></td>
-              <td>
-                {% if zone.has_polygon %}
-                <span class="badge bg-success"><i class="fas fa-check"></i> {{ zone.polygon|length }}</span>
-                {% else %}
-                <span class="badge bg-secondary">-</span>
-                {% endif %}
-              </td>
-              <td>
-                <span class="badge bg-secondary">{{ zone.neighbour_zones.count }}</span>
-              </td>
-              <td>
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="focusZone({{ zone.zone_number }})" title="Focus on map">
-                  <i class="fas fa-crosshairs"></i>
-                </button>
-                <a href="{% url 'delivery:edit_zone_polygon' zone.zone_number %}" class="btn btn-sm btn-outline-secondary" title="Edit polygon">
-                  <i class="fas fa-edit"></i>
-                </a>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+    <div class="table-responsive">
+      <table class="znm__table">
+        <thead>
+          <tr>
+            <th>Zone #</th>
+            <th>Name</th>
+            <th>Arabic</th>
+            <th>Latitude</th>
+            <th>Longitude</th>
+            <th>Polygon</th>
+            <th>Neighbours</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for zone in zones %}
+          <tr id="zone-row-{{ zone.zone_number }}">
+            <td><span class="znl__zone-num">{{ zone.zone_number }}</span></td>
+            <td><strong>{{ zone.zone_name }}</strong></td>
+            <td class="znl__arabic">{{ zone.zone_name_arabic|default:"-" }}</td>
+            <td><span class="znm__table-coord">{{ zone.latitude|floatformat:5 }}</span></td>
+            <td><span class="znm__table-coord">{{ zone.longitude|floatformat:5 }}</span></td>
+            <td>
+              {% if zone.has_polygon %}
+              <span class="znl__poly znl__poly--yes"><i class="fa-solid fa-check"></i> {{ zone.polygon|length }}</span>
+              {% else %}
+              <span class="znl__poly znl__poly--no">-</span>
+              {% endif %}
+            </td>
+            <td><span class="znl__count">{{ zone.neighbour_zones.count }}</span></td>
+            <td>
+              <button class="znl__action me-1" onclick="focusZone({{ zone.zone_number }})" title="Focus on map">
+                <i class="fa-solid fa-crosshairs"></i>
+              </button>
+              <a href="{% url 'delivery:edit_zone_polygon' zone.zone_number %}" class="znl__action" title="Edit polygon">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
 {% endblock content %}
 
 {% block extra_js %}
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   // Zone data from Django
@@ -476,16 +216,16 @@
       <div class="zone-popup">
         <div class="zone-popup__title">Zone ${zone.zone_number} - ${zone.name}</div>
         ${zone.name_arabic ? `<div class="zone-popup__arabic">${zone.name_arabic}</div>` : ''}
-        <div class="zone-popup__info"><i class="fas fa-map-pin me-1"></i> ${zone.lat.toFixed(5)}, ${zone.lng.toFixed(5)}</div>
-        <div class="zone-popup__info"><i class="fas fa-layer-group me-1"></i> ${groupList}</div>
-        <div class="zone-popup__info"><i class="fas fa-draw-polygon me-1"></i> Polygon: ${zone.has_polygon ? zone.polygon.length + ' points' : 'Not set'}</div>
+        <div class="zone-popup__info"><i class="fa-solid fa-map-pin me-1"></i> ${zone.lat.toFixed(5)}, ${zone.lng.toFixed(5)}</div>
+        <div class="zone-popup__info"><i class="fa-solid fa-layer-group me-1"></i> ${groupList}</div>
+        <div class="zone-popup__info"><i class="fa-solid fa-draw-polygon me-1"></i> Polygon: ${zone.has_polygon ? zone.polygon.length + ' points' : 'Not set'}</div>
         <div class="zone-popup__neighbours">
-          <div class="zone-popup__neighbours-title"><i class="fas fa-project-diagram me-1"></i> Neighbours (${zone.neighbour_count})</div>
+          <div class="zone-popup__neighbours-title"><i class="fa-solid fa-diagram-project me-1"></i> Neighbours (${zone.neighbour_count})</div>
           <div class="zone-popup__neighbour-list">${neighbourList}</div>
         </div>
         <div class="zone-popup__actions">
           <a href="/delivery/zones/edit-polygon/${zone.zone_number}/" class="zone-popup__btn zone-popup__btn--edit">
-            <i class="fas fa-draw-polygon me-1"></i> Edit Polygon
+            <i class="fa-solid fa-draw-polygon me-1"></i> Edit Polygon
           </a>
         </div>
       </div>
@@ -523,15 +263,12 @@
         zoneData: zone
       });
 
-      // Polygon popup
       polygonLayer.bindPopup(popupContent);
 
-      // Click event to highlight neighbours
       polygonLayer.on('click', function(e) {
         highlightNeighbours(zone);
       });
 
-      // Hover effects (don't override if highlighted)
       polygonLayer.on('mouseover', function(e) {
         if (!highlightedPolygons.includes(zone.zone_number)) {
           this.setStyle({ fillOpacity: 0.4, weight: 3 });
@@ -549,85 +286,59 @@
 
   // Highlight neighbours of a zone
   function highlightNeighbours(zone) {
-    // Clear existing highlights
     clearNeighbourLines();
     clearHighlightedPolygons();
-
-    // Store selected zone
     selectedZone = zone.zone_number;
 
-    // Highlight the selected zone's polygon
     if (polygons[zone.zone_number] && showingPolygons) {
       polygons[zone.zone_number].setStyle({
-        color: '#10b981',
-        weight: 4,
-        fillColor: '#10b981',
-        fillOpacity: 0.3
+        color: '#10b981', weight: 4, fillColor: '#10b981', fillOpacity: 0.3
       });
       highlightedPolygons.push(zone.zone_number);
     }
 
-    // Draw lines and highlight neighbour polygons
     zone.neighbours.forEach(neighbour => {
-      // Draw connecting line
       const line = L.polyline(
         [[zone.lat, zone.lng], [neighbour.lat, neighbour.lng]],
         { color: '#f59e0b', weight: 2, opacity: 0.8, dashArray: '5, 5' }
       ).addTo(map);
       neighbourLines.push(line);
 
-      // Highlight neighbour polygon if it exists and polygons are shown
       if (polygons[neighbour.zone_number] && showingPolygons) {
         polygons[neighbour.zone_number].setStyle({
-          color: '#f59e0b',
-          weight: 3,
-          fillColor: '#f59e0b',
-          fillOpacity: 0.25
+          color: '#f59e0b', weight: 3, fillColor: '#f59e0b', fillOpacity: 0.25
         });
         highlightedPolygons.push(neighbour.zone_number);
       }
     });
   }
 
-  // Clear neighbour lines
   function clearNeighbourLines() {
     neighbourLines.forEach(line => map.removeLayer(line));
     neighbourLines.length = 0;
   }
 
-  // Clear highlighted polygons and reset their styles
   function clearHighlightedPolygons() {
     highlightedPolygons.forEach(zoneNumber => {
       if (polygons[zoneNumber]) {
         const zoneData = zonesData.find(z => z.zone_number === zoneNumber);
         const color = zoneData && zoneData.groups.length > 0
-          ? (groupColors[zoneData.groups[0]] || '#001f3f')
-          : '#001f3f';
-        polygons[zoneNumber].setStyle({
-          color: color,
-          weight: 2,
-          fillColor: color,
-          fillOpacity: 0.2
-        });
+          ? (groupColors[zoneData.groups[0]] || '#001f3f') : '#001f3f';
+        polygons[zoneNumber].setStyle({ color: color, weight: 2, fillColor: color, fillOpacity: 0.2 });
       }
     });
     highlightedPolygons.length = 0;
     selectedZone = null;
   }
 
-  // Toggle all neighbour lines
   function toggleNeighbourLines() {
     const btn = document.getElementById('btn-neighbours');
     showingNeighbours = !showingNeighbours;
-
     if (showingNeighbours) {
       btn.classList.add('active');
       document.getElementById('legend-neighbours').style.display = 'flex';
-
-      // Draw all neighbour lines
       zonesData.forEach(zone => {
         zone.neighbours.forEach(neighbour => {
-          // Only draw line once (from lower to higher zone number)
           if (zone.zone_number < neighbour.zone_number) {
             const line = L.polyline(
               [[zone.lat, zone.lng], [neighbour.lat, neighbour.lng]],
@@ -644,109 +355,69 @@
     }
   }
 
-  // Toggle markers
   function toggleMarkers() {
     const btn = document.getElementById('btn-markers');
     btn.classList.toggle('active');
-
     Object.values(markers).forEach(marker => {
-      if (map.hasLayer(marker)) {
-        map.removeLayer(marker);
-      } else {
-        marker.addTo(map);
-      }
+      if (map.hasLayer(marker)) { map.removeLayer(marker); }
+      else { marker.addTo(map); }
     });
   }
 
-  // Toggle labels
   function toggleLabels() {
     const btn = document.getElementById('btn-labels');
     showingLabels = !showingLabels;
     btn.classList.toggle('active');
-
     Object.values(labels).forEach(label => {
-      if (showingLabels) {
-        label.addTo(map);
-      } else {
-        map.removeLayer(label);
-      }
+      if (showingLabels) { label.addTo(map); }
+      else { map.removeLayer(label); }
     });
   }
 
-  // Toggle polygons
   function togglePolygons() {
     const btn = document.getElementById('btn-polygons');
     showingPolygons = !showingPolygons;
     btn.classList.toggle('active');
     document.getElementById('legend-polygons').style.display = showingPolygons ? 'flex' : 'none';
-
     Object.values(polygons).forEach(polygon => {
-      if (showingPolygons) {
-        polygon.addTo(map);
-      } else {
-        map.removeLayer(polygon);
-      }
+      if (showingPolygons) { polygon.addTo(map); }
+      else { map.removeLayer(polygon); }
     });
   }
 
-  // Filter by zone group
   function filterByGroup(groupName, btn) {
-    // Update button states
-    document.querySelectorAll('.group-filter').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.znm__group-pill').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-
-    // Show/hide markers
     Object.values(markers).forEach(marker => {
       const zone = marker.options.zoneData;
-      if (groupName === 'all' || zone.groups.includes(groupName)) {
-        marker.addTo(map);
-      } else {
-        map.removeLayer(marker);
-      }
+      if (groupName === 'all' || zone.groups.includes(groupName)) { marker.addTo(map); }
+      else { map.removeLayer(marker); }
     });
-
-    // Update labels if showing
     if (showingLabels) {
       Object.entries(labels).forEach(([zoneNum, label]) => {
         const zone = zonesData.find(z => z.zone_number == zoneNum);
-        if (groupName === 'all' || (zone && zone.groups.includes(groupName))) {
-          label.addTo(map);
-        } else {
-          map.removeLayer(label);
-        }
+        if (groupName === 'all' || (zone && zone.groups.includes(groupName))) { label.addTo(map); }
+        else { map.removeLayer(label); }
       });
     }
-
-    // Update polygons if showing
     if (showingPolygons) {
       Object.entries(polygons).forEach(([zoneNum, polygon]) => {
         const zone = zonesData.find(z => z.zone_number == zoneNum);
-        if (groupName === 'all' || (zone && zone.groups.includes(groupName))) {
-          polygon.addTo(map);
-        } else {
-          map.removeLayer(polygon);
-        }
+        if (groupName === 'all' || (zone && zone.groups.includes(groupName))) { polygon.addTo(map); }
+        else { map.removeLayer(polygon); }
       });
     }
-
-    // Clear neighbour lines
     clearNeighbourLines();
   }
 
-  // Focus on a specific zone
   function focusZone(zoneNumber) {
     const marker = markers[zoneNumber];
     if (marker) {
-      // If zone has polygon, fit bounds to polygon, otherwise center on marker
       const polygon = polygons[zoneNumber];
       if (polygon) {
         map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
-        // Show polygon if not already showing
-        if (!showingPolygons) {
-          polygon.addTo(map);
-        }
+        if (!showingPolygons) { polygon.addTo(map); }
         polygon.setStyle({ fillOpacity: 0.4, weight: 3, color: '#10b981' });
-        // Reset other polygons
         Object.entries(polygons).forEach(([zNum, p]) => {
           if (zNum != zoneNumber) {
             const zone = zonesData.find(z => z.zone_number == zNum);
@@ -758,52 +429,36 @@
         map.setView(marker.getLatLng(), 14);
       }
       marker.openPopup();
-
-      // Highlight table row
       document.querySelectorAll('tbody tr').forEach(row => row.classList.remove('table-primary'));
       document.getElementById(`zone-row-${zoneNumber}`)?.classList.add('table-primary');
-
-      // Show neighbours
       const zone = zonesData.find(z => z.zone_number === zoneNumber);
-      if (zone) {
-        highlightNeighbours(zone);
-      }
+      if (zone) { highlightNeighbours(zone); }
     }
   }
 
-  // Reset map view
   function resetView() {
     map.setView([25.276987, 51.520008], 11);
     clearNeighbourLines();
     clearHighlightedPolygons();
     document.querySelectorAll('tbody tr').forEach(row => row.classList.remove('table-primary'));
-
-    // Reset polygon styles
     Object.entries(polygons).forEach(([zoneNum, polygon]) => {
       const zone = zonesData.find(z => z.zone_number == zoneNum);
       const color = zone && zone.groups.length > 0 ? (groupColors[zone.groups[0]] || '#001f3f') : '#001f3f';
       polygon.setStyle({ fillOpacity: 0.2, weight: 2, color: color });
-      if (!showingPolygons) {
-        map.removeLayer(polygon);
-      }
+      if (!showingPolygons) { map.removeLayer(polygon); }
     });
   }
 
-  // Clear highlights when clicking on empty map area
   map.on('click', function(e) {
-    // Small delay to check if click was on a marker/polygon (they stop propagation)
     setTimeout(() => {
       if (selectedZone === null) return;
-      // Check if popup is open - if so, don't clear
       if (map._popup && map._popup.isOpen()) return;
-      // Clear highlights
       clearNeighbourLines();
       clearHighlightedPolygons();
       document.querySelectorAll('tbody tr').forEach(row => row.classList.remove('table-primary'));
     }, 100);
   });
 
-  // Fit map to show all markers
   if (zonesData.length > 0) {
     const bounds = L.latLngBounds(zonesData.map(z => [z.lat, z.lng]));
     map.fitBounds(bounds, { padding: [30, 30] });

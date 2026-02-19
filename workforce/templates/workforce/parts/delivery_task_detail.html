@@ -106,6 +106,10 @@
                             <div class="dtd__route__point-head">
                                 <div class="dtd__route__dot dtd__route__dot--pickup"></div>
                                 <span class="dtd__route__type">Pickup</span>
+                                <button type="button" class="dtd__ai-btn" title="AI Parse Address"
+                                    onclick="aiParseAddress('{{ task.pickup_location.pickup_location_title|default:""|escapejs }} {{ task.pickup_location.pickup_area|default:""|escapejs }}', 'pickup')">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                </button>
                             </div>
                             <div class="dtd__route__name">{{ task.pickup_location.pickup_location_title|default:"Seller Location" }}</div>
                             {% if task.pickup_location.pickup_area %}
@@ -119,6 +123,10 @@
                             <div class="dtd__route__point-head">
                                 <div class="dtd__route__dot dtd__route__dot--dropoff"></div>
                                 <span class="dtd__route__type">Dropoff</span>
+                                <button type="button" class="dtd__ai-btn" title="AI Parse Address"
+                                    onclick="aiParseAddress('{{ task.order.customer_address|default:""|escapejs }} Zone {{ task.order.dl_zone|default:""|escapejs }} Street {{ task.order.dl_street|default:""|escapejs }} Building {{ task.order.dl_building|default:""|escapejs }}', 'dropoff')">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                </button>
                             </div>
                             <div class="dtd__route__name">{% if task.order.dl_zone %}Zone {{ task.order.dl_zone }}{% endif %}{% if task.order.dl_street %}, St {{ task.order.dl_street }}{% endif %}{% if task.order.dl_building %}, Bldg {{ task.order.dl_building }}{% endif %}</div>
                             {% if task.order.customer_address %}
@@ -326,6 +334,37 @@
                     <br><i class="fa-solid fa-store text-primary"></i> Pickup: {{ task.pickup_location.pickup_location_title|default:"Seller Location" }}
                     {% endif %}
                 </div>
+                <!-- Coordinates Display -->
+                <div class="dtd__coords">
+                    <div class="dtd__coords__row">
+                        <span class="dtd__coords__label"><i class="fa-solid fa-store"></i> Pickup</span>
+                        {% if task.pickup_location.pickup_lat and task.pickup_location.pickup_lon %}
+                        <span class="dtd__coords__value">
+                            <i class="fa-solid fa-location-crosshairs dtd__coords__icon--ok"></i>
+                            {{ task.pickup_location.pickup_lat|floatformat:6 }}, {{ task.pickup_location.pickup_lon|floatformat:6 }}
+                            <a href="https://www.google.com/maps?q={{ task.pickup_location.pickup_lat }},{{ task.pickup_location.pickup_lon }}" target="_blank" class="dtd__coords__link" title="Open in Google Maps"><i class="fa-solid fa-up-right-from-square"></i></a>
+                        </span>
+                        {% else %}
+                        <span class="dtd__coords__value dtd__coords__value--missing">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Coordinates missing
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="dtd__coords__row">
+                        <span class="dtd__coords__label"><i class="fa-solid fa-location-dot"></i> Dropoff</span>
+                        {% if task.dl_address_update and task.dl_address_update.dl_latitude and task.dl_address_update.dl_longitude %}
+                        <span class="dtd__coords__value">
+                            <i class="fa-solid fa-location-crosshairs dtd__coords__icon--ok"></i>
+                            {{ task.dl_address_update.dl_latitude|floatformat:6 }}, {{ task.dl_address_update.dl_longitude|floatformat:6 }}
+                            <a href="https://www.google.com/maps?q={{ task.dl_address_update.dl_latitude }},{{ task.dl_address_update.dl_longitude }}" target="_blank" class="dtd__coords__link" title="Open in Google Maps"><i class="fa-solid fa-up-right-from-square"></i></a>
+                        </span>
+                        {% else %}
+                        <span class="dtd__coords__value dtd__coords__value--missing">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Coordinates missing
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
 
             <!-- Seller Comments -->
@@ -439,6 +478,19 @@
         </div>
     </div>
 </div>
+<!-- AI Parse Result Panel -->
+<div class="dtd__ai-panel" id="aiParsePanel" style="display:none;">
+    <div class="dtd__ai-panel__head">
+        <span><i class="fa-solid fa-wand-magic-sparkles"></i> AI Address Parse</span>
+        <button type="button" class="dtd__ai-panel__close" onclick="document.getElementById('aiParsePanel').style.display='none'">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    <div class="dtd__ai-panel__body" id="aiParsePanelBody">
+        <div class="text-center py-3"><i class="fa-solid fa-spinner fa-spin"></i> Parsing address...</div>
+    </div>
+</div>
+
 {% endblock content %}
 
 {% block extra_js %}
@@ -535,6 +587,64 @@
 
     // Auto-refresh every hour
     setInterval(function() { location.reload(); }, 3600000);
+
+    function aiParseAddress(address, type) {
+        if (!address || !address.trim()) { alert('No address to parse'); return; }
+        var panel = document.getElementById('aiParsePanel');
+        var body = document.getElementById('aiParsePanelBody');
+        panel.style.display = '';
+        body.innerHTML = '<div class="text-center py-3"><i class="fa-solid fa-spinner fa-spin me-1"></i> AI parsing "' + type + '" address...</div>';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        fetch('/api/ai-agent/tools/parse-address/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            credentials: 'same-origin',
+            body: JSON.stringify({ address: address.trim() })
+        })
+        .then(function(r) {
+            if (!r.ok) throw new Error('Server returned ' + r.status + ' ' + r.statusText);
+            return r.json();
+        })
+        .then(function(data) {
+            if (data.success && data.data) {
+                var r = data.data;
+                var coords = r.coordinates || {};
+                var html = '<div class="dtd__ai-result">';
+                html += '<div class="dtd__ai-result__type">' + (type === 'pickup' ? '<i class="fa-solid fa-store"></i> Pickup' : '<i class="fa-solid fa-location-dot"></i> Dropoff') + '</div>';
+                html += '<div class="dtd__ai-result__input"><strong>Input:</strong> ' + address + '</div>';
+                html += '<table class="dtd__ai-result__table">';
+                var fields = [
+                    ['Zone', r.zone_number], ['Zone Name', r.zone_name],
+                    ['Street', r.street_number], ['Building', r.building_number],
+                    ['Unit', r.unit_number], ['Area', r.area_name],
+                    ['Latitude', coords.latitude], ['Longitude', coords.longitude],
+                    ['Confidence', r.confidence ? (r.confidence * 100).toFixed(0) + '%' : null]
+                ];
+                for (var i = 0; i < fields.length; i++) {
+                    var val = fields[i][1];
+                    if (val !== undefined && val !== null && val !== '') {
+                        html += '<tr><td class="dtd__ai-result__key">' + fields[i][0] + '</td>';
+                        html += '<td class="dtd__ai-result__val">' + val + '</td></tr>';
+                    }
+                }
+                html += '</table>';
+                if (coords.latitude && coords.longitude) {
+                    html += '<a href="https://www.google.com/maps?q=' + coords.latitude + ',' + coords.longitude + '" target="_blank" class="dtd__ai-result__map-link"><i class="fa-solid fa-map-location-dot me-1"></i> View on Google Maps</a>';
+                }
+                if (r.parse_notes && r.parse_notes.length > 0) {
+                    html += '<div class="dtd__ai-result__notes"><i class="fa-solid fa-circle-info me-1"></i> ' + r.parse_notes.join(' &bull; ') + '</div>';
+                }
+                html += '</div>';
+                body.innerHTML = html;
+            } else {
+                body.innerHTML = '<div class="dtd__ai-result__error"><i class="fa-solid fa-circle-exclamation me-1"></i> ' + (data.error || 'Failed to parse address') + '</div>';
+            }
+        })
+        .catch(function(err) {
+            body.innerHTML = '<div class="dtd__ai-result__error"><i class="fa-solid fa-circle-exclamation me-1"></i> Error: ' + err.message + '</div>';
+        });
+    }
 </script>
 
 <!-- Leaflet Map -->

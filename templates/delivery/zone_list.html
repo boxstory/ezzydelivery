@@ -4,298 +4,49 @@
 {% block title %}Zone List{% endblock title %}
 
 {% block extra_css %}
-<style>
-  .zone-list-container {
-    padding: 20px;
-  }
-
-  .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .page-header h1 {
-    font-size: 24px;
-    font-weight: 700;
-    color: #001f3f;
-    margin: 0;
-  }
-
-  .stats-row {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-  }
-
-  .stat-card {
-    background: white;
-    padding: 16px 24px;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    text-align: center;
-    min-width: 140px;
-  }
-
-  .stat-card__value {
-    font-size: 28px;
-    font-weight: 700;
-    color: #001f3f;
-  }
-
-  .stat-card__label {
-    font-size: 12px;
-    color: #666;
-    text-transform: uppercase;
-    margin-top: 4px;
-  }
-
-  .stat-card--success .stat-card__value { color: #10b981; }
-  .stat-card--warning .stat-card__value { color: #f59e0b; }
-
-  .filters-row {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .search-box {
-    flex: 1;
-    min-width: 200px;
-  }
-
-  .search-box input {
-    width: 100%;
-    padding: 10px 16px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 14px;
-  }
-
-  .filter-select {
-    padding: 10px 16px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 14px;
-    min-width: 180px;
-    background: white;
-  }
-
-  .zones-table {
-    width: 100%;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    overflow: hidden;
-  }
-
-  .zones-table table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  .zones-table th {
-    background: #f8f9fa;
-    padding: 12px 16px;
-    text-align: left;
-    font-weight: 600;
-    color: #001f3f;
-    font-size: 13px;
-    text-transform: uppercase;
-    border-bottom: 2px solid #e5e7eb;
-  }
-
-  .zones-table td {
-    padding: 12px 16px;
-    border-bottom: 1px solid #e5e7eb;
-    font-size: 14px;
-  }
-
-  .zones-table tr:hover {
-    background: #f8f9fa;
-  }
-
-  .zone-number {
-    display: inline-block;
-    background: #001f3f;
-    color: white;
-    padding: 4px 12px;
-    border-radius: 4px;
-    font-size: 14px;
-    font-weight: 700;
-    min-width: 40px;
-    text-align: center;
-  }
-
-  .arabic-text {
-    font-family: 'Noto Sans Arabic', sans-serif;
-    direction: rtl;
-    color: #666;
-    font-size: 13px;
-  }
-
-  .coords {
-    font-family: monospace;
-    font-size: 12px;
-    color: #666;
-  }
-
-  .badge-polygon {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 600;
-  }
-
-  .badge-polygon--yes {
-    background: #d1fae5;
-    color: #065f46;
-  }
-
-  .badge-polygon--no {
-    background: #fee2e2;
-    color: #991b1b;
-  }
-
-  .badge-count {
-    display: inline-block;
-    background: #e5e7eb;
-    color: #374151;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  .group-tags {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-  }
-
-  .group-tag {
-    display: inline-block;
-    background: #dbeafe;
-    color: #1e40af;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-  }
-
-  .action-btn {
-    padding: 6px 12px;
-    border: 1px solid #ddd;
-    background: white;
-    border-radius: 4px;
-    font-size: 12px;
-    cursor: pointer;
-    text-decoration: none;
-    color: #374151;
-  }
-
-  .action-btn:hover {
-    background: #f3f4f6;
-    border-color: #001f3f;
-    color: #001f3f;
-  }
-
-  .pagination-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 20px;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .pagination-info {
-    font-size: 14px;
-    color: #666;
-  }
-
-  .pagination-links {
-    display: flex;
-    gap: 4px;
-  }
-
-  .pagination-links a,
-  .pagination-links span {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-    text-decoration: none;
-    color: #001f3f;
-  }
-
-  .pagination-links a:hover {
-    background: #f8f9fa;
-  }
-
-  .pagination-links .current {
-    background: #001f3f;
-    color: white;
-    border-color: #001f3f;
-  }
-
-  .btn-clear {
-    background: #f3f4f6;
-    border: 1px solid #ddd;
-    padding: 10px 16px;
-    border-radius: 6px;
-    font-size: 14px;
-    cursor: pointer;
-    text-decoration: none;
-    color: #374151;
-  }
-
-  .empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: #666;
-  }
-</style>
+<link rel="stylesheet" href="{% static 'delivery/css/delivery.css' %}?v=20260219a">
 {% endblock extra_css %}
 
 {% block content %}
-<div class="zone-list-container">
-  <!-- Header -->
-  <div class="page-header">
-    <h1><i class="fas fa-list me-2"></i>Zone List</h1>
-    <a href="{% url 'delivery:zone_map' %}" class="btn btn-primary">
-      <i class="fas fa-map me-1"></i> View Map
+<div class="znl">
+  <!-- Hero -->
+  <div class="znl__hero">
+    <div class="d-flex align-items-center gap-2">
+      <div class="znl__hero-icon">
+        <i class="fa-solid fa-list-ol"></i>
+      </div>
+      <div>
+        <h1 class="znl__hero-title">Zone List</h1>
+        <p class="znl__hero-sub">Manage all delivery zones across Qatar</p>
+      </div>
+    </div>
+    <a href="{% url 'delivery:zone_map' %}" class="znl__hero-btn">
+      <i class="fa-solid fa-map"></i> View Map
     </a>
   </div>
 
   <!-- Stats -->
-  <div class="stats-row">
-    <div class="stat-card">
-      <div class="stat-card__value">{{ total_zones }}</div>
-      <div class="stat-card__label">Total Zones</div>
+  <div class="znl__stats">
+    <div class="znl__stat">
+      <div class="znl__stat-val">{{ total_zones }}</div>
+      <div class="znl__stat-lbl">Total Zones</div>
     </div>
-    <div class="stat-card stat-card--success">
-      <div class="stat-card__value">{{ zones_with_polygon }}</div>
-      <div class="stat-card__label">With Polygon</div>
+    <div class="znl__stat">
+      <div class="znl__stat-val znl__stat-val--success">{{ zones_with_polygon }}</div>
+      <div class="znl__stat-lbl">With Polygon</div>
     </div>
-    <div class="stat-card stat-card--warning">
-      <div class="stat-card__value">{{ zones_without_polygon }}</div>
-      <div class="stat-card__label">Without Polygon</div>
+    <div class="znl__stat">
+      <div class="znl__stat-val znl__stat-val--warning">{{ zones_without_polygon }}</div>
+      <div class="znl__stat-lbl">Without Polygon</div>
     </div>
   </div>
 
   <!-- Filters -->
-  <form method="get" class="filters-row">
-    <div class="search-box">
+  <form method="get" class="znl__filters">
+    <div class="znl__search">
       <input type="text" name="search" placeholder="Search zones..." value="{{ search }}">
     </div>
-    <select name="group" class="filter-select" onchange="this.form.submit()">
+    <select name="group" class="znl__select" onchange="this.form.submit()">
       <option value="">All Groups</option>
       {% for group in groups %}
         <option value="{{ group.id }}" {% if group_filter == group.id|stringformat:"s" %}selected{% endif %}>
@@ -303,25 +54,25 @@
         </option>
       {% endfor %}
     </select>
-    <select name="polygon" class="filter-select" onchange="this.form.submit()">
+    <select name="polygon" class="znl__select" onchange="this.form.submit()">
       <option value="">All Polygons</option>
       <option value="with" {% if polygon_filter == 'with' %}selected{% endif %}>With Polygon</option>
       <option value="without" {% if polygon_filter == 'without' %}selected{% endif %}>Without Polygon</option>
     </select>
-    <button type="submit" class="btn btn-primary">
-      <i class="fas fa-search me-1"></i> Search
+    <button type="submit" class="znl__btn znl__btn--primary">
+      <i class="fa-solid fa-magnifying-glass"></i> Search
     </button>
     {% if search or group_filter or polygon_filter %}
-      <a href="{% url 'delivery:zone_list' %}" class="btn-clear">
-        <i class="fas fa-times me-1"></i> Clear
+      <a href="{% url 'delivery:zone_list' %}" class="znl__btn znl__btn--clear">
+        <i class="fa-solid fa-xmark"></i> Clear
       </a>
     {% endif %}
   </form>
 
   <!-- Table -->
-  <div class="zones-table">
+  <div class="znl__table-card">
     {% if zones %}
-      <table>
+      <table class="znl__table">
         <thead>
           <tr>
             <th>Zone</th>
@@ -337,40 +88,40 @@
         <tbody>
           {% for zone in zones %}
             <tr>
-              <td><span class="zone-number">{{ zone.zone_number }}</span></td>
+              <td><span class="znl__zone-num">{{ zone.zone_number }}</span></td>
               <td><strong>{{ zone.zone_name }}</strong></td>
               <td>
                 {% if zone.zone_name_arabic %}
-                  <span class="arabic-text">{{ zone.zone_name_arabic }}</span>
+                  <span class="znl__arabic">{{ zone.zone_name_arabic }}</span>
                 {% else %}
                   <span class="text-muted">-</span>
                 {% endif %}
               </td>
               <td>
                 {% if zone.polygon and zone.polygon|length >= 3 %}
-                  <span class="badge-polygon badge-polygon--yes">
-                    <i class="fas fa-check me-1"></i>{{ zone.polygon|length }} pts
+                  <span class="znl__poly znl__poly--yes">
+                    <i class="fa-solid fa-check"></i> {{ zone.polygon|length }} pts
                   </span>
                 {% else %}
-                  <span class="badge-polygon badge-polygon--no">
-                    <i class="fas fa-times me-1"></i>None
+                  <span class="znl__poly znl__poly--no">
+                    <i class="fa-solid fa-xmark"></i> None
                   </span>
                 {% endif %}
               </td>
-              <td><span class="badge-count">{{ zone.area_count }}</span></td>
-              <td><span class="badge-count">{{ zone.neighbour_count }}</span></td>
+              <td><span class="znl__count">{{ zone.area_count }}</span></td>
+              <td><span class="znl__count">{{ zone.neighbour_count }}</span></td>
               <td>
-                <div class="group-tags">
+                <div class="znl__groups">
                   {% for group in zone.zone_groups.all %}
-                    <span class="group-tag">{{ group.name }}</span>
+                    <span class="znl__group-tag">{{ group.name }}</span>
                   {% empty %}
                     <span class="text-muted">-</span>
                   {% endfor %}
                 </div>
               </td>
               <td>
-                <a href="{% url 'delivery:edit_zone_polygon' zone.zone_number %}" class="action-btn" title="Edit Polygon">
-                  <i class="fas fa-draw-polygon"></i>
+                <a href="{% url 'delivery:edit_zone_polygon' zone.zone_number %}" class="znl__action" title="Edit Polygon">
+                  <i class="fa-solid fa-draw-polygon"></i>
                 </a>
               </td>
             </tr>
@@ -378,8 +129,8 @@
         </tbody>
       </table>
     {% else %}
-      <div class="empty-state">
-        <i class="fas fa-map-marker-alt" style="font-size:48px; opacity:0.5;"></i>
+      <div class="znl__empty">
+        <i class="fa-solid fa-map-location-dot"></i>
         <p>No zones found{% if search or group_filter or polygon_filter %} matching your criteria{% endif %}.</p>
       </div>
     {% endif %}
@@ -387,20 +138,20 @@
 
   <!-- Pagination -->
   {% if zones.has_other_pages %}
-    <div class="pagination-row">
-      <div class="pagination-info">
+    <div class="znl__pager">
+      <div class="znl__pager-info">
         Showing {{ zones.start_index }}-{{ zones.end_index }} of {{ zones.paginator.count }} zones
       </div>
-      <div class="pagination-links">
+      <div class="znl__pager-links">
         {% if zones.has_previous %}
           <a href="?page={{ zones.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if group_filter %}&group={{ group_filter }}{% endif %}{% if polygon_filter %}&polygon={{ polygon_filter }}{% endif %}">
-            <i class="fas fa-chevron-left"></i>
+            <i class="fa-solid fa-chevron-left"></i>
           </a>
         {% endif %}
 
         {% for num in zones.paginator.page_range %}
           {% if zones.number == num %}
-            <span class="current">{{ num }}</span>
+            <span class="znl__pager--active">{{ num }}</span>
           {% elif num > zones.number|add:'-3' and num < zones.number|add:'3' %}
             <a href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if group_filter %}&group={{ group_filter }}{% endif %}{% if polygon_filter %}&polygon={{ polygon_filter }}{% endif %}">{{ num }}</a>
           {% endif %}
@@ -408,7 +159,7 @@
 
         {% if zones.has_next %}
           <a href="?page={{ zones.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if group_filter %}&group={{ group_filter }}{% endif %}{% if polygon_filter %}&polygon={{ polygon_filter }}{% endif %}">
-            <i class="fas fa-chevron-right"></i>
+            <i class="fa-solid fa-chevron-right"></i>
           </a>
         {% endif %}
       </div>
