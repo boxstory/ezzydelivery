@@ -6,9 +6,9 @@ from fleet import models as fleet_models
 @admin.register(fleet_models.Driver)
 class DriverAdmin(admin.ModelAdmin):
     list_display = ('user', 'driver_code', 'driver_phone',
-                    'driver_whatsapp', 'driver_status', 'wallet_balance',
-                    'cod_in_hand', 'pending_earnings', 'created_at')
-    list_filter = ('driver_status', 'created_at', 'updated_at')
+                    'driver_whatsapp', 'driver_status', 'driver_availability',
+                    'wallet_balance', 'cod_in_hand', 'pending_earnings', 'created_at')
+    list_filter = ('driver_status', 'driver_availability', 'created_at', 'updated_at')
     list_per_page = 10
     readonly_fields = ('wallet_usage_percentage', 'is_wallet_warning',
                        'is_wallet_blocked', 'available_credit')
@@ -20,7 +20,7 @@ class DriverAdmin(admin.ModelAdmin):
         }),
         ('License & Status', {
             'fields': ('driver_license_number', 'driver_languages', 'driver_status',
-                      'driver_rating', 'driver_rating_count')
+                      'driver_availability', 'driver_rating', 'driver_rating_count')
         }),
         ('COD Wallet System', {
             'fields': ('wallet_balance', 'credit_limit', 'cod_in_hand',

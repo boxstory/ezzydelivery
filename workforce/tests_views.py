@@ -78,7 +78,7 @@ class WorkforceTestMixin:
 
     _driver_seq = 7000
 
-    def create_driver(self, did=None, status='Approved', code='DRV001'):
+    def create_driver(self, did=None, status='approved', code='DRV001'):
         if did is None:
             WorkforceTestMixin._driver_seq += 1
             did = WorkforceTestMixin._driver_seq
@@ -195,8 +195,8 @@ class WfDashboardTest(WorkforceTestMixin, TestCase):
     def test_dashboard_driver_seller_counts(self):
         """#5: Dashboard shows driver/seller counts"""
         self.create_business(status='active')
-        self.create_driver(status='Approved')
-        self.create_driver(did=2, status='Pending on Review', code='DRV002')
+        self.create_driver(status='approved')
+        self.create_driver(did=2, status='pending', code='DRV002')
         self.staff_login()
         resp = self.client.get(reverse('workforce:wf_dashboard'))
         self.assertEqual(resp.context['active_drivers'], 1)
@@ -1105,7 +1105,7 @@ class WfDriverManagementTest(WorkforceTestMixin, TestCase):
         """#99: Drivers status filter"""
         resp = self.client.get(
             reverse('workforce:drivers_list'),
-            {'status': 'Approved'})
+            {'status': 'approved'})
         self.assertEqual(resp.status_code, 200)
 
     def test_export_drivers_csv(self):
@@ -1165,7 +1165,7 @@ class WfUserVerificationTest(WorkforceTestMixin, TestCase):
 
     def test_verify_user_activates_driver(self):
         """#105: Verify user activates their driver"""
-        driver = self.create_driver(status='Pending on Review', code='PND01')
+        driver = self.create_driver(status='pending', code='PND01')
         drv_profile = driver.profile
         drv_profile.verification_status = 'pending'
         drv_profile.save()
@@ -1176,7 +1176,7 @@ class WfUserVerificationTest(WorkforceTestMixin, TestCase):
             content_type='application/json')
         self.assertEqual(resp.status_code, 200)
         driver.refresh_from_db()
-        self.assertEqual(driver.driver_status, 'Approved')
+        self.assertEqual(driver.driver_status, 'approved')
 
     def test_reject_user_stores_reason(self):
         """#106: Reject user stores rejection reason"""

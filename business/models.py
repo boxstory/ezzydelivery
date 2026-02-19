@@ -382,6 +382,7 @@ class BusinessTeamProfile(models.Model):
         ('active', 'Active'),
         ('inactive', 'Inactive'),
         ('suspended', 'Suspended'),
+        ('rejected', 'Rejected'),
     ]
 
     user = models.ForeignKey(

@@ -54,7 +54,7 @@ class DriverTestMixin:
         return user, profile
 
     def create_driver(self, user, profile, driver_id=1001, driver_code='DRV001',
-                      driver_status='Approved', credit_limit=5000, **kwargs):
+                      driver_status='approved', credit_limit=5000, **kwargs):
         """Create a Driver instance."""
         defaults = {
             'driver_id': driver_id,
@@ -156,7 +156,7 @@ class DriverModelTest(DriverTestMixin, TestCase):
     def test_driver_creation(self):
         self.assertEqual(self.driver.driver_id, 1001)
         self.assertEqual(self.driver.driver_code, 'DRV001')
-        self.assertEqual(self.driver.driver_status, 'Approved')
+        self.assertEqual(self.driver.driver_status, 'approved')
         self.assertEqual(self.driver.wallet_balance, Decimal('0.00'))
 
     def test_driver_str_with_profile(self):

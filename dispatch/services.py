@@ -312,7 +312,7 @@ class AssignmentService:
             rider = shift.rider
 
             # Check rider status
-            if rider.driver_status != 'Approved':
+            if rider.driver_status != 'approved':
                 logger.debug(f"Rider {rider.driver_code} not approved")
                 continue
 

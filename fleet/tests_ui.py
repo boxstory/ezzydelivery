@@ -95,7 +95,7 @@ class DriverUITestBase(StaticLiveServerTestCase):
             driver_whatsapp='55512345',
             driver_languages='english',
             driver_license_number='LIC12345',
-            driver_status='Approved',
+            driver_status='approved',
             credit_limit=Decimal('5000.00'),
             wallet_balance=Decimal('-500.00'),
             cod_in_hand=Decimal('500.00'),

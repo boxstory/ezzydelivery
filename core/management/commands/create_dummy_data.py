@@ -377,7 +377,7 @@ class Command(BaseCommand):
                 'driver_license_number': 'QA-DL-123456',
                 'driver_rating': 48,
                 'driver_rating_count': 10,
-                'driver_status': 'Approved',
+                'driver_status': 'approved',
                 'wallet_balance': Decimal('500.00'),
                 'credit_limit': Decimal('5000.00'),
                 'cod_in_hand': Decimal('0.00'),

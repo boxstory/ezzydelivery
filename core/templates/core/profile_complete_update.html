@@ -212,6 +212,72 @@
 
                             </div>
 
+                            <!-- Team Invitations (only shown when profile is 100% complete) -->
+                            {% if completion_percentage == 100 and team_invitations %}
+                            <div class="mt-4 pt-4 border-top">
+                                <h6 class="fw-bold mb-3 d-flex align-items-center gap-2">
+                                    <i class="fa-solid fa-envelope-open-text text-warning"></i>
+                                    Team Invitations
+                                </h6>
+                                {% for invitation in team_invitations %}
+
+                                {% if invitation.team_status == 'pending' and not invitation.team_verifed %}
+                                <!-- New invitation - show accept/decline buttons -->
+                                <div class="alert alert-warning d-flex flex-column flex-sm-row align-items-start align-items-sm-center gap-3 mb-3 border shadow-sm" role="alert">
+                                    <div class="flex-grow-1">
+                                        <strong>{{ invitation.business.business_name }}</strong> has invited you to join as
+                                        <span class="badge bg-dark text-white">{{ invitation.get_team_role_display }}</span>
+                                        {% if invitation.invited_by %}
+                                        <br><small class="text-muted">Invited by {{ invitation.invited_by.get_full_name|default:invitation.invited_by.username }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="d-flex gap-2 flex-shrink-0">
+                                        <button type="submit" name="action" value="accept_invitation_{{ invitation.id }}"
+                                                class="btn btn-success btn-sm d-flex align-items-center gap-1">
+                                            <i class="fa-solid fa-check"></i> Accept
+                                        </button>
+                                        <button type="submit" name="action" value="decline_invitation_{{ invitation.id }}"
+                                                class="btn btn-outline-danger btn-sm d-flex align-items-center gap-1">
+                                            <i class="fa-solid fa-times"></i> Decline
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {% elif invitation.team_status == 'pending' and invitation.team_verifed %}
+                                <!-- Accepted - pending staff verification -->
+                                <div class="alert alert-info d-flex flex-column flex-sm-row align-items-start align-items-sm-center gap-3 mb-3 border shadow-sm" role="alert">
+                                    <div class="flex-grow-1">
+                                        <strong>{{ invitation.business.business_name }}</strong> &mdash;
+                                        <span class="badge bg-dark text-white">{{ invitation.get_team_role_display }}</span>
+                                        {% if invitation.invited_by %}
+                                        <br><small class="text-muted">Invited by {{ invitation.invited_by.get_full_name|default:invitation.invited_by.username }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <span class="badge bg-info-subtle text-info border border-info-subtle px-3 py-2">
+                                        <i class="fa-solid fa-clock me-1"></i> Pending Staff Verification
+                                    </span>
+                                </div>
+
+                                {% elif invitation.team_status == 'rejected' %}
+                                <!-- Rejected by user -->
+                                <div class="alert alert-secondary d-flex flex-column flex-sm-row align-items-start align-items-sm-center gap-3 mb-3 border shadow-sm" role="alert">
+                                    <div class="flex-grow-1">
+                                        <strong>{{ invitation.business.business_name }}</strong> &mdash;
+                                        <span class="badge bg-dark text-white">{{ invitation.get_team_role_display }}</span>
+                                        {% if invitation.invited_by %}
+                                        <br><small class="text-muted">Invited by {{ invitation.invited_by.get_full_name|default:invitation.invited_by.username }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2">
+                                        <i class="fa-solid fa-times-circle me-1"></i> Rejected
+                                    </span>
+                                </div>
+                                {% endif %}
+
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
                             <!-- Action Buttons -->
                             <div class="mt-5 pt-4 border-top">
                                 <div class="row g-3">

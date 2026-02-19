@@ -312,7 +312,7 @@ class SuggestDriverTool(BaseTool):
 
         # Query available drivers (approved only)
         drivers = Driver.objects.filter(
-            driver_status='Approved',
+            driver_status='approved',
         ).prefetch_related(
             'preferred_zone_groups',
             'driver_vehicle'

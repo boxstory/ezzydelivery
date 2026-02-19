@@ -45,7 +45,7 @@ class DriverSerializer(serializers.ModelSerializer):
         fields = [
             'driver_id', 'driver_code', 'driver_code_dms', 'driver_phone', 'driver_whatsapp',
             'driver_bio', 'driver_languages', 'driver_license_number', 'driver_rating',
-            'driver_rating_count', 'driver_status', 'profile', 'driver_vehicle', 'driver_document',
+            'driver_rating_count', 'driver_status', 'driver_availability', 'profile', 'driver_vehicle', 'driver_document',
             'created_at', 'updated_at'
         ]
 
@@ -115,7 +115,7 @@ class DriverListSerializer(serializers.ModelSerializer):
         model = fleet_models.Driver
         fields = [
             'driver_id', 'driver_code', 'driver_code_dms', 'driver_phone',
-            'driver_whatsapp', 'driver_status', 'driver_rating', 'driver_rating_count',
+            'driver_whatsapp', 'driver_status', 'driver_availability', 'driver_rating', 'driver_rating_count',
             'driver_name', 'vehicle_type'
         ]
     

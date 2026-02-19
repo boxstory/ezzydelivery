@@ -37,7 +37,7 @@ class DriverSitemap(Sitemap):
 
     def items(self):
         # Return only approved drivers
-        return fleet_models.Driver.objects.filter(driver_status='Approved')
+        return fleet_models.Driver.objects.filter(driver_status='approved')
 
     def lastmod(self, obj):
         return obj.updated_at

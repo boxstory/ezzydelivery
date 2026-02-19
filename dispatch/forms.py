@@ -11,7 +11,7 @@ class RiderShiftForm(forms.ModelForm):
     """Form for creating and editing rider shifts"""
 
     rider = forms.ModelChoiceField(
-        queryset=Driver.objects.filter(driver_status='Approved'),
+        queryset=Driver.objects.filter(driver_status='approved'),
         widget=forms.Select(attrs={'class': 'form-select'}),
         help_text='Select an approved rider'
     )

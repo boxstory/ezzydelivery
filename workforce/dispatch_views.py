@@ -281,7 +281,7 @@ def shift_list(request):
     locations = PickupLocation.objects.filter(
         pickup_status='active'
     ).order_by('-is_fulfilment_center', 'pickup_location_title')
-    riders = Driver.objects.filter(driver_status='Approved').select_related('user')
+    riders = Driver.objects.filter(driver_status='approved').select_related('user')
 
     # Get today for template default value
     today_date = timezone.now().date()
@@ -385,7 +385,7 @@ def shift_create(request):
     locations = PickupLocation.objects.filter(
         pickup_status='active'
     ).order_by('-is_fulfilment_center', 'pickup_location_title')
-    riders = Driver.objects.filter(driver_status='Approved').select_related('user')
+    riders = Driver.objects.filter(driver_status='approved').select_related('user')
 
     context = {
         'locations': locations,
@@ -492,7 +492,7 @@ def shift_edit(request, shift_id):
     locations = PickupLocation.objects.filter(
         pickup_status='active'
     ).order_by('-is_fulfilment_center', 'pickup_location_title')
-    riders = Driver.objects.filter(driver_status='Approved').select_related('user')
+    riders = Driver.objects.filter(driver_status='approved').select_related('user')
 
     context = {
         'shift': shift,

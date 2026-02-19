@@ -204,25 +204,23 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
                 verified_by=instance.verified_by
             )
             
-            # Auto-create delivery task when order is verified
-            if instance.verification_status == 'verified' and not instance.task_created:
-                # Check if batching is enabled
-                from django.conf import settings
-                if getattr(settings, 'DISPATCH_BATCHING_ENABLED', False):
-                    # Route to batching system (async via Celery)
-                    try:
-                        from dispatch.tasks import process_verified_order
-                        process_verified_order.delay(instance.id)
-                        logger.info(f"Order {instance.order_number} queued for batch processing")
-                    except Exception as e:
-                        logger.error(f"Error queuing order for batching: {e}, falling back to direct task creation")
-                        _create_delivery_task_from_order(instance)
-                else:
-                    # Legacy: direct task creation
-                    _create_delivery_task_from_order(instance)
-        
         # Log all status field changes to OrderStatusHistory
         _log_order_status_changes(instance)
+
+        # Auto-create delivery task when order is published
+        old_order_status = getattr(instance, '_old_order_status', '')
+        if instance.order_status == 'publish' and old_order_status != 'publish' and not instance.task_created:
+            from django.conf import settings
+            if getattr(settings, 'DISPATCH_BATCHING_ENABLED', False):
+                try:
+                    from dispatch.tasks import process_verified_order
+                    process_verified_order.delay(instance.id)
+                    logger.info(f"Order {instance.order_number} queued for batch processing")
+                except Exception as e:
+                    logger.error(f"Error queuing order for batching: {e}, falling back to direct task creation")
+                    _create_delivery_task_from_order(instance)
+            else:
+                _create_delivery_task_from_order(instance)
 
         # Clean up stored old status from instance
         for attr in ('_old_verification_status', '_old_order_status', '_old_task_status', '_old_cod_status_by_staff'):

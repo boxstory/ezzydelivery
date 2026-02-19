@@ -81,9 +81,9 @@ VERIFICATION_STATUS_UNDER_REVIEW = 'under_review'
 VERIFICATION_STATUS_VERIFIED = 'verified'
 VERIFICATION_STATUS_REJECTED = 'rejected'
 
-DRIVER_STATUS_PENDING = 'Pending on Review'
-DRIVER_STATUS_ACTIVE = 'Active'
-DRIVER_STATUS_APPROVAL_PENDING = 'Approval Pending'
+DRIVER_STATUS_PENDING = 'pending'
+DRIVER_STATUS_APPROVED = 'approved'
+DRIVER_STATUS_PROCESSING = 'processing'
 
 BUSINESS_STATUS_PENDING = 'pending'
 
@@ -282,7 +282,7 @@ def join_driver(request):
                 driver = form.save(commit=False)
                 driver.profile = profile
                 driver.driver_id = profile.id
-                driver.driver_status = DRIVER_STATUS_APPROVAL_PENDING
+                driver.driver_status = DRIVER_STATUS_PROCESSING
                 driver.driver_code = ''.join(random.choice(string.digits) for _ in range(6))
                 driver.user_id = request.user.id
                 driver.driver_rating = 0
@@ -438,7 +438,7 @@ def join_us(request):
                 driver = driverjoinform.save(commit=False)
                 driver.user = request.user
                 driver.driver_id = request.user.id
-                driver.driver_status = DRIVER_STATUS_ACTIVE
+                driver.driver_status = DRIVER_STATUS_APPROVED
                 driver.save()
 
                 logger.info(f"Driver join completed for user {request.user.id}")
@@ -811,15 +811,51 @@ def profile_complete_update(request):
         profile.username = request.user.username
         profile.save()
 
+    # Fetch team invitations for this user:
+    # - pending + not verified = new invitation (show accept/decline buttons)
+    # - pending + verified = user accepted, awaiting staff verification
+    # - rejected = user declined
+    team_invitations = business_models.BusinessTeamProfile.objects.filter(
+        user=request.user,
+        team_status__in=['pending', 'rejected']
+    ).select_related('business', 'invited_by')
+
     if request.method == 'POST':
+        action = request.POST.get('action')
+
+        # Handle accept/decline invitation actions separately (no form validation needed)
+        if action and action.startswith('accept_invitation_'):
+            invitation_id = action.replace('accept_invitation_', '')
+            try:
+                invitation = business_models.BusinessTeamProfile.objects.get(
+                    id=invitation_id, user=request.user, team_status='pending', team_verifed=False
+                )
+                # Keep pending for staff verification, mark user accepted
+                invitation.team_verifed = True
+                invitation.save()
+                messages.success(request, f"Invitation accepted! Pending staff verification for {invitation.business.business_name}.")
+            except business_models.BusinessTeamProfile.DoesNotExist:
+                messages.error(request, "Invitation not found or already processed.")
+            return redirect('core:profile_complete_update')
+
+        elif action and action.startswith('decline_invitation_'):
+            invitation_id = action.replace('decline_invitation_', '')
+            try:
+                invitation = business_models.BusinessTeamProfile.objects.get(
+                    id=invitation_id, user=request.user, team_status='pending', team_verifed=False
+                )
+                invitation.team_status = 'rejected'
+                invitation.save()
+                messages.success(request, "Invitation declined.")
+            except business_models.BusinessTeamProfile.DoesNotExist:
+                messages.error(request, "Invitation not found or already processed.")
+            return redirect('core:profile_complete_update')
+
         form = core_forms.ProfileUpdateForm(request.POST, instance=profile)
         # Auto-populate username from logged-in user and disable it
         form.fields['username'].initial = request.user.username
         form.fields['username'].widget.attrs['readonly'] = True
         form.fields['username'].disabled = True
-
-        # Check which button was clicked
-        action = request.POST.get('action')
 
         if form.is_valid():
             profile = form.save(commit=False)
@@ -873,6 +909,7 @@ def profile_complete_update(request):
         'form': form,
         'profile': profile,
         'completion_percentage': completion_percentage,
+        'team_invitations': team_invitations,
     }
     return render(request, 'core/profile_complete_update.html', context)
 

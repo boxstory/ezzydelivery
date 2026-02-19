@@ -3,23 +3,35 @@
 {% load static %}
 
 {% block extra_css %}
-<link href="{% static 'orders/css/orders.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 {% endblock extra_css %}
 
 {% block content %}
-<div class="  col-12 p-3">
-    <!-- Task Header -->
-    <div class="task-header">
-        <div class="d-flex justify-content-between align-items-center">
+<div class="col-12 p-3">
+
+    <!-- Hero Banner -->
+    <div class="dtd__hero">
+        <div class="dtd__hero__top">
             <div>
-                <h2><i class="fa-solid fa-clipboard-check me-2"></i>Delivery Task #{{ task.dl_task_number }}</h2>
-                <p class="mb-0 opacity-75">Order: {{ task.order.client_order_code }}</p>
+                <h2 class="dtd__hero__title">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                    Task #{{ task.dl_task_number }}
+                </h2>
+                <div class="dtd__hero__sub">
+                    <i class="fa-solid fa-box-open"></i>
+                    Order: <span>{{ task.order.client_order_code }}</span>
+                    <span class="ms-2"><i class="fa-solid fa-store"></i></span>
+                    <span>{{ task.order.business.business_name }}</span>
+                </div>
             </div>
-            <div class="text-end">
-                <span class="badge bg-light text-dark fs-6">
-                    Status: {{ task.get_dl_task_status_dms_display }}
+            <div class="dtd__hero__badges">
+                <span class="dtd__hero__badge {% if task.dl_task_status == 'delivered' %}dtd__hero__badge--delivered{% elif task.dl_task_status == 'cancelled' %}dtd__hero__badge--cancelled{% elif task.dl_task_status == 'in_transit' or task.dl_task_status == 'out_for_delivery' %}dtd__hero__badge--transit{% else %}dtd__hero__badge--status{% endif %}">
+                    <i class="fa-solid fa-truck-fast"></i>
+                    {{ task.get_dl_task_status_display }}
+                </span>
+                <span class="dtd__hero__badge dtd__hero__badge--status">
+                    <i class="fa-solid fa-satellite-dish"></i>
+                    DMS: {{ task.get_dl_task_status_dms_display }}
                 </span>
             </div>
         </div>
@@ -28,101 +40,157 @@
     <div class="row">
         <!-- Left Column -->
         <div class="col-lg-8">
-            <!-- Task Information -->
-            <div class="info-card">
-                <div class="info-card-header">
-                    <h3 class="info-card-title">
-                        <i class="fa-solid fa-info-circle text-primary"></i>
+
+            <!-- Task Details Card -->
+            <div class="dtd__card">
+                <div class="dtd__card__head">
+                    <div class="dtd__card__head-left">
+                        <i class="fa-solid fa-info-circle"></i>
                         Task Details
-                    </h3>
+                    </div>
                 </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <small class="text-muted d-block mb-1">Customer Name</small>
-                        <strong>{{ task.order.customer_name }}</strong>
+                <div class="dtd__card__body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="dtd__fields">
+                                <div class="dtd__field">
+                                    <span class="dtd__field__label"><i class="fa-solid fa-user"></i> Customer</span>
+                                    <span class="dtd__field__value">{{ task.order.customer_name }}</span>
+                                </div>
+                                <div class="dtd__field">
+                                    <span class="dtd__field__label"><i class="fa-solid fa-phone"></i> Phone</span>
+                                    <span class="dtd__field__value dtd__field__value--mono">{{ task.order.customer_phone }}</span>
+                                </div>
+                                <div class="dtd__field">
+                                    <span class="dtd__field__label"><i class="fa-solid fa-user-shield"></i> Driver</span>
+                                    {% if task.driver %}
+                                    <div class="dtd__driver">
+                                        <div class="dtd__driver__avatar"><i class="fa-solid fa-motorcycle"></i></div>
+                                        <div class="dtd__driver__info">
+                                            <div class="dtd__driver__name">{{ task.driver.user.get_full_name|default:task.driver.driver_phone }}</div>
+                                            <div class="dtd__driver__code">{{ task.driver.driver_code }}</div>
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                    <span class="dtd__field__value dtd__field__value--muted">Not Assigned</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <!-- COD Highlight -->
+                            <div class="dtd__cod">
+                                <span class="dtd__cod__label"><i class="fa-solid fa-money-bill-wave me-1"></i> COD Amount</span>
+                                <div>
+                                    <span class="dtd__cod__amount">{{ task.order.cod_amount|default:0 }}</span>
+                                    <span class="dtd__cod__currency">QAR</span>
+                                </div>
+                            </div>
+                            <!-- Contact Buttons -->
+                            {% if task.order.customer_phone %}
+                            <div class="dtd__contacts">
+                                <a href="tel:{{ task.order.customer_phone }}" class="dtd__contact dtd__contact--phone">
+                                    <i class="fa-solid fa-phone"></i> {{ task.order.customer_phone }}
+                                </a>
+                                <a href="https://wa.me/{{ task.order.customer_phone }}" target="_blank" class="dtd__contact dtd__contact--whatsapp">
+                                    <i class="fa-brands fa-whatsapp"></i> WhatsApp
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <small class="text-muted d-block mb-1">Phone Number</small>
-                        <strong>{{ task.order.customer_phone }}</strong>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <small class="text-muted d-block mb-1">COD Amount</small>
-                        <strong class="text-success">{{ task.order.cod_amount|default:0 }} QAR</strong>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <small class="text-muted d-block mb-1">Assigned Driver</small>
-                        <strong>{{ task.driver|default:"Not Assigned" }}</strong>
-                    </div>
-                    <div class="col-12 mb-3">
-                        <small class="text-muted d-block mb-1">Delivery Address</small>
-                        <p class="mb-0">
-                            <i class="fa-solid fa-location-dot text-danger me-2"></i>
-                            Zone: {{ task.order.dl_zone }}, Street: {{ task.order.dl_street }}, Building: {{ task.order.dl_building }}<br>
-                            {{ task.order.customer_address }}
-                        </p>
+
+                    <!-- Route Visualization -->
+                    <div class="dtd__route">
+                        <div class="dtd__route__point">
+                            <div class="dtd__route__point-head">
+                                <div class="dtd__route__dot dtd__route__dot--pickup"></div>
+                                <span class="dtd__route__type">Pickup</span>
+                            </div>
+                            <div class="dtd__route__name">{{ task.pickup_location.pickup_location_title|default:"Seller Location" }}</div>
+                            {% if task.pickup_location.pickup_area %}
+                            <div class="dtd__route__addr">{{ task.pickup_location.pickup_area }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="dtd__route__connector">
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </div>
+                        <div class="dtd__route__point">
+                            <div class="dtd__route__point-head">
+                                <div class="dtd__route__dot dtd__route__dot--dropoff"></div>
+                                <span class="dtd__route__type">Dropoff</span>
+                            </div>
+                            <div class="dtd__route__name">{% if task.order.dl_zone %}Zone {{ task.order.dl_zone }}{% endif %}{% if task.order.dl_street %}, St {{ task.order.dl_street }}{% endif %}{% if task.order.dl_building %}, Bldg {{ task.order.dl_building }}{% endif %}</div>
+                            {% if task.order.customer_address %}
+                            <div class="dtd__route__addr">{{ task.order.customer_address }}</div>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Driver App Updates -->
-            <div class="info-card">
-                <div class="info-card-header">
-                    <h3 class="info-card-title">
-                        <i class="fa-solid fa-mobile-screen text-success"></i>
+            <div class="dtd__card">
+                <div class="dtd__card__head">
+                    <div class="dtd__card__head-left">
+                        <i class="fa-solid fa-mobile-screen"></i>
                         Driver App Updates
-                        {% if driver_status_updates or driver_documents %}
-                        <span class="badge bg-success rounded-pill ms-1">{{ driver_status_updates.count|add:driver_documents.count }}</span>
-                        {% endif %}
-                    </h3>
+                    </div>
+                    {% if driver_status_updates or driver_documents %}
+                    <span class="dtd__card__head-count">{{ driver_status_updates.count|add:driver_documents.count }}</span>
+                    {% endif %}
                 </div>
-                <div class="driver-updates-list p-3">
+                <div class="dtd__updates">
                     {% if driver_status_updates or driver_documents %}
 
-                    <!-- DMS / Driver Status Changes -->
                     {% for entry in driver_status_updates %}
-                    <div class="d-flex align-items-start mb-3">
-                        <div class="me-3">
-                            <div class="rounded-circle d-flex align-items-center justify-content-center {% if entry.field_name == 'dl_task_status_dms' %}bg-primary{% else %}bg-info{% endif %} bg-opacity-10" style="width:36px;height:36px;">
-                                {% if entry.field_name == 'dl_task_status_dms' %}
-                                <i class="fa-solid fa-satellite-dish text-primary small"></i>
-                                {% else %}
-                                <i class="fa-solid fa-truck-fast text-info small"></i>
-                                {% endif %}
-                            </div>
+                    <div class="dtd__update">
+                        <div class="dtd__update__icon {% if entry.field_name == 'dl_task_status_dms' %}dtd__update__icon--dms{% else %}dtd__update__icon--driver{% endif %}">
+                            {% if entry.field_name == 'dl_task_status_dms' %}
+                            <i class="fa-solid fa-satellite-dish"></i>
+                            {% else %}
+                            <i class="fa-solid fa-truck-fast"></i>
+                            {% endif %}
                         </div>
-                        <div class="flex-grow-1">
-                            <div class="fw-semibold small">{{ entry.get_field_name_display }}</div>
-                            <div class="small">
-                                {% if entry.old_display %}<span class="text-muted">{{ entry.old_display }}</span> <i class="fa-solid fa-arrow-right small text-muted mx-1"></i>{% endif %}
-                                <span class="fw-semibold {% if entry.new_value == 'delivered' or entry.new_value == '2' %}text-success{% elif entry.new_value == 'cancelled' or entry.new_value == '9' %}text-danger{% else %}text-primary{% endif %}">{{ entry.new_display }}</span>
+                        <div class="dtd__update__body">
+                            <div class="dtd__update__title">{{ entry.get_field_name_display }}</div>
+                            <div class="dtd__update__transition">
+                                {% if entry.old_display %}
+                                <span class="dtd__update__pill dtd__update__pill--from">{{ entry.old_display }}</span>
+                                <i class="fa-solid fa-arrow-right dtd__update__arrow"></i>
+                                {% endif %}
+                                <span class="dtd__update__pill {% if entry.new_value == 'delivered' or entry.new_value == '2' %}dtd__update__pill--success{% elif entry.new_value == 'cancelled' or entry.new_value == '9' %}dtd__update__pill--danger{% else %}dtd__update__pill--to{% endif %}">{{ entry.new_display }}</span>
                             </div>
-                            <div class="text-muted small mt-1">
-                                <i class="fa-regular fa-clock me-1"></i>{{ entry.created_at|date:"d M Y, H:i" }}
-                                {% if entry.changed_by %}<span class="ms-2"><i class="fa-regular fa-user me-1"></i>{{ entry.changed_by.get_full_name|default:entry.changed_by.username }}</span>{% endif %}
+                            <div class="dtd__update__meta">
+                                <i class="fa-regular fa-clock"></i> {{ entry.created_at|date:"d M Y, H:i" }}
+                                {% if entry.changed_by %}
+                                <span><i class="fa-regular fa-user"></i> {{ entry.changed_by.get_full_name|default:entry.changed_by.username }}</span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
                     {% endfor %}
 
-                    <!-- Document Uploads -->
                     {% for doc in driver_documents %}
-                    <div class="d-flex align-items-start mb-3">
-                        <div class="me-3">
-                            <div class="rounded-circle d-flex align-items-center justify-content-center bg-success bg-opacity-10" style="width:36px;height:36px;">
-                                <i class="fa-solid fa-file-arrow-up text-success small"></i>
-                            </div>
+                    <div class="dtd__update">
+                        <div class="dtd__update__icon dtd__update__icon--doc">
+                            <i class="fa-solid fa-file-arrow-up"></i>
                         </div>
-                        <div class="flex-grow-1">
-                            <div class="fw-semibold small">{{ doc.get_document_type_display }}</div>
-                            {% if doc.description %}<div class="small text-muted">{{ doc.description }}</div>{% endif %}
+                        <div class="dtd__update__body">
+                            <div class="dtd__update__title">{{ doc.get_document_type_display }}</div>
+                            {% if doc.description %}
+                            <div style="font-size:0.75rem;color:var(--brand-grey-500);">{{ doc.description }}</div>
+                            {% endif %}
                             {% if doc.document_file %}
-                            <a href="{{ doc.document_file.url }}" target="_blank" class="small text-primary mt-1 d-inline-block">
-                                <i class="fa-solid fa-paperclip me-1"></i>{{ doc.document_name|default:"View file" }}
+                            <a href="{{ doc.document_file.url }}" target="_blank" class="dtd__update__file">
+                                <i class="fa-solid fa-paperclip"></i> {{ doc.document_name|default:"View file" }}
                             </a>
                             {% endif %}
-                            <div class="text-muted small mt-1">
-                                <i class="fa-regular fa-clock me-1"></i>{{ doc.created_at|date:"d M Y, H:i" }}
-                                {% if doc.uploaded_by %}<span class="ms-2"><i class="fa-regular fa-user me-1"></i>{{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username }}</span>{% endif %}
+                            <div class="dtd__update__meta">
+                                <i class="fa-regular fa-clock"></i> {{ doc.created_at|date:"d M Y, H:i" }}
+                                {% if doc.uploaded_by %}
+                                <span><i class="fa-regular fa-user"></i> {{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username }}</span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -130,344 +198,225 @@
 
                     {% else %}
                     <!-- No activity — show task summary -->
-                    <div class="mb-3">
-                        <div class="d-flex align-items-start mb-3">
-                            <div class="me-3">
-                                <div class="rounded-circle d-flex align-items-center justify-content-center bg-secondary bg-opacity-10" style="width:36px;height:36px;">
-                                    <i class="fa-solid fa-plus text-secondary small"></i>
-                                </div>
-                            </div>
-                            <div class="flex-grow-1">
-                                <div class="fw-semibold small">Task Created</div>
-                                <div class="text-muted small mt-1"><i class="fa-regular fa-clock me-1"></i>{{ task.created_at|date:"d M Y, H:i" }}</div>
-                            </div>
+                    <div class="dtd__update">
+                        <div class="dtd__update__icon dtd__update__icon--default">
+                            <i class="fa-solid fa-plus"></i>
                         </div>
-                        {% if task.driver %}
-                        <div class="d-flex align-items-start mb-3">
-                            <div class="me-3">
-                                <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary bg-opacity-10" style="width:36px;height:36px;">
-                                    <i class="fa-solid fa-user-check text-primary small"></i>
-                                </div>
-                            </div>
-                            <div class="flex-grow-1">
-                                <div class="fw-semibold small">Driver Assigned</div>
-                                <div class="small">{{ task.driver.driver_code }} — {{ task.driver.user.get_full_name|default:task.driver.driver_phone }}</div>
-                            </div>
-                        </div>
-                        {% endif %}
-                        <div class="d-flex align-items-start">
-                            <div class="me-3">
-                                <div class="rounded-circle d-flex align-items-center justify-content-center {% if task.dl_task_status == 'delivered' %}bg-success{% elif task.dl_task_status == 'cancelled' %}bg-danger{% else %}bg-warning{% endif %} bg-opacity-10" style="width:36px;height:36px;">
-                                    {% if task.dl_task_status == 'delivered' %}<i class="fa-solid fa-check text-success small"></i>
-                                    {% elif task.dl_task_status == 'cancelled' %}<i class="fa-solid fa-xmark text-danger small"></i>
-                                    {% else %}<i class="fa-solid fa-clock text-warning small"></i>{% endif %}
-                                </div>
-                            </div>
-                            <div class="flex-grow-1">
-                                <div class="fw-semibold small">Current Status</div>
-                                <div class="small">
-                                    <span class="badge bg-{% if task.dl_task_status == 'delivered' %}success{% elif task.dl_task_status == 'cancelled' %}danger{% elif task.dl_task_status == 'in_transit' or task.dl_task_status == 'out_for_delivery' %}primary{% else %}warning{% endif %}">{{ task.get_dl_task_status_display }}</span>
-                                    <span class="badge bg-secondary ms-1">DMS: {{ task.get_dl_task_status_dms_display }}</span>
-                                </div>
-                                <div class="text-muted small mt-1"><i class="fa-regular fa-clock me-1"></i>{{ task.updated_at|date:"d M Y, H:i" }}</div>
+                        <div class="dtd__update__body">
+                            <div class="dtd__update__title">Task Created</div>
+                            <div class="dtd__update__meta">
+                                <i class="fa-regular fa-clock"></i> {{ task.created_at|date:"d M Y, H:i" }}
                             </div>
                         </div>
                     </div>
-                    <div class="text-center pt-2 border-top">
-                        <small class="text-muted"><i class="fa-solid fa-info-circle me-1"></i>Status tracking started — future driver activity will appear here</small>
+                    {% if task.driver %}
+                    <div class="dtd__update">
+                        <div class="dtd__update__icon dtd__update__icon--driver">
+                            <i class="fa-solid fa-user-check"></i>
+                        </div>
+                        <div class="dtd__update__body">
+                            <div class="dtd__update__title">Driver Assigned</div>
+                            <div class="dtd__update__meta">
+                                {{ task.driver.driver_code }} &mdash; {{ task.driver.user.get_full_name|default:task.driver.driver_phone }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="dtd__update">
+                        <div class="dtd__update__icon {% if task.dl_task_status == 'delivered' %}dtd__update__icon--doc{% elif task.dl_task_status == 'cancelled' %}dtd__update__icon--default{% else %}dtd__update__icon--dms{% endif %}">
+                            {% if task.dl_task_status == 'delivered' %}<i class="fa-solid fa-check"></i>
+                            {% elif task.dl_task_status == 'cancelled' %}<i class="fa-solid fa-xmark"></i>
+                            {% else %}<i class="fa-solid fa-clock"></i>{% endif %}
+                        </div>
+                        <div class="dtd__update__body">
+                            <div class="dtd__update__title">Current Status</div>
+                            <div class="dtd__update__transition">
+                                <span class="dtd__update__pill {% if task.dl_task_status == 'delivered' %}dtd__update__pill--success{% elif task.dl_task_status == 'cancelled' %}dtd__update__pill--danger{% else %}dtd__update__pill--to{% endif %}">{{ task.get_dl_task_status_display }}</span>
+                                <span class="dtd__update__pill dtd__update__pill--from" style="text-decoration:none;">DMS: {{ task.get_dl_task_status_dms_display }}</span>
+                            </div>
+                            <div class="dtd__update__meta">
+                                <i class="fa-regular fa-clock"></i> {{ task.updated_at|date:"d M Y, H:i" }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dtd__empty" style="border-top:1px solid var(--brand-grey-200);padding-top:0.75rem;">
+                        <p><i class="fa-solid fa-info-circle me-1"></i> Status tracking started &mdash; future driver activity will appear here</p>
                     </div>
                     {% endif %}
                 </div>
             </div>
 
-            <!-- Status Timeline -->
-            <div class="card tl-card">
-                <div class="card-header tl-header">
-                    <div class="tl-header__left">
-                        <i class="fa-solid fa-clock-rotate-left me-2"></i>
-                        Status Timeline
-                    </div>
-                    <span class="tl-header__count">{{ status_history.count|default:"0" }} event{{ status_history.count|pluralize }}</span>
-                </div>
-                <div class="card-body p-0">
-                    <div class="tl-wrap">
-                        <!-- Task Created -->
-                        <div class="tl-item tl-item--first">
-                            <div class="tl-track">
-                                <div class="tl-icon tl-icon--created"><i class="fa-solid fa-plus"></i></div>
-                            </div>
-                            <div class="tl-body">
-                                <div class="tl-card-inner tl-card-inner--created">
-                                    <div class="tl-row">
-                                        <span class="tl-title">Order Created</span>
-                                        <span class="tl-timestamp"><i class="fa-regular fa-clock"></i> {{ task.order.created_at|date:"d M Y, H:i" }}</span>
-                                    </div>
-                                    <div class="tl-detail">
-                                        <span class="tl-pill tl-pill--muted">{{ task.order.order_number }}</span>
-                                        <span class="tl-pill tl-pill--muted">{{ task.order.business.business_name }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+            <!-- Status Timeline (reusable include) -->
+            {% with order=task.order delivery_task=task timeline_count=status_history.count %}
+            {% include "workforce/parts/status_timeline.html" %}
+            {% endwith %}
 
-                        {% for entry in status_history %}
-                        <div class="tl-item">
-                            <div class="tl-track">
-                                <div class="tl-icon {% if entry.field_name == 'order_status' %}tl-icon--order{% elif entry.field_name == 'verification_status' %}tl-icon--verify{% elif entry.field_name == 'dl_task_status' %}tl-icon--task{% elif entry.field_name == 'dl_task_status_dms' %}tl-icon--dms{% elif entry.field_name == 'cod_status_by_staff' %}tl-icon--cod{% else %}tl-icon--default{% endif %}">
-                                    {% if entry.field_name == 'order_status' %}<i class="fa-solid fa-box"></i>
-                                    {% elif entry.field_name == 'verification_status' %}<i class="fa-solid fa-shield-halved"></i>
-                                    {% elif entry.field_name == 'dl_task_status' %}<i class="fa-solid fa-truck-fast"></i>
-                                    {% elif entry.field_name == 'dl_task_status_dms' %}<i class="fa-solid fa-satellite-dish"></i>
-                                    {% elif entry.field_name == 'cod_status_by_staff' %}<i class="fa-solid fa-money-bill-wave"></i>
-                                    {% elif entry.field_name == 'task_status' %}<i class="fa-solid fa-list-check"></i>
-                                    {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
-                                </div>
-                            </div>
-                            <div class="tl-body">
-                                <div class="tl-card-inner">
-                                    <div class="tl-row">
-                                        <span class="tl-title">{{ entry.get_field_name_display }}</span>
-                                        <span class="tl-timestamp"><i class="fa-regular fa-clock"></i> {{ entry.created_at|date:"d M Y, H:i" }}</span>
-                                    </div>
-                                    <div class="tl-transition">
-                                        {% if entry.old_display %}
-                                        <span class="tl-pill tl-pill--from">{{ entry.old_display }}</span>
-                                        <span class="tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
-                                        {% endif %}
-                                        <span class="tl-pill {% if entry.new_value == 'delivered' or entry.new_value == 'fulfilled' or entry.new_value == 'verified' or entry.new_value == '2' %}tl-pill--success{% elif entry.new_value == 'cancelled' or entry.new_value == 'rejected' or entry.new_value == 'failed' or entry.new_value == '3' or entry.new_value == '9' %}tl-pill--danger{% else %}tl-pill--to{% endif %}">{{ entry.new_display }}</span>
-                                    </div>
-                                    {% if entry.notes %}<div class="tl-note"><i class="fa-regular fa-message"></i> {{ entry.notes }}</div>{% endif %}
-                                    {% if entry.changed_by %}<div class="tl-meta"><i class="fa-regular fa-user"></i> {{ entry.changed_by.get_full_name|default:entry.changed_by.username }}</div>{% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        {% empty %}
-                        {% endfor %}
-
-                        {% if not status_history %}
-                        {% for log in verification_logs %}
-                        <div class="tl-item">
-                            <div class="tl-track">
-                                <div class="tl-icon tl-icon--verify"><i class="fa-solid fa-shield-halved"></i></div>
-                            </div>
-                            <div class="tl-body">
-                                <div class="tl-card-inner">
-                                    <div class="tl-row">
-                                        <span class="tl-title">{{ log.action }}</span>
-                                        <span class="tl-timestamp"><i class="fa-regular fa-clock"></i> {{ log.created_at|date:"d M Y, H:i" }}</span>
-                                    </div>
-                                    <div class="tl-transition">
-                                        {% if log.old_status %}
-                                        <span class="tl-pill tl-pill--from">{{ log.old_status }}</span>
-                                        <span class="tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
-                                        {% endif %}
-                                        <span class="tl-pill tl-pill--to">{{ log.new_status }}</span>
-                                    </div>
-                                    {% if log.verified_by %}<div class="tl-meta"><i class="fa-regular fa-user"></i> {{ log.verified_by.get_full_name|default:log.verified_by.username }}</div>{% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                        {% endif %}
-
-                        <!-- Current State -->
-                        <div class="tl-item tl-item--last">
-                            <div class="tl-track">
-                                <div class="tl-icon tl-icon--now"><i class="fa-solid fa-location-dot"></i></div>
-                            </div>
-                            <div class="tl-body">
-                                <div class="tl-card-inner tl-card-inner--now">
-                                    <div class="tl-row">
-                                        <span class="tl-title">Current State</span>
-                                        <span class="tl-timestamp"><i class="fa-regular fa-clock"></i> {{ task.order.updated_at|date:"d M Y, H:i" }}</span>
-                                    </div>
-                                    <div class="tl-now-grid">
-                                        <div class="tl-now-cell">
-                                            <span class="tl-now-label">Order</span>
-                                            <span class="tl-pill tl-pill--live">{{ task.order.get_order_status_display }}</span>
-                                        </div>
-                                        <div class="tl-now-cell">
-                                            <span class="tl-now-label">Verification</span>
-                                            <span class="tl-pill {% if task.order.verification_status == 'verified' %}tl-pill--success{% elif task.order.verification_status == 'rejected' %}tl-pill--danger{% else %}tl-pill--live{% endif %}">{{ task.order.get_verification_status_display }}</span>
-                                        </div>
-                                        <div class="tl-now-cell">
-                                            <span class="tl-now-label">Delivery</span>
-                                            <span class="tl-pill tl-pill--live-alt">{{ task.get_dl_task_status_display }}</span>
-                                        </div>
-                                        <div class="tl-now-cell">
-                                            <span class="tl-now-label">DMS</span>
-                                            <span class="tl-pill tl-pill--live-dms">{{ task.get_dl_task_status_dms_display }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- Right Column -->
         <div class="col-lg-4">
-            <!-- Action Buttons -->
-            <div class="info-card">
-                <div class="info-card-header">
-                    <h3 class="info-card-title">
-                        <i class="fa-solid fa-bolt text-warning"></i>
+
+            <!-- Quick Actions -->
+            <div class="dtd__card">
+                <div class="dtd__card__head">
+                    <div class="dtd__card__head-left">
+                        <i class="fa-solid fa-bolt"></i>
                         Quick Actions
-                    </h3>
+                    </div>
                 </div>
-                <div class="action-buttons">
-                    <a href="{% url 'workforce:delivery_task_edit' task.id %}" class="btn btn-primary"
+                <div class="dtd__actions">
+                    <a href="{% url 'workforce:delivery_task_edit' task.id %}" class="dtd__btn dtd__btn--primary"
                        hx-get="{% url 'workforce:delivery_task_edit' task.id %}"
                        hx-target="#main-content"
                        hx-select="#main-content"
                        hx-swap="outerHTML"
                        hx-push-url="true">
-                        <i class="fa-solid fa-pen me-2"></i>Edit Task
+                        <i class="fa-solid fa-pen"></i> Edit Task
                     </a>
 
                     {% if task.dl_task_status_dms != 'published' %}
-                    <button class="btn btn-primary" onclick="publishToDMS({{ task.id }})">
-                        <i class="fa-solid fa-cloud-arrow-up me-2"></i>Publish to DMS
+                    <button class="dtd__btn dtd__btn--primary" onclick="publishToDMS({{ task.id }})">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Publish to DMS
                     </button>
                     {% else %}
-                    <button class="btn btn-success" disabled>
-                        <i class="fa-solid fa-check-circle me-2"></i>Published to DMS
+                    <button class="dtd__btn dtd__btn--success" disabled>
+                        <i class="fa-solid fa-check-circle"></i> Published to DMS
                     </button>
                     {% endif %}
 
                     {% if task.dl_task_status_dms == 'published' and not task.published_to_driver_app %}
-                    <button class="btn btn-info" onclick="publishToDriverApp({{ task.id }})">
-                        <i class="fa-solid fa-mobile-screen me-2"></i>Publish to Driver App
+                    <button class="dtd__btn dtd__btn--info" onclick="publishToDriverApp({{ task.id }})">
+                        <i class="fa-solid fa-mobile-screen"></i> Publish to App
                     </button>
                     {% elif task.published_to_driver_app %}
-                    <button class="btn btn-success" disabled>
-                        <i class="fa-solid fa-check-circle me-2"></i>Published to App
+                    <button class="dtd__btn dtd__btn--success" disabled>
+                        <i class="fa-solid fa-check-circle"></i> Published to App
                     </button>
                     {% endif %}
 
-                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignDriverModal">
-                        <i class="fa-solid fa-user-plus me-2"></i>Assign Driver
+                    <button class="dtd__btn dtd__btn--secondary" data-bs-toggle="modal" data-bs-target="#assignDriverModal">
+                        <i class="fa-solid fa-user-plus"></i> Assign Driver
                     </button>
 
-                    <button class="btn btn-outline-secondary" onclick="updateTaskStatus({{ task.id }})">
-                        <i class="fa-solid fa-edit me-2"></i>Update Status
+                    <button class="dtd__btn dtd__btn--secondary" onclick="updateTaskStatus({{ task.id }})">
+                        <i class="fa-solid fa-edit"></i> Update Status
                     </button>
                 </div>
             </div>
 
             <!-- Delivery Map -->
-            <div class="info-card">
-                <div class="info-card-header">
-                    <h3 class="info-card-title">
-                        <i class="fa-solid fa-map-location-dot text-danger"></i>
+            <div class="dtd__card">
+                <div class="dtd__card__head">
+                    <div class="dtd__card__head-left">
+                        <i class="fa-solid fa-map-location-dot"></i>
                         Delivery Location
-                    </h3>
-                </div>
-                <div id="taskMapContainer" style="height: 260px; background: var(--brand-grey-100); position: relative;">
-                    <div id="taskMap" style="height: 100%; width: 100%; z-index: 1;"></div>
-                    <div id="mapLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--brand-grey-100);z-index:2;">
-                        <span style="font-size:0.75rem;color:var(--brand-grey-500);"><i class="fa-solid fa-spinner fa-spin me-1"></i>Loading map...</span>
                     </div>
                 </div>
-                <div style="padding:0.5rem 0.75rem; font-size:0.6875rem; color:var(--brand-grey-600); border-top:1px solid var(--brand-grey-200);">
-                    <i class="fa-solid fa-location-dot text-danger me-1"></i>
+                <div class="dtd__map">
+                    <div id="taskMap" class="dtd__map__inner"></div>
+                    <div id="mapLoading" class="dtd__map__loading">
+                        <span><i class="fa-solid fa-spinner fa-spin me-1"></i>Loading map...</span>
+                    </div>
+                </div>
+                <div class="dtd__map__footer">
+                    <i class="fa-solid fa-location-dot text-danger"></i>
                     {% if task.order.dl_zone %}Zone {{ task.order.dl_zone }}{% endif %}{% if task.order.dl_street %}, St {{ task.order.dl_street }}{% endif %}{% if task.order.dl_building %}, Bldg {{ task.order.dl_building }}{% endif %}
-                    {% if task.order.customer_address %}<span class="ms-1 text-muted">{{ task.order.customer_address|truncatechars:50 }}</span>{% endif %}
+                    {% if task.order.customer_address %}<span class="ms-1" style="color:var(--brand-grey-400);">{{ task.order.customer_address|truncatechars:50 }}</span>{% endif %}
                     {% if task.pickup_location %}
-                    <br><i class="fa-solid fa-store text-primary me-1"></i>Pickup: {{ task.pickup_location.pickup_location_title|default:"Seller Location" }}
+                    <br><i class="fa-solid fa-store text-primary"></i> Pickup: {{ task.pickup_location.pickup_location_title|default:"Seller Location" }}
                     {% endif %}
                 </div>
             </div>
 
             <!-- Seller Comments -->
-            <div class="info-card">
-                <div class="info-card-header">
-                    <h3 class="info-card-title">
-                        <i class="fa-solid fa-comments text-primary"></i>
+            <div class="dtd__card">
+                <div class="dtd__card__head">
+                    <div class="dtd__card__head-left">
+                        <i class="fa-solid fa-comments"></i>
                         Seller Comments
-                        {% if seller_comments %}
-                        <span class="badge bg-primary rounded-pill ms-1">{{ seller_comments.count }}</span>
-                        {% endif %}
-                    </h3>
+                    </div>
+                    {% if seller_comments %}
+                    <span class="dtd__card__head-count">{{ seller_comments.count }}</span>
+                    {% endif %}
                 </div>
-                <div class="comments-list" style="max-height: 300px; overflow-y: auto;">
+                <div class="dtd__comments">
                     {% if seller_comments %}
                     {% for comment in seller_comments %}
-                    <div class="mb-2 p-2 rounded bg-light">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <strong class="small">{{ comment.name|default:"Seller" }}</strong>
-                            <small class="text-muted">{{ comment.created_at|date:"d M, H:i" }}</small>
+                    <div class="dtd__comment">
+                        <div class="dtd__comment__head">
+                            <span class="dtd__comment__author">{{ comment.name|default:"Seller" }}</span>
+                            <span class="dtd__comment__time">{{ comment.created_at|date:"d M, H:i" }}</span>
                         </div>
-                        <p class="mb-0 small">{{ comment.body }}</p>
+                        <p class="dtd__comment__text">{{ comment.body }}</p>
                     </div>
                     {% endfor %}
                     {% else %}
-                    <div class="text-center py-4 text-muted">
-                        <i class="fa-solid fa-comments fa-2x mb-2 opacity-50"></i>
-                        <p class="mb-0 small">No seller comments yet</p>
+                    <div class="dtd__empty">
+                        <i class="fa-solid fa-comments d-block"></i>
+                        <p>No seller comments yet</p>
                     </div>
                     {% endif %}
                 </div>
             </div>
 
             <!-- Task Info -->
-            <div class="info-card">
-                <div class="info-card-header">
-                    <h3 class="info-card-title">
-                        <i class="fa-solid fa-calendar-alt text-secondary"></i>
+            <div class="dtd__card">
+                <div class="dtd__card__head">
+                    <div class="dtd__card__head-left">
+                        <i class="fa-solid fa-calendar-alt"></i>
                         Task Info
-                    </h3>
+                    </div>
                 </div>
-                <div class="small">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Created:</span>
-                        <strong>{{ task.created_at|date:"M d, Y H:i" }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Last Updated:</span>
-                        <strong>{{ task.updated_at|date:"M d, Y H:i" }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Delivery Date:</span>
-                        <strong>{{ task.dl_task_date|date:"M d, Y"|default:"Not Scheduled" }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span class="text-muted">Priority:</span>
-                        <span class="badge bg-secondary">{{ task.dl_speed|default:"Normal" }}</span>
+                <div class="dtd__card__body">
+                    <div class="dtd__fields">
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-regular fa-clock"></i> Created</span>
+                            <span class="dtd__field__value">{{ task.created_at|date:"M d, Y H:i" }}</span>
+                        </div>
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-arrows-rotate"></i> Last Updated</span>
+                            <span class="dtd__field__value">{{ task.updated_at|date:"M d, Y H:i" }}</span>
+                        </div>
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-calendar-day"></i> Delivery Date</span>
+                            <span class="dtd__field__value">{{ task.dl_task_date|date:"M d, Y"|default:"Not Scheduled" }}</span>
+                        </div>
+                        <div class="dtd__field">
+                            <span class="dtd__field__label"><i class="fa-solid fa-gauge-high"></i> Priority</span>
+                            <span class="dtd__update__pill dtd__update__pill--to">{{ task.dl_speed|default:"Normal" }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
 
-    <!-- Back Button -->
-    <div class="mt-4">
-        <a href="{% url 'workforce:wf_orders_all' %}" class="btn btn-secondary">
-            <i class="fa-solid fa-arrow-left me-2"></i>Back to Orders
-        </a>
-    </div>
+    <!-- Back Link -->
+    <a href="{% url 'workforce:wf_orders_all' %}" class="dtd__back">
+        <i class="fa-solid fa-arrow-left"></i> Back to Orders
+    </a>
 </div>
 
 <!-- Assign Driver Modal -->
-<div class="modal fade" id="assignDriverModal" tabindex="-1" aria-labelledby="assignDriverModalLabel" aria-hidden="true">
+<div class="modal fade dtd__modal" id="assignDriverModal" tabindex="-1" aria-labelledby="assignDriverModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="assignDriverModalLabel">
-                    <i class="fa-solid fa-user-plus me-2"></i>Assign Driver
+                    <i class="fa-solid fa-user-plus"></i>
+                    Assign Driver
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label for="driverSelect" class="form-label fw-semibold">Select Driver</label>
+                    <label for="driverSelect" class="form-label" style="font-size:0.75rem;font-weight:600;color:var(--brand-grey-500);text-transform:uppercase;letter-spacing:0.04em;">Select Driver</label>
                     <select class="form-select" id="driverSelect">
                         <option value="">-- Choose a driver --</option>
                         {% for driver in approved_drivers %}
                         <option value="{{ driver.driver_id }}" {% if task.driver_id == driver.driver_id %}selected{% endif %}>
-                            {{ driver.driver_code }} — {{ driver.user.get_full_name|default:driver.driver_phone }}
+                            {{ driver.driver_code }} &mdash; {{ driver.user.get_full_name|default:driver.driver_phone }}
                         </option>
                         {% empty %}
                         <option value="" disabled>No approved drivers available</option>
@@ -475,15 +424,16 @@
                     </select>
                 </div>
                 {% if task.driver %}
-                <div class="alert alert-info py-2 mb-0">
-                    <small><i class="fa-solid fa-info-circle me-1"></i>Currently assigned: <strong>{{ task.driver.driver_code }}</strong> — {{ task.driver.user.get_full_name|default:task.driver.driver_phone }}</small>
+                <div class="dtd__modal__info">
+                    <i class="fa-solid fa-info-circle me-1"></i>
+                    Currently assigned: <strong>{{ task.driver.driver_code }}</strong> &mdash; {{ task.driver.user.get_full_name|default:task.driver.driver_phone }}
                 </div>
                 {% endif %}
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="btnConfirmAssignDriver" onclick="assignDriver({{ task.id }})">
-                    <i class="fa-solid fa-check me-1"></i>Assign
+                <button type="button" class="dtd__btn dtd__btn--secondary" data-bs-dismiss="modal" style="width:auto;">Cancel</button>
+                <button type="button" class="dtd__btn dtd__btn--primary" id="btnConfirmAssignDriver" onclick="assignDriver({{ task.id }})" style="width:auto;">
+                    <i class="fa-solid fa-check"></i> Assign
                 </button>
             </div>
         </div>
@@ -502,153 +452,89 @@
     }
     const csrftoken = getCSRFToken();
 
-    // Publish to DMS
     function publishToDMS(taskId) {
         if (confirm('Publish this task to the Delivery Management System?')) {
             fetch(`/workforce/delivery-task/${taskId}/publish-dms/`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                }
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    alert('Task published to DMS successfully!');
-                    location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to publish to DMS'));
-                }
+                if (data.success) { alert('Task published to DMS successfully!'); location.reload(); }
+                else { alert('Error: ' + (data.error || 'Failed to publish to DMS')); }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred');
-            });
+            .catch(error => { console.error('Error:', error); alert('An error occurred'); });
         }
     }
 
-    // Publish to Driver App
     function publishToDriverApp(taskId) {
         if (confirm('Publish this task to the Driver Mobile App?')) {
             fetch(`/workforce/delivery-task/${taskId}/publish-driver-app/`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                }
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    alert('Task published to Driver App successfully!');
-                    location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to publish to Driver App'));
-                }
+                if (data.success) { alert('Task published to Driver App successfully!'); location.reload(); }
+                else { alert('Error: ' + (data.error || 'Failed to publish to Driver App')); }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred');
-            });
+            .catch(error => { console.error('Error:', error); alert('An error occurred'); });
         }
     }
 
-    // Assign Driver (from modal)
     function assignDriver(taskId) {
         const select = document.getElementById('driverSelect');
         const driverId = select.value;
-        if (!driverId) {
-            alert('Please select a driver');
-            return;
-        }
+        if (!driverId) { alert('Please select a driver'); return; }
         const btn = document.getElementById('btnConfirmAssignDriver');
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Assigning...';
 
         fetch(`/workforce/delivery-task/${taskId}/assign-driver/`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken
-            },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
             body: JSON.stringify({ driver_id: driverId })
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                alert('Driver assigned successfully!');
-                location.reload();
-            } else {
-                alert('Error: ' + (data.error || 'Failed to assign driver'));
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Assign';
-            }
+            if (data.success) { alert('Driver assigned successfully!'); location.reload(); }
+            else { alert('Error: ' + (data.error || 'Failed to assign driver')); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Assign'; }
         })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Assign';
-        });
+        .catch(error => { console.error('Error:', error); alert('An error occurred'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Assign'; });
     }
 
-    // Update Task Status
     function updateTaskStatus(taskId) {
         const status = prompt('Enter new status (e.g., assigned, in_transit, delivered, failed):');
         if (status) {
             fetch(`/workforce/delivery-task/${taskId}/update-status/`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
                 body: JSON.stringify({ status: status })
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    alert('Status updated successfully!');
-                    location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to update status'));
-                }
+                if (data.success) { alert('Status updated successfully!'); location.reload(); }
+                else { alert('Error: ' + (data.error || 'Failed to update status')); }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred');
-            });
+            .catch(error => { console.error('Error:', error); alert('An error occurred'); });
         }
     }
 
-    // Mark Comments as Read
     function markCommentsAsRead(taskId) {
         fetch(`/workforce/delivery-task/${taskId}/mark-comments-read/`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken
-            }
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                alert('All comments marked as read');
-                location.reload();
-            } else {
-                alert('Error: ' + (data.error || 'Failed to mark comments as read'));
-            }
+            if (data.success) { alert('All comments marked as read'); location.reload(); }
+            else { alert('Error: ' + (data.error || 'Failed to mark comments as read')); }
         })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred');
-        });
+        .catch(error => { console.error('Error:', error); alert('An error occurred'); });
     }
 
-    // Auto-refresh driver updates every hour
-    setInterval(function() {
-        location.reload();
-    }, 3600000); // 1 hour in milliseconds
+    // Auto-refresh every hour
+    setInterval(function() { location.reload(); }, 3600000);
 </script>
 
 <!-- Leaflet Map -->
@@ -659,57 +545,42 @@
     var loadingEl = document.getElementById('mapLoading');
     if (!mapEl) return;
 
-    // Qatar center as default
     var defaultLat = 25.2854;
     var defaultLng = 51.5310;
     var defaultZoom = 13;
 
-    // Delivery address info
     var zone = '{{ task.order.dl_zone|default:"" }}';
     var street = '{{ task.order.dl_street|default:"" }}';
     var building = '{{ task.order.dl_building|default:"" }}';
     var address = '{{ task.order.customer_address|default:""|escapejs }}';
 
-    // Pickup location coords (if available)
     var pickupLat = {{ task.pickup_location.pickup_lat|default:"null" }};
     var pickupLon = {{ task.pickup_location.pickup_lon|default:"null" }};
     var pickupTitle = '{{ task.pickup_location.pickup_location_title|default:"Pickup"|escapejs }}';
 
-    // Initialize map
     var map = L.map('taskMap', { zoomControl: true, attributionControl: false }).setView([defaultLat, defaultLng], defaultZoom);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19
-    }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-    // Custom icons
     var deliveryIcon = L.divIcon({
         className: '',
         html: '<div style="background:#dc2626;color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><i class="fa-solid fa-location-dot"></i></div>',
-        iconSize: [28, 28],
-        iconAnchor: [14, 28],
-        popupAnchor: [0, -28]
+        iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28]
     });
 
     var pickupIcon = L.divIcon({
         className: '',
         html: '<div style="background:#2563eb;color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><i class="fa-solid fa-store"></i></div>',
-        iconSize: [28, 28],
-        iconAnchor: [14, 28],
-        popupAnchor: [0, -28]
+        iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28]
     });
 
     var markers = [];
 
-    // Add pickup marker if coords exist
     if (pickupLat && pickupLon) {
-        var pm = L.marker([pickupLat, pickupLon], { icon: pickupIcon })
-            .addTo(map)
-            .bindPopup('<strong>Pickup:</strong> ' + pickupTitle);
+        var pm = L.marker([pickupLat, pickupLon], { icon: pickupIcon }).addTo(map).bindPopup('<strong>Pickup:</strong> ' + pickupTitle);
         markers.push(pm);
     }
 
-    // Build geocode query for delivery address
     var query = '';
     if (zone) query += 'Zone ' + zone + ', ';
     if (street) query += 'Street ' + street + ', ';
@@ -717,7 +588,6 @@
     if (address && !address.startsWith('Zone')) query += address + ', ';
     query += 'Qatar';
 
-    // Geocode delivery address using Nominatim
     fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&countrycodes=qa&limit=1', {
         headers: { 'Accept': 'application/json' }
     })
@@ -727,13 +597,9 @@
         if (data && data.length > 0) {
             var lat = parseFloat(data[0].lat);
             var lng = parseFloat(data[0].lon);
-            var dm = L.marker([lat, lng], { icon: deliveryIcon })
-                .addTo(map)
-                .bindPopup('<strong>Delivery:</strong><br>' + address + (zone ? '<br>Zone ' + zone : ''));
+            var dm = L.marker([lat, lng], { icon: deliveryIcon }).addTo(map).bindPopup('<strong>Delivery:</strong><br>' + address + (zone ? '<br>Zone ' + zone : ''));
             markers.push(dm);
             dm.openPopup();
-
-            // Fit map to all markers
             if (markers.length > 1) {
                 var group = L.featureGroup(markers);
                 map.fitBounds(group.getBounds().pad(0.3));
@@ -741,26 +607,16 @@
                 map.setView([lat, lng], 15);
             }
         } else {
-            // No geocode result — show Qatar centered with zone label
-            if (markers.length > 0) {
-                map.setView([pickupLat, pickupLon], 14);
-            }
-            // Add a note on map
-            var fallback = L.marker([defaultLat, defaultLng], { icon: deliveryIcon })
-                .addTo(map)
-                .bindPopup('<strong>Delivery area:</strong><br>' + (zone ? 'Zone ' + zone + ', ' : '') + 'Qatar<br><small>Exact location unavailable</small>');
+            if (markers.length > 0) { map.setView([pickupLat, pickupLon], 14); }
+            var fallback = L.marker([defaultLat, defaultLng], { icon: deliveryIcon }).addTo(map).bindPopup('<strong>Delivery area:</strong><br>' + (zone ? 'Zone ' + zone + ', ' : '') + 'Qatar<br><small>Exact location unavailable</small>');
             fallback.openPopup();
         }
     })
     .catch(function() {
         loadingEl.style.display = 'none';
-        // Fallback: show Qatar
-        if (markers.length > 0) {
-            map.setView([pickupLat, pickupLon], 14);
-        }
+        if (markers.length > 0) { map.setView([pickupLat, pickupLon], 14); }
     });
 
-    // Fix map tile rendering in hidden tabs / late-loading
     setTimeout(function() { map.invalidateSize(); }, 300);
 })();
 </script>

@@ -16,7 +16,7 @@
           <i class="fas fa-user"></i>
         </div>
       {% endif %}
-      <span class="pwa-profile-status pwa-profile-status--{{ driver.driver_status|lower|slugify }}"></span>
+      <span class="pwa-profile-status pwa-profile-status--{{ driver.driver_status }}"></span>
     </div>
     <h1 class="pwa-profile-name">{{ driver.user.first_name }} {{ driver.user.last_name }}</h1>
     <p class="pwa-profile-code">Driver ID: {{ driver.driver_code|default:driver.driver_id }}</p>
@@ -37,8 +37,8 @@
     </div>
 
     <!-- Status Badge -->
-    <div class="pwa-profile-badge pwa-profile-badge--{{ driver.driver_status|lower|slugify }}">
-      {{ driver.driver_status }}
+    <div class="pwa-profile-badge pwa-profile-badge--{{ driver.driver_status }}">
+      {{ driver.get_driver_status_display }}
     </div>
   </div>
 
@@ -398,7 +398,7 @@
             {% endif %}
             <h4>{{ driver.user.first_name }} {{ driver.user.last_name }}</h4>
             <p class="text-muted">Driver ID: {{ driver.driver_code|default:driver.driver_id }}</p>
-            <span class="badge bg-{{ driver.driver_status|lower|slugify }}">{{ driver.driver_status }}</span>
+            <span class="badge bg-{{ driver.driver_status }}">{{ driver.get_driver_status_display }}</span>
 
             <div class="mt-3">
               <div class="d-flex justify-content-center">

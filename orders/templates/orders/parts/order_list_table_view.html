@@ -90,19 +90,20 @@
               <i class="fa-solid fa-pen-to-square status-cell__edit-icon"></i>
             </span>
             {% with delivery=order.delivery_task.first %}
-            <span class="ob ob--dl-{% if delivery %}{{ delivery.dl_task_status }}{% elif order.task_created %}task_created{% else %}none{% endif %}">
-              <i class="fa-solid {% if delivery and delivery.dl_task_status == 'delivered' %}fa-check{% elif delivery and delivery.dl_task_status == 'assigned' %}fa-user{% elif delivery and delivery.dl_task_status == 'accepted' %}fa-user-check{% elif delivery and delivery.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}fa-truck{% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}fa-times{% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}fa-ban{% elif order.task_created %}fa-clipboard-check{% else %}fa-minus{% endif %}"></i>
-              {% if delivery and delivery.dl_task_status == 'delivered' %}Delivered{% elif delivery and delivery.dl_task_status == 'assigned' %}Assigned{% elif delivery and delivery.dl_task_status == 'accepted' %}Accepted{% elif delivery and delivery.dl_task_status == 'picked_up' %}Picked Up{% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}In Transit{% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}Failed{% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}Cancelled{% elif order.task_created %}Task Created{% else %}No Task{% endif %}
+            <span class="ob ob--dl-{% if delivery %}{{ delivery.dl_task_status }}{% elif order.task_created %}task_created{% elif order.order_status == 'publish' %}published{% else %}none{% endif %}">
+              <i class="fa-solid {% if delivery and delivery.dl_task_status == 'delivered' %}fa-check{% elif delivery and delivery.dl_task_status == 'assigned' %}fa-user{% elif delivery and delivery.dl_task_status == 'accepted' %}fa-user-check{% elif delivery and delivery.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}fa-truck{% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}fa-times{% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}fa-ban{% elif order.task_created %}fa-clipboard-check{% elif order.order_status == 'publish' %}fa-paper-plane{% else %}fa-minus{% endif %}"></i>
+              {% if delivery and delivery.dl_task_status == 'delivered' %}Delivered{% elif delivery and delivery.dl_task_status == 'assigned' %}Assigned{% elif delivery and delivery.dl_task_status == 'accepted' %}Accepted{% elif delivery and delivery.dl_task_status == 'picked_up' %}Picked Up{% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}In Transit{% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}Failed{% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}Cancelled{% elif order.task_created %}Task Created{% elif order.order_status == 'publish' %}In DL Task{% else %}No Task{% endif %}
             </span>
             {% endwith %}
           </div>
-          {% if order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
+          {% if order.order_status != 'delivered' and order.order_status != 'cancelled' %}
           <div class="status-popup" style="display:none;">
             <div class="status-popup__option" data-status="to_review"><i class="fa-solid fa-clock oal-icon--warning"></i> Hold for Review</div>
-            <div class="status-popup__option" data-status="ready_to_pickup"><i class="fa-solid fa-clipboard-check oal-icon--info"></i> Confirmed</div>
-            <div class="status-popup__option" data-status="publish"><i class="fa-solid fa-rocket oal-icon--success"></i> Publish</div>
+            <div class="status-popup__option" data-status="ready_to_pickup"><i class="fa-solid fa-clipboard-check oal-icon--info"></i> Ready to pickup</div>
+            <div class="status-popup__option" data-status="publish"><i class="fa-solid fa-rocket oal-icon--success"></i> Publish to DL Task</div>
+            <div class="status-popup__option" data-status="delivered"><i class="fa-solid fa-check oal-icon--success"></i> Delivered</div>
             <div class="status-popup__divider"></div>
-            <div class="status-popup__option status-popup__option--danger" data-status="cancelled"><i class="fa-solid fa-ban"></i> Cancel</div>
+            <div class="status-popup__option status-popup__option--danger" data-status="cancelled"><i class="fa-solid fa-ban"></i> Cancelled</div>
           </div>
           {% endif %}
         </td>

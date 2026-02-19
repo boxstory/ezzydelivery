@@ -17,13 +17,14 @@ Business = business_models.Business
 # DRIVER FORM ---------------------------------------------------------------------------------------------------------------------
 
 
-DRIVER_STATUS = (
-    ('aproval pending', 'Aproval Pending'),
-    ('active', 'Active'),
-    ('inactive', 'Inactive'),
-    ('Suspended', 'Suspended'),
-    ('blacklisted', 'Black Listed'),
-)
+DRIVER_STATUS = [
+    ('pending', 'Pending'),
+    ('processing', 'Processing'),
+    ('approved', 'Approved'),
+    ('rejected', 'Rejected'),
+    ('blocked', 'Blocked'),
+    ('suspended', 'Suspended'),
+]
 
 
 class DriverJoinForm(forms.ModelForm):

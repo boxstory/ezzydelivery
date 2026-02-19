@@ -39,16 +39,16 @@
       </div>
       <div class="pb-1">
         <div class="d-flex justify-content-between">
-          <div>Pickup Status</div>
+          <div>Order Status</div>
           <div>COD</div>
-          <div>DMS Status</div>
+          <div>Delivery Status</div>
         </div>
         <hr class="p-0 m-0 align-content-center" />
 
         <div class="d-flex justify-content-between pt-2">
-          <div>{{ order.order_status }}</div>
-          <div>{{ order.task_created }} - {{ order.cod_amount }}</div>
-          <div>{{ order.dl_task.dl_task_status_dms }}assigned</div>
+          <div>{{ order.get_order_status_display }}</div>
+          <div>{{ order.cod_amount }}</div>
+          <div>{% with dl=order.delivery_task.first %}{% if dl %}{{ dl.get_dl_task_status_display }}{% else %}—{% endif %}{% endwith %}</div>
         </div>
 
 

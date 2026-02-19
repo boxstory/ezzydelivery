@@ -21,7 +21,7 @@ Models:
         - DriverSettlement: Periodic payouts/settlements
 
 Driver Status Flow:
-    Applied → Pending on Review → Processing → Approved (or Rejected/Blocked)
+    Applied → pending → processing → approved (or rejected/blocked/suspended)
 
 Wallet System:
     - wallet_balance: Tracks COD credits/debits
@@ -53,6 +53,23 @@ from core import models as core_models
 # =============================================================================
 # CONSTANTS
 # =============================================================================
+
+DRIVER_STATUS_CHOICES = [
+    ('pending', 'Pending'),
+    ('processing', 'Processing'),
+    ('approved', 'Approved'),
+    ('rejected', 'Rejected'),
+    ('blocked', 'Blocked'),
+    ('suspended', 'Suspended'),
+]
+
+DRIVER_AVAILABILITY_CHOICES = [
+    ('offline', 'Offline'),
+    ('available', 'Available'),
+    ('on_delivery', 'On Delivery'),
+    ('on_break', 'On Break'),
+    ('returning', 'Returning'),
+]
 
 VEHICLE_CHOICES = [
     ('none', 'None'),
@@ -128,15 +145,12 @@ class Driver(models.Model):
     driver_rating_count = models.IntegerField(default=0)
     driver_reviews = models.TextField(default="")
     driver_reviews_count = models.IntegerField(default=0)
-    driver_status_choices = (
-        ('Pending on Review', 'Pending on Review'),
-        ('Processing', 'Processing'),
-        ('Approved', 'Approved'),
-        ('Rejected', 'Rejected'),
-        ('Blocked', 'Blocked'),
-    )
     driver_status = models.CharField(
-        max_length=100, choices=driver_status_choices, db_index=True)  # INDEX: Filtered for approved/pending drivers
+        max_length=100, choices=DRIVER_STATUS_CHOICES, default='pending', db_index=True)  # INDEX: Filtered for approved/pending drivers
+    driver_availability = models.CharField(
+        max_length=20, choices=DRIVER_AVAILABILITY_CHOICES, default='offline', db_index=True,
+        help_text="Real-time availability status of the driver"
+    )
 
     # COD Wallet System Fields
     wallet_balance = models.DecimalField(
@@ -213,6 +227,7 @@ class Driver(models.Model):
         # COMPOUND INDEX: user + driver_status for fast driver lookups
         indexes = [
             models.Index(fields=['user', 'driver_status'], name='driver_user_status_idx'),
+            models.Index(fields=['driver_availability'], name='driver_avail_idx'),
             models.Index(fields=['driver_code'], name='driver_code_idx'),
             models.Index(fields=['created_at'], name='driver_created_idx'),
         ]

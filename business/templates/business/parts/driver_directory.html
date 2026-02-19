@@ -66,14 +66,14 @@
               </div>
             </td>
             <td class="bdd__td">
-              {% if contact.driver.driver_status == 'active' %}
-                <span class="bdd__badge bdd__badge--success"><i class="fa-solid fa-circle-check"></i> Active</span>
-              {% elif contact.driver.driver_status == 'inactive' %}
-                <span class="bdd__badge bdd__badge--muted"><i class="fa-solid fa-circle-minus"></i> Inactive</span>
-              {% elif contact.driver.driver_status == 'pending' %}
-                <span class="bdd__badge bdd__badge--warning"><i class="fa-solid fa-clock"></i> Pending</span>
+              {% if contact.driver.driver_status == 'approved' %}
+                <span class="bdd__badge bdd__badge--success"><i class="fa-solid fa-circle-check"></i> {{ contact.driver.get_driver_status_display }}</span>
+              {% elif contact.driver.driver_status == 'blocked' or contact.driver.driver_status == 'rejected' or contact.driver.driver_status == 'suspended' %}
+                <span class="bdd__badge bdd__badge--muted"><i class="fa-solid fa-circle-minus"></i> {{ contact.driver.get_driver_status_display }}</span>
+              {% elif contact.driver.driver_status == 'pending' or contact.driver.driver_status == 'processing' %}
+                <span class="bdd__badge bdd__badge--warning"><i class="fa-solid fa-clock"></i> {{ contact.driver.get_driver_status_display }}</span>
               {% else %}
-                <span class="bdd__badge bdd__badge--muted">{{ contact.driver.driver_status }}</span>
+                <span class="bdd__badge bdd__badge--muted">{{ contact.driver.get_driver_status_display }}</span>
               {% endif %}
             </td>
             <td class="bdd__td bdd__td--center">

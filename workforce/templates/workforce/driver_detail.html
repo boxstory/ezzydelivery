@@ -51,7 +51,7 @@
         </div>
     </div>
     <div class="drv-hero__right">
-        <span class="drv-hero__status drv-hero__status--{% if driver.driver_status == 'Approved' %}approved{% elif driver.driver_status == 'Rejected' or driver.driver_status == 'Blocked' %}rejected{% else %}pending{% endif %}">
+        <span class="drv-hero__status drv-hero__status--{% if driver.driver_status == 'approved' %}approved{% elif driver.driver_status == 'rejected' or driver.driver_status == 'blocked' or driver.driver_status == 'suspended' %}rejected{% else %}pending{% endif %}">
             <i class="fa-solid fa-circle"></i>
             {{ driver.driver_status }}
         </span>
@@ -383,8 +383,8 @@
                         <div class="drv-info-row">
                             <span class="drv-info-row__label">Status</span>
                             <span class="drv-info-row__value">
-                                <span class="drv-status-pill drv-status-pill--{% if driver.driver_status == 'Approved' %}green{% elif driver.driver_status == 'Rejected' or driver.driver_status == 'Blocked' %}red{% else %}amber{% endif %}">
-                                    {{ driver.driver_status }}
+                                <span class="drv-status-pill drv-status-pill--{% if driver.driver_status == 'approved' %}green{% elif driver.driver_status == 'rejected' or driver.driver_status == 'blocked' or driver.driver_status == 'suspended' %}red{% else %}amber{% endif %}">
+                                    {{ driver.get_driver_status_display }}
                                 </span>
                             </span>
                         </div>
@@ -586,11 +586,12 @@
                     <div class="drv-form-group">
                         <label class="drv-form-label">Status</label>
                         <select name="driver_status" class="drv-form-input">
-                            <option value="Pending on Review" {% if driver.driver_status == 'Pending on Review' %}selected{% endif %}>Pending on Review</option>
-                            <option value="Processing" {% if driver.driver_status == 'Processing' %}selected{% endif %}>Processing</option>
-                            <option value="Approved" {% if driver.driver_status == 'Approved' %}selected{% endif %}>Approved</option>
-                            <option value="Rejected" {% if driver.driver_status == 'Rejected' %}selected{% endif %}>Rejected</option>
-                            <option value="Blocked" {% if driver.driver_status == 'Blocked' %}selected{% endif %}>Blocked</option>
+                            <option value="pending" {% if driver.driver_status == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="processing" {% if driver.driver_status == 'processing' %}selected{% endif %}>Processing</option>
+                            <option value="approved" {% if driver.driver_status == 'approved' %}selected{% endif %}>Approved</option>
+                            <option value="rejected" {% if driver.driver_status == 'rejected' %}selected{% endif %}>Rejected</option>
+                            <option value="blocked" {% if driver.driver_status == 'blocked' %}selected{% endif %}>Blocked</option>
+                            <option value="suspended" {% if driver.driver_status == 'suspended' %}selected{% endif %}>Suspended</option>
                         </select>
                     </div>
                     <div class="drv-form-group">

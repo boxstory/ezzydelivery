@@ -585,7 +585,7 @@ class Command(BaseCommand):
                 driver_license_number=f"QA{random.randint(100000, 999999)}",
                 driver_rating=random.randint(3, 5),
                 driver_rating_count=random.randint(10, 500),
-                driver_status='Approved',
+                driver_status='approved',
                 wallet_balance=Decimal(str(random.randint(0, 5000))),
                 credit_limit=Decimal('5000.00'),
                 cod_in_hand=Decimal(str(random.randint(0, 2000))),

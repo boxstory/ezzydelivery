@@ -196,7 +196,7 @@ def driver_login(request):
     # Check if user is a driver
     try:
         driver = fleet_models.Driver.objects.get(user=user)
-        if driver.driver_status != 'Approved':
+        if driver.driver_status != 'approved':
             return Response(
                 {'error': 'Driver account not approved'},
                 status=status.HTTP_403_FORBIDDEN
@@ -755,7 +755,7 @@ def dms_assign_task(request):
         task = delivery_models.DeliveryTask.objects.get(id=task_id)
         driver = fleet_models.Driver.objects.get(driver_id=driver_id)
         
-        if driver.driver_status != 'Approved':
+        if driver.driver_status != 'approved':
             return Response(
                 {'error': 'Driver is not approved'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -914,7 +914,7 @@ def dms_analytics(request):
     
     # Driver analytics
     active_drivers = fleet_models.Driver.objects.filter(
-        driver_status='Approved'
+        driver_status='approved'
     ).count()
     
     drivers_with_tasks = tasks.values('driver').distinct().count()

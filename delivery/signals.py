@@ -102,6 +102,55 @@ def _sync_order_status_from_task(task):
         logger.exception(f"Error syncing order status from task {task.id}: {e}")
 
 
+# Active DL task statuses that mean the driver is busy
+ACTIVE_TASK_STATUSES = [
+    'assigned', 'accepted', 'picked_up', 'start_ride',
+    'in_transit', 'out_for_delivery', 'contacted',
+    'non_reachable', 'address_pending',
+    'customer_confiration_pending', 'customer_delaying',
+    'dl_pending_payment',
+]
+
+# Terminal DL task statuses that mean the task is done
+TERMINAL_TASK_STATUSES = ['delivered', 'failed', 'cancelled', 'rejected']
+
+
+def _sync_driver_availability(task):
+    """
+    Auto-sync driver availability based on delivery task status changes.
+    - Active task statuses → driver on_delivery
+    - Terminal task statuses → driver available (only if no other active tasks)
+    """
+    try:
+        from fleet.models import Driver
+        driver = task.driver
+        if not driver or driver.driver_status != 'approved':
+            return
+
+        new_dl_status = task.dl_task_status
+
+        if new_dl_status in ACTIVE_TASK_STATUSES:
+            if driver.driver_availability != 'on_delivery':
+                driver.driver_availability = 'on_delivery'
+                driver.save(update_fields=['driver_availability'])
+                logger.info(f"Driver {driver.driver_id} availability → on_delivery (task {task.dl_task_number} status: {new_dl_status})")
+
+        elif new_dl_status in TERMINAL_TASK_STATUSES:
+            # Only set to available if no other active tasks remain
+            other_active = DeliveryTask.objects.filter(
+                driver=driver,
+                dl_task_status__in=ACTIVE_TASK_STATUSES,
+            ).exclude(pk=task.pk).exists()
+
+            if not other_active and driver.driver_availability == 'on_delivery':
+                driver.driver_availability = 'available'
+                driver.save(update_fields=['driver_availability'])
+                logger.info(f"Driver {driver.driver_id} availability → available (no more active tasks)")
+
+    except Exception as e:
+        logger.exception(f"Error syncing driver availability from task {task.id}: {e}")
+
+
 @receiver(post_save, sender=DeliveryTask)
 def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs):
     """Handle delivery task creation/update and push to DMS with error handling"""
@@ -176,3 +225,10 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
         new_status = instance.dl_task_status
         if old_status is not None and old_status != new_status and instance.order_id:
             _sync_order_status_from_task(instance)
+
+    # Sync delivery task status → driver availability
+    if instance.driver_id:
+        old_dl = getattr(instance, '_old_dl_task_status', None)
+        new_dl = instance.dl_task_status
+        if created or (old_dl is not None and old_dl != new_dl):
+            _sync_driver_availability(instance)

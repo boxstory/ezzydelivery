@@ -218,8 +218,8 @@ def wf_dashboard(request):
 
     # Driver and Seller counts - 2 aggregate queries instead of 4 separate counts
     driver_stats = Driver.objects.aggregate(
-        active=Count(Case(When(driver_status='Approved', then=1), output_field=IntegerField())),
-        pending=Count(Case(When(driver_status='Pending on Review', then=1), output_field=IntegerField())),
+        active=Count(Case(When(driver_status='approved', then=1), output_field=IntegerField())),
+        pending=Count(Case(When(driver_status='pending', then=1), output_field=IntegerField())),
         cod_in_hand=Sum('wallet_balance'),
     )
     active_drivers = driver_stats['active']
@@ -1939,7 +1939,7 @@ def assign_driver_to_order(request, order_id):
 
         # Verify driver exists and is approved
         try:
-            driver = fleet_models.Driver.objects.get(driver_id=driver_id, driver_status='Approved')
+            driver = fleet_models.Driver.objects.get(driver_id=driver_id, driver_status='approved')
         except fleet_models.Driver.DoesNotExist:
             return JsonResponse({
                 'success': False,
@@ -2320,7 +2320,7 @@ def delivery_task_detail(request, task_id):
 
     # Approved drivers for assignment modal
     approved_drivers = fleet_models.Driver.objects.filter(
-        driver_status='Approved'
+        driver_status='approved'
     ).select_related('user').order_by('driver_code')
 
     context = {
@@ -2443,7 +2443,7 @@ def assign_driver_to_task(request, task_id):
         # Get driver — must exist and be approved
         try:
             driver = fleet_models.Driver.objects.get(
-                driver_id=driver_id, driver_status='Approved')
+                driver_id=driver_id, driver_status='approved')
         except fleet_models.Driver.DoesNotExist:
             return JsonResponse({
                 'success': False,
@@ -2481,7 +2481,7 @@ def assign_driver_to_task(request, task_id):
 def api_drivers_list(request):
     """API endpoint to get active drivers for dropdowns"""
     drivers = fleet_models.Driver.objects.select_related('user').filter(
-        driver_status='Approved'
+        driver_status='approved'
     ).order_by('user__first_name')
     driver_list = []
     for d in drivers:
@@ -2662,12 +2662,20 @@ def user_verification_list(request):
     # Build verification data efficiently
     verification_data = []
     for profile in profile_list:
+        team_list = team_memberships_by_user.get(profile.user_id, [])
+        # Build JSON for pending team memberships (accepted by user, awaiting staff verification)
+        pending_teams_json = json.dumps([
+            {'id': tm.id, 'biz': tm.business.business_name, 'role': tm.get_team_role_display()}
+            for tm in team_list
+            if tm.team_status == 'pending' and tm.team_verifed
+        ])
         data = {
             'profile': profile,
             'business': businesses_by_user.get(profile.user_id) if profile.is_business else None,
             'driver': drivers_by_user.get(profile.user_id) if profile.is_driver else None,
             'user': profile.user,
-            'team_memberships': team_memberships_by_user.get(profile.user_id, []),
+            'team_memberships': team_list,
+            'pending_teams_json': pending_teams_json,
         }
         verification_data.append(data)
 
@@ -2727,10 +2735,21 @@ def update_verification_status(request, profile_id):
                 profile.is_driver_profile_completed = True
                 try:
                     driver = fleet_models.Driver.objects.get(user=profile.user)
-                    driver.driver_status = 'Approved'
+                    driver.driver_status = 'approved'
                     driver.save()
                 except fleet_models.Driver.DoesNotExist:
                     pass
+
+            # Activate team memberships if requested
+            activate_teams = data.get('activate_teams', [])
+            if activate_teams:
+                from business import models as business_models
+                business_models.BusinessTeamProfile.objects.filter(
+                    id__in=activate_teams,
+                    user=profile.user,
+                    team_status='pending',
+                    team_verifed=True
+                ).update(team_status='active')
 
         elif new_status == 'rejected':
             profile.rejection_reason = rejection_reason
@@ -2751,6 +2770,54 @@ def update_verification_status(request, profile_id):
         raise
     except Exception as e:
         logger.exception("Error updating verification status for profile %s: %s", profile_id, str(e))
+        return JsonResponse({
+            'success': False,
+            'error': f'Error: {type(e).__name__}: {str(e)}'
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def update_team_status(request, team_id):
+    """AJAX endpoint to update team membership status"""
+    from business import models as business_models
+    try:
+        team_profile = get_object_or_404(business_models.BusinessTeamProfile, id=team_id)
+        data = json.loads(request.body)
+        new_status = data.get('status')
+
+        valid_statuses = ['active', 'pending', 'inactive', 'suspended', 'rejected']
+        if new_status not in valid_statuses:
+            return JsonResponse({
+                'success': False,
+                'error': f'Invalid status. Must be one of: {", ".join(valid_statuses)}'
+            }, status=400)
+
+        old_status = team_profile.team_status
+        team_profile.team_status = new_status
+
+        # When activating, also mark as verified
+        if new_status == 'active':
+            team_profile.team_verifed = True
+
+        team_profile.save()
+
+        logger.info(
+            "Team membership %s status changed from '%s' to '%s' by staff user %s",
+            team_id, old_status, new_status, request.user.id
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Team status updated to {new_status}',
+            'team_id': team_id,
+            'new_status': new_status
+        })
+    except Http404:
+        raise
+    except Exception as e:
+        logger.exception("Error updating team status for team %s: %s", team_id, str(e))
         return JsonResponse({
             'success': False,
             'error': f'Error: {type(e).__name__}: {str(e)}'
@@ -2985,7 +3052,7 @@ def workforce_finance_dashboard(request):
 
     # All drivers summary
     drivers = fleet_models.Driver.objects.filter(
-        driver_status='Approved'
+        driver_status='approved'
     ).select_related('user')
 
     driver_totals = drivers.aggregate(
@@ -3277,7 +3344,7 @@ def fleet_cod_in_hand(request):
     }
 
     # Total drivers in system (not just those with COD)
-    total_drivers = fleet_models.Driver.objects.filter(driver_status='Approved').count()
+    total_drivers = fleet_models.Driver.objects.filter(driver_status='approved').count()
 
     # View mode (grid or list) - default to list
     view_mode = request.GET.get('view', 'list')
@@ -3320,7 +3387,7 @@ def fleet_cod_in_hand(request):
 def fleet_drivers_earnings(request):
     """View for drivers earnings"""
     drivers = fleet_models.Driver.objects.filter(
-        driver_status='Approved'
+        driver_status='approved'
     ).select_related('user').order_by('user__first_name')
 
     drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=20)
@@ -3392,7 +3459,7 @@ def earnings_verification(request):
 
     # Get approved drivers for filter dropdown
     drivers = fleet_models.Driver.objects.filter(
-        driver_status='Approved'
+        driver_status='approved'
     ).select_related('user').order_by('user__first_name')
 
     # Paginate
@@ -3658,7 +3725,7 @@ def cod_settlement_pdf(request):
         ).select_related('user').order_by('-cod_in_hand')
     else:
         drivers = fleet_models.Driver.objects.filter(
-            driver_status='Approved',
+            driver_status='approved',
             cod_in_hand__gt=0
         ).select_related('user').order_by('-cod_in_hand')
 
@@ -3748,7 +3815,7 @@ def fleet_transactions(request):
 
     # Get all approved drivers for filter dropdown
     all_drivers = fleet_models.Driver.objects.filter(
-        driver_status='Approved'
+        driver_status='approved'
     ).select_related('user').order_by('user__first_name')
 
     # Get selected driver
@@ -4426,7 +4493,7 @@ def fleet_task_sheets_list(request):
         selected_date = today
 
     drivers = fleet_models.Driver.objects.filter(
-        driver_status='Approved'
+        driver_status='approved'
     ).select_related('user').annotate(
         task_count=Count(
             'deliverytask',
@@ -4494,7 +4561,7 @@ def staff_reports(request):
     # Get driver statistics in single query
     driver_stats = fleet_models.Driver.objects.aggregate(
         total=Count('driver_id'),
-        active=Count('driver_id', filter=Q(driver_status='Approved')),
+        active=Count('driver_id', filter=Q(driver_status='approved')),
     )
 
     context = {
@@ -4610,7 +4677,7 @@ def dms_analytics(request):
         pending_tasks = delivery_models.DeliveryTask.objects.filter(dl_task_number_dms__isnull=True).count()
 
         # Get driver statistics
-        total_drivers = fleet_models.Driver.objects.filter(driver_status='Approved').count()
+        total_drivers = fleet_models.Driver.objects.filter(driver_status='approved').count()
 
         # Get order statistics
         total_orders = orders_models.Order.objects.count()
@@ -5637,9 +5704,9 @@ def drivers_list(request):
 
     # Get counts for stats
     total_count = fleet_models.Driver.objects.count()
-    active_count = fleet_models.Driver.objects.filter(driver_status='Approved').count()
-    pending_count = fleet_models.Driver.objects.filter(driver_status__in=['Pending on Review', 'Processing']).count()
-    inactive_count = fleet_models.Driver.objects.filter(driver_status__in=['Rejected', 'Blocked']).count()
+    active_count = fleet_models.Driver.objects.filter(driver_status='approved').count()
+    pending_count = fleet_models.Driver.objects.filter(driver_status__in=['pending', 'processing']).count()
+    inactive_count = fleet_models.Driver.objects.filter(driver_status__in=['rejected', 'blocked', 'suspended']).count()
 
     context = {
         'page_title': 'All Drivers',
@@ -5666,7 +5733,7 @@ def drivers_pending(request):
     ).prefetch_related(
         'driver_vehicle', 'driver_document'
     ).filter(
-        driver_status__in=['Pending on Review', 'Processing']
+        driver_status__in=['pending', 'processing']
     ).order_by('-driver_id')
 
     # Apply search filter
@@ -5704,7 +5771,7 @@ def drivers_active(request):
     ).prefetch_related(
         'driver_vehicle', 'driver_document'
     ).filter(
-        driver_status='Approved'
+        driver_status='approved'
     ).order_by('-driver_id')
 
     # Apply search filter
@@ -5742,7 +5809,7 @@ def drivers_inactive(request):
     ).prefetch_related(
         'driver_vehicle', 'driver_document'
     ).filter(
-        driver_status__in=['Rejected', 'Blocked']
+        driver_status__in=['rejected', 'blocked', 'suspended']
     ).order_by('-driver_id')
 
     # Apply search filter
@@ -6139,7 +6206,7 @@ def delivery_task_edit(request, task_id):
 
     # Get available drivers for dropdown (approved drivers)
     drivers = fleet_models.Driver.objects.select_related('user').filter(
-        driver_status='Approved'
+        driver_status='approved'
     ).order_by('user__first_name')
 
     context = {

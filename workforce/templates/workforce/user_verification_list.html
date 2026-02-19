@@ -118,16 +118,48 @@
             </span>
             {% endif %}
             {% if data.driver %}
-            <span class="uvl__scope {% if data.driver.driver_status == 'Approved' %}uvl__scope--ok{% else %}uvl__scope--warn{% endif %}">
-                <i class="fa-solid fa-car"></i> Driver: {{ data.driver.driver_status }}
+            <span class="uvl__scope {% if data.driver.driver_status == 'approved' %}uvl__scope--ok{% else %}uvl__scope--warn{% endif %}">
+                <i class="fa-solid fa-car"></i> Driver: {{ data.driver.get_driver_status_display }}
             </span>
             {% endif %}
             {% for tm in data.team_memberships %}
             <span class="uvl__scope {% if tm.team_status == 'active' and tm.team_verifed %}uvl__scope--ok{% elif tm.team_status == 'pending' %}uvl__scope--warn{% else %}uvl__scope--neutral{% endif %}">
                 <i class="fa-solid fa-users"></i> Team: {{ tm.business.business_name|truncatechars:20 }}
-                <small>({{ tm.team_role|title }} — {% if tm.team_verifed %}Verified{% else %}{{ tm.team_status|title }}{% endif %})</small>
+                <small>({{ tm.team_role|title }} — {{ tm.get_team_status_display }})</small>
             </span>
             {% endfor %}
+
+            <!-- Team Membership Actions -->
+            {% if data.team_memberships %}
+            <div class="uvl__team-actions" style="width:100%; margin-top:0.25rem;">
+                {% for tm in data.team_memberships %}
+                <div class="uvl__team-row d-flex align-items-center justify-content-between gap-2 py-1" data-team-id="{{ tm.id }}">
+                    <span class="small">
+                        <i class="fa-solid fa-users"></i>
+                        <strong>{{ tm.business.business_name|truncatechars:25 }}</strong>
+                        <span class="text-muted">— {{ tm.get_team_role_display }}</span>
+                    </span>
+                    <span class="d-flex gap-1">
+                        {% if tm.team_status != 'active' %}
+                        <button type="button" class="uvl__team-btn uvl__team-btn--activate" data-team-id="{{ tm.id }}" data-action="active" title="Activate">
+                            <i class="fa-solid fa-check"></i> Activate
+                        </button>
+                        {% endif %}
+                        {% if tm.team_status == 'active' %}
+                        <button type="button" class="uvl__team-btn uvl__team-btn--suspend" data-team-id="{{ tm.id }}" data-action="suspended" title="Suspend">
+                            <i class="fa-solid fa-ban"></i> Suspend
+                        </button>
+                        {% endif %}
+                        {% if tm.team_status == 'pending' or tm.team_status == 'suspended' %}
+                        <button type="button" class="uvl__team-btn uvl__team-btn--reject" data-team-id="{{ tm.id }}" data-action="rejected" title="Reject">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        {% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
             <span class="uvl__scope uvl__scope--neutral">
                 <i class="fa-solid fa-at"></i> {{ data.profile.username|default_if_none:"—" }}
             </span>
@@ -333,7 +365,8 @@
                 data-is-business="{% if data.profile.is_business %}1{% else %}0{% endif %}"
                 data-is-driver="{% if data.profile.is_driver %}1{% else %}0{% endif %}"
                 data-biz-name="{% if data.business %}{{ data.business.business_name }}{% endif %}"
-                data-driver-code="{% if data.driver %}{{ data.driver.driver_code }}{% endif %}">
+                data-driver-code="{% if data.driver %}{{ data.driver.driver_code }}{% endif %}"
+                data-team-memberships='{{ data.pending_teams_json }}'>
                 <i class="fa-solid fa-check-double"></i> Approve
             </button>
             <button type="button" class="uvl__btn uvl__btn--review" data-action="under_review" data-profile-id="{{ data.profile.id }}">
@@ -422,6 +455,7 @@
                         <span class="uvl-modal__check-desc" id="uvlChkDrvCode">Set driver status to Approved</span>
                     </span>
                 </label>
+                <div id="uvlChkTeamWrap"></div>
             </div>
         </div>
         <div class="uvl-modal__footer">
@@ -539,9 +573,11 @@ document.addEventListener('DOMContentLoaded', function() {
     var chkBiz     = document.getElementById('uvlChkBiz');
     var chkDrv     = document.getElementById('uvlChkDrv');
     var confirmBtn = document.getElementById('uvlApproveConfirmBtn');
+    var teamWrap   = document.getElementById('uvlChkTeamWrap');
+    var currentTeamIds = [];
 
     function updateApproveBtn() {
-        /* Must have profile checked + at least reviewed all items */
+        /* Must have profile checked */
         confirmBtn.disabled = !chkProfile.checked;
     }
     chkProfile.addEventListener('change', updateApproveBtn);
@@ -557,6 +593,13 @@ document.addEventListener('DOMContentLoaded', function() {
         var bizName = btn.dataset.bizName;
         var drvCode = btn.dataset.driverCode;
 
+        /* Parse team memberships */
+        var teamData = [];
+        try { teamData = JSON.parse(btn.dataset.teamMemberships || '[]'); } catch(e) {}
+        /* Filter out empty objects from template rendering */
+        teamData = teamData.filter(function(t) { return t && t.id; });
+        currentTeamIds = [];
+
         document.getElementById('uvlApproveUser').textContent = name + ' (' + email + ')';
 
         /* Show/hide role checkboxes */
@@ -568,6 +611,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (isDrv && drvCode) {
             document.getElementById('uvlChkDrvCode').textContent = 'Approve driver ' + drvCode;
+        }
+
+        /* Build team checkboxes */
+        teamWrap.innerHTML = '';
+        if (teamData.length > 0) {
+            teamData.forEach(function(tm) {
+                currentTeamIds.push(tm.id);
+                var label = document.createElement('label');
+                label.className = 'uvl-modal__check';
+                label.innerHTML =
+                    '<input type="checkbox" checked data-team-id="' + tm.id + '">' +
+                    '<span class="uvl-modal__checkmark"></span>' +
+                    '<span class="uvl-modal__check-body">' +
+                        '<span class="uvl-modal__check-title"><i class="fa-solid fa-users"></i> Activate Team Role</span>' +
+                        '<span class="uvl-modal__check-desc">Activate ' + tm.role + ' role at "' + tm.biz + '"</span>' +
+                    '</span>';
+                teamWrap.appendChild(label);
+            });
         }
 
         /* Reset checkboxes */
@@ -584,7 +645,18 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmBtn.disabled = true;
         confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Approving...';
 
-        postVerification(currentProfileId, { status: 'verified' })
+        /* Collect checked team IDs */
+        var activateTeams = [];
+        teamWrap.querySelectorAll('input[data-team-id]:checked').forEach(function(cb) {
+            activateTeams.push(parseInt(cb.dataset.teamId));
+        });
+
+        var payload = { status: 'verified' };
+        if (activateTeams.length > 0) {
+            payload.activate_teams = activateTeams;
+        }
+
+        postVerification(currentProfileId, payload)
         .then(function(data) {
             if (data.success) {
                 closeModal(approveOverlay);
@@ -654,6 +726,44 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(function(err) { alert(err.message || 'An error occurred'); });
         }
     }
+
+    /* ---------- TEAM STATUS INLINE ACTIONS ---------- */
+    function updateTeamStatus(btn, teamId, newStatus) {
+        var statusLabels = { active: 'Activate', suspended: 'Suspend', rejected: 'Reject' };
+        var label = statusLabels[newStatus] || newStatus;
+        if (!confirm(label + ' this team membership?')) return;
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+        fetch('/workforce/verification/team/' + teamId + '/update-status/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            credentials: 'same-origin',
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to update'));
+                btn.disabled = false;
+                btn.textContent = label;
+            }
+        })
+        .catch(function(err) {
+            alert(err.message || 'An error occurred');
+            btn.disabled = false;
+            btn.textContent = label;
+        });
+    }
+
+    document.querySelectorAll('.uvl__team-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            updateTeamStatus(this, this.dataset.teamId, this.dataset.action);
+        });
+    });
 
     /* ---------- EVENT DELEGATION ---------- */
     document.querySelectorAll('[data-action][data-profile-id]').forEach(function(btn) {
