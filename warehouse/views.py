@@ -46,8 +46,8 @@ def is_staff_user(request):
 
 
 def is_superuser_only(user):
-    """Check if user is a superuser (required for warehouse setup/config)"""
-    return user.is_superuser
+    """Check if user is staff or superuser (required for warehouse setup/config)"""
+    return user.is_staff or user.is_superuser
 
 
 def get_business_filter(request):
@@ -68,7 +68,7 @@ def get_business_filter(request):
 
 @login_required(login_url='account_login')
 def dashboard(request):
-    """Warehouse dashboard with summary stats"""
+    """Warehouse dashboard with live summary stats"""
     business, is_staff = get_business_filter(request)
 
     # Staff users see all warehouses, regular users see only linked warehouses
@@ -79,11 +79,12 @@ def dashboard(request):
         pick_filter = {'status__in': ['pending', 'assigned', 'in_progress']}
         count_filter = {'status__in': ['scheduled', 'in_progress']}
         txn_filter = {}
+        link_filter = {}
+        location_filter = {}
     else:
         if not business:
             messages.error(request, "No business associated with your account")
             return redirect('business:business_dashboard')
-        # Get warehouses linked to this business
         linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
             business=business, is_active=True
         ).values_list('warehouse_id', flat=True)
@@ -95,13 +96,16 @@ def dashboard(request):
         pick_filter = {'warehouse_id__in': linked_warehouse_ids, 'status__in': ['pending', 'assigned', 'in_progress']}
         count_filter = {'warehouse_id__in': linked_warehouse_ids, 'status__in': ['scheduled', 'in_progress']}
         txn_filter = {'warehouse_id__in': linked_warehouse_ids}
+        link_filter = {'warehouse_id__in': linked_warehouse_ids}
+        location_filter = {'warehouse_id__in': linked_warehouse_ids}
 
     # Summary stats
     total_stock = warehouse_models.StockLevel.objects.filter(
         **stock_filter
     ).aggregate(
         total_on_hand=Sum('quantity_on_hand'),
-        total_reserved=Sum('quantity_reserved')
+        total_reserved=Sum('quantity_reserved'),
+        total_incoming=Sum('quantity_incoming'),
     )
 
     low_stock_count = warehouse_models.LowStockAlert.objects.filter(
@@ -121,14 +125,64 @@ def dashboard(request):
         **txn_filter
     ).select_related('product', 'warehouse').order_by('-created_at')[:10]
 
+    # Storage locations (zones) with stock counts
+    storage_locations = warehouse_models.StorageLocation.objects.filter(
+        location_type='zone', is_active=True, **location_filter
+    ).select_related('warehouse').order_by('warehouse__code', 'code')
+
+    # Annotate zones with usage info
+    for loc in storage_locations:
+        total_bins = warehouse_models.StorageLocation.objects.filter(
+            warehouse=loc.warehouse, code__startswith=loc.code, location_type='bin'
+        ).count()
+        occupied_bins = warehouse_models.StockLevel.objects.filter(
+            location__warehouse=loc.warehouse,
+            location__code__startswith=loc.code,
+            quantity_on_hand__gt=0
+        ).values('location').distinct().count()
+        loc.total_bins = total_bins
+        loc.occupied_bins = occupied_bins
+        loc.usage_percent = int((occupied_bins / total_bins * 100) if total_bins > 0 else 0)
+
+    # Seller-warehouse links
+    seller_links = warehouse_models.SellerWarehouseLink.objects.filter(
+        **link_filter
+    ).select_related('business', 'warehouse').order_by('-is_default', '-is_active')
+
+    total_links = seller_links.count()
+    active_links = seller_links.filter(is_active=True).count()
+
+    # Warehouse capacity summary
+    total_zones = sum(w.total_zones for w in warehouses)
+    total_capacity = sum(
+        w.total_zones * w.racks_per_zone * w.shelves_per_rack * w.bins_per_shelf
+        for w in warehouses
+    )
+
+    # All storage location counts by type
+    loc_counts = {}
+    for lt in ['zone', 'rack', 'shelf', 'bin']:
+        loc_counts[lt] = warehouse_models.StorageLocation.objects.filter(
+            location_type=lt, is_active=True, **location_filter
+        ).count()
+
     context = {
         'warehouses': warehouses,
         'total_on_hand': total_stock['total_on_hand'] or 0,
         'total_reserved': total_stock['total_reserved'] or 0,
+        'total_incoming': total_stock['total_incoming'] or 0,
         'low_stock_count': low_stock_count,
         'pending_picks': pending_picks,
         'pending_counts': pending_counts,
         'recent_transactions': recent_transactions,
+        'storage_locations': storage_locations,
+        'seller_links': seller_links,
+        'total_links': total_links,
+        'active_links': active_links,
+        'total_zones': total_zones,
+        'total_capacity': total_capacity,
+        'loc_counts': loc_counts,
+        'current_date': timezone.now(),
         'is_staff': is_staff,
     }
     return render(request, 'warehouse/dashboard.html', context)
@@ -1151,7 +1205,7 @@ def warehouse_generate_locations(request, pk):
 @login_required(login_url='account_login')
 @user_passes_test(is_superuser_only)
 def location_list(request):
-    """List all storage locations - Superuser only"""
+    """List all storage locations in hierarchical tree view"""
     business, is_staff = get_business_filter(request)
 
     if not is_staff and not business:
@@ -1159,34 +1213,60 @@ def location_list(request):
         return redirect('business:business_dashboard')
 
     if is_staff:
-        locations = warehouse_models.StorageLocation.objects.all()
         warehouses = warehouse_models.Warehouse.objects.filter(is_active=True)
+        all_locations = warehouse_models.StorageLocation.objects.all()
     else:
-        # Get warehouses linked to this business
         linked_warehouse_ids = warehouse_models.SellerWarehouseLink.objects.filter(
             business=business, is_active=True
         ).values_list('warehouse_id', flat=True)
-        locations = warehouse_models.StorageLocation.objects.filter(warehouse_id__in=linked_warehouse_ids)
         warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
-
-    locations = locations.select_related('warehouse', 'parent').order_by('warehouse', 'code')
+        all_locations = warehouse_models.StorageLocation.objects.filter(warehouse_id__in=linked_warehouse_ids)
 
     warehouse_id = request.GET.get('warehouse')
     if warehouse_id:
-        locations = locations.filter(warehouse_id=warehouse_id)
+        warehouses = warehouses.filter(pk=warehouse_id)
+        all_locations = all_locations.filter(warehouse_id=warehouse_id)
 
-    # Get view mode from query parameter
-    view_mode = request.GET.get('view', 'table')
+    all_locations = all_locations.select_related('warehouse', 'parent').order_by('code')
 
-    paginator = Paginator(locations, 50)
-    page = request.GET.get('page', 1)
-    items = paginator.get_page(page)
+    # Build hierarchical tree per warehouse
+    warehouse_trees = []
+    for wh in warehouses:
+        wh_locs = [loc for loc in all_locations if loc.warehouse_id == wh.id]
+        zones = [loc for loc in wh_locs if loc.location_type == 'zone']
+        # Count totals
+        type_counts = {}
+        for loc in wh_locs:
+            type_counts[loc.location_type] = type_counts.get(loc.location_type, 0) + 1
+
+        zone_trees = []
+        for zone in zones:
+            racks = [loc for loc in wh_locs if loc.parent_id == zone.id and loc.location_type == 'rack']
+            rack_trees = []
+            for rack in racks:
+                shelves = [loc for loc in wh_locs if loc.parent_id == rack.id and loc.location_type == 'shelf']
+                shelf_trees = []
+                for shelf in shelves:
+                    bins = [loc for loc in wh_locs if loc.parent_id == shelf.id and loc.location_type == 'bin']
+                    shelf.bin_list = bins
+                    shelf_trees.append(shelf)
+                rack.shelf_list = shelf_trees
+                rack_trees.append(rack)
+            zone.rack_list = rack_trees
+            zone_trees.append(zone)
+
+        warehouse_trees.append({
+            'warehouse': wh,
+            'zones': zone_trees,
+            'type_counts': type_counts,
+            'total': len(wh_locs),
+        })
 
     context = {
-        'locations': items,
-        'warehouses': warehouses,
+        'warehouse_trees': warehouse_trees,
+        'warehouses_all': warehouse_models.Warehouse.objects.filter(is_active=True),
         'selected_warehouse': warehouse_id,
-        'view_mode': view_mode,
+        'total_locations': all_locations.count(),
         'is_staff': is_staff,
     }
     return render(request, 'warehouse/location_list.html', context)
@@ -1248,8 +1328,19 @@ def location_add(request):
         ).values_list('warehouse_id', flat=True)
         warehouses = warehouse_models.Warehouse.objects.filter(id__in=linked_warehouse_ids, is_active=True)
 
+    # Pre-select default warehouse: from URL param, or single warehouse, or is_default
+    default_wh_id = request.GET.get('warehouse')
+    if not default_wh_id:
+        if warehouses.count() == 1:
+            default_wh_id = str(warehouses.first().id)
+        else:
+            default_wh = warehouses.filter(is_default=True).first()
+            if default_wh:
+                default_wh_id = str(default_wh.id)
+
     context = {
         'warehouses': warehouses,
+        'default_warehouse_id': default_wh_id,
         'location_types': warehouse_models.LOCATION_TYPE_CHOICES,
         'is_staff': is_staff,
     }

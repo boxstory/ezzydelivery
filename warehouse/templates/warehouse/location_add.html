@@ -3,9 +3,11 @@
 
 {% block title %}Add Storage Location{% endblock %}
 
-{% block content %}
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260219c" type="text/css" />
+{% endblock extra_css %}
 
+{% block content %}
 <div class="wh">
     <!-- Breadcrumb -->
     <div class="wh__breadcrumb">
@@ -39,12 +41,15 @@
 
                         <div class="wha__field">
                             <label for="warehouse" class="wha__label">Warehouse <span class="wha__required">*</span></label>
-                            <select name="warehouse" id="warehouse" class="wha__select" required>
+                            <select name="warehouse" id="warehouse" class="wha__select" required {% if default_warehouse_id %}disabled{% endif %}>
                                 <option value="">Select Warehouse</option>
                                 {% for wh in warehouses %}
-                                <option value="{{ wh.id }}">{{ wh.name }} ({{ wh.code }})</option>
+                                <option value="{{ wh.id }}" {% if wh.id|stringformat:"s" == default_warehouse_id %}selected{% endif %}>{{ wh.name }} ({{ wh.code }})</option>
                                 {% endfor %}
                             </select>
+                            {% if default_warehouse_id %}
+                            <input type="hidden" name="warehouse" value="{{ default_warehouse_id }}">
+                            {% endif %}
                         </div>
 
                         <div class="wha__field">
@@ -60,7 +65,9 @@
                             <select name="location_type" id="location_type" class="wha__select" required>
                                 <option value="">Select Type</option>
                                 {% for type_val, type_label in location_types %}
+                                {% if type_val != 'zone' %}
                                 <option value="{{ type_val }}">{{ type_label }}</option>
+                                {% endif %}
                                 {% endfor %}
                             </select>
                         </div>
@@ -105,6 +112,22 @@
                     </ul>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Rack Labeling Guide -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left">
+                <i class="fas fa-tags"></i>
+                <span>WAREHOUSE RACK LABELING GUIDE</span>
+            </div>
+        </div>
+        <div class="wh__card-body" style="text-align: center;">
+            <img src="{% static 'warehouse/img/What-is-warehouse-rack-labelling-writing.jpg' %}"
+                 alt="Warehouse Rack Labeling Guide - How to label zones, racks, shelves and bins"
+                 style="max-width: 100%; height: auto; border-radius: var(--brand-radius-sm, 0.5rem);">
+            <p class="wh__meta" style="margin-top: 0.75rem;">Use this guide to understand the Zone &rarr; Rack &rarr; Shelf &rarr; Bin hierarchy when creating storage locations.</p>
         </div>
     </div>
 </div>
@@ -152,11 +175,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    var urlParams = new URLSearchParams(window.location.search);
-    var warehouseParam = urlParams.get('warehouse');
-    if (warehouseParam) {
-        warehouseSelect.value = warehouseParam;
-        loadParentLocations(warehouseParam);
+    // Auto-load parent locations if warehouse is pre-selected
+    if (warehouseSelect.value) {
+        loadParentLocations(warehouseSelect.value);
     }
 
     warehouseSelect.addEventListener('change', function() {

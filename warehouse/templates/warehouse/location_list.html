@@ -3,290 +3,192 @@
 
 {% block title %}Storage Locations{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260219e" type="text/css" />
+{% endblock extra_css %}
+
 {% block content %}
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260215a" type="text/css" />
-
 <div class="wh">
-  <!-- Header -->
-  <div class="wh__header">
-    <div class="wh__header-left">
-      <div class="wh__header-icon">
-        <i class="fas fa-map-marked-alt"></i>
-      </div>
-      <div>
-        <h1 class="wh__title">Storage Locations</h1>
-        <p class="wh__subtitle">Manage storage locations across warehouses</p>
-      </div>
-    </div>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-      <form method="GET" class="d-flex gap-2" id="filter-form">
-        <select name="warehouse" class="wh__filter-select" onchange="this.form.submit()">
-          <option value="">All Warehouses</option>
-          {% for wh in warehouses %}
-          <option value="{{ wh.id }}" {% if selected_warehouse == wh.id|stringformat:'s' %}selected{% endif %}>{{ wh.name }}</option>
-          {% endfor %}
-        </select>
-        <input type="hidden" name="view" id="view-input" value="{{ view_mode|default:'table' }}">
-      </form>
-      <div class="wh__view-toggle">
-        <button type="button" class="wh__toggle-btn {% if view_mode == 'visual' %}active{% endif %}" onclick="switchView('visual')">
-          <i class="fas fa-th"></i> Visual
-        </button>
-        <button type="button" class="wh__toggle-btn {% if view_mode != 'visual' %}active{% endif %}" onclick="switchView('table')">
-          <i class="fas fa-list"></i> Table
-        </button>
-      </div>
-      <a href="{% url 'warehouse:location_add' %}" class="wh__btn wh__btn--primary">
-        <i class="fas fa-plus"></i> Add Location
-      </a>
-    </div>
-  </div>
-
-  <!-- Visual View -->
-  <div id="visual-view" style="display: none;">
-    <div class="wh__diagram">
-      <!-- Guide -->
-      <div class="wh__card" style="margin-bottom: 1rem;">
-        <div class="wh__card-body">
-          <div class="wh__card-header-left" style="margin-bottom: 0.75rem;">
-            <i class="fas fa-info-circle" style="color: #2563eb;"></i>
-            <strong>Warehouse Rack Labeling Guide</strong>
-          </div>
-          <img src="{% static 'warehouse/img/What-is-warehouse-rack-labelling-writing.jpg' %}"
-               alt="Warehouse Rack Labeling"
-               class="wh__guide-img"
-               onerror="this.style.display='none'">
-          <p class="wh__meta" style="margin-top: 0.5rem;">
-            <strong>Location Hierarchy:</strong> Zone &rarr; Aisle &rarr; Rack &rarr; Shelf &rarr; Bin
-          </p>
-        </div>
-      </div>
-
-      <!-- Legend -->
-      <div class="wh__legend">
-        <div class="wh__legend-item"><div class="wh__legend-color" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div><span>Zone</span></div>
-        <div class="wh__legend-item"><div class="wh__legend-color" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div><span>Aisle</span></div>
-        <div class="wh__legend-item"><div class="wh__legend-color" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div><span>Rack</span></div>
-        <div class="wh__legend-item"><div class="wh__legend-color" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div><span>Bin</span></div>
-        <div class="wh__legend-item"><div class="wh__legend-color" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);"></div><span>Shelf</span></div>
-      </div>
-
-      <!-- Location Cards by Type -->
-      {% regroup locations by get_location_type_display as locations_by_type %}
-      {% for type_group in locations_by_type %}
-      <div style="margin-bottom: 1.5rem;">
-        <div class="wh__hierarchy-title">
-          <i class="fas fa-layer-group"></i>
-          {{ type_group.grouper }} Locations ({{ type_group.list|length }})
-        </div>
-        <div class="wh__loc-grid">
-          {% for loc in type_group.list %}
-          <div class="wh__loc-card wh__loc-card--{{ loc.location_type }}" onclick="editLocation({{ loc.id }})">
-            <div class="wh__loc-status {% if not loc.is_active %}wh__loc-status--inactive{% endif %}"></div>
-            <div class="wh__loc-code">{{ loc.code }}</div>
-            <div class="wh__loc-name">{{ loc.name }}</div>
-            <div class="wh__loc-type">{{ loc.warehouse.name }}</div>
-            {% if loc.parent %}
-            <div class="wh__meta" style="margin-top: 0.5rem; opacity: 0.8; color: rgba(255,255,255,0.8);">
-              <i class="fas fa-arrow-up"></i> {{ loc.parent.code }}
-            </div>
-            {% endif %}
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% empty %}
-      <div class="wh__empty">
-        <i class="fas fa-map-marker-alt"></i>
-        <p>No storage locations found</p>
-        <a href="{% url 'warehouse:location_add' %}" class="wh__btn wh__btn--primary mt-2">
-          <i class="fas fa-plus"></i> Add First Location
-        </a>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-
-  <!-- Table View -->
-  <div id="table-view">
-    <!-- Guide Card -->
-    <div class="wh__card" style="margin-bottom: 1rem;">
-      <div class="wh__card-body">
-        <div class="wh__card-header-left" style="margin-bottom: 0.75rem;">
-          <i class="fas fa-info-circle" style="color: #2563eb;"></i>
-          <strong>Warehouse Rack Labeling Guide</strong>
-        </div>
-        <div class="row">
-          <div class="col-md-8">
-            <img src="{% static 'warehouse/img/What-is-warehouse-rack-labelling-writing.jpg' %}"
-                 alt="Warehouse Rack Labeling"
-                 class="wh__guide-img"
-                 onerror="this.parentElement.style.display='none'">
-          </div>
-          <div class="col-md-4 d-flex align-items-center">
+    <!-- Header -->
+    <div class="wh__header">
+        <div class="wh__header-left">
+            <div class="wh__header-icon"><i class="fa-solid fa-sitemap"></i></div>
             <div>
-              <p class="wh__product-name" style="margin-bottom: 0.5rem;">Location Hierarchy:</p>
-              <div class="wh__step"><span class="wh__badge wh__type-badge--zone">Zone</span><span class="wh__meta" style="margin-left: 0.5rem;">Top level area</span></div>
-              <div class="wh__step"><span class="wh__badge wh__type-badge--aisle">Aisle</span><span class="wh__meta" style="margin-left: 0.5rem;">Pathway within zone</span></div>
-              <div class="wh__step"><span class="wh__badge wh__type-badge--rack">Rack</span><span class="wh__meta" style="margin-left: 0.5rem;">Storage structure</span></div>
-              <div class="wh__step"><span class="wh__badge wh__type-badge--shelf">Shelf</span><span class="wh__meta" style="margin-left: 0.5rem;">Horizontal level</span></div>
-              <div class="wh__step"><span class="wh__badge wh__type-badge--bin">Bin</span><span class="wh__meta" style="margin-left: 0.5rem;">Storage container</span></div>
+                <h1 class="wh__title">Storage Locations</h1>
+                <p class="wh__subtitle">{{ total_locations }} locations across {{ warehouse_trees|length }} warehouse{{ warehouse_trees|length|pluralize }}</p>
             </div>
-          </div>
         </div>
-      </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <form method="GET" class="d-flex gap-2">
+                <select name="warehouse" class="wh__filter-select" onchange="this.form.submit()">
+                    <option value="">All Warehouses</option>
+                    {% for wh in warehouses_all %}
+                    <option value="{{ wh.id }}" {% if selected_warehouse == wh.id|stringformat:'s' %}selected{% endif %}>{{ wh.name }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            <button type="button" class="wh__btn wh__btn--secondary" onclick="toggleAll(true)">
+                <i class="fa-solid fa-expand"></i> Expand All
+            </button>
+            <button type="button" class="wh__btn wh__btn--secondary" onclick="toggleAll(false)">
+                <i class="fa-solid fa-compress"></i> Collapse
+            </button>
+            <a href="{% url 'warehouse:location_add' %}" class="wh__btn wh__btn--primary"
+               hx-get="{% url 'warehouse:location_add' %}" hx-target="body" hx-push-url="true">
+                <i class="fa-solid fa-plus"></i> Add Location
+            </a>
+        </div>
     </div>
 
-    <!-- Locations Table -->
-    <div class="wh__card">
-      <div class="wh__card-header">
-        <div class="wh__card-header-left">
-          <i class="fas fa-list"></i>
-          <span>All Locations</span>
+    {% for wt in warehouse_trees %}
+    <!-- Warehouse Card -->
+    <div class="wh__card loc-tree">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left">
+                <i class="fa-solid fa-warehouse"></i>
+                <span>{{ wt.warehouse.name }} ({{ wt.warehouse.code }})</span>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                {% if wt.type_counts.zone %}<span class="wh__badge loc-badge--zone">{{ wt.type_counts.zone }} Zone{{ wt.type_counts.zone|pluralize }}</span>{% endif %}
+                {% if wt.type_counts.rack %}<span class="wh__badge loc-badge--rack">{{ wt.type_counts.rack }} Rack{{ wt.type_counts.rack|pluralize }}</span>{% endif %}
+                {% if wt.type_counts.shelf %}<span class="wh__badge loc-badge--shelf">{{ wt.type_counts.shelf }} Shel{{ wt.type_counts.shelf|pluralize:"f,ves" }}</span>{% endif %}
+                {% if wt.type_counts.bin %}<span class="wh__badge loc-badge--bin">{{ wt.type_counts.bin }} Bin{{ wt.type_counts.bin|pluralize }}</span>{% endif %}
+                <span class="wh__meta">{{ wt.total }} total</span>
+            </div>
         </div>
-        <a href="{% url 'warehouse:location_add' %}" class="wh__btn wh__btn--primary">
-          <i class="fas fa-plus"></i> Add
-        </a>
-      </div>
-      <div class="wh__table-wrap">
-        <table class="wh__table">
-          <thead>
-            <tr>
-              <th class="wh__th">Type</th>
-              <th class="wh__th">Code</th>
-              <th class="wh__th">Name</th>
-              <th class="wh__th">Warehouse</th>
-              <th class="wh__th">Parent</th>
-              <th class="wh__th">Status</th>
-              <th class="wh__th wh__th--end">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for loc in locations %}
-            <tr class="wh__locrow--{{ loc.location_type }}">
-              <td class="wh__td">
-                <span class="wh__badge wh__type-badge--{{ loc.location_type }}">
-                  {{ loc.get_location_type_display }}
-                </span>
-              </td>
-              <td class="wh__td"><code class="wh__code">{{ loc.code }}</code></td>
-              <td class="wh__td"><strong>{{ loc.name }}</strong></td>
-              <td class="wh__td">{{ loc.warehouse.name }}</td>
-              <td class="wh__td">
-                {% if loc.parent %}
-                <code class="wh__code">{{ loc.parent.code }}</code>
-                {% else %}
-                <span class="wh__muted">-</span>
-                {% endif %}
-              </td>
-              <td class="wh__td">
-                {% if loc.is_active %}
-                <span class="wh__badge wh__badge--success">Active</span>
-                {% else %}
-                <span class="wh__badge wh__badge--muted">Inactive</span>
-                {% endif %}
-              </td>
-              <td class="wh__td wh__td--end">
-                <div class="wh__actions">
-                  <a href="{% url 'warehouse:location_edit' loc.id %}" class="wh__action-btn" title="Edit">
-                    <i class="fas fa-edit"></i>
-                  </a>
-                  <a href="{% url 'warehouse:location_delete' loc.id %}" class="wh__action-btn wh__action-btn--danger" title="Delete">
-                    <i class="fas fa-trash"></i>
-                  </a>
+        <div class="wh__card-body" style="padding: 0;">
+            {% for zone in wt.zones %}
+            <!-- Zone -->
+            <div class="loc-node loc-node--zone">
+                <div class="loc-node__header" onclick="this.parentElement.classList.toggle('loc-node--collapsed')">
+                    <div class="loc-node__toggle"><i class="fa-solid fa-chevron-down"></i></div>
+                    <div class="loc-node__icon loc-icon--zone"><i class="fa-solid fa-map"></i></div>
+                    <div class="loc-node__info">
+                        <span class="loc-node__code">{{ zone.code }}</span>
+                        <span class="loc-node__name">{{ zone.name }}</span>
+                    </div>
+                    <div class="loc-node__meta">
+                        <span class="wh__badge loc-badge--rack">{{ zone.rack_list|length }} rack{{ zone.rack_list|length|pluralize }}</span>
+                        {% if zone.is_active %}<span class="wh__badge wh__badge--success">Active</span>{% else %}<span class="wh__badge wh__badge--muted">Inactive</span>{% endif %}
+                        <a href="{% url 'warehouse:location_edit' zone.id %}" class="wh__action-btn wh__action-btn--pill" onclick="event.stopPropagation()"
+                           hx-get="{% url 'warehouse:location_edit' zone.id %}" hx-target="body" hx-push-url="true">
+                            <i class="fa-solid fa-edit"></i>
+                        </a>
+                    </div>
                 </div>
-              </td>
-            </tr>
+                <div class="loc-node__children">
+                    {% for rack in zone.rack_list %}
+                    <!-- Rack -->
+                    <div class="loc-node loc-node--rack">
+                        <div class="loc-node__header" onclick="this.parentElement.classList.toggle('loc-node--collapsed')">
+                            <div class="loc-node__toggle"><i class="fa-solid fa-chevron-down"></i></div>
+                            <div class="loc-node__icon loc-icon--rack"><i class="fa-solid fa-server"></i></div>
+                            <div class="loc-node__info">
+                                <span class="loc-node__code">{{ rack.code }}</span>
+                                <span class="loc-node__name">{{ rack.name }}</span>
+                            </div>
+                            <div class="loc-node__meta">
+                                <span class="wh__badge loc-badge--shelf">{{ rack.shelf_list|length }} shel{{ rack.shelf_list|length|pluralize:"f,ves" }}</span>
+                                <a href="{% url 'warehouse:location_edit' rack.id %}" class="wh__action-btn wh__action-btn--pill" onclick="event.stopPropagation()"
+                                   hx-get="{% url 'warehouse:location_edit' rack.id %}" hx-target="body" hx-push-url="true">
+                                    <i class="fa-solid fa-edit"></i>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="loc-node__children">
+                            <!-- Shelves -->
+                            {% for shelf in rack.shelf_list %}
+                            <div class="loc-shelf-row">
+                                <div class="loc-shelf-row__header" {% if shelf.bin_list %}onclick="this.parentElement.classList.toggle('loc-shelf-row--expanded')"{% endif %}>
+                                    {% if shelf.bin_list %}
+                                    <div class="loc-shelf-row__toggle"><i class="fa-solid fa-chevron-right"></i></div>
+                                    {% else %}
+                                    <div class="loc-shelf-row__toggle loc-shelf-row__toggle--empty"></div>
+                                    {% endif %}
+                                    <div class="loc-shelf-row__icon"><i class="fa-solid fa-bars"></i></div>
+                                    <span class="loc-shelf-row__code">{{ shelf.code }}</span>
+                                    <span class="loc-shelf-row__name">{{ shelf.name }}</span>
+                                    {% if shelf.width_cm %}
+                                    <span class="loc-shelf-row__dims">{{ shelf.width_cm|floatformat:0 }}&times;{{ shelf.length_cm|floatformat:0 }}&times;{{ shelf.height_cm|floatformat:0 }} cm</span>
+                                    {% endif %}
+                                    {% if shelf.bin_list %}
+                                    <span class="wh__badge loc-badge--bin">{{ shelf.bin_list|length }} bin{{ shelf.bin_list|length|pluralize }}</span>
+                                    {% endif %}
+                                    {% if not shelf.is_active %}<span class="wh__badge wh__badge--muted">Inactive</span>{% endif %}
+                                    <a href="{% url 'warehouse:location_edit' shelf.id %}" class="wh__action-btn wh__action-btn--pill" onclick="event.stopPropagation()"
+                                       hx-get="{% url 'warehouse:location_edit' shelf.id %}" hx-target="body" hx-push-url="true">
+                                        <i class="fa-solid fa-pen"></i>
+                                    </a>
+                                </div>
+                                {% if shelf.bin_list %}
+                                <div class="loc-shelf-row__bins">
+                                    <div class="loc-bin-grid">
+                                        {% for bin in shelf.bin_list %}
+                                        <div class="loc-bin-chip {% if not bin.is_active %}loc-bin-chip--inactive{% endif %}">
+                                            <i class="fa-solid fa-cube"></i>
+                                            <span class="loc-bin-chip__code">{{ bin.code }}</span>
+                                            {% if bin.width_cm %}
+                                            <span class="loc-bin-chip__dims">{{ bin.width_cm|floatformat:0 }}&times;{{ bin.length_cm|floatformat:0 }}&times;{{ bin.height_cm|floatformat:0 }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% empty %}
+                            <div class="wh__muted" style="padding: 0.5rem 0.5rem 0.5rem 3rem;">No shelves</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="wh__muted" style="padding: 0.75rem 1rem 0.75rem 3rem;">No racks in this zone</div>
+                    {% endfor %}
+                </div>
+            </div>
             {% empty %}
-            <tr>
-              <td colspan="7" class="wh__empty">
-                <i class="fas fa-map-marker-alt"></i>
-                <p>No storage locations found</p>
-              </td>
-            </tr>
+            <div class="wh__empty">
+                <i class="fa-solid fa-sitemap"></i>
+                <p><strong>No Zones</strong></p>
+                <p>This warehouse has no storage zones configured.</p>
+            </div>
             {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <div class="wh__card-footer">
-        {% include "includes/components/_pagination.html" with page_obj=locations filter_params=filter_params %}
-      </div>
+        </div>
     </div>
-  </div>
+    {% empty %}
+    <div class="wh__card">
+        <div class="wh__card-body wh__empty">
+            <i class="fa-solid fa-sitemap"></i>
+            <p><strong>No Warehouses Found</strong></p>
+            <p>Create a warehouse first, then add storage locations.</p>
+        </div>
+    </div>
+    {% endfor %}
 
-  <!-- Tips & Workflow -->
-  <div class="wh__help-grid">
-    <div class="wh__help-card">
-      <div class="wh__help-header wh__help-header--tips">
-        <i class="fas fa-lightbulb"></i> Quick Tips
-      </div>
-      <div class="wh__help-body">
-        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Visual View:</strong> Click "Visual" to see warehouse locations as interactive cards organized by type</span></div>
-        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Color Coding:</strong> Zone=Purple, Aisle=Pink, Rack=Blue, Bin=Green, Shelf=Orange</span></div>
-        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Hierarchy:</strong> Follow the standard: Zone &rarr; Aisle &rarr; Rack &rarr; Shelf &rarr; Bin</span></div>
-        <div class="wh__tip"><i class="fas fa-circle"></i><span><strong>Rack Labeling:</strong> Use the guide image to understand standard warehouse rack labeling conventions</span></div>
-      </div>
+    <!-- Rack Labeling Guide -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-tags"></i> <span>WAREHOUSE RACK LABELING GUIDE</span></div>
+        </div>
+        <div class="wh__card-body" style="text-align: center;">
+            <img src="{% static 'warehouse/img/What-is-warehouse-rack-labelling-writing.jpg' %}"
+                 alt="Warehouse Rack Labeling Guide"
+                 style="max-width: 100%; height: auto; border-radius: var(--brand-radius-sm, 0.5rem);"
+                 onerror="this.parentElement.parentElement.style.display='none'">
+            <p class="wh__meta" style="margin-top: 0.75rem;">Zone &rarr; Rack &rarr; Shelf &rarr; Bin hierarchy</p>
+        </div>
     </div>
-    <div class="wh__help-card">
-      <div class="wh__help-header wh__help-header--workflow">
-        <i class="fas fa-route"></i> Location Setup Workflow
-      </div>
-      <div class="wh__help-body">
-        <div class="wh__step">
-          <div class="wh__step-number">1</div>
-          <div><div class="wh__step-title">Create Zones</div><div class="wh__step-desc">Start by creating major zones (e.g., Z-A, Z-B)</div></div>
-        </div>
-        <div class="wh__step">
-          <div class="wh__step-number">2</div>
-          <div><div class="wh__step-title">Add Aisles</div><div class="wh__step-desc">Within each zone, create aisles (e.g., Z-A-01, Z-A-02)</div></div>
-        </div>
-        <div class="wh__step">
-          <div class="wh__step-number">3</div>
-          <div><div class="wh__step-title">Define Racks & Bins</div><div class="wh__step-desc">Create racks within aisles, then add bins/shelves</div></div>
-        </div>
-        <div class="wh__step">
-          <div class="wh__step-number wh__step-number--success"><i class="fas fa-check fa-xs"></i></div>
-          <div><div class="wh__step-title">Assign Inventory</div><div class="wh__step-desc">Use these locations when receiving stock</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <script>
-function switchView(view) {
-    const visualView = document.getElementById('visual-view');
-    const tableView = document.getElementById('table-view');
-    const viewInput = document.getElementById('view-input');
-    const buttons = document.querySelectorAll('.wh__toggle-btn');
-
-    if (view === 'visual') {
-        if (visualView) visualView.style.display = 'block';
-        if (tableView) tableView.style.display = 'none';
-        if (viewInput) viewInput.value = 'visual';
-        buttons[0].classList.add('active');
-        buttons[1].classList.remove('active');
-    } else {
-        if (visualView) visualView.style.display = 'none';
-        if (tableView) tableView.style.display = 'block';
-        if (viewInput) viewInput.value = 'table';
-        buttons[0].classList.remove('active');
-        buttons[1].classList.add('active');
-    }
-
-    const url = new URL(window.location);
-    url.searchParams.set('view', view);
-    window.history.pushState({}, '', url);
+function toggleAll(expand) {
+    document.querySelectorAll('.loc-node').forEach(function(node) {
+        if (expand) {
+            node.classList.remove('loc-node--collapsed');
+        } else {
+            node.classList.add('loc-node--collapsed');
+        }
+    });
 }
-
-function editLocation(locationId) {
-    window.location.href = `/workforce/warehouse/locations/${locationId}/edit/`;
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const viewMode = urlParams.get('view') || 'table';
-    switchView(viewMode);
-});
 </script>
 {% endblock %}

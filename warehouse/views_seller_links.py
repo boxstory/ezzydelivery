@@ -19,13 +19,13 @@ from business import models as business_models
 logger = logging.getLogger('warehouse')
 
 
-def is_superuser_only(user):
-    """Check if user is a superuser - required for seller-warehouse link management"""
-    return user.is_superuser
+def is_staff_or_superuser(user):
+    """Check if user is staff or superuser - required for seller-warehouse link management"""
+    return user.is_staff or user.is_superuser
 
 
 @login_required
-@user_passes_test(is_superuser_only)
+@user_passes_test(is_staff_or_superuser)
 def seller_warehouse_links(request):
     """
     List all seller-warehouse links with filtering and search.
@@ -112,7 +112,7 @@ def seller_warehouse_links(request):
 
 
 @login_required
-@user_passes_test(is_superuser_only)
+@user_passes_test(is_staff_or_superuser)
 def seller_warehouse_link_detail(request, pk):
     """
     View details of a specific seller-warehouse link.
@@ -161,7 +161,7 @@ def seller_warehouse_link_detail(request, pk):
 
 
 @login_required
-@user_passes_test(is_superuser_only)
+@user_passes_test(is_staff_or_superuser)
 def seller_warehouse_link_add(request):
     """
     Create a new seller-warehouse link.
@@ -268,7 +268,7 @@ def seller_warehouse_link_add(request):
 
 
 @login_required
-@user_passes_test(is_superuser_only)
+@user_passes_test(is_staff_or_superuser)
 def seller_warehouse_link_edit(request, pk):
     """
     Edit an existing seller-warehouse link.
@@ -337,7 +337,7 @@ def seller_warehouse_link_edit(request, pk):
 
 
 @login_required
-@user_passes_test(is_superuser_only)
+@user_passes_test(is_staff_or_superuser)
 def seller_warehouse_link_delete(request, pk):
     """
     Delete a seller-warehouse link.

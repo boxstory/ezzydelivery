@@ -87,6 +87,7 @@ from business import forms as business_forms
 from datetime import datetime
 from core.seo import SEOMetadata
 from core.context_processors import get_cached_profile, get_cached_business
+from warehouse import models as warehouse_models
 
 # Local aliases for commonly used models
 Business = business_models.Business
@@ -380,31 +381,26 @@ def pickup_location_list(request):
             business_id=business.business_id
         ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
-        # If fulfillment service is enabled, also get warehouse locations
+        # Also get warehouse locations from active seller-warehouse links
         warehouse_locations = []
-        if business.fulfillment_service_enabled:
-            from warehouse.models import SellerWarehouseLink, WarehouseLocation
+        from warehouse.models import SellerWarehouseLink, WarehouseLocation
 
-            # Get all warehouses linked to this business
-            warehouse_links = SellerWarehouseLink.objects.filter(
-                business=business
-            ).select_related('warehouse', 'default_location')
+        warehouse_links = SellerWarehouseLink.objects.filter(
+            business=business, is_active=True
+        ).select_related('warehouse', 'default_location')
 
-            # Get all active warehouse locations from linked warehouses
-            for link in warehouse_links:
-                wh_locs = WarehouseLocation.objects.filter(
-                    warehouse=link.warehouse,
-                    is_active=True
-                ).select_related('warehouse')
-                warehouse_locations.extend(wh_locs)
+        for link in warehouse_links:
+            wh_locs = WarehouseLocation.objects.filter(
+                warehouse=link.warehouse,
+                is_active=True
+            ).select_related('warehouse')
+            warehouse_locations.extend(wh_locs)
 
         # Combine locations: warehouse locations first, then regular pickup locations
         all_locations = list(pickup_locations)
 
         if not all_locations and not warehouse_locations:
-            if business.fulfillment_service_enabled:
-                return redirect('business:pickup_location_choose')
-            return redirect('business:pickup_location_add')
+            return redirect('business:pickup_location_choose')
 
         logger.info(f"User {request.user.id} viewing {len(all_locations)} pickup locations and {len(warehouse_locations)} warehouse locations for business {business.business_id}")
 
@@ -429,8 +425,6 @@ def pickup_location_choose(request):
     if not business:
         messages.error(request, "No business associated with your account")
         return redirect('core:main_dashboard')
-    if not business.fulfillment_service_enabled:
-        return redirect('business:pickup_location_add')
     return render(request, 'business/parts/pickup_location_choose.html', {
         'business': business,
     })
@@ -2007,3 +2001,85 @@ def outbound_requests_list(request):
         'status_filter': status_filter,
     }
     return render(request, 'business/outbound_requests_list.html', context)
+
+
+# =============================================================================
+# WAREHOUSE LINK REQUEST
+# =============================================================================
+
+@login_required(login_url='account_login')
+@business_required
+def warehouse_request(request):
+    """
+    Business-facing view to request linking to a fulfillment center.
+
+    Shows active warehouses and lets the business submit a link request.
+    Creates SellerWarehouseLink with is_active=False (pending staff approval).
+    """
+    business = get_cached_business(request)
+    if not business:
+        messages.error(request, "No business associated with your account")
+        return redirect('core:main_dashboard')
+
+    # Get existing links for this business
+    existing_links = warehouse_models.SellerWarehouseLink.objects.filter(
+        business=business
+    ).select_related('warehouse')
+
+    existing_warehouse_ids = set(existing_links.values_list('warehouse_id', flat=True))
+
+    if request.method == 'POST':
+        warehouse_id = request.POST.get('warehouse')
+        notes = request.POST.get('notes', '').strip()
+
+        if not warehouse_id:
+            messages.error(request, "Please select a warehouse")
+        else:
+            try:
+                warehouse = get_object_or_404(
+                    warehouse_models.Warehouse, pk=warehouse_id, is_active=True
+                )
+
+                if warehouse.pk in existing_warehouse_ids:
+                    messages.warning(
+                        request,
+                        f"You already have a link to {warehouse.name}."
+                    )
+                else:
+                    warehouse_models.SellerWarehouseLink.objects.create(
+                        business=business,
+                        warehouse=warehouse,
+                        is_active=False,
+                        is_default=False,
+                        priority=0,
+                        notes=notes,
+                        linked_by=request.user,
+                    )
+                    messages.success(
+                        request,
+                        f"Request submitted to link with {warehouse.name}. "
+                        f"Our team will review and activate it shortly."
+                    )
+                    logger.info(
+                        f"Warehouse link request: {business.business_name} → "
+                        f"{warehouse.name} by {request.user.username}"
+                    )
+                    return redirect('business:pickup_location_list')
+
+            except Exception as e:
+                logger.error(f"Error creating warehouse link request: {e}")
+                messages.error(request, "Something went wrong. Please try again.")
+
+    # Available warehouses (active, not already linked)
+    available_warehouses = warehouse_models.Warehouse.objects.filter(
+        is_active=True
+    ).exclude(
+        pk__in=existing_warehouse_ids
+    ).order_by('-is_default', 'name')
+
+    context = {
+        'business': business,
+        'available_warehouses': available_warehouses,
+        'existing_links': existing_links,
+    }
+    return render(request, 'business/parts/warehouse_request.html', context)

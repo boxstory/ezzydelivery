@@ -6,11 +6,80 @@
 {% block meta_keywords %}{{ seo.keywords|join:", " }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'webpages/css/services.css' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'webpages/css/services.css' %}?v=20260219e">
 {% endblock %}
 
 {% block content %}
-<div class="services-page">
+<div class="services-page ez-services">
+
+    <!-- Services Hero -->
+    <section class="ez-svc-hero">
+        <div class="container ez-svc-hero__inner">
+            <div class="row align-items-center">
+                <div class="col-12 col-lg-7">
+                    <span class="ez-svc-hero__badge">
+                        <i class="fa-solid fa-shapes"></i>
+                        Complete Logistics Solutions
+                    </span>
+                    <h1 class="ez-svc-hero__title">
+                        Delivery & Fulfillment <span class="ez-svc-hero__accent">Built for Qatar</span>
+                    </h1>
+                    <p class="ez-svc-hero__desc">
+                        From same-day courier to full 3PL warehousing, we power e-commerce logistics for 500+ businesses across Doha, Al Wakrah, Lusail and beyond.
+                    </p>
+                    <div class="ez-svc-hero__ctas">
+                        <a class="ez-svc-btn--gold" href="{% url 'core:business_register' %}">
+                            <i class="fa-solid fa-rocket"></i>
+                            Register Your Business
+                        </a>
+                        <a class="ez-svc-btn--ghost" href="{% url 'webpages:delivery_pricing' %}">
+                            <i class="fa-solid fa-tag"></i>
+                            View Pricing
+                        </a>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-5 d-none d-lg-flex justify-content-center">
+                    <div class="ez-svc-hero__stats">
+                        <div class="ez-svc-hero__stat">
+                            <div class="ez-svc-hero__stat-num">6</div>
+                            <div class="ez-svc-hero__stat-label">Core Services</div>
+                        </div>
+                        <div class="ez-svc-hero__stat">
+                            <div class="ez-svc-hero__stat-num">8+</div>
+                            <div class="ez-svc-hero__stat-label">Industries</div>
+                        </div>
+                        <div class="ez-svc-hero__stat">
+                            <div class="ez-svc-hero__stat-num">8</div>
+                            <div class="ez-svc-hero__stat-label">Qatar Zones</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     {% include 'webpages/parts/services_list.html' %}
 </div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+(function() {
+  'use strict';
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('ez-svc-reveal--visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.ez-svc-reveal').forEach(function(el) {
+    observer.observe(el);
+  });
+})();
+</script>
+{% endblock %}

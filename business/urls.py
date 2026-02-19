@@ -26,6 +26,8 @@ urlpatterns = [
          business_views.pickup_location_delete, name='pickup_location_delete'),
     path('settings/pickup_locations/',
          business_views.pickup_location_list, name='pickup_location_list'),
+    path('settings/warehouse-request/',
+         business_views.warehouse_request, name='warehouse_request'),
      # api settings       
     path('<int:business_id>/settings/api/list/', business_views.business_settings_api_list,
          name='business_settings_api_list'),

@@ -1,0 +1,150 @@
+{% extends "business_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'business/css/business.css' %}?v=20260219e">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="whr" id="business_warehouse_request_container">
+
+    <!-- Hero Banner -->
+    <div class="whr__hero">
+        <div class="whr__hero-icon">
+            <i class="fa-solid fa-warehouse"></i>
+        </div>
+        <h1 class="whr__hero-title">Link Fulfillment Center</h1>
+        <p class="whr__hero-sub">Select a warehouse to request fulfillment services</p>
+    </div>
+
+    {% if existing_links %}
+    <!-- Existing Links -->
+    <div class="whr__section">
+        <h2 class="whr__section-title">
+            <i class="fa-solid fa-link"></i> Your Warehouse Links
+        </h2>
+        <div class="whr__links-grid">
+            {% for link in existing_links %}
+            <div class="whr__link-card {% if link.is_active %}whr__link-card--active{% else %}whr__link-card--pending{% endif %}">
+                <div class="whr__link-icon">
+                    <i class="fa-solid fa-warehouse"></i>
+                </div>
+                <div class="whr__link-info">
+                    <div class="whr__link-name">{{ link.warehouse.name }}</div>
+                    <div class="whr__link-code">{{ link.warehouse.code }}</div>
+                    {% if link.warehouse.city %}
+                    <div class="whr__link-location">
+                        <i class="fa-solid fa-location-dot"></i> {{ link.warehouse.city }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="whr__link-status">
+                    {% if link.is_active %}
+                    <span class="whr__badge whr__badge--active">
+                        <i class="fa-solid fa-check-circle"></i> Active
+                    </span>
+                    {% else %}
+                    <span class="whr__badge whr__badge--pending">
+                        <i class="fa-solid fa-clock"></i> Pending Approval
+                    </span>
+                    {% endif %}
+                    {% if link.is_default %}
+                    <span class="whr__badge whr__badge--default">
+                        <i class="fa-solid fa-star"></i> Default
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if available_warehouses %}
+    <!-- Available Warehouses -->
+    <div class="whr__section">
+        <h2 class="whr__section-title">
+            <i class="fa-solid fa-building"></i> Available Warehouses
+        </h2>
+        <p class="whr__section-desc">Select a warehouse to request linking. Our team will review and activate your request.</p>
+
+        <form method="post" id="business_warehouse_request_form">
+            {% csrf_token %}
+
+            <div class="whr__warehouse-grid">
+                {% for wh in available_warehouses %}
+                <label class="whr__wh-card" for="whr_wh_{{ wh.pk }}">
+                    <input type="radio" name="warehouse" value="{{ wh.pk }}" id="whr_wh_{{ wh.pk }}" class="whr__wh-radio" required>
+                    <div class="whr__wh-card-inner">
+                        <div class="whr__wh-icon">
+                            <i class="fa-solid fa-warehouse"></i>
+                        </div>
+                        <div class="whr__wh-details">
+                            <div class="whr__wh-name">{{ wh.name }}</div>
+                            <div class="whr__wh-code">{{ wh.code }}</div>
+                            {% if wh.city %}
+                            <div class="whr__wh-location">
+                                <i class="fa-solid fa-location-dot"></i> {{ wh.city }}{% if wh.country %}, {{ wh.country }}{% endif %}
+                            </div>
+                            {% endif %}
+                            {% if wh.is_default %}
+                            <span class="whr__badge whr__badge--default mt-1">
+                                <i class="fa-solid fa-star"></i> Primary Center
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="whr__wh-check">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                    </div>
+                </label>
+                {% endfor %}
+            </div>
+
+            <!-- Notes -->
+            <div class="whr__notes-group">
+                <label for="whr_notes" class="whr__notes-label">Notes (optional)</label>
+                <textarea name="notes" id="whr_notes" class="whr__notes-input" rows="3"
+                    placeholder="Any special requirements or notes for the warehouse team..."></textarea>
+            </div>
+
+            <!-- Submit -->
+            <div class="whr__actions">
+                <a href="{% url 'business:pickup_location_choose' %}" class="whr__btn whr__btn--secondary">
+                    <i class="fa-solid fa-arrow-left"></i> Back
+                </a>
+                <button type="submit" class="whr__btn whr__btn--primary">
+                    <i class="fa-solid fa-paper-plane"></i> Submit Request
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {% elif not existing_links %}
+    <!-- No warehouses available -->
+    <div class="whr__empty">
+        <div class="whr__empty-icon">
+            <i class="fa-solid fa-box-open"></i>
+        </div>
+        <h3 class="whr__empty-title">No Warehouses Available</h3>
+        <p class="whr__empty-desc">There are no fulfillment centers available at the moment. Please contact our team or add your own store location.</p>
+        <a href="{% url 'business:pickup_location_add' %}" class="whr__btn whr__btn--primary">
+            <i class="fa-solid fa-plus"></i> Add Store Location Instead
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Help Callout -->
+    <div class="whr__callout">
+        <i class="fa-solid fa-circle-info whr__callout-icon"></i>
+        <div>
+            <p class="whr__callout-title">How does it work?</p>
+            <p class="whr__callout-text">
+                After you submit a request, our warehouse team will review and activate the link.
+                Once active, the fulfillment center will appear as a pickup location for your orders.
+            </p>
+        </div>
+    </div>
+
+</div>
+{% endblock content %}

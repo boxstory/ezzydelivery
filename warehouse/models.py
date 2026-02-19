@@ -490,6 +490,12 @@ class StorageLocation(models.Model):
         choices=LOCATION_TYPE_CHOICES,
         default='bin'
     )
+    # Dimensions (in cm)
+    width_cm = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Width in cm")
+    length_cm = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Length in cm")
+    height_cm = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Height in cm")
+    max_weight_kg = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Max weight capacity in kg")
+
     is_pickable = models.BooleanField(default=True)  # Can pick from this location
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -136,7 +136,7 @@ class Business(models.Model):
 
     # Fulfillment Service - Businesses using EzzyDelivery's fulfillment/WMS service
     fulfillment_service_enabled = models.BooleanField(
-        default=False,
+        default=True,
         help_text="Enable fulfillment service (WMS integration) for this business"
     )
     FULFILLMENT_STATUS_CHOICES = [

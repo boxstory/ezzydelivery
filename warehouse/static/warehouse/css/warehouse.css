@@ -1098,6 +1098,49 @@ main .col-12.d-flex {
     object-fit: contain;
 }
 
+/* --- List Row (dashboard, detail cards) --- */
+.wh__list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+    gap: 1rem;
+}
+.wh__list-row:last-child { border-bottom: none; }
+.wh__list-row-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    flex: 1;
+}
+.wh__list-row-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    background: var(--brand-grey-100, #fafafa);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--brand-grey-500, #6c757d);
+    font-size: 0.85rem;
+}
+.wh__list-row-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--brand-navy, #001f3f);
+}
+.wh__list-row-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
 /* --- Responsive --- */
 @media (max-width: 767px) {
     .wh {
@@ -1124,4 +1167,1679 @@ main .col-12.d-flex {
     .wh__loc-grid {
         grid-template-columns: 1fr 1fr;
     }
+    .wh__list-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .wh__list-row-right {
+        justify-content: flex-start;
+        margin-top: 0.5rem;
+    }
+}
+
+/* =================================================================
+   LOC-TREE — Hierarchical Location Tree
+   Collapsible tree view for Zone → Rack → Shelf → Bin
+   ================================================================= */
+
+/* --- Badges by type --- */
+.loc-badge--zone { background: #667eea; color: #fff; }
+.loc-badge--rack { background: #4facfe; color: #fff; }
+.loc-badge--shelf { background: #43e97b; color: #1a3a2a; }
+.loc-badge--bin { background: #fa709a; color: #fff; }
+
+/* --- Tree Node --- */
+.loc-node {
+    border-bottom: 1px solid var(--brand-grey-200, #f0f0f0);
+}
+.loc-node:last-child { border-bottom: none; }
+
+.loc-node__header {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 1rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+}
+.loc-node__header:hover { background: var(--brand-grey-100, #fafafa); }
+
+.loc-node__toggle {
+    width: 1.25rem;
+    flex-shrink: 0;
+    text-align: center;
+    color: var(--brand-grey-400, #b0b0b0);
+    font-size: 0.65rem;
+    transition: transform 0.2s;
+}
+.loc-node--collapsed > .loc-node__header > .loc-node__toggle {
+    transform: rotate(-90deg);
+}
+
+.loc-node__icon {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    color: #fff;
+}
+.loc-icon--zone { background: #667eea; }
+.loc-icon--rack { background: #4facfe; }
+
+.loc-node__info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+}
+.loc-node__code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--brand-navy, #001f3f);
+    background: var(--brand-grey-100, #fafafa);
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.25rem;
+}
+.loc-node__name {
+    font-size: 0.8rem;
+    color: var(--brand-grey-600, #555);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.loc-node__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-shrink: 0;
+}
+
+/* --- Children container --- */
+.loc-node__children {
+    padding-left: 1.5rem;
+    border-left: 2px solid var(--brand-grey-200, #f0f0f0);
+    margin-left: 1.6rem;
+}
+.loc-node--collapsed > .loc-node__children {
+    display: none;
+}
+
+/* --- Zone level indent --- */
+.loc-node--zone > .loc-node__header { padding-left: 1rem; }
+.loc-node--zone > .loc-node__children { margin-left: 1.85rem; }
+
+/* --- Rack level indent --- */
+.loc-node--rack > .loc-node__header { padding-left: 0.5rem; }
+
+/* --- Shelf Row (expandable with bins) --- */
+.loc-shelf-row {
+    border-bottom: 1px solid var(--brand-grey-200, #eee);
+}
+.loc-shelf-row:last-child { border-bottom: none; }
+
+.loc-shelf-row__header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    cursor: default;
+    transition: background 0.15s;
+    font-size: 0.78rem;
+}
+.loc-shelf-row__header:hover {
+    background: rgba(76, 175, 80, 0.04);
+}
+
+.loc-shelf-row__toggle {
+    width: 1rem;
+    text-align: center;
+    font-size: 0.55rem;
+    color: var(--brand-grey-400, #999);
+    transition: transform 0.2s;
+    cursor: pointer;
+}
+.loc-shelf-row__toggle--empty { visibility: hidden; }
+.loc-shelf-row--expanded > .loc-shelf-row__header .loc-shelf-row__toggle {
+    transform: rotate(90deg);
+}
+
+.loc-shelf-row__icon {
+    width: 1.4rem;
+    height: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.25rem;
+    background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+    color: #43a047;
+    font-size: 0.55rem;
+    flex-shrink: 0;
+}
+
+.loc-shelf-row__code {
+    font-weight: 700;
+    color: #2e7d32;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.75rem;
+}
+.loc-shelf-row__name {
+    color: var(--brand-grey-500, #666);
+    font-size: 0.72rem;
+    margin-right: auto;
+}
+.loc-shelf-row__dims {
+    font-size: 0.65rem;
+    color: var(--brand-grey-400, #999);
+    background: var(--brand-grey-100, #f5f5f5);
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.2rem;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    white-space: nowrap;
+}
+
+/* Bins container - hidden by default */
+.loc-shelf-row__bins {
+    display: none;
+    padding: 0.25rem 0.75rem 0.5rem 2.85rem;
+}
+.loc-shelf-row--expanded > .loc-shelf-row__bins {
+    display: block;
+}
+
+/* Bin Grid */
+.loc-bin-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.loc-bin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: linear-gradient(135deg, #fff3e0, #fff8e1);
+    border: 1px solid #ffe0b2;
+    border-radius: 0.3rem;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #e65100;
+    transition: all 0.15s;
+}
+.loc-bin-chip i { font-size: 0.5rem; opacity: 0.6; }
+.loc-bin-chip:hover {
+    background: linear-gradient(135deg, #ffe0b2, #ffecb3);
+    border-color: #ffcc80;
+}
+.loc-bin-chip--inactive {
+    background: var(--brand-grey-100, #fafafa);
+    border-color: var(--brand-grey-300, #dcdcdc);
+    color: var(--brand-grey-400, #b0b0b0);
+}
+.loc-bin-chip__code {
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.63rem;
+}
+.loc-bin-chip__dims {
+    font-size: 0.55rem;
+    font-weight: 400;
+    color: #bf360c;
+    opacity: 0.7;
+}
+
+/* Bin badge color */
+.loc-badge--bin {
+    background: #fff3e0 !important;
+    color: #e65100 !important;
+    border-color: #ffe0b2 !important;
+}
+
+/* --- Responsive --- */
+@media (max-width: 767px) {
+    .loc-node__header { padding: 0.5rem 0.5rem; gap: 0.4rem; }
+    .loc-node__children { padding-left: 0.75rem; margin-left: 1rem; }
+    .loc-node--zone > .loc-node__children { margin-left: 1.25rem; }
+    .loc-node__name { display: none; }
+    .loc-shelf-row__header { padding: 0.35rem 0.5rem; font-size: 0.72rem; }
+    .loc-shelf-row__name { display: none; }
+    .loc-shelf-row__bins { padding-left: 1.5rem; }
+    .loc-bin-chip { padding: 0.15rem 0.35rem; font-size: 0.6rem; }
+}
+
+
+/* =================================================================
+   WHDT — Warehouse Detail Page
+   BEM classes for warehouse detail view
+   ================================================================= */
+
+/* Hero Header */
+.whdt__hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #003366 100%);
+    border-radius: 0.75rem;
+    color: #fff;
+}
+
+.whdt__hero-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.whdt__hero-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--brand-primary, #f7c000);
+}
+
+.whdt__hero-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+}
+
+.whdt__hero-code {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.25rem 0 0;
+    font-family: monospace;
+}
+
+.whdt__hero-code i {
+    margin-right: 0.25rem;
+    font-size: 0.75rem;
+}
+
+/* Info Grid */
+.whdt__info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Field */
+.whdt__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.whdt__field:last-child {
+    border-bottom: none;
+}
+
+.whdt__field-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-500, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.whdt__field-label i {
+    color: var(--brand-primary, #f7c000);
+    font-size: 0.75rem;
+}
+
+.whdt__field-value {
+    font-size: 1rem;
+    color: var(--brand-grey-800, #1f1f1f);
+    font-weight: 500;
+}
+
+/* Stock Grid */
+.whdt__stock-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.whdt__stock-stat {
+    text-align: center;
+    padding: 1rem;
+    background: rgba(247, 192, 0, 0.05);
+    border-radius: 0.75rem;
+    border: 1px solid rgba(247, 192, 0, 0.1);
+}
+
+.whdt__stock-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--brand-navy, #001f3f);
+    line-height: 1;
+    margin-bottom: 0.375rem;
+}
+
+.whdt__stock-label {
+    font-size: 0.8125rem;
+    color: var(--brand-grey-500, #6b7280);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+}
+
+.whdt__stock-label i {
+    color: var(--brand-primary, #f7c000);
+    font-size: 0.75rem;
+}
+
+/* Rack Image */
+.whdt__rack-img-wrap {
+    text-align: center;
+    margin-bottom: 0.75rem;
+}
+
+.whdt__rack-img-wrap img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+}
+
+.whdt__rack-caption {
+    font-size: 0.875rem;
+    color: var(--brand-grey-500, #6b7280);
+    text-align: center;
+    margin: 0;
+    font-style: italic;
+}
+
+/* WHDT Responsive */
+@media (max-width: 767px) {
+    .whdt__hero {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+    .whdt__info-grid {
+        grid-template-columns: 1fr;
+    }
+    .whdt__stock-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .whdt__stock-value {
+        font-size: 1.5rem;
+    }
+}
+
+/* =================================================================
+   WHA — Warehouse Form Components (shared across all form pages)
+   ================================================================= */
+
+/* Section Label */
+.wha__section-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--brand-grey-500, #6c757d);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.wha__section-icon {
+    color: var(--brand-primary, #f7c000);
+    font-size: 0.75rem;
+}
+
+/* Form Field */
+.wha__field {
+    margin-bottom: 1rem;
+}
+.wha__label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-700, #333);
+    margin-bottom: 0.35rem;
+}
+.wha__required {
+    color: #dc2626;
+}
+.wha__input,
+.wha__select,
+.wha__textarea {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    border: 1px solid var(--brand-grey-300, #dcdcdc);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    background: #fff;
+    color: var(--brand-grey-700, #333);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.wha__input:focus,
+.wha__select:focus,
+.wha__textarea:focus {
+    outline: none;
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: 0 0 0 2px rgba(247, 192, 0, 0.15);
+}
+.wha__input--readonly {
+    background: var(--brand-grey-100, #fafafa);
+    color: var(--brand-grey-500, #6c757d);
+    cursor: not-allowed;
+}
+.wha__textarea {
+    resize: vertical;
+    min-height: 2.5rem;
+}
+.wha__hint {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--brand-grey-400, #b0b0b0);
+    margin-top: 0.25rem;
+}
+.wha__hint-inline {
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: var(--brand-grey-400, #b0b0b0);
+    text-transform: none;
+    letter-spacing: 0;
+}
+.wha__info-text {
+    font-size: 0.8125rem;
+    color: var(--brand-grey-500, #6c757d);
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: #eff6ff;
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    border-left: 3px solid #2563eb;
+}
+.wha__info-text i {
+    color: #2563eb;
+    margin-right: 0.25rem;
+}
+
+/* Form Row (two columns) */
+.wha__row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+/* Divider */
+.wha__divider {
+    border-top: 1px solid var(--brand-grey-200, #f0f0f0);
+    margin: 1rem 0;
+}
+
+/* Checkbox Card */
+.wha__check-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    margin-bottom: 0.75rem;
+    transition: border-color 0.2s ease;
+}
+.wha__check-card:hover {
+    border-color: var(--brand-primary, #f7c000);
+}
+.wha__check-input {
+    width: 1.125rem;
+    height: 1.125rem;
+    accent-color: var(--brand-primary, #f7c000);
+    margin-top: 0.15rem;
+    flex-shrink: 0;
+}
+.wha__check-label {
+    font-size: 0.875rem;
+    color: var(--brand-grey-700, #333);
+    cursor: pointer;
+}
+.wha__check-desc {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--brand-grey-400, #b0b0b0);
+    margin-top: 0.15rem;
+}
+
+/* Form Actions */
+.wha__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+/* WHA Responsive */
+@media (max-width: 767px) {
+    .wha__row {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* =================================================================
+   WHA Hero — Warehouse Add/Edit Hero
+   ================================================================= */
+.wha__hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #003366 100%);
+    border-radius: 0.75rem;
+    color: #fff;
+}
+.wha__hero-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--brand-primary, #f7c000);
+    flex-shrink: 0;
+}
+.wha__hero-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+}
+.wha__hero-subtitle {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.25rem 0 0;
+}
+
+
+/* =================================================================
+   WLA — Location Add Page
+   ================================================================= */
+.wla__hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #003366 100%);
+    border-radius: 0.75rem;
+    color: #fff;
+}
+.wla__hero-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--brand-primary, #f7c000);
+    flex-shrink: 0;
+}
+.wla__hero-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+}
+.wla__hero-subtitle {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.25rem 0 0;
+}
+.wla__layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1rem;
+    align-items: start;
+}
+.wla__main {
+    min-width: 0;
+}
+.wla__aside {
+    min-width: 0;
+}
+.wla__tip-intro {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-grey-700, #333);
+    margin-bottom: 0.5rem;
+}
+.wla__tip-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.wla__tip-list li {
+    font-size: 0.8125rem;
+    color: var(--brand-grey-600, #555);
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--brand-grey-100, #fafafa);
+}
+.wla__tip-list li:last-child {
+    border-bottom: none;
+}
+
+@media (max-width: 991px) {
+    .wla__layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* =================================================================
+   WLA2 — Warehouse Location Add Hero
+   ================================================================= */
+.wla2__hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #003366 100%);
+    border-radius: 0.75rem;
+    color: #fff;
+}
+.wla2__hero-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--brand-primary, #f7c000);
+    flex-shrink: 0;
+}
+.wla2__hero-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+}
+.wla2__hero-subtitle {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.25rem 0 0;
+}
+
+
+/* =================================================================
+   WLE — Location Edit Hero
+   ================================================================= */
+.wle__hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #003366 100%);
+    border-radius: 0.75rem;
+    color: #fff;
+}
+.wle__hero-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--brand-primary, #f7c000);
+    flex-shrink: 0;
+}
+.wle__hero-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+}
+.wle__hero-subtitle {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.25rem 0 0;
+}
+
+
+/* =================================================================
+   WLD — Delete/Alert Components (shared across delete & alert pages)
+   ================================================================= */
+
+/* Delete Hero */
+.wld__hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    border-radius: 0.75rem;
+    color: #fff;
+}
+.wld__hero--danger {
+    background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+}
+.wld__hero-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+.wld__hero-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+}
+.wld__hero-subtitle {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0.25rem 0 0;
+}
+
+/* Alert Boxes */
+.wld__alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+.wld__alert > i {
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+    font-size: 1rem;
+}
+.wld__alert p {
+    margin: 0.25rem 0 0;
+    font-size: 0.8125rem;
+}
+.wld__alert--danger {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+}
+.wld__alert--danger > i { color: #dc2626; }
+.wld__alert--warning {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+}
+.wld__alert--warning > i { color: #f59e0b; }
+.wld__alert--info {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+}
+.wld__alert--info > i { color: #2563eb; }
+.wld__alert--success {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+.wld__alert--success > i { color: #15803d; }
+
+/* Impact List */
+.wld__impact-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
+}
+.wld__impact-list li {
+    padding: 0.25rem 0;
+    font-size: 0.8125rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+}
+.wld__impact-list li::before {
+    content: "\2022";
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* Detail Grid */
+.wld__detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+/* Confirm Actions */
+.wld__confirm-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+/* Danger Button */
+.wld__btn--danger {
+    background: #dc2626;
+    color: #fff;
+    border-color: #dc2626;
+}
+.wld__btn--danger:hover {
+    background: #b91c1c;
+    color: #fff;
+    border-color: #b91c1c;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+}
+
+@media (max-width: 767px) {
+    .wld__detail-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* =================================================================
+   WRS — Receive Stock Page
+   ================================================================= */
+.wrs__hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #003366 100%);
+    border-radius: 0.75rem;
+    color: #fff;
+}
+.wrs__hero-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--brand-primary, #f7c000);
+    flex-shrink: 0;
+}
+.wrs__hero-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+}
+.wrs__hero-subtitle {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.25rem 0 0;
+}
+.wrs__layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 1rem;
+    align-items: start;
+}
+.wrs__main { min-width: 0; }
+.wrs__aside { min-width: 0; }
+.wrs__tips-header {
+    background: #eff6ff !important;
+}
+.wrs__tips-header i { color: #2563eb !important; }
+
+/* Product Rows */
+.wrs__products-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+.wrs__add-btn {
+    font-size: 0.75rem !important;
+}
+.wrs__table-wrap {
+    margin-bottom: 0.5rem;
+}
+.wrs__product-row td {
+    vertical-align: middle;
+}
+.wrs__row-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--brand-navy, #001f3f);
+    color: var(--brand-primary, #f7c000);
+    font-size: 0.65rem;
+    font-weight: 700;
+}
+
+/* Info Card (sidebar) */
+.wrs__info-card {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: var(--brand-radius-md, 0.75rem);
+    padding: 1.25rem;
+    text-align: center;
+    margin-top: 0.75rem;
+}
+.wrs__info-icon {
+    font-size: 1.5rem;
+    color: var(--brand-primary, #f7c000);
+    margin-bottom: 0.5rem;
+}
+.wrs__info-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--brand-grey-800, #1f1f1f);
+    margin: 0 0 0.25rem;
+}
+.wrs__info-text {
+    font-size: 0.8125rem;
+    color: var(--brand-grey-500, #6c757d);
+    margin: 0;
+}
+
+@media (max-width: 991px) {
+    .wrs__layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* =================================================================
+   WCP — Capacity Configure Page
+   ================================================================= */
+.wcp__hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #003366 100%);
+    border-radius: 0.75rem;
+    color: #fff;
+}
+.wcp__hero-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--brand-primary, #f7c000);
+    flex-shrink: 0;
+}
+.wcp__hero-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+}
+.wcp__hero-subtitle {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.25rem 0 0;
+}
+.wcp__layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1rem;
+    align-items: start;
+}
+.wcp__main { min-width: 0; }
+.wcp__aside { min-width: 0; }
+
+/* Hierarchy Box */
+.wcp__hierarchy-box {
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Preview Box */
+.wcp__preview-box {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    padding: 1rem;
+    margin-top: 1rem;
+}
+.wcp__preview-calc {
+    font-size: 0.875rem;
+    color: var(--brand-grey-700, #333);
+    text-align: center;
+}
+.wcp__preview-total {
+    font-size: 1.25rem;
+    color: var(--brand-navy, #001f3f);
+}
+
+/* Naming Row */
+.wcp__naming-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+}
+
+/* Example */
+.wcp__example {
+    font-size: 0.75rem;
+    color: var(--brand-grey-400, #b0b0b0);
+    margin-top: 0.25rem;
+    font-family: monospace;
+}
+.wcp__example-code {
+    text-align: center;
+    font-size: 1rem;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+
+@media (max-width: 991px) {
+    .wcp__layout {
+        grid-template-columns: 1fr;
+    }
+    .wcp__naming-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* =================================================================
+   WCPV — Capacity Preview Page
+   ================================================================= */
+.wcpv__hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #003366 100%);
+    border-radius: 0.75rem;
+    color: #fff;
+}
+.wcpv__hero-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--brand-primary, #f7c000);
+    flex-shrink: 0;
+}
+.wcpv__hero-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+}
+.wcpv__hero-subtitle {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.25rem 0 0;
+}
+
+/* Structure Tree */
+.wcpv__tree {
+    padding: 0.5rem 0;
+}
+.wcpv__zone {
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--brand-grey-100, #fafafa);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    border-left: 4px solid #667eea;
+}
+.wcpv__zone-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 0.5rem;
+}
+.wcpv__zone-title i { color: #667eea; margin-right: 0.25rem; }
+.wcpv__rack {
+    margin-left: 1.25rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 3px solid #f59e0b;
+    margin-bottom: 0.5rem;
+    background: #fff;
+    border-radius: 0 0.375rem 0.375rem 0;
+}
+.wcpv__rack-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #f59e0b;
+    margin-bottom: 0.35rem;
+}
+.wcpv__rack-title i { color: #f59e0b; margin-right: 0.25rem; }
+.wcpv__shelf {
+    margin-left: 1rem;
+    padding: 0.35rem 0.625rem;
+    border-left: 2px solid #15803d;
+    margin-bottom: 0.35rem;
+}
+.wcpv__shelf-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #15803d;
+    margin-bottom: 0.25rem;
+}
+.wcpv__shelf-title i { color: #15803d; margin-right: 0.25rem; }
+.wcpv__bins {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-left: 0.5rem;
+}
+.wcpv__bin {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: #eff6ff;
+    color: #2563eb;
+    border-radius: 0.25rem;
+    border: 1px solid #bfdbfe;
+}
+.wcpv__bin i { font-size: 0.6rem; }
+.wcpv__indent {
+    margin-left: 1.25rem;
+    font-size: 0.75rem;
+}
+.wcpv__note {
+    margin-top: 1rem;
+}
+
+/* Generate Actions */
+.wcpv__gen-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.wcpv__btn--success {
+    background: #15803d !important;
+    color: #fff !important;
+    border-color: #15803d !important;
+}
+.wcpv__btn--success:hover {
+    background: #166534 !important;
+    border-color: #166534 !important;
+}
+
+
+/* =================================================================
+   WCC — Cycle Count Detail Page
+   ================================================================= */
+.wcc__hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #003366 100%);
+    border-radius: 0.75rem;
+    color: #fff;
+    flex-wrap: wrap;
+}
+.wcc__hero-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+.wcc__hero-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--brand-primary, #f7c000);
+    flex-shrink: 0;
+}
+.wcc__hero-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+}
+.wcc__hero-subtitle {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.25rem 0 0;
+}
+.wcc__info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+@media (max-width: 767px) {
+    .wcc__hero {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .wcc__info-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* =================================================================
+   SWL — Seller Warehouse Links List Page
+   ================================================================= */
+.swl__card {
+    background: #fff;
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: var(--brand-radius-md, 0.75rem);
+    padding: 1.25rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.2s ease;
+}
+.swl__card:hover {
+    border-color: var(--brand-primary, #f7c000);
+    box-shadow: var(--brand-shadow-sm, 0 0.0625rem 0.1875rem rgba(0,0,0,0.08));
+    transform: translateY(-1px);
+}
+.swl__card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+.swl__link-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+.swl__arrow {
+    color: var(--brand-primary, #f7c000);
+    font-size: 0.875rem;
+}
+.swl__badges {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+/* Details Grid */
+.swl__details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--brand-grey-100, #fafafa);
+}
+.swl__detail {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+}
+.swl__detail-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.375rem;
+    background: var(--brand-grey-100, #fafafa);
+    color: var(--brand-grey-500, #6c757d);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+.swl__detail-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--brand-grey-400, #b0b0b0);
+}
+.swl__detail-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+
+/* Notes */
+.swl__notes {
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--brand-grey-100, #fafafa);
+    margin-top: 0.75rem;
+}
+.swl__notes-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--brand-grey-400, #b0b0b0);
+    margin-bottom: 0.25rem;
+}
+.swl__notes-text {
+    font-size: 0.8125rem;
+    color: var(--brand-grey-600, #555);
+    margin: 0;
+}
+
+/* Actions */
+.swl__actions {
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--brand-grey-100, #fafafa);
+}
+
+/* Priority Bar */
+.swl__priority-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--brand-grey-200, #f0f0f0);
+    border-radius: 2rem;
+    overflow: hidden;
+    margin-top: 0.35rem;
+}
+.swl__priority-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--brand-primary, #f7c000) 0%, #f59e0b 100%);
+    border-radius: 2rem;
+    transition: width 0.3s ease;
+}
+
+/* Pagination */
+.swl__pagination {
+    margin-top: 1rem;
+}
+
+
+/* =================================================================
+   SWLD — Seller Warehouse Link Detail Page
+   ================================================================= */
+.swld__hero {
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #003366 100%);
+    border-radius: 0.75rem;
+    color: #fff;
+}
+.swld__hero-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+.swld__link-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+}
+.swld__arrow {
+    color: var(--brand-primary, #f7c000);
+    font-size: 1rem;
+}
+.swld__badges {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+/* Info Grid */
+.swld__info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+.swld__info-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--brand-grey-100, #fafafa);
+}
+.swld__info-item:last-child {
+    border-bottom: none;
+}
+.swld__info-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--brand-grey-500, #6c757d);
+    margin-bottom: 0.15rem;
+}
+.swld__info-value {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--brand-grey-800, #1f1f1f);
+}
+
+/* Notes Section */
+.swld__notes-section {
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--brand-grey-200, #f0f0f0);
+    margin-top: 0.75rem;
+}
+.swld__notes-text {
+    font-size: 0.8125rem;
+    color: var(--brand-grey-600, #555);
+    margin: 0.25rem 0 0;
+    line-height: 1.5;
+}
+
+/* Locations */
+.swld__locations {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.swld__loc-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    transition: border-color 0.2s ease;
+}
+.swld__loc-card:hover {
+    border-color: var(--brand-primary, #f7c000);
+}
+.swld__loc-card--default {
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+.swld__loc-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-grey-800, #1f1f1f);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.swld__loc-details {
+    font-size: 0.75rem;
+    color: var(--brand-grey-500, #6c757d);
+}
+
+/* Related Items */
+.swld__related-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--brand-grey-100, #fafafa);
+}
+.swld__related-item:last-child {
+    border-bottom: none;
+}
+
+@media (max-width: 767px) {
+    .swld__hero-top {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .swld__info-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* =================================================================
+   SWLF — Seller Warehouse Link Form Page
+   ================================================================= */
+.swlf__hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, var(--brand-navy, #001f3f) 0%, #003366 100%);
+    border-radius: 0.75rem;
+    color: #fff;
+}
+.swlf__hero-icon {
+    width: 3rem;
+    height: 3rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--brand-primary, #f7c000);
+    flex-shrink: 0;
+}
+.swlf__hero-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+}
+.swlf__hero-subtitle {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.25rem 0 0;
+}
+.swlf__current-link {
+    background: var(--brand-grey-100, #fafafa);
+    border: 1px solid var(--brand-grey-200, #f0f0f0);
+    border-radius: var(--brand-radius-sm, 0.5rem);
+    padding: 1rem;
+}
+
+/* Priority Slider */
+.swlf__priority-val {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: var(--brand-navy, #001f3f);
+    color: var(--brand-primary, #f7c000);
+    border-radius: 0.25rem;
+    margin-left: 0.35rem;
+}
+.swlf__slider {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--brand-grey-200, #f0f0f0);
+    border-radius: 3rem;
+    outline: none;
+    margin: 0.5rem 0;
+}
+.swlf__slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    background: var(--brand-navy, #001f3f);
+    border: 3px solid var(--brand-primary, #f7c000);
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+.swlf__slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+.swlf__slider::-moz-range-thumb {
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    background: var(--brand-navy, #001f3f);
+    border: 3px solid var(--brand-primary, #f7c000);
+    cursor: pointer;
+}
+
+
+/* =================================================================
+   SWLX — Seller Warehouse Link Delete Page
+   ================================================================= */
+.swlx__link-display {
+    padding: 1rem 0;
+    margin-bottom: 0.75rem;
+    text-align: center;
+}
+.swlx__impact {
+    font-size: 0.8125rem;
+    color: var(--brand-grey-700, #333);
+    line-height: 1.6;
+}
+.swlx__impact ul {
+    margin-top: 0.5rem;
+}
+.swlx__icon--success { color: #15803d; }
+.swlx__icon--warning { color: #f59e0b; }
+.swlx__icon--info { color: #2563eb; }
+.swlx__alt-intro {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-grey-700, #333);
+    margin-bottom: 0.5rem;
 }

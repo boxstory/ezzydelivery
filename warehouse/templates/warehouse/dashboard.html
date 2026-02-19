@@ -1,261 +1,288 @@
 {% extends 'wf_dashboard_base.html' %}
 {% load static %}
 
-{% block title %}Warehouse Logistics{% endblock %}
+{% block title %}Warehouse Dashboard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}?v=20260219c" type="text/css" />
+{% endblock extra_css %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse.css' %}" type="text/css" />
-<link rel="stylesheet" href="{% static 'warehouse/css/warehouse-logistics.css' %}" type="text/css" />
-
-<div class="whd">
-    <!-- Left Panel -->
-    <div class="whd__main">
-        <!-- Hero Header -->
-        <div class="whd__hero">
-            <div class="whd__hero-left">
-                <div class="whd__hero-icon"><i class="fas fa-warehouse"></i></div>
-                <div>
-                    <h1 class="whd__hero-title">Warehouse Logistics</h1>
-                    <p class="whd__hero-subtitle">Real-time storage monitoring and section overview</p>
-                </div>
-            </div>
-            <div class="whd__search">
-                <i class="fas fa-search whd__search-icon"></i>
-                <input type="text" class="whd__search-input" placeholder="Search product..." id="searchInput">
+<div class="wh">
+    <!-- Hero Header -->
+    <div class="wh__header">
+        <div class="wh__header-left">
+            <div class="wh__header-icon"><i class="fa-solid fa-warehouse"></i></div>
+            <div>
+                <h1 class="wh__title">Warehouse Dashboard</h1>
+                <p class="wh__subtitle">Live overview &mdash; {{ current_date|date:"D, M d Y \a\t h:i A" }}</p>
             </div>
         </div>
+        {% if is_staff %}
+        <a href="{% url 'warehouse:warehouse_add' %}" class="wh__btn wh__btn--primary"
+           hx-get="{% url 'warehouse:warehouse_add' %}" hx-target="body" hx-push-url="true">
+            <i class="fa-solid fa-plus"></i> Add Warehouse
+        </a>
+        {% endif %}
+    </div>
 
-        <!-- Section Card -->
-        <div class="whd__section-card">
-            <div class="whd__section-header">
-                <h2 class="whd__section-title">
-                    <i class="fas fa-layer-group whd__section-title-icon"></i>
-                    SECTION <span id="currentSectionName">{{ selected_section.code|default:"001" }}</span>
-                </h2>
-                <div class="whd__section-actions">
-                    <div class="whd__section-date">
-                        <i class="far fa-calendar"></i>
-                        <span id="currentDate">{{ current_date|date:"d.m.Y" }}</span>
-                    </div>
-                    <a href="{% url 'warehouse:location_list' %}" class="wh__btn wh__btn--primary">Show all</a>
-                </div>
-            </div>
-
-            <!-- Storage Grid -->
-            <div class="whd__grid" id="storageGrid">
-                {% for i in "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" %}
-                <div class="whd__cell whd__cell--{% cycle 'loaded' 'loaded' 'loaded' 'loaded' 'loaded' 'loaded' 'free' 'free' 'free' 'free' 'free' 'free' %}" data-position="{{ forloop.counter }}">
-                    {% if forloop.counter == 35 %}
-                    <div class="whd__tooltip">
-                        <div class="whd__tooltip-row">
-                            <span class="whd__tooltip-label">Row 3</span>
-                            <span class="whd__tooltip-value">#132236</span>
-                        </div>
-                        <div class="whd__tooltip-row">
-                            <span class="whd__tooltip-label">H60 x W60 x 20 KG</span>
-                        </div>
-                        <div class="whd__tooltip-delivered">Delivered 06.15PM</div>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-
-            <!-- Legend -->
-            <div class="whd__legend">
-                <div class="whd__legend-item">
-                    <div class="whd__legend-box whd__legend-box--free"></div>
-                    <span>Free place</span>
-                </div>
-                <div class="whd__legend-item">
-                    <div class="whd__legend-box whd__legend-box--loaded"></div>
-                    <span>Loaded place</span>
-                </div>
-            </div>
-
-            <!-- Section List -->
-            <div class="whd__list">
-                <div class="whd__list-header">
-                    <h3 class="whd__list-title">
-                        <i class="fas fa-list whd__list-title-icon"></i>
-                        LIST OF SECTIONS
-                    </h3>
-                    <select class="wh__filter-select" id="sortBy">
-                        <option>Sort by</option>
-                        <option value="usage">Usage %</option>
-                        <option value="name">Section Name</option>
-                        <option value="date">Date</option>
-                    </select>
-                </div>
-
-                {% for location in storage_locations %}
-                <div class="whd__item" onclick="loadSection('{{ location.code }}', {{ location.id }})">
-                    <div class="whd__item-name">Section {{ location.code }}</div>
-                    <div class="whd__item-meta">
-                        <div class="whd__item-date">
-                            <i class="far fa-calendar"></i>
-                            <span>{{ location.created_at|date:"d/m/Y" }}</span>
-                        </div>
-                        <div class="whd__item-usage">
-                            <span class="whd__item-usage-label">Used</span>
-                            <div class="whd__usage-bar">
-                                <div class="whd__usage-fill whd__usage-fill--{% if location.usage_percent < 40 %}low{% elif location.usage_percent < 70 %}medium{% else %}high{% endif %}" data-width="{{ location.usage_percent }}%"></div>
-                            </div>
-                            <span class="whd__item-usage-pct">{{ location.usage_percent|default:"0" }}%</span>
-                        </div>
-                    </div>
-                </div>
-                {% empty %}
-                <div class="whd__item" onclick="loadSection('001', 0)">
-                    <div class="whd__item-name">Section 001</div>
-                    <div class="whd__item-meta">
-                        <div class="whd__item-date"><i class="far fa-calendar"></i> <span>28/09/2020</span></div>
-                        <div class="whd__item-usage">
-                            <span class="whd__item-usage-label">Used</span>
-                            <div class="whd__usage-bar"><div class="whd__usage-fill whd__usage-fill--low" data-width="20%"></div></div>
-                            <span class="whd__item-usage-pct">20%</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="whd__item" onclick="loadSection('002', 0)">
-                    <div class="whd__item-name">Section 002</div>
-                    <div class="whd__item-meta">
-                        <div class="whd__item-date"><i class="far fa-calendar"></i> <span>28/09/2020</span></div>
-                        <div class="whd__item-usage">
-                            <span class="whd__item-usage-label">Used</span>
-                            <div class="whd__usage-bar"><div class="whd__usage-fill whd__usage-fill--low" data-width="28%"></div></div>
-                            <span class="whd__item-usage-pct">28%</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="whd__item" onclick="loadSection('003', 0)">
-                    <div class="whd__item-name">Section 003</div>
-                    <div class="whd__item-meta">
-                        <div class="whd__item-date"><i class="far fa-calendar"></i> <span>28/09/2020</span></div>
-                        <div class="whd__item-usage">
-                            <span class="whd__item-usage-label">Used</span>
-                            <div class="whd__usage-bar"><div class="whd__usage-fill whd__usage-fill--high" data-width="80%"></div></div>
-                            <span class="whd__item-usage-pct">80%</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="whd__item" onclick="loadSection('004', 0)">
-                    <div class="whd__item-name">Section 004</div>
-                    <div class="whd__item-meta">
-                        <div class="whd__item-date"><i class="far fa-calendar"></i> <span>28/02/2020</span></div>
-                        <div class="whd__item-usage">
-                            <span class="whd__item-usage-label">Used</span>
-                            <div class="whd__usage-bar"><div class="whd__usage-fill whd__usage-fill--medium" data-width="50%"></div></div>
-                            <span class="whd__item-usage-pct">50%</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="whd__item" onclick="loadSection('005', 0)">
-                    <div class="whd__item-name">Section 005</div>
-                    <div class="whd__item-meta">
-                        <div class="whd__item-date"><i class="far fa-calendar"></i> <span>28/02/2020</span></div>
-                        <div class="whd__item-usage">
-                            <span class="whd__item-usage-label">Used</span>
-                            <div class="whd__usage-bar"><div class="whd__usage-fill whd__usage-fill--medium" data-width="58%"></div></div>
-                            <span class="whd__item-usage-pct">58%</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="whd__item" onclick="loadSection('006', 0)">
-                    <div class="whd__item-name">Section 006</div>
-                    <div class="whd__item-meta">
-                        <div class="whd__item-date"><i class="far fa-calendar"></i> <span>28/03/2020</span></div>
-                        <div class="whd__item-usage">
-                            <span class="whd__item-usage-label">Used</span>
-                            <div class="whd__usage-bar"><div class="whd__usage-fill whd__usage-fill--low" data-width="36%"></div></div>
-                            <span class="whd__item-usage-pct">36%</span>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
+    <!-- Summary Stats -->
+    <div class="wh__stats">
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--primary"><i class="fa-solid fa-warehouse"></i></div>
+            <div><div class="wh__stat-value">{{ warehouses|length }}</div><div class="wh__stat-label">Active Warehouses</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--success"><i class="fa-solid fa-cubes"></i></div>
+            <div><div class="wh__stat-value">{{ total_on_hand }}</div><div class="wh__stat-label">Items On Hand</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--info"><i class="fa-solid fa-lock"></i></div>
+            <div><div class="wh__stat-value">{{ total_reserved }}</div><div class="wh__stat-label">Reserved</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--warning"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div><div class="wh__stat-value">{{ low_stock_count }}</div><div class="wh__stat-label">Low Stock Alerts</div></div>
         </div>
     </div>
 
-    <!-- Right Panel -->
-    <div class="whd__sidebar">
-        <!-- Usage Circle -->
-        <div class="whd__usage-card">
-            <button class="whd__close-btn" onclick="this.parentElement.classList.add('whd__usage-card--hidden')">
-                <i class="fas fa-times"></i>
-            </button>
-            <div class="whd__usage-title">Section 5 usage</div>
-            <div class="whd__circle-wrap">
-                <div class="whd__circle">
-                    <svg width="180" height="180">
-                        <circle class="whd__circle-bg" cx="90" cy="90" r="80"></circle>
-                        <circle class="whd__circle-bar" cx="90" cy="90" r="80"
-                                stroke-dasharray="502.65" stroke-dashoffset="210.11"></circle>
-                    </svg>
-                    <div class="whd__circle-text">
-                        <div class="whd__circle-pct">58%</div>
-                        <div class="whd__circle-label">Location used</div>
-                    </div>
-                </div>
-            </div>
-            <div class="whd__usage-stats">
-                <div class="whd__usage-stat">
-                    <div class="whd__usage-stat-label">Loaded</div>
-                    <div class="whd__usage-stat-value">19 Shelves</div>
-                </div>
-                <div class="whd__usage-stat">
-                    <div class="whd__usage-stat-label">Empty</div>
-                    <div class="whd__usage-stat-value">64 Shelves</div>
-                </div>
-            </div>
+    <!-- Second Row Stats -->
+    <div class="wh__stats">
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--primary"><i class="fa-solid fa-link"></i></div>
+            <div><div class="wh__stat-value">{{ total_links }}</div><div class="wh__stat-label">Seller Links ({{ active_links }} active)</div></div>
         </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--info"><i class="fa-solid fa-clipboard-list"></i></div>
+            <div><div class="wh__stat-value">{{ pending_picks }}</div><div class="wh__stat-label">Pending Pick Lists</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--success"><i class="fa-solid fa-rotate"></i></div>
+            <div><div class="wh__stat-value">{{ pending_counts }}</div><div class="wh__stat-label">Pending Cycle Counts</div></div>
+        </div>
+        <div class="wh__stat">
+            <div class="wh__stat-icon wh__stat-icon--warning"><i class="fa-solid fa-truck-loading"></i></div>
+            <div><div class="wh__stat-value">{{ total_incoming }}</div><div class="wh__stat-label">Incoming Stock</div></div>
+        </div>
+    </div>
 
-        <!-- Box List -->
-        <div class="whd__box-list">
-            <div class="whd__tabs">
-                <div class="whd__tab whd__tab--active">Received</div>
-                <div class="whd__tab">Sent</div>
-                <div class="whd__tab">Expected</div>
+    <!-- Warehouses -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-warehouse"></i> <span>ACTIVE WAREHOUSES</span></div>
+            <a href="{% url 'warehouse:warehouse_list' %}" class="wh__action-btn wh__action-btn--pill"
+               hx-get="{% url 'warehouse:warehouse_list' %}" hx-target="body" hx-push-url="true">
+                View All
+            </a>
+        </div>
+        <div class="wh__card-body">
+            {% for wh in warehouses %}
+            <div class="wh__list-row">
+                <div class="wh__list-row-left">
+                    <div class="wh__list-row-icon"><i class="fa-solid fa-building-warehouse"></i></div>
+                    <div>
+                        <div class="wh__list-row-title">{{ wh.name }}</div>
+                        <div class="wh__meta">{{ wh.code }} &middot; {{ wh.city }}{% if wh.state %}, {{ wh.state }}{% endif %}</div>
+                    </div>
+                </div>
+                <div class="wh__list-row-right">
+                    {% if wh.is_default %}<span class="wh__badge wh__badge--primary">Default</span>{% endif %}
+                    <span class="wh__badge wh__badge--success">Active</span>
+                    {% if wh.total_zones > 0 %}
+                    <span class="wh__meta">{{ wh.total_zones }} zones &middot; {{ wh.racks_per_zone }} racks/zone</span>
+                    {% else %}
+                    <span class="wh__meta">Not configured</span>
+                    {% endif %}
+                    <a href="{% url 'warehouse:warehouse_detail' wh.pk %}" class="wh__action-btn wh__action-btn--pill"
+                       hx-get="{% url 'warehouse:warehouse_detail' wh.pk %}" hx-target="body" hx-push-url="true">
+                        View
+                    </a>
+                </div>
             </div>
-            <div class="whd__boxes">
-                {% for txn in recent_transactions|slice:":10" %}
-                <div class="whd__box-item">
-                    <div class="whd__box-icon"><i class="fas fa-box"></i></div>
-                    <div class="whd__box-info">
-                        <div class="whd__box-id">Box {{ txn.transaction_number|truncatechars:8 }}</div>
-                        <div class="whd__box-time">Delivered {{ txn.created_at|date:"H:i" }}PM</div>
-                    </div>
+            {% empty %}
+            <div class="wh__empty">
+                <i class="fa-solid fa-warehouse"></i>
+                <p><strong>No Warehouses</strong></p>
+                <p>Create your first warehouse to get started.</p>
+                <a href="{% url 'warehouse:warehouse_add' %}" class="wh__btn wh__btn--primary"
+                   hx-get="{% url 'warehouse:warehouse_add' %}" hx-target="body" hx-push-url="true">
+                    <i class="fa-solid fa-plus"></i> Add Warehouse
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Storage Capacity Overview -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-layer-group"></i> <span>STORAGE CAPACITY</span></div>
+            <a href="{% url 'warehouse:location_list' %}" class="wh__action-btn wh__action-btn--pill"
+               hx-get="{% url 'warehouse:location_list' %}" hx-target="body" hx-push-url="true">
+                Manage Locations
+            </a>
+        </div>
+        <div class="wh__card-body">
+            <div class="wh__stats" style="margin-bottom: 0;">
+                <div class="wh__stat">
+                    <div class="wh__stat-icon wh__stat-icon--primary"><i class="fa-solid fa-map"></i></div>
+                    <div><div class="wh__stat-value">{{ loc_counts.zone }}</div><div class="wh__stat-label">Zones</div></div>
                 </div>
-                {% empty %}
-                <div class="whd__box-item">
-                    <div class="whd__box-icon"><i class="fas fa-box"></i></div>
-                    <div class="whd__box-info">
-                        <div class="whd__box-id">Box 132236</div>
-                        <div class="whd__box-time">Delivered 06:15PM</div>
-                    </div>
+                <div class="wh__stat">
+                    <div class="wh__stat-icon wh__stat-icon--info"><i class="fa-solid fa-server"></i></div>
+                    <div><div class="wh__stat-value">{{ loc_counts.rack }}</div><div class="wh__stat-label">Racks</div></div>
                 </div>
-                <div class="whd__box-item">
-                    <div class="whd__box-icon"><i class="fas fa-box"></i></div>
-                    <div class="whd__box-info">
-                        <div class="whd__box-id">Box 232645</div>
-                        <div class="whd__box-time">Delivered 06:15PM</div>
-                    </div>
+                <div class="wh__stat">
+                    <div class="wh__stat-icon wh__stat-icon--success"><i class="fa-solid fa-bars"></i></div>
+                    <div><div class="wh__stat-value">{{ loc_counts.shelf }}</div><div class="wh__stat-label">Shelves</div></div>
                 </div>
-                <div class="whd__box-item">
-                    <div class="whd__box-icon"><i class="fas fa-box"></i></div>
-                    <div class="whd__box-info">
-                        <div class="whd__box-id">Box 323624</div>
-                        <div class="whd__box-time">Delivered 06:15PM</div>
-                    </div>
+                <div class="wh__stat">
+                    <div class="wh__stat-icon wh__stat-icon--warning"><i class="fa-solid fa-box"></i></div>
+                    <div><div class="wh__stat-value">{{ loc_counts.bin }}</div><div class="wh__stat-label">Bins</div></div>
                 </div>
-                <div class="whd__box-item">
-                    <div class="whd__box-icon"><i class="fas fa-box"></i></div>
-                    <div class="whd__box-info">
-                        <div class="whd__box-id">Box 323624</div>
-                        <div class="whd__box-time">Delivered 06:15PM</div>
+            </div>
+            {% if storage_locations %}
+            <div style="margin-top: 1rem;">
+                {% for loc in storage_locations %}
+                <div class="wh__list-row">
+                    <div class="wh__list-row-left">
+                        <div class="wh__list-row-icon"><i class="fa-solid fa-map"></i></div>
+                        <div>
+                            <div class="wh__list-row-title">{{ loc.name }} ({{ loc.code }})</div>
+                            <div class="wh__meta">{{ loc.warehouse.name }} &middot; {{ loc.total_bins }} bins</div>
+                        </div>
+                    </div>
+                    <div class="wh__list-row-right">
+                        <span class="wh__meta">{{ loc.occupied_bins }}/{{ loc.total_bins }} occupied</span>
+                        <div class="swl__priority-bar" style="width:80px;">
+                            <div class="swl__priority-fill" data-width="{{ loc.usage_percent }}%"></div>
+                        </div>
+                        <span class="wh__meta">{{ loc.usage_percent }}%</span>
                     </div>
                 </div>
                 {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Seller-Warehouse Links -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-link"></i> <span>SELLER-WAREHOUSE LINKS</span></div>
+            <a href="{% url 'warehouse:seller_warehouse_links' %}" class="wh__action-btn wh__action-btn--pill"
+               hx-get="{% url 'warehouse:seller_warehouse_links' %}" hx-target="body" hx-push-url="true">
+                Manage Links
+            </a>
+        </div>
+        <div class="wh__card-body">
+            {% for link in seller_links %}
+            <div class="wh__list-row">
+                <div class="wh__list-row-left">
+                    <div class="wh__list-row-icon"><i class="fa-solid fa-store"></i></div>
+                    <div>
+                        <div class="wh__list-row-title">{{ link.business.business_name|default:"(No business)" }}</div>
+                        <div class="wh__meta"><i class="fa-solid fa-arrow-right"></i> {{ link.warehouse.name }}</div>
+                    </div>
+                </div>
+                <div class="wh__list-row-right">
+                    {% if link.is_default %}<span class="wh__badge wh__badge--warning">Default</span>{% endif %}
+                    {% if link.is_active %}<span class="wh__badge wh__badge--success">Active</span>{% else %}<span class="wh__badge wh__badge--muted">Inactive</span>{% endif %}
+                    <span class="wh__meta">Priority: {{ link.priority }}</span>
+                    <a href="{% url 'warehouse:seller_warehouse_link_detail' link.pk %}" class="wh__action-btn wh__action-btn--pill"
+                       hx-get="{% url 'warehouse:seller_warehouse_link_detail' link.pk %}" hx-target="body" hx-push-url="true">
+                        View
+                    </a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="wh__empty">
+                <i class="fa-solid fa-link-slash"></i>
+                <p><strong>No Seller Links</strong></p>
+                <p>Link sellers to warehouses for fulfillment.</p>
+                <a href="{% url 'warehouse:seller_warehouse_link_add' %}" class="wh__btn wh__btn--primary"
+                   hx-get="{% url 'warehouse:seller_warehouse_link_add' %}" hx-target="body" hx-push-url="true">
+                    <i class="fa-solid fa-plus"></i> Add Link
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-arrow-right-arrow-left"></i> <span>RECENT TRANSACTIONS</span></div>
+            <a href="{% url 'warehouse:transaction_list' %}" class="wh__action-btn wh__action-btn--pill"
+               hx-get="{% url 'warehouse:transaction_list' %}" hx-target="body" hx-push-url="true">
+                View All
+            </a>
+        </div>
+        <div class="wh__card-body">
+            {% for txn in recent_transactions %}
+            <div class="wh__list-row">
+                <div class="wh__list-row-left">
+                    <div class="wh__list-row-icon">
+                        {% if txn.quantity > 0 %}
+                        <i class="fa-solid fa-arrow-down" style="color: var(--brand-success, #28a745);"></i>
+                        {% else %}
+                        <i class="fa-solid fa-arrow-up" style="color: var(--brand-danger, #dc3545);"></i>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div class="wh__list-row-title">{{ txn.product.item_name|default:txn.transaction_number }}</div>
+                        <div class="wh__meta">{{ txn.transaction_type }} &middot; {{ txn.warehouse.code }} &middot; Qty: {{ txn.quantity }}</div>
+                    </div>
+                </div>
+                <div class="wh__list-row-right">
+                    <span class="wh__meta">{{ txn.created_at|date:"M d, h:i A" }}</span>
+                </div>
+            </div>
+            {% empty %}
+            <div class="wh__empty">
+                <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                <p><strong>No Transactions Yet</strong></p>
+                <p>Inventory transactions will appear here when stock is received or moved.</p>
+                <a href="{% url 'warehouse:receive_stock' %}" class="wh__btn wh__btn--primary"
+                   hx-get="{% url 'warehouse:receive_stock' %}" hx-target="body" hx-push-url="true">
+                    <i class="fa-solid fa-truck-loading"></i> Receive Stock
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="wh__card">
+        <div class="wh__card-header">
+            <div class="wh__card-header-left"><i class="fa-solid fa-bolt"></i> <span>QUICK ACTIONS</span></div>
+        </div>
+        <div class="wh__card-body">
+            <div class="wh__stats">
+                <a href="{% url 'warehouse:receive_stock' %}" class="wh__stat"
+                   hx-get="{% url 'warehouse:receive_stock' %}" hx-target="body" hx-push-url="true"
+                   style="text-decoration: none; cursor: pointer;">
+                    <div class="wh__stat-icon wh__stat-icon--success"><i class="fa-solid fa-truck-loading"></i></div>
+                    <div><div class="wh__stat-label">Receive Stock</div></div>
+                </a>
+                <a href="{% url 'warehouse:inventory_list' %}" class="wh__stat"
+                   hx-get="{% url 'warehouse:inventory_list' %}" hx-target="body" hx-push-url="true"
+                   style="text-decoration: none; cursor: pointer;">
+                    <div class="wh__stat-icon wh__stat-icon--primary"><i class="fa-solid fa-boxes-stacked"></i></div>
+                    <div><div class="wh__stat-label">View Inventory</div></div>
+                </a>
+                <a href="{% url 'warehouse:pick_list_list' %}" class="wh__stat"
+                   hx-get="{% url 'warehouse:pick_list_list' %}" hx-target="body" hx-push-url="true"
+                   style="text-decoration: none; cursor: pointer;">
+                    <div class="wh__stat-icon wh__stat-icon--info"><i class="fa-solid fa-clipboard-list"></i></div>
+                    <div><div class="wh__stat-label">Pick Lists</div></div>
+                </a>
+                <a href="{% url 'warehouse:low_stock_alerts' %}" class="wh__stat"
+                   hx-get="{% url 'warehouse:low_stock_alerts' %}" hx-target="body" hx-push-url="true"
+                   style="text-decoration: none; cursor: pointer;">
+                    <div class="wh__stat-icon wh__stat-icon--warning"><i class="fa-solid fa-bell"></i></div>
+                    <div><div class="wh__stat-label">Stock Alerts</div></div>
+                </a>
             </div>
         </div>
     </div>
@@ -263,43 +290,9 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Set dynamic widths on usage fills
-    document.querySelectorAll('.whd__usage-fill').forEach(function(el) {
+    document.querySelectorAll('.swl__priority-fill').forEach(function(el) {
         el.style.width = el.getAttribute('data-width');
     });
-
-    var searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', function(e) {
-            console.log('Searching for:', e.target.value.toLowerCase());
-        });
-    }
-
-    var sortBy = document.getElementById('sortBy');
-    if (sortBy) {
-        sortBy.addEventListener('change', function(e) {
-            console.log('Sorting by:', e.target.value);
-        });
-    }
-
-    document.querySelectorAll('.whd__tab').forEach(function(tab) {
-        tab.addEventListener('click', function() {
-            document.querySelectorAll('.whd__tab').forEach(function(t) { t.classList.remove('whd__tab--active'); });
-            this.classList.add('whd__tab--active');
-        });
-    });
-
-    document.querySelectorAll('.whd__cell--loaded').forEach(function(cell) {
-        cell.addEventListener('click', function() {
-            document.querySelectorAll('.whd__cell').forEach(function(c) { c.classList.remove('whd__cell--highlight'); });
-            this.classList.add('whd__cell--highlight');
-        });
-    });
 });
-
-function loadSection(code, id) {
-    document.getElementById('currentSectionName').textContent = code;
-    console.log('Loading section:', code, id);
-}
 </script>
 {% endblock %}
