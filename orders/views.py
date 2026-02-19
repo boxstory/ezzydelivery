@@ -1317,6 +1317,77 @@ def order_details(request, order_id):
         return redirect('orders:orders_all_list')
 
 
+@require_POST
+@login_required(login_url='account_login')
+@business_permission_required(BusinessPermissions.ORDER_EDIT)
+def update_order_zone(request, order_id):
+    """Update order delivery zone and coordinates (from AI parse result)"""
+    try:
+        business = request.current_business
+        order = get_object_or_404(
+            orders_models.Order.objects.select_related('business'),
+            id=order_id, business=business
+        )
+        data = json.loads(request.body)
+        zone_number = data.get('zone_number')
+        street_number = data.get('street_number')
+        building_number = data.get('building_number')
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+
+        if not zone_number:
+            return JsonResponse({'success': False, 'error': 'Zone number is required'}, status=400)
+
+        from delivery import models as delivery_models
+        try:
+            zone = delivery_models.ZoneName.objects.get(zone_number=zone_number, is_active=True)
+        except delivery_models.ZoneName.DoesNotExist:
+            return JsonResponse({'success': False, 'error': f'Zone {zone_number} not found or inactive'}, status=400)
+
+        old_zone = order.dl_zone
+        order.dl_zone = zone_number
+        if street_number:
+            order.dl_street = str(street_number)
+        if building_number:
+            order.dl_building = str(building_number)
+        order.save()
+
+        coords_saved = False
+        if latitude and longitude:
+            delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
+            if delivery_task and delivery_task.dl_to_address:
+                dl_address = delivery_task.dl_to_address
+                dl_address.dl_latitude = latitude
+                dl_address.dl_longitude = longitude
+                dl_address.dl_zone = zone_number
+                if street_number:
+                    dl_address.dl_street = str(street_number)
+                if building_number:
+                    dl_address.dl_building = str(building_number)
+                dl_address.save()
+                coords_saved = True
+
+        orders_models.OrderVerificationLog.objects.create(
+            order=order,
+            verified_by=request.user,
+            action='zone_updated',
+            old_status=str(old_zone) if old_zone else 'None',
+            new_status=str(zone_number),
+            notes=f'Zone updated from AI parse: {zone.zone_name}' + (f' | Coordinates: {latitude}, {longitude}' if coords_saved else '')
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Zone updated to {zone_number} ({zone.zone_name})' + (' with coordinates' if coords_saved else ''),
+            'zone_number': zone_number,
+            'zone_name': zone.zone_name,
+            'coordinates_saved': coords_saved
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON data'}, status=400)
+    except Exception as e:
+        logger.exception("Error updating zone for order %s: %s", order_id, str(e))
+        return JsonResponse({'success': False, 'error': 'An error occurred while updating zone'}, status=400)
 
 
 @login_required(login_url='account_login')

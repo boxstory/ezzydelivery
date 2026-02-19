@@ -308,7 +308,7 @@
                 <span class="selected-count"><span id="selectedOrderCount">0</span> orders selected</span>
             </div>
             <div class="ai-toolbar-actions">
-                <button type="button" class="btn" onclick="aiParseAddresses()" title="Parse addresses from text">
+                <button type="button" class="btn" onclick="runGlobalBulkParse()" title="Parse addresses from text">
                     <i class="fa-solid fa-location-dot"></i> Parse Addresses
                 </button>
                 <button type="button" class="btn" onclick="aiVerifyOrders()" title="Verify order completeness">
@@ -1154,121 +1154,16 @@
         currentAIResults = null;
     }
 
-    // AI Parse Addresses for selected orders
-    async function aiParseAddresses() {
+    // AI Parse Addresses — delegates to global EzzyAIParse.parseBulk()
+    function runGlobalBulkParse() {
         if (selectedOrders.length === 0) {
             alert('Please select at least one order');
             return;
         }
-
-        AIBulkProcess.init('Address Parsing', 'parse-address', selectedOrders.length);
-        await delay(300);
-
-        let resultsHtml = '';
-        for (const order of selectedOrders) {
-            AIBulkProcess.updateProgress(order.orderNumber);
-            await delay(100);
-
-            // Validate address exists
-            const addressToProcess = (order.customerAddress || '').trim();
-            if (!addressToProcess) {
-                const noAddrHtml = `
-                    <div class="ai-result-card" data-order-id="${order.id}">
-                        <div class="ai-result-card-header">
-                            <i class="fa-solid fa-circle-exclamation text-warning"></i>
-                            <strong>${order.orderNumber}</strong>
-                        </div>
-                        <div class="text-warning">No address available for this order</div>
-                    </div>
-                `;
-                resultsHtml += noAddrHtml;
-                AIBulkProcess.addResult(order.orderNumber, false, noAddrHtml);
-                continue;
-            }
-
-            try {
-                const response = await fetch('/api/ai-agent/tools/parse-address/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken()
-                    },
-                    body: JSON.stringify({ address: addressToProcess })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    const result = data.data;
-                    const cardHtml = `
-                        <div class="ai-result-card" data-order-id="${order.id}">
-                            <div class="ai-result-card-header">
-                                <i class="fa-solid fa-location-dot"></i>
-                                <strong>${order.orderNumber}</strong>
-                                <span class="ms-auto badge bg-${result.confidence > 0.7 ? 'success' : result.confidence > 0.4 ? 'warning' : 'secondary'}">
-                                    ${Math.round(result.confidence * 100)}% confidence
-                                </span>
-                            </div>
-                            <div class="ai-result-grid">
-                                <div class="ai-result-item">
-                                    <span class="label">Zone</span>
-                                    <span class="value ${result.zone_number ? 'success' : ''}">${result.zone_number || '-'}</span>
-                                </div>
-                                <div class="ai-result-item">
-                                    <span class="label">Street</span>
-                                    <span class="value">${result.street_number || '-'}</span>
-                                </div>
-                                <div class="ai-result-item">
-                                    <span class="label">Building</span>
-                                    <span class="value">${result.building_number || '-'}</span>
-                                </div>
-                                <div class="ai-result-item">
-                                    <span class="label">Area</span>
-                                    <span class="value">${result.area_name || result.zone_name || '-'}</span>
-                                </div>
-                            </div>
-                            ${result.landmarks && result.landmarks.length > 0 ? `
-                                <div class="mt-2">
-                                    <small class="text-muted">Landmarks: ${result.landmarks.join(', ')}</small>
-                                </div>
-                            ` : ''}
-                            <div class="mt-2">
-                                <small class="text-muted">Original: ${result.original_address}</small>
-                            </div>
-                        </div>
-                    `;
-                    resultsHtml += cardHtml;
-                    AIBulkProcess.addResult(order.orderNumber, true, cardHtml);
-                } else {
-                    const errorHtml = `
-                        <div class="ai-result-card" data-order-id="${order.id}">
-                            <div class="ai-result-card-header">
-                                <i class="fa-solid fa-circle-exclamation text-danger"></i>
-                                <strong>${order.orderNumber}</strong>
-                            </div>
-                            <div class="text-danger">${data.error || 'Failed to parse address'}</div>
-                        </div>
-                    `;
-                    resultsHtml += errorHtml;
-                    AIBulkProcess.addResult(order.orderNumber, false, errorHtml);
-                }
-            } catch (error) {
-                const errorHtml = `
-                    <div class="ai-result-card" data-order-id="${order.id}">
-                        <div class="ai-result-card-header">
-                            <i class="fa-solid fa-circle-exclamation text-danger"></i>
-                            <strong>${order.orderNumber}</strong>
-                        </div>
-                        <div class="text-danger">Error: ${error.message}</div>
-                    </div>
-                `;
-                resultsHtml += errorHtml;
-                AIBulkProcess.addResult(order.orderNumber, false, errorHtml);
-            }
-        }
-
-        await delay(500);
-        AIBulkProcess.showResults(resultsHtml);
+        var orders = selectedOrders.map(function(o) {
+            return { id: o.id, orderNumber: o.orderNumber, address: o.customerAddress || '' };
+        });
+        EzzyAIParse.parseBulk(orders);
     }
 
     // AI Verify Orders for selected orders
@@ -1700,7 +1595,7 @@
         try {
             switch(toolType) {
                 case 'parse':
-                    await aiParseAddresses();
+                    runGlobalBulkParse();
                     break;
                 case 'verify':
                     await aiVerifyOrders();

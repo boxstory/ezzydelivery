@@ -1,0 +1,37 @@
+{% comment %}
+AI Parse Button Component
+Triggers the global EzzyAIParse.parse() utility.
+
+Usage:
+{% include "includes/components/_ai_parse_button.html" with address="Zone 51, Street 203" %}
+
+Parameters (all optional except address):
+- address: Full address text to parse
+- zone: Existing zone number (if known)
+- street: Existing street number (if known)
+- building: Existing building number (if known)
+- lat: Existing latitude (for comparison)
+- lng: Existing longitude (for comparison)
+- order_id: Order ID (enables "Save to Order" button in results)
+- order_number: Order display number
+- show_map: "true" to show Leaflet map (default: "false")
+- btn_class: Additional CSS classes for the button
+- btn_label: Text label next to the icon (optional)
+- title: Modal title override
+{% endcomment %}
+<button type="button" class="ai-parse-btn {{ btn_class }}"
+    onclick="EzzyAIParse.parse({
+        address: '{{ address|default:""|escapejs }}',
+        zone: '{{ zone|default:"" }}',
+        street: '{{ street|default:"" }}',
+        building: '{{ building|default:"" }}',
+        lat: '{{ lat|default:"" }}',
+        lng: '{{ lng|default:"" }}',
+        orderId: '{{ order_id|default:"" }}',
+        orderNumber: '{{ order_number|default:"" }}',
+        showMap: {{ show_map|default:"false" }},
+        title: '{{ title|default:""|escapejs }}'
+    })"
+    title="AI Parse Address">
+    <i class="fa-solid fa-wand-magic-sparkles"></i>{% if btn_label %} {{ btn_label }}{% endif %}
+</button>

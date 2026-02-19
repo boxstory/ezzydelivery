@@ -112,6 +112,7 @@
       <div class="pwa-detail-section__header">
         <i class="fas fa-map-marker-alt"></i>
         <span>Delivery Address</span>
+        {% include "includes/components/_ai_parse_button.html" with address=order.customer_address zone=order.dl_zone street=order.dl_street building=order.dl_building order_id=order.id order_number=order.order_number show_map="true" title="Delivery Address" %}
       </div>
       <div class="pwa-detail-section__body">
         {% if order.customer_address %}
@@ -394,7 +395,9 @@
                     <i class="fa-solid fa-arrow-down"></i>
                   </div>
                   <div class="odt-route__info">
-                    <span class="odt-route__label">Drop-off</span>
+                    <span class="odt-route__label">Drop-off
+                      {% include "includes/components/_ai_parse_button.html" with address=order.customer_address zone=order.dl_zone street=order.dl_street building=order.dl_building order_id=order.id order_number=order.order_number show_map="true" title="Drop-off Location" %}
+                    </span>
                     <span class="odt-route__value">
                       {% if order.customer_address %}{{ order.customer_address }}{% else %}-{% endif %}
                     </span>

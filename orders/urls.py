@@ -26,6 +26,8 @@ urlpatterns = [
          orders_views.delete_order, name='delete_order'),
     path('order_details/<int:order_id>/',
          orders_views.order_details, name='order_details'),
+    path('order/<int:order_id>/update-zone/',
+         orders_views.update_order_zone, name='update_order_zone'),
     #uploading order files
     path('upload_file/', orders_views.order_upload_file, name='order_upload_file'),
     path('review_data/', orders_views.order_upload_review_data, name='order_upload_review_data'),
