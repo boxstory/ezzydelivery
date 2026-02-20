@@ -1,31 +1,132 @@
+/**
+ * 3PL INQUIRY PAGE - PREMIUM DESIGN
+ * Modern multi-step form with enhanced UX
+ * Uses Brand Kit Pro variables
+ */
+
+/* ============================================================================
+   HERO SECTION - MODERN GRADIENT
+   ============================================================================ */
 .pricing-hero {
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  color: var(--brand-grey-800);
-  padding: 2rem 0;
-  margin-bottom: 2rem;
+  background: linear-gradient(135deg, #f7c000 0%, #e5b000 50%, #001f3f 100%);
+  padding: 4rem 0 3rem;
+  margin-bottom: 3rem;
+  position: relative;
+  overflow: hidden;
 }
 
-.progress-container {
-  max-width: 37.5rem;
+.pricing-hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.pricing-hero .container {
+  position: relative;
+  z-index: 1;
+}
+
+.pricing-hero h1 {
+  color: #001f3f;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 1.25rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  animation: hero-fade-in 0.8s ease-out;
+}
+
+.pricing-hero .lead {
+  color: #001f3f;
+  font-size: 1.25rem;
+  font-weight: 500;
+  opacity: 0.9;
+  max-width: 42rem;
   margin: 0 auto 2rem;
+  animation: hero-fade-in 1s ease-out 0.2s backwards;
+}
+
+@keyframes hero-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================================
+   WHATSAPP BUTTON - PREMIUM STYLE
+   ============================================================================ */
+.btn-whatsapp {
+  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+  color: white;
+  border: none;
+  padding: 1rem 2.5rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+  border-radius: 3.125rem;
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+  animation: hero-fade-in 1.2s ease-out 0.4s backwards;
+}
+
+.btn-whatsapp:hover {
+  background: linear-gradient(135deg, #128C7E 0%, #075E54 100%);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 211, 102, 0.4);
+}
+
+.btn-whatsapp i {
+  font-size: 1.5rem;
+  vertical-align: middle;
+}
+
+/* ============================================================================
+   PROGRESS INDICATOR - ENHANCED
+   ============================================================================ */
+.progress-container {
+  max-width: 50rem;
+  margin: 0 auto 3rem;
+  padding: 0 1rem;
+  animation: fade-slide-up 0.6s ease-out;
+}
+
+@keyframes fade-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .step-indicator {
   display: flex;
   justify-content: space-between;
   position: relative;
-  margin-bottom: 2rem;
+  margin-bottom: 0;
 }
 
 .step-indicator::before {
   content: '';
   position: absolute;
-  top: 1.25rem;
-  left: 0;
-  width: 100%;
-  height: 0.125rem;
-  background: #e9ecef;
+  top: 1.875rem;
+  left: 10%;
+  width: 80%;
+  height: 3px;
+  background: linear-gradient(90deg, #e0e0e0 0%, #f5f5f5 100%);
   z-index: 0;
+  border-radius: 2px;
 }
 
 .step-item {
@@ -33,177 +134,248 @@
   text-align: center;
   position: relative;
   z-index: 1;
+  transition: all 400ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .step-circle {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 3.75rem;
+  height: 3.75rem;
   border-radius: 50%;
   background: white;
-  border: 0.125rem solid #e9ecef;
+  border: 3px solid #e0e0e0;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 0.5rem;
-  font-weight: 700;
-  transition: all 0.3s ease;
+  margin: 0 auto 0.75rem;
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: #9e9e9e;
+  transition: all 400ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.step-circle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(247, 192, 0, 0.1) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 300ms;
 }
 
 .step-item.active .step-circle {
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  color: var(--brand-grey-800);
-  border-color: var(--brand-primary);
-  transform: scale(1.1);
-  box-shadow: 0 0.25rem 0.75rem rgba(255, 211, 59, 0.3);
+  background: linear-gradient(135deg, #f7c000 0%, #e5b000 100%);
+  color: #001f3f;
+  border-color: #f7c000;
+  transform: scale(1.15);
+  box-shadow: 0 8px 24px rgba(247, 192, 0, 0.4), 0 0 0 4px rgba(247, 192, 0, 0.15);
+}
+
+.step-item.active .step-circle::before {
+  opacity: 1;
 }
 
 .step-item.completed .step-circle {
-  background: #28a745;
+  background: linear-gradient(135deg, #28a745 0%, #20903b 100%);
   border-color: #28a745;
   color: white;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.step-item.completed .step-circle i {
+  animation: checkmark-pop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes checkmark-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .step-label {
   font-size: 0.875rem;
-  color: #6c757d;
+  color: #757575;
   font-weight: 600;
+  transition: all 300ms;
+  line-height: 1.3;
 }
 
 .step-item.active .step-label {
-  color: var(--brand-grey-800);
+  color: #001f3f;
   font-weight: 700;
+  font-size: 0.9375rem;
 }
 
+.step-item.completed .step-label {
+  color: #28a745;
+}
+
+/* ============================================================================
+   FORM CARD - GLASS MORPHISM STYLE
+   ============================================================================ */
 .pricing-form-card {
-  background: white;
-  border-radius: 1.25rem;
-  padding: 2rem;
-  box-shadow: 0 0.625rem 2.5rem rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 1.5rem;
+  padding: 2.5rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.1);
+  margin-bottom: 3rem;
+  min-height: 35rem;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  animation: card-fade-in 0.8s ease-out 0.2s backwards;
+  position: relative;
+  overflow: hidden;
+}
+
+.pricing-form-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #f7c000 0%, #001f3f 100%);
+}
+
+@keyframes card-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================================
+   FORM ELEMENTS - MODERN STYLING
+   ============================================================================ */
+.form-section-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #001f3f;
   margin-bottom: 2rem;
-  min-height: 31.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 3px solid #f7c000;
+  position: relative;
+  animation: title-slide-in 0.6s ease-out;
 }
 
-.form-control, .form-select, textarea {
-  border-radius: 0.5rem;
-  border: 0.125rem solid #e9ecef;
-  padding: 0.75rem 1rem;
-  transition: all 0.3s ease;
+.form-section-title::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  width: 80px;
+  height: 3px;
+  background: #001f3f;
 }
 
-.form-control:focus, .form-select:focus, textarea:focus {
-  border-color: var(--brand-primary);
-  box-shadow: 0 0 0 0.2rem rgba(255, 211, 59, 0.15);
+@keyframes title-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .form-label {
   font-weight: 600;
-  color: #495057;
+  color: #424242;
   margin-bottom: 0.5rem;
+  font-size: 0.9375rem;
+  display: block;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  border: none;
-  color: var(--brand-grey-800);
-  padding: 0.75rem 2rem;
+.form-label::after {
+  content: ' *';
+  color: #dc3545;
   font-weight: 700;
-  border-radius: 3.125rem;
-  transition: all 0.3s ease;
+  display: none;
 }
 
-.btn-primary:hover {
-  background: linear-gradient(135deg, var(--brand-primary-dark) 0%, var(--brand-primary) 100%);
-  color: var(--brand-grey-900);
-  transform: translateY(-0.125rem);
-  box-shadow: 0 0.5rem 1.25rem rgba(255, 211, 59, 0.4);
+.form-control:required + .form-label::after,
+input[required] ~ .form-label::after {
+  display: inline;
 }
 
-.btn-secondary {
-  background: #6c757d;
-  border: none;
-  padding: 0.75rem 2rem;
-  font-weight: 700;
-  border-radius: 3.125rem;
+.form-control,
+.form-select,
+textarea {
+  border-radius: 0.75rem;
+  border: 2px solid #e0e0e0;
+  padding: 0.875rem 1.25rem;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 1rem;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.btn-whatsapp {
-  background: #25D366;
-  color: white;
-  border: none;
-  padding: 1rem 2rem;
-  font-weight: 700;
-  border-radius: 3.125rem;
-  transition: all 0.3s ease;
+.form-control:hover,
+.form-select:hover {
+  border-color: #bdbdbd;
 }
 
-.btn-whatsapp:hover {
-  background: #128C7E;
-  color: white;
-  transform: translateY(-0.125rem);
-  box-shadow: 0 0.5rem 1.25rem rgba(37, 211, 102, 0.3);
+.form-control:focus,
+.form-select:focus,
+textarea:focus {
+  border-color: #f7c000;
+  box-shadow: 0 0 0 4px rgba(247, 192, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.08);
+  outline: none;
+  background: #fffef8;
 }
 
-.form-navigation {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 2rem;
-  padding-top: 2rem;
-  border-top: 1px solid #e9ecef;
+.form-control::placeholder {
+  color: #9e9e9e;
+  font-style: italic;
 }
 
-.form-section-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--brand-grey-800);
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 0.125rem solid var(--brand-primary);
+/* Input validation states */
+.form-control:invalid:not(:placeholder-shown) {
+  border-color: #dc3545;
+  background: #fff5f5;
 }
 
-.help-text {
-  font-size: 0.875rem;
-  color: #6c757d;
-  margin-top: 0.25rem;
+.form-control:valid:not(:placeholder-shown) {
+  border-color: #28a745;
 }
 
-
-/* WhatsApp Modal Styles */
-.modal-content {
-  border-radius: 1.25rem;
-  border: none;
-}
-
-.modal-header {
-  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
-  color: white;
-  border-radius: 1.25rem 1.25rem 0 0;
-  padding: 1.5rem;
-}
-
-.modal-title {
-  font-weight: 700;
-}
-
-.btn-close {
-  filter: brightness(0) invert(1);
-}
-
-/* Modern Radio Button Group Styles */
+/* ============================================================================
+   RADIO BUTTON GROUPS - PREMIUM CARD STYLE
+   ============================================================================ */
 .radio-group {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-top: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
 }
 
 .radio-group .form-check {
-  flex: 1;
-  min-width: 2rem;
   margin: 0;
 }
 
 .radio-group .form-check-input {
-  display: none;
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .radio-group .form-check-label {
@@ -211,64 +383,319 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 1rem 1.5rem;
-  border: 0.125rem solid #e9ecef;
-  border-radius: 0.75rem;
-  background: #cfcece;
-  color: #6c757d;
+  padding: 1.125rem 1.5rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 0.875rem;
+  background: white;
+  color: #616161;
   font-weight: 600;
+  font-size: 0.9375rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  user-select: none;
 }
 
 .radio-group .form-check-label:hover {
-  border-color: var(--brand-primary);
-  background: rgba(255, 211, 59, 0.05);
-  transform: translateY(-0.125rem);
-  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
+  border-color: #f7c000;
+  background: linear-gradient(135deg, rgba(247, 192, 0, 0.05) 0%, rgba(247, 192, 0, 0.02) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .radio-group .form-check-input:checked + .form-check-label {
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  border-color: var(--brand-primary);
-  color: var(--brand-grey-800);
+  background: linear-gradient(135deg, #f7c000 0%, #e5b000 100%);
+  border-color: #f7c000;
+  color: #001f3f;
   font-weight: 700;
-  box-shadow: 0 0.375rem 1rem rgba(255, 211, 59, 0.3);
-  transform: translateY(-0.125rem);
+  box-shadow: 0 6px 16px rgba(247, 192, 0, 0.35), 0 0 0 3px rgba(247, 192, 0, 0.1);
+  transform: translateY(-2px) scale(1.02);
 }
 
 .radio-group .form-check-input:checked + .form-check-label::before {
   content: '\2713';
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  width: 1.25rem;
-  height: 1.25rem;
-  background: var(--brand-grey-800);
-  color: var(--brand-primary);
+  top: 0.625rem;
+  right: 0.625rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  background: #001f3f;
+  color: #f7c000;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
-  font-weight: bold;
+  font-size: 0.875rem;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  animation: checkmark-pop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 .radio-group .form-check-input:focus + .form-check-label {
-  outline: 0.125rem solid var(--brand-primary);
-  outline-offset: 0.125rem;
+  outline: 2px solid #f7c000;
+  outline-offset: 2px;
 }
 
-/* Responsive adjustments for radio groups */
-@media (max-width: 576px) {
-  .radio-group {
-    flex-direction: column;
+/* ============================================================================
+   NAVIGATION BUTTONS
+   ============================================================================ */
+.form-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 2px solid #f5f5f5;
+  gap: 1rem;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #f7c000 0%, #e5b000 100%);
+  border: none;
+  color: #001f3f;
+  padding: 1rem 2.5rem;
+  font-weight: 700;
+  font-size: 1.0625rem;
+  border-radius: 3.125rem;
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(247, 192, 0, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 500ms;
+}
+
+.btn-primary:hover::before {
+  left: 100%;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #e5b000 0%, #d4a000 100%);
+  color: #001f3f;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(247, 192, 0, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(247, 192, 0, 0.3);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+  border: none;
+  color: white;
+  padding: 1rem 2.5rem;
+  font-weight: 700;
+  font-size: 1.0625rem;
+  border-radius: 3.125rem;
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, #5a6268 0%, #545b62 100%);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(108, 117, 125, 0.4);
+}
+
+.btn-lg {
+  min-width: 180px;
+}
+
+/* ============================================================================
+   WHATSAPP MODAL - MODERN DESIGN
+   ============================================================================ */
+.modal-content {
+  border-radius: 1.5rem;
+  border: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.modal-header {
+  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+  color: white;
+  border-radius: 0;
+  padding: 1.75rem 2rem;
+  border-bottom: none;
+}
+
+.modal-title {
+  font-weight: 700;
+  font-size: 1.375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.modal-title i {
+  font-size: 1.75rem;
+}
+
+.modal-body {
+  padding: 2rem;
+}
+
+.btn-close {
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+  transition: all 200ms;
+}
+
+.btn-close:hover {
+  opacity: 1;
+  transform: rotate(90deg);
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================ */
+@media (max-width: 768px) {
+  .pricing-hero {
+    padding: 3rem 0 2rem;
+    margin-bottom: 2rem;
   }
 
-  .radio-group .form-check {
-    width: 100%;
-    min-width: unset;
+  .pricing-hero h1 {
+    font-size: 2rem;
   }
+
+  .pricing-hero .lead {
+    font-size: 1.125rem;
+  }
+
+  .btn-whatsapp {
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+  }
+
+  .step-circle {
+    width: 3rem;
+    height: 3rem;
+    font-size: 1.125rem;
+  }
+
+  .step-label {
+    font-size: 0.8125rem;
+  }
+
+  .pricing-form-card {
+    padding: 1.75rem 1.25rem;
+    min-height: auto;
+  }
+
+  .form-section-title {
+    font-size: 1.5rem;
+  }
+
+  .radio-group {
+    grid-template-columns: 1fr;
+  }
+
+  .form-navigation {
+    flex-direction: column-reverse;
+    gap: 0.75rem;
+  }
+
+  .form-navigation .btn {
+    width: 100%;
+  }
+
+  .btn-lg {
+    min-width: auto;
+  }
+}
+
+@media (max-width: 576px) {
+  .step-indicator::before {
+    left: 15%;
+    width: 70%;
+  }
+
+  .step-circle {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1rem;
+  }
+
+  .step-item.active .step-circle {
+    transform: scale(1.1);
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+}
+
+/* ============================================================================
+   LOADING & ANIMATIONS
+   ============================================================================ */
+.step-content {
+  animation: step-fade-in 0.5s ease-out;
+}
+
+@keyframes step-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Form submission loading state */
+.btn-primary.loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+
+.btn-primary.loading::after {
+  content: '';
+  position: absolute;
+  width: 1.25rem;
+  height: 1.25rem;
+  top: 50%;
+  left: 50%;
+  margin-left: -0.625rem;
+  margin-top: -0.625rem;
+  border: 2px solid #001f3f;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spinner 0.8s linear infinite;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Help text styling */
+.help-text {
+  font-size: 0.875rem;
+  color: #757575;
+  margin-top: 0.375rem;
+  font-style: italic;
+}
+
+/* Focus visible for accessibility */
+:focus-visible {
+  outline: 2px solid #f7c000;
+  outline-offset: 2px;
 }

@@ -150,14 +150,25 @@
     }
 
     function _lookupQNASCoords(zone, street, building) {
+        console.log('[QNAS] Looking up Zone', zone, 'Street', street, 'Building', building);
+
         return _fetchQNASBuildings(zone, street).then(function(buildings) {
-            if (!Array.isArray(buildings) || buildings.length === 0) return null;
+            console.log('[QNAS] Response:', buildings);
+
+            if (!Array.isArray(buildings) || buildings.length === 0) {
+                console.log('[QNAS] No buildings found or invalid response');
+                return null;
+            }
+
+            console.log('[QNAS] Found', buildings.length, 'buildings');
 
             // Try exact building match
             if (building) {
                 var bStr = String(building);
                 for (var i = 0; i < buildings.length; i++) {
+                    console.log('[QNAS] Checking building:', buildings[i].building_number, 'vs', bStr);
                     if (String(buildings[i].building_number || '') === bStr) {
+                        console.log('[QNAS] Exact match found!', buildings[i]);
                         return {
                             latitude: parseFloat(buildings[i].x),
                             longitude: parseFloat(buildings[i].y),
@@ -166,11 +177,14 @@
                         };
                     }
                 }
+                console.log('[QNAS] No exact building match, using first building');
             }
 
             // Fallback to first building on street
             var first = buildings[0];
+            console.log('[QNAS] First building:', first);
             if (first.x && first.y) {
+                console.log('[QNAS] Returning street-level coords:', first.x, first.y);
                 return {
                     latitude: parseFloat(first.x),
                     longitude: parseFloat(first.y),
@@ -179,8 +193,10 @@
                 };
             }
 
+            console.log('[QNAS] First building has no coordinates');
             return null;
-        }).catch(function() {
+        }).catch(function(err) {
+            console.error('[QNAS] Error:', err);
             return null;
         });
     }
@@ -359,7 +375,7 @@
             var qc = opts.qnasCoords;
             html += '<div class="mt-3 p-2 rounded" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);">';
             html += '<strong class="small text-success"><i class="fa-solid fa-map-pin me-1"></i>QNAS Coordinates (' + _escapeHtml(qc.source) + '):</strong>';
-            html += '<p class="mb-1 small" id="ezzyAiParseCoordsText">' + qc.latitude.toFixed(6) + ', ' + qc.longitude.toFixed(6) + '</p>';
+            html += '<p class="mb-1 small" id="ezzyAiParseCoordsText"><strong>' + qc.latitude.toFixed(6) + ', ' + qc.longitude.toFixed(6) + '</strong></p>';
 
             // Show comparison with existing coordinates
             if (opts.existingLat && opts.existingLng) {
@@ -373,6 +389,11 @@
                 if (dist > 100) {
                     html += ' <span class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i>QNAS result differs from current</span>';
                 }
+                html += '</div>';
+            } else {
+                // No existing coordinates - show that QNAS found new ones
+                html += '<div class="small mt-1 text-success">';
+                html += '<i class="fa-solid fa-check-circle me-1"></i>New coordinates found from QNAS';
                 html += '</div>';
             }
             html += '</div>';
@@ -423,12 +444,37 @@
         }
 
         // Save button
-        if (opts.orderId && result.zone_number) {
+        if (opts.orderId) {
             html += '<div class="mt-3 pt-3 border-top">';
-            html += '<button type="button" class="btn btn-info w-100" id="ezzyAiParseSaveBtn">';
-            html += '<i class="fa-solid fa-save me-2"></i>Save Zone ' + _escapeHtml(String(result.zone_number));
-            html += (finalLat ? ' with Coordinates' : '') + ' to Order';
-            html += '</button>';
+
+            // Determine what we're saving
+            var saveLabel = '';
+            if (result.zone_number && finalLat) {
+                saveLabel = 'Save Zone ' + _escapeHtml(String(result.zone_number)) + ' + Coordinates';
+            } else if (result.zone_number) {
+                saveLabel = 'Save Zone ' + _escapeHtml(String(result.zone_number));
+            } else if (finalLat) {
+                saveLabel = 'Update Coordinates Only';
+            } else {
+                saveLabel = 'Save to Order';
+            }
+
+            if (result.zone_number || finalLat) {
+                html += '<button type="button" class="btn btn-info w-100" id="ezzyAiParseSaveBtn">';
+                html += '<i class="fa-solid fa-save me-2"></i>' + saveLabel;
+                html += '</button>';
+
+                // Show what will be saved
+                html += '<div class="small text-muted mt-2 text-center">';
+                var saveItems = [];
+                if (result.zone_number) saveItems.push('Zone ' + result.zone_number);
+                if (result.street_number) saveItems.push('Street ' + result.street_number);
+                if (result.building_number) saveItems.push('Building ' + result.building_number);
+                if (finalLat) saveItems.push('Lat/Lng: ' + finalLat.toFixed(6) + ', ' + finalLng.toFixed(6));
+                html += 'Will save: ' + saveItems.join(', ');
+                html += '</div>';
+            }
+
             html += '</div>';
         }
 
@@ -548,6 +594,7 @@
                         '<div class="ai-progress-text"><span>Step ' + this.steps.length + ' of ' + this.steps.length + '</span><span>100% complete</span></div>' +
                     '</div>' +
                     '<div class="ai-process-steps">' + this.renderStepsHtml() + '</div>' +
+                    this.renderLogsHtml() +
                     '<div class="ai-result-output mt-3">' + resultHtml + '</div>' +
                 '</div>'
             );
@@ -650,12 +697,19 @@
                 _process.addLog('Querying QNAS for Zone ' + zone + ', Street ' + street + (building ? ', Building ' + building : '') + '...');
                 _process.render();
 
-                qnasCoords = await _lookupQNASCoords(zone, street, building);
+                try {
+                    qnasCoords = await _lookupQNASCoords(zone, street, building);
+                    console.log('[Parse] QNAS result:', qnasCoords);
 
-                if (qnasCoords) {
-                    _process.addLog('QNAS coordinates found: ' + qnasCoords.latitude.toFixed(6) + ', ' + qnasCoords.longitude.toFixed(6) + ' (' + qnasCoords.source + ')', 'success');
-                } else {
-                    _process.addLog('QNAS lookup returned no results', 'info');
+                    if (qnasCoords) {
+                        _process.addLog('✓ QNAS coordinates found: ' + qnasCoords.latitude.toFixed(6) + ', ' + qnasCoords.longitude.toFixed(6) + ' (' + qnasCoords.source + ')', 'success');
+                    } else {
+                        _process.addLog('⚠ QNAS lookup returned no results (check console for details)', 'info');
+                    }
+                } catch (err) {
+                    console.error('[Parse] QNAS error:', err);
+                    _process.addLog('✗ QNAS lookup failed: ' + err.message, 'error');
+                    qnasCoords = null;
                 }
 
                 _process.updateStep(stepIdx, 'completed');
@@ -688,16 +742,22 @@
                     _process.addLog('Using AI-parsed Zone ' + result.zone_number + ', Street ' + result.street_number + ' for QNAS lookup...');
                     _process.render();
 
-                    qnasCoords = await _lookupQNASCoords(result.zone_number, result.street_number, result.building_number);
+                    try {
+                        qnasCoords = await _lookupQNASCoords(result.zone_number, result.street_number, result.building_number);
+                        console.log('[Parse] QNAS after AI result:', qnasCoords);
 
-                    if (qnasCoords) {
-                        _process.addLog('QNAS coordinates found: ' + qnasCoords.latitude.toFixed(6) + ', ' + qnasCoords.longitude.toFixed(6) + ' (' + qnasCoords.source + ')', 'success');
-                        // Override AI parse coordinates with QNAS
-                        result.coordinates = { latitude: qnasCoords.latitude, longitude: qnasCoords.longitude };
-                        result.parse_notes = result.parse_notes || [];
-                        result.parse_notes.push('Coordinates from ' + qnasCoords.source);
-                    } else {
-                        _process.addLog('QNAS returned no results for AI-parsed location', 'info');
+                        if (qnasCoords) {
+                            _process.addLog('✓ QNAS coordinates found: ' + qnasCoords.latitude.toFixed(6) + ', ' + qnasCoords.longitude.toFixed(6) + ' (' + qnasCoords.source + ')', 'success');
+                            // Override AI parse coordinates with QNAS
+                            result.coordinates = { latitude: qnasCoords.latitude, longitude: qnasCoords.longitude };
+                            result.parse_notes = result.parse_notes || [];
+                            result.parse_notes.push('Coordinates from ' + qnasCoords.source);
+                        } else {
+                            _process.addLog('⚠ QNAS returned no results for AI-parsed location (check console)', 'info');
+                        }
+                    } catch (err) {
+                        console.error('[Parse] QNAS after AI error:', err);
+                        _process.addLog('✗ QNAS lookup failed: ' + err.message, 'error');
                     }
 
                     _process.updateStep(stepIdx, 'completed');

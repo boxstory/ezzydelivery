@@ -1151,15 +1151,11 @@ def zone_groups(request):
     Display all zone groups in a dashboard-style view.
     Shows groups with their zones and stats.
     """
-    from django.db.models import Count
-
     # Get filter parameters
     search = request.GET.get('search', '').strip()
 
-    # Base queryset
-    groups = delivery_models.ZoneGroup.objects.annotate(
-        zone_count=Count('zones')
-    ).prefetch_related('zones').order_by('display_order', 'name')
+    # Base queryset (zone_count is already a property on ZoneGroup model)
+    groups = delivery_models.ZoneGroup.objects.prefetch_related('zones').order_by('display_order', 'name')
 
     # Apply search
     if search:

@@ -136,6 +136,9 @@ function bulkAction(action) {
     }
 
     switch(action) {
+        case 'assign_driver':
+            bulkAssignDriver(selectedIds);
+            break;
         case 'print':
             bulkPrint(selectedIds);
             break;
@@ -254,6 +257,149 @@ function bulkUpdateStatus(taskIds, status) {
 function bulkExport(taskIds) {
     const exportUrl = '/workforce/tasks/bulk-export/?ids=' + taskIds.join(',');
     window.location.href = exportUrl;
+}
+
+// Bulk assign driver
+function bulkAssignDriver(taskIds) {
+    // Show modal with driver selection
+    const modal = document.getElementById('bulkDriverModal') || createBulkDriverModal();
+
+    // Store task IDs for later use
+    window.selectedTaskIdsForDriver = taskIds;
+
+    // Fetch available drivers
+    fetch('/workforce/api/get-active-drivers/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                populateDriverList(data.drivers, taskIds.length);
+                const bsModal = new bootstrap.Modal(modal);
+                bsModal.show();
+            } else {
+                showToast('Error loading drivers', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error loading drivers', 'error');
+            console.error('Error:', error);
+        });
+}
+
+// Create bulk driver assignment modal
+function createBulkDriverModal() {
+    const modal = document.createElement('div');
+    modal.id = 'bulkDriverModal';
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fa-solid fa-user-plus me-2"></i>Assign Driver to Tasks
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">
+                        <i class="fa-solid fa-info-circle me-1"></i>
+                        Assigning driver to <strong id="taskCountDisplay">0</strong> task(s)
+                    </p>
+                    <div class="mb-3">
+                        <label for="bulkDriverSelect" class="form-label">Select Driver</label>
+                        <select class="form-select" id="bulkDriverSelect" style="width: 100%;">
+                            <option value="">Loading drivers...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmBulkDriverAssign()">
+                        <i class="fa-solid fa-check me-1"></i>Assign Driver
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+}
+
+// Populate driver list
+function populateDriverList(drivers, taskCount) {
+    document.getElementById('taskCountDisplay').textContent = taskCount;
+    const selectElement = $('#bulkDriverSelect');
+
+    // Clear existing options
+    selectElement.empty();
+
+    if (drivers.length === 0) {
+        selectElement.append(new Option('No active drivers found', '', false, false));
+        return;
+    }
+
+    // Add placeholder
+    selectElement.append(new Option('Select a driver...', '', false, false));
+
+    // Add driver options
+    drivers.forEach(driver => {
+        const displayText = `${driver.name}${driver.driver_code ? ' (' + driver.driver_code + ')' : ''} - ${driver.phone || 'No phone'}`;
+        const option = new Option(displayText, driver.driver_id, false, false);
+        selectElement.append(option);
+    });
+
+    // Initialize or refresh Select2
+    selectElement.select2({
+        placeholder: 'Select a driver...',
+        allowClear: true,
+        width: '100%',
+        dropdownParent: $('#bulkDriverModal')
+    });
+}
+
+// Confirm and perform bulk driver assignment
+function confirmBulkDriverAssign() {
+    const driverId = $('#bulkDriverSelect').val();
+    const driverName = $('#bulkDriverSelect option:selected').text();
+    const taskIds = window.selectedTaskIdsForDriver;
+
+    if (!driverId) {
+        showToast('Please select a driver', 'warning');
+        return;
+    }
+
+    if (!taskIds || taskIds.length === 0) {
+        showToast('No tasks selected', 'warning');
+        return;
+    }
+
+    fetch('/workforce/tasks/bulk-assign-driver/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            task_ids: taskIds,
+            driver_id: driverId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`Successfully assigned ${data.assigned || taskIds.length} task(s) to driver`, 'success');
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('bulkDriverModal'));
+            if (modal) modal.hide();
+            // Reload page
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast(data.message || 'Error assigning tasks', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error assigning tasks', 'error');
+        console.error('Error:', error);
+    });
 }
 
 // ============================================
