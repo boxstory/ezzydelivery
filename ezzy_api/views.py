@@ -3299,7 +3299,8 @@ def business_pickup_locations_api(request):
 
 # ==================== QNAS PROXY APIs ====================
 # These endpoints proxy requests to QNAS API (qnas.qa)
-# Cloudflare protection requires browser cookies to be forwarded
+# QNAS uses path-based endpoints: /get_buildings/{zone}/{street}
+# Requires X-Token and X-Domain headers for authentication
 
 QNAS_BASE_URL = "https://qnas.qa"
 QNAS_TOKEN = config("QNAS_TOKEN", default="")
@@ -3308,8 +3309,8 @@ QNAS_DOMAIN = config("QNAS_DOMAIN", default="ezzydelivery.qa")
 
 def _make_qnas_request(request, endpoint, method='GET', data=None):
     """
-    Helper function to make requests to QNAS API with proper headers and cookies.
-    Forwards browser cookies to bypass Cloudflare protection.
+    Helper function to make requests to QNAS API with proper headers.
+    Uses X-Token and X-Domain for authentication.
     """
     url = f"{QNAS_BASE_URL}/{endpoint}"
 
@@ -3318,21 +3319,16 @@ def _make_qnas_request(request, endpoint, method='GET', data=None):
         "X-Domain": QNAS_DOMAIN,
         "Accept": "application/json",
         "User-Agent": request.META.get("HTTP_USER_AGENT", "Mozilla/5.0"),
-        "Referer": f"https://{QNAS_DOMAIN}/",
-        "Origin": f"https://{QNAS_DOMAIN}",
     }
-
-    # Forward browser cookies (critical for Cloudflare bypass)
-    cookies = request.COOKIES
 
     try:
         if method == 'GET':
-            resp = requests.get(url, headers=headers, cookies=cookies, timeout=15)
+            resp = requests.get(url, headers=headers, timeout=15)
         elif method == 'POST':
             headers["Content-Type"] = "application/json"
-            resp = requests.post(url, headers=headers, cookies=cookies, json=data, timeout=15)
+            resp = requests.post(url, headers=headers, json=data, timeout=15)
         else:
-            resp = requests.request(method, url, headers=headers, cookies=cookies, json=data, timeout=15)
+            resp = requests.request(method, url, headers=headers, json=data, timeout=15)
 
         return resp
     except requests.exceptions.Timeout:
@@ -3389,7 +3385,7 @@ def qnas_get_streets(request):
 
     logger.info(f"QNAS proxy: Fetching streets for zone {zone}")
 
-    resp = _make_qnas_request(request, f"get_streets?zone={zone}")
+    resp = _make_qnas_request(request, f"get_streets/{zone}")
 
     if resp is None:
         return JsonResponse({'error': 'QNAS API request failed'}, status=502)
@@ -3425,7 +3421,7 @@ def qnas_get_buildings(request):
 
     logger.info(f"QNAS proxy: Fetching buildings for zone {zone}, street {street}")
 
-    resp = _make_qnas_request(request, f"get_buildings?zone={zone}&street={street}")
+    resp = _make_qnas_request(request, f"get_buildings/{zone}/{street}")
 
     if resp is None:
         return JsonResponse({'error': 'QNAS API request failed'}, status=502)
@@ -3503,7 +3499,7 @@ def qnas_get_address_details(request):
 
     logger.info(f"QNAS proxy: Getting address details for zone={zone}, street={street}, building={building}")
 
-    resp = _make_qnas_request(request, f"get_address_details?zone={zone}&street={street}&building={building}")
+    resp = _make_qnas_request(request, f"get_location/{zone}/{street}/{building}")
 
     if resp is None:
         return JsonResponse({'error': 'QNAS API request failed'}, status=502)
@@ -3542,7 +3538,7 @@ def qnas_geocode(request):
 
     logger.info(f"QNAS proxy: Geocoding lat={lat}, lng={lng}")
 
-    resp = _make_qnas_request(request, f"geocode?lat={lat}&lng={lng}")
+    resp = _make_qnas_request(request, f"geocode/{lat}/{lng}")
 
     if resp is None:
         return JsonResponse({'error': 'QNAS API request failed'}, status=502)
@@ -3575,7 +3571,7 @@ def qnas_get_zone_polygon(request, zone_number):
 
     logger.info(f"QNAS proxy: Fetching polygon for zone {zone_number}")
 
-    resp = _make_qnas_request(request, f"get_zone_polygon?zone={zone_number}")
+    resp = _make_qnas_request(request, f"get_zone_polygon/{zone_number}")
 
     if resp is None:
         return JsonResponse({'error': 'QNAS API request failed'}, status=502)
@@ -3637,7 +3633,7 @@ def qnas_get_coordinates(request):
         logger.info(f"QNAS coordinates POST: zone={zone}, street={street}, building={building}")
 
         # Fetch buildings from QNAS
-        resp = _make_qnas_request(request, f"get_buildings?zone={zone}&street={street}")
+        resp = _make_qnas_request(request, f"get_buildings/{zone}/{street}")
 
         if resp is None:
             return JsonResponse({
@@ -3746,7 +3742,7 @@ def qnas_get_location(request, zone_number, street_number, building_number=None)
         logger.info(f"QNAS location GET: zone={zone}, street={street}, building={building}")
 
         # Fetch buildings from QNAS
-        resp = _make_qnas_request(request, f"get_buildings?zone={zone}&street={street}")
+        resp = _make_qnas_request(request, f"get_buildings/{zone}/{street}")
 
         if resp is None:
             return JsonResponse({
