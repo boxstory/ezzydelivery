@@ -56,6 +56,7 @@ urlpatterns = [
     path('orders/<int:order_id>/publish/', workforce_views.publish_order_to_delivery, name='publish_order_to_delivery'),
     path('orders/<int:order_id>/update-status/', workforce_views.update_order_status, name='update_order_status'),
     path('orders/<int:order_id>/add-comment/', workforce_views.add_order_comment, name='add_order_comment'),
+    path('orders/<int:order_id>/update-coords/', workforce_views.update_order_coords, name='update_order_coords'),
 
 
 

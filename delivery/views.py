@@ -1102,13 +1102,42 @@ def zone_list(request):
         neighbour_count=Count('neighbour_zones')
     ).prefetch_related('zone_groups').order_by('zone_number')
 
-    # Apply search
+    # Apply search (includes area names so "muaither" finds its parent zones)
+    # Falls back to fuzzy trigram search when exact icontains returns 0 results
     if search:
-        zones = zones.filter(
+        exact_qs = zones.filter(
             Q(zone_name__icontains=search) |
             Q(zone_name_arabic__icontains=search) |
-            Q(zone_number__icontains=search)
-        )
+            Q(zone_number__icontains=search) |
+            Q(areas__area_name__icontains=search) |
+            Q(areas__area_name_arabic__icontains=search)
+        ).distinct()
+        if exact_qs.exists():
+            zones = exact_qs
+        else:
+            # Fuzzy fallback using pg_trgm trigram similarity
+            from django.contrib.postgres.search import TrigramSimilarity
+            from delivery.models import ZoneArea
+            fuzzy_areas = (
+                ZoneArea.objects.filter(is_active=True)
+                .annotate(
+                    sim_en=TrigramSimilarity('area_name', search),
+                    sim_ar=TrigramSimilarity('area_name_arabic', search),
+                )
+                .filter(Q(sim_en__gte=0.2) | Q(sim_ar__gte=0.2))
+                .order_by('-sim_en', '-sim_ar')
+                .values_list('zone_id', flat=True)
+                .distinct()
+            )
+            fuzzy_zone_ids = list(fuzzy_areas[:20])
+            if fuzzy_zone_ids:
+                zones = zones.filter(id__in=fuzzy_zone_ids)
+            else:
+                # Also try fuzzy on zone_name itself
+                from django.contrib.postgres.search import TrigramSimilarity as TS
+                zones = zones.annotate(
+                    sim=TrigramSimilarity('zone_name', search),
+                ).filter(sim__gte=0.2).order_by('-sim')
 
     # Apply group filter
     if group_filter:

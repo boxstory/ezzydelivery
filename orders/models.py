@@ -149,6 +149,16 @@ class Order(models.Model):
     dl_zone = models.PositiveIntegerField(blank=True, null=True, default=None)
     dl_building = models.PositiveIntegerField(blank=True, null=True, default=None)
     dl_street = models.PositiveIntegerField(blank=True, null=True, default=None)
+    latitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
+    longitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
+    COORDS_ACCURACY = [
+        ('exact', 'Exact (Building)'),
+        ('street', 'Street Level'),
+        ('landmark', 'Landmark/Area'),
+        ('zone_center', 'Zone Center'),
+        ('ai_estimate', 'AI Estimate'),
+    ]
+    coords_accuracy = models.CharField(max_length=15, choices=COORDS_ACCURACY, blank=True, null=True)
 
     # Delivery completion tracking
     delivered_at = models.DateTimeField(blank=True, null=True, help_text="When the order was delivered")

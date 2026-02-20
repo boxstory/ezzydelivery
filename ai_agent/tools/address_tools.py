@@ -112,6 +112,7 @@ class ParseAddressTool(BaseTool):
                 'latitude': None,
                 'longitude': None,
             },
+            'geocode_source': None,
         }
 
         # Extract zone number
@@ -141,7 +142,7 @@ class ParseAddressTool(BaseTool):
             result['unit_number'] = unit
             result['confidence'] += 0.1
 
-        # Try to find area/zone from training data
+        # Step 1: Training data lookup
         zone_match = self._find_zone_from_training_data(address)
         if zone_match:
             if not result['zone_number']:
@@ -151,7 +152,7 @@ class ParseAddressTool(BaseTool):
             result['area_name'] = zone_match.get('area_name')
             result['parse_notes'].append(f"Matched area: {zone_match.get('area_name')}")
 
-        # Try to find zone from ZoneName/ZoneArea models
+        # Step 2: ZoneName/ZoneArea DB lookup (fuzzy)
         if not result['zone_number']:
             zone_from_db = self._find_zone_from_database(address)
             if zone_from_db:
@@ -160,21 +161,31 @@ class ParseAddressTool(BaseTool):
                 result['area_name'] = zone_from_db.get('area_name')
                 result['confidence'] += 0.25
                 result['parse_notes'].append(f"Matched from database: {zone_from_db.get('area_name')}")
-                # Get coordinates if available
                 if zone_from_db.get('latitude') and zone_from_db.get('longitude'):
                     result['coordinates']['latitude'] = zone_from_db['latitude']
                     result['coordinates']['longitude'] = zone_from_db['longitude']
+                    result['geocode_source'] = 'zone_center'
 
-        # Fetch zone name and coordinates if we have a zone number but missing details
+        # Step 3: AI search for typo handling (moved earlier — runs before geocoding)
+        if not result['zone_number']:
+            ai_result = self._ai_search_zone(address)
+            if ai_result:
+                result['zone_number'] = ai_result.get('zone_number')
+                result['zone_name'] = ai_result.get('zone_name')
+                result['area_name'] = ai_result.get('area_name')
+                result['confidence'] += 0.35
+                result['geocode_source'] = 'ai_estimate'
+                result['parse_notes'].append(f"AI identified zone: {ai_result.get('zone_name')} (Zone {ai_result.get('zone_number')})")
+
+        # Step 4: Enrich with zone details + QNAS/geocoding
         if result['zone_number']:
             zone_details = self._get_zone_details(result['zone_number'])
             if zone_details:
-                # Set zone name if not already set
                 if not result['zone_name']:
                     result['zone_name'] = zone_details.get('zone_name')
                     result['parse_notes'].append(f"Zone name: {zone_details.get('zone_name')}")
 
-            # Try QNAS API for precise building-level coordinates
+            # Step 4a: QNAS lookup if we have zone + street
             if result['street_number']:
                 qnas_coords = self._lookup_qnas_building(
                     result['zone_number'],
@@ -185,34 +196,45 @@ class ParseAddressTool(BaseTool):
                     result['coordinates']['latitude'] = qnas_coords['latitude']
                     result['coordinates']['longitude'] = qnas_coords['longitude']
                     result['confidence'] += 0.15
-                    src = f"building {result.get('building_number')}" if qnas_coords.get('exact_match') else "street"
-                    result['parse_notes'].append(f"QNAS precise coordinates from {src}")
+                    if qnas_coords.get('exact_match'):
+                        result['geocode_source'] = 'qnas_exact'
+                        result['parse_notes'].append(f"QNAS precise coordinates from building {result.get('building_number')}")
+                    else:
+                        result['geocode_source'] = 'qnas_street'
+                        result['parse_notes'].append("QNAS precise coordinates from street")
 
-            # Fallback to zone center if no QNAS coordinates
+            # Step 4b: Landmark geocoding if zone but no street (better than zone center)
+            if not result['coordinates']['latitude'] and not result['street_number']:
+                # Pass zone center as hint for picking best geocode result
+                hint_lat = zone_details.get('latitude') if zone_details else None
+                hint_lng = zone_details.get('longitude') if zone_details else None
+                landmark_coords = self._geocode_landmark(address, hint_lat, hint_lng)
+                if landmark_coords:
+                    result['coordinates']['latitude'] = landmark_coords['latitude']
+                    result['coordinates']['longitude'] = landmark_coords['longitude']
+                    result['geocode_source'] = 'landmark'
+                    result['confidence'] += 0.1
+                    result['parse_notes'].append(f"Landmark/area geocoded via {landmark_coords.get('provider', 'geocoder')}")
+
+            # Step 4c: Fallback to zone center if still no coordinates
             if not result['coordinates']['latitude'] and zone_details and zone_details.get('latitude'):
                 result['coordinates']['latitude'] = zone_details['latitude']
                 result['coordinates']['longitude'] = zone_details['longitude']
+                if not result['geocode_source'] or result['geocode_source'] == 'ai_estimate':
+                    # Keep ai_estimate if that's how we found the zone
+                    if result['geocode_source'] != 'ai_estimate':
+                        result['geocode_source'] = 'zone_center'
                 result['parse_notes'].append(f"Zone {result['zone_number']} center coordinates (approximate)")
 
-        # AI Search fallback if no zone found
-        if not result['zone_number']:
-            ai_result = self._ai_search_zone(address)
-            if ai_result:
-                result['zone_number'] = ai_result.get('zone_number')
-                result['zone_name'] = ai_result.get('zone_name')
-                result['area_name'] = ai_result.get('area_name')
-                result['confidence'] += 0.35
-                result['parse_notes'].append(f"AI identified zone: {ai_result.get('zone_name')} (Zone {ai_result.get('zone_number')})")
-
-                # Get coordinates for the AI-identified zone
-                if result['zone_number']:
-                    zone_details = self._get_zone_details(result['zone_number'])
-                    if zone_details:
-                        if not result['zone_name']:
-                            result['zone_name'] = zone_details.get('zone_name')
-                        if zone_details.get('latitude'):
-                            result['coordinates']['latitude'] = zone_details['latitude']
-                            result['coordinates']['longitude'] = zone_details['longitude']
+        # Step 5: If still no zone and no coords, try landmark geocoding alone
+        if not result['zone_number'] and not result['coordinates']['latitude']:
+            landmark_coords = self._geocode_landmark(address)
+            if landmark_coords:
+                result['coordinates']['latitude'] = landmark_coords['latitude']
+                result['coordinates']['longitude'] = landmark_coords['longitude']
+                result['geocode_source'] = 'landmark'
+                result['confidence'] += 0.15
+                result['parse_notes'].append(f"Address geocoded via {landmark_coords.get('provider', 'geocoder')} (no zone identified)")
 
         # Extract common landmarks
         landmarks = self._extract_landmarks(address)
@@ -494,6 +516,114 @@ Do not include any other text, only the JSON."""
 
         except Exception as e:
             logger.error(f"AI zone search error: {e}")
+
+        return None
+
+    def _geocode_landmark(
+        self,
+        address: str,
+        zone_lat: Optional[float] = None,
+        zone_lng: Optional[float] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Geocode an address/landmark via HERE Maps (Geocode + Discover APIs).
+
+        Uses zone center coordinates as a hint to pick the best result when
+        both APIs return different locations. Fallback to Nominatim.
+        """
+        import math
+        import requests
+        from decouple import config
+
+        def _dist(lat1, lng1, lat2, lng2):
+            return math.sqrt((lat1 - lat2) ** 2 + (lng1 - lng2) ** 2) * 111
+
+        # Strip zone/street/building numbers from query (confuses geocoders)
+        cleaned = re.sub(r'\b(?:zone|z)\s*[#:]?\s*\d+', '', address, flags=re.IGNORECASE)
+        cleaned = re.sub(r'\b(?:street|st\.?)\s*[#:]?\s*\d+', '', cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r'\b(?:building|bldg\.?|house|villa)\s*[#:]?\s*\d+', '', cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r'\b(?:منطقة|شارع|مبنى)\s*\d+', '', cleaned)
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip().strip(',').strip()
+        query = cleaned if cleaned and len(cleaned) >= 3 else address
+
+        here_key = config("HERE_MAP_API_KEY", default="")
+        geo_result = None
+        disc_result = None
+
+        # 1) HERE Geocode API (good for area/neighborhood names)
+        if here_key:
+            try:
+                resp = requests.get(
+                    "https://geocode.search.hereapi.com/v1/geocode",
+                    params={
+                        'q': f"{address}, Qatar",
+                        'in': 'countryCode:QAT',
+                        'limit': 1,
+                        'apiKey': here_key,
+                    },
+                    timeout=8,
+                )
+                if resp.status_code == 200:
+                    items = resp.json().get('items', [])
+                    if items:
+                        pos = items[0].get('position', {})
+                        if pos.get('lat') and pos.get('lng'):
+                            geo_result = (round(pos['lat'], 8), round(pos['lng'], 8))
+            except Exception as e:
+                logger.warning(f"HERE Geocode error for '{address}': {e}")
+
+            # 2) HERE Discover API (good for landmarks/places)
+            try:
+                resp = requests.get(
+                    "https://discover.search.hereapi.com/v1/discover",
+                    params={
+                        'q': query,
+                        'in': 'circle:25.3,51.5;r=80000',
+                        'limit': 1,
+                        'apiKey': here_key,
+                    },
+                    timeout=8,
+                )
+                if resp.status_code == 200:
+                    items = resp.json().get('items', [])
+                    if items:
+                        pos = items[0].get('position', {})
+                        if pos.get('lat') and pos.get('lng'):
+                            disc_result = (round(pos['lat'], 8), round(pos['lng'], 8))
+            except Exception as e:
+                logger.warning(f"HERE Discover error for '{address}': {e}")
+
+        # 3) Pick best result
+        if geo_result and disc_result:
+            if zone_lat and zone_lng:
+                # Use zone center as hint — pick whichever is closer
+                g_dist = _dist(geo_result[0], geo_result[1], zone_lat, zone_lng)
+                d_dist = _dist(disc_result[0], disc_result[1], zone_lat, zone_lng)
+                if d_dist < g_dist - 0.3:
+                    return {'latitude': disc_result[0], 'longitude': disc_result[1], 'provider': 'HERE Discover'}
+            return {'latitude': geo_result[0], 'longitude': geo_result[1], 'provider': 'HERE'}
+        elif geo_result:
+            return {'latitude': geo_result[0], 'longitude': geo_result[1], 'provider': 'HERE'}
+        elif disc_result:
+            return {'latitude': disc_result[0], 'longitude': disc_result[1], 'provider': 'HERE Discover'}
+
+        # 4) Fallback: Nominatim (free, no key needed)
+        try:
+            from geopy.geocoders import Nominatim
+            geo = Nominatim(user_agent="EzzyDelivery/1.0", timeout=8)
+            location = geo.geocode(
+                f"{address}, Qatar",
+                viewbox=[(24.47, 50.75), (26.18, 51.67)],
+                bounded=True,
+            )
+            if location:
+                return {
+                    'latitude': round(location.latitude, 8),
+                    'longitude': round(location.longitude, 8),
+                    'provider': 'Nominatim',
+                }
+        except Exception as e:
+            logger.warning(f"Nominatim geocode error for '{address}': {e}")
 
         return None
 

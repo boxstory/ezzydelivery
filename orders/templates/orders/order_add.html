@@ -84,9 +84,36 @@
       </div>
       <div class="pwa-form-group" id="fg_customer_address">
         <label class="pwa-form-group__label">Address</label>
-        <input type="text" name="customer_address" id="mobile_customer_address"
-          class="pwa-form-group__input" placeholder="Full address or area name">
+        <div class="d-flex gap-2">
+          <input type="text" name="customer_address" id="mobile_customer_address"
+            class="pwa-form-group__input flex-grow-1" placeholder="Full address or area name">
+          <button type="button" class="btn btn-sm btn-outline-info" id="mobileAiParseBtn" style="height: 38px; white-space: nowrap;"
+                  onclick="aiParseAddress('mobile_customer_address', 'mobile_dl_zone', 'mobile_dl_street', 'mobile_dl_building', 'mobileAiParseBtn', 'mobileAiParseResult', {qnasOpts: {zoneId:'mobile_dl_zone', streetId:'mobile_dl_street', buildingId:'mobile_dl_building', latId:'mobile_latitude', lngId:'mobile_longitude', resultId:'mobileQnasResult', btnId:'mobileQnasBtn', mapId:'mobileMapLink'}})">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+          </button>
+        </div>
+        <div id="mobileAiParseResult" class="mt-1"></div>
       </div>
+      <div class="pwa-form-row-3">
+        <div class="pwa-form-group">
+          <label class="pwa-form-group__label">Lat</label>
+          <input type="text" id="mobile_latitude" class="pwa-form-group__input" placeholder="--" readonly>
+        </div>
+        <div class="pwa-form-group">
+          <label class="pwa-form-group__label">Lng</label>
+          <input type="text" id="mobile_longitude" class="pwa-form-group__input" placeholder="--" readonly>
+        </div>
+        <div class="pwa-form-group d-flex align-items-end gap-2">
+          <a id="mobileMapLink" href="#" target="_blank" class="btn btn-sm btn-outline-secondary disabled" style="height: 38px; line-height: 28px;" title="Map">
+            <i class="fa-solid fa-map-location-dot"></i>
+          </a>
+          <button type="button" class="btn btn-sm btn-outline-warning flex-grow-1" id="mobileQnasBtn" style="height: 38px;"
+                  onclick="qnasValidateAndFill({zoneId:'mobile_dl_zone', streetId:'mobile_dl_street', buildingId:'mobile_dl_building', latId:'mobile_latitude', lngId:'mobile_longitude', resultId:'mobileQnasResult', btnId:'mobileQnasBtn', mapId:'mobileMapLink'})">
+            <i class="fa-solid fa-satellite-dish me-1"></i>Validate
+          </button>
+        </div>
+      </div>
+      <div id="mobileQnasResult" class="mb-2"></div>
     </div>
 
     <!-- Payment Section -->
@@ -269,6 +296,21 @@
         </div>
         <div class="form-section-body">
           <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label" for="id_customer_address">
+                <i class="fas fa-location-arrow me-1 text-muted"></i>Full Address
+              </label>
+              <div class="d-flex gap-2">
+                <div class="flex-grow-1">{{ form.customer_address }}</div>
+                <button type="button" class="btn btn-sm btn-outline-info" id="addOrderAiParseBtn" style="height: 38px; white-space: nowrap;"
+                        onclick="aiParseAddress('id_customer_address', 'id_dl_zone', 'id_dl_street', 'id_dl_building', 'addOrderAiParseBtn', 'addOrderAiParseResult', {qnasOpts: {zoneId:'id_dl_zone', streetId:'id_dl_street', buildingId:'id_dl_building', latId:'id_latitude', lngId:'id_longitude', resultId:'addOrderQnasResult', btnId:'addOrderQnasBtn', mapId:'addOrderMapLink', accuracyId:'id_coords_accuracy', accuracyBadgeId:'addOrderAccuracyBadge'}})">
+                  <i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI Parse
+                </button>
+              </div>
+              <div id="addOrderAiParseResult" class="mt-1"></div>
+            </div>
+          </div>
+          <div class="row g-3 mt-0">
             <div class="col-4 col-md-2">
               <label class="form-label" for="id_dl_zone">
                 <i class="fas fa-map me-1 text-muted"></i>Zone
@@ -287,13 +329,30 @@
               </label>
               {{ form.dl_building }}
             </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label" for="id_customer_address">
-                <i class="fas fa-location-arrow me-1 text-muted"></i>Full Address
-              </label>
-              {{ form.customer_address }}
-              <div class="form-text">Include any landmarks or additional directions</div>
+          </div>
+          <div class="row g-3 mt-0">
+            <div class="col-4 col-md-2">
+              <label class="form-label" for="id_latitude">Latitude</label>
+              {{ form.latitude }}
             </div>
+            <div class="col-4 col-md-2">
+              <label class="form-label" for="id_longitude">Longitude</label>
+              {{ form.longitude }}
+            </div>
+            <div class="col-4 col-md-2 d-flex align-items-end gap-2">
+              <a id="addOrderMapLink" href="#" target="_blank" class="btn btn-sm btn-outline-secondary disabled" style="height: 38px; line-height: 28px;" title="View on Google Maps">
+                <i class="fa-solid fa-map-location-dot"></i>
+              </a>
+              {{ form.coords_accuracy }}
+              <button type="button" class="btn btn-sm btn-outline-warning flex-grow-1" id="addOrderQnasBtn" style="height: 38px;"
+                      onclick="qnasValidateAndFill({zoneId:'id_dl_zone', streetId:'id_dl_street', buildingId:'id_dl_building', latId:'id_latitude', lngId:'id_longitude', resultId:'addOrderQnasResult', btnId:'addOrderQnasBtn', mapId:'addOrderMapLink', accuracyId:'id_coords_accuracy', accuracyBadgeId:'addOrderAccuracyBadge'})">
+                <i class="fa-solid fa-satellite-dish me-1"></i>Validate
+              </button>
+            </div>
+          </div>
+          <div class="d-flex gap-2 mt-1">
+            <span id="addOrderAccuracyBadge"></span>
+            <div id="addOrderQnasResult"></div>
           </div>
         </div>
       </div>

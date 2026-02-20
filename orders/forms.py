@@ -121,13 +121,16 @@ class AddOrderForm(forms.ModelForm):
     class Meta:
         model = Order
         fields = ['pickup_location', 'client_order_code', 'customer_name', 'customer_phone', 'customer_whatsapp',   'cod_status_by_client', 'cod_amount',
-                  'dl_building', 'dl_street', 'dl_zone', 'customer_address', 'order_notes', 'order_status']
+                  'dl_building', 'dl_street', 'dl_zone', 'customer_address', 'latitude', 'longitude', 'coords_accuracy', 'order_notes', 'order_status']
         exclude = ['order_number', 'business', 'delivery_task', 'deadline_date', 'cod_status_by_staff',
                    'updated_at', 'created_at']
         widgets = {
             'order_notes': forms.TextInput(attrs={'class': 'form-control'}),
             'order_status': forms.Select(attrs={'class': 'form-control'}, choices=ORDER_STATUS),
             'client_order_code': forms.TextInput(attrs={'class': 'form-control', 'id': 'client_order_code_input'}),
+            'latitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
+            'longitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
+            'coords_accuracy': forms.HiddenInput(),
         }
         labels = {
             'order_notes': _('Order Short description'),
@@ -412,13 +415,13 @@ class CustomerLocationUpdateForm(forms.Form):
         required=False,
     )
     latitude = forms.DecimalField(
-        widget=forms.HiddenInput(),
+        widget=forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
         max_digits=19,
         decimal_places=15,
         required=False,
     )
     longitude = forms.DecimalField(
-        widget=forms.HiddenInput(),
+        widget=forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
         max_digits=19,
         decimal_places=15,
         required=False,
@@ -456,7 +459,7 @@ class UpdateOrderForm(forms.ModelForm):
     class Meta:
         model = Order
         fields = [ 'customer_name', 'customer_phone', 'customer_whatsapp',  'task_created', 'cod_status_by_client', 'cod_amount',
-                  'dl_zone', 'customer_address', 'pickup_location', 'order_notes', ]
+                  'dl_zone', 'dl_street', 'dl_building', 'customer_address', 'latitude', 'longitude', 'coords_accuracy', 'pickup_location', 'order_notes', ]
 
         exclude = ['order_number','client_order_code', 'business', 'delivery_task', 'order_date',
                    'pickup_location_id', 'updated_at', 'created_at']
@@ -469,6 +472,9 @@ class UpdateOrderForm(forms.ModelForm):
             'customer_whatsapp': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
             'order_notes': forms.TextInput(attrs={'class': 'form-control'}),
             'cod_amount': forms.TextInput(attrs={'class': 'form-control'}),
+            'latitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
+            'longitude': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'readonly': True, 'placeholder': '--'}),
+            'coords_accuracy': forms.HiddenInput(),
         }
 
     def __init__(self, *args, **kwargs):

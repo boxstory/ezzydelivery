@@ -108,9 +108,37 @@ Parameters:
                 </div>
             </div>
         </div>
-        <div class="odp__field">
-            <span class="odp__field__label">Address</span>
-            <span class="odp__field__value">{{ order.customer_address }}</span>
+        <div class="row g-0">
+            <div class="col-6">
+                <div class="odp__field">
+                    <span class="odp__field__label">Address</span>
+                    <span class="odp__field__value">{{ order.customer_address }}</span>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="odp__field">
+                    <span class="odp__field__label">Lat / Long</span>
+                    <div class="odp__field__value" id="orderLatLng{{ order.id }}">
+                        {% if order.latitude and order.longitude %}
+                        <a href="https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="text-decoration-none">
+                            <i class="fa-solid fa-map-pin me-1 text-success"></i>{{ order.latitude }}, {{ order.longitude }}
+                        </a>
+                        {% else %}
+                        <span class="text-muted small me-2"><i class="fa-solid fa-location-crosshairs me-1"></i>Not Available</span>
+                        <div class="d-flex gap-2 mt-1">
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="EzzyAIParse.parse({ address: '{{ order.customer_address|escapejs }}', zone: '{{ order.dl_zone|default:"" }}', street: '{{ order.dl_street|default:"" }}', building: '{{ order.dl_building|default:"" }}', orderId: '{{ order.id }}', orderNumber: '{{ order.order_number }}', showMap: true })">
+                                <i class="fa-solid fa-robot me-1"></i>AI Parse
+                            </button>
+                            {% if order.dl_zone and order.dl_street %}
+                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="verifyAndUpdateCoords({{ order.dl_zone }}, {{ order.dl_street }}, '{{ order.dl_building|default:"" }}', {{ order.id }})">
+                                <i class="fa-solid fa-satellite-dish me-1"></i>QNAS Verify
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="row g-0">
             <div class="col-3">

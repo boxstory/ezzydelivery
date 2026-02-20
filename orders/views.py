@@ -1202,12 +1202,7 @@ def order_update(request, order_id):
             return redirect('orders:orders_all_list')
 
         if request.method == 'POST':
-            form = orders_forms.UpdateOrderForm(request.POST, instance=order, is_staff=is_staff)
-
-            if order.task_status == 'dl_task_listed':
-                logger.warning(f"Cannot update order {order_id} - already published in delivery tasks")
-                messages.error(request, 'Cannot update order published in Delivery Tasks. Contact Operation Admin')
-                return redirect('orders:orders_all_list')
+            form = orders_forms.UpdateOrderForm(request.POST, instance=order, is_staff=is_staff, business_id=business.business_id)
 
             if form.is_valid():
                 logger.info(f"Order {order_id} updated successfully")
@@ -1217,7 +1212,7 @@ def order_update(request, order_id):
             else:
                 logger.warning(f"Invalid order update form for order {order_id}: {form.errors}")
         else:
-            form = orders_forms.UpdateOrderForm(instance=order, is_staff=is_staff)
+            form = orders_forms.UpdateOrderForm(instance=order, is_staff=is_staff, business_id=business.business_id)
 
         # Fetch existing order items for the products section
         order_items = order.order_items.select_related('product').all()

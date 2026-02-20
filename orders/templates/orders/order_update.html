@@ -81,29 +81,58 @@
             <i class="fa-solid fa-location-dot"></i>
             <span>Delivery Address</span>
           </div>
+          <div class="ou__field">
+            <label class="ou__label" for="id_customer_address">Full Address</label>
+            <div class="d-flex gap-2">
+              <div class="flex-grow-1">{{ form.customer_address }}</div>
+              <button type="button" class="btn btn-sm btn-outline-info" id="ouAiParseBtn" style="height: 38px; white-space: nowrap;"
+                      onclick="aiParseAddress('id_customer_address', 'id_dl_zone', 'id_dl_street', 'id_dl_building', 'ouAiParseBtn', 'ouAiParseResult', {qnasOpts: {zoneId:'id_dl_zone', streetId:'id_dl_street', buildingId:'id_dl_building', latId:'id_latitude', lngId:'id_longitude', resultId:'ouQnasResult', btnId:'ouQnasBtn', mapId:'ouMapLink', accuracyId:'id_coords_accuracy', accuracyBadgeId:'ouAccuracyBadge'}})">
+                <i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI Parse
+              </button>
+            </div>
+            <div id="ouAiParseResult" class="mt-1"></div>
+            {% if form.customer_address.errors %}<div class="ou__error">{{ form.customer_address.errors.0 }}</div>{% endif %}
+          </div>
           <div class="ou__field-grid ou__field-grid--3col">
             <div class="ou__field">
               <label class="ou__label" for="id_dl_zone">Zone</label>
               {{ form.dl_zone }}
               {% if form.dl_zone.errors %}<div class="ou__error">{{ form.dl_zone.errors.0 }}</div>{% endif %}
             </div>
-            {% if form.dl_street %}
             <div class="ou__field">
               <label class="ou__label" for="id_dl_street">Street</label>
               {{ form.dl_street }}
+              {% if form.dl_street.errors %}<div class="ou__error">{{ form.dl_street.errors.0 }}</div>{% endif %}
             </div>
-            {% endif %}
-            {% if form.dl_building %}
             <div class="ou__field">
               <label class="ou__label" for="id_dl_building">Building</label>
               {{ form.dl_building }}
+              {% if form.dl_building.errors %}<div class="ou__error">{{ form.dl_building.errors.0 }}</div>{% endif %}
             </div>
-            {% endif %}
           </div>
-          <div class="ou__field">
-            <label class="ou__label" for="id_customer_address">Full Address</label>
-            {{ form.customer_address }}
-            {% if form.customer_address.errors %}<div class="ou__error">{{ form.customer_address.errors.0 }}</div>{% endif %}
+          <div class="ou__field-grid ou__field-grid--3col mt-1">
+            <div class="ou__field">
+              <label class="ou__label" for="id_latitude">Latitude</label>
+              {{ form.latitude }}
+            </div>
+            <div class="ou__field">
+              <label class="ou__label" for="id_longitude">Longitude</label>
+              {{ form.longitude }}
+            </div>
+            <div class="ou__field d-flex align-items-end gap-2">
+              <a id="ouMapLink" href="#" target="_blank" class="btn btn-sm btn-outline-secondary disabled" style="height: 38px; line-height: 28px;" title="View on Google Maps">
+                <i class="fa-solid fa-map-location-dot"></i>
+              </a>
+              {{ form.coords_accuracy }}
+              <button type="button" class="btn btn-sm btn-outline-warning flex-grow-1" id="ouQnasBtn" style="height: 38px;"
+                      onclick="qnasValidateAndFill({zoneId:'id_dl_zone', streetId:'id_dl_street', buildingId:'id_dl_building', latId:'id_latitude', lngId:'id_longitude', resultId:'ouQnasResult', btnId:'ouQnasBtn', mapId:'ouMapLink', accuracyId:'id_coords_accuracy', accuracyBadgeId:'ouAccuracyBadge'})">
+                <i class="fa-solid fa-satellite-dish me-1"></i>Validate
+              </button>
+            </div>
+          </div>
+          <div class="d-flex gap-2 mt-1">
+            <span id="ouAccuracyBadge"></span>
+            <div id="ouQnasResult"></div>
           </div>
         </div>
 
@@ -285,6 +314,30 @@ document.addEventListener('DOMContentLoaded', function() {
       submitBtn.querySelector('.btn-text').textContent = 'Saving...';
     });
   }
+
+  // Enable map link if lat/lng exist (green=exact, yellow=street level)
+  function updateMapLink() {
+    var lat = document.getElementById('id_latitude').value;
+    var lng = document.getElementById('id_longitude').value;
+    var acc = document.getElementById('id_coords_accuracy').value;
+    var link = document.getElementById('ouMapLink');
+    var badge = document.getElementById('ouAccuracyBadge');
+    if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+      link.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+      link.classList.remove('disabled', 'btn-outline-secondary', 'btn-success', 'btn-warning');
+      var isExact = acc === 'exact';
+      link.classList.add(isExact ? 'btn-success' : 'btn-warning');
+      if (badge) badge.innerHTML = isExact
+        ? '<span class="badge bg-success" style="font-size:.7rem">Exact</span>'
+        : '<span class="badge bg-warning text-dark" style="font-size:.7rem">Street</span>';
+    } else {
+      link.href = '#';
+      link.classList.add('disabled', 'btn-outline-secondary');
+      link.classList.remove('btn-success', 'btn-warning');
+      if (badge) badge.innerHTML = '';
+    }
+  }
+  updateMapLink();
 
   // Delete item buttons
   document.querySelectorAll('.orders-item-delete-btn').forEach(function(btn) {

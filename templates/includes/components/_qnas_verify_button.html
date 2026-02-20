@@ -18,17 +18,15 @@ Parameters:
 {% endcomment %}
 
 {% if zone and street %}
-<div class="qnas-verify-wrapper d-flex flex-column gap-2 {% if show_inline == 'false' %}mt-2{% endif %}">
-    <div class="d-flex align-items-center gap-2">
-        <button type="button"
-                class="btn btn-sm btn-outline-primary qnas-verify-btn"
-                onclick="verifyQNAS({{ zone }}, {{ street }}, '{{ building|default:"" }}', {{ record_id }})"
-                id="qnasVerifyBtn{{ record_id }}"
-                {% if auto_verify %}data-auto-verify="true" data-zone="{{ zone }}" data-street="{{ street }}" data-building="{{ building|default:"" }}" data-record-id="{{ record_id }}"{% endif %}>
-            <i class="fa-solid fa-check-circle me-1"></i>Verify QNAS
-        </button>
-        <span id="qnasResult{{ record_id }}"></span>
-    </div>
-    <span id="qnasCoords{{ record_id }}" class="qnas-coords-display"></span>
+<div class="qnas-verify-wrapper {% if show_inline == 'false' %}mt-2{% endif %}">
+    <button type="button"
+            class="btn btn-sm btn-outline-primary qnas-verify-btn"
+            onclick="verifyQNAS({{ zone }}, {{ street }}, '{{ building|default:"" }}', {{ record_id }})"
+            id="qnasVerifyBtn{{ record_id }}"
+            {% if auto_verify %}data-auto-verify="true" data-zone="{{ zone }}" data-street="{{ street }}" data-building="{{ building|default:"" }}" data-record-id="{{ record_id }}"{% endif %}>
+        <i class="fa-solid fa-check-circle me-1"></i>Verify QNAS
+    </button>
+    <div id="qnasResult{{ record_id }}" class="mt-1"></div>
+    <div id="qnasCoords{{ record_id }}" class="qnas-coords-display mt-1"></div>
 </div>
 {% endif %}

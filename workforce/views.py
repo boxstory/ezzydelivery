@@ -62,7 +62,7 @@ from django.utils import timezone
 import csv
 from django.contrib.auth.decorators import login_required
 from core.decorators import staff_required
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.csrf import ensure_csrf_cookie
 import json
 import logging
@@ -2327,6 +2327,35 @@ def add_order_comment(request, order_id):
             'success': False,
             'error': 'An error occurred while adding comment'
         }, status=400)
+
+
+@login_required(login_url='account_login')
+@require_POST
+def update_order_coords(request, order_id):
+    """AJAX endpoint to update order latitude/longitude from QNAS verification"""
+    try:
+        order = get_object_or_404(orders_models.Order, id=order_id)
+        data = json.loads(request.body)
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+
+        if not latitude or not longitude:
+            return JsonResponse({'success': False, 'error': 'Latitude and longitude are required'}, status=400)
+
+        order.latitude = latitude
+        order.longitude = longitude
+        order.save(update_fields=['latitude', 'longitude'])
+
+        return JsonResponse({
+            'success': True,
+            'latitude': float(order.latitude),
+            'longitude': float(order.longitude),
+        })
+    except Http404:
+        raise
+    except Exception as e:
+        logger.exception("Error updating coords for order %s: %s", order_id, str(e))
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 # Delivery Task Detail View ------------------------------------------------------------------------------------------------------
