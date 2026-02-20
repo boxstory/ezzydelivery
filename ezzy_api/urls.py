@@ -90,4 +90,9 @@ urlpatterns = [
     path('qnas/address-details/', ezzy_api_views.qnas_get_address_details, name='qnas_get_address_details'),
     path('qnas/geocode/', ezzy_api_views.qnas_geocode, name='qnas_geocode'),
     path('qnas/get-zone-polygon/<str:zone_number>/', ezzy_api_views.qnas_get_zone_polygon, name='qnas_get_zone_polygon'),
+    # POST endpoint for coordinates (no query params in URL)
+    path('qnas/coordinates/', ezzy_api_views.qnas_get_coordinates, name='qnas_get_coordinates'),
+    # GET endpoint with path parameters (QNAS-style)
+    path('qnas/location/<str:zone_number>/<str:street_number>/', ezzy_api_views.qnas_get_location, name='qnas_get_location'),
+    path('qnas/location/<str:zone_number>/<str:street_number>/<str:building_number>/', ezzy_api_views.qnas_get_location, name='qnas_get_location_with_building'),
 ]

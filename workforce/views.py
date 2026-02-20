@@ -337,6 +337,23 @@ def all_orders(request):
     # Get all businesses for filter dropdown
     all_businesses = business_models.Business.objects.all().order_by('business_name')
 
+    # Build filter_params string for pagination to preserve filters
+    filter_params_list = []
+    if dl_code:
+        filter_params_list.append(f'dlCode={dl_code}')
+    if c_code:
+        filter_params_list.append(f'cCode={c_code}')
+    if mobile:
+        filter_params_list.append(f'mobile={mobile}')
+    if c_status:
+        filter_params_list.append(f'cStatus={c_status}')
+    if dms_status:
+        filter_params_list.append(f'dmsStatus={dms_status}')
+    if business_id:
+        filter_params_list.append(f'business={business_id}')
+
+    filter_params = '&'.join(filter_params_list)
+
     data = {
         'orders': orders,
         'all_businesses': all_businesses,
@@ -347,7 +364,9 @@ def all_orders(request):
             'cStatus': c_status,
             'dmsStatus': dms_status,
             'business': business_id,
-        }
+        },
+        'filter_params': filter_params,
+        'per_page': request.GET.get('per_page', '10'),
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
 
@@ -396,6 +415,23 @@ def fulfilled_clients_orders(request):
         fulfillment_service_enabled=True
     ).order_by('business_name')
 
+    # Build filter_params string for pagination
+    filter_params_list = []
+    if dl_code:
+        filter_params_list.append(f'dlCode={dl_code}')
+    if c_code:
+        filter_params_list.append(f'cCode={c_code}')
+    if mobile:
+        filter_params_list.append(f'mobile={mobile}')
+    if c_status:
+        filter_params_list.append(f'cStatus={c_status}')
+    if dms_status:
+        filter_params_list.append(f'dmsStatus={dms_status}')
+    if business_id:
+        filter_params_list.append(f'business={business_id}')
+
+    filter_params = '&'.join(filter_params_list)
+
     data = {
         'orders': orders,
         'all_businesses': all_businesses,
@@ -407,6 +443,8 @@ def fulfilled_clients_orders(request):
             'dmsStatus': dms_status,
             'business': business_id,
         },
+        'filter_params': filter_params,
+        'per_page': request.GET.get('per_page', '10'),
         'page_title': 'Fulfilled Clients Orders',
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
@@ -456,6 +494,23 @@ def non_fulfilled_clients_orders(request):
         fulfillment_service_enabled=False
     ).order_by('business_name')
 
+    # Build filter_params string for pagination
+    filter_params_list = []
+    if dl_code:
+        filter_params_list.append(f'dlCode={dl_code}')
+    if c_code:
+        filter_params_list.append(f'cCode={c_code}')
+    if mobile:
+        filter_params_list.append(f'mobile={mobile}')
+    if c_status:
+        filter_params_list.append(f'cStatus={c_status}')
+    if dms_status:
+        filter_params_list.append(f'dmsStatus={dms_status}')
+    if business_id:
+        filter_params_list.append(f'business={business_id}')
+
+    filter_params = '&'.join(filter_params_list)
+
     data = {
         'orders': orders,
         'all_businesses': all_businesses,
@@ -467,6 +522,8 @@ def non_fulfilled_clients_orders(request):
             'dmsStatus': dms_status,
             'business': business_id,
         },
+        'filter_params': filter_params,
+        'per_page': request.GET.get('per_page', '10'),
         'page_title': 'Non-Fulfilled Clients Orders',
     }
     return render(request, 'workforce/parts/lists/orders_list_view.html', data)
@@ -6445,6 +6502,95 @@ def bulk_export_tasks(request):
 
 @login_required(login_url='/accounts/login/')
 @staff_required
+def get_active_drivers(request):
+    """API endpoint to get active drivers with details for bulk assignment"""
+    drivers = fleet_models.Driver.objects.select_related('user').filter(
+        driver_status='approved'
+    ).order_by('user__first_name')
+
+    driver_list = []
+    for driver in drivers:
+        name = driver.user.get_full_name() or driver.user.username
+        driver_list.append({
+            'driver_id': driver.driver_id,  # Use driver_id (PK)
+            'name': name,
+            'driver_code': driver.driver_code or '',
+            'phone': driver.driver_phone or '',
+            'status': 'available',  # Could be enhanced with real-time status
+        })
+
+    return JsonResponse({'success': True, 'drivers': driver_list})
+
+
+@require_http_methods(["POST"])
+@login_required(login_url='/accounts/login/')
+@staff_required
+def bulk_assign_driver(request):
+    """Bulk assign driver to selected tasks"""
+    try:
+        data = json.loads(request.body)
+        task_ids = data.get('task_ids', [])
+        driver_id = data.get('driver_id')
+
+        if not task_ids or not driver_id:
+            return JsonResponse({
+                'success': False,
+                'message': 'Missing task IDs or driver ID'
+            }, status=400)
+
+        # Validate driver
+        try:
+            driver = fleet_models.Driver.objects.get(driver_id=driver_id, driver_status='approved')
+        except fleet_models.Driver.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Driver not found or not approved'
+            }, status=400)
+
+        # Get tasks
+        tasks = delivery_models.DeliveryTask.objects.filter(id__in=task_ids)
+
+        if not tasks.exists():
+            return JsonResponse({
+                'success': False,
+                'message': 'No tasks found with provided IDs'
+            }, status=400)
+
+        # Assign driver to all tasks
+        assigned_count = 0
+        for task in tasks:
+            task.driver = driver
+            # Update status to assigned if currently pending/for_review
+            if task.dl_task_status in ['for_review', 'pending', None]:
+                task.dl_task_status = 'assigned'
+            task.save()
+            assigned_count += 1
+
+        # Log assignment
+        driver_name = driver.user.get_full_name() or driver.user.username
+        logger.info(f"Bulk assign by user {request.user.id}: {assigned_count} tasks to driver {driver_id} ({driver_name})")
+
+        return JsonResponse({
+            'success': True,
+            'assigned': assigned_count,
+            'message': f'Successfully assigned {assigned_count} task(s) to {driver_name}'
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'message': 'Invalid JSON data'
+        }, status=400)
+    except Exception as e:
+        logger.error(f"Error in bulk assign driver: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'message': f'Error assigning tasks: {str(e)}'
+        }, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
 def order_edit(request, order_id):
     """Edit order details - Staff view for correcting order information"""
     order = get_object_or_404(
@@ -6797,3 +6943,24 @@ def complete_product_request(request, request_id, request_type):
     messages.success(request, f"Request {req.request_number} marked as completed.")
     return redirect('workforce:product_requests_list')
 
+
+
+
+# QNAS Coordinate Lookup Tool
+@login_required(login_url="/accounts/login/")
+@staff_required
+def qnas_lookup_tool(request):
+    """
+    QNAS coordinate lookup tool - enter zone/street/building to get coordinates
+    """
+    return render(request, "workforce/qnas_lookup_tool.html")
+
+
+
+@login_required(login_url="/accounts/login/")
+@staff_required
+def qnas_test(request):
+    """
+    QNAS API connection test page - diagnostics and troubleshooting
+    """
+    return render(request, "workforce/qnas_test.html")

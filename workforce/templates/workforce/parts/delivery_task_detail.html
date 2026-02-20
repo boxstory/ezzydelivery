@@ -106,10 +106,12 @@
                             <div class="dtd__route__point-head">
                                 <div class="dtd__route__dot dtd__route__dot--pickup"></div>
                                 <span class="dtd__route__type">Pickup</span>
-                                {% include "includes/components/_ai_parse_button.html" with address=task.pickup_location.pickup_location_title|default:""|add:" "|add:task.pickup_location.pickup_area|default:"" lat=task.pickup_location.pickup_lat lng=task.pickup_location.pickup_lon title="Pickup Location" %}
+                                {% if task.pickup_location %}
+                                    {% include "includes/components/_ai_parse_button.html" with address=task.pickup_location.pickup_location_title|default:""|add:" "|add:task.pickup_location.pickup_area|default:"" lat=task.pickup_location.pickup_lat lng=task.pickup_location.pickup_lon title="Pickup Location" %}
+                                {% endif %}
                             </div>
-                            <div class="dtd__route__name">{{ task.pickup_location.pickup_location_title|default:"Seller Location" }}</div>
-                            {% if task.pickup_location.pickup_area %}
+                            <div class="dtd__route__name">{% if task.pickup_location %}{{ task.pickup_location.pickup_location_title|default:"Seller Location" }}{% else %}Seller Location{% endif %}</div>
+                            {% if task.pickup_location and task.pickup_location.pickup_area %}
                             <div class="dtd__route__addr">{{ task.pickup_location.pickup_area }}</div>
                             {% endif %}
                         </div>
@@ -122,10 +124,17 @@
                                 <span class="dtd__route__type">Dropoff</span>
                                 {% include "includes/components/_ai_parse_button.html" with address=task.order.customer_address|default:"" zone=task.order.dl_zone street=task.order.dl_street building=task.order.dl_building lat=task.dl_address_update.dl_latitude lng=task.dl_address_update.dl_longitude title="Dropoff Location" %}
                             </div>
-                            <div class="dtd__route__name">{% if task.order.dl_zone %}Zone {{ task.order.dl_zone }}{% endif %}{% if task.order.dl_street %}, St {{ task.order.dl_street }}{% endif %}{% if task.order.dl_building %}, Bldg {{ task.order.dl_building }}{% endif %}</div>
+                            <div class="dtd__route__name">
+                                {% if task.order.dl_zone %}Zone {{ task.order.dl_zone }}{% endif %}{% if task.order.dl_street %}, St {{ task.order.dl_street }}{% endif %}{% if task.order.dl_building %}, Bldg {{ task.order.dl_building }}{% endif %}
+                            </div>
                             {% if task.order.customer_address %}
-                            <div class="dtd__route__addr">{{ task.order.customer_address }}</div>
+                            <div class="dtd__route__addr">
+                                {{ task.order.customer_address }}
+                            </div>
                             {% endif %}
+                            <div class="mt-2">
+                                {% include "includes/components/_qnas_verify_button.html" with zone=task.order.dl_zone street=task.order.dl_street building=task.order.dl_building record_id=task.id record_type="task" show_inline="false" %}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -332,7 +341,7 @@
                 <div class="dtd__coords">
                     <div class="dtd__coords__row">
                         <span class="dtd__coords__label"><i class="fa-solid fa-store"></i> Pickup</span>
-                        {% if task.pickup_location.pickup_lat and task.pickup_location.pickup_lon %}
+                        {% if task.pickup_location and task.pickup_location.pickup_lat and task.pickup_location.pickup_lon %}
                         <span class="dtd__coords__value">
                             <i class="fa-solid fa-location-crosshairs dtd__coords__icon--ok"></i>
                             {{ task.pickup_location.pickup_lat|floatformat:6 }}, {{ task.pickup_location.pickup_lon|floatformat:6 }}
@@ -589,9 +598,9 @@
     var building = '{{ task.order.dl_building|default:"" }}';
     var address = '{{ task.order.customer_address|default:""|escapejs }}';
 
-    var pickupLat = {{ task.pickup_location.pickup_lat|default:"null" }};
-    var pickupLon = {{ task.pickup_location.pickup_lon|default:"null" }};
-    var pickupTitle = '{{ task.pickup_location.pickup_location_title|default:"Pickup"|escapejs }}';
+    var pickupLat = {% if task.pickup_location %}{{ task.pickup_location.pickup_lat|default:"null" }}{% else %}null{% endif %};
+    var pickupLon = {% if task.pickup_location %}{{ task.pickup_location.pickup_lon|default:"null" }}{% else %}null{% endif %};
+    var pickupTitle = '{% if task.pickup_location %}{{ task.pickup_location.pickup_location_title|default:"Pickup"|escapejs }}{% else %}Pickup{% endif %}';
 
     var map = L.map('taskMap', { zoomControl: true, attributionControl: false }).setView([defaultLat, defaultLng], defaultZoom);
 

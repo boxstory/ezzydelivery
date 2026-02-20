@@ -3588,3 +3588,226 @@ def qnas_get_zone_polygon(request, zone_number):
     )
 
 
+@csrf_exempt
+def qnas_get_coordinates(request):
+    """
+    POST endpoint to get latitude/longitude from QNAS by zone, street, and building.
+
+    Request body (JSON):
+    {
+        "zone": "51",
+        "street": "203",
+        "building": "26"  // optional
+    }
+
+    Response:
+    {
+        "success": true,
+        "latitude": 25.123456,
+        "longitude": 51.567890,
+        "building_number": "26",
+        "match_type": "exact" | "street_level",
+        "total_buildings": 5
+    }
+
+    Frontend usage:
+    fetch("/api/qnas/coordinates/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ zone: "51", street: "203", building: "26" })
+    })
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed. Use POST.'}, status=405)
+
+    try:
+        import json
+        data = json.loads(request.body)
+        zone = data.get('zone', '')
+        street = data.get('street', '')
+        building = data.get('building', '')
+
+        if not zone or not street:
+            return JsonResponse({
+                'success': False,
+                'error': 'Zone and street are required'
+            }, status=400)
+
+        logger.info(f"QNAS coordinates POST: zone={zone}, street={street}, building={building}")
+
+        # Fetch buildings from QNAS
+        resp = _make_qnas_request(request, f"get_buildings?zone={zone}&street={street}")
+
+        if resp is None:
+            return JsonResponse({
+                'success': False,
+                'error': 'QNAS API request failed'
+            }, status=502)
+
+        if resp.status_code != 200:
+            return JsonResponse({
+                'success': False,
+                'error': f'QNAS API returned status {resp.status_code}'
+            }, status=502)
+
+        buildings = resp.json()
+
+        if not buildings or len(buildings) == 0:
+            return JsonResponse({
+                'success': False,
+                'error': 'No buildings found for this zone and street'
+            }, status=404)
+
+        # Find matching building or use first one
+        selected_building = buildings[0]
+        match_type = 'street_level'
+
+        if building:
+            for b in buildings:
+                if str(b.get('building_number', '')) == str(building):
+                    selected_building = b
+                    match_type = 'exact'
+                    break
+
+        latitude = float(selected_building.get('x', 0))
+        longitude = float(selected_building.get('y', 0))
+
+        if latitude == 0 or longitude == 0:
+            return JsonResponse({
+                'success': False,
+                'error': 'Coordinates not available for this location'
+            }, status=404)
+
+        return JsonResponse({
+            'success': True,
+            'latitude': latitude,
+            'longitude': longitude,
+            'building_number': selected_building.get('building_number', ''),
+            'match_type': match_type,
+            'total_buildings': len(buildings)
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON in request body'
+        }, status=400)
+    except Exception as e:
+        logger.error(f"QNAS coordinates error: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+
+@csrf_exempt
+def qnas_get_location(request, zone_number, street_number, building_number=None):
+    """
+    GET endpoint to get coordinates by zone/street/building using path parameters.
+    Matches QNAS API format: /get_location/{zone}/{street}/{building}
+
+    URL Parameters:
+    - zone_number: Zone number (required)
+    - street_number: Street number (required)
+    - building_number: Building number (optional)
+
+    Response:
+    {
+        "success": true,
+        "latitude": 25.123456,
+        "longitude": 51.567890,
+        "building_number": "26",
+        "match_type": "exact" | "street_level",
+        "total_buildings": 5
+    }
+
+    Frontend usage:
+    fetch("/api/qnas/location/54/534/23/", {
+        method: "GET",
+        credentials: "include"
+    })
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed. Use GET.'}, status=405)
+
+    try:
+        zone = str(zone_number)
+        street = str(street_number)
+        building = str(building_number) if building_number else ''
+
+        if not zone or not street:
+            return JsonResponse({
+                'success': False,
+                'error': 'Zone and street are required'
+            }, status=400)
+
+        logger.info(f"QNAS location GET: zone={zone}, street={street}, building={building}")
+
+        # Fetch buildings from QNAS
+        resp = _make_qnas_request(request, f"get_buildings?zone={zone}&street={street}")
+
+        if resp is None:
+            return JsonResponse({
+                'success': False,
+                'error': 'QNAS API request failed'
+            }, status=502)
+
+        if resp.status_code != 200:
+            return JsonResponse({
+                'success': False,
+                'error': f'QNAS API returned status {resp.status_code}'
+            }, status=502)
+
+        try:
+            buildings = resp.json()
+        except ValueError as e:
+            logger.error(f"QNAS location: Invalid JSON response: {resp.text[:200]}")
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid response from QNAS API'
+            }, status=502)
+
+        if not buildings or len(buildings) == 0:
+            logger.warning(f"QNAS location: No buildings found for zone={zone}, street={street}")
+            return JsonResponse({
+                'success': False,
+                'error': 'No buildings found for this zone and street'
+            }, status=404)
+
+        # Find matching building or use first one
+        selected_building = buildings[0]
+        match_type = 'street_level'
+
+        if building:
+            for b in buildings:
+                if str(b.get('building_number', '')) == str(building):
+                    selected_building = b
+                    match_type = 'exact'
+                    break
+
+        latitude = float(selected_building.get('x', 0))
+        longitude = float(selected_building.get('y', 0))
+
+        if latitude == 0 or longitude == 0:
+            return JsonResponse({
+                'success': False,
+                'error': 'Coordinates not available for this location'
+            }, status=404)
+
+        return JsonResponse({
+            'success': True,
+            'latitude': latitude,
+            'longitude': longitude,
+            'building_number': selected_building.get('building_number', ''),
+            'match_type': match_type,
+            'total_buildings': len(buildings)
+        })
+
+    except Exception as e:
+        logger.error(f"QNAS location error: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)

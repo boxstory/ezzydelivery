@@ -83,6 +83,7 @@ urlpatterns = [
     path('tasks/bulk-publish-app/', workforce_views.bulk_publish_app, name='bulk_publish_app'),
     path('tasks/bulk-update-status/', workforce_views.bulk_update_status, name='bulk_update_status'),
     path('tasks/bulk-export/', workforce_views.bulk_export_tasks, name='bulk_export_tasks'),
+    path('tasks/bulk-assign-driver/', workforce_views.bulk_assign_driver, name='bulk_assign_driver'),
 
     # User Verification URLs
     path('verification/users/', workforce_views.user_verification_list, name='user_verification_list'),
@@ -196,10 +197,15 @@ urlpatterns = [
 
     # API endpoints
     path('api/drivers-list/', workforce_views.api_drivers_list, name='api_drivers_list'),
+    path('api/get-active-drivers/', workforce_views.get_active_drivers, name='get_active_drivers'),
 
     # Product Request Management
     path('product-requests/', workforce_views.product_requests_list, name='product_requests_list'),
     path('product-requests/<int:request_id>/<str:request_type>/approve/', workforce_views.approve_product_request, name='approve_product_request'),
     path('product-requests/<int:request_id>/<str:request_type>/complete/', workforce_views.complete_product_request, name='complete_product_request'),
+
+    # QNAS Coordinate Lookup Tool
+    path('tools/qnas-lookup/', workforce_views.qnas_lookup_tool, name='qnas_lookup_tool'),
+    path('tools/qnas-test/', workforce_views.qnas_test, name='qnas_test'),
 
 ]
