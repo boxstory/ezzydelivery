@@ -139,11 +139,14 @@
                     <span class="fleet-bottom-nav__label">Home</span>
                 </a>
 
-                <a href="{% url 'fleet:driver_earnings' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'driver_earnings' %}active{% endif %}">
+                <a href="{% url 'delivery:all_delivery_tasks' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'all_delivery_tasks' %}active{% endif %}">
                     <span class="fleet-bottom-nav__icon">
-                        <i class="fa-solid fa-wallet"></i>
+                        <i class="fa-solid fa-list-check"></i>
                     </span>
-                    <span class="fleet-bottom-nav__label">Earnings</span>
+                    <span class="fleet-bottom-nav__label">Tasks</span>
+                    {% if pending_tasks_count %}
+                    <span class="fleet-bottom-nav__badge">{{ pending_tasks_count }}</span>
+                    {% endif %}
                 </a>
 
                 <a href="{% url 'fleet:pickup_scanner' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'pickup_scanner' %}active{% endif %}">
@@ -153,16 +156,23 @@
                     <span class="fleet-bottom-nav__label">Scan</span>
                 </a>
 
-                <a href="{% url 'fleet:driver_performance' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'driver_performance' %}active{% endif %}">
+                <a href="{% url 'fleet:cod_collection' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'cod_collection' %}active{% endif %}">
                     <span class="fleet-bottom-nav__icon">
-                        <i class="fa-solid fa-chart-line"></i>
+                        <i class="fa-solid fa-money-bill-wave"></i>
                     </span>
-                    <span class="fleet-bottom-nav__label">Stats</span>
+                    <span class="fleet-bottom-nav__label">COD</span>
+                </a>
+
+                <a href="{% url 'fleet:driver_earnings' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'driver_earnings' %}active{% endif %}">
+                    <span class="fleet-bottom-nav__icon">
+                        <i class="fa-solid fa-wallet"></i>
+                    </span>
+                    <span class="fleet-bottom-nav__label">Earnings</span>
                 </a>
 
                 <a href="{% url 'fleet:driver_profile_mobile' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'driver_profile_mobile' %}active{% endif %}">
                     <span class="fleet-bottom-nav__icon">
-                        <i class="fa-solid fa-user"></i>
+                        <i class="fa-solid fa-user-circle"></i>
                     </span>
                     <span class="fleet-bottom-nav__label">Profile</span>
                 </a>
