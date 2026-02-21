@@ -147,16 +147,29 @@ def fleet_dashboard(request):
         # Get wallet alerts
         wallet_alerts = WalletAlertService.check_wallet_alerts(driver)
 
+        # Get today's stats
+        from datetime import date
+        stats_today = WalletService.get_driver_statistics(driver, days=1)
+
+        # Get recent transactions (last 10)
+        recent_transactions = fleet_models.CODTransaction.objects.filter(
+            driver=driver
+        ).order_by('-created_at')[:10]
+
         context = {
             'profile': profile,
             'driver': driver,
             'driver_vehicle': driver_vehicle,
             'stats_30_days': stats_30_days,
             'stats_7_days': stats_7_days,
+            'stats_today': stats_today,
             'wallet_status': wallet_status,
             'wallet_alerts': wallet_alerts,
+            'recent_transactions': recent_transactions,
+            'total_deliveries': getattr(driver, 'total_deliveries', 0),
+            'total_earnings': wallet_status.get('total_earnings', 0),
         }
-        return render(request, 'fleet/fleet_dashboard.html', context)
+        return render(request, 'fleet/fleet_dashboard_pwa.html', context)
 
     except fleet_models.Driver.DoesNotExist:
         logger.warning(f"User {request.user.id} has no driver profile")
@@ -417,6 +430,15 @@ def cod_collection(request):
             id__in=cod_in_hand_ids
         ).select_related('order', 'order__business', 'dl_to_address').order_by('-completed_at')[:20]
 
+        # Get filter days parameter
+        filter_days = request.GET.get('days', '7')
+
+        # Convert COD in hand tasks to orders format for PWA template
+        from orders.models import Order
+        cod_orders = Order.objects.filter(
+            id__in=cod_in_hand_list.values_list('order_id', flat=True)
+        ).select_related('delivery_task').order_by('-created_at')
+
         context = {
             'driver': driver,
             'wallet_status': wallet_status,
@@ -425,9 +447,14 @@ def cod_collection(request):
             'cod_in_hand_list': cod_in_hand_list,
             'cod_in_hand_total': cod_in_hand_total,
             'cod_in_hand_count': cod_in_hand_count,
+            'cod_orders': cod_orders,
+            'total_cod_in_hand': cod_in_hand_total,
+            'total_orders': cod_in_hand_count,
+            'filter_days': filter_days,
+            'days_range': filter_days if filter_days != 'all' else 'All',
         }
 
-        return render(request, 'fleet/parts/cod_collection.html', context)
+        return render(request, 'fleet/cod_collection_pwa.html', context)
 
     except fleet_models.Driver.DoesNotExist:
         messages.error(request, 'Driver profile not found.')
@@ -512,16 +539,24 @@ def cod_submission(request):
             transaction_type__in=['cod_deposit', 'cod_driver_settle']
         ).order_by('-created_at')[:10]
 
+        # Convert COD in hand tasks to orders format for PWA template
+        from orders.models import Order
+        selected_orders = Order.objects.filter(
+            id__in=cod_in_hand_list.values_list('order_id', flat=True)
+        ).select_related('delivery_task').order_by('-created_at')
+
         context = {
             'driver': driver,
             'wallet_status': wallet_status,
             'cod_in_hand_list': cod_in_hand_list,
             'cod_in_hand_total': cod_in_hand_total,
+            'total_cod_amount': cod_in_hand_total,
             'auto_reference': auto_reference,
             'recent_submissions': recent_submissions,
+            'selected_orders': selected_orders,
         }
 
-        return render(request, 'fleet/parts/cod_submission.html', context)
+        return render(request, 'fleet/cod_submission_pwa.html', context)
 
     except fleet_models.Driver.DoesNotExist:
         messages.error(request, 'Driver profile not found.')
@@ -1123,6 +1158,37 @@ def driver_earnings(request):
             earnings_verification_status='pending'
         ).count()
 
+        # Calculate stats for PWA template
+        total_earnings = total_delivery_fee
+        deliveries_count = total_count
+        avg_per_delivery = (total_earnings / deliveries_count) if deliveries_count > 0 else 0
+
+        # Get recent earnings transactions
+        recent_earnings = fleet_models.DriverTransaction.objects.filter(
+            driver=driver,
+            transaction_type__in=['delivery', 'bonus', 'adjustment']
+        ).order_by('-created_at')[:10]
+
+        # Mock daily earnings data (you can replace with actual daily aggregation)
+        from datetime import date, timedelta
+        daily_earnings = []
+        max_daily_earning = 0
+        for i in range(7):
+            day = date.today() - timedelta(days=6-i)
+            # Get earnings for this day
+            day_total = fleet_models.DriverTransaction.objects.filter(
+                driver=driver,
+                created_at__date=day,
+                transaction_type__in=['delivery', 'bonus']
+            ).aggregate(total=Sum('amount'))['total'] or 0
+
+            daily_earnings.append({
+                'date': day,
+                'amount': float(day_total)
+            })
+            if day_total > max_daily_earning:
+                max_daily_earning = float(day_total)
+
         context = {
             'driver': driver,
             'completed_tasks': page_obj,
@@ -1140,9 +1206,20 @@ def driver_earnings(request):
             'unsettled_total': unsettled_total,
             'pending_earnings': driver.pending_earnings or 0,
             'pending_verification_count': pending_verification_count,
+            # PWA template additions
+            'total_earnings': total_earnings,
+            'deliveries_count': deliveries_count,
+            'avg_per_delivery': avg_per_delivery,
+            'filter_days': days,
+            'days_range': days,
+            'delivery_earnings': total_delivery_fee,
+            'bonus_earnings': 0,  # Add actual bonus calculation if needed
+            'recent_earnings': recent_earnings,
+            'daily_earnings': daily_earnings,
+            'max_daily_earning': max_daily_earning if max_daily_earning > 0 else 1,
         }
 
-        return render(request, 'fleet/parts/driver_earnings.html', context)
+        return render(request, 'fleet/driver_earnings_pwa.html', context)
 
     except fleet_models.Driver.DoesNotExist:
         messages.error(request, 'Driver profile not found.')
@@ -1636,6 +1713,10 @@ def driver_profile_mobile(request):
         # Get driver's current preferred zone group IDs
         preferred_group_ids = list(driver.preferred_zone_groups.values_list('id', flat=True))
 
+        # Calculate total deliveries and earnings for PWA template
+        total_deliveries = stats.get('total_deliveries', 0)
+        total_earnings = wallet_status.get('total_earnings', 0)
+
         context = {
             'driver': driver,
             'profile': profile,
@@ -1647,9 +1728,11 @@ def driver_profile_mobile(request):
             'documents_count': documents_count,
             'zone_groups': zone_groups,
             'preferred_group_ids': preferred_group_ids,
+            'total_deliveries': total_deliveries,
+            'total_earnings': total_earnings,
         }
 
-        return render(request, 'fleet/parts/driver_profile_mobile.html', context)
+        return render(request, 'fleet/driver_profile_pwa.html', context)
 
     except fleet_models.Driver.DoesNotExist:
         logger.warning(f"User {request.user.id} has no driver profile")
@@ -1683,7 +1766,7 @@ def pickup_scanner(request):
             'pending_count': pending_tasks.count(),
         }
 
-        return render(request, 'fleet/pickup_scanner.html', context)
+        return render(request, 'fleet/pickup_scanner_pwa.html', context)
 
     except fleet_models.Driver.DoesNotExist:
         messages.error(request, "Driver profile not found.")
