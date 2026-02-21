@@ -1,0 +1,267 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+
+{% block title %}Earnings{% endblock %}
+{% block page_title %}Earnings{% endblock %}
+
+{% block header_actions %}
+<button type="button" class="fleet-btn-icon" onclick="openFilterModal()">
+    <i class="fa-solid fa-sliders"></i>
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Total Earnings Card -->
+<div class="fleet-wallet fade-in">
+    <div class="fleet-wallet__label">Total Earnings</div>
+    <div class="fleet-wallet__balance">
+        {{ total_earnings|floatformat:2|default:"0.00" }} <small>QR</small>
+    </div>
+    <div class="fleet-wallet__stats">
+        <div class="fleet-wallet__stat">
+            <span class="fleet-wallet__stat-value">{{ deliveries_count|default:0 }}</span>
+            <span class="fleet-wallet__stat-label">Deliveries</span>
+        </div>
+        <div class="fleet-wallet__stat">
+            <span class="fleet-wallet__stat-value">{{ avg_per_delivery|floatformat:2|default:"0.00" }}</span>
+            <span class="fleet-wallet__stat-label">Avg/Order</span>
+        </div>
+        <div class="fleet-wallet__stat">
+            <span class="fleet-wallet__stat-value">{{ days_range|default:7 }}d</span>
+            <span class="fleet-wallet__stat-label">Period</span>
+        </div>
+    </div>
+</div>
+
+<!-- Period Tabs -->
+<div class="fleet-tabs slide-up" style="animation-delay: 0.1s;">
+    <button type="button" class="fleet-tab {% if not filter_days or filter_days == '7' %}active{% endif %}" onclick="filterByDays(7)">
+        Week
+    </button>
+    <button type="button" class="fleet-tab {% if filter_days == '30' %}active{% endif %}" onclick="filterByDays(30)">
+        Month
+    </button>
+    <button type="button" class="fleet-tab {% if filter_days == '90' %}active{% endif %}" onclick="filterByDays(90)">
+        Quarter
+    </button>
+    <button type="button" class="fleet-tab {% if filter_days == 'all' %}active{% endif %}" onclick="filterByDays('all')">
+        All
+    </button>
+</div>
+
+<!-- Earnings Breakdown -->
+<div class="fleet-stats slide-up" style="animation-delay: 0.2s;">
+    <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--success">
+            <i class="fa-solid fa-truck-fast"></i>
+        </div>
+        <div class="fleet-stat__value">{{ delivery_earnings|floatformat:2|default:"0.00" }}</div>
+        <div class="fleet-stat__label">Delivery Fees</div>
+    </div>
+
+    <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--info">
+            <i class="fa-solid fa-star"></i>
+        </div>
+        <div class="fleet-stat__value">{{ bonus_earnings|floatformat:2|default:"0.00" }}</div>
+        <div class="fleet-stat__label">Bonuses</div>
+    </div>
+</div>
+
+<!-- Daily Earnings Chart -->
+<div class="fleet-card slide-up" style="animation-delay: 0.3s;">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-chart-line me-2"></i>
+            Daily Earnings
+        </h3>
+    </div>
+    <div class="fleet-card__body">
+        <div class="fleet-chart">
+            {% if daily_earnings %}
+            {% for day in daily_earnings %}
+            <div class="fleet-chart__bar-container">
+                <div class="fleet-chart__bar" style="height: {% widthratio day.amount max_daily_earning 100 %}%;">
+                    <span class="fleet-chart__value">{{ day.amount|floatformat:0 }}</span>
+                </div>
+                <div class="fleet-chart__label">{{ day.date|date:"D" }}</div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="fleet-empty" style="padding: var(--spacing-xl) 0;">
+                <div class="fleet-empty__icon" style="width: 60px; height: 60px; font-size: var(--font-size-2xl);">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+                <div class="fleet-empty__title" style="font-size: var(--font-size-base);">No Data</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Earnings Timeline -->
+<div class="fleet-card slide-up" style="animation-delay: 0.4s;">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-clock-rotate-left me-2"></i>
+            Recent Earnings
+        </h3>
+        <a href="{% url 'fleet:transaction_history' %}" class="fleet-card__action">
+            View All <i class="fa-solid fa-arrow-right ms-1"></i>
+        </a>
+    </div>
+    <div class="fleet-card__body">
+        {% if recent_earnings %}
+        <div class="fleet-timeline">
+            {% for earning in recent_earnings|slice:":10" %}
+            <div class="fleet-timeline-item {% if earning.transaction_type == 'bonus' %}fleet-timeline-item--warning{% else %}fleet-timeline-item--success{% endif %}">
+                <div class="fleet-timeline__content">
+                    <div class="fleet-timeline__header">
+                        <div class="fleet-timeline__title">
+                            {{ earning.get_transaction_type_display }}
+                            {% if earning.order_number %}
+                            <span style="font-size: var(--font-size-xs); color: var(--fleet-grey-500); font-weight: 400;">
+                                #{{ earning.order_number }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="fleet-timeline__amount">+{{ earning.amount|floatformat:2 }}</div>
+                    </div>
+                    <div class="fleet-timeline__meta">
+                        <i class="fa-solid fa-calendar me-1"></i>
+                        {{ earning.created_at|date:"M d, Y" }}
+                        <span style="margin: 0 0.5rem;">•</span>
+                        <i class="fa-solid fa-clock me-1"></i>
+                        {{ earning.created_at|time:"g:i A" }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="fleet-empty">
+            <div class="fleet-empty__icon">
+                <i class="fa-solid fa-coins"></i>
+            </div>
+            <div class="fleet-empty__title">No Earnings Yet</div>
+            <div class="fleet-empty__text">Complete deliveries to start earning</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    /* Chart Styles */
+    .fleet-chart {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: var(--spacing-xs);
+        height: 200px;
+        padding: var(--spacing-md) 0;
+    }
+
+    .fleet-chart__bar-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--spacing-sm);
+        height: 100%;
+    }
+
+    .fleet-chart__bar {
+        width: 100%;
+        background: linear-gradient(to top, var(--fleet-primary), var(--fleet-primary-dark));
+        border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+        position: relative;
+        min-height: 20px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: var(--spacing-xs);
+        transition: all var(--transition-base);
+        animation: grow-bar 0.6s ease-out;
+    }
+
+    @keyframes grow-bar {
+        from {
+            height: 0;
+            opacity: 0;
+        }
+    }
+
+    .fleet-chart__value {
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+        color: var(--fleet-dark);
+    }
+
+    .fleet-chart__label {
+        font-size: var(--font-size-xs);
+        color: var(--fleet-grey-600);
+        font-weight: 600;
+        text-align: center;
+        margin-top: auto;
+    }
+
+    /* Tabs */
+    .fleet-tabs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--spacing-sm);
+        margin-bottom: var(--spacing-lg);
+        padding: var(--spacing-xs);
+        background: var(--fleet-grey-100);
+        border-radius: var(--radius-xl);
+    }
+
+    .fleet-tab {
+        padding: var(--spacing-sm) var(--spacing-md);
+        border: none;
+        background: transparent;
+        color: var(--fleet-grey-600);
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        border-radius: var(--radius-lg);
+        transition: all var(--transition-base);
+        cursor: pointer;
+    }
+
+    .fleet-tab.active {
+        background: var(--fleet-white);
+        color: var(--fleet-primary);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .fleet-tab:active {
+        transform: scale(0.95);
+    }
+</style>
+
+<script>
+    function filterByDays(days) {
+        haptic([10]);
+        const url = new URL(window.location);
+        if (days === 'all') {
+            url.searchParams.delete('days');
+        } else {
+            url.searchParams.set('days', days);
+        }
+        window.location = url;
+    }
+
+    function openFilterModal() {
+        // Implement filter modal
+        showToast('Advanced filters coming soon!', 'info');
+    }
+
+    // Animate chart bars on load
+    window.addEventListener('load', () => {
+        const bars = document.querySelectorAll('.fleet-chart__bar');
+        bars.forEach((bar, index) => {
+            bar.style.animationDelay = `${index * 0.05}s`;
+        });
+    });
+</script>
+{% endblock %}

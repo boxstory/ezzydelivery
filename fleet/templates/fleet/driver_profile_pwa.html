@@ -1,0 +1,376 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+
+{% block title %}Profile{% endblock %}
+{% block page_title %}Profile{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'account_logout' %}" class="fleet-btn-icon">
+    <i class="fa-solid fa-right-from-bracket"></i>
+</a>
+{% endblock %}
+
+{% block content %}
+<!-- Profile Header Card -->
+<div class="fleet-profile-header fade-in">
+    <div class="fleet-profile-header__bg"></div>
+    <div class="fleet-profile-header__content">
+        <div class="fleet-profile-header__avatar">
+            {% if driver.profile_picture %}
+            <img src="{{ driver.profile_picture.url }}" alt="{{ driver.driver_first_name }}">
+            {% else %}
+            <i class="fa-solid fa-user"></i>
+            {% endif %}
+            <button type="button" class="fleet-profile-header__edit-avatar" onclick="document.getElementById('avatarInput').click()">
+                <i class="fa-solid fa-camera"></i>
+            </button>
+        </div>
+        <h2 class="fleet-profile-header__name">{{ driver.driver_first_name }} {{ driver.driver_last_name }}</h2>
+        <div class="fleet-profile-header__meta">
+            <span class="fleet-badge fleet-badge--success">
+                <i class="fa-solid fa-check-circle me-1"></i>
+                {{ driver.driver_status|default:"Active" }}
+            </span>
+            <span class="fleet-badge fleet-badge--warning" style="margin-left: var(--spacing-sm);">
+                <i class="fa-solid fa-star me-1"></i>
+                {{ driver.driver_rating|floatformat:1|default:"0.0" }}
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden avatar upload input -->
+<form id="avatarForm" method="POST" enctype="multipart/form-data" style="display: none;">
+    {% csrf_token %}
+    <input type="file" id="avatarInput" name="avatar" accept="image/*" onchange="uploadAvatar(this)">
+</form>
+
+<!-- Stats Overview -->
+<div class="fleet-stats slide-up" style="animation-delay: 0.1s;">
+    <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--success">
+            <i class="fa-solid fa-truck-fast"></i>
+        </div>
+        <div class="fleet-stat__value">{{ total_deliveries|default:0 }}</div>
+        <div class="fleet-stat__label">Total Deliveries</div>
+    </div>
+
+    <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--warning">
+            <i class="fa-solid fa-coins"></i>
+        </div>
+        <div class="fleet-stat__value">{{ total_earnings|floatformat:0|default:0 }}</div>
+        <div class="fleet-stat__label">Total Earnings</div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="fleet-card slide-up" style="animation-delay: 0.2s;">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-bolt me-2"></i>
+            Quick Actions
+        </h3>
+    </div>
+    <div class="fleet-card__body" style="padding: 0;">
+        <ul class="fleet-list" style="margin: 0;">
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:driver_documents' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--info">
+                    <i class="fa-solid fa-file-lines"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">My Documents</div>
+                    <div class="fleet-list-item__subtitle">Manage licenses & permits</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:vehicle_own' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--warning">
+                    <i class="fa-solid fa-car"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">My Vehicles</div>
+                    <div class="fleet-list-item__subtitle">View & manage vehicles</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:driver_performance' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--success">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Performance</div>
+                    <div class="fleet-list-item__subtitle">View stats & reports</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+
+            <li class="fleet-list-item" style="border-radius: 0; border: none; margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:transaction_history' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--danger">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Transaction History</div>
+                    <div class="fleet-list-item__subtitle">View all transactions</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- Account Information -->
+<div class="fleet-card slide-up" style="animation-delay: 0.3s;">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-user-circle me-2"></i>
+            Account Information
+        </h3>
+    </div>
+    <div class="fleet-card__body">
+        <div class="fleet-info-grid">
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Driver ID</div>
+                <div class="fleet-info-item__value">#{{ driver.driver_id }}</div>
+            </div>
+
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Phone</div>
+                <div class="fleet-info-item__value">{{ driver.phone_number|default:"Not set" }}</div>
+            </div>
+
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Email</div>
+                <div class="fleet-info-item__value">{{ driver.user.email|default:"Not set" }}</div>
+            </div>
+
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Join Date</div>
+                <div class="fleet-info-item__value">{{ driver.created_at|date:"M d, Y" }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Settings & Support -->
+<div class="fleet-card slide-up" style="animation-delay: 0.4s;">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-gear me-2"></i>
+            Settings & Support
+        </h3>
+    </div>
+    <div class="fleet-card__body" style="padding: 0;">
+        <ul class="fleet-list" style="margin: 0;">
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="showToast('Feature coming soon!', 'info')">
+                <div class="fleet-list-item__icon" style="background: var(--fleet-grey-100); color: var(--fleet-grey-600);">
+                    <i class="fa-solid fa-bell"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Notifications</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="showToast('Feature coming soon!', 'info')">
+                <div class="fleet-list-item__icon" style="background: var(--fleet-grey-100); color: var(--fleet-grey-600);">
+                    <i class="fa-solid fa-shield"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Privacy & Security</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="showToast('Contact support at support@ezzydelivery.qa', 'info')">
+                <div class="fleet-list-item__icon" style="background: var(--fleet-grey-100); color: var(--fleet-grey-600);">
+                    <i class="fa-solid fa-headset"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Help & Support</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+
+            <li class="fleet-list-item" style="border-radius: 0; border: none; margin-bottom: 0;" onclick="if(confirm('Are you sure you want to logout?')) window.location.href='{% url 'account_logout' %}'">
+                <div class="fleet-list-item__icon" style="background: var(--fleet-danger-light); color: var(--fleet-danger);">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title" style="color: var(--fleet-danger);">Logout</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color: var(--fleet-danger);"></i>
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- App Version -->
+<div style="text-align: center; padding: var(--spacing-xl) 0; color: var(--fleet-grey-500); font-size: var(--font-size-xs);">
+    <div>EzzyDelivery Driver v1.0.0</div>
+    <div style="margin-top: var(--spacing-xs);">© 2026 EzzyDelivery. All rights reserved.</div>
+</div>
+
+<style>
+    /* Profile Header */
+    .fleet-profile-header {
+        position: relative;
+        background: var(--fleet-white);
+        border-radius: var(--radius-2xl);
+        overflow: hidden;
+        margin-bottom: var(--spacing-lg);
+        box-shadow: var(--shadow-md);
+    }
+
+    .fleet-profile-header__bg {
+        height: 120px;
+        background: linear-gradient(135deg, var(--fleet-dark) 0%, var(--fleet-navy) 100%);
+    }
+
+    .fleet-profile-header__content {
+        padding: 0 var(--spacing-lg) var(--spacing-lg);
+        text-align: center;
+        margin-top: -60px;
+    }
+
+    .fleet-profile-header__avatar {
+        width: 100px;
+        height: 100px;
+        border-radius: var(--radius-full);
+        background: linear-gradient(135deg, var(--fleet-primary) 0%, var(--fleet-primary-dark) 100%);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        border: 5px solid var(--fleet-white);
+        box-shadow: var(--shadow-lg);
+        position: relative;
+    }
+
+    .fleet-profile-header__avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .fleet-profile-header__avatar i {
+        font-size: var(--font-size-3xl);
+        color: var(--fleet-dark);
+    }
+
+    .fleet-profile-header__edit-avatar {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-full);
+        background: var(--fleet-primary);
+        border: 3px solid var(--fleet-white);
+        color: var(--fleet-dark);
+        font-size: var(--font-size-sm);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all var(--transition-base);
+    }
+
+    .fleet-profile-header__edit-avatar:active {
+        transform: scale(0.9);
+    }
+
+    .fleet-profile-header__name {
+        font-size: var(--font-size-2xl);
+        font-weight: 800;
+        color: var(--fleet-dark);
+        margin: var(--spacing-md) 0 var(--spacing-sm) 0;
+    }
+
+    .fleet-profile-header__meta {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--spacing-sm);
+    }
+
+    /* Info Grid */
+    .fleet-info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-md);
+    }
+
+    .fleet-info-item {
+        padding: var(--spacing-md);
+        background: var(--fleet-grey-50);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--fleet-grey-100);
+    }
+
+    .fleet-info-item__label {
+        font-size: var(--font-size-xs);
+        color: var(--fleet-grey-600);
+        font-weight: 600;
+        margin-bottom: var(--spacing-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .fleet-info-item__value {
+        font-size: var(--font-size-base);
+        font-weight: 700;
+        color: var(--fleet-dark);
+    }
+</style>
+
+<script>
+    function uploadAvatar(input) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+
+            // Validate file type
+            if (!file.type.match('image.*')) {
+                showToast('Please select an image file', 'warning');
+                return;
+            }
+
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('Image size must be less than 5MB', 'warning');
+                return;
+            }
+
+            // Preview and confirm
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (confirm('Upload this image as your profile picture?')) {
+                    // Submit form
+                    document.getElementById('avatarForm').submit();
+                    showToast('Uploading...', 'info');
+                    haptic([10, 50, 10]);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,387 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+
+{% block title %}Scan Pickup{% endblock %}
+{% block page_title %}Scan Pickup{% endblock %}
+
+{% block bottom_nav %}
+<!-- Hide bottom nav on scanner -->
+{% endblock %}
+
+{% block content %}
+<!-- Scanner Container -->
+<div class="fleet-scanner-container">
+    <!-- Camera Video -->
+    <video id="cameraVideo" autoplay playsinline></video>
+
+    <!-- Scanner Overlay -->
+    <div class="fleet-scanner">
+        <div class="fleet-scanner__viewport">
+            <div class="fleet-scanner__frame"></div>
+            <div class="fleet-scanner__line"></div>
+        </div>
+
+        <div class="fleet-scanner__hint">
+            <i class="fa-solid fa-qrcode me-2"></i>
+            Align barcode within frame
+        </div>
+
+        <button type="button" class="fleet-scanner__close" onclick="closeScanner()">
+            <i class="fa-solid fa-times"></i>
+        </button>
+
+        <!-- Torch Toggle (if available) -->
+        <button type="button" class="fleet-scanner__torch" id="torchBtn" style="display: none;" onclick="toggleTorch()">
+            <i class="fa-solid fa-flashlight"></i>
+        </button>
+    </div>
+
+    <!-- Manual Entry -->
+    <div class="fleet-scanner__manual">
+        <button type="button" class="fleet-btn fleet-btn--outline" onclick="showManualEntry()">
+            <i class="fa-solid fa-keyboard me-2"></i>
+            Enter Manually
+        </button>
+    </div>
+</div>
+
+<!-- Manual Entry Modal -->
+<div class="fleet-modal" id="manualEntryModal" style="display: none;">
+    <div class="fleet-modal__overlay" onclick="hideManualEntry()"></div>
+    <div class="fleet-modal__content">
+        <div class="fleet-modal__header">
+            <h3 class="fleet-modal__title">Enter Barcode</h3>
+            <button type="button" class="fleet-btn-icon" onclick="hideManualEntry()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="fleet-modal__body">
+            <form id="manualEntryForm" onsubmit="return submitManualEntry(event)">
+                <div class="fleet-form-group">
+                    <label for="barcodeInput" class="fleet-label">Barcode Number</label>
+                    <input
+                        type="text"
+                        id="barcodeInput"
+                        class="fleet-input"
+                        placeholder="Enter barcode number"
+                        autocomplete="off"
+                        required
+                    >
+                </div>
+                <button type="submit" class="fleet-btn fleet-btn--primary fleet-btn--block">
+                    <i class="fa-solid fa-check me-2"></i>
+                    Submit
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="fleet-modal" id="successModal" style="display: none;">
+    <div class="fleet-modal__overlay"></div>
+    <div class="fleet-modal__content">
+        <div class="fleet-modal__body" style="text-align: center; padding: var(--spacing-2xl);">
+            <div style="width: 80px; height: 80px; border-radius: var(--radius-full); background: var(--fleet-success-light); color: var(--fleet-success); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--spacing-lg); font-size: var(--font-size-3xl);">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h3 style="font-size: var(--font-size-2xl); font-weight: 800; color: var(--fleet-dark); margin-bottom: var(--spacing-sm);">Pickup Confirmed!</h3>
+            <p style="color: var(--fleet-grey-600); margin-bottom: var(--spacing-lg);" id="successMessage"></p>
+            <button type="button" class="fleet-btn fleet-btn--primary fleet-btn--block" onclick="resetScanner()">
+                <i class="fa-solid fa-qrcode me-2"></i>
+                Scan Another
+            </button>
+            <button type="button" class="fleet-btn fleet-btn--outline fleet-btn--block" style="margin-top: var(--spacing-sm);" onclick="window.location.href='{% url 'fleet:fleet_dashboard' %}'">
+                Back to Dashboard
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Scanner Container */
+    .fleet-scanner-container {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 9999;
+    }
+
+    #cameraVideo {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* Scanner UI */
+    .fleet-scanner__torch {
+        position: absolute;
+        top: calc(var(--spacing-lg) + env(safe-area-inset-top, 0px));
+        left: var(--spacing-lg);
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-full);
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        border: none;
+        color: var(--fleet-white);
+        font-size: var(--font-size-xl);
+        cursor: pointer;
+        transition: all var(--transition-base);
+    }
+
+    .fleet-scanner__torch:active {
+        transform: scale(0.9);
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .fleet-scanner__torch.active {
+        background: rgba(247, 192, 0, 0.9);
+        color: var(--fleet-dark);
+    }
+
+    .fleet-scanner__manual {
+        position: absolute;
+        bottom: calc(var(--spacing-2xl) + env(safe-area-inset-bottom, 0px));
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+    }
+
+    /* Modal */
+    .fleet-modal {
+        position: fixed;
+        inset: 0;
+        z-index: var(--z-modal);
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+    .fleet-modal__overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(4px);
+    }
+
+    .fleet-modal__content {
+        position: relative;
+        background: var(--fleet-white);
+        border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+        width: 100%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+        animation: slide-up var(--transition-base);
+    }
+
+    .fleet-modal__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--spacing-lg);
+        border-bottom: 1px solid var(--fleet-grey-100);
+    }
+
+    .fleet-modal__title {
+        font-size: var(--font-size-lg);
+        font-weight: 700;
+        color: var(--fleet-dark);
+        margin: 0;
+    }
+
+    .fleet-modal__body {
+        padding: var(--spacing-lg);
+    }
+</style>
+
+<script>
+    let videoStream = null;
+    let torchEnabled = false;
+    let isScanning = true;
+
+    // Initialize camera
+    async function initCamera() {
+        try {
+            const constraints = {
+                video: {
+                    facingMode: 'environment', // Use back camera
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                }
+            };
+
+            videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+            document.getElementById('cameraVideo').srcObject = videoStream;
+
+            // Check if torch is available
+            const track = videoStream.getVideoTracks()[0];
+            const capabilities = track.getCapabilities();
+            if (capabilities.torch) {
+                document.getElementById('torchBtn').style.display = 'block';
+            }
+
+            // Start barcode detection
+            startBarcodeDetection();
+
+        } catch (error) {
+            console.error('Camera error:', error);
+            showToast('Camera access denied', 'danger');
+            setTimeout(() => {
+                window.location.href = '{% url "fleet:fleet_dashboard" %}';
+            }, 2000);
+        }
+    }
+
+    // Barcode detection using BarcodeDetector API or fallback
+    async function startBarcodeDetection() {
+        if ('BarcodeDetector' in window) {
+            const barcodeDetector = new BarcodeDetector({
+                formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code']
+            });
+
+            const video = document.getElementById('cameraVideo');
+
+            const detectBarcode = async () => {
+                if (!isScanning) return;
+
+                try {
+                    const barcodes = await barcodeDetector.detect(video);
+                    if (barcodes.length > 0) {
+                        const barcode = barcodes[0].rawValue;
+                        handleBarcodeDetected(barcode);
+                    } else {
+                        requestAnimationFrame(detectBarcode);
+                    }
+                } catch (error) {
+                    console.error('Detection error:', error);
+                    requestAnimationFrame(detectBarcode);
+                }
+            };
+
+            video.addEventListener('loadeddata', () => {
+                detectBarcode();
+            });
+        } else {
+            console.warn('BarcodeDetector API not available');
+            showToast('Please use manual entry', 'info');
+        }
+    }
+
+    // Handle detected barcode
+    function handleBarcodeDetected(barcode) {
+        isScanning = false;
+        haptic([10, 100, 10]);
+
+        console.log('Barcode detected:', barcode);
+
+        // Submit to backend
+        submitBarcode(barcode);
+    }
+
+    // Submit barcode to backend
+    async function submitBarcode(barcode) {
+        try {
+            const response = await fetch('{% url "fleet:pickup_scan_process" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ barcode: barcode })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess(data.message || 'Pickup confirmed!');
+            } else {
+                showToast(data.error || 'Invalid barcode', 'danger');
+                isScanning = true;
+            }
+        } catch (error) {
+            console.error('Submit error:', error);
+            showToast('Network error. Please try again.', 'danger');
+            isScanning = true;
+        }
+    }
+
+    // Show success modal
+    function showSuccess(message) {
+        document.getElementById('successMessage').textContent = message;
+        document.getElementById('successModal').style.display = 'flex';
+        haptic([10, 50, 10, 50, 10]);
+    }
+
+    // Reset scanner
+    function resetScanner() {
+        document.getElementById('successModal').style.display = 'none';
+        isScanning = true;
+        startBarcodeDetection();
+    }
+
+    // Close scanner
+    function closeScanner() {
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+        }
+        window.location.href = '{% url "fleet:fleet_dashboard" %}';
+    }
+
+    // Toggle torch
+    async function toggleTorch() {
+        if (!videoStream) return;
+
+        const track = videoStream.getVideoTracks()[0];
+        try {
+            await track.applyConstraints({
+                advanced: [{ torch: !torchEnabled }]
+            });
+            torchEnabled = !torchEnabled;
+            document.getElementById('torchBtn').classList.toggle('active');
+            haptic([10]);
+        } catch (error) {
+            console.error('Torch error:', error);
+        }
+    }
+
+    // Manual entry
+    function showManualEntry() {
+        document.getElementById('manualEntryModal').style.display = 'flex';
+        setTimeout(() => {
+            document.getElementById('barcodeInput').focus();
+        }, 300);
+    }
+
+    function hideManualEntry() {
+        document.getElementById('manualEntryModal').style.display = 'none';
+    }
+
+    function submitManualEntry(e) {
+        e.preventDefault();
+        const barcode = document.getElementById('barcodeInput').value.trim();
+        if (barcode) {
+            hideManualEntry();
+            handleBarcodeDetected(barcode);
+        }
+        return false;
+    }
+
+    // Initialize on load
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            initCamera();
+        }, 300);
+    });
+
+    // Cleanup on unload
+    window.addEventListener('beforeunload', () => {
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+        }
+    });
+</script>
+{% endblock %}

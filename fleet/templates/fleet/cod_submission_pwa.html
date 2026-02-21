@@ -1,0 +1,196 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+
+{% block title %}Submit COD{% endblock %}
+{% block page_title %}Submit COD{% endblock %}
+
+{% block content %}
+<!-- COD Amount Card -->
+<div class="fleet-card--gradient fade-in">
+    <div style="text-align: center; padding: var(--spacing-lg) 0;">
+        <div style="font-size: var(--font-size-sm); opacity: 0.9; margin-bottom: var(--spacing-sm);">
+            Total Amount to Submit
+        </div>
+        <div style="font-size: var(--font-size-4xl); font-weight: 800;">
+            {{ total_cod_amount|floatformat:2|default:"0.00" }} <small style="font-size: var(--font-size-xl); font-weight: 500;">QR</small>
+        </div>
+    </div>
+</div>
+
+<!-- Submission Form -->
+<form method="POST" id="codSubmissionForm" class="slide-up" style="animation-delay: 0.1s;">
+    {% csrf_token %}
+
+    <div class="fleet-card">
+        <div class="fleet-card__header">
+            <h3 class="fleet-card__title">
+                <i class="fa-solid fa-file-invoice-dollar me-2"></i>
+                Submission Details
+            </h3>
+        </div>
+        <div class="fleet-card__body">
+            <!-- Amount Input -->
+            <div class="fleet-form-group">
+                <label for="amount" class="fleet-label">
+                    <i class="fa-solid fa-money-bill-wave me-1"></i>
+                    Amount (QR) *
+                </label>
+                <div class="fleet-input-icon">
+                    <span class="fleet-input-icon__icon">QR</span>
+                    <input
+                        type="number"
+                        step="0.01"
+                        id="amount"
+                        name="amount"
+                        class="fleet-input"
+                        value="{{ total_cod_amount|floatformat:2 }}"
+                        required
+                        readonly
+                    >
+                </div>
+            </div>
+
+            <!-- Received By -->
+            <div class="fleet-form-group">
+                <label for="received_by" class="fleet-label">
+                    <i class="fa-solid fa-user me-1"></i>
+                    Received By *
+                </label>
+                <input
+                    type="text"
+                    id="received_by"
+                    name="received_by"
+                    class="fleet-input"
+                    placeholder="Staff member name"
+                    required
+                    autocomplete="name"
+                >
+            </div>
+
+            <!-- Notes -->
+            <div class="fleet-form-group" style="margin-bottom: 0;">
+                <label for="notes" class="fleet-label">
+                    <i class="fa-solid fa-note-sticky me-1"></i>
+                    Notes <span style="font-weight: 400; color: var(--fleet-grey-500);">(Optional)</span>
+                </label>
+                <textarea
+                    id="notes"
+                    name="notes"
+                    class="fleet-input"
+                    rows="3"
+                    placeholder="Add any remarks..."
+                    style="resize: vertical; min-height: 80px;"
+                ></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders Breakdown -->
+    <div class="fleet-card slide-up" style="animation-delay: 0.2s; padding: 0; overflow: hidden;">
+        <div class="fleet-card__header" style="padding: var(--spacing-lg); margin-bottom: 0; border-bottom: 1px solid var(--fleet-grey-100);">
+            <h3 class="fleet-card__title">
+                <i class="fa-solid fa-list-check me-2"></i>
+                Orders ({{ selected_orders|length }})
+            </h3>
+        </div>
+
+        <ul class="fleet-list" style="margin: 0; max-height: 300px; overflow-y: auto;">
+            {% for order in selected_orders %}
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;">
+                <div class="fleet-list-item__icon fleet-stat__icon--success" style="width: 36px; height: 36px; font-size: var(--font-size-base);">
+                    <i class="fa-solid fa-box"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title" style="font-size: var(--font-size-sm);">#{{ order.order_number }}</div>
+                    <div class="fleet-list-item__subtitle" style="font-size: 0.625rem;">
+                        {{ order.delivery_task.cod_collected_at|date:"M d" }}
+                    </div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <span style="font-size: var(--font-size-base); font-weight: 700; color: var(--fleet-success);">
+                        {{ order.delivery_task.cod_amount|floatformat:2 }}
+                    </span>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- Submit Button -->
+    <div style="position: sticky; bottom: calc(5rem + env(safe-area-inset-bottom, 0px) + 1rem); z-index: 100; margin-top: var(--spacing-lg);">
+        <button type="submit" class="fleet-btn fleet-btn--success fleet-btn--block fleet-btn--lg" id="submitBtn">
+            <i class="fa-solid fa-check-circle me-2"></i>
+            Confirm Submission
+        </button>
+    </div>
+</form>
+
+<style>
+    /* Scrollable list with smooth scroll */
+    .fleet-list {
+        -webkit-overflow-scrolling: touch;
+    }
+</style>
+
+<script>
+    const form = document.getElementById('codSubmissionForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const amountInput = document.getElementById('amount');
+    const receivedByInput = document.getElementById('received_by');
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        // Validate
+        if (!receivedByInput.value.trim()) {
+            showToast('Please enter who received the COD', 'warning');
+            receivedByInput.focus();
+            return;
+        }
+
+        const amount = parseFloat(amountInput.value);
+        if (isNaN(amount) || amount <= 0) {
+            showToast('Invalid amount', 'danger');
+            return;
+        }
+
+        // Confirm submission
+        if (!confirm(`Confirm COD submission of ${amount.toFixed(2)} QR?`)) {
+            return;
+        }
+
+        // Disable button
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Processing...';
+        haptic([10, 100, 10]);
+
+        try {
+            // Submit form
+            form.submit();
+
+            // Show success
+            showToast('COD submitted successfully!', 'success');
+        } catch (error) {
+            console.error('Submission error:', error);
+            showToast('Submission failed. Please try again.', 'danger');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-check-circle me-2"></i>Confirm Submission';
+        }
+    });
+
+    // Auto-focus first input
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            receivedByInput.focus();
+        }, 600);
+    });
+
+    // Format amount on change
+    amountInput.addEventListener('blur', function() {
+        const val = parseFloat(this.value);
+        if (!isNaN(val)) {
+            this.value = val.toFixed(2);
+        }
+    });
+</script>
+{% endblock %}

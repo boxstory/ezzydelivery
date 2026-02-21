@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('business', '0001_initial'),
         ('product', '0001_initial'),
-        ('warehouse', '0003_sellerwarehouselink_warehouselocation_and_more'),
+        ('warehouse', '0003_warehouse_bin_naming_pattern_and_more'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

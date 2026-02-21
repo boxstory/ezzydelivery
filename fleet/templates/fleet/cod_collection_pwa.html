@@ -1,0 +1,188 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+
+{% block title %}COD Collection{% endblock %}
+{% block page_title %}COD Collection{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'fleet:cod_export' %}" class="fleet-btn-icon">
+    <i class="fa-solid fa-download"></i>
+</a>
+{% endblock %}
+
+{% block content %}
+<!-- COD Summary Card -->
+<div class="fleet-card--gradient fade-in">
+    <div style="text-align: center; padding: var(--spacing-lg) 0;">
+        <div style="font-size: var(--font-size-sm); opacity: 0.9; margin-bottom: var(--spacing-sm); text-transform: uppercase; letter-spacing: 0.05em;">
+            Total COD In Hand
+        </div>
+        <div style="font-size: var(--font-size-4xl); font-weight: 800; margin-bottom: var(--spacing-md);">
+            {{ total_cod_in_hand|floatformat:2|default:"0.00" }} <small style="font-size: var(--font-size-xl); font-weight: 500;">QR</small>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--spacing-lg); padding-top: var(--spacing-lg); border-top: 1px solid rgba(255, 255, 255, 0.2);">
+            <div>
+                <div style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--spacing-xs);">{{ total_orders|default:0 }}</div>
+                <div style="font-size: var(--font-size-xs); opacity: 0.9;">Orders</div>
+            </div>
+            <div>
+                <div style="font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--spacing-xs);">{{ days_range|default:7 }}d</div>
+                <div style="font-size: var(--font-size-xs); opacity: 0.9;">Period</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="fleet-tabs slide-up" style="animation-delay: 0.1s;">
+    <button type="button" class="fleet-tab {% if not filter_days or filter_days == '7' %}active{% endif %}" onclick="filterByDays(7)">
+        7 Days
+    </button>
+    <button type="button" class="fleet-tab {% if filter_days == '30' %}active{% endif %}" onclick="filterByDays(30)">
+        30 Days
+    </button>
+    <button type="button" class="fleet-tab {% if filter_days == '90' %}active{% endif %}" onclick="filterByDays(90)">
+        90 Days
+    </button>
+    <button type="button" class="fleet-tab {% if filter_days == 'all' %}active{% endif %}" onclick="filterByDays('all')">
+        All
+    </button>
+</div>
+
+<!-- COD Orders List -->
+<div class="slide-up" style="animation-delay: 0.2s;">
+    {% if cod_orders %}
+    <div class="fleet-card" style="padding: 0; overflow: hidden;">
+        <div class="fleet-card__header" style="padding: var(--spacing-lg); margin-bottom: 0; border-bottom: 1px solid var(--fleet-grey-100);">
+            <h3 class="fleet-card__title">
+                <i class="fa-solid fa-list me-2"></i>
+                COD Orders ({{ cod_orders|length }})
+            </h3>
+        </div>
+
+        <ul class="fleet-list" style="margin: 0;">
+            {% for order in cod_orders %}
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;">
+                <div class="fleet-list-item__icon fleet-stat__icon--warning">
+                    <i class="fa-solid fa-box"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">#{{ order.order_number }}</div>
+                    <div class="fleet-list-item__subtitle">
+                        <i class="fa-solid fa-calendar me-1"></i>
+                        {{ order.delivery_task.cod_collected_at|date:"M d, Y" }}
+                    </div>
+                </div>
+                <div class="fleet-list-item__action" style="flex-direction: column; align-items: flex-end; gap: var(--spacing-xs);">
+                    <span style="font-size: var(--font-size-lg); font-weight: 700; color: var(--fleet-success);">
+                        {{ order.delivery_task.cod_amount|floatformat:2 }} QR
+                    </span>
+                    <span class="fleet-badge fleet-badge--success" style="font-size: 0.625rem;">
+                        <i class="fa-solid fa-check-circle me-1"></i>Collected
+                    </span>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- Submit COD Button -->
+    <div style="position: sticky; bottom: calc(5rem + env(safe-area-inset-bottom, 0px) + 1rem); z-index: 100; margin-top: var(--spacing-lg);">
+        <a href="{% url 'fleet:cod_submission' %}" class="fleet-btn fleet-btn--dark fleet-btn--block fleet-btn--lg">
+            <i class="fa-solid fa-building-columns me-2"></i>
+            Submit COD to Office
+        </a>
+    </div>
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="fleet-empty">
+        <div class="fleet-empty__icon">
+            <i class="fa-solid fa-money-bill-wave"></i>
+        </div>
+        <div class="fleet-empty__title">No COD Orders</div>
+        <div class="fleet-empty__text">You haven't collected any COD in the selected period</div>
+        <a href="{% url 'fleet:fleet_dashboard' %}" class="fleet-btn fleet-btn--primary" style="margin-top: var(--spacing-lg);">
+            <i class="fa-solid fa-arrow-left me-2"></i>
+            Back to Dashboard
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    /* Tabs */
+    .fleet-tabs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--spacing-sm);
+        margin-bottom: var(--spacing-lg);
+        padding: var(--spacing-xs);
+        background: var(--fleet-grey-100);
+        border-radius: var(--radius-xl);
+    }
+
+    .fleet-tab {
+        padding: var(--spacing-sm) var(--spacing-md);
+        border: none;
+        background: transparent;
+        color: var(--fleet-grey-600);
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        border-radius: var(--radius-lg);
+        transition: all var(--transition-base);
+        cursor: pointer;
+    }
+
+    .fleet-tab.active {
+        background: var(--fleet-white);
+        color: var(--fleet-primary);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .fleet-tab:active {
+        transform: scale(0.95);
+    }
+</style>
+
+<script>
+    function filterByDays(days) {
+        haptic([10]);
+        const url = new URL(window.location);
+        if (days === 'all') {
+            url.searchParams.delete('days');
+        } else {
+            url.searchParams.set('days', days);
+        }
+        window.location = url;
+    }
+
+    // Pull to refresh
+    let touchStartY = 0;
+    let isPulling = false;
+
+    document.addEventListener('touchstart', (e) => {
+        if (window.scrollY === 0) {
+            touchStartY = e.touches[0].clientY;
+        }
+    });
+
+    document.addEventListener('touchmove', (e) => {
+        if (window.scrollY === 0 && touchStartY > 0) {
+            const touchY = e.touches[0].clientY;
+            const pullDistance = touchY - touchStartY;
+
+            if (pullDistance > 80 && !isPulling) {
+                isPulling = true;
+                haptic([10, 50, 10]);
+                window.location.reload();
+            }
+        }
+    });
+
+    document.addEventListener('touchend', () => {
+        touchStartY = 0;
+        isPulling = false;
+    });
+</script>
+{% endblock %}

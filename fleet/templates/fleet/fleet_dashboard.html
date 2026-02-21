@@ -2,94 +2,95 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block extra_css %}
-<link href="{% static 'fleet/css/fleet.css' %}" rel="stylesheet" type="text/css" />
-<link href="{% static 'fleet/css/fleet-dashboard-pro.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'fleet/css/fleet-bem.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
   <!-- Mobile PWA Dashboard View -->
-  <div class="pwa-content d-md-none">
+  <div class="fleet-pwa d-md-none">
     <!-- Wallet Card (Hero) -->
-    <div class="pwa-wallet-card pwa-fade-in">
-      <div class="pwa-wallet-card__label">Available Credit</div>
-      <div class="pwa-wallet-card__balance">
+    <div class="fleet-wallet fleet-fade-in {% if wallet_status.is_blocked %}fleet-wallet--danger{% elif wallet_status.is_warning %}fleet-wallet--warning{% else %}fleet-wallet--success{% endif %}">
+      <div class="fleet-wallet__label">Available Credit</div>
+      <div class="fleet-wallet__balance">
         {{ wallet_status.available_credit|default:0 }} <small>QR</small>
       </div>
-      <div class="pwa-wallet-card__stats">
-        <div class="pwa-wallet-card__stat">
-          <span class="pwa-wallet-card__stat-value">{{ wallet_status.cod_in_hand|default:0 }}</span>
-          <span class="pwa-wallet-card__stat-label">COD In Hand</span>
+      <div class="fleet-wallet__stats">
+        <div class="fleet-wallet__stat">
+          <span class="fleet-wallet__stat-value">{{ wallet_status.cod_in_hand|default:0 }}</span>
+          <span class="fleet-wallet__stat-label">COD In Hand</span>
         </div>
-        <div class="pwa-wallet-card__stat">
-          <span class="pwa-wallet-card__stat-value">{{ wallet_status.pending_earnings|default:0 }}</span>
-          <span class="pwa-wallet-card__stat-label">Pending</span>
+        <div class="fleet-wallet__stat">
+          <span class="fleet-wallet__stat-value">{{ wallet_status.pending_earnings|default:0 }}</span>
+          <span class="fleet-wallet__stat-label">Pending</span>
         </div>
-        <div class="pwa-wallet-card__stat">
-          <span class="pwa-wallet-card__stat-value">{{ wallet_status.usage_percentage|floatformat:0|default:0 }}%</span>
-          <span class="pwa-wallet-card__stat-label">Usage</span>
+        <div class="fleet-wallet__stat">
+          <span class="fleet-wallet__stat-value">{{ wallet_status.usage_percentage|floatformat:0|default:0 }}%</span>
+          <span class="fleet-wallet__stat-label">Usage</span>
         </div>
       </div>
     </div>
 
     <!-- Stats Grid -->
-    <div class="pwa-stats-grid pwa-slide-up">
-      <div class="pwa-stat-card">
-        <div class="pwa-stat-card__icon pwa-stat-card__icon--primary">
+    <div class="fleet-stat-grid fleet-slide-up">
+      <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--primary">
           <i class="fa-solid fa-truck-fast"></i>
         </div>
-        <div class="pwa-stat-card__value">{{ stats_7_days.total_deliveries|default:0 }}</div>
-        <div class="pwa-stat-card__label">Deliveries (7d)</div>
+        <div class="fleet-stat__value">{{ stats_7_days.total_deliveries|default:0 }}</div>
+        <div class="fleet-stat__label">Deliveries (7d)</div>
       </div>
-      <div class="pwa-stat-card">
-        <div class="pwa-stat-card__icon pwa-stat-card__icon--success">
+      <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--success">
           <i class="fa-solid fa-circle-check"></i>
         </div>
-        <div class="pwa-stat-card__value">{{ stats_7_days.success_rate|floatformat:0|default:0 }}%</div>
-        <div class="pwa-stat-card__label">Success Rate</div>
+        <div class="fleet-stat__value">{{ stats_7_days.success_rate|floatformat:0|default:0 }}%</div>
+        <div class="fleet-stat__label">Success Rate</div>
       </div>
-      <div class="pwa-stat-card">
-        <div class="pwa-stat-card__icon pwa-stat-card__icon--warning">
+      <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--warning">
           <i class="fa-solid fa-coins"></i>
         </div>
-        <div class="pwa-stat-card__value">{{ stats_7_days.total_cod_collected|floatformat:0|default:0 }}</div>
-        <div class="pwa-stat-card__label">COD (7d)</div>
+        <div class="fleet-stat__value">{{ stats_7_days.total_cod_collected|floatformat:0|default:0 }}</div>
+        <div class="fleet-stat__label">COD (7d)</div>
       </div>
-      <div class="pwa-stat-card">
-        <div class="pwa-stat-card__icon pwa-stat-card__icon--primary">
+      <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--primary">
           <i class="fa-solid fa-star"></i>
         </div>
-        <div class="pwa-stat-card__value">{{ driver.driver_rating|default:0 }}</div>
-        <div class="pwa-stat-card__label">Rating</div>
+        <div class="fleet-stat__value">{{ driver.driver_rating|default:0 }}</div>
+        <div class="fleet-stat__label">Rating</div>
       </div>
     </div>
 
     <!-- Quick Actions -->
-    <div class="pwa-section-header">
-      <h3 class="pwa-section-title">Quick Actions</h3>
+    <div class="fleet-section">
+      <div class="fleet-section__header">
+        <h3 class="fleet-section__title">Quick Actions</h3>
+      </div>
     </div>
-    <div class="pwa-quick-actions">
-      <a href="{% url 'fleet:pickup_scanner' %}" class="pwa-quick-action">
-        <div class="pwa-quick-action__icon pwa-quick-action__icon--danger">
+    <div class="fleet-actions">
+      <a href="{% url 'fleet:pickup_scanner' %}" class="fleet-action">
+        <div class="fleet-action__icon fleet-action__icon--danger">
           <i class="fa-solid fa-camera"></i>
         </div>
-        <span class="pwa-quick-action__label">Scan Pickup</span>
+        <span class="fleet-action__label">Scan Pickup</span>
       </a>
-      <a href="{% url 'delivery:all_delivery_tasks' %}" class="pwa-quick-action">
-        <div class="pwa-quick-action__icon">
+      <a href="{% url 'delivery:all_delivery_tasks' %}" class="fleet-action">
+        <div class="fleet-action__icon">
           <i class="fa-solid fa-list-check"></i>
         </div>
-        <span class="pwa-quick-action__label">My Tasks</span>
+        <span class="fleet-action__label">My Tasks</span>
       </a>
-      <a href="{% url 'fleet:cod_collection' %}" class="pwa-quick-action">
-        <div class="pwa-quick-action__icon pwa-quick-action__icon--success">
+      <a href="{% url 'fleet:cod_collection' %}" class="fleet-action">
+        <div class="fleet-action__icon fleet-action__icon--success">
           <i class="fa-solid fa-money-bill-wave"></i>
         </div>
-        <span class="pwa-quick-action__label">COD</span>
+        <span class="fleet-action__label">COD</span>
       </a>
-      <a href="{% url 'fleet:driver_earnings' %}" class="pwa-quick-action">
-        <div class="pwa-quick-action__icon pwa-quick-action__icon--navy">
+      <a href="{% url 'fleet:driver_earnings' %}" class="fleet-action">
+        <div class="fleet-action__icon fleet-action__icon--navy">
           <i class="fa-solid fa-wallet"></i>
         </div>
-        <span class="pwa-quick-action__label">Earnings</span>
+        <span class="fleet-action__label">Earnings</span>
       </a>
     </div>
 
@@ -97,68 +98,68 @@
     {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="fleet" %}
 
     <!-- Today's Summary Card -->
-    <div class="pwa-card pwa-slide-up">
-      <div class="pwa-card__header">
-        <h4 class="pwa-card__title">
-          <i class="fa-solid fa-calendar-day me-2"></i>
+    <div class="fleet-card fleet-slide-up">
+      <div class="fleet-card__header">
+        <h4 class="fleet-card__title">
+          <i class="fa-solid fa-calendar-day"></i>
           Today's Summary
         </h4>
       </div>
-      <div class="pwa-card__body">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <span class="pwa-text-muted">Deliveries</span>
-          <span class="pwa-font-bold">{{ stats_today.total_deliveries|default:0 }}</span>
+      <div class="fleet-card__body">
+        <div class="fleet-card__row">
+          <span class="fleet-card__label">Deliveries</span>
+          <span class="fleet-card__value">{{ stats_today.total_deliveries|default:0 }}</span>
         </div>
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <span class="pwa-text-muted">COD Collected</span>
-          <span class="pwa-font-bold pwa-text-success">{{ stats_today.total_cod_collected|floatformat:0|default:0 }} QR</span>
+        <div class="fleet-card__row">
+          <span class="fleet-card__label">COD Collected</span>
+          <span class="fleet-card__value fleet-card__value--success">{{ stats_today.total_cod_collected|floatformat:0|default:0 }} QR</span>
         </div>
-        <div class="d-flex justify-content-between align-items-center">
-          <span class="pwa-text-muted">Earnings</span>
-          <span class="pwa-font-bold pwa-text-navy">{{ stats_today.total_earnings|floatformat:0|default:0 }} QR</span>
+        <div class="fleet-card__row">
+          <span class="fleet-card__label">Earnings</span>
+          <span class="fleet-card__value fleet-card__value--navy">{{ stats_today.total_earnings|floatformat:0|default:0 }} QR</span>
         </div>
       </div>
     </div>
 
     <!-- Performance Card -->
-    <div class="pwa-card">
-      <div class="pwa-card__header">
-        <h4 class="pwa-card__title">
-          <i class="fa-solid fa-chart-line me-2"></i>
+    <div class="fleet-card">
+      <div class="fleet-card__header">
+        <h4 class="fleet-card__title">
+          <i class="fa-solid fa-chart-line"></i>
           30 Day Performance
         </h4>
-        <a href="{% url 'fleet:driver_performance' %}" class="pwa-section-link">View All</a>
+        <a href="{% url 'fleet:driver_performance' %}" class="fleet-section__link">View All</a>
       </div>
-      <div class="pwa-card__body">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="pwa-text-muted">Total Deliveries</span>
-          <span class="pwa-font-bold">{{ stats_30_days.total_deliveries|default:0 }}</span>
+      <div class="fleet-card__body">
+        <div class="fleet-card__row">
+          <span class="fleet-card__label">Total Deliveries</span>
+          <span class="fleet-card__value">{{ stats_30_days.total_deliveries|default:0 }}</span>
         </div>
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="pwa-text-muted">Success Rate</span>
-          <span class="pwa-font-bold pwa-text-success">{{ stats_30_days.success_rate|floatformat:1|default:0 }}%</span>
+        <div class="fleet-card__row">
+          <span class="fleet-card__label">Success Rate</span>
+          <span class="fleet-card__value fleet-card__value--success">{{ stats_30_days.success_rate|floatformat:1|default:0 }}%</span>
         </div>
-        <div class="pwa-progress pwa-mt-1">
-          <div class="pwa-progress__bar" style="width: {{ stats_30_days.success_rate|default:0 }}%;"></div>
+        <div class="fleet-progress fleet-mt-1">
+          <div class="fleet-progress__bar" style="width: {{ stats_30_days.success_rate|default:0 }}%;"></div>
         </div>
-        <div class="d-flex justify-content-between align-items-center pwa-mt-2">
-          <span class="pwa-text-muted">Total Earnings</span>
-          <span class="pwa-font-bold pwa-text-navy">{{ stats_30_days.total_earnings|floatformat:0|default:0 }} QR</span>
+        <div class="fleet-card__row fleet-mt-2">
+          <span class="fleet-card__label">Total Earnings</span>
+          <span class="fleet-card__value fleet-card__value--navy">{{ stats_30_days.total_earnings|floatformat:0|default:0 }} QR</span>
         </div>
       </div>
     </div>
 
     <!-- Rating Card -->
     {% if driver.driver_rating_count > 0 %}
-    <div class="pwa-card">
-      <div class="pwa-card__body pwa-text-center">
-        <div class="pwa-rating mb-2" style="justify-content: center;">
+    <div class="fleet-card">
+      <div class="fleet-card__body fleet-text--center">
+        <div class="fleet-rating fleet-mb-2" style="justify-content: center;">
           {% for i in "12345" %}
-          <i class="fa-solid fa-star {% if forloop.counter <= driver.driver_rating %}{% else %}opacity-25{% endif %}"></i>
+          <i class="fa-solid fa-star fleet-rating__star {% if forloop.counter > driver.driver_rating %}fleet-rating__star--empty{% endif %}"></i>
           {% endfor %}
-          <span class="pwa-rating__value">{{ driver.driver_rating|default:0 }}/5</span>
+          <span class="fleet-rating__value">{{ driver.driver_rating|default:0 }}/5</span>
         </div>
-        <p class="pwa-text-muted" style="font-size: 12px; margin: 0;">
+        <p class="fleet-text--muted" style="font-size: 12px; margin: 0;">
           Based on {{ driver.driver_rating_count }} ratings
         </p>
       </div>
@@ -167,167 +168,157 @@
   </div>
 
   <!-- Desktop Dashboard View (Hidden on Mobile) -->
-  <div class="flex-fill p-2 d-none d-md-block">
-    <div class="col-12 py-2">
-      <section class="m-0 p-0" id="fleet_dashboard_section_main">
-        <div class="pt-3 pt-md-3 pb-0 text-dark">
-          <div class="text-center">
-            <h1 class="h3 fw-bolder text-uppercase" id="fleet_dashboard_header_title">
-              Driver Dashboard
-              <br />
-              <span class="fw-light text-lowercase h5">{{ profile.first_name }} {{ profile.last_name }}</span>
-            </h1>
+  <div class="fleet-dashboard d-none d-md-block">
+    <div class="fleet-dashboard__container">
+      <div class="fleet-dashboard__header">
+        <h1 class="fleet-dashboard__title">
+          Driver Dashboard
+        </h1>
+        <p class="fleet-dashboard__subtitle">{{ profile.first_name }} {{ profile.last_name }}</p>
+      </div>
+      {% block widget %}
+        <!-- Wallet Alert Section -->
+        {% if wallet_alerts %}
+          <div class="row mb-3">
+            <div class="col-12">
+              {% for alert in wallet_alerts %}
+                <div class="fleet-alert fleet-alert--{{ alert.level|lower }}">
+                  <i class="fa {{ alert.icon }} fleet-alert__icon"></i>
+                  <div class="fleet-alert__content">
+                    <h5 class="fleet-alert__title">{{ alert.title }}</h5>
+                    <p class="fleet-alert__message">{{ alert.message }}</p>
+                  </div>
+                  {% if alert.action_url %}
+                    <a href="{{ alert.action_url }}" class="fleet-btn fleet-btn--sm fleet-btn--{{ alert.level|lower }}">{{ alert.action }}</a>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
           </div>
-        </div>
-        <div class="pt-md-3 m-0 px-3" id="fleet_dashboard_container_main">
-          {% block widget %}
-            <!-- Wallet Alert Section -->
-            {% if wallet_alerts %}
-              <div class="row mb-3">
-                <div class="col-12">
-                  {% for alert in wallet_alerts %}
-                    <div class="alert alert-{{ alert.level }} alert-dismissible fade show d-flex align-items-center" role="alert">
-                      <i class="fa {{ alert.icon }} fs-4 me-3"></i>
-                      <div class="flex-grow-1">
-                        <h5 class="alert-heading mb-1">{{ alert.title }}</h5>
-                        <p class="mb-0">{{ alert.message }}</p>
-                      </div>
-                      {% if alert.action_url %}
-                        <a href="{{ alert.action_url }}" class="btn btn-sm btn-{{ alert.level }} ms-3">{{ alert.action }}</a>
-                      {% endif %}
-                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        {% endif %}
+
+        <!-- Wallet Status Widget -->
+        <div class="row g-3 mb-4">
+          <div class="col-12">
+            <div class="fleet-wallet fleet-wallet--desktop {% if wallet_status.is_blocked %}fleet-wallet--danger{% elif wallet_status.is_warning %}fleet-wallet--warning{% else %}fleet-wallet--success{% endif %}">
+              <div class="row align-items-center">
+                <div class="col-md-8">
+                  <h5 class="fleet-card__title fleet-mb-3">
+                    <i class="fa-solid fa-wallet"></i>
+                    COD Wallet Status
+                  </h5>
+                  <div class="fleet-mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                      <span class="fleet-text--muted">Credit Usage</span>
+                      <span class="fleet-text--bold">{{ wallet_status.usage_percentage|floatformat:1 }}%</span>
                     </div>
-                  {% endfor %}
+                    <div class="fleet-progress" style="height: 25px;">
+                      <div class="fleet-progress__bar {% if wallet_status.is_blocked %}fleet-progress__bar--danger{% elif wallet_status.is_warning %}fleet-progress__bar--warning{% endif %}"
+                           role="progressbar"
+                           style="width: {{ wallet_status.usage_percentage }}%;"
+                           aria-valuenow="{{ wallet_status.usage_percentage }}"
+                           aria-valuemin="0"
+                           aria-valuemax="100">
+                        {{ wallet_status.usage_percentage|floatformat:0 }}%
+                      </div>
+                    </div>
+                  </div>
+                  <div class="row text-center">
+                    <div class="col-4">
+                      <p class="fleet-card__label fleet-mb-0">Available Credit</p>
+                      <p class="fleet-card__value fleet-card__value--success fleet-mb-0">{{ wallet_status.available_credit }} QR</p>
+                    </div>
+                    <div class="col-4">
+                      <p class="fleet-card__label fleet-mb-0">Credit Limit</p>
+                      <p class="fleet-card__value fleet-mb-0">{{ wallet_status.credit_limit }} QR</p>
+                    </div>
+                    <div class="col-4">
+                      <p class="fleet-card__label fleet-mb-0">COD In Hand</p>
+                      <p class="fleet-card__value fleet-card__value--warning fleet-mb-0">{{ wallet_status.cod_in_hand }} QR</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-4 text-center border-start">
+                  <i class="fa-solid fa-sack-dollar" style="font-size: 3rem; color: var(--fleet-primary); margin-bottom: 0.5rem;"></i>
+                  <p class="fleet-card__label fleet-mb-1">Pending Earnings</p>
+                  <h3 class="fleet-card__value fleet-card__value--navy fleet-mb-3">{{ wallet_status.pending_earnings }} QR</h3>
+                  <a href="{% url 'fleet:cod_submission' %}" class="fleet-btn fleet-btn--primary fleet-btn--sm me-2">
+                    <i class="fa-solid fa-upload"></i> Submit COD
+                  </a>
+                  <a href="{% url 'fleet:driver_earnings' %}" class="fleet-btn fleet-btn--outline fleet-btn--sm">
+                    <i class="fa-solid fa-chart-line"></i> View Earnings
+                  </a>
                 </div>
               </div>
-            {% endif %}
+            </div>
+          </div>
+        </div>
 
-            <!-- Wallet Status Widget -->
-            <div class="row g-3 mb-4">
-              <div class="col-12">
-                <section class="p-4 bg-white rounded shadow-sm border-start border-5 {% if wallet_status.is_blocked %}border-danger{% elif wallet_status.is_warning %}border-warning{% else %}border-success{% endif %}" id="fleet_dashboard_card_wallet_status">
-                  <div class="row align-items-center">
-                    <div class="col-md-8">
-                      <h5 class="fw-bold mb-3" id="fleet_dashboard_title_wallet">
-                        <i class="fa-solid fa-wallet me-2"></i>
-                        COD Wallet Status
-                      </h5>
-                      <div class="mb-3">
-                        <div class="d-flex justify-content-between mb-1">
-                          <span class="text-muted">Credit Usage</span>
-                          <span class="fw-bold">{{ wallet_status.usage_percentage|floatformat:1 }}%</span>
-                        </div>
-                        <div class="progress" style="height: 25px;">
-                          <div class="progress-bar {% if wallet_status.is_blocked %}bg-danger{% elif wallet_status.is_warning %}bg-warning{% else %}bg-success{% endif %}"
-                               role="progressbar"
-                               style="width: {{ wallet_status.usage_percentage }}%;"
-                               aria-valuenow="{{ wallet_status.usage_percentage }}"
-                               aria-valuemin="0"
-                               aria-valuemax="100">
-                            {{ wallet_status.usage_percentage|floatformat:0 }}%
-                          </div>
-                        </div>
-                      </div>
-                      <div class="row text-center">
-                        <div class="col-4">
-                          <p class="text-muted mb-0 small">Available Credit</p>
-                          <p class="fw-bold fs-5 mb-0 text-success">{{ wallet_status.available_credit }} QR</p>
-                        </div>
-                        <div class="col-4">
-                          <p class="text-muted mb-0 small">Credit Limit</p>
-                          <p class="fw-bold fs-5 mb-0">{{ wallet_status.credit_limit }} QR</p>
-                        </div>
-                        <div class="col-4">
-                          <p class="text-muted mb-0 small">COD In Hand</p>
-                          <p class="fw-bold fs-5 mb-0 text-warning">{{ wallet_status.cod_in_hand }} QR</p>
-                        </div>
-                      </div>
+        <!-- Statistics Cards -->
+        <div class="fleet-stat-grid--desktop mb-4">
+          <div class="fleet-stat fleet-stat--desktop">
+            <div class="fleet-stat__label">Total Deliveries (30d)</div>
+            <div class="fleet-stat__value" style="color: var(--fleet-primary);">{{ stats_30_days.total_deliveries }}</div>
+          </div>
+          <div class="fleet-stat fleet-stat--desktop">
+            <div class="fleet-stat__label">Successful Deliveries</div>
+            <div class="fleet-stat__value fleet-text--success">{{ stats_30_days.successful_deliveries }}</div>
+            <div class="fleet-stat__subtitle">Success Rate: {{ stats_30_days.success_rate|floatformat:1 }}%</div>
+          </div>
+          <div class="fleet-stat fleet-stat--desktop">
+            <div class="fleet-stat__label">Total COD Collected</div>
+            <div class="fleet-stat__value fleet-text--warning">{{ stats_30_days.total_cod_collected|floatformat:2 }} QR</div>
+          </div>
+          <div class="fleet-stat fleet-stat--desktop">
+            <div class="fleet-stat__label">Total Earnings (30d)</div>
+            <div class="fleet-stat__value fleet-text--info">{{ stats_30_days.total_earnings|floatformat:2 }} QR</div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="row mb-4">
+          <div class="col-12">
+            <div class="fleet-card">
+              <div class="fleet-card__header">
+                <h5 class="fleet-card__title">Quick Actions</h5>
+              </div>
+              <div class="fleet-card__body">
+                <div class="fleet-actions--desktop">
+                  <a href="{% url 'fleet:pickup_scanner' %}" class="fleet-action fleet-action--desktop">
+                    <div class="fleet-action__icon fleet-action__icon--danger">
+                      <i class="fa-solid fa-camera"></i>
                     </div>
-                    <div class="col-md-4 text-center border-start">
-                      <i class="fa-solid fa-sack-dollar fs-1 text-primary mb-2"></i>
-                      <p class="text-muted mb-1">Pending Earnings</p>
-                      <h3 class="fw-bold text-primary mb-3">{{ wallet_status.pending_earnings }} QR</h3>
-                      <a href="{% url 'fleet:cod_submission' %}" class="btn btn-primary btn-sm me-2" id="fleet_dashboard_btn_submit_cod">
-                        <i class="fa-solid fa-upload me-1"></i> Submit COD
-                      </a>
-                      <a href="{% url 'fleet:driver_earnings' %}" class="btn btn-outline-primary btn-sm" id="fleet_dashboard_btn_view_earnings">
-                        <i class="fa-solid fa-chart-line me-1"></i> View Earnings
-                      </a>
+                    <span class="fleet-action__label">Scan Pickup</span>
+                  </a>
+                  <a href="{% url 'fleet:cod_collection' %}" class="fleet-action fleet-action--desktop">
+                    <div class="fleet-action__icon">
+                      <i class="fa-solid fa-money-bill-wave"></i>
                     </div>
-                  </div>
-                </section>
+                    <span class="fleet-action__label">COD Tracking</span>
+                  </a>
+                  <a href="{% url 'fleet:transaction_history' %}" class="fleet-action fleet-action--desktop">
+                    <div class="fleet-action__icon fleet-action__icon--navy">
+                      <i class="fa-solid fa-list"></i>
+                    </div>
+                    <span class="fleet-action__label">Transactions</span>
+                  </a>
+                  <a href="{% url 'delivery:all_delivery_tasks' %}" class="fleet-action fleet-action--desktop">
+                    <div class="fleet-action__icon fleet-action__icon--success">
+                      <i class="fa-solid fa-truck"></i>
+                    </div>
+                    <span class="fleet-action__label">My Deliveries</span>
+                  </a>
+                  <a href="{% url 'fleet:driver_documents' %}" class="fleet-action fleet-action--desktop">
+                    <div class="fleet-action__icon fleet-action__icon--info">
+                      <i class="fa-solid fa-id-card"></i>
+                    </div>
+                    <span class="fleet-action__label">Documents</span>
+                  </a>
+                </div>
               </div>
             </div>
-
-            <!-- Statistics Cards -->
-            <div class="row g-3 mb-3">
-              <div class="col-12 col-md-6 col-lg-3">
-                <section class="p-3 bg-light rounded shadow-sm" id="fleet_dashboard_card_stats_total_deliveries">
-                  <p class="m-0 fw-bolder fs-6 text-muted text-uppercase">Total Deliveries (30d)</p>
-                  <p class="mb-0 mt-2 fs-2 fw-bold text-end text-primary">{{ stats_30_days.total_deliveries }}</p>
-                </section>
-              </div>
-              <div class="col-12 col-md-6 col-lg-3">
-                <section class="p-3 bg-light rounded shadow-sm" id="fleet_dashboard_card_stats_successful">
-                  <p class="m-0 fw-bolder fs-6 text-muted text-uppercase">Successful Deliveries</p>
-                  <p class="mb-0 mt-2 fs-2 fw-bold text-end text-success">{{ stats_30_days.successful_deliveries }}</p>
-                  <p class="mb-0 mt-1 small text-muted text-end">Success Rate: {{ stats_30_days.success_rate|floatformat:1 }}%</p>
-                </section>
-              </div>
-              <div class="col-12 col-md-6 col-lg-3">
-                <section class="p-3 bg-light rounded shadow-sm" id="fleet_dashboard_card_stats_cod_collected">
-                  <p class="m-0 fw-bolder fs-6 text-muted text-uppercase">Total COD Collected</p>
-                  <p class="mb-0 mt-2 fs-2 fw-bold text-end text-warning">{{ stats_30_days.total_cod_collected|floatformat:2 }} QR</p>
-                </section>
-              </div>
-              <div class="col-12 col-md-6 col-lg-3">
-                <section class="p-3 bg-light rounded shadow-sm" id="fleet_dashboard_card_stats_earnings">
-                  <p class="m-0 fw-bolder fs-6 text-muted text-uppercase">Total Earnings (30d)</p>
-                  <p class="mb-0 mt-2 fs-2 fw-bold text-end text-info">{{ stats_30_days.total_earnings|floatformat:2 }} QR</p>
-                </section>
-              </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="row g-3 mb-3">
-              <div class="col-12">
-                <section class="p-3 bg-light rounded shadow-sm" id="fleet_dashboard_section_quick_actions">
-                  <h5 class="fw-bold mb-3" id="fleet_dashboard_title_quick_actions">Quick Actions</h5>
-                  <div class="row g-2">
-                    <div class="col-6 col-md-2">
-                      <a href="{% url 'fleet:pickup_scanner' %}" class="btn btn-danger w-100">
-                        <i class="fa-solid fa-camera d-block fs-3 mb-2"></i>
-                        <span class="small">Scan Pickup</span>
-                      </a>
-                    </div>
-                    <div class="col-6 col-md-2">
-                      <a href="{% url 'fleet:cod_collection' %}" class="btn btn-outline-primary w-100">
-                        <i class="fa-solid fa-money-bill-wave d-block fs-3 mb-2"></i>
-                        <span class="small">COD Tracking</span>
-                      </a>
-                    </div>
-                    <div class="col-6 col-md-2">
-                      <a href="{% url 'fleet:transaction_history' %}" class="btn btn-outline-secondary w-100">
-                        <i class="fa-solid fa-list d-block fs-3 mb-2"></i>
-                        <span class="small">Transactions</span>
-                      </a>
-                    </div>
-                    <div class="col-6 col-md-2">
-                      <a href="{% url 'delivery:all_delivery_tasks' %}" class="btn btn-outline-success w-100">
-                        <i class="fa-solid fa-truck d-block fs-3 mb-2"></i>
-                        <span class="small">My Deliveries</span>
-                      </a>
-                    </div>
-                    <div class="col-6 col-md-2">
-                      <a href="{% url 'fleet:driver_documents' %}" class="btn btn-outline-info w-100">
-                        <i class="fa-solid fa-id-card d-block fs-3 mb-2"></i>
-                        <span class="small">Documents</span>
-                      </a>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            </div>
+          </div>
+        </div>
 
             <!-- AI Assistant Chat (Desktop) -->
             {% include "ai_agent/parts/chat_widget.html" with widget_id_prefix="fleet_desktop" %}
@@ -475,8 +466,6 @@
               </section>
             </div>
           {% endblock widget %}
-        </div>
-      </section>
     </div>
   </div>
 {% endblock content %}

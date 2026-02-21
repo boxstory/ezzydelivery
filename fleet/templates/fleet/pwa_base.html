@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="theme-color" content="#001f3f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <title>{% block title %}EzzyDelivery{% endblock %} - Driver</title>
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- PWA Modern CSS -->
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'fleet/css/fleet-pwa-modern.css' %}?v=20260221">
+
+    {% block extra_css %}{% endblock %}
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
+
+    <style>
+        /* Critical CSS for instant load */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overscroll-behavior-y: none;
+            touch-action: pan-y;
+        }
+
+        /* Prevent pull-to-refresh */
+        html, body {
+            overflow-x: hidden;
+            position: relative;
+            height: 100%;
+        }
+
+        /* Loading screen */
+        .app-splash {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #001f3f 0%, #003366 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.3s ease-out;
+        }
+
+        .app-splash.hide {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .app-splash__logo {
+            width: 80px;
+            height: 80px;
+            background: #f7c000;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: #001f3f;
+            margin-bottom: 1rem;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .app-splash__text {
+            color: #f7c000;
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div class="app-splash" id="appSplash">
+        <div class="app-splash__logo">
+            <i class="fa-solid fa-truck-fast"></i>
+        </div>
+        <div class="app-splash__text">EzzyDelivery</div>
+    </div>
+
+    <!-- Main PWA Container -->
+    <div class="fleet-pwa">
+        {% block header %}
+        <header class="fleet-pwa__header">
+            <div class="fleet-pwa__header-content">
+                <h1 class="fleet-pwa__title">{% block page_title %}Dashboard{% endblock %}</h1>
+                <div class="fleet-pwa__header-actions">
+                    {% block header_actions %}
+                    <button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                    {% endblock %}
+                </div>
+            </div>
+        </header>
+        {% endblock %}
+
+        <!-- Main Content -->
+        <main class="fleet-pwa__content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Bottom Navigation -->
+        {% block bottom_nav %}
+        <nav class="fleet-bottom-nav">
+            <div class="fleet-bottom-nav__items">
+                <a href="{% url 'fleet:fleet_dashboard' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'fleet_dashboard' %}active{% endif %}">
+                    <span class="fleet-bottom-nav__icon">
+                        <i class="fa-solid fa-house"></i>
+                    </span>
+                    <span class="fleet-bottom-nav__label">Home</span>
+                </a>
+
+                <a href="{% url 'fleet:driver_earnings' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'driver_earnings' %}active{% endif %}">
+                    <span class="fleet-bottom-nav__icon">
+                        <i class="fa-solid fa-wallet"></i>
+                    </span>
+                    <span class="fleet-bottom-nav__label">Earnings</span>
+                </a>
+
+                <a href="{% url 'fleet:pickup_scanner' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'pickup_scanner' %}active{% endif %}">
+                    <span class="fleet-bottom-nav__icon">
+                        <i class="fa-solid fa-qrcode"></i>
+                    </span>
+                    <span class="fleet-bottom-nav__label">Scan</span>
+                </a>
+
+                <a href="{% url 'fleet:driver_performance' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'driver_performance' %}active{% endif %}">
+                    <span class="fleet-bottom-nav__icon">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </span>
+                    <span class="fleet-bottom-nav__label">Stats</span>
+                </a>
+
+                <a href="{% url 'fleet:driver_profile_mobile' %}" class="fleet-bottom-nav__item {% if request.resolver_match.url_name == 'driver_profile_mobile' %}active{% endif %}">
+                    <span class="fleet-bottom-nav__icon">
+                        <i class="fa-solid fa-user"></i>
+                    </span>
+                    <span class="fleet-bottom-nav__label">Profile</span>
+                </a>
+            </div>
+        </nav>
+        {% endblock %}
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script>
+        // Hide splash screen after page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('appSplash').classList.add('hide');
+            }, 500);
+        });
+
+        // Prevent pull-to-refresh on iOS
+        let startY = 0;
+        document.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].pageY;
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            const y = e.touches[0].pageY;
+            if (y > startY && window.scrollY === 0) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // Toast notification system
+        function showToast(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `fleet-toast fleet-toast--${type}`;
+
+            let icon = 'fa-circle-info';
+            if (type === 'success') icon = 'fa-circle-check';
+            if (type === 'warning') icon = 'fa-triangle-exclamation';
+            if (type === 'danger') icon = 'fa-circle-xmark';
+
+            toast.innerHTML = `
+                <i class="fa-solid ${icon}"></i>
+                <span>${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            // Trigger animation
+            setTimeout(() => toast.classList.add('show'), 10);
+
+            // Remove toast
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        // Haptic feedback (vibration)
+        function haptic(pattern = [10]) {
+            if ('vibrate' in navigator) {
+                navigator.vibrate(pattern);
+            }
+        }
+
+        // Add haptic feedback to all buttons
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.fleet-btn, .fleet-btn-icon, .fleet-quick-action, .fleet-bottom-nav__item').forEach(btn => {
+                btn.addEventListener('click', () => haptic([5]));
+            });
+        });
+
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                    console.log('SW registered:', registration);
+                }).catch(error => {
+                    console.log('SW registration failed:', error);
+                });
+            });
+        }
+
+        // Install PWA prompt
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // Show install button if needed
+        });
+
+        // Handle online/offline status
+        window.addEventListener('online', () => {
+            showToast('You are back online', 'success');
+        });
+
+        window.addEventListener('offline', () => {
+            showToast('You are offline', 'warning');
+        });
+    </script>
+
+    <style>
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: calc(env(safe-area-inset-top, 0px) + 1rem);
+            left: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            pointer-events: none;
+        }
+
+        .fleet-toast {
+            background: var(--fleet-white);
+            padding: 1rem 1.25rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xl);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            opacity: 0;
+            transform: translateY(-100%);
+            transition: all var(--transition-base);
+            pointer-events: auto;
+        }
+
+        .fleet-toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .fleet-toast--success {
+            color: var(--fleet-success);
+            border-left: 4px solid var(--fleet-success);
+        }
+
+        .fleet-toast--warning {
+            color: var(--fleet-warning);
+            border-left: 4px solid var(--fleet-warning);
+        }
+
+        .fleet-toast--danger {
+            color: var(--fleet-danger);
+            border-left: 4px solid var(--fleet-danger);
+        }
+
+        .fleet-toast--info {
+            color: var(--fleet-info);
+            border-left: 4px solid var(--fleet-info);
+        }
+
+        .fleet-toast i {
+            font-size: 1.25rem;
+        }
+    </style>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

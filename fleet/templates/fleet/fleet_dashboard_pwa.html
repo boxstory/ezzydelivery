@@ -1,0 +1,324 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block header_actions %}
+<button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
+    <i class="fa-solid fa-rotate-right"></i>
+</button>
+<button type="button" class="fleet-btn-icon" onclick="toggleNotifications()">
+    <i class="fa-solid fa-bell"></i>
+    {% if unread_notifications > 0 %}
+    <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
+    {% endif %}
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Greeting Section -->
+<div class="fleet-greeting slide-up">
+    <div class="fleet-greeting__text">
+        <span class="fleet-greeting__time">
+            {% now "H" as hour %}
+            {% if hour|add:"0" < 12 %}
+            Good Morning
+            {% elif hour|add:"0" < 18 %}
+            Good Afternoon
+            {% else %}
+            Good Evening
+            {% endif %}
+        </span>
+        <h2 class="fleet-greeting__name">{{ driver.driver_first_name|default:"Driver" }}</h2>
+    </div>
+    <div class="fleet-greeting__avatar">
+        {% if driver.profile_picture %}
+        <img src="{{ driver.profile_picture.url }}" alt="{{ driver.driver_first_name }}">
+        {% else %}
+        <i class="fa-solid fa-user"></i>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Wallet Hero Card -->
+<div class="fleet-wallet fade-in">
+    <div class="fleet-wallet__label">Available Credit</div>
+    <div class="fleet-wallet__balance">
+        {{ wallet_status.available_credit|floatformat:2|default:"0.00" }} <small>QR</small>
+    </div>
+    <div class="fleet-wallet__stats">
+        <div class="fleet-wallet__stat">
+            <span class="fleet-wallet__stat-value">{{ wallet_status.cod_in_hand|floatformat:0|default:0 }}</span>
+            <span class="fleet-wallet__stat-label">COD</span>
+        </div>
+        <div class="fleet-wallet__stat">
+            <span class="fleet-wallet__stat-value">{{ wallet_status.pending_earnings|floatformat:0|default:0 }}</span>
+            <span class="fleet-wallet__stat-label">Pending</span>
+        </div>
+        <div class="fleet-wallet__stat">
+            <span class="fleet-wallet__stat-value">{{ wallet_status.usage_percentage|floatformat:0|default:0 }}%</span>
+            <span class="fleet-wallet__stat-label">Usage</span>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="fleet-quick-actions slide-up" style="animation-delay: 0.1s">
+    <a href="{% url 'fleet:pickup_scanner' %}" class="fleet-quick-action fleet-quick-action--primary">
+        <div class="fleet-quick-action__icon">
+            <i class="fa-solid fa-qrcode"></i>
+        </div>
+        <span class="fleet-quick-action__label">Scan</span>
+    </a>
+
+    <a href="{% url 'delivery:all_delivery_tasks' %}" class="fleet-quick-action">
+        <div class="fleet-quick-action__icon">
+            <i class="fa-solid fa-list-check"></i>
+        </div>
+        <span class="fleet-quick-action__label">Tasks</span>
+    </a>
+
+    <a href="{% url 'fleet:cod_collection' %}" class="fleet-quick-action fleet-quick-action--success">
+        <div class="fleet-quick-action__icon">
+            <i class="fa-solid fa-money-bill-wave"></i>
+        </div>
+        <span class="fleet-quick-action__label">COD</span>
+    </a>
+
+    <a href="{% url 'fleet:vehicle_own' %}" class="fleet-quick-action fleet-quick-action--warning">
+        <div class="fleet-quick-action__icon">
+            <i class="fa-solid fa-car"></i>
+        </div>
+        <span class="fleet-quick-action__label">Vehicle</span>
+    </a>
+</div>
+
+<!-- Today's Stats -->
+<div class="fleet-stats slide-up" style="animation-delay: 0.2s">
+    <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--success">
+            <i class="fa-solid fa-truck-fast"></i>
+        </div>
+        <div class="fleet-stat__value">{{ stats_today.total_deliveries|default:0 }}</div>
+        <div class="fleet-stat__label">Today's Deliveries</div>
+        {% if stats_today.change_percent %}
+        <div class="fleet-stat__change {% if stats_today.change_percent > 0 %}fleet-stat__change--up{% else %}fleet-stat__change--down{% endif %}">
+            <i class="fa-solid fa-arrow-{% if stats_today.change_percent > 0 %}up{% else %}down{% endif %} me-1"></i>
+            {{ stats_today.change_percent|floatformat:1 }}%
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--warning">
+            <i class="fa-solid fa-coins"></i>
+        </div>
+        <div class="fleet-stat__value">{{ stats_today.earnings|floatformat:0|default:0 }}</div>
+        <div class="fleet-stat__label">Today's Earnings</div>
+    </div>
+</div>
+
+<!-- Week Performance -->
+<div class="fleet-card slide-up" style="animation-delay: 0.3s">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">This Week</h3>
+        <a href="{% url 'fleet:driver_performance' %}" class="fleet-card__action">
+            View All <i class="fa-solid fa-arrow-right ms-1"></i>
+        </a>
+    </div>
+    <div class="fleet-card__body">
+        <div class="fleet-stats" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="fleet-stat" style="padding: 0.75rem;">
+                <div class="fleet-stat__icon fleet-stat__icon--info" style="width: 32px; height: 32px; font-size: 1rem; margin-bottom: 0.5rem;">
+                    <i class="fa-solid fa-box"></i>
+                </div>
+                <div class="fleet-stat__value" style="font-size: 1.25rem;">{{ stats_7_days.total_deliveries|default:0 }}</div>
+                <div class="fleet-stat__label" style="font-size: 0.625rem;">Deliveries</div>
+            </div>
+
+            <div class="fleet-stat" style="padding: 0.75rem;">
+                <div class="fleet-stat__icon fleet-stat__icon--success" style="width: 32px; height: 32px; font-size: 1rem; margin-bottom: 0.5rem;">
+                    <i class="fa-solid fa-check"></i>
+                </div>
+                <div class="fleet-stat__value" style="font-size: 1.25rem;">{{ stats_7_days.success_rate|floatformat:0|default:0 }}%</div>
+                <div class="fleet-stat__label" style="font-size: 0.625rem;">Success</div>
+            </div>
+
+            <div class="fleet-stat" style="padding: 0.75rem;">
+                <div class="fleet-stat__icon fleet-stat__icon--warning" style="width: 32px; height: 32px; font-size: 1rem; margin-bottom: 0.5rem;">
+                    <i class="fa-solid fa-star"></i>
+                </div>
+                <div class="fleet-stat__value" style="font-size: 1.25rem;">{{ driver.driver_rating|floatformat:1|default:"0.0" }}</div>
+                <div class="fleet-stat__label" style="font-size: 0.625rem;">Rating</div>
+            </div>
+
+            <div class="fleet-stat" style="padding: 0.75rem;">
+                <div class="fleet-stat__icon fleet-stat__icon--danger" style="width: 32px; height: 32px; font-size: 1rem; margin-bottom: 0.5rem;">
+                    <i class="fa-solid fa-money-bill"></i>
+                </div>
+                <div class="fleet-stat__value" style="font-size: 1.25rem;">{{ stats_7_days.total_cod_collected|floatformat:0|default:0 }}</div>
+                <div class="fleet-stat__label" style="font-size: 0.625rem;">COD</div>
+            </div>
+        </div>
+
+        <!-- Progress bar for weekly goal -->
+        <div style="margin-top: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-size: 0.875rem; font-weight: 600; color: var(--fleet-grey-700);">Weekly Goal</span>
+                <span style="font-size: 0.875rem; font-weight: 700; color: var(--fleet-primary);">{{ stats_7_days.total_deliveries|default:0 }}/100</span>
+            </div>
+            <div class="fleet-progress">
+                <div class="fleet-progress__bar" style="width: {% widthratio stats_7_days.total_deliveries|default:0 100 100 %}%;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="fleet-card slide-up" style="animation-delay: 0.4s">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">Recent Activity</h3>
+        <a href="{% url 'fleet:transaction_history' %}" class="fleet-card__action">
+            See All <i class="fa-solid fa-arrow-right ms-1"></i>
+        </a>
+    </div>
+    <div class="fleet-card__body">
+        {% if recent_transactions %}
+        <ul class="fleet-list">
+            {% for txn in recent_transactions|slice:":5" %}
+            <li class="fleet-list-item">
+                <div class="fleet-list-item__icon {% if txn.transaction_type == 'cod_collection' %}fleet-stat__icon--success{% elif txn.transaction_type == 'cod_submission' %}fleet-stat__icon--warning{% else %}fleet-stat__icon--info{% endif %}">
+                    {% if txn.transaction_type == 'cod_collection' %}
+                    <i class="fa-solid fa-money-bill-wave"></i>
+                    {% elif txn.transaction_type == 'cod_submission' %}
+                    <i class="fa-solid fa-building-columns"></i>
+                    {% else %}
+                    <i class="fa-solid fa-circle-dollar-to-slot"></i>
+                    {% endif %}
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">{{ txn.get_transaction_type_display }}</div>
+                    <div class="fleet-list-item__subtitle">{{ txn.created_at|timesince }} ago</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <span style="font-size: 1rem; font-weight: 700; {% if txn.amount > 0 %}color: var(--fleet-success);{% else %}color: var(--fleet-danger);{% endif %}">
+                        {% if txn.amount > 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} QR
+                    </span>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="fleet-empty">
+            <div class="fleet-empty__icon">
+                <i class="fa-solid fa-receipt"></i>
+            </div>
+            <div class="fleet-empty__title">No Activity Yet</div>
+            <div class="fleet-empty__text">Your transactions will appear here</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Documents Status -->
+{% if pending_documents or expiring_documents %}
+<div class="fleet-card slide-up" style="animation-delay: 0.5s; border-left: 4px solid var(--fleet-warning);">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-triangle-exclamation text-warning me-2"></i>
+            Document Alerts
+        </h3>
+        <a href="{% url 'fleet:driver_documents' %}" class="fleet-card__action">
+            View <i class="fa-solid fa-arrow-right ms-1"></i>
+        </a>
+    </div>
+    <div class="fleet-card__body">
+        {% if pending_documents %}
+        <div class="fleet-badge fleet-badge--warning mb-2">
+            {{ pending_documents }} document{{ pending_documents|pluralize }} pending upload
+        </div>
+        {% endif %}
+        {% if expiring_documents %}
+        <div class="fleet-badge fleet-badge--danger">
+            {{ expiring_documents }} document{{ expiring_documents|pluralize }} expiring soon
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<style>
+    /* Greeting Section */
+    .fleet-greeting {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--spacing-lg);
+        padding: var(--spacing-md);
+        background: var(--fleet-white);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .fleet-greeting__text {
+        flex: 1;
+    }
+
+    .fleet-greeting__time {
+        display: block;
+        font-size: var(--font-size-sm);
+        color: var(--fleet-grey-600);
+        font-weight: 500;
+        margin-bottom: var(--spacing-xs);
+    }
+
+    .fleet-greeting__name {
+        font-size: var(--font-size-2xl);
+        font-weight: 800;
+        color: var(--fleet-dark);
+        margin: 0;
+    }
+
+    .fleet-greeting__avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: var(--radius-full);
+        background: linear-gradient(135deg, var(--fleet-primary) 0%, var(--fleet-primary-dark) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+    }
+
+    .fleet-greeting__avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .fleet-greeting__avatar i {
+        font-size: var(--font-size-2xl);
+        color: var(--fleet-dark);
+    }
+</style>
+
+<script>
+    function toggleNotifications() {
+        // Implement notification panel toggle
+        showToast('Notifications coming soon!', 'info');
+    }
+
+    // Auto-refresh data every 5 minutes
+    let refreshInterval = setInterval(() => {
+        console.log('Auto-refreshing dashboard data...');
+        // Implement AJAX refresh here
+    }, 300000);
+
+    // Clear interval on page unload
+    window.addEventListener('beforeunload', () => {
+        clearInterval(refreshInterval);
+    });
+</script>
+{% endblock %}
