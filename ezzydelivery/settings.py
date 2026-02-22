@@ -199,8 +199,8 @@ MIDDLEWARE = [
     # Custom middleware for session timeout and auto-logout
     'core.middleware.SessionTimeoutMiddleware',
     'core.middleware.SessionWarningMiddleware',
-    # SQL query inspector - logs duplicate queries in DEBUG mode
-    'core.middleware.QueryInspectorMiddleware',
+    # SQL query inspector - disabled (high CPU overhead per request in DEBUG mode)
+    # 'core.middleware.QueryInspectorMiddleware',
 ]
 
 # Add debug toolbar only in DEBUG mode (skip during tests as Django forces DEBUG=False)
@@ -239,6 +239,8 @@ TEMPLATES = [
                 'workforce.context_processors.workforce_sidebar_counts',
                 # Fleet driver wallet status for COD warnings
                 'fleet.context_processors.driver_wallet_status',
+                # Fleet PWA bottom nav: pending tasks badge count
+                'core.context_processors.driver_pending_tasks',
             ],
         },
     },
@@ -314,6 +316,7 @@ STATIC_URL = '/static/'
 # Additional locations of static files (for development)
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'templates', 'static/'),
+    os.path.join(BASE_DIR, 'static/'),
 ]
 
 # For production: collectstatic will copy files here
@@ -451,13 +454,19 @@ INTERNAL_IPS = [
 ]
 
 def show_toolbar(request):
-    return DEBUG
+    if not DEBUG:
+        return False
+    # Don't inject toolbar on PWA fleet pages (no Django template base with toolbar container)
+    if request.path.startswith('/fleet/'):
+        return False
+    return True
 
 DEBUG_TOOLBAR_CONFIG = {
     'SHOW_TOOLBAR_CALLBACK': show_toolbar,
     'RENDER_PANELS': False,
     'DISABLE_PANELS': {
         'debug_toolbar.panels.redirects.RedirectsPanel',
+        'debug_toolbar.panels.profiling.ProfilingPanel',
     },
 }
 
@@ -473,6 +482,18 @@ DEBUG_TOOLBAR_CONFIG = {
 # Create logs directory if it doesn't exist
 LOGS_DIR = BASE_DIR / 'logs'
 LOGS_DIR.mkdir(exist_ok=True)
+
+# Windows doesn't support RotatingFileHandler with multithreaded dev server
+# (can't rename open files). Use plain FileHandler on Windows.
+import sys as _sys
+_LOG_HANDLER_CLASS = (
+    'logging.FileHandler' if _sys.platform == 'win32'
+    else 'logging.handlers.RotatingFileHandler'
+)
+_LOG_HANDLER_EXTRA = {} if _sys.platform == 'win32' else {
+    'maxBytes': 10 * 1024 * 1024,
+    'backupCount': 5,
+}
 
 LOGGING = {
     'version': 1,
@@ -514,10 +535,9 @@ LOGGING = {
         # Debug log (only in DEBUG mode)
         'file_debug': {
             'level': 'DEBUG',
-            'class': 'logging.handlers.RotatingFileHandler',
+            'class': _LOG_HANDLER_CLASS,
             'filename': LOGS_DIR / 'debug.log',
-            'maxBytes': 10 * 1024 * 1024,  # 10 MB
-            'backupCount': 5,
+            **_LOG_HANDLER_EXTRA,
             'formatter': 'verbose',
             'filters': ['require_debug_true'],
         },
@@ -525,60 +545,54 @@ LOGGING = {
         # Error log (all errors)
         'file_error': {
             'level': 'ERROR',
-            'class': 'logging.handlers.RotatingFileHandler',
+            'class': _LOG_HANDLER_CLASS,
             'filename': LOGS_DIR / 'error.log',
-            'maxBytes': 10 * 1024 * 1024,  # 10 MB
-            'backupCount': 10,
+            **_LOG_HANDLER_EXTRA,
             'formatter': 'verbose',
         },
 
         # Orders-specific log
         'file_orders': {
             'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
+            'class': _LOG_HANDLER_CLASS,
             'filename': LOGS_DIR / 'orders.log',
-            'maxBytes': 10 * 1024 * 1024,  # 10 MB
-            'backupCount': 5,
+            **_LOG_HANDLER_EXTRA,
             'formatter': 'verbose',
         },
 
         # Delivery-specific log
         'file_delivery': {
             'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
+            'class': _LOG_HANDLER_CLASS,
             'filename': LOGS_DIR / 'delivery.log',
-            'maxBytes': 10 * 1024 * 1024,  # 10 MB
-            'backupCount': 5,
+            **_LOG_HANDLER_EXTRA,
             'formatter': 'verbose',
         },
 
         # API-specific log (Shopify, WooCommerce, DMS)
         'file_api': {
             'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
+            'class': _LOG_HANDLER_CLASS,
             'filename': LOGS_DIR / 'api.log',
-            'maxBytes': 10 * 1024 * 1024,  # 10 MB
-            'backupCount': 5,
+            **_LOG_HANDLER_EXTRA,
             'formatter': 'verbose',
         },
 
         # Security log (authorization, authentication)
         'file_security': {
             'level': 'WARNING',
-            'class': 'logging.handlers.RotatingFileHandler',
+            'class': _LOG_HANDLER_CLASS,
             'filename': LOGS_DIR / 'security.log',
-            'maxBytes': 10 * 1024 * 1024,  # 10 MB
-            'backupCount': 10,
+            **_LOG_HANDLER_EXTRA,
             'formatter': 'verbose',
         },
 
         # Query log (SQL queries and duplicates)
         'file_queries': {
             'level': 'DEBUG',
-            'class': 'logging.handlers.RotatingFileHandler',
+            'class': _LOG_HANDLER_CLASS,
             'filename': LOGS_DIR / 'queries.log',
-            'maxBytes': 10 * 1024 * 1024,  # 10 MB
-            'backupCount': 3,
+            **_LOG_HANDLER_EXTRA,
             'formatter': 'verbose',
             'filters': ['require_debug_true'],
         },

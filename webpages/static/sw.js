@@ -1,13 +1,13 @@
 // EzzyDriver Service Worker
-const CACHE_NAME = 'ezzydriver-v1';
-const STATIC_CACHE = 'ezzydriver-static-v1';
-const DYNAMIC_CACHE = 'ezzydriver-dynamic-v1';
+const CACHE_NAME = 'ezzydriver-v3';
+const STATIC_CACHE = 'ezzydriver-static-v3';
+const DYNAMIC_CACHE = 'ezzydriver-dynamic-v3';
 
 // Static assets to cache
 const STATIC_ASSETS = [
   '/static/fleet/css/fleet.css',
   '/static/fleet/css/fleet-mobile.css',
-  '/static/webpages/css/brand-kit.css',
+  '/static/brand-kit-pro.css',
   '/static/webpages/img/ezzy-logo-512-512.png',
   '/static/webpages/img/ezzy-logo-sqr-round.png'
 ];

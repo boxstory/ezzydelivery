@@ -219,6 +219,20 @@
         }
 
         var coords = _adjustedCoords.lat !== null ? _adjustedCoords : (data.coordinates || {});
+        var lat = coords.latitude || coords.lat || null;
+        var lng = coords.longitude || coords.lng || null;
+
+        // Determine accuracy: exact if building known + exact QNAS match, else street, else ai_estimate
+        var accuracy = null;
+        if (lat && lng) {
+            if (data.building_number && data._qnasExactMatch) {
+                accuracy = 'exact';
+            } else if (data.building_number || data._qnasMatch) {
+                accuracy = 'street';
+            } else {
+                accuracy = 'ai_estimate';
+            }
+        }
 
         return fetch(_getSaveEndpoint(orderId), {
             method: 'POST',
@@ -231,8 +245,9 @@
                 zone_number: data.zone_number,
                 street_number: data.street_number,
                 building_number: data.building_number,
-                latitude: coords.latitude || coords.lat || null,
-                longitude: coords.longitude || coords.lng || null
+                latitude: lat,
+                longitude: lng,
+                coords_accuracy: accuracy
             })
         }).then(function(r) {
             if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + r.statusText);
@@ -823,9 +838,11 @@
                 _process.updateStep(stepIdx, 'completed');
                 await _delay(200);
 
-                // If QNAS coords found, override AI coordinates
+                // If QNAS coords found, override AI coordinates and tag match type
                 if (qnasCoords) {
                     result.coordinates = { latitude: qnasCoords.latitude, longitude: qnasCoords.longitude };
+                    result._qnasMatch = true;
+                    result._qnasExactMatch = qnasCoords.exact_match || false;
                 }
 
                 var resultHtml = _renderResultCard(result, {
