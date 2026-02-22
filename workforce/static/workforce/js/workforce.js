@@ -499,6 +499,41 @@
                 submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Updating...';
             }
 
+            // Special action: Publish to Fleets (sets dl_task_publish=True + status=pending)
+            if (status === 'publish_to_fleets') {
+                fetch('/workforce/delivery-task/' + taskId + '/publish-fleets/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    }
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Update Status';
+                    }
+                    if (data.success) {
+                        var modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
+                        if (modal) modal.hide();
+                        showToast('Task published to Fleet drivers!', 'success');
+                        if (typeof htmx !== 'undefined') {
+                            htmx.ajax('GET', window.location.href, { target: '#main-content', select: '#main-content', swap: 'outerHTML' });
+                        } else {
+                            location.reload();
+                        }
+                    } else {
+                        showToast('Error: ' + (data.error || 'Failed to publish'), 'danger');
+                    }
+                })
+                .catch(function() {
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Update Status'; }
+                    showToast('An error occurred', 'danger');
+                });
+                return;
+            }
+
             var payload = { status: status };
             if (driverId) payload.driver_id = driverId;
             if (time) payload.time = time;

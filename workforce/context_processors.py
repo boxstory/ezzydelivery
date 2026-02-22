@@ -11,7 +11,7 @@ def workforce_sidebar_counts(request):
 
     Provides:
         - pending_publish_count: Orders verified but not yet published to task
-        - unpublished_dms_count: Tasks not yet published to DMS
+        - unpublished_tasks_count: Tasks created but not yet published to fleet
         - followup_count: Tasks in pending status (follow-up required)
     """
     if not hasattr(request, 'user') or not request.user.is_authenticated:
@@ -42,10 +42,11 @@ def workforce_sidebar_counts(request):
             task_created=False
         ).count(),
 
-        # Tasks not yet published to DMS (status is publish_to_dms but not actually published)
-        'unpublished_dms_count': DeliveryTask.objects.filter(
-            dl_task_status='publish_to_dms',
+        # Tasks created but not yet published to fleet drivers
+        'unpublished_tasks_count': DeliveryTask.objects.filter(
             dl_task_publish=False
+        ).exclude(
+            dl_task_status__in=['delivered', 'cancelled', 'failed', 'rejected']
         ).count(),
 
         # Tasks in pending status (follow-up required)

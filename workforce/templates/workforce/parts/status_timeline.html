@@ -48,12 +48,13 @@ Usage:
             {% for entry in status_history %}
             <div class="odp__tl-item">
                 <div class="odp__tl-track">
-                    <div class="odp__tl-icon {% if entry.field_name == 'order_status' %}odp__tl-icon--order{% elif entry.field_name == 'verification_status' %}odp__tl-icon--verify{% elif entry.field_name == 'dl_task_status' %}odp__tl-icon--task{% elif entry.field_name == 'dl_task_status_dms' %}odp__tl-icon--dms{% elif entry.field_name == 'cod_status_by_staff' %}odp__tl-icon--cod{% else %}odp__tl-icon--default{% endif %}">
+                    <div class="odp__tl-icon {% if entry.field_name == 'order_status' %}odp__tl-icon--order{% elif entry.field_name == 'verification_status' %}odp__tl-icon--verify{% elif entry.field_name == 'dl_task_status' %}odp__tl-icon--task{% elif entry.field_name == 'dl_task_status_dms' %}odp__tl-icon--dms{% elif entry.field_name == 'cod_status_by_staff' %}odp__tl-icon--cod{% elif entry.field_name == 'dl_task_publish' %}odp__tl-icon--publish{% else %}odp__tl-icon--default{% endif %}">
                         {% if entry.field_name == 'order_status' %}<i class="fa-solid fa-box"></i>
                         {% elif entry.field_name == 'verification_status' %}<i class="fa-solid fa-shield-halved"></i>
                         {% elif entry.field_name == 'dl_task_status' %}<i class="fa-solid fa-truck-fast"></i>
                         {% elif entry.field_name == 'dl_task_status_dms' %}<i class="fa-solid fa-satellite-dish"></i>
                         {% elif entry.field_name == 'cod_status_by_staff' %}<i class="fa-solid fa-money-bill-wave"></i>
+                        {% elif entry.field_name == 'dl_task_publish' %}<i class="fa-solid fa-paper-plane"></i>
                         {% elif entry.field_name == 'task_status' %}<i class="fa-solid fa-list-check"></i>
                         {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
                     </div>
@@ -69,7 +70,7 @@ Usage:
                             <span class="odp__tl-pill odp__tl-pill--from">{{ entry.old_display }}</span>
                             <span class="odp__tl-arrow-wrap"><i class="fa-solid fa-arrow-right-long"></i></span>
                             {% endif %}
-                            <span class="odp__tl-pill {% if entry.new_value == 'delivered' or entry.new_value == 'fulfilled' or entry.new_value == 'verified' or entry.new_value == '2' %}odp__tl-pill--success{% elif entry.new_value == 'cancelled' or entry.new_value == 'rejected' or entry.new_value == 'failed' or entry.new_value == '3' or entry.new_value == '9' %}odp__tl-pill--danger{% else %}odp__tl-pill--to{% endif %}">{{ entry.new_display }}</span>
+                            <span class="odp__tl-pill {% if entry.new_value == 'delivered' or entry.new_value == 'fulfilled' or entry.new_value == 'verified' or entry.new_value == '2' or entry.new_value == 'True' %}odp__tl-pill--success{% elif entry.new_value == 'cancelled' or entry.new_value == 'rejected' or entry.new_value == 'failed' or entry.new_value == '3' or entry.new_value == '9' %}odp__tl-pill--danger{% else %}odp__tl-pill--to{% endif %}">{{ entry.new_display }}</span>
                         </div>
                         {% if entry.notes %}
                         <div class="odp__tl-note"><i class="fa-regular fa-message"></i> {{ entry.notes }}</div>

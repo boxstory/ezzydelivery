@@ -2,58 +2,32 @@
 {% load crispy_forms_tags %}
 {% load static %}
 
-{% block extra_css %}
-<link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
-{% endblock extra_css %}
-
 {% block content %}
-<div class="flex-fill p-3">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h4 class="mb-1">
-                <i class="fa-solid fa-pen-to-square me-2"></i>
-                Edit Delivery Task
-            </h4>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item">
-                        <a href="{% url 'workforce:wf_dashboard' %}"
-                           hx-get="{% url 'workforce:wf_dashboard' %}"
-                           hx-target="#main-content"
-                           hx-select="#main-content"
-                           hx-swap="outerHTML"
-                           hx-push-url="true">Dashboard</a>
-                    </li>
-                    <li class="breadcrumb-item">
-                        <a href="{% url 'workforce:dl_list_all' %}"
-                           hx-get="{% url 'workforce:dl_list_all' %}"
-                           hx-target="#main-content"
-                           hx-select="#main-content"
-                           hx-swap="outerHTML"
-                           hx-push-url="true">Delivery Tasks</a>
-                    </li>
-                    <li class="breadcrumb-item">
-                        <a href="{% url 'workforce:delivery_task_detail' task.id %}"
-                           hx-get="{% url 'workforce:delivery_task_detail' task.id %}"
-                           hx-target="#main-content"
-                           hx-select="#main-content"
-                           hx-swap="outerHTML"
-                           hx-push-url="true">Task #{{ task.dl_task_number }}</a>
-                    </li>
-                    <li class="breadcrumb-item active">Edit</li>
-                </ol>
-            </nav>
-        </div>
-        <div>
+<div class="col-12 p-2 p-md-3">
+
+    <!-- Hero Banner -->
+    <div class="dtd__hero" style="padding:0.75rem 1.25rem;">
+        <div class="d-flex align-items-center justify-content-between gap-2 flex-nowrap">
+            <div class="d-flex align-items-center gap-2 flex-wrap min-width-0">
+                <h2 class="dtd__hero__title mb-0" style="font-size:1rem;white-space:nowrap;">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    Edit Task #{{ task.dl_task_number }}
+                </h2>
+                <span style="color:rgba(255,255,255,0.3);">|</span>
+                <div class="d-flex align-items-center gap-1" style="font-size:0.7rem;color:rgba(255,255,255,0.6);white-space:nowrap;">
+                    <a href="{% url 'workforce:wf_dashboard' %}" style="color:rgba(255,255,255,0.6);" hx-get="{% url 'workforce:wf_dashboard' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Dashboard</a>
+                    <span style="color:rgba(255,255,255,0.3);">›</span>
+                    <a href="{% url 'workforce:dl_list_all' %}" style="color:rgba(255,255,255,0.6);" hx-get="{% url 'workforce:dl_list_all' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Delivery Tasks</a>
+                    <span style="color:rgba(255,255,255,0.3);">›</span>
+                    <a href="{% url 'workforce:delivery_task_detail' task.id %}" style="color:rgba(255,255,255,0.6);" hx-get="{% url 'workforce:delivery_task_detail' task.id %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Task #{{ task.dl_task_number }}</a>
+                    <span style="color:rgba(255,255,255,0.3);">›</span>
+                    <span style="color:rgba(255,255,255,0.4);">Edit</span>
+                </div>
+            </div>
             <a href="{% url 'workforce:delivery_task_detail' task.id %}"
-               class="btn btn-outline-secondary"
-               hx-get="{% url 'workforce:delivery_task_detail' task.id %}"
-               hx-target="#main-content"
-               hx-select="#main-content"
-               hx-swap="outerHTML"
-               hx-push-url="true">
-                <i class="fa-solid fa-times me-1"></i> Cancel
+               class="dtd__hero__badge dtd__hero__badge--status flex-shrink-0"
+               hx-get="{% url 'workforce:delivery_task_detail' task.id %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fa-solid fa-times"></i> Cancel
             </a>
         </div>
     </div>
@@ -61,22 +35,23 @@
     <form method="post" id="taskEditForm" novalidate>
         {% csrf_token %}
         <div class="row">
-            <!-- Left Column - Task & Order Details -->
+
+            <!-- Left Column -->
             <div class="col-lg-8">
+
                 <!-- Task Settings -->
-                <div class="card mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-cog me-2"></i>
-                            Task Settings
-                        </h5>
+                <div class="dtd__card">
+                    <div class="dtd__card__head">
+                        <div class="dtd__card__head-left">
+                            <i class="fa-solid fa-cog"></i> Task Settings
+                        </div>
                     </div>
-                    <div class="card-body">
+                    <div class="dtd__card__body">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="driver" class="form-label">Driver Assignment</label>
-                                <select name="driver" id="driver" class="form-select">
-                                    <option value="">-- Select Driver --</option>
+                                <label class="odp__field__label d-block mb-1">Driver Assignment</label>
+                                <select name="driver" id="driver" class="form-select form-select-sm">
+                                    <option value="">-- Unassigned --</option>
                                     {% for driver in drivers %}
                                     <option value="{{ driver.driver_id }}" {% if task.driver_id == driver.driver_id %}selected{% endif %}>
                                         {{ driver.driver_first_name }} {{ driver.driver_last_name }} ({{ driver.driver_code }})
@@ -85,189 +60,392 @@
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label for="status" class="form-label">Task Status</label>
-                                <select name="status" id="status" class="form-select">
+                                <label class="odp__field__label d-block mb-1">Task Status</label>
+                                <select name="status" id="status" class="form-select form-select-sm">
                                     <option value="">-- Select Status --</option>
-                                    <option value="pending" {% if task.dl_task_status == 'pending' %}selected{% endif %}>Pending</option>
-                                    <option value="assigned" {% if task.dl_task_status == 'assigned' %}selected{% endif %}>Assigned</option>
-                                    <option value="accepted" {% if task.dl_task_status == 'accepted' %}selected{% endif %}>Accepted</option>
-                                    <option value="picked_up" {% if task.dl_task_status == 'picked_up' %}selected{% endif %}>Picked Up</option>
+                                    <option value="for_review"       {% if task.dl_task_status == 'for_review' %}selected{% endif %}>For Review</option>
+                                    <option value="pending"          {% if task.dl_task_status == 'pending' %}selected{% endif %}>Pending</option>
+                                    <option value="assigned"         {% if task.dl_task_status == 'assigned' %}selected{% endif %}>Assigned</option>
+                                    <option value="accepted"         {% if task.dl_task_status == 'accepted' %}selected{% endif %}>Accepted</option>
+                                    <option value="picked_up"        {% if task.dl_task_status == 'picked_up' %}selected{% endif %}>Picked Up</option>
                                     <option value="out_for_delivery" {% if task.dl_task_status == 'out_for_delivery' %}selected{% endif %}>Out for Delivery</option>
-                                    <option value="in_transit" {% if task.dl_task_status == 'in_transit' %}selected{% endif %}>In Transit</option>
-                                    <option value="contacted" {% if task.dl_task_status == 'contacted' %}selected{% endif %}>Contacted & Confirmed</option>
-                                    <option value="non_reachable" {% if task.dl_task_status == 'non_reachable' %}selected{% endif %}>Non Reachable</option>
-                                    <option value="delivered" {% if task.dl_task_status == 'delivered' %}selected{% endif %}>Delivered</option>
-                                    <option value="failed" {% if task.dl_task_status == 'failed' %}selected{% endif %}>Failed</option>
-                                    <option value="rejected" {% if task.dl_task_status == 'rejected' %}selected{% endif %}>Rejected</option>
-                                    <option value="cancelled" {% if task.dl_task_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                                    <option value="in_transit"       {% if task.dl_task_status == 'in_transit' %}selected{% endif %}>In Transit</option>
+                                    <option value="contacted"        {% if task.dl_task_status == 'contacted' %}selected{% endif %}>Contacted & Confirmed</option>
+                                    <option value="non_reachable"    {% if task.dl_task_status == 'non_reachable' %}selected{% endif %}>Non Reachable</option>
+                                    <option value="delivered"        {% if task.dl_task_status == 'delivered' %}selected{% endif %}>Delivered</option>
+                                    <option value="failed"           {% if task.dl_task_status == 'failed' %}selected{% endif %}>Failed</option>
+                                    <option value="rejected"         {% if task.dl_task_status == 'rejected' %}selected{% endif %}>Rejected</option>
+                                    <option value="cancelled"        {% if task.dl_task_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="odp__field__label d-block mb-1">Pickup Location</label>
+                                <select name="pickup_location" id="pickup_location" class="form-select form-select-sm">
+                                    <option value="">-- Not Set --</option>
+                                    {% for loc in pickup_locations %}
+                                    <option value="{{ loc.id }}" {% if task.pickup_location_id == loc.id %}selected{% endif %}>
+                                        {% if loc.is_fulfilment_center %}[FC] {% endif %}{{ loc.pickup_location_title }}{% if loc.locality %} · {{ loc.locality }}{% endif %}
+                                    </option>
+                                    {% endfor %}
+                                    {% if not pickup_locations %}
+                                    <option disabled>No pickup locations for this business</option>
+                                    {% endif %}
                                 </select>
                             </div>
                             <div class="col-12">
-                                <label for="notes" class="form-label">Task Notes</label>
-                                <textarea name="notes" id="notes" class="form-control" rows="2" placeholder="Add notes about this task...">{{ task.notes|default:"" }}</textarea>
+                                <label class="odp__field__label d-block mb-1">Task Description / Update Note</label>
+                                <textarea name="task_description" id="task_description" class="form-control form-control-sm" rows="2"
+                                          placeholder="Add a note about this task or order update...">{{ task.dl_task_description|default:"" }}</textarea>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Customer Information -->
-                <div class="card mb-4">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-user me-2"></i>
-                            Customer Information
-                        </h5>
+                <div class="dtd__card">
+                    <div class="dtd__card__head">
+                        <div class="dtd__card__head-left">
+                            <i class="fa-solid fa-user"></i> Customer Information
+                        </div>
                     </div>
-                    <div class="card-body">
+                    <div class="dtd__card__body">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label for="customer_name" class="form-label">Customer Name</label>
-                                <input type="text" class="form-control" id="customer_name" name="customer_name"
+                                <label class="odp__field__label d-block mb-1">Customer Name</label>
+                                <input type="text" class="form-control form-control-sm" id="customer_name" name="customer_name"
                                        value="{{ task.order.customer_name }}">
                             </div>
                             <div class="col-md-6">
-                                <label for="customer_phone" class="form-label">Phone</label>
-                                <input type="text" class="form-control" id="customer_phone" name="customer_phone"
+                                <label class="odp__field__label d-block mb-1">Phone</label>
+                                <input type="text" class="form-control form-control-sm" id="customer_phone" name="customer_phone"
                                        value="{{ task.order.customer_phone }}">
                             </div>
                             <div class="col-md-6">
-                                <label for="customer_whatsapp" class="form-label">WhatsApp</label>
-                                <input type="text" class="form-control" id="customer_whatsapp" name="customer_whatsapp"
+                                <label class="odp__field__label d-block mb-1">WhatsApp</label>
+                                <input type="text" class="form-control form-control-sm" id="customer_whatsapp" name="customer_whatsapp"
                                        value="{{ task.order.customer_whatsapp }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="odp__field__label d-block mb-1">Order Notes</label>
+                                <input type="text" class="form-control form-control-sm" id="order_notes" name="order_notes"
+                                       value="{{ task.order.order_notes|default:'' }}" placeholder="e.g. Leave at door">
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Delivery Address -->
-                <div class="card mb-4">
-                    <div class="card-header bg-warning text-dark">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-location-dot me-2"></i>
-                            Delivery Address
-                        </h5>
+                <div class="dtd__card">
+                    <div class="dtd__card__head">
+                        <div class="dtd__card__head-left">
+                            <i class="fa-solid fa-location-dot"></i> Delivery Address
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label for="dl_zone" class="form-label">Zone Number</label>
-                                <input type="number" class="form-control" id="dl_zone" name="dl_zone"
-                                       value="{{ task.order.dl_zone|default:'' }}" min="1" max="100">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="dl_street" class="form-label">Street Number</label>
-                                <input type="number" class="form-control" id="dl_street" name="dl_street"
-                                       value="{{ task.order.dl_street|default:'' }}" min="1">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="dl_building" class="form-label">Building Number</label>
-                                <input type="number" class="form-control" id="dl_building" name="dl_building"
-                                       value="{{ task.order.dl_building|default:'' }}" min="1">
-                            </div>
+                    <div class="dtd__card__body">
+                        <div class="row g-2">
+
+                            <!-- Full Address -->
                             <div class="col-12">
-                                <label for="customer_address" class="form-label">Full Address</label>
-                                <textarea class="form-control" id="customer_address" name="customer_address"
-                                          rows="3">{{ task.order.customer_address }}</textarea>
+                                <label class="odp__field__label d-block mb-1">Full Address</label>
+                                <textarea class="form-control form-control-sm" id="customer_address" name="customer_address"
+                                          rows="2" style="resize:vertical;">{{ task.order.customer_address }}</textarea>
                             </div>
+
+                            <!-- AI Tool Buttons -->
+                            <div class="col-12 d-flex gap-2 align-items-center flex-wrap">
+                                <button type="button" class="dtd__addr__qnas-btn dtd__addr__qnas-btn--ai" id="teAiParseBtn"
+                                        onclick="aiParseAddress('customer_address','dl_zone','dl_street','dl_building','teAiParseBtn','teAiParseResult',{qnasOpts:{zoneId:'dl_zone',streetId:'dl_street',buildingId:'dl_building',latId:'te_latitude',lngId:'te_longitude',resultId:'teQnasResult',btnId:'teQnasBtn',mapId:'teMapLink',accuracyId:'te_coords_accuracy',accuracyBadgeId:'teAccuracyBadge'}})">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> AI Parse
+                                </button>
+                                <button type="button" class="dtd__addr__qnas-btn" id="teQnasBtn"
+                                        onclick="qnasValidateAndFill({zoneId:'dl_zone',streetId:'dl_street',buildingId:'dl_building',latId:'te_latitude',lngId:'te_longitude',resultId:'teQnasResult',btnId:'teQnasBtn',mapId:'teMapLink',accuracyId:'te_coords_accuracy',accuracyBadgeId:'teAccuracyBadge'})">
+                                    <i class="fa-solid fa-satellite-dish"></i> QNAS Validate
+                                </button>
+                                <a id="teMapLink" href="#" target="_blank"
+                                   class="dtd__addr__map-btn {% if not task.order.latitude %}dtd__addr__map-btn--disabled{% endif %}"
+                                   title="View on Google Maps">
+                                    <i class="fa-solid fa-map-location-dot"></i> Map
+                                </a>
+                            </div>
+
+                            <!-- Zone / Street / Building -->
+                            <div class="col-3">
+                                <label class="odp__field__label d-block mb-1">Zone</label>
+                                <input type="number" class="form-control form-control-sm" id="dl_zone" name="dl_zone"
+                                       value="{{ task.order.dl_zone|default:'' }}" min="1" max="100" placeholder="e.g. 25">
+                            </div>
+                            <div class="col-3">
+                                <label class="odp__field__label d-block mb-1">Street</label>
+                                <input type="number" class="form-control form-control-sm" id="dl_street" name="dl_street"
+                                       value="{{ task.order.dl_street|default:'' }}" min="1" placeholder="e.g. 450">
+                            </div>
+                            <div class="col-3">
+                                <label class="odp__field__label d-block mb-1">Building</label>
+                                <input type="number" class="form-control form-control-sm" id="dl_building" name="dl_building"
+                                       value="{{ task.order.dl_building|default:'' }}" min="1" placeholder="e.g. 12">
+                            </div>
+                            <div class="col-3 d-flex flex-column justify-content-end">
+                                <button type="button" class="dtd__addr__qnas-btn w-100" id="teQnasVerifyBtn"
+                                        onclick="verifyQNASFromInputs()">
+                                    <i class="fa-solid fa-check-circle"></i> Verify QNAS
+                                </button>
+                                <div id="teQnasVerifyResult" class="small mt-1"></div>
+                            </div>
+
+                            <!-- Accuracy + Lat/Lng — single line -->
+                            <div class="col-6">
+                                <label class="odp__field__label d-block mb-1">
+                                    <i class="fa-solid fa-bullseye me-1"></i>Accuracy
+                                </label>
+                                <select class="form-select form-select-sm" id="te_coords_accuracy" name="coords_accuracy">
+                                    <option value="">-- Select --</option>
+                                    <option value="exact"       {% if task.order.coords_accuracy == 'exact' %}selected{% endif %}>Exact (Building)</option>
+                                    <option value="street"      {% if task.order.coords_accuracy == 'street' %}selected{% endif %}>Street Level</option>
+                                    <option value="landmark"    {% if task.order.coords_accuracy == 'landmark' %}selected{% endif %}>Landmark / Area</option>
+                                    <option value="zone_center" {% if task.order.coords_accuracy == 'zone_center' %}selected{% endif %}>Zone Center</option>
+                                    <option value="ai_estimate" {% if task.order.coords_accuracy == 'ai_estimate' %}selected{% endif %}>AI Estimate</option>
+                                </select>
+                            </div>
+                            <div class="col-3">
+                                <label class="odp__field__label d-block mb-1">Latitude</label>
+                                <input type="text" class="form-control form-control-sm dtd__latlon-input" id="te_latitude" name="latitude"
+                                       value="{{ task.order.latitude|default:'' }}" placeholder="25.xxxx">
+                            </div>
+                            <div class="col-3">
+                                <label class="odp__field__label d-block mb-1">Longitude</label>
+                                <input type="text" class="form-control form-control-sm dtd__latlon-input" id="te_longitude" name="longitude"
+                                       value="{{ task.order.longitude|default:'' }}" placeholder="51.xxxx">
+                            </div>
+
+                            <!-- Result badges -->
+                            <div class="col-12">
+                                <span id="teAccuracyBadge" class="me-2"></span>
+                                <div id="teAiParseResult" class="small" style="color:var(--brand-primary);"></div>
+                                <div id="teQnasResult" class="small mt-1"></div>
+                            </div>
+
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Right Column - Sidebar -->
-            <div class="col-lg-4">
-                <!-- Task Info (Read-only) -->
-                <div class="card mb-4">
-                    <div class="card-header bg-secondary text-white">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-info-circle me-2"></i>
-                            Task Info
-                        </h5>
+                <!-- Order Items -->
+                {% if task.order and task.order.order_items.all %}
+                <div class="dtd__card">
+                    <div class="dtd__card__head">
+                        <div class="dtd__card__head-left">
+                            <i class="fa-solid fa-box-open"></i> Order Items
+                        </div>
+                        <span class="dtd__card__head-count">{{ task.order.order_items.count }}</span>
                     </div>
-                    <div class="card-body">
-                        <dl class="row mb-0 small">
-                            <dt class="col-5">Task Number</dt>
-                            <dd class="col-7">#{{ task.dl_task_number }}</dd>
+                    <div style="overflow-x:auto;">
+                        <table class="table table-sm mb-0" style="font-size:0.8rem;">
+                            <thead style="background:var(--brand-grey-100);font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--brand-grey-500);">
+                                <tr>
+                                    <th class="ps-3 fw-600">Product</th>
+                                    <th class="text-center" style="width:90px;">Qty</th>
+                                    <th class="text-end" style="width:100px;">Unit Price</th>
+                                    <th class="text-end pe-3" style="width:100px;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in task.order.order_items.all %}
+                                <tr>
+                                    <td class="ps-3 align-middle">
+                                        <div class="fw-semibold" style="font-size:0.8rem;">{{ item.product.product_name|default:"—" }}</div>
+                                        {% if item.notes %}<div style="font-size:0.7rem;color:var(--brand-grey-500);">{{ item.notes }}</div>{% endif %}
+                                    </td>
+                                    <td class="text-center align-middle">
+                                        <input type="number" class="form-control form-control-sm text-center item-qty"
+                                               name="item_qty_{{ item.id }}" value="{{ item.quantity }}"
+                                               min="0" max="9999" style="width:60px;margin:0 auto;"
+                                               data-item-id="{{ item.id }}"
+                                               data-unit-price="{{ item.unit_price|default:0 }}"
+                                               onchange="recalcRow(this)">
+                                    </td>
+                                    <td class="text-end align-middle" style="color:var(--brand-grey-600);">{{ item.unit_price|default:0 }} QAR</td>
+                                    <td class="text-end pe-3 align-middle fw-semibold item-total-{{ item.id }}">{{ item.total_price|default:0 }} QAR</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot style="background:var(--brand-grey-100);">
+                                <tr>
+                                    <td colspan="3" class="text-end fw-bold ps-3" style="font-size:0.8rem;">Items Total:</td>
+                                    <td class="text-end pe-3 fw-bold" style="color:#059669;" id="itemsGrandTotal">—</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
 
-                            <dt class="col-5">Order Number</dt>
-                            <dd class="col-7">{{ task.order.order_number|default:"N/A" }}</dd>
+            </div><!-- /col-lg-8 -->
 
-                            <dt class="col-5">Date</dt>
-                            <dd class="col-7">{{ task.dl_task_date|date:"d M Y" }}</dd>
+            <!-- Right Column -->
+            <div class="col-lg-4">
 
-                            <dt class="col-5">Business</dt>
-                            <dd class="col-7">{{ task.business.business_name|default:"N/A" }}</dd>
+                <!-- Save / Cancel -->
+                <div class="dtd__card">
+                    <div class="dtd__card__body">
+                        <button type="submit" class="dtd__btn dtd__btn--primary w-100 mb-2">
+                            <i class="fa-solid fa-save"></i> Save Changes
+                        </button>
+                        <a href="{% url 'workforce:delivery_task_detail' task.id %}"
+                           class="dtd__btn dtd__btn--secondary w-100"
+                           hx-get="{% url 'workforce:delivery_task_detail' task.id %}"
+                           hx-target="#main-content" hx-select="#main-content"
+                           hx-swap="outerHTML" hx-push-url="true">
+                            <i class="fa-solid fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </div>
 
-                            <dt class="col-5">Created</dt>
-                            <dd class="col-7">{{ task.created_at|date:"d M Y H:i" }}</dd>
-                        </dl>
+                <!-- Task Info (read-only) -->
+                <div class="dtd__card">
+                    <div class="dtd__card__head">
+                        <div class="dtd__card__head-left">
+                            <i class="fa-solid fa-info-circle"></i> Task Info
+                        </div>
+                    </div>
+                    <div class="dtd__card__body">
+                        <div class="dtd__fields">
+                            <div class="dtd__field">
+                                <span class="dtd__field__label">Task #</span>
+                                <span class="dtd__field__value dtd__field__value--mono">{{ task.dl_task_number }}</span>
+                            </div>
+                            <div class="dtd__field">
+                                <span class="dtd__field__label">Order #</span>
+                                <span class="dtd__field__value dtd__field__value--mono">{{ task.order.order_number|default:"N/A" }}</span>
+                            </div>
+                            <div class="dtd__field">
+                                <span class="dtd__field__label">Date</span>
+                                <span class="dtd__field__value">{{ task.dl_task_date|date:"d M Y" }}</span>
+                            </div>
+                            <div class="dtd__field">
+                                <span class="dtd__field__label">Business</span>
+                                <span class="dtd__field__value">{{ task.business.business_name|default:"N/A" }}</span>
+                            </div>
+                            <div class="dtd__field">
+                                <span class="dtd__field__label">Pickup</span>
+                                <span class="dtd__field__value">{{ task.pickup_location.pickup_location_title|default:"N/A" }}</span>
+                            </div>
+                            <div class="dtd__field">
+                                <span class="dtd__field__label">Verification</span>
+                                <span class="dtd__update__pill {% if task.order.verification_status == 'verified' %}dtd__update__pill--success{% elif task.order.verification_status == 'pending' %}dtd__update__pill--to{% else %}dtd__update__pill--from{% endif %}">
+                                    {{ task.order.get_verification_status_display|default:task.order.verification_status }}
+                                </span>
+                            </div>
+                            <div class="dtd__field">
+                                <span class="dtd__field__label">Created</span>
+                                <span class="dtd__field__value">{{ task.created_at|date:"d M Y H:i" }}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- COD Details -->
-                <div class="card mb-4">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-money-bill me-2"></i>
-                            COD Details
-                        </h5>
+                <div class="dtd__card">
+                    <div class="dtd__card__head">
+                        <div class="dtd__card__head-left">
+                            <i class="fa-solid fa-money-bill-wave"></i> COD Details
+                        </div>
                     </div>
-                    <div class="card-body">
+                    <div class="dtd__card__body">
                         <div class="mb-3">
-                            <label for="cod_amount" class="form-label">COD Amount (QAR)</label>
-                            <input type="number" class="form-control" id="cod_amount" name="cod_amount"
+                            <label class="odp__field__label d-block mb-1">COD Amount (QAR)</label>
+                            <input type="number" class="form-control form-control-sm" id="cod_amount" name="cod_amount"
                                    value="{{ task.order.cod_amount|default:0 }}" min="0">
                         </div>
                         <div class="mb-3">
-                            <label for="dl_amount" class="form-label">Delivery Fee (QAR)</label>
-                            <input type="number" class="form-control" id="dl_amount" name="dl_amount"
+                            <label class="odp__field__label d-block mb-1">Delivery Fee (QAR)</label>
+                            <input type="number" class="form-control form-control-sm" id="dl_amount" name="dl_amount"
                                    value="{{ task.order.dl_amount|default:0 }}" min="0">
                         </div>
-                        <hr>
-                        <div class="d-flex justify-content-between">
-                            <span class="fw-bold">Total:</span>
-                            <strong class="text-success fs-5" id="totalAmount">
-                                {% with total=task.order.cod_amount|add:task.order.dl_amount %}
-                                {{ total|default:0 }} QAR
-                                {% endwith %}
-                            </strong>
+                        <div class="dtd__cod" style="margin-top:0.5rem;">
+                            <div class="dtd__cod__info">
+                                <span class="dtd__cod__label"><i class="fa-solid fa-sigma me-1"></i>Total</span>
+                            </div>
+                            <div class="dtd__cod__value">
+                                <span class="dtd__cod__amount" id="totalAmount">{% with total=task.order.cod_amount|add:task.order.dl_amount %}{{ total|default:0 }}{% endwith %}</span>
+                                <span class="dtd__cod__currency">QAR</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Submit Buttons -->
-                <div class="card">
-                    <div class="card-body">
-                        <button type="submit" class="btn btn-primary w-100 mb-2">
-                            <i class="fa-solid fa-save me-2"></i> Save Changes
-                        </button>
-                        <a href="{% url 'workforce:delivery_task_detail' task.id %}"
-                           class="btn btn-outline-secondary w-100"
-                           hx-get="{% url 'workforce:delivery_task_detail' task.id %}"
-                           hx-target="#main-content"
-                           hx-select="#main-content"
-                           hx-swap="outerHTML"
-                           hx-push-url="true">
-                            <i class="fa-solid fa-times me-2"></i> Cancel
-                        </a>
-                    </div>
-                </div>
-            </div>
+            </div><!-- /col-lg-4 -->
         </div>
     </form>
+
+    <!-- Back Link -->
+    <a href="{% url 'workforce:dl_list_all' %}" class="dtd__back"
+       hx-get="{% url 'workforce:dl_list_all' %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+        <i class="fa-solid fa-arrow-left"></i> Back to Delivery Tasks
+    </a>
+
 </div>
 {% endblock content %}
 
 {% block extra_js %}
+<script src="{% static 'workforce/js/qnas-verify.js' %}"></script>
 <script>
-// Update total amount when COD or delivery fee changes
+function verifyQNASFromInputs() {
+    qnasValidateAndFill({
+        zoneId:          'dl_zone',
+        streetId:        'dl_street',
+        buildingId:      'dl_building',
+        latId:           'te_latitude',
+        lngId:           'te_longitude',
+        resultId:        'teQnasVerifyResult',
+        btnId:           'teQnasVerifyBtn',
+        mapId:           'teMapLink',
+        accuracyId:      'te_coords_accuracy',
+        accuracyBadgeId: 'teAccuracyBadge'
+    });
+}
+
+// COD total live update
 document.getElementById('cod_amount').addEventListener('input', updateTotal);
 document.getElementById('dl_amount').addEventListener('input', updateTotal);
-
 function updateTotal() {
     const cod = parseInt(document.getElementById('cod_amount').value) || 0;
-    const delivery = parseInt(document.getElementById('dl_amount').value) || 0;
-    document.getElementById('totalAmount').textContent = (cod + delivery) + ' QAR';
+    const dl  = parseInt(document.getElementById('dl_amount').value)  || 0;
+    document.getElementById('totalAmount').textContent = (cod + dl);
 }
+
+// Order items qty recalc
+function recalcRow(input) {
+    const qty       = parseInt(input.value) || 0;
+    const unitPrice = parseFloat(input.dataset.unitPrice) || 0;
+    const itemId    = input.dataset.itemId;
+    const total     = (qty * unitPrice).toFixed(2);
+    const cell      = document.querySelector('.item-total-' + itemId);
+    if (cell) cell.textContent = total + ' QAR';
+    recalcGrandTotal();
+}
+function recalcGrandTotal() {
+    let grand = 0;
+    document.querySelectorAll('.item-qty').forEach(function(input) {
+        grand += (parseInt(input.value) || 0) * (parseFloat(input.dataset.unitPrice) || 0);
+    });
+    const el = document.getElementById('itemsGrandTotal');
+    if (el) el.textContent = grand.toFixed(2) + ' QAR';
+}
+document.addEventListener('DOMContentLoaded', recalcGrandTotal);
+
+// Map link update when lat/lng change
+['te_latitude','te_longitude'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', updateMapLink);
+});
+function updateMapLink() {
+    var lat  = document.getElementById('te_latitude').value;
+    var lng  = document.getElementById('te_longitude').value;
+    var link = document.getElementById('teMapLink');
+    if (lat && lng && link) {
+        link.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+        link.classList.remove('dtd__addr__map-btn--disabled');
+    }
+}
+updateMapLink();
 </script>
 {% endblock extra_js %}

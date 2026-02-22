@@ -26,8 +26,8 @@ Each task should have select_related: order, driver, business, pickup_location, 
                 <button type="button" class="btn btn-sm btn-light" onclick="bulkAction('print')" title="Print Selected">
                     <i class="fa-solid fa-print me-1"></i>Print
                 </button>
-                <button type="button" class="btn btn-sm btn-light" onclick="bulkAction('publish_dms')" title="Publish to DMS">
-                    <i class="fa-solid fa-cloud-arrow-up me-1"></i>DMS
+                <button type="button" class="btn btn-sm btn-light" onclick="bulkAction('publish_fleets')" title="Publish to Fleets">
+                    <i class="fa-solid fa-truck-fast me-1"></i>Publish Fleets
                 </button>
                 <button type="button" class="btn btn-sm btn-light" onclick="bulkAction('publish_app')" title="Publish to App">
                     <i class="fa-solid fa-mobile-screen me-1"></i>App
@@ -156,23 +156,43 @@ Each task should have select_related: order, driver, business, pickup_location, 
                     </td>
                     <!-- Status -->
                     <td class="dl-table__td-status" onclick="event.stopPropagation();">
-                        {% if dl.dl_task_status %}
-                        <span class="dl-badge dl-badge--{{ dl.dl_task_status }}">
-                            {{ dl.get_dl_task_status_display }}
-                        </span>
-                        {% else %}—{% endif %}
-                        <button class="dl-table__edit-btn dl-table__edit-btn--status status-modal-trigger"
-                            data-bs-toggle="modal" data-bs-target="#statusModal"
-                            data-task-id="{{ dl.id }}"
-                            data-task-number="{{ dl.dl_task_number }}"
-                            data-status-type="task"
-                            data-current-status="{{ dl.dl_task_status }}"
-                            data-driver-id="{{ dl.driver_id|default:'' }}"
-                            data-driver-name="{{ dl.driver|default:'' }}"
-                            data-customer-name="{{ dl.order.customer_name|default:'' }}"
-                            title="Update Task Status">
-                            <i class="fa-solid fa-circle-dot"></i>
-                        </button>
+                        <div class="dl-status-stack">
+                            <!-- Line 1: Publish status -->
+                            <div class="dl-status-row">
+                                {% if dl.dl_task_publish %}
+                                <span class="dl-badge dl-badge--published">
+                                    <i class="fa-solid fa-truck-fast me-1"></i>Published
+                                </span>
+                                {% else %}
+                                <span class="dl-badge dl-badge--not-published">
+                                    <i class="fa-solid fa-truck-fast me-1"></i>Not Published
+                                </span>
+                                <button class="dl-table__publish-icon-btn" onclick="publishToFleets({{ dl.id }})" title="Publish to Fleet drivers">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                            <!-- Line 2: Task status + update button -->
+                            <div class="dl-status-row">
+                                {% if dl.dl_task_status %}
+                                <span class="dl-badge dl-badge--{{ dl.dl_task_status }}">
+                                    {{ dl.get_dl_task_status_display }}
+                                </span>
+                                {% else %}—{% endif %}
+                                <button class="dl-table__edit-btn dl-table__edit-btn--status status-modal-trigger"
+                                    data-bs-toggle="modal" data-bs-target="#statusModal"
+                                    data-task-id="{{ dl.id }}"
+                                    data-task-number="{{ dl.dl_task_number }}"
+                                    data-status-type="task"
+                                    data-current-status="{{ dl.dl_task_status }}"
+                                    data-driver-id="{{ dl.driver_id|default:'' }}"
+                                    data-driver-name="{{ dl.driver|default:'' }}"
+                                    data-customer-name="{{ dl.order.customer_name|default:'' }}"
+                                    title="Update Task Status">
+                                    <i class="fa-solid fa-circle-dot"></i>
+                                </button>
+                            </div>
+                        </div>
                     </td>
                     <!-- Driver -->
                     <td class="dl-table__td-driver">
@@ -191,9 +211,6 @@ Each task should have select_related: order, driver, business, pickup_location, 
                             <a href="https://wa.me/{{ dl.order.customer_phone|whatsapp_number }}?text=Hi%20{{ dl.order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ dl.order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ dl.order.order_number|urlencode }}%26key={{ dl.order|verify_key }}" target="_blank" class="dl-table__action-btn dl-table__action-btn--whatsapp" title="WhatsApp">
                                 <i class="fa-brands fa-whatsapp"></i>
                             </a>
-                            <button class="dl-table__action-btn dl-table__action-btn--publish" onclick="publishToDMS({{ dl.id }})" title="Publish DMS" {% if dl.dl_task_publish %}disabled{% endif %}>
-                                <i class="fa-solid fa-cloud-arrow-up"></i>
-                            </button>
                         </div>
                     </td>
                 </tr>

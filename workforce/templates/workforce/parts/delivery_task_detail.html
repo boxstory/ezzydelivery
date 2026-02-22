@@ -7,7 +7,7 @@
 {% endblock extra_css %}
 
 {% block content %}
-<div class="col-12 p-3">
+<div class="col-12 p-2 p-md-3">
 
     <!-- Hero Banner -->
     <div class="dtd__hero">
@@ -57,46 +57,44 @@
                                     <span class="dtd__field__label"><i class="fa-solid fa-user"></i> Customer</span>
                                     <span class="dtd__field__value">{{ task.order.customer_name }}</span>
                                 </div>
+                            </div>
+                            <!-- Contact Buttons -->
+                            {% if task.order.customer_phone %}
+                            <div class="dtd__fields">
                                 <div class="dtd__field">
-                                    <span class="dtd__field__label"><i class="fa-solid fa-phone"></i> Phone</span>
-                                    <span class="dtd__field__value dtd__field__value--mono">{{ task.order.customer_phone }}</span>
-                                </div>
-                                <div class="dtd__field">
-                                    <span class="dtd__field__label"><i class="fa-solid fa-user-shield"></i> Driver</span>
-                                    {% if task.driver %}
-                                    <div class="dtd__driver">
-                                        <div class="dtd__driver__avatar"><i class="fa-solid fa-motorcycle"></i></div>
-                                        <div class="dtd__driver__info">
-                                            <div class="dtd__driver__name">{{ task.driver.user.get_full_name|default:task.driver.driver_phone }}</div>
-                                            <div class="dtd__driver__code">{{ task.driver.driver_code }}</div>
-                                        </div>
+                                    <span class="dtd__field__label"><i class="fa-solid fa-address-book"></i> Contact</span>
+                                    <div class="dtd__contacts">
+                                        <a href="tel:{{ task.order.customer_phone }}" class="dtd__contact dtd__contact--phone">
+                                            <i class="fa-solid fa-phone"></i> {{ task.order.customer_phone }}
+                                        </a>
+                                        <a href="https://wa.me/{{ task.order.customer_phone }}" target="_blank" class="dtd__contact dtd__contact--whatsapp">
+                                            <i class="fa-brands fa-whatsapp"></i> WhatsApp
+                                        </a>
                                     </div>
-                                    {% else %}
-                                    <span class="dtd__field__value dtd__field__value--muted">Not Assigned</span>
-                                    {% endif %}
                                 </div>
                             </div>
+                            {% endif %}
                         </div>
                         <div class="col-md-6">
                             <!-- COD Highlight -->
                             <div class="dtd__cod">
-                                <span class="dtd__cod__label"><i class="fa-solid fa-money-bill-wave me-1"></i> COD Amount</span>
-                                <div>
+                                <div class="dtd__cod__info">
+                                    <span class="dtd__cod__label"><i class="fa-solid fa-money-bill-wave me-1"></i> COD Amount</span>
+                                    {% if task.cod_collected %}
+                                    <span class="dtd__update__pill dtd__update__pill--success" style="font-size:0.7rem;">
+                                        <i class="fa-solid fa-check-circle"></i> Collected{% if task.cod_collected_at %} · {{ task.cod_collected_at|date:"d M, H:i" }}{% endif %}
+                                    </span>
+                                    {% else %}
+                                    <span class="dtd__update__pill dtd__update__pill--from" style="font-size:0.7rem;">
+                                        <i class="fa-solid fa-clock"></i> Pending Collection
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                <div class="dtd__cod__value">
                                     <span class="dtd__cod__amount">{{ task.order.cod_amount|default:0 }}</span>
                                     <span class="dtd__cod__currency">QAR</span>
                                 </div>
                             </div>
-                            <!-- Contact Buttons -->
-                            {% if task.order.customer_phone %}
-                            <div class="dtd__contacts">
-                                <a href="tel:{{ task.order.customer_phone }}" class="dtd__contact dtd__contact--phone">
-                                    <i class="fa-solid fa-phone"></i> {{ task.order.customer_phone }}
-                                </a>
-                                <a href="https://wa.me/{{ task.order.customer_phone }}" target="_blank" class="dtd__contact dtd__contact--whatsapp">
-                                    <i class="fa-brands fa-whatsapp"></i> WhatsApp
-                                </a>
-                            </div>
-                            {% endif %}
                         </div>
                     </div>
 
@@ -115,26 +113,98 @@
                             <div class="dtd__route__addr">{{ task.pickup_location.pickup_area }}</div>
                             {% endif %}
                         </div>
-                        <div class="dtd__route__connector">
-                            <i class="fa-solid fa-arrow-right"></i>
-                        </div>
+                         
                         <div class="dtd__route__point">
                             <div class="dtd__route__point-head">
                                 <div class="dtd__route__dot dtd__route__dot--dropoff"></div>
                                 <span class="dtd__route__type">Dropoff</span>
-                                {% include "includes/components/_ai_parse_button.html" with address=task.order.customer_address|default:"" zone=task.order.dl_zone street=task.order.dl_street building=task.order.dl_building lat=task.dl_address_update.dl_latitude lng=task.dl_address_update.dl_longitude title="Dropoff Location" %}
                             </div>
-                            <div class="dtd__route__name">
-                                {% if task.order.dl_zone %}Zone {{ task.order.dl_zone }}{% endif %}{% if task.order.dl_street %}, St {{ task.order.dl_street }}{% endif %}{% if task.order.dl_building %}, Bldg {{ task.order.dl_building }}{% endif %}
+
+                            <!-- Address row + AI Parse + Map inline -->
+                            <div class="d-flex gap-2 align-items-start mt-1">
+                                <div class="flex-fill">
+                                    <span class="odp__field__label d-block">Address</span>
+                                    <span class="odp__field__value">{{ task.order.customer_address|default:"-" }}</span>
+                                </div>
+                                <div class="d-flex flex-column gap-1 flex-shrink-0">
+                                    {% include "includes/components/_ai_parse_button.html" with address=task.order.customer_address|default:"" zone=task.order.dl_zone street=task.order.dl_street building=task.order.dl_building lat=task.order.latitude|default:task.dl_address_update.dl_latitude lng=task.order.longitude|default:task.dl_address_update.dl_longitude order_id=task.order.id order_number=task.order.order_number show_map="true" title="Dropoff Location" btn_label="AI Parse" %}
+                                    {% if task.order.latitude or task.dl_address_update.dl_latitude %}
+                                    <a href="https://www.google.com/maps?q={% if task.order.latitude %}{{ task.order.latitude }},{{ task.order.longitude }}{% else %}{{ task.dl_address_update.dl_latitude }},{{ task.dl_address_update.dl_longitude }}{% endif %}"
+                                       target="_blank" class="dtd__addr__map-btn" title="Open in Google Maps">
+                                        <i class="fa-solid fa-map-location-dot"></i> Map
+                                    </a>
+                                    {% endif %}
+                                </div>
                             </div>
-                            {% if task.order.customer_address %}
-                            <div class="dtd__route__addr">
-                                {{ task.order.customer_address }}
+
+                            <!-- Zone / Street / Building / QNAS row -->
+                            <div class="row g-0 mt-0">
+                                <div class="col-3">
+                                    <div class="odp__field">
+                                        <span class="odp__field__label">Zone</span>
+                                        <span class="odp__field__value odp__field__value--mono">{{ task.order.dl_zone|default:"-" }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="odp__field">
+                                        <span class="odp__field__label">Street</span>
+                                        <span class="odp__field__value">{{ task.order.dl_street|default:"-" }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="odp__field">
+                                        <span class="odp__field__label">Building</span>
+                                        <span class="odp__field__value">{{ task.order.dl_building|default:"-" }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="odp__field">
+                                        <span class="odp__field__label">QNAS</span>
+                                        <div class="odp__field__value d-flex flex-column gap-1">
+                                            <button type="button" class="dtd__addr__qnas-btn"
+                                                    id="qnasVerifyBtn{{ task.id }}"
+                                                    onclick="verifyQNAS({{ task.order.dl_zone|default:0 }}, {{ task.order.dl_street|default:0 }}, '{{ task.order.dl_building|default:"" }}', {{ task.id }})">
+                                                <i class="fa-solid fa-satellite-dish"></i> Verify
+                                            </button>
+                                            <div id="qnasResult{{ task.id }}" class="small mt-1"></div>
+                                            <div id="qnasCoords{{ task.id }}" class="small mt-1"></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            {% endif %}
-                            <div class="mt-2">
-                                {% include "includes/components/_qnas_verify_button.html" with zone=task.order.dl_zone street=task.order.dl_street building=task.order.dl_building record_id=task.id record_type="task" show_inline="false" %}
+
+                            <!-- Lat / Long + Accuracy -->
+                            <div class="row g-1 mt-1 mx-0">
+                                <div class="col-4 ps-0">
+                                    <label class="odp__field__label d-block mb-0" style="font-size:0.65rem;">Latitude</label>
+                                    <input type="text" class="form-control form-control-sm dtd__latlon-input" disabled
+                                           value="{% if task.order.latitude %}{{ task.order.latitude|floatformat:6 }}{% elif task.dl_address_update.dl_latitude %}{{ task.dl_address_update.dl_latitude|floatformat:6 }}{% endif %}"
+                                           placeholder="Not set">
+                                </div>
+                                <div class="col-4 px-1">
+                                    <label class="odp__field__label d-block mb-0" style="font-size:0.65rem;">Longitude</label>
+                                    <input type="text" class="form-control form-control-sm dtd__latlon-input" disabled
+                                           value="{% if task.order.longitude %}{{ task.order.longitude|floatformat:6 }}{% elif task.dl_address_update.dl_longitude %}{{ task.dl_address_update.dl_longitude|floatformat:6 }}{% endif %}"
+                                           placeholder="Not set">
+                                </div>
+                                <div class="col-4 pe-0">
+                                    <label class="odp__field__label d-block mb-0" style="font-size:0.65rem;">Accuracy</label>
+                                    {% if task.order.coords_accuracy %}
+                                    <span class="dtd__accuracy dtd__accuracy--{{ task.order.coords_accuracy }}">
+                                        {% if task.order.coords_accuracy == 'exact' %}<i class="fa-solid fa-bullseye"></i>
+                                        {% elif task.order.coords_accuracy == 'street' %}<i class="fa-solid fa-road"></i>
+                                        {% elif task.order.coords_accuracy == 'landmark' %}<i class="fa-solid fa-map-marker-alt"></i>
+                                        {% elif task.order.coords_accuracy == 'zone_center' %}<i class="fa-solid fa-draw-polygon"></i>
+                                        {% elif task.order.coords_accuracy == 'ai_estimate' %}<i class="fa-solid fa-wand-magic-sparkles"></i>
+                                        {% endif %}
+                                        {{ task.order.get_coords_accuracy_display }}
+                                    </span>
+                                    {% else %}
+                                    <span class="odp__field__value odp__field__value--muted">—</span>
+                                    {% endif %}
+                                </div>
                             </div>
+
                         </div>
                     </div>
                 </div>
@@ -152,16 +222,44 @@
                     {% endif %}
                 </div>
                 <div class="dtd__updates">
+                    <!-- Driver assignment — always first -->
+                    {% if task.driver %}
+                    <div class="dtd__update">
+                        <div class="dtd__update__icon dtd__update__icon--driver">
+                            <i class="fa-solid fa-motorcycle"></i>
+                        </div>
+                        <div class="dtd__update__body">
+                            <div class="dtd__update__title">Assigned Driver</div>
+                            <div class="dtd__update__transition">
+                                <span class="dtd__update__pill dtd__update__pill--success">
+                                    {{ task.driver.user.get_full_name|default:task.driver.driver_phone }}
+                                </span>
+                            </div>
+                            <div class="dtd__update__meta">
+                                <i class="fa-solid fa-id-badge"></i> {{ task.driver.driver_code }}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="dtd__update">
+                        <div class="dtd__update__icon dtd__update__icon--default">
+                            <i class="fa-solid fa-motorcycle"></i>
+                        </div>
+                        <div class="dtd__update__body">
+                            <div class="dtd__update__title">Assigned Driver</div>
+                            <div class="dtd__update__transition">
+                                <span class="dtd__update__pill dtd__update__pill--from">Not Assigned</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     {% if driver_status_updates or driver_documents %}
 
                     {% for entry in driver_status_updates %}
                     <div class="dtd__update">
-                        <div class="dtd__update__icon {% if entry.field_name == 'dl_task_status_dms' %}dtd__update__icon--dms{% else %}dtd__update__icon--driver{% endif %}">
-                            {% if entry.field_name == 'dl_task_status_dms' %}
-                            <i class="fa-solid fa-satellite-dish"></i>
-                            {% else %}
+                        <div class="dtd__update__icon dtd__update__icon--driver">
                             <i class="fa-solid fa-truck-fast"></i>
-                            {% endif %}
                         </div>
                         <div class="dtd__update__body">
                             <div class="dtd__update__title">{{ entry.get_field_name_display }}</div>
@@ -285,31 +383,36 @@
                         <i class="fa-solid fa-pen"></i> Edit Task
                     </a>
 
-                    {% if task.dl_task_status_dms != 'published' %}
-                    <button class="dtd__btn dtd__btn--primary" onclick="publishToDMS({{ task.id }})">
-                        <i class="fa-solid fa-cloud-arrow-up"></i> Publish to DMS
+                    {% if task.dl_task_publish %}
+                    <button class="dtd__btn dtd__btn--success" disabled style="cursor:default;">
+                        <i class="fa-solid fa-check-circle"></i> Published to Fleets
                     </button>
                     {% else %}
-                    <button class="dtd__btn dtd__btn--success" disabled>
-                        <i class="fa-solid fa-check-circle"></i> Published to DMS
+                    <button class="dtd__btn dtd__btn--warning" onclick="publishToFleets({{ task.id }})">
+                        <i class="fa-solid fa-paper-plane"></i> Publish to Fleets
                     </button>
                     {% endif %}
 
-                    {% if task.dl_task_status_dms == 'published' and not task.published_to_driver_app %}
-                    <button class="dtd__btn dtd__btn--info" onclick="publishToDriverApp({{ task.id }})">
-                        <i class="fa-solid fa-mobile-screen"></i> Publish to App
-                    </button>
-                    {% elif task.published_to_driver_app %}
-                    <button class="dtd__btn dtd__btn--success" disabled>
-                        <i class="fa-solid fa-check-circle"></i> Published to App
-                    </button>
-                    {% endif %}
-
+                    {% if task.driver %}
+                    <div class="dtd__assigned-driver">
+                        <div class="dtd__assigned-driver__info">
+                            <i class="fa-solid fa-circle-check" style="color:#10b981;"></i>
+                            <div>
+                                <div class="dtd__assigned-driver__name">{{ task.driver.driver_code }} — {{ task.driver.user.get_full_name|default:task.driver.driver_phone }}</div>
+                                <div class="dtd__assigned-driver__label">Assigned Driver</div>
+                            </div>
+                        </div>
+                        <button class="dtd__btn dtd__btn--secondary dtd__btn--sm" data-bs-toggle="modal" data-bs-target="#assignDriverModal" title="Change Driver">
+                            <i class="fa-solid fa-pen"></i> Change
+                        </button>
+                    </div>
+                    {% else %}
                     <button class="dtd__btn dtd__btn--secondary" data-bs-toggle="modal" data-bs-target="#assignDriverModal">
                         <i class="fa-solid fa-user-plus"></i> Assign Driver
                     </button>
+                    {% endif %}
 
-                    <button class="dtd__btn dtd__btn--secondary" onclick="updateTaskStatus({{ task.id }})">
+                    <button class="dtd__btn dtd__btn--secondary" data-bs-toggle="modal" data-bs-target="#updateStatusModal">
                         <i class="fa-solid fa-edit"></i> Update Status
                     </button>
                 </div>
@@ -336,37 +439,6 @@
                     {% if task.pickup_location %}
                     <br><i class="fa-solid fa-store text-primary"></i> Pickup: {{ task.pickup_location.pickup_location_title|default:"Seller Location" }}
                     {% endif %}
-                </div>
-                <!-- Coordinates Display -->
-                <div class="dtd__coords">
-                    <div class="dtd__coords__row">
-                        <span class="dtd__coords__label"><i class="fa-solid fa-store"></i> Pickup</span>
-                        {% if task.pickup_location and task.pickup_location.pickup_lat and task.pickup_location.pickup_lon %}
-                        <span class="dtd__coords__value">
-                            <i class="fa-solid fa-location-crosshairs dtd__coords__icon--ok"></i>
-                            {{ task.pickup_location.pickup_lat|floatformat:6 }}, {{ task.pickup_location.pickup_lon|floatformat:6 }}
-                            <a href="https://www.google.com/maps?q={{ task.pickup_location.pickup_lat }},{{ task.pickup_location.pickup_lon }}" target="_blank" class="dtd__coords__link" title="Open in Google Maps"><i class="fa-solid fa-up-right-from-square"></i></a>
-                        </span>
-                        {% else %}
-                        <span class="dtd__coords__value dtd__coords__value--missing">
-                            <i class="fa-solid fa-triangle-exclamation"></i> Coordinates missing
-                        </span>
-                        {% endif %}
-                    </div>
-                    <div class="dtd__coords__row">
-                        <span class="dtd__coords__label"><i class="fa-solid fa-location-dot"></i> Dropoff</span>
-                        {% if task.dl_address_update and task.dl_address_update.dl_latitude and task.dl_address_update.dl_longitude %}
-                        <span class="dtd__coords__value">
-                            <i class="fa-solid fa-location-crosshairs dtd__coords__icon--ok"></i>
-                            {{ task.dl_address_update.dl_latitude|floatformat:6 }}, {{ task.dl_address_update.dl_longitude|floatformat:6 }}
-                            <a href="https://www.google.com/maps?q={{ task.dl_address_update.dl_latitude }},{{ task.dl_address_update.dl_longitude }}" target="_blank" class="dtd__coords__link" title="Open in Google Maps"><i class="fa-solid fa-up-right-from-square"></i></a>
-                        </span>
-                        {% else %}
-                        <span class="dtd__coords__value dtd__coords__value--missing">
-                            <i class="fa-solid fa-triangle-exclamation"></i> Coordinates missing
-                        </span>
-                        {% endif %}
-                    </div>
                 </div>
             </div>
 
@@ -482,6 +554,52 @@
     </div>
 </div>
 
+<!-- Update Status Modal -->
+<div class="modal fade dtd__modal" id="updateStatusModal" tabindex="-1" aria-labelledby="updateStatusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="updateStatusModalLabel">
+                    <i class="fa-solid fa-edit"></i> Update Task Status
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="dtd__modal__info mb-3">
+                    <i class="fa-solid fa-info-circle me-1"></i>
+                    Current status: <strong>{{ task.get_dl_task_status_display }}</strong>
+                </div>
+                <div class="mb-3">
+                    <label for="statusSelect" class="form-label fw-semibold" style="font-size:0.8125rem;">Select New Status</label>
+                    <select class="form-select" id="statusSelect" style="font-size:0.8125rem;">
+                        <option value="">-- Choose a status --</option>
+                        <option value="for_review">For Review</option>
+                        <option value="pending">Pending</option>
+                        <option value="assigned">Assigned</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="picked_up">Picked Up</option>
+                        <option value="start_ride">Start Ride</option>
+                        <option value="out_for_delivery">Out for Delivery</option>
+                        <option value="in_transit">In Transit</option>
+                        <option value="contacted">Contacted & Confirmed</option>
+                        <option value="non_reachable">Non Reachable</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="failed">Failed</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="dtd__btn dtd__btn--secondary" data-bs-dismiss="modal" style="width:auto;">Cancel</button>
+                <button type="button" class="dtd__btn dtd__btn--primary" onclick="confirmUpdateStatus({{ task.id }})" style="width:auto;">
+                    <i class="fa-solid fa-check"></i> Update
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock content %}
 
 {% block extra_js %}
@@ -495,31 +613,16 @@
     }
     const csrftoken = getCSRFToken();
 
-    function publishToDMS(taskId) {
-        if (confirm('Publish this task to the Delivery Management System?')) {
-            fetch(`/workforce/delivery-task/${taskId}/publish-dms/`, {
+    function publishToFleets(taskId) {
+        if (confirm('Publish this task to Fleet drivers?')) {
+            fetch(`/workforce/delivery-task/${taskId}/publish-fleets/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) { alert('Task published to DMS successfully!'); location.reload(); }
-                else { alert('Error: ' + (data.error || 'Failed to publish to DMS')); }
-            })
-            .catch(error => { console.error('Error:', error); alert('An error occurred'); });
-        }
-    }
-
-    function publishToDriverApp(taskId) {
-        if (confirm('Publish this task to the Driver Mobile App?')) {
-            fetch(`/workforce/delivery-task/${taskId}/publish-driver-app/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) { alert('Task published to Driver App successfully!'); location.reload(); }
-                else { alert('Error: ' + (data.error || 'Failed to publish to Driver App')); }
+                if (data.success) { location.reload(); }
+                else { alert('Error: ' + (data.error || 'Failed to publish to Fleets')); }
             })
             .catch(error => { console.error('Error:', error); alert('An error occurred'); });
         }
@@ -546,21 +649,33 @@
         .catch(error => { console.error('Error:', error); alert('An error occurred'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Assign'; });
     }
 
-    function updateTaskStatus(taskId) {
-        const status = prompt('Enter new status (e.g., assigned, in_transit, delivered, failed):');
-        if (status) {
-            fetch(`/workforce/delivery-task/${taskId}/update-status/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-                body: JSON.stringify({ status: status })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) { alert('Status updated successfully!'); location.reload(); }
-                else { alert('Error: ' + (data.error || 'Failed to update status')); }
-            })
-            .catch(error => { console.error('Error:', error); alert('An error occurred'); });
-        }
+    function confirmUpdateStatus(taskId) {
+        const status = document.getElementById('statusSelect').value;
+        if (!status) { return; }
+        const btn = document.querySelector('#updateStatusModal .dtd__btn--primary');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
+        fetch(`/workforce/delivery-task/${taskId}/update-status/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            body: JSON.stringify({ status: status })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('updateStatusModal')).hide();
+                location.reload();
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Update';
+                alert('Error: ' + (data.error || 'Failed to update status'));
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Update';
+            alert('An error occurred');
+        });
     }
 
     function markCommentsAsRead(taskId) {
@@ -618,6 +733,10 @@
         iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28]
     });
 
+    // Stored dropoff coordinates (order.latitude/longitude takes priority, fallback to dl_address_update)
+    var dropoffLat = {% if task.order.latitude %}{{ task.order.latitude }}{% elif task.dl_address_update.dl_latitude %}{{ task.dl_address_update.dl_latitude }}{% else %}null{% endif %};
+    var dropoffLon = {% if task.order.longitude %}{{ task.order.longitude }}{% elif task.dl_address_update.dl_longitude %}{{ task.dl_address_update.dl_longitude }}{% else %}null{% endif %};
+
     var markers = [];
 
     if (pickupLat && pickupLon) {
@@ -625,41 +744,59 @@
         markers.push(pm);
     }
 
-    var query = '';
-    if (zone) query += 'Zone ' + zone + ', ';
-    if (street) query += 'Street ' + street + ', ';
-    if (building) query += 'Building ' + building + ', ';
-    if (address && !address.startsWith('Zone')) query += address + ', ';
-    query += 'Qatar';
-
-    fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&countrycodes=qa&limit=1', {
-        headers: { 'Accept': 'application/json' }
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        loadingEl.style.display = 'none';
-        if (data && data.length > 0) {
-            var lat = parseFloat(data[0].lat);
-            var lng = parseFloat(data[0].lon);
-            var dm = L.marker([lat, lng], { icon: deliveryIcon }).addTo(map).bindPopup('<strong>Delivery:</strong><br>' + address + (zone ? '<br>Zone ' + zone : ''));
-            markers.push(dm);
-            dm.openPopup();
-            if (markers.length > 1) {
-                var group = L.featureGroup(markers);
-                map.fitBounds(group.getBounds().pad(0.3));
-            } else {
-                map.setView([lat, lng], 15);
-            }
-        } else {
-            if (markers.length > 0) { map.setView([pickupLat, pickupLon], 14); }
-            var fallback = L.marker([defaultLat, defaultLng], { icon: deliveryIcon }).addTo(map).bindPopup('<strong>Delivery area:</strong><br>' + (zone ? 'Zone ' + zone + ', ' : '') + 'Qatar<br><small>Exact location unavailable</small>');
-            fallback.openPopup();
+    function fitMarkers() {
+        if (markers.length > 1) {
+            map.fitBounds(L.featureGroup(markers).getBounds().pad(0.3));
+        } else if (markers.length === 1) {
+            map.setView(markers[0].getLatLng(), 15);
         }
-    })
-    .catch(function() {
+    }
+
+    if (dropoffLat && dropoffLon) {
+        // Use stored coordinates directly — no geocoding needed
         loadingEl.style.display = 'none';
-        if (markers.length > 0) { map.setView([pickupLat, pickupLon], 14); }
-    });
+        var popupText = '<strong>Dropoff</strong>' +
+            (zone ? '<br>Zone ' + zone : '') +
+            (street ? ', St ' + street : '') +
+            (building ? ', Bldg ' + building : '') +
+            (address ? '<br><small>' + address + '</small>' : '');
+        var dm = L.marker([dropoffLat, dropoffLon], { icon: deliveryIcon }).addTo(map).bindPopup(popupText);
+        markers.push(dm);
+        dm.openPopup();
+        fitMarkers();
+    } else {
+        // No stored coords — fall back to Nominatim geocoding
+        var query = '';
+        if (zone) query += 'Zone ' + zone + ', ';
+        if (street) query += 'Street ' + street + ', ';
+        if (building) query += 'Building ' + building + ', ';
+        if (address && !address.startsWith('Zone')) query += address + ', ';
+        query += 'Qatar';
+
+        fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&countrycodes=qa&limit=1', {
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            loadingEl.style.display = 'none';
+            if (data && data.length > 0) {
+                var lat = parseFloat(data[0].lat);
+                var lng = parseFloat(data[0].lon);
+                var dm = L.marker([lat, lng], { icon: deliveryIcon }).addTo(map).bindPopup('<strong>Delivery (approx):</strong><br>' + address + (zone ? '<br>Zone ' + zone : ''));
+                markers.push(dm);
+                dm.openPopup();
+                fitMarkers();
+            } else {
+                loadingEl.style.display = 'none';
+                if (markers.length > 0) { map.setView([pickupLat, pickupLon], 14); }
+                else { map.setView([defaultLat, defaultLng], defaultZoom); }
+            }
+        })
+        .catch(function() {
+            loadingEl.style.display = 'none';
+            if (markers.length > 0) { map.setView([pickupLat, pickupLon], 14); }
+        });
+    }
 
     setTimeout(function() { map.invalidateSize(); }, 300);
 })();

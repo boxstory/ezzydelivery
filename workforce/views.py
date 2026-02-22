@@ -12,13 +12,11 @@ View Categories:
     Order Management:
         - all_orders: List/filter all orders (paginated)
         - order_detail_modal: AJAX order details
-        - publish_orders_to_dms: Publish orders to delivery management system
-        - update_order_dms: Update order DMS status
 
     Delivery Management:
         - all_deliveries: List all delivery tasks
         - delivery_detail: View delivery details
-        - dms_publish_order: Publish single order to DMS
+        - publish_task_to_fleets: Publish single task to fleet drivers
 
     Driver Management:
         - all_drivers: List all drivers with status
@@ -2082,6 +2080,7 @@ def update_order_zone(request, order_id):
         building_number = data.get('building_number')
         latitude = data.get('latitude')
         longitude = data.get('longitude')
+        coords_accuracy = data.get('coords_accuracy')  # optional, sent by JS
 
         if not zone_number:
             return JsonResponse({
@@ -2105,10 +2104,24 @@ def update_order_zone(request, order_id):
             order.dl_street = str(street_number)
         if building_number:
             order.dl_building = str(building_number)
+
+        # Update order coordinates and accuracy if provided
+        coords_saved = False
+        if latitude and longitude:
+            order.latitude = latitude
+            order.longitude = longitude
+            # Derive accuracy: use value sent by JS, or infer from building presence
+            if coords_accuracy:
+                order.coords_accuracy = coords_accuracy
+            elif building_number:
+                order.coords_accuracy = 'exact'
+            else:
+                order.coords_accuracy = 'street'
+            coords_saved = True
+
         order.save()
 
-        # Update delivery task address (dl_to_address) with coordinates if available
-        coords_saved = False
+        # Also update delivery task address (dl_to_address) for legacy compatibility
         if latitude and longitude:
             delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
             if delivery_task and delivery_task.dl_to_address:
@@ -2121,7 +2134,6 @@ def update_order_zone(request, order_id):
                 if building_number:
                     dl_address.dl_building = str(building_number)
                 dl_address.save()
-                coords_saved = True
 
         # Log the update
         notes = f'Zone updated from AI parse: {zone.zone_name}'
@@ -2374,20 +2386,20 @@ def delivery_task_detail(request, task_id):
         id=task_id
     )
 
-    # Status timeline from OrderStatusHistory
+    # Status timeline from OrderStatusHistory (exclude DMS — logged by ShipDay, not useful)
     status_history = orders_models.OrderStatusHistory.objects.filter(
         order=task.order
-    ).select_related('changed_by').order_by('created_at')
+    ).exclude(field_name='dl_task_status_dms').select_related('changed_by').order_by('created_at')
 
     # Verification logs as fallback
     verification_logs = orders_models.OrderVerificationLog.objects.filter(
         order=task.order
     ).select_related('verified_by').order_by('-created_at')
 
-    # Driver / DMS activity: delivery-related status changes
+    # Driver activity: delivery task status changes only (no DMS)
     driver_status_updates = orders_models.OrderStatusHistory.objects.filter(
         order=task.order,
-        field_name__in=['dl_task_status', 'dl_task_status_dms']
+        field_name__in=['dl_task_status']
     ).select_related('changed_by').order_by('created_at')
 
     # Driver uploads / documents
@@ -2428,8 +2440,8 @@ def delivery_task_detail(request, task_id):
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
 @staff_required
-def publish_task_to_dms(request, task_id):
-    """AJAX endpoint to publish delivery task to DMS"""
+def publish_task_to_fleets(request, task_id):
+    """AJAX endpoint to publish delivery task to Fleet drivers"""
     try:
         task = get_object_or_404(
             delivery_models.DeliveryTask.objects.select_related('order'), id=task_id)
@@ -2448,49 +2460,53 @@ def publish_task_to_dms(request, task_id):
                 'error': 'Cannot publish — order must be verified first'
             }, status=400)
 
-        # Update task status to publish to DMS
-        task.dl_task_status = 'publish_to_dms'
+        # Mark task as published to fleet (pending = visible to all fleet drivers)
+        task.dl_task_status = 'pending'
         task.dl_task_publish = True
         task.save()
 
+        # Log to timeline
+        orders_models.OrderStatusHistory.objects.create(
+            order=task.order,
+            field_name='dl_task_publish',
+            old_value='False',
+            new_value='True',
+            old_display='Not Published',
+            new_display='Published to Fleet',
+            changed_by=request.user,
+        )
+
         return JsonResponse({
             'success': True,
-            'message': 'Task published to DMS successfully',
+            'message': 'Task published to Fleets successfully',
             'task_id': task.id,
             'task_number': task.dl_task_number
         })
     except Exception as e:
-        logger.exception("Error publishing task %s to DMS: %s", task_id, str(e))
+        logger.exception("Error publishing task %s to fleets: %s", task_id, str(e))
         return JsonResponse({
             'success': False,
-            'error': 'An error occurred while publishing task to DMS'
+            'error': 'An error occurred while publishing task to fleets'
         }, status=400)
 
 
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
 @staff_required
-def publish_task_to_driver_app(request, task_id):
-    """AJAX endpoint to publish delivery task to Driver App"""
+def unpublish_task_from_fleets(request, task_id):
+    """AJAX endpoint to unpublish delivery task from Fleet drivers"""
     try:
         task = get_object_or_404(delivery_models.DeliveryTask, id=task_id)
-
-        # Update task to be available in driver app
-        task.dl_task_status_dms = '6'  # Unassigned - available for drivers
-        task.save()
-
+        task.dl_task_publish = False
+        task.save(update_fields=['dl_task_publish'])
         return JsonResponse({
             'success': True,
-            'message': 'Task published to Driver App successfully',
+            'message': 'Task unpublished from Fleets',
             'task_id': task.id,
-            'task_number': task.dl_task_number
         })
     except Exception as e:
-        logger.exception("Error publishing task %s to driver app: %s", task_id, str(e))
-        return JsonResponse({
-            'success': False,
-            'error': 'An error occurred while publishing task to driver app'
-        }, status=400)
+        logger.exception("Error unpublishing task %s: %s", task_id, str(e))
+        return JsonResponse({'success': False, 'error': 'An error occurred'}, status=400)
 
 
 @require_http_methods(["POST"])
@@ -2537,6 +2553,7 @@ def assign_driver_to_task(request, task_id):
             }, status=400)
 
         task.driver = driver
+        task.dl_task_status = 'assigned'
         task.dl_task_status_dms = '0'  # Assigned
         task.save()
 
@@ -2608,6 +2625,18 @@ def update_task_status(request, task_id):
                 'success': False,
                 'error': 'Status is required'
             }, status=400)
+
+        # Handle publish_to_fleets as a special action (fallback if JS intercept missed it)
+        if status == 'publish_to_fleets':
+            task.dl_task_status = 'pending'
+            task.dl_task_publish = True
+            task.save(update_fields=['dl_task_status', 'dl_task_publish'])
+            return JsonResponse({
+                'success': True,
+                'message': 'Task published to Fleet drivers',
+                'task_id': task.id,
+                'new_status': 'pending'
+            })
 
         if status not in VALID_STATUSES:
             return JsonResponse({
@@ -2912,95 +2941,6 @@ def update_team_status(request, team_id):
 
 # ADDITIONAL SIDEBAR FUNCTIONS --------------------------------------------------------------------------------------------------------------
 
-# Orders Section Functions
-@login_required(login_url='/accounts/login/')
-@staff_required
-def orders_dms_updated(request):
-    """
-    View for DMS updated orders list.
-    Shows orders that have delivery tasks with DMS status updates.
-    """
-    from orders import models as orders_models
-    from django.db.models import Prefetch
-
-    # Get orders that have delivery tasks with DMS IDs (meaning they're in the DMS system)
-    # Use select_related and prefetch_related to optimize queries
-    orders_list = orders_models.Order.objects.filter(
-        delivery_task__dl_task_number_dms__isnull=False
-    ).select_related(
-        'business',
-        'pickup_location'
-    ).prefetch_related(
-        Prefetch(
-            'delivery_task',
-            queryset=delivery_models.DeliveryTask.objects.select_related(
-                'driver__user',
-                'order'
-            ).filter(
-                dl_task_number_dms__isnull=False
-            )
-        )
-    ).distinct().order_by('-created_at')
-
-    # Check if there are any orders
-    has_orders = orders_list.exists()
-
-    # Check if DMS is configured (you can check if shipday_obj exists)
-    dms_configured = shipday_obj is not None
-
-    orders_with_pagination = paginate_queryset(request, orders_list, items_per_page=20)
-
-    context = {
-        'orders': orders_with_pagination,
-        'page_title': 'DMS Updated Orders',
-        'has_orders': has_orders,
-        'dms_configured': dms_configured,
-    }
-    return render(request, 'workforce/wf_orders_dms_updated.html', context)
-
-
-@login_required(login_url='/accounts/login/')
-@staff_required
-def match_dms_task(request):
-    """Manually match a delivery task to a DMS job ID."""
-    from delivery import models as delivery_models
-    from django.contrib import messages
-
-    if request.method == 'POST':
-        delivery_task_number = request.POST.get('delivery_task_number', '').strip()
-        dms_job_id = request.POST.get('dms_job_id', '').strip()
-
-        if not delivery_task_number or not dms_job_id:
-            messages.error(request, 'Both Delivery Task Number and DMS Job ID are required.')
-            logger.warning(f"Match attempt failed - missing fields. Task: {delivery_task_number}, DMS ID: {dms_job_id}")
-            return redirect('workforce:wf_orders_dms_updated')
-
-        try:
-            # Find the delivery task
-            task = delivery_models.DeliveryTask.objects.get(
-                dl_task_number=delivery_task_number
-            )
-
-            # Update with DMS job ID
-            task.dl_task_number_dms = dms_job_id
-            task.save()
-
-            messages.success(
-                request,
-                f'Successfully matched Delivery Task {delivery_task_number} to DMS Job ID: {dms_job_id}'
-            )
-            logger.info(f"User {request.user.id} matched delivery task {delivery_task_number} to DMS ID {dms_job_id}")
-
-        except delivery_models.DeliveryTask.DoesNotExist:
-            messages.error(request, f'Delivery Task "{delivery_task_number}" not found in the system.')
-            logger.warning(f"Failed to match - delivery task {delivery_task_number} not found")
-
-        except Exception as e:
-            messages.error(request, 'An error occurred while matching. Please try again.')
-            logger.exception("Error matching task %s to DMS ID %s: %s", delivery_task_number, dms_job_id, str(e))
-
-    return redirect('workforce:wf_orders_dms_updated')
-
 
 @login_required(login_url='/accounts/login/')
 @staff_required
@@ -3048,29 +2988,6 @@ def tasks_followup_list(request):
     return render(request, 'workforce/parts/lists/dl_list_all.html', context)
 
 
-@login_required(login_url='/accounts/login/')
-@staff_required
-def tasks_dms_updated(request):
-    """View for DMS updated tasks list"""
-    tasks_list = delivery_models.DeliveryTask.objects.select_related(
-        'order', 'driver', 'business', 'pickup_location', 'order__business'
-    ).prefetch_related(
-        'order__order_items',
-    ).filter(
-        dl_task_status_dms__isnull=False
-    ).order_by('-created_at')
-
-    tasks_with_pagination = paginate_queryset(request, tasks_list, items_per_page=20)
-
-    context = {
-        'dl_tasks': tasks_with_pagination,
-        'page_title': 'DMS Updated Tasks',
-        'page_subtitle': 'Tasks with DMS status updates',
-        'page_icon': 'fa-cloud',
-        'list_type': 'dms_updated',
-    }
-    return render(request, 'workforce/parts/lists/dl_list_all.html', context)
-
 
 @login_required(login_url='/accounts/login/')
 @staff_required
@@ -3095,28 +3012,6 @@ def tasks_reported(request):
     }
     return render(request, 'workforce/parts/lists/dl_list_all.html', context)
 
-
-# DMS Links Section Functions
-@login_required(login_url='/accounts/login/')
-@staff_required
-def dms_publish_order(request):
-    """View for publishing orders to DMS"""
-    from orders import models as orders_models
-
-    orders_list = orders_models.Order.objects.select_related(
-        'business'
-    ).filter(
-        verification_status='verified',
-        task_created=False
-    ).order_by('-created_at')
-
-    orders_with_pagination = paginate_queryset(request, orders_list, items_per_page=20)
-
-    context = {
-        'orders': orders_with_pagination,
-        'page_title': 'Publish Orders to DMS',
-    }
-    return render(request, 'workforce/dms_publish_order.html', context)
 
 
 # Finance Dashboard Section Functions
@@ -4694,134 +4589,6 @@ def staff_contacts(request):
     return render(request, 'workforce/staff_contacts.html', context)
 
 
-# ==================== DMS (ShipDay) VIEWS ====================
-
-@login_required(login_url='/accounts/login/')
-@staff_required
-def dms_drivers_list(request):
-    """View for listing all drivers from ShipDay DMS"""
-    logger.info(f"Fetching Shipday carriers for user: {request.user.id if request.user.is_authenticated else 'anonymous'}")
-
-    carriers = []
-    error_message = None
-
-    try:
-        if shipday_obj:
-            carriers = shipday_obj.CarrierService.get_carriers()
-            logger.info(f"Successfully fetched {len(carriers) if carriers else 0} carriers from Shipday")
-        else:
-            error_message = "ShipDay API is not configured. Please check SHIPDAY_API_KEY in settings."
-            logger.warning(error_message)
-    except Exception as e:
-        error_message = "Error fetching Shipday carriers. Please try again later."
-        logger.exception("Error fetching Shipday carriers: %s", str(e))
-
-    context = {
-        'page_title': 'DMS Drivers List',
-        'carriers': carriers or [],
-        'error_message': error_message,
-    }
-    return render(request, 'workforce/dms_drivers_list.html', context)
-
-
-@login_required(login_url='/accounts/login/')
-@staff_required
-def dms_orders_list(request):
-    """View for listing all orders from ShipDay DMS"""
-    logger.info(f"Fetching Shipday orders for user: {request.user.id if request.user.is_authenticated else 'anonymous'}")
-
-    orders = []
-    error_message = None
-
-    try:
-        if shipday_obj:
-            orders = shipday_obj.OrderService.get_orders()
-            logger.info(f"Successfully fetched {len(orders) if orders else 0} orders from Shipday")
-        else:
-            error_message = "ShipDay API is not configured. Please check SHIPDAY_API_KEY in settings."
-            logger.warning(error_message)
-    except Exception as e:
-        error_message = "Error fetching Shipday orders. Please try again later."
-        logger.exception("Error fetching Shipday orders: %s", str(e))
-
-    context = {
-        'page_title': 'DMS Orders List',
-        'orders_in_shipday': orders or [],
-        'error_message': error_message,
-    }
-    return render(request, 'workforce/dms_orders_list.html', context)
-
-
-@login_required(login_url='/accounts/login/')
-@staff_required
-def dms_analytics(request):
-    """View for DMS analytics and statistics"""
-    try:
-        # Get statistics from local database
-        total_tasks = delivery_models.DeliveryTask.objects.count()
-        synced_tasks = delivery_models.DeliveryTask.objects.filter(dl_task_number_dms__isnull=False).count()
-        pending_tasks = delivery_models.DeliveryTask.objects.filter(dl_task_number_dms__isnull=True).count()
-
-        # Get driver statistics
-        total_drivers = fleet_models.Driver.objects.filter(driver_status='approved').count()
-
-        # Get order statistics
-        total_orders = orders_models.Order.objects.count()
-        published_orders = orders_models.Order.objects.filter(task_created=True).count()
-
-        context = {
-            'page_title': 'DMS Analytics',
-            'total_tasks': total_tasks,
-            'synced_tasks': synced_tasks,
-            'pending_tasks': pending_tasks,
-            'total_drivers': total_drivers,
-            'total_orders': total_orders,
-            'published_orders': published_orders,
-        }
-    except Exception as e:
-        logger.exception("Error fetching DMS analytics: %s", str(e))
-        context = {
-            'page_title': 'DMS Analytics',
-            'error_message': 'Error loading analytics. Please try again later.',
-        }
-
-    return render(request, 'workforce/dms_analytics.html', context)
-
-
-@login_required(login_url='/accounts/login/')
-@staff_required
-def dms_sync_monitor(request):
-    """View for monitoring DMS sync status"""
-    try:
-        # Get recently synced tasks
-        recently_synced = delivery_models.DeliveryTask.objects.select_related(
-            'order', 'driver', 'driver__user'
-        ).filter(
-            dl_task_number_dms__isnull=False
-        ).order_by('-updated_at')[:50]
-
-        # Get failed sync attempts
-        failed_sync = delivery_models.DeliveryTask.objects.select_related(
-            'order', 'driver', 'driver__user'
-        ).filter(
-            dl_task_number_dms__isnull=True,
-            dl_task_status__in=['in_transit', 'pending', 'address_pending']
-        ).order_by('-created_at')[:50]
-
-        context = {
-            'page_title': 'DMS Sync Monitor',
-            'recently_synced': recently_synced,
-            'failed_sync': failed_sync,
-        }
-    except Exception as e:
-        logger.exception("Error fetching DMS sync monitor data: %s", str(e))
-        context = {
-            'page_title': 'DMS Sync Monitor',
-            'error_message': 'Error loading sync monitor. Please try again later.',
-        }
-
-    return render(request, 'workforce/dms_sync_monitor.html', context)
-
 
 # Documents section  ------------------------------------------------------------------------------------------------------
 
@@ -6234,13 +6001,19 @@ def delivery_task_edit(request, task_id):
             # Handle task fields
             driver_id = request.POST.get('driver')
             status = request.POST.get('status')
-            notes = request.POST.get('notes', '')
+            task_description = request.POST.get('task_description', '').strip()
 
             if driver_id:
                 task.driver_id = driver_id
             if status:
                 task.dl_task_status = status
-            task.notes = notes
+            if task_description:
+                task.dl_task_description = task_description[:100]  # max_length=100
+            pickup_location_id = request.POST.get('pickup_location', '').strip()
+            if pickup_location_id:
+                task.pickup_location_id = int(pickup_location_id)
+            elif pickup_location_id == '':
+                task.pickup_location_id = None
             task.save()
 
             # Handle order fields if order exists
@@ -6262,6 +6035,9 @@ def delivery_task_edit(request, task_id):
                 order.dl_street = int(dl_street) if dl_street and dl_street.isdigit() else None
                 order.dl_building = int(dl_building) if dl_building and dl_building.isdigit() else None
 
+                # Order notes
+                order.order_notes = request.POST.get('order_notes', order.order_notes)
+
                 # COD details
                 cod_amount = request.POST.get('cod_amount', '0')
                 order.cod_amount = int(cod_amount) if cod_amount and cod_amount.isdigit() else 0
@@ -6269,7 +6045,39 @@ def delivery_task_edit(request, task_id):
                 dl_amount = request.POST.get('dl_amount', '0')
                 order.dl_amount = int(dl_amount) if dl_amount and dl_amount.isdigit() else 0
 
+                # Coordinates & accuracy
+                from decimal import Decimal, InvalidOperation
+                lat_raw = request.POST.get('latitude', '').strip()
+                lng_raw = request.POST.get('longitude', '').strip()
+                try:
+                    order.latitude = Decimal(lat_raw) if lat_raw else None
+                except InvalidOperation:
+                    pass
+                try:
+                    order.longitude = Decimal(lng_raw) if lng_raw else None
+                except InvalidOperation:
+                    pass
+                coords_accuracy = request.POST.get('coords_accuracy', '').strip()
+                if coords_accuracy:
+                    order.coords_accuracy = coords_accuracy
+
                 order.save()
+
+                # Update order item quantities
+                from orders.models import OrderItem
+                for key, val in request.POST.items():
+                    if key.startswith('item_qty_'):
+                        try:
+                            item_id = int(key.split('item_qty_')[1])
+                            qty = int(val)
+                            item = OrderItem.objects.get(id=item_id, order=order)
+                            item.quantity = max(0, qty)
+                            if item.unit_price:
+                                from decimal import Decimal as D
+                                item.total_price = D(item.unit_price) * item.quantity
+                            item.save()
+                        except (ValueError, OrderItem.DoesNotExist):
+                            pass
 
                 # Log the change
                 orders_models.OrderVerificationLog.objects.create(
@@ -6295,10 +6103,36 @@ def delivery_task_edit(request, task_id):
         driver_status='approved'
     ).order_by('user__first_name')
 
+    # Pickup locations scoped to the task's business, including fulfillment center
+    from business.models import PickupLocation
+    from warehouse.models import SellerWarehouseLink
+    from django.db.models import Q
+    task_business = task.business or (task.order.business if task.order else None)
+
+    if task_business:
+        # Get the linked warehouse (if any) for this business
+        wh_link = SellerWarehouseLink.objects.filter(
+            business=task_business
+        ).select_related('default_location').first()
+        linked_wh = wh_link.default_location if (wh_link and wh_link.default_location) else None
+
+        # Include: business's own pickup locations + any fulfillment center linked to their warehouse
+        q = Q(business=task_business)
+        if linked_wh:
+            q |= Q(warehouse=linked_wh, is_fulfilment_center=True)
+        pickup_locations = list(
+            PickupLocation.objects.filter(q)
+            .select_related('warehouse')
+            .order_by('-is_fulfilment_center', 'pickup_location_title')
+        )
+    else:
+        pickup_locations = []
+
     context = {
         'page_title': f'Edit Task #{task.dl_task_number}',
         'task': task,
         'drivers': drivers,
+        'pickup_locations': pickup_locations,
     }
 
     return render(request, 'workforce/parts/delivery_task_edit.html', context)
@@ -6334,8 +6168,8 @@ def bulk_print_tasks(request):
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
 @staff_required
-def bulk_publish_dms(request):
-    """Bulk publish tasks to DMS"""
+def bulk_publish_fleets(request):
+    """Bulk publish tasks to Fleet drivers"""
     try:
         data = json.loads(request.body)
         task_ids = data.get('task_ids', [])
@@ -6353,20 +6187,20 @@ def bulk_publish_dms(request):
         ).exclude(
             order__order_status='cancelled'
         ).update(
-            dl_task_status='publish_to_dms',
+            dl_task_status='pending',
             dl_task_publish=True
         )
 
         return JsonResponse({
             'success': True,
-            'message': f'{updated} task(s) published to DMS',
+            'message': f'{updated} task(s) published to Fleets',
             'updated_count': updated
         })
     except Exception as e:
-        logger.exception("Error bulk publishing to DMS: %s", str(e))
+        logger.exception("Error bulk publishing to fleets: %s", str(e))
         return JsonResponse({
             'success': False,
-            'error': 'An error occurred while publishing tasks to DMS'
+            'error': 'An error occurred while publishing tasks to Fleets'
         }, status=400)
 
 

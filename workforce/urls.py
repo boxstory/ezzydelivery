@@ -64,8 +64,8 @@ urlpatterns = [
     path('tasks/dl_list_all/', workforce_views.dl_list_all, name='dl_list_all'),
     path('tasks/fulfilled-clients/', workforce_views.fulfilled_clients_tasks, name='dl_list_fulfilled_clients'),
     path('tasks/non-fulfilled-clients/', workforce_views.non_fulfilled_clients_tasks, name='dl_list_non_fulfilled_clients'),
-    path('tasks/dl_list_unpublished/', workforce_views.dl_list_ready_to_published_to_dms, name='dl_list_ready_to_published_to_dms'),
-    path('tasks/dl_list_published/', workforce_views.dl_list_published_to_dms, name='dl_list_published_to_dms'),
+    path('tasks/unpublished/', workforce_views.dl_list_ready_to_published_to_dms, name='dl_list_ready_to_published_to_dms'),
+    path('tasks/published/', workforce_views.dl_list_published_to_dms, name='dl_list_published_to_dms'),
     path('tasks/dl_list_incompleted/', workforce_views.dl_list_incompleted_details, name='dl_list_incompleted_details'),
 
     # Delivery task detail view
@@ -73,14 +73,14 @@ urlpatterns = [
     path('delivery-task/<int:task_id>/edit/', workforce_views.delivery_task_edit, name='delivery_task_edit'),
 
     # AJAX endpoints for delivery tasks
-    path('delivery-task/<int:task_id>/publish-dms/', workforce_views.publish_task_to_dms, name='publish_task_to_dms'),
-    path('delivery-task/<int:task_id>/publish-driver-app/', workforce_views.publish_task_to_driver_app, name='publish_task_to_driver_app'),
+    path('delivery-task/<int:task_id>/publish-fleets/', workforce_views.publish_task_to_fleets, name='publish_task_to_fleets'),
+    path('delivery-task/<int:task_id>/unpublish-fleets/', workforce_views.unpublish_task_from_fleets, name='unpublish_task_from_fleets'),
     path('delivery-task/<int:task_id>/assign-driver/', workforce_views.assign_driver_to_task, name='assign_driver_to_task'),
     path('delivery-task/<int:task_id>/update-status/', workforce_views.update_task_status, name='update_task_status'),
 
     # Bulk action endpoints for delivery tasks
     path('tasks/bulk-print/', workforce_views.bulk_print_tasks, name='bulk_print_tasks'),
-    path('tasks/bulk-publish-dms/', workforce_views.bulk_publish_dms, name='bulk_publish_dms'),
+    path('tasks/bulk-publish-fleets/', workforce_views.bulk_publish_fleets, name='bulk_publish_fleets'),
     path('tasks/bulk-publish-app/', workforce_views.bulk_publish_app, name='bulk_publish_app'),
     path('tasks/bulk-update-status/', workforce_views.bulk_update_status, name='bulk_update_status'),
     path('tasks/bulk-export/', workforce_views.bulk_export_tasks, name='bulk_export_tasks'),
@@ -92,21 +92,11 @@ urlpatterns = [
     path('verification/team/<int:team_id>/update-status/', workforce_views.update_team_status, name='update_team_status'),
 
     # Additional Orders URLs
-    path('orders/dms-updated/', workforce_views.orders_dms_updated, name='wf_orders_dms_updated'),
-    path('orders/match-dms/', workforce_views.match_dms_task, name='match_dms_task'),
     path('orders/reported/', workforce_views.orders_reported, name='wf_orders_reported'),
 
     # Additional Tasks URLs
     path('tasks/followup-list/', workforce_views.tasks_followup_list, name='tasks_followup_list'),
-    path('tasks/dms-updated/', workforce_views.tasks_dms_updated, name='tasks_dms_updated'),
     path('tasks/reported/', workforce_views.tasks_reported, name='tasks_reported'),
-
-    #DMS sections urls -----------------------------------------------------------------------
-    path('dms/publish-order/', workforce_views.dms_publish_order, name='dms_publish_order'),
-    path('dms/drivers/', workforce_views.dms_drivers_list, name='dms_drivers_list'),
-    path('dms/orders/', workforce_views.dms_orders_list, name='dms_orders_list'),
-    path('dms/analytics/', workforce_views.dms_analytics, name='dms_analytics'),
-    path('dms/sync-monitor/', workforce_views.dms_sync_monitor, name='dms_sync_monitor'),
 
     # Finance Dashboard
     path('finance/', workforce_views.workforce_finance_dashboard, name='workforce_finance_dashboard'),

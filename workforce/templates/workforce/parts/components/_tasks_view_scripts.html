@@ -142,8 +142,8 @@ function bulkAction(action) {
         case 'print':
             bulkPrint(selectedIds);
             break;
-        case 'publish_dms':
-            bulkPublishDMS(selectedIds);
+        case 'publish_fleets':
+            bulkPublishFleets(selectedIds);
             break;
         case 'publish_app':
             bulkPublishApp(selectedIds);
@@ -172,10 +172,10 @@ function bulkPrint(taskIds) {
     window.open(printUrl, '_blank');
 }
 
-// Bulk publish to DMS
-function bulkPublishDMS(taskIds) {
-    if (confirm('Publish ' + taskIds.length + ' task(s) to DMS?')) {
-        fetch('/workforce/tasks/bulk-publish-dms/', {
+// Bulk publish to Fleets
+function bulkPublishFleets(taskIds) {
+    if (confirm('Publish ' + taskIds.length + ' task(s) to Fleet drivers?')) {
+        fetch('/workforce/tasks/bulk-publish-fleets/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -186,7 +186,7 @@ function bulkPublishDMS(taskIds) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showToast('Tasks published to DMS successfully', 'success');
+                showToast('Tasks published to Fleets successfully', 'success');
                 location.reload();
             } else {
                 showToast(data.message || 'Error publishing tasks', 'error');
@@ -496,10 +496,10 @@ function editTask(taskId) {
     }
 }
 
-// Publish single task to DMS
-function publishToDMS(taskId) {
-    if (confirm('Publish this task to DMS?')) {
-        fetch('/workforce/delivery-task/' + taskId + '/publish-dms/', {
+// Publish single task to Fleets
+function publishToFleets(taskId) {
+    if (confirm('Publish this task to Fleet drivers?')) {
+        fetch('/workforce/delivery-task/' + taskId + '/publish-fleets/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -509,7 +509,7 @@ function publishToDMS(taskId) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showToast('Task published to DMS successfully', 'success');
+                showToast('Task published to Fleets successfully', 'success');
                 location.reload();
             } else {
                 showToast(data.message || 'Error publishing task', 'error');
@@ -522,10 +522,10 @@ function publishToDMS(taskId) {
     }
 }
 
-// Publish single task to Driver App
-function publishToDriverApp(taskId) {
-    if (confirm('Publish this task to Driver App?')) {
-        fetch('/workforce/delivery-task/' + taskId + '/publish-driver-app/', {
+// Unpublish single task from Fleets
+function unpublishFromFleets(taskId) {
+    if (confirm('Unpublish this task? It will no longer show to Fleet drivers.')) {
+        fetch('/workforce/delivery-task/' + taskId + '/unpublish-fleets/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -535,14 +535,14 @@ function publishToDriverApp(taskId) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showToast('Task published to App successfully', 'success');
+                showToast('Task unpublished from Fleets', 'success');
                 location.reload();
             } else {
-                showToast(data.message || 'Error publishing task', 'error');
+                showToast(data.error || 'Error unpublishing task', 'error');
             }
         })
         .catch(error => {
-            showToast('Error publishing task', 'error');
+            showToast('Error unpublishing task', 'error');
             console.error('Error:', error);
         });
     }

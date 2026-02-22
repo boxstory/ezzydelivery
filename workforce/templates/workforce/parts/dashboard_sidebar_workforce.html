@@ -25,7 +25,7 @@
           <span>Orders</span>
           <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
         </a>
-        <div class="collapse submenu {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_dms_updated,wf_orders_reported,wf_orders_add,wf_orders_bulk_import,wf_orders_api_guide,order_detail' %}show{% endif %}" id="submenu-orders">
+        <div class="collapse submenu {% if request.resolver_match.url_name in 'wf_orders_all,wf_orders_fulfilled_clients,wf_orders_non_fulfilled_clients,wf_orders_to_publish,wf_orders_published,wf_orders_by_seller,wf_orders_reported,wf_orders_add,wf_orders_bulk_import,wf_orders_api_guide,order_detail' %}show{% endif %}" id="submenu-orders">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a id="workforce_sidebar_link_wf_orders_add" class="nav-link btn submenu-link submenu-link-highlight {% if request.resolver_match.url_name == 'wf_orders_add' %}active{% endif %}"
@@ -137,18 +137,6 @@
               </a>
             </li>
             <li class="nav-item">
-              <a id="workforce_sidebar_link_wf_orders_dms_updated" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'wf_orders_dms_updated' %}active{% endif %}"
-                 href="{% url 'workforce:wf_orders_dms_updated' %}"
-                 hx-get="{% url 'workforce:wf_orders_dms_updated' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-sync me-2"></i>
-                DMS Updated List
-              </a>
-            </li>
-            <li class="nav-item">
               <a id="workforce_sidebar_link_wf_orders_reported" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'wf_orders_reported' %}active{% endif %}"
                  href="{% url 'workforce:wf_orders_reported' %}"
                  hx-get="{% url 'workforce:wf_orders_reported' %}"
@@ -171,7 +159,7 @@
           <span>Tasks</span>
           <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
         </a>
-        <div class="collapse submenu {% if request.resolver_match.url_name in 'dl_list_all,dl_list_fulfilled_clients,dl_list_non_fulfilled_clients,dl_list_ready_to_published_to_dms,dl_list_published_to_dms,dl_list_incompleted_details,tasks_followup_list,tasks_dms_updated,tasks_reported,delivery_task_detail' %}show{% endif %}" id="submenu-deliveries">
+        <div class="collapse submenu {% if request.resolver_match.url_name in 'dl_list_all,dl_list_fulfilled_clients,dl_list_non_fulfilled_clients,dl_list_ready_to_published_to_dms,dl_list_published_to_dms,dl_list_incompleted_details,tasks_followup_list,tasks_reported,delivery_task_detail' %}show{% endif %}" id="submenu-deliveries">
           <ul class="nav flex-column">
             <li class="nav-item">
               <a id="workforce_sidebar_link_all_tasks" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'dl_list_all' or request.resolver_match.url_name == 'delivery_task_detail' %}active{% endif %}"
@@ -210,7 +198,7 @@
               </a>
             </li>
             <li class="nav-item">
-              <a id="workforce_sidebar_link_tasks_unpublished_dms" class="nav-link btn submenu-link d-flex align-items-center {% if request.resolver_match.url_name == 'dl_list_ready_to_published_to_dms' %}active{% endif %}"
+              <a id="workforce_sidebar_link_tasks_unpublished" class="nav-link btn submenu-link d-flex align-items-center {% if request.resolver_match.url_name == 'dl_list_ready_to_published_to_dms' %}active{% endif %}"
                  href="{% url 'workforce:dl_list_ready_to_published_to_dms' %}"
                  hx-get="{% url 'workforce:dl_list_ready_to_published_to_dms' %}"
                  hx-target="#main-content"
@@ -218,8 +206,8 @@
                  hx-swap="outerHTML"
                  hx-push-url="true">
                 <i class="fa-solid fa-spinner me-2"></i>
-                <span class="flex-grow-1">UnPublished-DMS</span>
-                {% if unpublished_dms_count %}<span class="badge bg-info ms-auto" data-badge="unpublished_dms">{{ unpublished_dms_count }}</span>{% endif %}
+                <span class="flex-grow-1">Unpublished Tasks</span>
+                {% if unpublished_tasks_count %}<span class="badge bg-info ms-auto" data-badge="unpublished_tasks">{{ unpublished_tasks_count }}</span>{% endif %}
               </a>
             </li>
             <li class="nav-item">
@@ -260,18 +248,6 @@
               </a>
             </li>
             <li class="nav-item">
-              <a id="workforce_sidebar_link_tasks_dms_updated" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'tasks_dms_updated' %}active{% endif %}"
-                 href="{% url 'workforce:tasks_dms_updated' %}"
-                 hx-get="{% url 'workforce:tasks_dms_updated' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-sync me-2"></i>
-                DMS Updated List
-              </a>
-            </li>
-            <li class="nav-item">
               <a id="workforce_sidebar_link_tasks_reported" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'tasks_reported' %}active{% endif %}"
                  href="{% url 'workforce:tasks_reported' %}"
                  hx-get="{% url 'workforce:tasks_reported' %}"
@@ -281,79 +257,6 @@
                  hx-push-url="true">
                 <i class="fa-solid fa-flag me-2"></i>
                 Reported
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- DMS Management Section -->
-      <li id="workforce_sidebar_menu_dms" class="nav-item">
-        <a id="workforce_sidebar_link_dms" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-dms" href="#">
-          <i class="fa-solid fa-cloud me-2"></i>
-          <span>DMS (ShipDay)</span>
-          <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
-        </a>
-        <div class="collapse submenu {% if request.resolver_match.url_name in 'dms_drivers_list,dms_orders_list,dms_analytics,dms_sync_monitor,dms_publish_order' %}show{% endif %}" id="submenu-dms">
-          <ul class="nav flex-column">
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_dms_analytics" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'dms_analytics' %}active{% endif %}"
-                 href="{% url 'workforce:dms_analytics' %}"
-                 hx-get="{% url 'workforce:dms_analytics' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-chart-line me-2"></i>
-                DMS Analytics
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_dms_drivers" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'dms_drivers_list' %}active{% endif %}"
-                 href="{% url 'workforce:dms_drivers_list' %}"
-                 hx-get="{% url 'workforce:dms_drivers_list' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-users-gear me-2"></i>
-                DMS Drivers
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_dms_orders" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'dms_orders_list' %}active{% endif %}"
-                 href="{% url 'workforce:dms_orders_list' %}"
-                 hx-get="{% url 'workforce:dms_orders_list' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-boxes-packing me-2"></i>
-                DMS Orders
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_dms_publish" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'dms_publish_order' %}active{% endif %}"
-                 href="{% url 'workforce:dms_publish_order' %}"
-                 hx-get="{% url 'workforce:dms_publish_order' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-paper-plane me-2"></i>
-                Publish to DMS
-              </a>
-            </li>
-            <li class="nav-item">
-              <a id="workforce_sidebar_link_dms_sync_monitor" class="nav-link btn submenu-link {% if request.resolver_match.url_name == 'dms_sync_monitor' %}active{% endif %}"
-                 href="{% url 'workforce:dms_sync_monitor' %}"
-                 hx-get="{% url 'workforce:dms_sync_monitor' %}"
-                 hx-target="#main-content"
-                 hx-select="#main-content"
-                 hx-swap="outerHTML"
-                 hx-push-url="true">
-                <i class="fa-solid fa-rotate me-2"></i>
-                Sync Monitor
               </a>
             </li>
           </ul>

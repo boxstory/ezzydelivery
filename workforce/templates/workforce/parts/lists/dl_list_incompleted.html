@@ -604,10 +604,10 @@
         return getCookie('csrftoken');
     }
 
-    // Publish to DMS
-    function publishToDMS(taskId) {
-        if (confirm('Publish this task to the Delivery Management System?')) {
-            fetch('/workforce/delivery-task/' + taskId + '/publish-dms/', {
+    // Publish to Fleets
+    function publishToFleets(taskId) {
+        if (confirm('Publish this task to Fleet drivers?')) {
+            fetch('/workforce/delivery-task/' + taskId + '/publish-fleets/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -617,56 +617,23 @@
             .then(function(response) { return response.json(); })
             .then(function(data) {
                 if (data.success) {
-                    alert('Task published to DMS successfully!');
+                    alert('Task published to Fleets successfully!');
                     location.reload();
                 } else {
-                    alert('Error: ' + (data.error || 'Failed to publish to DMS'));
+                    alert('Error: ' + (data.error || 'Failed to publish to Fleets'));
                 }
             })
             .catch(function(error) {
                 console.error('Error:', error);
-                alert('An error occurred while publishing to DMS');
+                alert('An error occurred while publishing to Fleets');
             });
         }
     }
 
-    // Event delegation for publish to DMS buttons
-    document.querySelectorAll('.btn-publish-dms[data-task-id]').forEach(function(btn) {
+    // Event delegation for publish to fleets buttons
+    document.querySelectorAll('.btn-publish-fleets[data-task-id]').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            publishToDMS(this.dataset.taskId);
-        });
-    });
-
-    // Publish to Driver App
-    function publishToDriverApp(taskId) {
-        if (confirm('Publish this task to the Driver Mobile App?')) {
-            fetch('/workforce/delivery-task/' + taskId + '/publish-driver-app/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken()
-                }
-            })
-            .then(function(response) { return response.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    alert('Task published to Driver App successfully!');
-                    location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to publish to Driver App'));
-                }
-            })
-            .catch(function(error) {
-                console.error('Error:', error);
-                alert('An error occurred while publishing to Driver App');
-            });
-        }
-    }
-
-    // Event delegation for publish to driver app buttons
-    document.querySelectorAll('.btn-publish-driver-app[data-task-id]').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            publishToDriverApp(this.dataset.taskId);
+            publishToFleets(this.dataset.taskId);
         });
     });
 
