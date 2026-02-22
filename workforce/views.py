@@ -1373,6 +1373,24 @@ def dl_list_all(request):
     if business_id:
         dl_tasks = dl_tasks.filter(order__business_id=business_id)
 
+    # Apply sorting
+    sort_field = request.GET.get('sort', '')
+    sort_order = request.GET.get('order', 'asc')
+    SORT_MAP = {
+        'task_number': 'dl_task_number',
+        'date': 'created_at',
+        'business': 'order__business__business_name',
+        'customer': 'order__customer_name',
+        'cod': 'order__order_cod_amount',
+        'status': 'dl_task_status',
+        'driver': 'driver__user__first_name',
+    }
+    if sort_field in SORT_MAP:
+        order_field = SORT_MAP[sort_field]
+        if sort_order == 'desc':
+            order_field = '-' + order_field
+        dl_tasks = dl_tasks.order_by(order_field)
+
     # Get all businesses for the filter dropdown
     businesses = business_models.Business.objects.filter(
         business_status='active'
@@ -1925,7 +1943,7 @@ def cancel_order(request, order_id):
             id=order_id
         )
 
-        if order.order_status == 'published':
+        if order.order_status == 'publish':
             return JsonResponse({
                 'success': False,
                 'error': 'Cannot cancel a published order'
@@ -2181,8 +2199,8 @@ def publish_order_to_delivery(request, order_id):
             id=order_id
         )
 
-        # Update order status to published
-        order.order_status = 'published'
+        # Update order status to publish (triggers auto delivery task creation signal)
+        order.order_status = 'publish'
         order.task_status = 'dl_task_listed'
         order.save()
 
@@ -2453,13 +2471,6 @@ def publish_task_to_fleets(request, task_id):
                 'error': 'Cannot publish — order is cancelled'
             }, status=400)
 
-        # Block if order is not verified
-        if task.order and task.order.verification_status != 'verified':
-            return JsonResponse({
-                'success': False,
-                'error': 'Cannot publish — order must be verified first'
-            }, status=400)
-
         # Mark task as published to fleet (pending = visible to all fleet drivers)
         task.dl_task_status = 'pending'
         task.dl_task_publish = True
@@ -2523,13 +2534,6 @@ def assign_driver_to_task(request, task_id):
             return JsonResponse({
                 'success': False,
                 'error': 'Cannot assign driver — order is cancelled'
-            }, status=400)
-
-        # Block if order is not verified
-        if task.order and task.order.verification_status != 'verified':
-            return JsonResponse({
-                'success': False,
-                'error': 'Cannot assign driver — order must be verified first'
             }, status=400)
 
         # Parse JSON body
@@ -5543,6 +5547,7 @@ def drivers_list(request):
         drivers = drivers.filter(
             Q(user__first_name__icontains=search) |
             Q(user__last_name__icontains=search) |
+            Q(user__username__icontains=search) |
             Q(driver_code__icontains=search) |
             Q(driver_phone__icontains=search)
         )
@@ -6183,10 +6188,9 @@ def bulk_publish_fleets(request):
                 'error': 'No tasks selected'
             }, status=400)
 
-        # Update all selected tasks (only verified, non-cancelled orders)
+        # Update all selected tasks (non-cancelled orders)
         updated = delivery_models.DeliveryTask.objects.filter(
             id__in=task_ids,
-            order__verification_status='verified',
         ).exclude(
             order__order_status='cancelled'
         ).update(
@@ -6287,12 +6291,13 @@ def bulk_update_status(request):
             dl_task_status_dms='2',
             order__cod_status_by_staff='cod_settled_with_business'
         )
+        updated = 0
         for task in tasks:
             task.dl_task_status = status
             if status in DMS_STATUS_MAP:
                 task.dl_task_status_dms = DMS_STATUS_MAP[status]
             task.save(update_fields=['dl_task_status', 'dl_task_status_dms'])
-        updated = tasks.count()
+            updated += 1
 
         return JsonResponse({
             'success': True,

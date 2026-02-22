@@ -379,10 +379,6 @@ def assign_driver(request):
                 if task.order and task.order.order_status == 'cancelled':
                     return JsonResponse({"success": False, "error": "Order is cancelled"})
 
-                # Block if order is not verified
-                if task.order and task.order.verification_status != 'verified':
-                    return JsonResponse({"success": False, "error": "Order not verified"})
-
                 # Update task: set driver and status to accepted
                 task.driver = driver
                 task.dl_task_status = 'accepted'
@@ -450,9 +446,6 @@ def accept_task(request):
                 if order_vals:
                     if order_vals[0] == 'cancelled':
                         return JsonResponse({"success": False, "error": "Order is cancelled — cannot accept task"})
-                    if order_vals[1] != 'verified':
-                        return JsonResponse({"success": False, "error": "Order not verified — cannot accept task"})
-
             # Update task status to accepted
             task.dl_task_status = 'accepted'
             task.dl_task_status_dms = '7'  # Accepted/Acknowledged in DMS
@@ -500,10 +493,6 @@ def start_ride(request):
             # Block if order is cancelled
             if task.order and task.order.order_status == 'cancelled':
                 return JsonResponse({"success": False, "error": "Order is cancelled — cannot start ride"})
-
-            # Block if order is not verified
-            if task.order and task.order.verification_status != 'verified':
-                return JsonResponse({"success": False, "error": "Order not verified — cannot start ride"})
 
             # Update status to out_for_delivery
             task.dl_task_status = 'out_for_delivery'

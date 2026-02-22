@@ -2190,20 +2190,17 @@ def driver_tasks(request):
     all_tasks = base_qs.filter(
         dl_task_publish=True, driver__isnull=True,
         dl_task_status__in=['pending', 'for_review'],
-        order__verification_status='verified',
     ).exclude(
         dl_task_status__in=['delivered', 'cancelled', 'failed']
     ).exclude(order__order_status='cancelled').order_by('-id')
 
     assigned_tasks = base_qs.filter(
         driver=driver, dl_task_status='assigned',
-        order__verification_status='verified',
     ).exclude(order__order_status='cancelled').order_by('-id')
 
     accepted_tasks = base_qs.filter(
         driver=driver,
         dl_task_status__in=['accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable'],
-        order__verification_status='verified',
     ).exclude(order__order_status='cancelled').order_by('-id')
 
     history_tasks = base_qs.filter(
@@ -2495,9 +2492,6 @@ def fleet_start_ride(request):
 
         if task.order and task.order.order_status == 'cancelled':
             return JsonResponse({'success': False, 'error': 'Order is cancelled — cannot start ride'})
-        if task.order and task.order.verification_status != 'verified':
-            return JsonResponse({'success': False, 'error': 'Order not verified — cannot start ride'})
-
         task.dl_task_status = 'out_for_delivery'
         task.save(update_fields=['dl_task_status'])
 
