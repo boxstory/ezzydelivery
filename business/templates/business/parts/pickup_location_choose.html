@@ -40,6 +40,25 @@
         </a>
 
         <!-- Option 2: Link Fulfillment Center -->
+        {% if pending_warehouse_link %}
+        <div class="plc__option plc__option--fulfillment plc__option--pending" id="client_location_choose_btn_fulfillment">
+            <div class="plc__option__icon plc__option__icon--warehouse">
+                <i class="fa-solid fa-warehouse"></i>
+            </div>
+            <h2 class="plc__option__title">Link Fulfillment Center</h2>
+            <p class="plc__option__desc">
+                Connect to an existing EzzyDelivery warehouse for managed fulfillment and inventory.
+            </p>
+            <div class="plc__option__features">
+                <span class="plc__option__tag"><i class="fa-solid fa-check"></i> Managed warehouse</span>
+                <span class="plc__option__tag"><i class="fa-solid fa-check"></i> Inventory sync</span>
+                <span class="plc__option__tag"><i class="fa-solid fa-check"></i> Pick & pack</span>
+            </div>
+            <span class="plc__option__cta plc__option__cta--pending">
+                <i class="fa-solid fa-clock"></i> Request Pending — {{ pending_warehouse_link.warehouse.name }}
+            </span>
+        </div>
+        {% else %}
         <a href="{% url 'business:warehouse_request' %}" class="plc__option plc__option--fulfillment" id="client_location_choose_btn_fulfillment">
             <div class="plc__option__icon plc__option__icon--warehouse">
                 <i class="fa-solid fa-warehouse"></i>
@@ -57,6 +76,7 @@
                 <i class="fa-solid fa-link"></i> Link Warehouse
             </span>
         </a>
+        {% endif %}
 
     </div>
 
