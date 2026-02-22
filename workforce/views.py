@@ -6014,6 +6014,9 @@ def delivery_task_edit(request, task_id):
                 task.pickup_location_id = int(pickup_location_id)
             elif pickup_location_id == '':
                 task.pickup_location_id = None
+            valid_time_slots = ('9am-1pm', '2pm-6pm', '6pm-10pm')
+            preferred_time = request.POST.get('preferred_time', '').strip()
+            task.preferred_time = preferred_time if preferred_time in valid_time_slots else ''
             task.save()
 
             # Handle order fields if order exists

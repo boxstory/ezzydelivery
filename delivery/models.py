@@ -250,13 +250,14 @@ class DeliveryTask(models.Model):
     )
 
     PREFERRED_TIME_CHOICES = [
-        ('10am-2pm', '10 AM – 2 PM'),
-        ('2pm-6pm', '2 PM – 6 PM'),
+        ('9am-1pm',  '9 AM – 1 PM'),
+        ('2pm-6pm',  '2 PM – 6 PM'),
         ('6pm-10pm', '6 PM – 10 PM'),
     ]
     preferred_time = models.CharField(
         max_length=50, blank=True, default='',
-        help_text="Customer preferred delivery time slots (comma-separated)"
+        choices=PREFERRED_TIME_CHOICES,
+        help_text="Customer preferred delivery time slot"
     )
 
     PAYMENT_METHOD_CHOICES = [
