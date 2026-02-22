@@ -2353,8 +2353,8 @@ def fleet_task_take_scan(request):
 
     try:
         data = _json.loads(request.body) if request.content_type == 'application/json' else request.POST
-        task_id = data.get('task_id', '').strip()
-        scanned_code = data.get('code', '').strip()
+        task_id = str(data.get('task_id', '')).strip()
+        scanned_code = str(data.get('code', '')).strip()
 
         if not task_id:
             return JsonResponse({'success': False, 'error': 'Task ID required'})

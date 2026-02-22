@@ -25,7 +25,7 @@
             onclick="switchTab('all')">
         New
         {% if all_count > 0 %}
-        <span class="fleet-bottom-nav__badge" style="position:static; display:inline-flex; margin-left:4px; min-width:18px; height:18px; font-size:10px;">{{ all_count }}</span>
+        <span class="fleet-tab__badge">{{ all_count }}</span>
         {% endif %}
     </button>
     <button type="button"
@@ -33,7 +33,7 @@
             onclick="switchTab('assigned')">
         Assigned
         {% if assigned_count > 0 %}
-        <span class="fleet-bottom-nav__badge" style="position:static; display:inline-flex; margin-left:4px; min-width:18px; height:18px; font-size:10px;">{{ assigned_count }}</span>
+        <span class="fleet-tab__badge">{{ assigned_count }}</span>
         {% endif %}
     </button>
     <button type="button"
@@ -41,7 +41,7 @@
             onclick="switchTab('accepted')">
         Active
         {% if accepted_count > 0 %}
-        <span class="fleet-bottom-nav__badge" style="position:static; display:inline-flex; margin-left:4px; min-width:18px; height:18px; font-size:10px; background:var(--fleet-success);">{{ accepted_count }}</span>
+        <span class="fleet-tab__badge fleet-tab__badge--success">{{ accepted_count }}</span>
         {% endif %}
     </button>
     <button type="button"
@@ -52,16 +52,13 @@
 </div>
 
 <!-- Filter Bar -->
-<form method="GET" id="filterForm" style="margin-bottom: var(--spacing-lg);">
+<form method="GET" id="filterForm">
     <input type="hidden" name="tab" value="{{ current_tab }}">
-    <div style="display:flex; gap:var(--spacing-sm); flex-wrap:wrap; align-items:center;">
+    <div class="fleet-filter-bar">
 
         <!-- Area Filter -->
         <select name="area" onchange="this.form.submit()"
-                style="flex:1; min-width:100px; padding:var(--spacing-sm) var(--spacing-md);
-                       border:1.5px solid var(--fleet-grey-200); border-radius:var(--radius-sm);
-                       background:var(--fleet-white); font-size:var(--font-size-sm); font-weight:600;
-                       color:var(--fleet-dark); cursor:pointer; appearance:none;">
+                class="fleet-select">
             <option value="all" {% if area_filter == 'all' %}selected{% endif %}>All Areas</option>
             <option value="my_zone" {% if area_filter == 'my_zone' %}selected{% endif %}>My Zones</option>
             <option value="doha" {% if area_filter == 'doha' %}selected{% endif %}>Doha</option>
@@ -71,11 +68,7 @@
         <!-- Zone Dropdown -->
         {% if available_zones %}
         <select name="zone" onchange="this.form.submit()"
-                style="flex:1; min-width:100px; padding:var(--spacing-sm) var(--spacing-md);
-                       border:1.5px solid {% if zone_filter %}var(--fleet-primary){% else %}var(--fleet-grey-200){% endif %};
-                       border-radius:var(--radius-sm); background:var(--fleet-white);
-                       font-size:var(--font-size-sm); font-weight:600; color:var(--fleet-dark);
-                       cursor:pointer; appearance:none;">
+                class="fleet-select {% if zone_filter %}fleet-select--active{% endif %}">
             <option value="">All Zones</option>
             {% for zone in available_zones %}
             <option value="{{ zone.zone_number }}" {% if zone_filter == zone.zone_number|stringformat:"s" %}selected{% endif %}>
@@ -88,11 +81,7 @@
         <!-- Status Filter (Active + History tabs) -->
         {% if current_tab == 'accepted' or current_tab == 'history' %}
         <select name="status" onchange="this.form.submit()"
-                style="flex:1; min-width:110px; padding:var(--spacing-sm) var(--spacing-md);
-                       border:1.5px solid {% if status_filter != 'all' %}var(--fleet-primary){% else %}var(--fleet-grey-200){% endif %};
-                       border-radius:var(--radius-sm); background:var(--fleet-white);
-                       font-size:var(--font-size-sm); font-weight:600; color:var(--fleet-dark);
-                       cursor:pointer; appearance:none;">
+                class="fleet-select {% if status_filter != 'all' %}fleet-select--active{% endif %}">
             <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Status</option>
             {% if current_tab == 'accepted' %}
             <option value="accepted" {% if status_filter == 'accepted' %}selected{% endif %}>Accepted</option>
@@ -109,10 +98,7 @@
 
         <!-- Sort -->
         <select name="sort" onchange="this.form.submit()"
-                style="flex:1; min-width:90px; padding:var(--spacing-sm) var(--spacing-md);
-                       border:1.5px solid var(--fleet-grey-200); border-radius:var(--radius-sm);
-                       background:var(--fleet-white); font-size:var(--font-size-sm); font-weight:600;
-                       color:var(--fleet-dark); cursor:pointer; appearance:none;">
+                class="fleet-select">
             <option value="date" {% if sort_by == 'date' %}selected{% endif %}>By Date</option>
             <option value="zone" {% if sort_by == 'zone' %}selected{% endif %}>By Zone</option>
             <option value="status" {% if sort_by == 'status' %}selected{% endif %}>By Status</option>
@@ -306,12 +292,10 @@
 
         <!-- Bottom info strip: COD + Items + Earnings + inline action -->
         <div class="task-card__strip">
-            {% if card.order.cod_amount %}
-            <div class="task-card__strip-item task-card__strip-item--cod">
+            <div class="task-card__strip-item {% if card.order.cod_amount %}task-card__strip-item--cod{% endif %}">
                 <i class="fa-solid fa-money-bill-wave"></i>
-                <span>COD {{ card.order.cod_amount }} QR</span>
+                <span>{% if card.order.cod_amount %}COD {{ card.order.cod_amount }} QR{% else %}No COD{% endif %}</span>
             </div>
-            {% endif %}
 
             {% with item_count=card.order.order_items.count %}
             {% if item_count %}
@@ -336,12 +320,18 @@
             </div>
             {% endif %}
 
-            <!-- Inline action button — right side -->
+            <!-- Inline action buttons — right side -->
             {% if current_tab == 'all' %}
-            <button class="task-card__action-btn task-card__action-btn--take"
-                    onclick="event.stopPropagation(); openTakeScanner({{ card.id }}, '{{ card.dl_task_number|default:card.id }}', '{{ card.order.order_number|default:'' }}', '{{ card.order.business.business_name|default:''|escapejs }}', '{{ card.order.customer_name|default:''|escapejs }}')">
-                <i class="fa-solid fa-qrcode"></i> Take
-            </button>
+            <div class="task-card__action-group">
+                <button class="task-card__action-btn task-card__action-btn--scan"
+                        onclick="event.stopPropagation(); openTakeScanner({{ card.id }}, '{{ card.dl_task_number|default:card.id }}', '{{ card.order.order_number|default:'' }}', '{{ card.order.business.business_name|default:''|escapejs }}', '{{ card.order.customer_name|default:''|escapejs }}')">
+                    <i class="fa-solid fa-qrcode"></i> Scan
+                </button>
+                <button class="task-card__action-btn task-card__action-btn--take"
+                        onclick="event.stopPropagation(); takeTaskDirect({{ card.id }}, '{{ card.dl_task_number|default:card.id }}', '{{ card.order.order_number|default:'' }}', '{{ card.order.business.business_name|default:''|escapejs }}', '{{ card.order.customer_name|default:''|escapejs }}')">
+                    <i class="fa-solid fa-hand"></i> Take
+                </button>
+            </div>
             {% elif current_tab == 'assigned' %}
             <button class="task-card__action-btn task-card__action-btn--accept"
                     onclick="event.stopPropagation(); acceptTask({{ card.id }}, this)">
@@ -466,12 +456,16 @@
             <p class="take-scan-countdown__label">Moving to Active tab…</p>
         </div>
 
-        <!-- Manual entry fallback -->
-        <div class="fleet-modal__body" id="takeScanManualWrap">
+        <!-- Manual entry fallback (shown when camera unavailable) -->
+        <div class="fleet-modal__body" id="takeScanManualWrap" style="display:none;">
+            <div class="text-center mb-3">
+                <i class="fa-solid fa-camera-slash" style="font-size:2rem;color:var(--fleet-grey-400)"></i>
+                <p class="text-muted mt-2 mb-0" style="font-size:.85rem">Camera not available. Enter code below.</p>
+            </div>
             <form id="takeScanManualForm" onsubmit="return submitTakeScanManual(event)">
                 <div class="fleet-form-group">
-                    <label class="fleet-label">Or enter barcode / task number manually</label>
-                    <input type="text" id="takeScanManualInput" class="fleet-input" placeholder="Scan or type here…" autocomplete="off">
+                    <label class="fleet-label">Barcode / task number</label>
+                    <input type="text" id="takeScanManualInput" class="fleet-input" placeholder="Type or paste code…" autocomplete="off">
                 </div>
                 <button type="submit" class="fleet-btn fleet-btn--primary fleet-btn--block">
                     <i class="fa-solid fa-check me-2"></i>Confirm
@@ -482,320 +476,7 @@
     </div>
 </div>
 
-{% block extra_css %}
-<style>
-    /* ── Tab Bar ─────────────────────────────────────── */
-    .fleet-tabs {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: var(--spacing-xs);
-        margin-bottom: var(--spacing-md);
-        padding: var(--spacing-xs);
-        background: var(--fleet-grey-100);
-        border-radius: var(--radius-sm);
-    }
-    .fleet-tab {
-        padding: var(--spacing-sm) var(--spacing-xs);
-        border: none;
-        background: transparent;
-        color: var(--fleet-grey-600);
-        font-size: var(--font-size-xs);
-        font-weight: 700;
-        border-radius: var(--radius-sm);
-
-        transition: all var(--transition-base);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        white-space: nowrap;
-    }
-    .fleet-tab.active { background: var(--fleet-white); color: var(--fleet-primary-dark); box-shadow: var(--shadow-sm); }
-    .fleet-tab:active { transform: scale(0.95); }
-
-    /* ── Task Card ───────────────────────────────────── */
-    .task-card {
-        background: var(--fleet-white);
-        border-radius: var(--radius-sm);
-
-        box-shadow: var(--shadow-sm);
-        margin-bottom: 6px;
-        overflow: hidden;
-        border: 1px solid var(--fleet-grey-100);
-    }
-
-    /* Header */
-    .task-card__header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 5px var(--spacing-sm);
-        background: var(--fleet-grey-50, #f8f9fa);
-        border-bottom: 1px solid var(--fleet-grey-100);
-        gap: var(--spacing-xs);
-    }
-    .task-card__header-left { display: flex; align-items: center; gap: var(--spacing-xs); flex-wrap: wrap; }
-    .task-card__header-right { display: flex; flex-direction: row; align-items: center; gap: var(--spacing-xs); flex-shrink: 0; }
-    .task-card__order-num { font-size: var(--font-size-xs); font-weight: 700; color: var(--fleet-primary); letter-spacing: 0.03em; }
-    .task-card__date { font-size: 10px; color: var(--fleet-grey-400); }
-
-    /* Speed badges */
-    .task-badge--pending { background: var(--fleet-grey-100); color: var(--fleet-grey-600); }
-    .task-badge--urgent  { background: #fff0f0; color: #c0392b; border: 1px solid #f5c6cb; }
-    .task-badge--sameday { background: #fff7e6; color: #e67e22; border: 1px solid #fde8c8; }
-
-    /* Body */
-    .task-card__body { padding: 6px var(--spacing-sm); display: flex; flex-direction: column; gap: 4px; }
-
-    .task-card__business {
-        display: flex; align-items: center; gap: var(--spacing-xs);
-        font-size: var(--font-size-xs); font-weight: 700; color: var(--fleet-dark);
-    }
-    .task-card__business i { color: var(--fleet-grey-400); font-size: var(--font-size-xs); }
-
-    /* Customer */
-    .task-card__customer { display: flex; align-items: center; gap: var(--spacing-xs); }
-    .task-card__customer-name {
-        display: flex; align-items: center; gap: var(--spacing-xs);
-        font-size: var(--font-size-sm); color: var(--fleet-dark);
-        flex: 1; min-width: 0;
-    }
-    .task-card__customer-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .task-card__customer-name i { color: var(--fleet-grey-400); font-size: var(--font-size-xs); flex-shrink: 0; }
-    .task-card__phone-row { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-    /* Icon buttons on card */
-    .task-card__icon-btn {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 36px; height: 36px; border-radius: var(--radius-sm);
-        font-size: 16px; text-decoration: none;
-        transition: opacity 0.15s;
-    }
-    .task-card__icon-btn:active { opacity: 0.7; }
-    .task-card__icon-btn--call { background: #e8f0fe; color: var(--fleet-primary); border: 1.5px solid var(--fleet-primary); }
-    .task-card__icon-btn--wa   { background: #e8f8ef; color: #128c3e; border: 1.5px solid #25d366; }
-    .task-card__contact-pill {
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 5px 12px; border-radius: var(--radius-sm);
-        font-size: var(--font-size-sm); font-weight: 600;
-        text-decoration: none; white-space: nowrap;
-        transition: opacity 0.15s;
-    }
-    /* Detail sheet: both buttons fill half-width, name can wrap */
-    .td-phone-row { width: 100%; }
-    .td-contact-pill {
-        flex: 1; justify-content: center;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    #tdCustomer { word-break: break-word; white-space: normal; }
-    .task-card__contact-pill:active { opacity: 0.75; }
-    .task-card__contact-pill--call {
-        background: #e8f0fe; color: var(--fleet-primary);
-        border: 1px solid var(--fleet-primary);
-    }
-    .task-card__contact-pill--wa {
-        background: #e8f8ef; color: #128c3e;
-        border: 1px solid #25d366;
-    }
-
-    /* Route */
-    .task-card__route {
-        background: var(--fleet-grey-50, #f8f9fa);
-        border-radius: var(--radius-sm);
-
-        padding: 5px var(--spacing-sm);
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-    }
-    .task-card__route-point { display: flex; align-items: center; gap: 6px; }
-    .task-card__route-line {
-        width: 2px; height: 8px;
-        background: var(--fleet-grey-200);
-        margin-left: 7px;
-    }
-    .task-card__route-pin {
-        font-size: 15px; flex-shrink: 0; width: 16px; text-align: center;
-    }
-    .task-card__route-pin--green { color: var(--fleet-success); }
-    .task-card__route-pin--red   { color: var(--fleet-danger); }
-    .task-card__route-info { display: flex; flex-direction: column; gap: 1px; }
-    .task-card__route-label { font-size: 10px; color: var(--fleet-grey-400); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-    .task-card__route-value { font-size: var(--font-size-sm); color: var(--fleet-dark); font-weight: 600; line-height: 1.4; }
-    .task-card__route-value small { font-size: var(--font-size-xs); color: var(--fleet-grey-500); font-weight: 500; }
-    .task-card__zone-group { color: var(--fleet-primary); font-weight: 600; }
-    .task-card__zone-name { color: var(--fleet-primary); font-weight: 700; }
-    .task-card__route-addr { color: var(--fleet-grey-500); }
-    .task-card__route-line1 { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-    .task-card__route-sub { font-size: var(--font-size-xs); color: var(--fleet-grey-500); font-weight: 500; }
-    .task-card__acc-badge {
-        font-size: 9px; font-weight: 700; padding: 1px 5px;
-        border-radius: var(--radius-md); border: 1px solid; white-space: nowrap; flex-shrink: 0;
-    }
-    .task-card__acc-badge--exact       { background:#e8f8f0; color:#27ae60; border-color:#c3e6cb; }
-    .task-card__acc-badge--street      { background:#eafaf1; color:#2ecc71; border-color:#a9dfbf; }
-    .task-card__acc-badge--landmark    { background:#fef9e7; color:#f39c12; border-color:#fde8c8; }
-    .task-card__acc-badge--zone_center { background:#fef5ec; color:#e67e22; border-color:#fad7a0; }
-    .task-card__acc-badge--ai_estimate { background:#fdecea; color:#e74c3c; border-color:#f5c6c6; }
-
-    /* Property tags — hide on card list to save space */
-    .task-card .task-card__tags { display: none; }
-    .task-card__tag {
-        display: inline-flex; align-items: center; gap: 4px;
-        font-size: 11px; font-weight: 600;
-        padding: 2px 7px; border-radius: var(--radius-md);
-        background: var(--fleet-grey-100); color: var(--fleet-grey-600);
-    }
-    .task-card__tag--time { background: #e8f4fd; color: #2980b9; }
-
-    /* Strip */
-    .task-card__strip {
-        display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
-        padding-top: 4px;
-        border-top: 1px solid var(--fleet-grey-100);
-    }
-    .task-card__strip-item {
-        display: flex; align-items: center; gap: 4px;
-        font-size: 11px; font-weight: 600;
-        color: var(--fleet-grey-600);
-        background: var(--fleet-grey-100);
-        padding: 2px 8px; border-radius: var(--radius-sm);
-    }
-    .task-card__strip-item--cod  { background: #fff7e6; color: #e67e22; }
-    .task-card__strip-item--earn { background: #eafaf1; color: #27ae60; }
-    .task-card__strip-item--note { background: #fef9e7; color: #d4ac0d; cursor: pointer; }
-    .task-card__strip-item i { font-size: 10px; }
-
-    /* Inline action buttons inside strip */
-    .task-card__action-btn {
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 5px 12px; border-radius: var(--radius-sm);
-        font-size: 12px; font-weight: 700;
-        border: none; cursor: pointer; text-decoration: none;
-        transition: opacity 0.15s;
-        margin-left: auto;
-        white-space: nowrap;
-    }
-    .task-card__action-btn:active { opacity: 0.75; }
-    .task-card__action-btn--take   { background: #2563eb; color: #fff; }
-    .task-card__action-btn--accept { background: #10b981; color: #fff; }
-    .task-card__action-btn--nav    { background: #7c3aed; color: #fff; }
-    .task-card__action-btn--nav-disabled { background: var(--fleet-grey-200) !important; color: var(--fleet-grey-400) !important; cursor: not-allowed; }
-    .task-card__action-btn--start  { background: #f59e0b; color: #fff; margin-left: 0; }
-
-    /* Clickable card cursor */
-    .task-card { cursor: pointer; }
-    .task-card a, .task-card button { cursor: pointer; }
-
-    /* ── Take-via-Scan Modal ─────────────────────────── */
-    .take-scan-modal { border-radius: var(--radius-2xl) var(--radius-2xl) 0 0; }
-    .take-scan-subtitle { font-size: var(--font-size-xs); color: var(--fleet-grey-500); margin: 2px 0 0; }
-
-    .take-scan-camera-wrap {
-        position: relative;
-        background: #000;
-        height: 220px;
-        overflow: hidden;
-    }
-    #takeScanVideo {
-        position: absolute; inset: 0;
-        width: 100%; height: 100%;
-        object-fit: cover;
-    }
-    .take-scan-frame {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .take-scan-frame__corner {
-        position: absolute;
-        width: 28px; height: 28px;
-        border-color: #fff;
-        border-style: solid;
-        border-width: 0;
-    }
-    .take-scan-frame__corner--tl { top: 30px; left: 50%; margin-left: -56px; border-top-width: 3px; border-left-width: 3px; border-radius: 4px 0 0 0; }
-    .take-scan-frame__corner--tr { top: 30px; left: 50%; margin-left: 28px; border-top-width: 3px; border-right-width: 3px; border-radius: 0 4px 0 0; }
-    .take-scan-frame__corner--bl { bottom: 30px; left: 50%; margin-left: -56px; border-bottom-width: 3px; border-left-width: 3px; border-radius: 0 0 0 4px; }
-    .take-scan-frame__corner--br { bottom: 30px; left: 50%; margin-left: 28px; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 4px 0; }
-    @keyframes scan-line { 0%, 100% { transform: translateY(-60px); } 50% { transform: translateY(60px); } }
-    .take-scan-frame__line {
-        position: absolute;
-        width: 80px; height: 2px;
-        background: linear-gradient(90deg, transparent, #00d4ff, transparent);
-        animation: scan-line 1.8s ease-in-out infinite;
-        box-shadow: 0 0 8px #00d4ff;
-    }
-    .take-scan-hint {
-        position: absolute; bottom: 8px; left: 0; right: 0;
-        text-align: center;
-        color: rgba(255,255,255,0.85);
-        font-size: var(--font-size-xs);
-        font-weight: 600;
-    }
-
-    /* Success state */
-    .take-scan-success {
-        padding: var(--spacing-lg);
-        text-align: center;
-    }
-    .take-scan-success__icon {
-        width: 64px; height: 64px;
-        border-radius: 50%;
-        background: #dcfce7;
-        color: #16a34a;
-        font-size: 2rem;
-        display: flex; align-items: center; justify-content: center;
-        margin: 0 auto var(--spacing-sm);
-    }
-    .take-scan-success__title {
-        font-size: var(--font-size-xl);
-        font-weight: 800;
-        color: var(--fleet-dark);
-        margin-bottom: var(--spacing-md);
-    }
-    .take-scan-success__card {
-        background: var(--fleet-grey-50, #f8f9fa);
-        border-radius: var(--radius-sm);
-        padding: var(--spacing-md);
-        text-align: left;
-        margin-bottom: var(--spacing-md);
-    }
-    .take-scan-info-row {
-        display: flex;
-        align-items: center;
-        gap: var(--spacing-sm);
-        padding: 4px 0;
-        border-bottom: 1px solid var(--fleet-grey-100);
-    }
-    .take-scan-info-row:last-child { border-bottom: none; }
-    .take-scan-info-label { color: var(--fleet-grey-400); font-size: var(--font-size-sm); width: 20px; flex-shrink: 0; }
-    .take-scan-info-val { font-size: var(--font-size-sm); font-weight: 600; color: var(--fleet-dark); }
-    .take-scan-info-val--cod { color: #16a34a; }
-
-    @keyframes countdown-shrink { from { width: 100%; } to { width: 0%; } }
-    .take-scan-countdown {
-        height: 4px;
-        background: var(--fleet-grey-100);
-        border-radius: 99px;
-        overflow: hidden;
-        margin-bottom: 6px;
-    }
-    .take-scan-countdown__bar {
-        height: 100%;
-        background: #16a34a;
-        border-radius: 99px;
-        animation: countdown-shrink 3s linear forwards;
-    }
-    .take-scan-countdown__label {
-        font-size: var(--font-size-xs);
-        color: var(--fleet-grey-500);
-        margin: 0;
-    }
-</style>
-{% endblock %}
+{% block extra_css %}{% endblock %}
 
 <script>
     function getCsrf() {
@@ -983,7 +664,7 @@
         // Reset UI
         document.getElementById('takeScanSuccess').style.display = 'none';
         document.getElementById('takeScanCameraWrap').style.display = 'block';
-        document.getElementById('takeScanManualWrap').style.display = 'block';
+        document.getElementById('takeScanManualWrap').style.display = 'none';
         document.getElementById('takeScanManualInput').value = '';
 
         document.getElementById('takeScanModal').style.display = 'flex';
@@ -1016,8 +697,9 @@
                 video.addEventListener('loadeddata', detect, { once: true });
             }
         } catch (err) {
-            showToast('Camera unavailable — use manual entry', 'warning');
             document.getElementById('takeScanCameraWrap').style.display = 'none';
+            document.getElementById('takeScanManualWrap').style.display = 'block';
+            document.getElementById('takeScanManualInput').focus();
         }
     }
 
@@ -1032,6 +714,26 @@
     function closeTakeScanner() {
         _stopTakeScanCamera();
         document.getElementById('takeScanModal').style.display = 'none';
+    }
+
+    function takeTaskDirect(taskId, taskNum, orderNum, business, customer) {
+        // Direct take — no scanner, just confirm and accept
+        _takeScanTaskId = taskId;
+        _takeScanTaskNum = String(taskNum);
+        _takeScanOrderNum = String(orderNum);
+        haptic([10]);
+
+        const code = _takeScanTaskNum || _takeScanOrderNum || String(_takeScanTaskId);
+
+        // Show modal with subtitle + success card only (skip camera)
+        const subtitle = document.getElementById('takeScanSubtitle');
+        subtitle.textContent = (taskNum ? '#' + taskNum : '') + (business ? ' · ' + business : '');
+        document.getElementById('takeScanSuccess').style.display = 'none';
+        document.getElementById('takeScanCameraWrap').style.display = 'none';
+        document.getElementById('takeScanManualWrap').style.display = 'none';
+        document.getElementById('takeScanModal').style.display = 'flex';
+
+        _submitTakeScan(code);
     }
 
     function submitTakeScanManual(e) {
@@ -1060,19 +762,12 @@
                 haptic([10, 50, 10, 50, 10]);
                 _showTakeScanSuccess(data);
             } else {
-                showToast(data.error || 'Scan failed', 'danger');
-                // Re-show manual entry
-                document.getElementById('takeScanManualWrap').style.display = 'block';
-                document.getElementById('takeScanCameraWrap').style.display = 'block';
-                _takeScanDetecting = true;
-                _startTakeScanCamera();
+                showToast(data.error || 'Take failed', 'danger');
+                closeTakeScanner();
             }
         } catch (err) {
             showToast('Network error. Try again.', 'danger');
-            document.getElementById('takeScanManualWrap').style.display = 'block';
-            document.getElementById('takeScanCameraWrap').style.display = 'block';
-            _takeScanDetecting = true;
-            _startTakeScanCamera();
+            closeTakeScanner();
         }
     }
 
