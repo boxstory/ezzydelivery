@@ -1,0 +1,1114 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static fleet_extras %}
+
+{% block title %}Tasks{% endblock %}
+{% block page_title %}My Tasks{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'fleet:driver_tasks' %}?area=all" class="fleet-btn-icon" title="Refresh">
+    <i class="fa-solid fa-rotate-right"></i>
+</a>
+<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+    <i class="fa-solid fa-bell"></i>
+    {% if unread_notifications > 0 %}
+    <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
+    {% endif %}
+</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Tab Navigation -->
+<div class="fleet-tabs fade-in">
+    <button type="button"
+            class="fleet-tab {% if current_tab == 'all' %}active{% endif %}"
+            onclick="switchTab('all')">
+        New
+        {% if all_count > 0 %}
+        <span class="fleet-bottom-nav__badge" style="position:static; display:inline-flex; margin-left:4px; min-width:18px; height:18px; font-size:10px;">{{ all_count }}</span>
+        {% endif %}
+    </button>
+    <button type="button"
+            class="fleet-tab {% if current_tab == 'assigned' %}active{% endif %}"
+            onclick="switchTab('assigned')">
+        Assigned
+        {% if assigned_count > 0 %}
+        <span class="fleet-bottom-nav__badge" style="position:static; display:inline-flex; margin-left:4px; min-width:18px; height:18px; font-size:10px;">{{ assigned_count }}</span>
+        {% endif %}
+    </button>
+    <button type="button"
+            class="fleet-tab {% if current_tab == 'accepted' %}active{% endif %}"
+            onclick="switchTab('accepted')">
+        Active
+        {% if accepted_count > 0 %}
+        <span class="fleet-bottom-nav__badge" style="position:static; display:inline-flex; margin-left:4px; min-width:18px; height:18px; font-size:10px; background:var(--fleet-success);">{{ accepted_count }}</span>
+        {% endif %}
+    </button>
+    <button type="button"
+            class="fleet-tab {% if current_tab == 'history' %}active{% endif %}"
+            onclick="switchTab('history')">
+        History
+    </button>
+</div>
+
+<!-- Filter Bar -->
+<form method="GET" id="filterForm" style="margin-bottom: var(--spacing-lg);">
+    <input type="hidden" name="tab" value="{{ current_tab }}">
+    <div style="display:flex; gap:var(--spacing-sm); flex-wrap:wrap; align-items:center;">
+
+        <!-- Area Filter -->
+        <select name="area" onchange="this.form.submit()"
+                style="flex:1; min-width:100px; padding:var(--spacing-sm) var(--spacing-md);
+                       border:1.5px solid var(--fleet-grey-200); border-radius:var(--radius-sm);
+                       background:var(--fleet-white); font-size:var(--font-size-sm); font-weight:600;
+                       color:var(--fleet-dark); cursor:pointer; appearance:none;">
+            <option value="all" {% if area_filter == 'all' %}selected{% endif %}>All Areas</option>
+            <option value="my_zone" {% if area_filter == 'my_zone' %}selected{% endif %}>My Zones</option>
+            <option value="doha" {% if area_filter == 'doha' %}selected{% endif %}>Doha</option>
+            <option value="qatar" {% if area_filter == 'qatar' %}selected{% endif %}>Qatar</option>
+        </select>
+
+        <!-- Zone Dropdown -->
+        {% if available_zones %}
+        <select name="zone" onchange="this.form.submit()"
+                style="flex:1; min-width:100px; padding:var(--spacing-sm) var(--spacing-md);
+                       border:1.5px solid {% if zone_filter %}var(--fleet-primary){% else %}var(--fleet-grey-200){% endif %};
+                       border-radius:var(--radius-sm); background:var(--fleet-white);
+                       font-size:var(--font-size-sm); font-weight:600; color:var(--fleet-dark);
+                       cursor:pointer; appearance:none;">
+            <option value="">All Zones</option>
+            {% for zone in available_zones %}
+            <option value="{{ zone.zone_number }}" {% if zone_filter == zone.zone_number|stringformat:"s" %}selected{% endif %}>
+                Z{{ zone.zone_number }} {% if zone.active_groups %}· {{ zone.active_groups.0.name }}{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+        {% endif %}
+
+        <!-- Status Filter (Active + History tabs) -->
+        {% if current_tab == 'accepted' or current_tab == 'history' %}
+        <select name="status" onchange="this.form.submit()"
+                style="flex:1; min-width:110px; padding:var(--spacing-sm) var(--spacing-md);
+                       border:1.5px solid {% if status_filter != 'all' %}var(--fleet-primary){% else %}var(--fleet-grey-200){% endif %};
+                       border-radius:var(--radius-sm); background:var(--fleet-white);
+                       font-size:var(--font-size-sm); font-weight:600; color:var(--fleet-dark);
+                       cursor:pointer; appearance:none;">
+            <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Status</option>
+            {% if current_tab == 'accepted' %}
+            <option value="accepted" {% if status_filter == 'accepted' %}selected{% endif %}>Accepted</option>
+            <option value="picked_up" {% if status_filter == 'picked_up' %}selected{% endif %}>Picked Up</option>
+            <option value="in_transit" {% if status_filter == 'in_transit' %}selected{% endif %}>In Transit</option>
+            <option value="contacted" {% if status_filter == 'contacted' %}selected{% endif %}>Contacted</option>
+            <option value="non_reachable" {% if status_filter == 'non_reachable' %}selected{% endif %}>Non Reachable</option>
+            {% else %}
+            <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>Delivered</option>
+            <option value="failed" {% if status_filter == 'failed' %}selected{% endif %}>Failed</option>
+            {% endif %}
+        </select>
+        {% endif %}
+
+        <!-- Sort -->
+        <select name="sort" onchange="this.form.submit()"
+                style="flex:1; min-width:90px; padding:var(--spacing-sm) var(--spacing-md);
+                       border:1.5px solid var(--fleet-grey-200); border-radius:var(--radius-sm);
+                       background:var(--fleet-white); font-size:var(--font-size-sm); font-weight:600;
+                       color:var(--fleet-dark); cursor:pointer; appearance:none;">
+            <option value="date" {% if sort_by == 'date' %}selected{% endif %}>By Date</option>
+            <option value="zone" {% if sort_by == 'zone' %}selected{% endif %}>By Zone</option>
+            <option value="status" {% if sort_by == 'status' %}selected{% endif %}>By Status</option>
+        </select>
+    </div>
+</form>
+
+<!-- Task Cards -->
+{% if cards %}
+{% for card in cards %}
+{% with addr=card.dl_to_address %}<div class="task-card slide-up" style="animation-delay: {{ forloop.counter0 }}00ms;"
+    onclick="openTaskDetail(event, this)"
+    data-id="{{ card.id }}"
+    data-order="{{ card.order.order_number|default:card.id }}"
+    data-date="{{ card.dl_task_date|date:'M d, Y' }}"
+    data-status="{{ card.dl_task_status }}"
+    data-speed="{{ card.dl_speed|default:'' }}"
+    data-business="{{ card.order.business.business_name|default:'' }}"
+    data-customer="{% if addr %}{{ addr.full_name|default:card.order.customer_name|default:'' }}{% else %}{{ card.order.customer_name|default:'' }}{% endif %}"
+    data-phone="{% if addr %}{{ addr.mobile_no|default:card.order.customer_phone|default:'' }}{% else %}{{ card.order.customer_phone|default:'' }}{% endif %}"
+    data-pickup="{{ card.order.pickup_location.pickup_location_title|default:'' }}"
+    data-zone="{{ card.order.dl_zone|default:'' }}{% if not card.order.dl_zone and addr %}{{ addr.dl_zone|default:'' }}{% endif %}"
+    data-street="{{ card.order.dl_street|default:'' }}{% if not card.order.dl_street and addr %}{{ addr.dl_street|default:'' }}{% endif %}"
+    data-building="{{ card.order.dl_building|default:'' }}{% if not card.order.dl_building and addr %}{{ addr.dl_building|default:'' }}{% endif %}"
+    data-unit="{% if addr %}{{ addr.dl_unit|default:'' }}{% endif %}"
+    data-area="{% if addr %}{{ addr.area_name|default:'' }}{% endif %}"
+    data-ptype="{% if addr %}{% if addr.is_villa_compound %}Villa{% elif addr.is_flat %}Apartment{% elif addr.is_office %}Office{% endif %}{% endif %}"
+    data-timeslot="{% if addr %}{{ addr.time_slot|default:'' }}{% endif %}"
+    data-cod="{{ card.order.cod_amount|default:'' }}"
+    data-items="{{ card.order.order_items.count }}"
+    data-earn="{{ card.driver_earnings|default:'' }}"
+    data-notes="{{ card.order.order_notes|default:'' }}"
+    data-address="{{ card.order.customer_address|default:'' }}"
+    data-tasknum="{{ card.dl_task_number|default:'' }}"
+    data-lat="{{ card.order.latitude|default:'' }}{% if not card.order.latitude and addr %}{{ addr.dl_latitude|default:'' }}{% endif %}"
+    data-lng="{{ card.order.longitude|default:'' }}{% if not card.order.longitude and addr %}{{ addr.dl_longitude|default:'' }}{% endif %}"
+    data-coords-accuracy="{{ card.order.coords_accuracy|default:'' }}"
+>
+<script type="application/json" class="task-products-data">{% spaceless %}[{% for item in card.order.order_items.all %}{"name":"{% if item.product %}{{ item.product.item_name|escapejs }}{% else %}{{ item.notes|default:'Item'|escapejs }}{% endif %}","brand":"{% if item.product %}{{ item.product.brand_name|default:''|escapejs }}{% endif %}","sku":"{% if item.product %}{{ item.product.item_sku|default:''|escapejs }}{% endif %}","qty":{{ item.quantity }}{% if item.unit_price %},"price":"{{ item.unit_price }}"{% endif %}{% if item.product and item.notes %},"note":"{{ item.notes|escapejs }}"{% endif %}}{% if not forloop.last %},{% endif %}{% endfor %}]{% endspaceless %}
+</script>
+{% with av=card.order.address_verifications.first %}
+<script type="application/json" class="task-address-data">{% spaceless %}{
+  "verification_status":"{{ card.order.verification_status }}",
+  "address_verified":{% if card.order.address_verified %}true{% else %}false{% endif %},
+  {% if av %}
+  "result":"{{ av.verification_result }}",
+  "verified_address":"{{ av.verified_address|default:''|escapejs }}",
+  "zone":"{{ av.zone_number|default:'' }}",
+  "street":"{{ av.street_number|default:'' }}",
+  "building":"{{ av.building_number|default:'' }}",
+  "lat":"{{ av.latitude|default:'' }}",
+  "lng":"{{ av.longitude|default:'' }}",
+  "notes":"{{ av.notes|default:''|escapejs }}",
+  "verified_at":"{{ av.verified_at|date:'M d, Y H:i'|default:'' }}",
+  {% else %}
+  "result":"",
+  {% endif %}
+  "dl_lat":"{% if addr %}{{ addr.dl_latitude|default:'' }}{% endif %}",
+  "dl_lng":"{% if addr %}{{ addr.dl_longitude|default:'' }}{% endif %}",
+  "dl_pluscode":"{% if addr %}{{ addr.dl_pluscode|default:''|escapejs }}{% endif %}",
+  "order_lat":"{{ card.order.latitude|default:'' }}",
+  "order_lng":"{{ card.order.longitude|default:'' }}",
+  "order_zone":"{{ card.order.dl_zone|default:'' }}",
+  "order_street":"{{ card.order.dl_street|default:'' }}",
+  "order_building":"{{ card.order.dl_building|default:'' }}",
+  "coords_accuracy":"{{ card.order.coords_accuracy|default:'' }}"
+}{% endspaceless %}
+</script>
+{% endwith %}
+
+    <!-- Card Header: Status + Order ID + Date -->
+    <div class="task-card__header">
+        <div class="task-card__header-left">
+            {% if card.dl_task_status == 'delivered' %}
+            <span class="fleet-badge fleet-badge--success">Delivered</span>
+            {% elif card.dl_task_status == 'failed' %}
+            <span class="fleet-badge fleet-badge--danger">Failed</span>
+            {% elif card.dl_task_status == 'cancelled' %}
+            <span class="fleet-badge fleet-badge--danger">Cancelled</span>
+            {% elif card.dl_task_status == 'out_for_delivery' or card.dl_task_status == 'in_transit' or card.dl_task_status == 'start_ride' %}
+            <span class="fleet-badge fleet-badge--info">In Transit</span>
+            {% elif card.dl_task_status == 'picked_up' %}
+            <span class="fleet-badge fleet-badge--info">Picked Up</span>
+            {% elif card.dl_task_status == 'accepted' %}
+            <span class="fleet-badge fleet-badge--warning">Accepted</span>
+            {% elif card.dl_task_status == 'assigned' %}
+            <span class="fleet-badge fleet-badge--warning">Assigned</span>
+            {% elif card.dl_task_status == 'contacted' %}
+            <span class="fleet-badge fleet-badge--info">Contacted</span>
+            {% elif card.dl_task_status == 'non_reachable' %}
+            <span class="fleet-badge fleet-badge--danger">Non Reachable</span>
+            {% else %}
+            <span class="fleet-badge task-badge--pending">Pending</span>
+            {% endif %}
+
+            {% if card.dl_speed == 'On Demand' %}
+            <span class="fleet-badge task-badge--urgent">Urgent</span>
+            {% elif card.dl_speed == 'Same Day' %}
+            <span class="fleet-badge task-badge--sameday">Same Day</span>
+            {% endif %}
+        </div>
+        <div class="task-card__header-right">
+            <span class="task-card__order-num">{{ card.order.order_number|default:card.id }}</span>
+            <span class="task-card__date">{{ card.dl_task_date|date:"M d" }}</span>
+        </div>
+    </div>
+
+    <!-- Business + Customer Row -->
+    <div class="task-card__body">
+        <div class="task-card__business">
+            <i class="fa-solid fa-store"></i>
+            {{ card.order.business.business_name|default:"—" }}
+        </div>
+
+        <!-- Customer Info -->
+        <div class="task-card__customer">
+            <div class="task-card__customer-name">
+                <i class="fa-solid fa-user"></i>
+                <strong>{% if addr %}{{ addr.full_name|default:card.order.customer_name|default:"—" }}{% else %}{{ card.order.customer_name|default:"—" }}{% endif %}</strong>
+            </div>
+            {% if addr and addr.mobile_no %}
+            <div class="task-card__phone-row" onclick="event.stopPropagation()">
+                <a href="tel:{{ addr.mobile_no }}" class="task-card__icon-btn task-card__icon-btn--call" title="{{ addr.mobile_no }}">
+                    <i class="fa-solid fa-phone"></i>
+                </a>
+                <a href="#" onclick="waMessage(this, '{{ addr.mobile_no }}', '{{ card.order.order_number|default:card.id }}', '{{ card.order.dl_zone|default:'' }}', '{{ card.order.dl_street|default:'' }}', '{{ card.order.dl_building|default:'' }}', '{{ card.order.cod_amount|default:'' }}'); return false;" class="task-card__icon-btn task-card__icon-btn--wa">
+                    <i class="fa-brands fa-whatsapp"></i>
+                </a>
+            </div>
+            {% elif card.order.customer_phone %}
+            <div class="task-card__phone-row" onclick="event.stopPropagation()">
+                <a href="tel:{{ card.order.customer_phone }}" class="task-card__icon-btn task-card__icon-btn--call" title="{{ card.order.customer_phone }}">
+                    <i class="fa-solid fa-phone"></i>
+                </a>
+                <a href="#" onclick="waMessage(this, '{{ card.order.customer_phone }}', '{{ card.order.order_number|default:card.id }}', '{{ card.order.dl_zone|default:'' }}', '{{ card.order.dl_street|default:'' }}', '{{ card.order.dl_building|default:'' }}', '{{ card.order.cod_amount|default:'' }}'); return false;" class="task-card__icon-btn task-card__icon-btn--wa">
+                    <i class="fa-brands fa-whatsapp"></i>
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Route: Pickup → Delivery Address -->
+        <div class="task-card__route">
+            <!-- Pickup -->
+            <div class="task-card__route-point task-card__route-point--pickup">
+                <i class="fa-solid fa-circle-dot task-card__route-pin task-card__route-pin--green"></i>
+                <div class="task-card__route-info">
+                    <span class="task-card__route-value">{{ card.order.pickup_location.pickup_location_title|default:"—" }}</span>
+                </div>
+            </div>
+            <div class="task-card__route-line"></div>
+            <!-- Dropoff — use order-level fields as primary (staff-corrected), addr as fallback -->
+            <div class="task-card__route-point task-card__route-point--dropoff">
+                <i class="fa-solid fa-location-dot task-card__route-pin task-card__route-pin--red"></i>
+                <div class="task-card__route-info">
+                    {% if card.order.dl_zone %}
+                    <div class="task-card__route-line1">
+                        <span class="task-card__route-value">Zone {{ card.order.dl_zone }}{% if card.order.dl_street %}, St {{ card.order.dl_street }}{% endif %}{% if card.order.dl_building %}, Bldg {{ card.order.dl_building }}{% endif %}{% if addr %}{% if addr.dl_unit %}, Unit {{ addr.dl_unit }}{% endif %}{% endif %}</span>
+                        {% if card.order.coords_accuracy %}
+                        <span class="task-card__acc-badge task-card__acc-badge--{{ card.order.coords_accuracy }}">{% if card.order.coords_accuracy == 'exact' %}Exact{% elif card.order.coords_accuracy == 'street' %}Street{% elif card.order.coords_accuracy == 'landmark' %}Landmark{% elif card.order.coords_accuracy == 'zone_center' %}Zone Ctr{% elif card.order.coords_accuracy == 'ai_estimate' %}AI Est.{% endif %}</span>
+                        {% endif %}
+                    </div>
+                    <span class="task-card__route-sub">{% if card.order.customer_address %}<span class="task-card__route-addr">{{ card.order.customer_address }}</span>{% elif addr and addr.area_name %}<span class="task-card__route-addr">{{ addr.area_name }}</span>{% endif %}{% if zone_name_map and card.order.dl_zone in zone_name_map %}<span class="task-card__zone-name"> · {{ zone_name_map|get_item:card.order.dl_zone }}</span>{% endif %}</span>
+                    {% elif addr and addr.dl_zone %}
+                    <div class="task-card__route-line1">
+                        <span class="task-card__route-value">Zone {{ addr.dl_zone }}{% if addr.dl_street %}, St {{ addr.dl_street }}{% endif %}{% if addr.dl_building %}, Bldg {{ addr.dl_building }}{% endif %}{% if addr.dl_unit %}, Unit {{ addr.dl_unit }}{% endif %}</span>
+                    </div>
+                    <span class="task-card__route-sub">{% if card.order.customer_address %}<span class="task-card__route-addr">{{ card.order.customer_address }}</span>{% elif addr.area_name %}<span class="task-card__route-addr">{{ addr.area_name }}</span>{% endif %}{% if zone_name_map and addr.dl_zone in zone_name_map %}<span class="task-card__zone-name"> · {{ zone_name_map|get_item:addr.dl_zone }}</span>{% endif %}</span>
+                    {% else %}
+                    <span class="task-card__route-value">{{ card.order.customer_address|default:"Address not set" }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Property type tags -->
+        {% if addr %}
+        <div class="task-card__tags">
+            {% if addr.is_villa_compound %}
+            <span class="task-card__tag"><i class="fa-solid fa-house-chimney"></i> Villa</span>
+            {% elif addr.is_flat %}
+            <span class="task-card__tag"><i class="fa-solid fa-building"></i> Apartment</span>
+            {% elif addr.is_office %}
+            <span class="task-card__tag"><i class="fa-solid fa-briefcase"></i> Office</span>
+            {% endif %}
+            {% if addr.time_slot %}
+            <span class="task-card__tag task-card__tag--time"><i class="fa-regular fa-clock"></i> {{ addr.time_slot }}</span>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Bottom info strip: COD + Items + Earnings + inline action -->
+        <div class="task-card__strip">
+            {% if card.order.cod_amount %}
+            <div class="task-card__strip-item task-card__strip-item--cod">
+                <i class="fa-solid fa-money-bill-wave"></i>
+                <span>COD {{ card.order.cod_amount }} QR</span>
+            </div>
+            {% endif %}
+
+            {% with item_count=card.order.order_items.count %}
+            {% if item_count %}
+            <div class="task-card__strip-item">
+                <i class="fa-solid fa-box"></i>
+                <span>{{ item_count }} item{{ item_count|pluralize }}</span>
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            {% if card.driver_earnings %}
+            <div class="task-card__strip-item task-card__strip-item--earn">
+                <i class="fa-solid fa-wallet"></i>
+                <span>{{ card.driver_earnings|floatformat:2 }} QR</span>
+            </div>
+            {% endif %}
+
+            {% if card.order.order_notes %}
+            <div class="task-card__strip-item task-card__strip-item--note" title="{{ card.order.order_notes }}">
+                <i class="fa-solid fa-note-sticky"></i>
+                <span>Note</span>
+            </div>
+            {% endif %}
+
+            <!-- Inline action button — right side -->
+            {% if current_tab == 'all' %}
+            <button class="task-card__action-btn task-card__action-btn--take"
+                    onclick="event.stopPropagation(); openTakeScanner({{ card.id }}, '{{ card.dl_task_number|default:card.id }}', '{{ card.order.order_number|default:'' }}', '{{ card.order.business.business_name|default:''|escapejs }}', '{{ card.order.customer_name|default:''|escapejs }}')">
+                <i class="fa-solid fa-qrcode"></i> Take
+            </button>
+            {% elif current_tab == 'assigned' %}
+            <button class="task-card__action-btn task-card__action-btn--accept"
+                    onclick="event.stopPropagation(); acceptTask({{ card.id }}, this)">
+                <i class="fa-solid fa-check"></i> Accept
+            </button>
+            {% elif current_tab == 'accepted' %}
+            <button class="task-card__action-btn task-card__action-btn--nav"
+                    onclick="event.stopPropagation(); openNav(this)">
+                <i class="fa-solid fa-map"></i> Navigate
+            </button>
+            {% if card.dl_task_status == 'accepted' %}
+            <button class="task-card__action-btn task-card__action-btn--start"
+                    onclick="event.stopPropagation(); startRide({{ card.id }}, this)">
+                <i class="fa-solid fa-play"></i> Start
+            </button>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+</div>{% endwith %}
+{% endfor %}
+
+{% else %}
+<!-- Empty State -->
+<div class="fleet-empty fade-in">
+    <div class="fleet-empty__icon">
+        {% if current_tab == 'all' %}
+        <i class="fa-solid fa-box-open"></i>
+        {% elif current_tab == 'assigned' %}
+        <i class="fa-solid fa-clipboard-list"></i>
+        {% elif current_tab == 'accepted' %}
+        <i class="fa-solid fa-truck-fast"></i>
+        {% else %}
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        {% endif %}
+    </div>
+    <div class="fleet-empty__title">
+        {% if current_tab == 'all' %}No Available Tasks{% elif current_tab == 'assigned' %}No Assigned Tasks{% elif current_tab == 'accepted' %}No Active Tasks{% else %}No History{% endif %}
+    </div>
+    <div class="fleet-empty__text">
+        {% if current_tab == 'all' %}
+        No tasks available in your area right now. Try changing the area filter.
+        {% elif current_tab == 'assigned' %}
+        No tasks have been assigned to you yet.
+        {% elif current_tab == 'accepted' %}
+        You have no active deliveries. Pick a task from the New tab.
+        {% else %}
+        No completed deliveries yet.
+        {% endif %}
+    </div>
+    {% if current_tab != 'history' %}
+    <button type="button" class="fleet-btn fleet-btn--outline" onclick="window.location.reload()">
+        <i class="fa-solid fa-rotate-right me-2"></i>Refresh
+    </button>
+    {% endif %}
+</div>
+{% endif %}
+
+{# Task Detail Bottom Sheet is included globally via pwa_base.html #}
+
+<!-- ── Take-via-Scan Modal ──────────────────────────── -->
+<div class="fleet-modal" id="takeScanModal" style="display:none;">
+    <div class="fleet-modal__overlay" onclick="closeTakeScanner()"></div>
+    <div class="fleet-modal__content take-scan-modal">
+
+        <!-- Header -->
+        <div class="fleet-modal__header">
+            <div>
+                <h3 class="fleet-modal__title"><i class="fa-solid fa-qrcode me-2"></i>Scan to Take Task</h3>
+                <p id="takeScanSubtitle" class="take-scan-subtitle"></p>
+            </div>
+            <button type="button" class="fleet-btn-icon" onclick="closeTakeScanner()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Camera / Scanner view inside modal -->
+        <div class="take-scan-camera-wrap" id="takeScanCameraWrap">
+            <video id="takeScanVideo" autoplay playsinline></video>
+            <div class="take-scan-frame">
+                <div class="take-scan-frame__corner take-scan-frame__corner--tl"></div>
+                <div class="take-scan-frame__corner take-scan-frame__corner--tr"></div>
+                <div class="take-scan-frame__corner take-scan-frame__corner--bl"></div>
+                <div class="take-scan-frame__corner take-scan-frame__corner--br"></div>
+                <div class="take-scan-frame__line"></div>
+            </div>
+            <p class="take-scan-hint"><i class="fa-solid fa-qrcode me-1"></i>Align barcode / QR within frame</p>
+        </div>
+
+        <!-- Success card — shown for 3 seconds after scan -->
+        <div class="take-scan-success" id="takeScanSuccess" style="display:none;">
+            <div class="take-scan-success__icon">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <h4 class="take-scan-success__title">Task Accepted!</h4>
+            <div class="take-scan-success__card">
+                <div class="take-scan-info-row">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-hashtag"></i></span>
+                    <span id="tsScanTaskNum" class="take-scan-info-val"></span>
+                </div>
+                <div class="take-scan-info-row">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-store"></i></span>
+                    <span id="tsScanBusiness" class="take-scan-info-val"></span>
+                </div>
+                <div class="take-scan-info-row">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-user"></i></span>
+                    <span id="tsScanCustomer" class="take-scan-info-val"></span>
+                </div>
+                <div class="take-scan-info-row" id="tsScanZoneRow">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-location-dot"></i></span>
+                    <span id="tsScanZone" class="take-scan-info-val"></span>
+                </div>
+                <div class="take-scan-info-row" id="tsScanCodRow">
+                    <span class="take-scan-info-label"><i class="fa-solid fa-money-bill-wave"></i></span>
+                    <span id="tsScanCod" class="take-scan-info-val take-scan-info-val--cod"></span>
+                </div>
+            </div>
+            <div class="take-scan-countdown">
+                <div class="take-scan-countdown__bar" id="takeScanCountdownBar"></div>
+            </div>
+            <p class="take-scan-countdown__label">Moving to Active tab…</p>
+        </div>
+
+        <!-- Manual entry fallback -->
+        <div class="fleet-modal__body" id="takeScanManualWrap">
+            <form id="takeScanManualForm" onsubmit="return submitTakeScanManual(event)">
+                <div class="fleet-form-group">
+                    <label class="fleet-label">Or enter barcode / task number manually</label>
+                    <input type="text" id="takeScanManualInput" class="fleet-input" placeholder="Scan or type here…" autocomplete="off">
+                </div>
+                <button type="submit" class="fleet-btn fleet-btn--primary fleet-btn--block">
+                    <i class="fa-solid fa-check me-2"></i>Confirm
+                </button>
+            </form>
+        </div>
+
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+    /* ── Tab Bar ─────────────────────────────────────── */
+    .fleet-tabs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--spacing-xs);
+        margin-bottom: var(--spacing-md);
+        padding: var(--spacing-xs);
+        background: var(--fleet-grey-100);
+        border-radius: var(--radius-sm);
+    }
+    .fleet-tab {
+        padding: var(--spacing-sm) var(--spacing-xs);
+        border: none;
+        background: transparent;
+        color: var(--fleet-grey-600);
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+        border-radius: var(--radius-sm);
+
+        transition: all var(--transition-base);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        white-space: nowrap;
+    }
+    .fleet-tab.active { background: var(--fleet-white); color: var(--fleet-primary-dark); box-shadow: var(--shadow-sm); }
+    .fleet-tab:active { transform: scale(0.95); }
+
+    /* ── Task Card ───────────────────────────────────── */
+    .task-card {
+        background: var(--fleet-white);
+        border-radius: var(--radius-sm);
+
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 6px;
+        overflow: hidden;
+        border: 1px solid var(--fleet-grey-100);
+    }
+
+    /* Header */
+    .task-card__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 5px var(--spacing-sm);
+        background: var(--fleet-grey-50, #f8f9fa);
+        border-bottom: 1px solid var(--fleet-grey-100);
+        gap: var(--spacing-xs);
+    }
+    .task-card__header-left { display: flex; align-items: center; gap: var(--spacing-xs); flex-wrap: wrap; }
+    .task-card__header-right { display: flex; flex-direction: row; align-items: center; gap: var(--spacing-xs); flex-shrink: 0; }
+    .task-card__order-num { font-size: var(--font-size-xs); font-weight: 700; color: var(--fleet-primary); letter-spacing: 0.03em; }
+    .task-card__date { font-size: 10px; color: var(--fleet-grey-400); }
+
+    /* Speed badges */
+    .task-badge--pending { background: var(--fleet-grey-100); color: var(--fleet-grey-600); }
+    .task-badge--urgent  { background: #fff0f0; color: #c0392b; border: 1px solid #f5c6cb; }
+    .task-badge--sameday { background: #fff7e6; color: #e67e22; border: 1px solid #fde8c8; }
+
+    /* Body */
+    .task-card__body { padding: 6px var(--spacing-sm); display: flex; flex-direction: column; gap: 4px; }
+
+    .task-card__business {
+        display: flex; align-items: center; gap: var(--spacing-xs);
+        font-size: var(--font-size-xs); font-weight: 700; color: var(--fleet-dark);
+    }
+    .task-card__business i { color: var(--fleet-grey-400); font-size: var(--font-size-xs); }
+
+    /* Customer */
+    .task-card__customer { display: flex; align-items: center; gap: var(--spacing-xs); }
+    .task-card__customer-name {
+        display: flex; align-items: center; gap: var(--spacing-xs);
+        font-size: var(--font-size-sm); color: var(--fleet-dark);
+        flex: 1; min-width: 0;
+    }
+    .task-card__customer-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .task-card__customer-name i { color: var(--fleet-grey-400); font-size: var(--font-size-xs); flex-shrink: 0; }
+    .task-card__phone-row { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    /* Icon buttons on card */
+    .task-card__icon-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 36px; height: 36px; border-radius: var(--radius-sm);
+        font-size: 16px; text-decoration: none;
+        transition: opacity 0.15s;
+    }
+    .task-card__icon-btn:active { opacity: 0.7; }
+    .task-card__icon-btn--call { background: #e8f0fe; color: var(--fleet-primary); border: 1.5px solid var(--fleet-primary); }
+    .task-card__icon-btn--wa   { background: #e8f8ef; color: #128c3e; border: 1.5px solid #25d366; }
+    .task-card__contact-pill {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 5px 12px; border-radius: var(--radius-sm);
+        font-size: var(--font-size-sm); font-weight: 600;
+        text-decoration: none; white-space: nowrap;
+        transition: opacity 0.15s;
+    }
+    /* Detail sheet: both buttons fill half-width, name can wrap */
+    .td-phone-row { width: 100%; }
+    .td-contact-pill {
+        flex: 1; justify-content: center;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #tdCustomer { word-break: break-word; white-space: normal; }
+    .task-card__contact-pill:active { opacity: 0.75; }
+    .task-card__contact-pill--call {
+        background: #e8f0fe; color: var(--fleet-primary);
+        border: 1px solid var(--fleet-primary);
+    }
+    .task-card__contact-pill--wa {
+        background: #e8f8ef; color: #128c3e;
+        border: 1px solid #25d366;
+    }
+
+    /* Route */
+    .task-card__route {
+        background: var(--fleet-grey-50, #f8f9fa);
+        border-radius: var(--radius-sm);
+
+        padding: 5px var(--spacing-sm);
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+    .task-card__route-point { display: flex; align-items: center; gap: 6px; }
+    .task-card__route-line {
+        width: 2px; height: 8px;
+        background: var(--fleet-grey-200);
+        margin-left: 7px;
+    }
+    .task-card__route-pin {
+        font-size: 15px; flex-shrink: 0; width: 16px; text-align: center;
+    }
+    .task-card__route-pin--green { color: var(--fleet-success); }
+    .task-card__route-pin--red   { color: var(--fleet-danger); }
+    .task-card__route-info { display: flex; flex-direction: column; gap: 1px; }
+    .task-card__route-label { font-size: 10px; color: var(--fleet-grey-400); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .task-card__route-value { font-size: var(--font-size-sm); color: var(--fleet-dark); font-weight: 600; line-height: 1.4; }
+    .task-card__route-value small { font-size: var(--font-size-xs); color: var(--fleet-grey-500); font-weight: 500; }
+    .task-card__zone-group { color: var(--fleet-primary); font-weight: 600; }
+    .task-card__zone-name { color: var(--fleet-primary); font-weight: 700; }
+    .task-card__route-addr { color: var(--fleet-grey-500); }
+    .task-card__route-line1 { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .task-card__route-sub { font-size: var(--font-size-xs); color: var(--fleet-grey-500); font-weight: 500; }
+    .task-card__acc-badge {
+        font-size: 9px; font-weight: 700; padding: 1px 5px;
+        border-radius: var(--radius-md); border: 1px solid; white-space: nowrap; flex-shrink: 0;
+    }
+    .task-card__acc-badge--exact       { background:#e8f8f0; color:#27ae60; border-color:#c3e6cb; }
+    .task-card__acc-badge--street      { background:#eafaf1; color:#2ecc71; border-color:#a9dfbf; }
+    .task-card__acc-badge--landmark    { background:#fef9e7; color:#f39c12; border-color:#fde8c8; }
+    .task-card__acc-badge--zone_center { background:#fef5ec; color:#e67e22; border-color:#fad7a0; }
+    .task-card__acc-badge--ai_estimate { background:#fdecea; color:#e74c3c; border-color:#f5c6c6; }
+
+    /* Property tags — hide on card list to save space */
+    .task-card .task-card__tags { display: none; }
+    .task-card__tag {
+        display: inline-flex; align-items: center; gap: 4px;
+        font-size: 11px; font-weight: 600;
+        padding: 2px 7px; border-radius: var(--radius-md);
+        background: var(--fleet-grey-100); color: var(--fleet-grey-600);
+    }
+    .task-card__tag--time { background: #e8f4fd; color: #2980b9; }
+
+    /* Strip */
+    .task-card__strip {
+        display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+        padding-top: 4px;
+        border-top: 1px solid var(--fleet-grey-100);
+    }
+    .task-card__strip-item {
+        display: flex; align-items: center; gap: 4px;
+        font-size: 11px; font-weight: 600;
+        color: var(--fleet-grey-600);
+        background: var(--fleet-grey-100);
+        padding: 2px 8px; border-radius: var(--radius-sm);
+    }
+    .task-card__strip-item--cod  { background: #fff7e6; color: #e67e22; }
+    .task-card__strip-item--earn { background: #eafaf1; color: #27ae60; }
+    .task-card__strip-item--note { background: #fef9e7; color: #d4ac0d; cursor: pointer; }
+    .task-card__strip-item i { font-size: 10px; }
+
+    /* Inline action buttons inside strip */
+    .task-card__action-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 5px 12px; border-radius: var(--radius-sm);
+        font-size: 12px; font-weight: 700;
+        border: none; cursor: pointer; text-decoration: none;
+        transition: opacity 0.15s;
+        margin-left: auto;
+        white-space: nowrap;
+    }
+    .task-card__action-btn:active { opacity: 0.75; }
+    .task-card__action-btn--take   { background: #2563eb; color: #fff; }
+    .task-card__action-btn--accept { background: #10b981; color: #fff; }
+    .task-card__action-btn--nav    { background: #7c3aed; color: #fff; }
+    .task-card__action-btn--nav-disabled { background: var(--fleet-grey-200) !important; color: var(--fleet-grey-400) !important; cursor: not-allowed; }
+    .task-card__action-btn--start  { background: #f59e0b; color: #fff; margin-left: 0; }
+
+    /* Clickable card cursor */
+    .task-card { cursor: pointer; }
+    .task-card a, .task-card button { cursor: pointer; }
+
+    /* ── Take-via-Scan Modal ─────────────────────────── */
+    .take-scan-modal { border-radius: var(--radius-2xl) var(--radius-2xl) 0 0; }
+    .take-scan-subtitle { font-size: var(--font-size-xs); color: var(--fleet-grey-500); margin: 2px 0 0; }
+
+    .take-scan-camera-wrap {
+        position: relative;
+        background: #000;
+        height: 220px;
+        overflow: hidden;
+    }
+    #takeScanVideo {
+        position: absolute; inset: 0;
+        width: 100%; height: 100%;
+        object-fit: cover;
+    }
+    .take-scan-frame {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .take-scan-frame__corner {
+        position: absolute;
+        width: 28px; height: 28px;
+        border-color: #fff;
+        border-style: solid;
+        border-width: 0;
+    }
+    .take-scan-frame__corner--tl { top: 30px; left: 50%; margin-left: -56px; border-top-width: 3px; border-left-width: 3px; border-radius: 4px 0 0 0; }
+    .take-scan-frame__corner--tr { top: 30px; left: 50%; margin-left: 28px; border-top-width: 3px; border-right-width: 3px; border-radius: 0 4px 0 0; }
+    .take-scan-frame__corner--bl { bottom: 30px; left: 50%; margin-left: -56px; border-bottom-width: 3px; border-left-width: 3px; border-radius: 0 0 0 4px; }
+    .take-scan-frame__corner--br { bottom: 30px; left: 50%; margin-left: 28px; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 4px 0; }
+    @keyframes scan-line { 0%, 100% { transform: translateY(-60px); } 50% { transform: translateY(60px); } }
+    .take-scan-frame__line {
+        position: absolute;
+        width: 80px; height: 2px;
+        background: linear-gradient(90deg, transparent, #00d4ff, transparent);
+        animation: scan-line 1.8s ease-in-out infinite;
+        box-shadow: 0 0 8px #00d4ff;
+    }
+    .take-scan-hint {
+        position: absolute; bottom: 8px; left: 0; right: 0;
+        text-align: center;
+        color: rgba(255,255,255,0.85);
+        font-size: var(--font-size-xs);
+        font-weight: 600;
+    }
+
+    /* Success state */
+    .take-scan-success {
+        padding: var(--spacing-lg);
+        text-align: center;
+    }
+    .take-scan-success__icon {
+        width: 64px; height: 64px;
+        border-radius: 50%;
+        background: #dcfce7;
+        color: #16a34a;
+        font-size: 2rem;
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto var(--spacing-sm);
+    }
+    .take-scan-success__title {
+        font-size: var(--font-size-xl);
+        font-weight: 800;
+        color: var(--fleet-dark);
+        margin-bottom: var(--spacing-md);
+    }
+    .take-scan-success__card {
+        background: var(--fleet-grey-50, #f8f9fa);
+        border-radius: var(--radius-sm);
+        padding: var(--spacing-md);
+        text-align: left;
+        margin-bottom: var(--spacing-md);
+    }
+    .take-scan-info-row {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
+        padding: 4px 0;
+        border-bottom: 1px solid var(--fleet-grey-100);
+    }
+    .take-scan-info-row:last-child { border-bottom: none; }
+    .take-scan-info-label { color: var(--fleet-grey-400); font-size: var(--font-size-sm); width: 20px; flex-shrink: 0; }
+    .take-scan-info-val { font-size: var(--font-size-sm); font-weight: 600; color: var(--fleet-dark); }
+    .take-scan-info-val--cod { color: #16a34a; }
+
+    @keyframes countdown-shrink { from { width: 100%; } to { width: 0%; } }
+    .take-scan-countdown {
+        height: 4px;
+        background: var(--fleet-grey-100);
+        border-radius: 99px;
+        overflow: hidden;
+        margin-bottom: 6px;
+    }
+    .take-scan-countdown__bar {
+        height: 100%;
+        background: #16a34a;
+        border-radius: 99px;
+        animation: countdown-shrink 3s linear forwards;
+    }
+    .take-scan-countdown__label {
+        font-size: var(--font-size-xs);
+        color: var(--fleet-grey-500);
+        margin: 0;
+    }
+</style>
+{% endblock %}
+
+<script>
+    function getCsrf() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    }
+
+    function waMessage(el, phone, orderNum, zone, street, building, cod) {
+        let msg = 'Hello! 👋 This is EzzyDelivery.\n\n';
+        msg += '📦 Order: ' + (orderNum || '—') + '\n';
+        if (zone) msg += '📍 Zone ' + zone;
+        if (street) msg += ', Street ' + street;
+        if (building) msg += ', Bldg ' + building;
+        if (zone || street || building) msg += '\n';
+        if (cod) msg += '💵 COD: ' + cod + ' QR\n';
+        msg += '\nYour delivery is on its way. Please be available to receive it. Thank you! 🚚';
+        const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
+        window.open(url, '_blank');
+    }
+
+    function tdOpenWa(el) {
+        const url = el.dataset.waUrl;
+        if (url) window.open(url, '_blank');
+        return false;
+    }
+
+    function switchTab(tab) {
+        haptic([5]);
+        const url = new URL(window.location);
+        url.searchParams.set('tab', tab);
+        url.searchParams.delete('status');
+        window.location = url;
+    }
+
+    function assignTask(taskId, btn) {
+        haptic([10]);
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Assigning...';
+
+        const form = new FormData();
+        form.append('task_id', taskId);
+        form.append('csrfmiddlewaretoken', getCsrf());
+
+        fetch('{% url "fleet:fleet_assign_driver" %}', {
+            method: 'POST',
+            body: form,
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                haptic([10, 50, 10]);
+                showToast('Task accepted! Switching to Active tab...', 'success');
+                setTimeout(() => switchTab('accepted'), 1200);
+            } else {
+                showToast(data.error || 'Could not take this task', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-hand-pointer me-2"></i>Take Task';
+            }
+        })
+        .catch(() => {
+            showToast('Network error. Please try again.', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-hand-pointer me-2"></i>Take Task';
+        });
+    }
+
+    function acceptTask(taskId, btn) {
+        haptic([10]);
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Accepting...';
+
+        const form = new FormData();
+        form.append('task_id', taskId);
+        form.append('csrfmiddlewaretoken', getCsrf());
+
+        fetch('{% url "fleet:fleet_accept_task" %}', {
+            method: 'POST',
+            body: form,
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                haptic([10, 50, 10]);
+                showToast('Task accepted! Moving to Active...', 'success');
+                setTimeout(() => switchTab('accepted'), 1200);
+            } else {
+                showToast(data.error || 'Could not accept this task', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Accept Task';
+            }
+        })
+        .catch(() => {
+            showToast('Network error. Please try again.', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Accept Task';
+        });
+    }
+
+    function startRide(taskId, btn) {
+        haptic([10]);
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+        const form = new FormData();
+        form.append('task_id', taskId);
+        form.append('csrfmiddlewaretoken', getCsrf());
+
+        fetch('{% url "fleet:fleet_start_ride" %}', {
+            method: 'POST',
+            body: form,
+        })
+        .then(r => {
+            if (!r.ok) {
+                return r.text().then(t => { throw new Error('Server error ' + r.status + ': ' + t.substring(0, 120)); });
+            }
+            return r.json();
+        })
+        .then(data => {
+            if (data.success && data.redirect_url) {
+                haptic([10, 50, 10]);
+                showToast('Starting navigation...', 'success');
+                setTimeout(() => { window.location.href = data.redirect_url; }, 800);
+            } else {
+                showToast(data.error || 'Could not start ride', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-play me-1"></i>Start';
+            }
+        })
+        .catch(err => {
+            console.error('startRide error:', err);
+            showToast(err.message || 'Network error. Please try again.', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-play me-1"></i>Start';
+        });
+    }
+
+    // Grey out nav buttons that have no valid coords
+    document.querySelectorAll('.task-card__action-btn--nav').forEach(btn => {
+        const card = btn.closest('.task-card');
+        const lat = card && card.dataset.lat;
+        const lng = card && card.dataset.lng;
+        if (!lat || !lng || parseFloat(lat) === 0) {
+            btn.classList.add('task-card__action-btn--nav-disabled');
+            btn.title = 'No GPS coordinates';
+        } else {
+            const acc = card.dataset.coordsAccuracy;
+            if (acc) btn.title = 'Navigate · ' + acc.replace('_', ' ');
+        }
+    });
+
+    function openNav(btn) {
+        const card = btn.closest('.task-card');
+        const lat = card.dataset.lat;
+        const lng = card.dataset.lng;
+        if (!lat || !lng || parseFloat(lat) === 0) {
+            showToast('No GPS coordinates for this order', 'error');
+            return;
+        }
+        window.open('https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng + '&travelmode=driving', '_blank');
+    }
+
+    // Auto-refresh every 60 seconds on New tab
+    {% if current_tab == 'all' %}
+    setTimeout(() => window.location.reload(), 60000);
+    {% endif %}
+
+    // openTaskDetail / closeTaskDetail are provided by fleet/parts/task_detail_sheet.html (via pwa_base.html)
+
+    // ── Take-via-Scan Scanner ─────────────────────────────────────────────────
+    let _takeScanStream = null;
+    let _takeScanDetecting = false;
+    let _takeScanTaskId = null;
+    let _takeScanTaskNum = '';
+    let _takeScanOrderNum = '';
+
+    function openTakeScanner(taskId, taskNum, orderNum, business, customer) {
+        _takeScanTaskId = taskId;
+        _takeScanTaskNum = String(taskNum);
+        _takeScanOrderNum = String(orderNum);
+        haptic([10]);
+
+        // Populate subtitle
+        const subtitle = document.getElementById('takeScanSubtitle');
+        subtitle.textContent = (taskNum ? '#' + taskNum : '') + (business ? ' · ' + business : '');
+
+        // Reset UI
+        document.getElementById('takeScanSuccess').style.display = 'none';
+        document.getElementById('takeScanCameraWrap').style.display = 'block';
+        document.getElementById('takeScanManualWrap').style.display = 'block';
+        document.getElementById('takeScanManualInput').value = '';
+
+        document.getElementById('takeScanModal').style.display = 'flex';
+        _startTakeScanCamera();
+    }
+
+    async function _startTakeScanCamera() {
+        _takeScanDetecting = true;
+        try {
+            _takeScanStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+            });
+            const video = document.getElementById('takeScanVideo');
+            video.srcObject = _takeScanStream;
+            if ('BarcodeDetector' in window) {
+                const detector = new BarcodeDetector({ formats: ['code_128', 'code_39', 'ean_13', 'qr_code'] });
+                const detect = async () => {
+                    if (!_takeScanDetecting) return;
+                    try {
+                        const barcodes = await detector.detect(video);
+                        if (barcodes.length > 0) {
+                            _takeScanDetecting = false;
+                            haptic([10, 80, 10]);
+                            _submitTakeScan(barcodes[0].rawValue);
+                        } else {
+                            requestAnimationFrame(detect);
+                        }
+                    } catch { requestAnimationFrame(detect); }
+                };
+                video.addEventListener('loadeddata', detect, { once: true });
+            }
+        } catch (err) {
+            showToast('Camera unavailable — use manual entry', 'warning');
+            document.getElementById('takeScanCameraWrap').style.display = 'none';
+        }
+    }
+
+    function _stopTakeScanCamera() {
+        _takeScanDetecting = false;
+        if (_takeScanStream) {
+            _takeScanStream.getTracks().forEach(t => t.stop());
+            _takeScanStream = null;
+        }
+    }
+
+    function closeTakeScanner() {
+        _stopTakeScanCamera();
+        document.getElementById('takeScanModal').style.display = 'none';
+    }
+
+    function submitTakeScanManual(e) {
+        e.preventDefault();
+        const val = document.getElementById('takeScanManualInput').value.trim();
+        if (val) { _takeScanDetecting = false; _submitTakeScan(val); }
+        return false;
+    }
+
+    async function _submitTakeScan(code) {
+        _stopTakeScanCamera();
+        document.getElementById('takeScanCameraWrap').style.display = 'none';
+        document.getElementById('takeScanManualWrap').style.display = 'none';
+
+        try {
+            const resp = await fetch('{% url "fleet:fleet_task_take_scan" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrf()
+                },
+                body: JSON.stringify({ task_id: _takeScanTaskId, code: code })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                haptic([10, 50, 10, 50, 10]);
+                _showTakeScanSuccess(data);
+            } else {
+                showToast(data.error || 'Scan failed', 'danger');
+                // Re-show manual entry
+                document.getElementById('takeScanManualWrap').style.display = 'block';
+                document.getElementById('takeScanCameraWrap').style.display = 'block';
+                _takeScanDetecting = true;
+                _startTakeScanCamera();
+            }
+        } catch (err) {
+            showToast('Network error. Try again.', 'danger');
+            document.getElementById('takeScanManualWrap').style.display = 'block';
+            document.getElementById('takeScanCameraWrap').style.display = 'block';
+            _takeScanDetecting = true;
+            _startTakeScanCamera();
+        }
+    }
+
+    function _showTakeScanSuccess(data) {
+        document.getElementById('tsScanTaskNum').textContent = data.task_number || data.order_number || '—';
+        document.getElementById('tsScanBusiness').textContent = data.business || '—';
+        document.getElementById('tsScanCustomer').textContent = data.customer || '—';
+
+        const zone = [data.zone ? 'Zone ' + data.zone : '', data.street ? 'St ' + data.street : '', data.building ? 'Bldg ' + data.building : ''].filter(Boolean).join(', ');
+        const zoneRow = document.getElementById('tsScanZoneRow');
+        document.getElementById('tsScanZone').textContent = zone || '—';
+        zoneRow.style.display = zone ? '' : 'none';
+
+        const codRow = document.getElementById('tsScanCodRow');
+        if (data.cod) {
+            document.getElementById('tsScanCod').textContent = data.cod + ' QR';
+            codRow.style.display = '';
+        } else {
+            codRow.style.display = 'none';
+        }
+
+        // Reset and start countdown bar animation
+        const bar = document.getElementById('takeScanCountdownBar');
+        bar.style.animation = 'none';
+        void bar.offsetWidth; // reflow
+        bar.style.animation = 'countdown-shrink 3s linear forwards';
+
+        document.getElementById('takeScanSuccess').style.display = 'block';
+        showToast('Task accepted! Moving to Active…', 'success');
+
+        // After 3 seconds: close modal and switch to accepted tab
+        setTimeout(() => {
+            closeTakeScanner();
+            switchTab('accepted');
+        }, 3000);
+    }
+</script>
+
+{% endblock %}

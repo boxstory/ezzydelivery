@@ -1,0 +1,167 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block header_actions %}
+<button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
+    <i class="fa-solid fa-rotate-right"></i>
+</button>
+<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+    <i class="fa-solid fa-bell"></i>
+    {% if unread_notifications > 0 %}
+    <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
+    {% endif %}
+</a>
+{% endblock %}
+
+{% block content %}
+
+{% if messages %}
+{% for msg in messages %}
+<div class="fade-in" style="background:{% if msg.tags == 'success' %}var(--fleet-success){% elif msg.tags == 'warning' %}var(--fleet-warning){% else %}var(--fleet-info){% endif %};
+     color:#fff; border-radius:var(--radius-sm); padding:var(--spacing-md) var(--spacing-lg);
+     margin-bottom:var(--spacing-md); font-weight:600; font-size:var(--font-size-sm);">
+    {{ msg }}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Availability Status -->
+<div class="fleet-card fade-in">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-circle-dot me-2" style="color:var(--fleet-success);"></i>
+            Availability Status
+        </h3>
+    </div>
+    <div class="fleet-card__body">
+        <p style="font-size:var(--font-size-sm); color:var(--fleet-grey-600); margin-bottom:var(--spacing-md);">
+            Set your current availability so dispatchers know if you can accept deliveries.
+        </p>
+        <form method="POST" action="{% url 'fleet:driver_settings' %}" id="availabilityForm">
+            {% csrf_token %}
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--spacing-sm);">
+                {% for value, label in availability_choices %}
+                <label class="avail-option {% if driver.driver_availability == value %}avail-option--active{% endif %}"
+                       style="display:flex; align-items:center; gap:var(--spacing-sm);
+                              padding:var(--spacing-md); border-radius:var(--radius-sm);
+                              border:2px solid {% if driver.driver_availability == value %}var(--fleet-primary){% else %}var(--fleet-grey-200){% endif %};
+                              background:{% if driver.driver_availability == value %}var(--fleet-grey-50){% else %}var(--fleet-white){% endif %};
+                              cursor:pointer; transition:all var(--transition-base);">
+                    <input type="radio" name="driver_availability" value="{{ value }}"
+                           {% if driver.driver_availability == value %}checked{% endif %}
+                           style="display:none;"
+                           onchange="document.getElementById('availabilityForm').submit();">
+                    <span style="width:10px; height:10px; border-radius:50%; flex-shrink:0; background:
+                        {% if value == 'available' %}var(--fleet-success)
+                        {% elif value == 'offline' %}var(--fleet-grey-400)
+                        {% elif value == 'on_delivery' %}var(--fleet-info)
+                        {% elif value == 'on_break' %}var(--fleet-warning)
+                        {% else %}var(--fleet-grey-400){% endif %};"></span>
+                    <span style="font-size:var(--font-size-sm); font-weight:{% if driver.driver_availability == value %}700{% else %}500{% endif %};">
+                        {{ label }}
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Account Settings -->
+<div class="fleet-card slide-up" style="animation-delay:0.1s;">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-user-gear me-2"></i>
+            Account
+        </h3>
+    </div>
+    <div class="fleet-card__body" style="padding:0;">
+        <ul class="fleet-list" style="margin:0;">
+            <li class="fleet-list-item"
+                style="border-radius:0; border:none; border-bottom:1px solid var(--fleet-grey-100); margin-bottom:0;"
+                onclick="window.location.href='/core/profile/'">
+                <div class="fleet-list-item__icon fleet-stat__icon--info">
+                    <i class="fa-solid fa-user-pen"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Edit Profile</div>
+                    <div class="fleet-list-item__subtitle">Update your name, phone, and photo</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color:var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+
+            <li class="fleet-list-item"
+                style="border-radius:0; border:none; border-bottom:1px solid var(--fleet-grey-100); margin-bottom:0;"
+                onclick="window.location.href='{% url 'account_change_password' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--warning">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Change Password</div>
+                    <div class="fleet-list-item__subtitle">Update your login password</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color:var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+
+            <li class="fleet-list-item"
+                style="border-radius:0; border:none; margin-bottom:0;"
+                onclick="window.location.href='{% url 'fleet:driver_profile_mobile' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--success">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Zone Preferences</div>
+                    <div class="fleet-list-item__subtitle">Set preferred delivery areas</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color:var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- App Info -->
+<div class="fleet-card slide-up" style="animation-delay:0.2s;">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-circle-info me-2"></i>
+            App
+        </h3>
+    </div>
+    <div class="fleet-card__body">
+        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:var(--spacing-md);">
+            <div style="padding:var(--spacing-md); background:var(--fleet-grey-50); border-radius:var(--radius-sm); border:1px solid var(--fleet-grey-100);">
+                <div style="font-size:var(--font-size-xs); color:var(--fleet-grey-600); font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:var(--spacing-xs);">Version</div>
+                <div style="font-size:var(--font-size-base); font-weight:700; color:var(--fleet-dark);">1.0.0</div>
+            </div>
+            <div style="padding:var(--spacing-md); background:var(--fleet-grey-50); border-radius:var(--radius-sm); border:1px solid var(--fleet-grey-100);">
+                <div style="font-size:var(--font-size-xs); color:var(--fleet-grey-600); font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:var(--spacing-xs);">Driver ID</div>
+                <div style="font-size:var(--font-size-base); font-weight:700; color:var(--fleet-dark);">#{{ driver.driver_id }}</div>
+            </div>
+        </div>
+
+        <div style="margin-top:var(--spacing-lg); display:flex; gap:var(--spacing-sm);">
+            <a href="{% url 'fleet:driver_help' %}"
+               class="fleet-btn fleet-btn--outline"
+               style="flex:1; text-align:center; text-decoration:none;">
+                <i class="fa-solid fa-headset me-1"></i> Help
+            </a>
+            <button type="button"
+                    onclick="if(confirm('Logout from EzzyDelivery?')) window.location.href='{% url 'account_logout' %}'"
+                    class="fleet-btn"
+                    style="flex:1; background:var(--fleet-danger); color:#fff; border:none;">
+                <i class="fa-solid fa-right-from-bracket me-1"></i> Logout
+            </button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

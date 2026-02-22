@@ -1,0 +1,1390 @@
+{% load static %}
+{# ── Task Detail Bottom Sheet — shared across all PWA pages ────────────────
+   Include this partial in any page that needs to show task details on tap.
+   Requires: openTaskDetail(event, cardEl) to be called from a .task-card onclick.
+   The card element must have data-* attributes as defined in driver_tasks_pwa.html.
+#}
+
+<!-- ── Task Detail Bottom Sheet ───────────────────────── -->
+<div id="taskDetailOverlay" class="td-overlay" onclick="closeTaskDetail()"></div>
+<div id="taskDetailSheet" class="td-sheet">
+    <div class="td-sheet__handle"></div>
+    <div class="td-sheet__header">
+        <div>
+            <span id="tdStatus" class="fleet-badge"></span>
+            <span id="tdSpeed" class="fleet-badge" style="display:none;"></span>
+        </div>
+        <button class="td-sheet__close" onclick="closeTaskDetail()" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <div class="td-sheet__body">
+
+        <!-- Order meta -->
+        <strong id="tdTask" style="display:none;"></strong>
+        <div class="td-row td-row--meta">
+            <div class="td-meta-item">
+                <span class="td-label">Task #</span>
+                <strong id="tdTaskNum"></strong>
+            </div>
+            <div class="td-meta-item">
+                <span class="td-label">Date</span>
+                <strong id="tdDate"></strong>
+            </div>
+        </div>
+
+        <div class="td-divider"></div>
+
+        <!-- Business -->
+        <div class="td-section">
+            <div class="td-section__icon"><i class="fa-solid fa-store"></i></div>
+            <div class="td-section__content">
+                <span class="td-label">Business</span>
+                <strong id="tdBusiness"></strong>
+            </div>
+        </div>
+
+        <!-- Customer -->
+        <div class="td-section">
+            <div class="td-section__icon"><i class="fa-solid fa-user"></i></div>
+            <div class="td-section__content">
+                <span class="td-label">Customer</span>
+                <strong id="tdCustomer"></strong>
+                <div id="tdPhoneRow" class="task-card__phone-row td-phone-row" style="display:none;">
+                    <a id="tdCallBtn" href="#" class="task-card__contact-pill task-card__contact-pill--call td-contact-pill">
+                        <i class="fa-solid fa-phone"></i><span id="tdPhone"></span>
+                    </a>
+                    <a id="tdWaBtn" href="#" onclick="return tdOpenWa(this);" class="task-card__contact-pill task-card__contact-pill--wa td-contact-pill">
+                        <i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="td-divider"></div>
+
+        <!-- Pickup -->
+        <div class="td-section">
+            <div class="td-section__icon td-section__icon--green"><i class="fa-solid fa-circle-dot"></i></div>
+            <div class="td-section__content">
+                <span class="td-label">Pickup From</span>
+                <strong id="tdPickup"></strong>
+            </div>
+        </div>
+
+        <!-- Dropoff -->
+        <div class="td-section">
+            <div class="td-section__icon td-section__icon--red"><i class="fa-solid fa-location-dot"></i></div>
+            <div class="td-section__content">
+                <span class="td-label">Deliver To</span>
+                <div id="tdAddrLine1" class="td-addr-line1" style="display:none;">
+                    <strong id="tdAddrStructured"></strong>
+                    <span id="tdAccuracyBadge" class="td-accuracy-badge"></span>
+                </div>
+                <span id="tdAddress" class="td-addr-full"></span>
+                <div id="tdPtypeRow" class="td-tags" style="display:none;">
+                    <span id="tdPtype" class="task-card__tag"></span>
+                    <span id="tdTimeslot" class="task-card__tag task-card__tag--time" style="display:none;">
+                        <i class="fa-regular fa-clock"></i> <span id="tdTimeslotVal"></span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Address Validation Status -->
+        <div id="tdAddrVerifyBox" class="td-addr-verify" style="display:none;">
+            <div class="td-addr-verify__badge" id="tdAddrVerifyBadge"></div>
+            <div class="td-addr-verify__details" id="tdAddrVerifyDetails"></div>
+        </div>
+
+        <div class="td-divider"></div>
+
+        <!-- COD / Items / Earnings -->
+        <div class="td-row td-row--stats">
+            <div id="tdCodBox" class="td-stat td-stat--cod" style="display:none;">
+                <i class="fa-solid fa-money-bill-wave"></i>
+                <span class="td-stat__label">COD</span>
+                <strong id="tdCod"></strong>
+            </div>
+            <div id="tdItemsBox" class="td-stat" style="display:none;">
+                <i class="fa-solid fa-box"></i>
+                <span class="td-stat__label">Items</span>
+                <strong id="tdItems"></strong>
+            </div>
+            <div id="tdEarnBox" class="td-stat td-stat--earn" style="display:none;">
+                <i class="fa-solid fa-wallet"></i>
+                <span class="td-stat__label">Earnings</span>
+                <strong id="tdEarn"></strong>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div id="tdNotesBox" class="td-notes" style="display:none;">
+            <i class="fa-solid fa-note-sticky"></i>
+            <span id="tdNotes"></span>
+        </div>
+
+        <!-- Products -->
+        <div id="tdProductsBox" style="display:none;">
+            <div class="td-divider"></div>
+            <div class="td-products-header">
+                <i class="fa-solid fa-boxes-stacked"></i> Items
+            </div>
+            <div id="tdProductsList" class="td-products-list"></div>
+        </div>
+
+        <!-- ── Action Panel (status-aware) ─────────────────────── -->
+        <div id="tdActionPanel" style="display:none;">
+            <div class="td-divider"></div>
+            <div class="td-action-header">
+                <i class="fa-solid fa-bolt"></i> Task Actions
+            </div>
+
+            <!-- Status Update Buttons (in-progress statuses) -->
+            <div id="tdStatusBtns" class="td-action-grid"></div>
+
+            <!-- Primary outcome buttons -->
+            <div id="tdOutcomeBtns" class="td-outcome-row"></div>
+        </div>
+
+        <!-- ── Activity Timeline ────────────────────────────────── -->
+        <div id="tdTimelineBox">
+            <div class="td-divider"></div>
+            <div class="td-timeline-header">
+                <i class="fa-solid fa-timeline"></i> Activity Log
+            </div>
+            <div id="tdTimelineBody" class="td-timeline">
+                <div id="tdTimelineList" class="td-timeline__list">
+                    <div class="td-timeline__loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /td-sheet__body -->
+</div>
+
+<!-- ── Delivered Sub-Sheet ───────────────────────────────── -->
+<div id="tdDeliveredOverlay" class="td-overlay" onclick="closeTdDelivered()"></div>
+<div id="tdDeliveredSheet" class="td-sub-sheet">
+    <div class="td-sheet__handle"></div>
+    <div class="td-sheet__header">
+        <strong style="color:var(--fleet-success)"><i class="fa-solid fa-circle-check me-2"></i>Mark Delivered</strong>
+        <button class="td-sheet__close" onclick="closeTdDelivered()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="td-sub-sheet__body">
+        <!-- Proof of Delivery Photo -->
+        <div class="td-form-group">
+            <label class="td-form-label"><i class="fa-solid fa-camera me-1"></i>Proof of Delivery Photo <span style="color:var(--fleet-grey-400)">(optional)</span></label>
+            <div class="td-photo-upload" id="tdProofUploadBox" onclick="document.getElementById('tdProofInput').click()">
+                <i class="fa-solid fa-cloud-arrow-up td-photo-upload__icon"></i>
+                <span class="td-photo-upload__text">Tap to take / upload photo</span>
+                <img id="tdProofPreview" class="td-photo-preview" style="display:none;" alt="Proof">
+            </div>
+            <input type="file" id="tdProofInput" accept="image/*" capture="environment" style="display:none;" onchange="previewProof(this)">
+        </div>
+
+        <!-- COD Toggle -->
+        <div id="tdCodSection" class="td-form-group" style="display:none;">
+            <label class="td-form-label"><i class="fa-solid fa-money-bill-wave me-1"></i>COD Collection</label>
+            <div class="td-toggle-row">
+                <span>Collected COD?</span>
+                <label class="td-switch">
+                    <input type="checkbox" id="tdCodCollected" onchange="toggleCodAmount(this)">
+                    <span class="td-switch__track"></span>
+                </label>
+            </div>
+            <div id="tdCodAmountRow" style="display:none; margin-top:8px;">
+                <label class="td-form-label">Amount Collected (QR)</label>
+                <input type="number" id="tdCodAmount" class="td-form-input" placeholder="0.00" step="0.01" min="0">
+            </div>
+        </div>
+
+        <button id="tdDeliveredBtn" class="fleet-btn td-confirm-btn td-confirm-btn--success" onclick="submitDelivered()">
+            <i class="fa-solid fa-check me-2"></i>Confirm Delivered
+        </button>
+    </div>
+</div>
+
+<!-- ── Failed Sub-Sheet ──────────────────────────────────── -->
+<div id="tdFailedOverlay" class="td-overlay" onclick="closeTdFailed()"></div>
+<div id="tdFailedSheet" class="td-sub-sheet">
+    <div class="td-sheet__handle"></div>
+    <div class="td-sheet__header">
+        <strong style="color:var(--fleet-danger)"><i class="fa-solid fa-circle-xmark me-2"></i>Mark Failed</strong>
+        <button class="td-sheet__close" onclick="closeTdFailed()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="td-sub-sheet__body">
+        <div class="td-form-group">
+            <label class="td-form-label"><i class="fa-solid fa-triangle-exclamation me-1"></i>Reason for Failure <span style="color:var(--fleet-danger)">*</span></label>
+            <div class="td-reason-grid">
+                <button type="button" class="td-reason-btn" onclick="selectReason(this, 'Customer not reachable')">Not Reachable</button>
+                <button type="button" class="td-reason-btn" onclick="selectReason(this, 'Customer refused delivery')">Refused</button>
+                <button type="button" class="td-reason-btn" onclick="selectReason(this, 'Wrong address')">Wrong Address</button>
+                <button type="button" class="td-reason-btn" onclick="selectReason(this, 'Customer not home')">Not Home</button>
+                <button type="button" class="td-reason-btn" onclick="selectReason(this, 'No COD cash available')">No COD Cash</button>
+                <button type="button" class="td-reason-btn" onclick="selectReason(this, 'Postponed by customer')">Postponed</button>
+            </div>
+            <textarea id="tdFailReason" class="td-form-textarea" placeholder="Add notes (or type custom reason)..." rows="2"></textarea>
+        </div>
+        <button id="tdFailedBtn" class="fleet-btn td-confirm-btn td-confirm-btn--danger" onclick="submitFailed()">
+            <i class="fa-solid fa-xmark me-2"></i>Confirm Failed
+        </button>
+    </div>
+</div>
+
+<!-- ── Postpone Sub-Sheet ────────────────────────────────── -->
+<div id="tdPostponeOverlay" class="td-overlay" onclick="closeTdPostpone()"></div>
+<div id="tdPostponeSheet" class="td-sub-sheet">
+    <div class="td-sheet__handle"></div>
+    <div class="td-sheet__header">
+        <strong style="color:var(--fleet-primary)"><i class="fa-regular fa-calendar me-2"></i>Postpone Delivery</strong>
+        <button class="td-sheet__close" onclick="closeTdPostpone()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="td-sub-sheet__body">
+        <div class="td-form-group">
+            <label class="td-form-label">New Delivery Date</label>
+            <input type="date" id="tdPostponeDate" class="td-form-input">
+        </div>
+        <button id="tdPostponeBtn" class="fleet-btn td-confirm-btn td-confirm-btn--primary" onclick="submitPostpone()">
+            <i class="fa-regular fa-calendar-check me-2"></i>Confirm Postpone
+        </button>
+    </div>
+</div>
+<!-- ── Non-Reachable Sub-Sheet ───────────────────────────── -->
+<div id="tdNrOverlay" class="td-overlay" onclick="closeTdNonReachable()"></div>
+<div id="tdNrSheet" class="td-sub-sheet">
+    <div class="td-sheet__handle"></div>
+    <div class="td-sheet__header">
+        <strong style="color:var(--fleet-warning)"><i class="fa-solid fa-phone-slash me-2"></i>Non Reachable</strong>
+        <button class="td-sheet__close" onclick="closeTdNonReachable()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="td-sub-sheet__body">
+
+        <!-- Help tip -->
+        <div class="td-nr-help">
+            <div class="td-nr-help__icon"><i class="fa-solid fa-circle-info"></i></div>
+            <div class="td-nr-help__text">
+                <strong>When to use "Non Reachable"</strong>
+                <ul>
+                    <li>You called the customer <strong>at least 2 times</strong> and got no answer</li>
+                    <li>Customer phone is switched off or unreachable</li>
+                    <li>You waited at the location but no one responded</li>
+                </ul>
+                <span class="td-nr-help__note"><i class="fa-solid fa-triangle-exclamation"></i> Upload a screenshot of your call log as proof. This protects you if the customer disputes the attempt.</span>
+            </div>
+        </div>
+
+        <!-- Call screenshot upload (required) -->
+        <div class="td-form-group">
+            <label class="td-form-label">
+                <i class="fa-solid fa-camera me-1"></i>Call Log Screenshot
+                <span style="color:var(--fleet-danger)">*</span>
+                <span style="color:var(--fleet-grey-400); font-weight:400"> (required)</span>
+            </label>
+            <div class="td-photo-upload" id="tdNrUploadBox" onclick="document.getElementById('tdNrInput').click()">
+                <i class="fa-solid fa-mobile-screen-button td-photo-upload__icon"></i>
+                <span class="td-photo-upload__text">Tap to take screenshot / upload call log</span>
+                <img id="tdNrPreview" class="td-photo-preview" style="display:none;" alt="Call screenshot">
+            </div>
+            <input type="file" id="tdNrInput" accept="image/*" style="display:none;" onchange="tdNrPreview(this)">
+            <span id="tdNrUploadError" style="color:var(--fleet-danger);font-size:var(--font-size-xs);display:none;">
+                <i class="fa-solid fa-circle-exclamation"></i> Please upload a call screenshot before confirming.
+            </span>
+        </div>
+
+        <!-- Optional notes -->
+        <div class="td-form-group">
+            <label class="td-form-label"><i class="fa-solid fa-note-sticky me-1"></i>Notes <span style="color:var(--fleet-grey-400); font-weight:400">(optional)</span></label>
+            <textarea id="tdNrNotes" class="td-form-textarea" placeholder="e.g. Called twice, no answer. Phone off." rows="2"></textarea>
+        </div>
+
+        <button id="tdNrBtn" class="fleet-btn td-confirm-btn td-confirm-btn--warning" onclick="submitNonReachable()">
+            <i class="fa-solid fa-phone-slash me-2"></i>Confirm Non Reachable
+        </button>
+    </div>
+</div>
+<!-- ─────────────────────────────────────────────────────── -->
+<!-- ─────────────────────────────────────────────────────── -->
+
+<style>
+    /* ── Task Detail Bottom Sheet ──────────────────────── */
+    .td-overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+        z-index: 1050; opacity: 0; pointer-events: none;
+        transition: opacity .25s ease;
+    }
+    .td-overlay.open { opacity: 1; pointer-events: all; }
+
+    .td-sheet {
+        position: fixed; left: 0; right: 0; bottom: 0;
+        background: var(--fleet-white);
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+        z-index: 1051;
+        transform: translateY(100%);
+        transition: transform .3s cubic-bezier(.32,.72,0,1);
+        height: calc(92dvh - env(safe-area-inset-top, 0px));
+        max-height: calc(92dvh - env(safe-area-inset-top, 0px));
+        display: flex; flex-direction: column;
+    }
+    @supports not (height: 1dvh) {
+        .td-sheet { height: 92vh; max-height: 92vh; }
+    }
+    .td-sheet.open { transform: translateY(0); }
+
+    .td-sheet__handle {
+        width: 40px; height: 4px; border-radius: var(--radius-sm);
+        background: var(--fleet-grey-200);
+        margin: 10px auto 0; flex-shrink: 0;
+    }
+    .td-sheet__header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: var(--spacing-sm) var(--spacing-md);
+        flex-shrink: 0; gap: var(--spacing-sm);
+        border-bottom: 1px solid var(--fleet-grey-100);
+    }
+    .td-sheet__close {
+        width: 2rem; height: 2rem; border-radius: 50%;
+        background: var(--fleet-grey-100); border: none;
+        color: var(--fleet-grey-600); font-size: 1rem;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0; cursor: pointer;
+    }
+    .td-sheet__body {
+        overflow-y: scroll;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-y: contain;
+        padding: var(--spacing-sm) var(--spacing-md);
+        padding-bottom: calc(var(--spacing-xl) + env(safe-area-inset-bottom, 0px));
+        flex: 1; min-height: 0;
+    }
+
+    .td-divider { height: 1px; background: var(--fleet-grey-100); margin: var(--spacing-sm) 0; }
+
+    .td-row--meta { display: flex; gap: var(--spacing-sm); padding: var(--spacing-sm) 0; }
+    .td-meta-item { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .td-label { font-size: var(--font-size-xs); color: var(--fleet-grey-400); font-weight: 500; }
+
+    .td-section { display: flex; align-items: flex-start; gap: var(--spacing-sm); padding: var(--spacing-sm) 0; }
+    .td-section__icon {
+        width: 2rem; height: 2rem; border-radius: 50%;
+        background: var(--fleet-grey-100);
+        display: flex; align-items: center; justify-content: center;
+        color: var(--fleet-grey-500); font-size: .8rem; flex-shrink: 0; margin-top: 2px;
+    }
+    .td-section__icon--green { background: #e8f8f0; color: #27ae60; }
+    .td-section__icon--red   { background: #fdecea; color: #e74c3c; }
+    .td-section__content { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+
+    .td-addr-line1 { display: flex; align-items: center; gap: var(--spacing-xs); flex-wrap: wrap; }
+    .td-addr-line1 strong { font-size: var(--font-size-sm); color: var(--fleet-dark); }
+    .td-accuracy-badge {
+        font-size: 10px; font-weight: 700; padding: 1px 7px;
+        border-radius: var(--radius-sm); border: 1px solid; white-space: nowrap; flex-shrink: 0;
+    }
+    .td-addr-full { font-size: var(--font-size-xs); color: var(--fleet-grey-500); }
+    .td-tags { display: flex; gap: var(--spacing-xs); flex-wrap: wrap; margin-top: 2px; }
+
+    #tdCustomer { word-break: break-word; white-space: normal; }
+    .td-phone-row { width: 100%; }
+    .td-contact-pill { flex: 1; justify-content: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .td-row--stats { display: flex; gap: var(--spacing-sm); padding: var(--spacing-sm) 0; }
+    .td-stat {
+        flex: 1; display: flex; flex-direction: column; align-items: center;
+        gap: 2px; padding: var(--spacing-sm);
+        background: var(--fleet-grey-50); border-radius: var(--radius-sm);
+        font-size: var(--font-size-xs);
+    }
+    .td-stat i { font-size: 1rem; }
+    .td-stat__label { color: var(--fleet-grey-400); }
+    .td-stat--cod  { background: #fff7e6; color: #e67e22; }
+    .td-stat--earn { background: #eafaf1; color: #27ae60; }
+
+    .td-notes {
+        display: flex; gap: var(--spacing-sm); align-items: flex-start;
+        background: #fef9e7; border-radius: var(--radius-sm);
+        padding: var(--spacing-sm) var(--spacing-md);
+        color: #b7950b; font-size: var(--font-size-sm);
+        margin-top: var(--spacing-sm);
+    }
+    .td-notes i { flex-shrink: 0; margin-top: 2px; }
+
+    .td-addr-verify {
+        margin-top: var(--spacing-sm); border-radius: var(--radius-sm); overflow: hidden;
+        border-left: 4px solid var(--av-color, var(--fleet-grey-300));
+        background: var(--av-bg, var(--fleet-grey-50));
+        padding: var(--spacing-sm) var(--spacing-md);
+        display: flex; flex-direction: column; gap: 6px;
+    }
+    .td-addr-verify--verified  { --av-color: #27ae60; --av-bg: #f0faf4; }
+    .td-addr-verify--pending   { --av-color: #e67e22; --av-bg: #fffbf5; }
+    .td-addr-verify--needs     { --av-color: #e74c3c; --av-bg: #fef8f8; }
+    .td-addr-verify--contacted { --av-color: var(--fleet-primary); --av-bg: #f5faff; }
+    .td-addr-verify__badge {
+        display: flex; align-items: center; gap: var(--spacing-xs);
+        font-size: var(--font-size-xs); font-weight: 700;
+        color: var(--av-color, var(--fleet-grey-500));
+    }
+    .td-addr-verify__badge i { font-size: .8rem; }
+    .td-addr-verify__details { display: flex; flex-direction: column; gap: 4px; font-size: var(--font-size-xs); color: var(--fleet-grey-600); }
+    .td-addr-verify__row { display: flex; gap: var(--spacing-xs); align-items: flex-start; }
+    .td-addr-verify__row i { color: var(--av-color, var(--fleet-grey-400)); width: 14px; flex-shrink: 0; margin-top: 2px; opacity: .7; }
+    .td-addr-verify__row a { color: var(--av-color, var(--fleet-primary)); text-decoration: none; font-weight: 600; }
+    .td-addr-verify__row--accuracy { align-items: flex-start; gap: var(--spacing-xs); }
+    .td-accuracy-bar { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+    .td-accuracy-bar__label { display: flex; justify-content: space-between; align-items: center; font-size: var(--font-size-xs); }
+    .td-accuracy-bar__label span { color: var(--fleet-grey-400); }
+    .td-accuracy-bar__label strong { font-size: var(--font-size-xs); }
+    .td-accuracy-bar__track { height: 5px; background: var(--fleet-grey-200); border-radius: var(--radius-sm); overflow: hidden; }
+    .td-accuracy-bar__fill { height: 100%; border-radius: var(--radius-sm); transition: width .4s ease; }
+
+    .td-gps-pill {
+        display: flex; align-items: center; gap: var(--spacing-xs);
+        background: color-mix(in srgb, var(--pin-color, #718096) 10%, white);
+        border: 1.5px solid color-mix(in srgb, var(--pin-color, #718096) 30%, white);
+        border-radius: var(--radius-sm); padding: 6px var(--spacing-sm);
+        text-decoration: none; margin-top: 2px;
+    }
+    .td-gps-pill__icon { font-size: 1.1rem; color: var(--pin-color, #718096); flex-shrink: 0; }
+    .td-gps-pill__coords { flex: 1; font-size: var(--font-size-xs); font-weight: 600; color: var(--fleet-dark); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+    .td-gps-pill__cta { font-size: var(--font-size-xs); font-weight: 700; color: var(--pin-color, #718096); white-space: nowrap; }
+    .td-gps-pill:active { opacity: .75; }
+    .td-gps-row { display: flex; gap: var(--spacing-xs); align-items: stretch; margin-top: 2px; }
+    .td-gps-row .td-gps-pill { flex: 1; margin-top: 0; }
+    .td-nav-btn {
+        display: flex; align-items: center; justify-content: center;
+        width: 2.4rem; flex-shrink: 0;
+        background: var(--pin-color, #718096); color: #fff;
+        border-radius: var(--radius-sm); font-size: 1.1rem; text-decoration: none;
+    }
+    .td-nav-btn:active { opacity: .8; }
+
+    /* Products section */
+    .td-products-header {
+        font-size: var(--font-size-sm); font-weight: 700;
+        color: var(--fleet-dark); margin: var(--spacing-sm) 0 var(--spacing-xs);
+        display: flex; align-items: center; gap: var(--spacing-xs);
+    }
+    .td-products-header i { color: var(--fleet-grey-400); }
+    .td-products-list { display: flex; flex-direction: column; gap: var(--spacing-xs); }
+    .td-product-item {
+        display: flex; align-items: center; gap: var(--spacing-sm);
+        background: var(--fleet-grey-50); border-radius: var(--radius-sm);
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+    .td-product-qty {
+        min-width: 2.2rem; height: 2.2rem; border-radius: var(--radius-md);
+        background: var(--fleet-dark); color: var(--fleet-white);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        font-size: 11px; font-weight: 700; flex-shrink: 0; line-height: 1;
+    }
+    .td-product-qty::before { content: 'qty'; font-size: 8px; font-weight: 500; opacity: .6; }
+    .td-product-info { flex: 1; min-width: 0; }
+    .td-product-name { font-size: var(--font-size-sm); font-weight: 600; color: var(--fleet-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .td-product-meta { font-size: var(--font-size-xs); color: var(--fleet-grey-400); }
+    .td-product-note { font-size: var(--font-size-xs); color: #d4ac0d; margin-top: 2px; }
+    .td-product-price { font-size: var(--font-size-sm); font-weight: 700; color: var(--fleet-primary); flex-shrink: 0; }
+
+    /* ── Action Panel ─────────────────────────────────── */
+    .td-action-header {
+        font-size: var(--font-size-sm); font-weight: 700; color: var(--fleet-dark);
+        margin: var(--spacing-sm) 0 var(--spacing-xs);
+        display: flex; align-items: center; gap: var(--spacing-xs);
+    }
+    .td-action-header i { color: var(--fleet-grey-400); }
+    .td-action-grid {
+        display: flex; flex-wrap: wrap; gap: var(--spacing-xs);
+        margin-bottom: var(--spacing-sm);
+    }
+    .td-status-btn {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 7px 12px; border-radius: var(--radius-sm);
+        font-size: var(--font-size-xs); font-weight: 700;
+        border: 1.5px solid; cursor: pointer; background: transparent;
+        transition: opacity .15s;
+    }
+    .td-status-btn:active { opacity: .75; }
+    .td-status-btn--pickedup  { border-color: var(--fleet-primary); color: var(--fleet-primary); }
+    .td-status-btn--transit   { border-color: #7c3aed; color: #7c3aed; }
+    .td-status-btn--contacted { border-color: var(--fleet-success); color: var(--fleet-success); }
+    .td-status-btn--noreachable { border-color: var(--fleet-warning); color: var(--fleet-warning); }
+    .td-status-btn--done      { background: var(--fleet-grey-100); border-color: var(--fleet-grey-200); color: var(--fleet-grey-400); cursor: not-allowed; }
+    .td-outcome-row { display: flex; gap: var(--spacing-xs); flex-wrap: wrap; }
+    .td-outcome-btn {
+        flex: 1; min-width: 100px;
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        padding: 10px; border-radius: var(--radius-sm);
+        font-size: var(--font-size-sm); font-weight: 700;
+        border: none; cursor: pointer; transition: opacity .15s;
+    }
+    .td-outcome-btn:active { opacity: .8; }
+    .td-outcome-btn--delivered { background: var(--fleet-success); color: #fff; }
+    .td-outcome-btn--failed    { background: var(--fleet-danger);  color: #fff; }
+    .td-outcome-btn--postpone  { background: var(--fleet-grey-100); color: var(--fleet-dark); border: 1.5px solid var(--fleet-grey-200); }
+
+    /* ── Sub-Sheets (Delivered / Failed / Postpone) ───── */
+    .td-sub-sheet {
+        position: fixed; left: 0; right: 0; bottom: 0;
+        background: var(--fleet-white);
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+        z-index: 1055;
+        transform: translateY(100%);
+        transition: transform .3s cubic-bezier(.32,.72,0,1);
+        max-height: 80dvh; display: flex; flex-direction: column;
+    }
+    @supports not (height: 1dvh) { .td-sub-sheet { max-height: 80vh; } }
+    .td-sub-sheet.open { transform: translateY(0); }
+    .td-sub-sheet__body {
+        overflow-y: auto; padding: var(--spacing-md);
+        padding-bottom: calc(var(--spacing-xl) + env(safe-area-inset-bottom, 0px));
+        flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--spacing-md);
+    }
+
+    /* ── Form Elements ──────────────────────────────────── */
+    .td-form-group { display: flex; flex-direction: column; gap: 6px; }
+    .td-form-label { font-size: var(--font-size-xs); font-weight: 700; color: var(--fleet-grey-600); text-transform: uppercase; letter-spacing: .04em; }
+    .td-form-input {
+        width: 100%; padding: var(--spacing-sm) var(--spacing-md);
+        border: 1.5px solid var(--fleet-grey-200); border-radius: var(--radius-sm);
+        font-size: var(--font-size-base); color: var(--fleet-dark); background: var(--fleet-white);
+    }
+    .td-form-input:focus { outline: none; border-color: var(--fleet-primary); }
+    .td-form-textarea {
+        width: 100%; padding: var(--spacing-sm) var(--spacing-md);
+        border: 1.5px solid var(--fleet-grey-200); border-radius: var(--radius-sm);
+        font-size: var(--font-size-sm); color: var(--fleet-dark); background: var(--fleet-white);
+        resize: vertical; font-family: inherit;
+    }
+    .td-form-textarea:focus { outline: none; border-color: var(--fleet-primary); }
+
+    /* Photo Upload */
+    .td-photo-upload {
+        border: 2px dashed var(--fleet-grey-200); border-radius: var(--radius-sm);
+        padding: var(--spacing-lg); text-align: center; cursor: pointer;
+        display: flex; flex-direction: column; align-items: center; gap: var(--spacing-xs);
+        background: var(--fleet-grey-50); transition: border-color .15s;
+    }
+    .td-photo-upload:active { border-color: var(--fleet-primary); }
+    .td-photo-upload__icon { font-size: 1.8rem; color: var(--fleet-grey-300); }
+    .td-photo-upload__text { font-size: var(--font-size-xs); color: var(--fleet-grey-400); font-weight: 600; }
+    .td-photo-preview { width: 100%; max-height: 180px; object-fit: cover; border-radius: var(--radius-sm); margin-top: var(--spacing-xs); }
+
+    /* COD Toggle */
+    .td-toggle-row { display: flex; align-items: center; justify-content: space-between; }
+    .td-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+    .td-switch input { opacity: 0; width: 0; height: 0; }
+    .td-switch__track {
+        position: absolute; inset: 0; background: var(--fleet-grey-200); border-radius: 24px;
+        transition: background .2s; cursor: pointer;
+    }
+    .td-switch__track::before {
+        content: ''; position: absolute; left: 3px; top: 3px;
+        width: 18px; height: 18px; border-radius: 50%; background: #fff;
+        transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .td-switch input:checked + .td-switch__track { background: var(--fleet-success); }
+    .td-switch input:checked + .td-switch__track::before { transform: translateX(20px); }
+
+    /* Reason Grid */
+    .td-reason-grid { display: flex; flex-wrap: wrap; gap: var(--spacing-xs); margin-bottom: var(--spacing-xs); }
+    .td-reason-btn {
+        padding: 6px 12px; border-radius: var(--radius-sm);
+        font-size: var(--font-size-xs); font-weight: 600;
+        border: 1.5px solid var(--fleet-grey-200); background: var(--fleet-white);
+        color: var(--fleet-grey-600); cursor: pointer; transition: all .15s;
+    }
+    .td-reason-btn.selected { border-color: var(--fleet-danger); background: #fdecea; color: var(--fleet-danger); }
+    .td-reason-btn:active { opacity: .75; }
+
+    /* Confirm Buttons */
+    .td-confirm-btn {
+        width: 100%; padding: var(--spacing-md);
+        border-radius: var(--radius-sm); border: none;
+        font-size: var(--font-size-base); font-weight: 700;
+        display: flex; align-items: center; justify-content: center; gap: var(--spacing-xs);
+        cursor: pointer; transition: opacity .15s;
+    }
+    .td-confirm-btn:active { opacity: .8; }
+    .td-confirm-btn--success { background: var(--fleet-success); color: #fff; }
+    .td-confirm-btn--danger  { background: var(--fleet-danger);  color: #fff; }
+    .td-confirm-btn--primary { background: var(--fleet-primary); color: #fff; }
+    .td-confirm-btn--warning { background: var(--fleet-warning, #e67e22); color: #fff; }
+    .td-confirm-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── Non-Reachable Help Box ─────────────────────────── */
+    .td-nr-help {
+        display: flex; gap: var(--spacing-sm); align-items: flex-start;
+        background: #fffbf0; border: 1.5px solid #f6c94a;
+        border-radius: var(--radius-sm); padding: var(--spacing-sm) var(--spacing-md);
+    }
+    .td-nr-help__icon { color: #d4a017; font-size: 1.1rem; flex-shrink: 0; padding-top: 2px; }
+    .td-nr-help__text { flex: 1; font-size: var(--font-size-xs); color: var(--fleet-grey-700, #333); }
+    .td-nr-help__text strong { display: block; margin-bottom: 4px; color: var(--fleet-dark); font-size: var(--font-size-xs); }
+    .td-nr-help__text ul { margin: 0 0 6px 0; padding-left: 14px; }
+    .td-nr-help__text ul li { margin-bottom: 2px; }
+    .td-nr-help__note {
+        display: flex; gap: 5px; align-items: flex-start;
+        background: #fdecea; border-radius: var(--radius-sm);
+        padding: 5px 8px; color: #c0392b; font-size: 10px; font-weight: 600;
+        margin-top: 4px;
+    }
+    .td-nr-help__note i { flex-shrink: 0; margin-top: 1px; }
+
+    /* ── Activity Timeline ──────────────────────────────── */
+    .td-timeline-header {
+        font-size: var(--font-size-sm); font-weight: 700; color: var(--fleet-dark);
+        margin: var(--spacing-sm) 0 var(--spacing-xs);
+        display: flex; align-items: center; gap: var(--spacing-xs);
+    }
+    .td-timeline-header i { color: var(--fleet-grey-400); }
+    .td-timeline-toggle {
+        margin-left: auto; background: none; border: none;
+        color: var(--fleet-grey-400); cursor: pointer;
+        padding: 4px 6px; font-size: .85rem; border-radius: var(--radius-sm);
+        transition: color .15s;
+    }
+    .td-timeline-toggle:active { color: var(--fleet-primary); }
+
+    .td-timeline { margin-top: var(--spacing-xs); }
+    .td-timeline__list { display: flex; flex-direction: column; gap: 0; }
+    .td-timeline__loading {
+        text-align: center; color: var(--fleet-grey-400);
+        font-size: var(--font-size-xs); padding: var(--spacing-sm) 0;
+    }
+    .td-timeline__empty {
+        text-align: center; color: var(--fleet-grey-400);
+        font-size: var(--font-size-xs); padding: var(--spacing-sm) 0;
+    }
+
+    /* Timeline event row */
+    .td-tl-event {
+        display: flex; align-items: flex-start; gap: var(--spacing-sm);
+        position: relative; padding-bottom: var(--spacing-sm);
+    }
+    /* Vertical connecting line */
+    .td-tl-event:not(:last-child)::after {
+        content: ''; position: absolute;
+        left: 13px; top: 28px;
+        width: 2px; bottom: 0;
+        background: var(--fleet-grey-100);
+    }
+
+    .td-tl-icon {
+        width: 28px; height: 28px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: .7rem; flex-shrink: 0; position: relative; z-index: 1;
+        border: 2px solid;
+        background: color-mix(in srgb, var(--tl-color, #718096) 12%, white);
+        border-color: color-mix(in srgb, var(--tl-color, #718096) 35%, white);
+        color: var(--tl-color, #718096);
+    }
+
+    .td-tl-body { flex: 1; min-width: 0; padding-top: 4px; }
+    .td-tl-title {
+        font-size: var(--font-size-xs); font-weight: 700;
+        color: var(--fleet-dark); display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+    }
+    .td-tl-field {
+        font-size: 10px; font-weight: 600; padding: 1px 6px;
+        background: var(--fleet-grey-100); color: var(--fleet-grey-500);
+        border-radius: var(--radius-sm); white-space: nowrap;
+    }
+    .td-tl-arrow { color: var(--fleet-grey-300); font-size: .7rem; }
+    .td-tl-new { color: var(--tl-color, var(--fleet-dark)); font-size: var(--font-size-xs); font-weight: 700; }
+    .td-tl-meta {
+        font-size: 10px; color: var(--fleet-grey-400); margin-top: 2px;
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .td-tl-meta i { font-size: .65rem; }
+    .td-tl-notes {
+        font-size: 10px; color: var(--fleet-grey-500); margin-top: 2px;
+        font-style: italic;
+    }
+</style>
+
+<script>
+(function() {
+    const STATUS_LABELS = {
+        pending: 'Pending', for_review: 'For Review', assigned: 'Assigned',
+        accepted: 'Accepted', picked_up: 'Picked Up', start_ride: 'In Transit',
+        out_for_delivery: 'In Transit', in_transit: 'In Transit',
+        contacted: 'Contacted', non_reachable: 'Non Reachable',
+        delivered: 'Delivered', failed: 'Failed', cancelled: 'Cancelled',
+    };
+    const STATUS_CLASS = {
+        delivered: 'fleet-badge--success', failed: 'fleet-badge--danger',
+        cancelled: 'fleet-badge--danger', accepted: 'fleet-badge--warning',
+        assigned: 'fleet-badge--warning', out_for_delivery: 'fleet-badge--info',
+        in_transit: 'fleet-badge--info', start_ride: 'fleet-badge--info',
+        picked_up: 'fleet-badge--info', contacted: 'fleet-badge--info',
+        non_reachable: 'fleet-badge--danger',
+    };
+    const ACCURACY_LABEL = {
+        exact:       { label: 'Exact (Building)',  pct: 100, color: '#27ae60' },
+        street:      { label: 'Street Level',      pct: 75,  color: '#2ecc71' },
+        landmark:    { label: 'Landmark / Area',   pct: 50,  color: '#f39c12' },
+        zone_center: { label: 'Zone Center',       pct: 25,  color: '#e67e22' },
+        ai_estimate: { label: 'AI Estimate',       pct: 10,  color: '#e74c3c' },
+    };
+    const VS_LABEL = {
+        pending:              { label: 'Pending Verification',    icon: 'fa-clock',                cls: 'pending'   },
+        address_verified:     { label: 'Address Verified',        icon: 'fa-circle-check',         cls: 'verified'  },
+        address_needs_update: { label: 'Address Needs Update',    icon: 'fa-triangle-exclamation', cls: 'needs'     },
+        customer_contacted:   { label: 'Customer Contacted',      icon: 'fa-phone',                cls: 'contacted' },
+        verified:             { label: 'Verified by Staff',       icon: 'fa-shield-halved',        cls: 'verified'  },
+        rejected:             { label: 'Rejected',                icon: 'fa-ban',                  cls: 'needs'     },
+    };
+
+    window.tdOpenWa = function(el) {
+        const url = el.dataset.waUrl;
+        if (url) window.open(url, '_blank');
+        return false;
+    };
+
+    window.openTaskDetail = function(e, card) {
+        if (e.target.closest('.task-card__action-btn')) return;
+        if (typeof haptic === 'function') haptic([5]);
+        const d = card.dataset;
+
+        // Status badge
+        const sEl = document.getElementById('tdStatus');
+        sEl.textContent = STATUS_LABELS[d.status] || d.status;
+        sEl.className = 'fleet-badge ' + (STATUS_CLASS[d.status] || '');
+
+        // Speed badge
+        const spEl = document.getElementById('tdSpeed');
+        if (d.speed === 'On Demand') {
+            spEl.textContent = 'Urgent'; spEl.className = 'fleet-badge task-badge--urgent'; spEl.style.display = '';
+        } else if (d.speed === 'Same Day') {
+            spEl.textContent = 'Same Day'; spEl.className = 'fleet-badge task-badge--sameday'; spEl.style.display = '';
+        } else { spEl.style.display = 'none'; }
+
+        // Meta
+        document.getElementById('tdTask').textContent    = d.order   || '—';
+        document.getElementById('tdTaskNum').textContent = d.tasknum  || '—';
+        document.getElementById('tdDate').textContent    = d.date     || '—';
+
+        // Business / Customer
+        document.getElementById('tdBusiness').textContent = d.business || '—';
+        document.getElementById('tdCustomer').textContent = d.customer || '—';
+
+        // Phone
+        const phoneRaw = d.phone;
+        if (phoneRaw) {
+            const phoneClean = phoneRaw.replace(/[\s+]/g, '');
+            const waUrl = 'https://wa.me/' + phoneClean + '?text=' + encodeURIComponent(
+                'Hello! 👋 This is EzzyDelivery.\n\n📦 Order: ' + (d.order||'—') +
+                (d.zone ? '\n📍 Zone ' + d.zone : '') +
+                (d.street ? ', St ' + d.street : '') +
+                (d.building ? ', Bldg ' + d.building : '') +
+                (d.cod ? '\n💵 COD: ' + d.cod + ' QR' : '') +
+                '\n\nYour delivery is on its way. Please be available. Thank you! 🚚'
+            );
+            document.getElementById('tdPhone').textContent = phoneRaw;
+            document.getElementById('tdCallBtn').href = 'tel:' + phoneRaw;
+            document.getElementById('tdWaBtn').dataset.waUrl = waUrl;
+            document.getElementById('tdPhoneRow').style.display = '';
+        } else {
+            document.getElementById('tdPhoneRow').style.display = 'none';
+        }
+
+        // Pickup
+        document.getElementById('tdPickup').textContent = d.pickup || '—';
+
+        // Delivery address
+        const addrLine1El  = document.getElementById('tdAddrLine1');
+        const addrStructEl = document.getElementById('tdAddrStructured');
+        const accBadgeEl   = document.getElementById('tdAccuracyBadge');
+
+        const avData = (() => { try { return JSON.parse(card.querySelector('.task-address-data').textContent); } catch(e) { return {}; } })();
+        const zn = avData.order_zone     || d.zone;
+        const st = avData.order_street   || d.street;
+        const bl = avData.order_building || d.building;
+
+        if (zn || st || bl) {
+            let structured = '';
+            if (zn) structured += 'Zone ' + zn;
+            if (st) structured += (structured ? ', ' : '') + 'St ' + st;
+            if (bl) structured += (structured ? ', ' : '') + 'Bldg ' + bl;
+            if (d.unit) structured += ', Unit ' + d.unit;
+            addrStructEl.textContent = structured;
+
+            const acc = avData.coords_accuracy && ACCURACY_LABEL[avData.coords_accuracy];
+            if (acc) {
+                accBadgeEl.textContent = acc.label.split(' ')[0];
+                accBadgeEl.style.background = acc.color + '18';
+                accBadgeEl.style.color = acc.color;
+                accBadgeEl.style.borderColor = acc.color + '40';
+                accBadgeEl.style.display = '';
+            } else { accBadgeEl.style.display = 'none'; }
+            addrLine1El.style.display = '';
+        } else {
+            addrLine1El.style.display = 'none';
+        }
+
+        const fullAddr = d.area || d.address || '';
+        const addrEl = document.getElementById('tdAddress');
+        addrEl.textContent = fullAddr;
+        addrEl.style.display = fullAddr ? '' : 'none';
+
+        // Property type & timeslot
+        const ptypeEl  = document.getElementById('tdPtype');
+        const tsEl     = document.getElementById('tdTimeslot');
+        const tsVal    = document.getElementById('tdTimeslotVal');
+        const ptypeRow = document.getElementById('tdPtypeRow');
+        if (d.ptype) { ptypeEl.innerHTML = d.ptype; ptypeEl.style.display = ''; }
+        else          { ptypeEl.style.display = 'none'; }
+        if (d.timeslot) { tsVal.textContent = d.timeslot; tsEl.style.display = ''; }
+        else             { tsEl.style.display = 'none'; }
+        ptypeRow.style.display = (d.ptype || d.timeslot) ? '' : 'none';
+
+        // COD / Items / Earnings
+        const codBox = document.getElementById('tdCodBox');
+        const itmBox = document.getElementById('tdItemsBox');
+        const ernBox = document.getElementById('tdEarnBox');
+        if (d.cod)                        { document.getElementById('tdCod').textContent   = d.cod + ' QR'; codBox.style.display = ''; } else { codBox.style.display = 'none'; }
+        if (d.items && d.items !== '0')   { document.getElementById('tdItems').textContent = d.items;        itmBox.style.display = ''; } else { itmBox.style.display = 'none'; }
+        if (d.earn)                       { document.getElementById('tdEarn').textContent  = parseFloat(d.earn).toFixed(2) + ' QR'; ernBox.style.display = ''; } else { ernBox.style.display = 'none'; }
+
+        // Notes
+        const notesBox = document.getElementById('tdNotesBox');
+        if (d.notes) { document.getElementById('tdNotes').textContent = d.notes; notesBox.style.display = ''; }
+        else         { notesBox.style.display = 'none'; }
+
+        // Address Verification
+        const addrBox    = document.getElementById('tdAddrVerifyBox');
+        const addrBadge  = document.getElementById('tdAddrVerifyBadge');
+        const addrDetail = document.getElementById('tdAddrVerifyDetails');
+        const addrScript = card.querySelector('.task-address-data');
+        let av = {};
+        try { av = JSON.parse(addrScript ? addrScript.textContent : '{}'); } catch(e) {}
+
+        const vs = VS_LABEL[av.verification_status] || { label: av.verification_status || 'Unknown', icon: 'fa-circle-question', cls: 'default' };
+        addrBox.className = 'td-addr-verify td-addr-verify--' + vs.cls;
+        addrBadge.className = 'td-addr-verify__badge';
+        addrBadge.innerHTML = `<i class="fa-solid ${vs.icon}"></i> ${vs.label}`;
+
+        let rows = '';
+        const oZone = av.order_zone, oStreet = av.order_street, oBuilding = av.order_building;
+        if (oZone || oStreet || oBuilding) {
+            let loc = '';
+            if (oZone)     loc += 'Zone ' + oZone;
+            if (oStreet)   loc += (loc ? ', ' : '') + 'St ' + oStreet;
+            if (oBuilding) loc += (loc ? ', ' : '') + 'Bldg ' + oBuilding;
+            rows += `<div class="td-addr-verify__row"><i class="fa-solid fa-map-pin"></i><strong>${loc}</strong></div>`;
+        }
+        if (av.coords_accuracy && ACCURACY_LABEL[av.coords_accuracy]) {
+            const acc = ACCURACY_LABEL[av.coords_accuracy];
+            rows += `<div class="td-addr-verify__row td-addr-verify__row--accuracy">
+                <i class="fa-solid fa-robot"></i>
+                <div class="td-accuracy-bar">
+                    <div class="td-accuracy-bar__label">
+                        <span>GPS Accuracy</span>
+                        <strong style="color:${acc.color}">${acc.label}</strong>
+                    </div>
+                    <div class="td-accuracy-bar__track">
+                        <div class="td-accuracy-bar__fill" style="width:${acc.pct}%;background:${acc.color};"></div>
+                    </div>
+                </div>
+            </div>`;
+        }
+        const bestLat  = av.order_lat || av.lat || av.dl_lat;
+        const bestLng  = av.order_lng || av.lng || av.dl_lng;
+        const pinColor = (av.coords_accuracy && ACCURACY_LABEL[av.coords_accuracy]) ? ACCURACY_LABEL[av.coords_accuracy].color : '#718096';
+        if (bestLat && bestLng && parseFloat(bestLat) !== 0) {
+            const mapsUrl = `https://www.google.com/maps?q=${bestLat},${bestLng}`;
+            const navUrl  = `https://www.google.com/maps/dir/?api=1&destination=${bestLat},${bestLng}&travelmode=driving`;
+            rows += `<div class="td-gps-row">
+                <a href="${mapsUrl}" target="_blank" class="td-gps-pill" style="--pin-color:${pinColor};">
+                    <i class="fa-solid fa-location-pin td-gps-pill__icon"></i>
+                    <span class="td-gps-pill__coords">${parseFloat(bestLat).toFixed(5)},&nbsp;${parseFloat(bestLng).toFixed(5)}</span>
+                    <span class="td-gps-pill__cta"><i class="fa-solid fa-arrow-up-right-from-square"></i> Maps</span>
+                </a>
+                <a href="${navUrl}" target="_blank" class="td-nav-btn" style="--pin-color:${pinColor};" title="Navigate">
+                    <i class="fa-solid fa-diamond-turn-right"></i>
+                </a>
+            </div>`;
+        }
+        if (av.dl_pluscode) {
+            rows += `<div class="td-addr-verify__row"><i class="fa-solid fa-qrcode"></i><span>${av.dl_pluscode}</span></div>`;
+        }
+        if (av.verified_address) {
+            rows += `<div class="td-addr-verify__row"><i class="fa-solid fa-circle-check"></i><span>${av.verified_address}</span></div>`;
+        }
+        if (av.zone && av.zone !== oZone) {
+            let corrected = 'Corrected: Zone ' + av.zone;
+            if (av.street)   corrected += ', St '   + av.street;
+            if (av.building) corrected += ', Bldg ' + av.building;
+            rows += `<div class="td-addr-verify__row"><i class="fa-solid fa-pen-to-square"></i><span>${corrected}</span></div>`;
+        }
+        if (av.notes) {
+            rows += `<div class="td-addr-verify__row"><i class="fa-solid fa-note-sticky"></i><span>${av.notes}</span></div>`;
+        }
+        if (av.verified_at) {
+            rows += `<div class="td-addr-verify__row"><i class="fa-regular fa-calendar-check"></i><span>Verified ${av.verified_at}</span></div>`;
+        }
+        addrDetail.innerHTML = rows || '<span style="color:var(--fleet-grey-400)">No location data yet.</span>';
+        addrBox.style.display = '';
+
+        // Products
+        const productsBox  = document.getElementById('tdProductsBox');
+        const productsList = document.getElementById('tdProductsList');
+        const productScript = card.querySelector('.task-products-data');
+        let products = [];
+        try { products = JSON.parse(productScript ? productScript.textContent : '[]'); } catch(e) {}
+        if (products.length) {
+            productsList.innerHTML = products.map(p => {
+                const name  = p.name || 'Item';
+                const meta  = [p.brand, p.sku].filter(Boolean).join(' · ');
+                const note  = p.note  ? `<div class="td-product-note">${p.note}</div>` : '';
+                const price = p.price ? `<div class="td-product-price">${parseFloat(p.price).toFixed(2)} QR</div>` : '';
+                return `<div class="td-product-item">
+                    <div class="td-product-qty">${p.qty}</div>
+                    <div class="td-product-info">
+                        <div class="td-product-name">${name}</div>
+                        ${meta ? `<div class="td-product-meta">${meta}</div>` : ''}
+                        ${note}
+                    </div>
+                    ${price}
+                </div>`;
+            }).join('');
+            productsBox.style.display = '';
+        } else {
+            productsBox.style.display = 'none';
+        }
+
+        // ── Action Panel ──────────────────────────────────
+        _renderActionPanel(d);
+
+        // Open sheet
+        document.getElementById('taskDetailOverlay').classList.add('open');
+        document.getElementById('taskDetailSheet').classList.add('open');
+        document.body.style.overflow = 'hidden';
+    };
+
+    // Statuses where actions are available
+    const ACTIVE_STATUSES = ['accepted','picked_up','start_ride','out_for_delivery','in_transit','contacted','non_reachable'];
+
+    function _renderActionPanel(d) {
+        const panel     = document.getElementById('tdActionPanel');
+        const statusBtns = document.getElementById('tdStatusBtns');
+        const outcomeBtns = document.getElementById('tdOutcomeBtns');
+        const tid = d.id;
+        const st  = d.status;
+
+        if (!ACTIVE_STATUSES.includes(st)) { panel.style.display = 'none'; return; }
+        panel.style.display = '';
+
+        // Status progression buttons
+        const STATUS_STEPS = [
+            { key: 'picked_up',    label: 'Picked Up',  icon: 'fa-box',          cls: 'td-status-btn--pickedup',   api: 'picked_up' },
+            { key: 'in_transit',   label: 'In Transit', icon: 'fa-truck-fast',   cls: 'td-status-btn--transit',    api: 'in_transit' },
+            { key: 'contacted',    label: 'Contacted',  icon: 'fa-phone-volume', cls: 'td-status-btn--contacted',  api: 'contacted' },
+            { key: 'non_reachable',label: 'No Answer',  icon: 'fa-phone-slash',  cls: 'td-status-btn--noreachable',api: 'non_reachable', useSheet: true },
+        ];
+        const DONE_ORDER = ['picked_up','in_transit','out_for_delivery','start_ride','contacted','non_reachable'];
+        const doneIdx = DONE_ORDER.indexOf(st);
+
+        statusBtns.innerHTML = STATUS_STEPS.map(step => {
+            const isDone = (step.key === 'picked_up' && ['picked_up','in_transit','out_for_delivery','start_ride','contacted','non_reachable'].includes(st))
+                || (step.key === 'in_transit' && ['in_transit','out_for_delivery','start_ride','contacted','non_reachable'].includes(st));
+            if (isDone) {
+                return `<button class="td-status-btn td-status-btn--done" disabled>
+                    <i class="fa-solid fa-check"></i>${step.label}
+                </button>`;
+            }
+            const clickHandler = step.useSheet
+                ? `openTdNonReachable()`
+                : `tdUpdateStatus('${tid}','${step.api}',this)`;
+            return `<button class="td-status-btn ${step.cls}" onclick="${clickHandler}">
+                <i class="fa-solid ${step.icon}"></i>${step.label}
+            </button>`;
+        }).join('');
+
+        // Outcome buttons
+        outcomeBtns.innerHTML = `
+            <button class="td-outcome-btn td-outcome-btn--delivered" onclick="openTdDelivered()">
+                <i class="fa-solid fa-circle-check"></i>Delivered
+            </button>
+            <button class="td-outcome-btn td-outcome-btn--failed" onclick="openTdFailed()">
+                <i class="fa-solid fa-circle-xmark"></i>Failed
+            </button>
+            <button class="td-outcome-btn td-outcome-btn--postpone" onclick="openTdPostpone()">
+                <i class="fa-regular fa-calendar"></i>Postpone
+            </button>`;
+
+        // Seed COD section in delivered sheet
+        const codSection = document.getElementById('tdCodSection');
+        if (d.cod && parseFloat(d.cod) > 0) {
+            codSection.style.display = '';
+            document.getElementById('tdCodAmount').value = d.cod;
+        } else {
+            codSection.style.display = 'none';
+        }
+    }
+
+    // Current task id (set when sheet opens)
+    let _tdCurrentTaskId = null;
+
+    // Patch openTaskDetail to capture task id
+    const _origOpen = window.openTaskDetail;
+    window.openTaskDetail = function(e, card) {
+        _tdCurrentTaskId = card.dataset.id;
+        // Reset sub-sheets
+        document.getElementById('tdProofPreview').style.display = 'none';
+        document.getElementById('tdProofInput').value = '';
+        document.getElementById('tdCodCollected').checked = false;
+        document.getElementById('tdCodAmountRow').style.display = 'none';
+        document.getElementById('tdFailReason').value = '';
+        document.querySelectorAll('.td-reason-btn').forEach(b => b.classList.remove('selected'));
+        // Set min date for postpone (tomorrow)
+        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+        document.getElementById('tdPostponeDate').min = tomorrow.toISOString().split('T')[0];
+        document.getElementById('tdPostponeDate').value = '';
+        _origOpen(e, card);
+    };
+
+    // ── Status Update ──────────────────────────────────────
+    window.tdUpdateStatus = function(taskId, newStatus, btn) {
+        if (typeof haptic === 'function') haptic([5]);
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        fetch('/api/driver/tasks/' + taskId + '/status/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { showToast(data.error, 'error'); btn.disabled = false; btn.innerHTML = orig; return; }
+            if (typeof haptic === 'function') haptic([10, 50, 10]);
+            showToast('Status updated!', 'success');
+            setTimeout(() => { window.closeTaskDetail(); window.location.reload(); }, 800);
+        })
+        .catch(() => { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = orig; });
+    };
+
+    // ── Delivered Sub-Sheet ────────────────────────────────
+    window.openTdDelivered = function() {
+        document.getElementById('tdDeliveredOverlay').classList.add('open');
+        document.getElementById('tdDeliveredSheet').classList.add('open');
+    };
+    window.closeTdDelivered = function() {
+        document.getElementById('tdDeliveredOverlay').classList.remove('open');
+        document.getElementById('tdDeliveredSheet').classList.remove('open');
+    };
+
+    window.previewProof = function(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = document.getElementById('tdProofPreview');
+            img.src = e.target.result;
+            img.style.display = 'block';
+            document.querySelector('#tdProofUploadBox .td-photo-upload__icon').style.display = 'none';
+            document.querySelector('#tdProofUploadBox .td-photo-upload__text').style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    };
+
+    window.toggleCodAmount = function(chk) {
+        document.getElementById('tdCodAmountRow').style.display = chk.checked ? '' : 'none';
+    };
+
+    window.submitDelivered = function() {
+        const btn = document.getElementById('tdDeliveredBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Submitting...';
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const fd = new FormData();
+        fd.append('status', 'delivered');
+        const proofFile = document.getElementById('tdProofInput').files[0];
+        if (proofFile) fd.append('delivery_proof', proofFile);
+        const codCollected = document.getElementById('tdCodCollected').checked;
+        fd.append('cod_collected', codCollected ? 'true' : 'false');
+        if (codCollected) {
+            const amt = document.getElementById('tdCodAmount').value;
+            if (amt) fd.append('cod_amount_collected', amt);
+        }
+        fetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrf },
+            body: fd
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { showToast(data.error, 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Confirm Delivered'; return; }
+            if (typeof haptic === 'function') haptic([10, 50, 10]);
+            showToast('Delivery confirmed!', 'success');
+            window.closeTdDelivered();
+            setTimeout(() => { window.closeTaskDetail(); window.location.reload(); }, 900);
+        })
+        .catch(() => { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Confirm Delivered'; });
+    };
+
+    // ── Failed Sub-Sheet ───────────────────────────────────
+    window.openTdFailed = function() {
+        document.getElementById('tdFailedOverlay').classList.add('open');
+        document.getElementById('tdFailedSheet').classList.add('open');
+    };
+    window.closeTdFailed = function() {
+        document.getElementById('tdFailedOverlay').classList.remove('open');
+        document.getElementById('tdFailedSheet').classList.remove('open');
+    };
+
+    window.selectReason = function(btn, reason) {
+        document.querySelectorAll('.td-reason-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        const ta = document.getElementById('tdFailReason');
+        if (!ta.value) ta.value = reason;
+    };
+
+    window.submitFailed = function() {
+        const reason = document.getElementById('tdFailReason').value.trim();
+        if (!reason) { showToast('Please enter a reason for failure', 'warning'); return; }
+        const btn = document.getElementById('tdFailedBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Submitting...';
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const fd = new FormData();
+        fd.append('status', 'failed');
+        fd.append('notes', reason);
+        fetch('/api/driver/tasks/' + _tdCurrentTaskId + '/complete/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrf },
+            body: fd
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { showToast(data.error, 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-xmark me-2"></i>Confirm Failed'; return; }
+            if (typeof haptic === 'function') haptic([10, 50, 10]);
+            showToast('Marked as failed', 'warning');
+            window.closeTdFailed();
+            setTimeout(() => { window.closeTaskDetail(); window.location.reload(); }, 900);
+        })
+        .catch(() => { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-xmark me-2"></i>Confirm Failed'; });
+    };
+
+    // ── Postpone Sub-Sheet ─────────────────────────────────
+    window.openTdPostpone = function() {
+        document.getElementById('tdPostponeOverlay').classList.add('open');
+        document.getElementById('tdPostponeSheet').classList.add('open');
+    };
+    window.closeTdPostpone = function() {
+        document.getElementById('tdPostponeOverlay').classList.remove('open');
+        document.getElementById('tdPostponeSheet').classList.remove('open');
+    };
+
+    window.submitPostpone = function() {
+        const newDate = document.getElementById('tdPostponeDate').value;
+        if (!newDate) { showToast('Please select a new date', 'warning'); return; }
+        const btn = document.getElementById('tdPostponeBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...';
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const fd = new FormData();
+        fd.append('task_id', _tdCurrentTaskId);
+        fd.append('new_date', newDate);
+        fd.append('csrfmiddlewaretoken', csrf);
+        fetch('/fleet/tasks/postpone/', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) { showToast(data.error || 'Could not postpone', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-regular fa-calendar-check me-2"></i>Confirm Postpone'; return; }
+            if (typeof haptic === 'function') haptic([10, 50, 10]);
+            showToast('Task postponed to ' + data.new_date, 'success');
+            window.closeTdPostpone();
+            setTimeout(() => { window.closeTaskDetail(); window.location.reload(); }, 900);
+        })
+        .catch(() => { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-regular fa-calendar-check me-2"></i>Confirm Postpone'; });
+    };
+
+    // ── Non-Reachable Sub-Sheet ────────────────────────────
+    window.openTdNonReachable = function() {
+        // Reset state
+        document.getElementById('tdNrInput').value = '';
+        document.getElementById('tdNrPreview').style.display = 'none';
+        document.getElementById('tdNrUploadBox').querySelector('.td-photo-upload__icon').style.display = '';
+        document.getElementById('tdNrUploadBox').querySelector('.td-photo-upload__text').style.display = '';
+        document.getElementById('tdNrNotes').value = '';
+        document.getElementById('tdNrUploadError').style.display = 'none';
+        document.getElementById('tdNrOverlay').classList.add('open');
+        document.getElementById('tdNrSheet').classList.add('open');
+    };
+    window.closeTdNonReachable = function() {
+        document.getElementById('tdNrOverlay').classList.remove('open');
+        document.getElementById('tdNrSheet').classList.remove('open');
+    };
+    window.tdNrPreview = function(input) {
+        const file = input.files[0];
+        if (!file) return;
+        document.getElementById('tdNrUploadError').style.display = 'none';
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = document.getElementById('tdNrPreview');
+            img.src = e.target.result;
+            img.style.display = 'block';
+            document.getElementById('tdNrUploadBox').querySelector('.td-photo-upload__icon').style.display = 'none';
+            document.getElementById('tdNrUploadBox').querySelector('.td-photo-upload__text').style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    };
+    window.submitNonReachable = function() {
+        const screenshotFile = document.getElementById('tdNrInput').files[0];
+        if (!screenshotFile) {
+            document.getElementById('tdNrUploadError').style.display = '';
+            if (typeof haptic === 'function') haptic([10, 50, 10]);
+            return;
+        }
+        const btn = document.getElementById('tdNrBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Uploading…';
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const notes = document.getElementById('tdNrNotes').value.trim();
+
+        // Step 1: Upload the call screenshot
+        const fd = new FormData();
+        fd.append('document_file', screenshotFile);
+        fd.append('document_type', 'other');
+        fd.append('document_name', 'Call Screenshot – Non Reachable');
+        if (notes) fd.append('description', notes);
+
+        fetch('/api/driver/tasks/' + _tdCurrentTaskId + '/documents/upload/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrf },
+            body: fd
+        })
+        .then(r => r.json())
+        .then(docData => {
+            if (docData.error) {
+                showToast('Upload failed: ' + docData.error, 'danger');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-phone-slash me-2"></i>Confirm Non Reachable';
+                return;
+            }
+            // Step 2: Update task status to non_reachable
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Updating status…';
+            return fetch('/api/driver/tasks/' + _tdCurrentTaskId + '/status/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                body: JSON.stringify({ status: 'non_reachable' })
+            });
+        })
+        .then(r => r && r.json())
+        .then(data => {
+            if (!data) return;
+            if (data.error) {
+                showToast(data.error, 'danger');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-phone-slash me-2"></i>Confirm Non Reachable';
+                return;
+            }
+            if (typeof haptic === 'function') haptic([10, 50, 10]);
+            showToast('Marked as Non Reachable — proof uploaded', 'warning');
+            window.closeTdNonReachable();
+            setTimeout(() => { window.closeTaskDetail(); window.location.reload(); }, 900);
+        })
+        .catch(() => {
+            showToast('Network error', 'danger');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-phone-slash me-2"></i>Confirm Non Reachable';
+        });
+    };
+
+    // ── Activity Timeline ──────────────────────────────────
+    let _tlLoaded = false;
+    let _tlOpen   = false;
+
+    window.tdToggleTimeline = function() {
+        const body    = document.getElementById('tdTimelineBody');
+        const chevron = document.getElementById('tdTimelineChevron');
+        _tlOpen = !_tlOpen;
+        body.style.display = _tlOpen ? '' : 'none';
+        chevron.className  = _tlOpen ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down';
+        if (_tlOpen && !_tlLoaded) _fetchTimeline();
+    };
+
+    function _fetchTimeline() {
+        if (!_tdCurrentTaskId) return;
+        const list = document.getElementById('tdTimelineList');
+        list.innerHTML = '<div class="td-timeline__loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+        fetch('/fleet/tasks/' + _tdCurrentTaskId + '/timeline/', {
+            headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '' }
+        })
+        .then(r => {
+            if (!r.ok && r.status !== 403 && r.status !== 404) throw new Error('HTTP ' + r.status);
+            return r.json().catch(() => { throw new Error('Invalid response'); });
+        })
+        .then(data => {
+            _tlLoaded = true;
+            if (!data.success || !data.events || data.events.length === 0) {
+                list.innerHTML = '<div class="td-timeline__empty"><i class="fa-regular fa-circle-dot"></i> No activity recorded yet.</div>';
+                return;
+            }
+            // Chronological order (oldest → newest, scroll down to see latest)
+            list.innerHTML = data.events.map(ev => `
+                <div class="td-tl-event" style="--tl-color:${ev.color}">
+                    <div class="td-tl-icon"><i class="fa-solid ${ev.icon}"></i></div>
+                    <div class="td-tl-body">
+                        <div class="td-tl-title">
+                            <span class="td-tl-new">${ev.label}</span>
+                        </div>
+                        <div class="td-tl-meta">
+                            <span><i class="fa-regular fa-clock"></i> ${ev.ts}</span>
+                            ${ev.by ? `<span><i class="fa-solid fa-user"></i> ${ev.by}</span>` : ''}
+                        </div>
+                        ${ev.notes ? `<div class="td-tl-notes">"${ev.notes}"</div>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        })
+        .catch(() => {
+            list.innerHTML = '<div class="td-timeline__empty"><i class="fa-solid fa-triangle-exclamation"></i> Could not load timeline.</div>';
+        });
+    }
+
+    // Reset timeline + NR state when sheet opens
+    const _origOpenForTimeline = window.openTaskDetail;
+    window.openTaskDetail = function(e, card) {
+        _tlLoaded = false;
+        _tlOpen   = true;
+        const body = document.getElementById('tdTimelineBody');
+        if (body) {
+            body.style.display = '';
+            document.getElementById('tdTimelineList').innerHTML =
+                '<div class="td-timeline__loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+        }
+        // Reset NR sheet
+        const nrInput = document.getElementById('tdNrInput');
+        if (nrInput) { nrInput.value = ''; }
+        const nrPrev = document.getElementById('tdNrPreview');
+        if (nrPrev)  { nrPrev.style.display = 'none'; }
+        _origOpenForTimeline(e, card);
+        // Auto-load timeline immediately when sheet opens
+        setTimeout(_fetchTimeline, 50);
+    };
+
+    window.closeTaskDetail = function() {
+        document.getElementById('taskDetailOverlay').classList.remove('open');
+        document.getElementById('taskDetailSheet').classList.remove('open');
+        document.body.style.overflow = '';
+    };
+
+    // Swipe-down handle/header to close
+    document.addEventListener('DOMContentLoaded', function() {
+        const handle = document.querySelector('.td-sheet__handle');
+        const header = document.querySelector('.td-sheet__header');
+        let startY = 0;
+        [handle, header].forEach(el => {
+            if (!el) return;
+            el.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
+            el.addEventListener('touchend', e => {
+                if (e.changedTouches[0].clientY - startY > 60) window.closeTaskDetail();
+            }, { passive: true });
+        });
+    });
+})();
+</script>

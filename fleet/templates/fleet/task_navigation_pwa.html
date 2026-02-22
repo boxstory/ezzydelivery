@@ -1,0 +1,614 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+
+{% block title %}Navigate · #{{ task.dl_task_number }}{% endblock %}
+{% block page_title %}Navigate{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'fleet:driver_tasks' %}?tab=accepted" class="fleet-btn-icon" title="Back to Tasks">
+    <i class="fa-solid fa-arrow-left"></i>
+</a>
+<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+    <i class="fa-solid fa-bell"></i>
+    {% if unread_notifications > 0 %}
+    <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
+    {% endif %}
+</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Map — full bleed, no padding, tall on mobile -->
+<div id="fleet-nav-map"></div>
+
+<!-- Task Summary Card -->
+<div class="fleet-card fade-in" style="margin-top: var(--spacing-lg);">
+    <div class="fleet-card__header">
+        <div style="display:flex; align-items:center; gap:var(--spacing-sm);">
+            <div style="width:36px; height:36px; border-radius:var(--radius-sm);
+                        background:var(--fleet-danger-light); color:var(--fleet-danger);
+                        display:flex; align-items:center; justify-content:center;">
+                <i class="fa-solid fa-location-dot"></i>
+            </div>
+            <div>
+                <div style="font-size:var(--font-size-xs); color:var(--fleet-grey-500); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Delivery Destination</div>
+                <div style="font-size:var(--font-size-sm); font-weight:700; color:var(--fleet-dark);">
+                    Task #{{ task.dl_task_number|default:task.id }}
+                </div>
+            </div>
+        </div>
+        {% if task.dl_task_status == 'delivered' %}
+        <span class="fleet-badge fleet-badge--success">Delivered</span>
+        {% elif task.dl_task_status == 'failed' %}
+        <span class="fleet-badge fleet-badge--danger">Failed</span>
+        {% elif task.dl_task_status in 'out_for_delivery,in_transit,start_ride' %}
+        <span class="fleet-badge fleet-badge--info">In Transit</span>
+        {% elif task.dl_task_status == 'picked_up' %}
+        <span class="fleet-badge fleet-badge--info">Picked Up</span>
+        {% elif task.dl_task_status == 'contacted' %}
+        <span class="fleet-badge fleet-badge--info">Contacted</span>
+        {% elif task.dl_task_status == 'non_reachable' %}
+        <span class="fleet-badge fleet-badge--danger">Non Reachable</span>
+        {% else %}
+        <span class="fleet-badge fleet-badge--warning">{{ task.get_dl_task_status_display }}</span>
+        {% endif %}
+    </div>
+    <div class="fleet-card__body">
+        <!-- Address -->
+        <div class="fleet-info-grid" style="grid-template-columns: repeat(2, 1fr);">
+            {% if dropoff %}
+            {% if dropoff.dl_zone %}
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Zone</div>
+                <div class="fleet-info-item__value">{{ dropoff.dl_zone }}</div>
+            </div>
+            {% endif %}
+            {% if dropoff.area_name %}
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Area</div>
+                <div class="fleet-info-item__value">{{ dropoff.area_name }}</div>
+            </div>
+            {% endif %}
+            {% if dropoff.dl_street %}
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Street</div>
+                <div class="fleet-info-item__value">{{ dropoff.dl_street }}</div>
+            </div>
+            {% endif %}
+            {% if dropoff.dl_building %}
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Building</div>
+                <div class="fleet-info-item__value">{{ dropoff.dl_building }}</div>
+            </div>
+            {% endif %}
+            {% if dropoff.full_name or task.order.customer_name %}
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Customer</div>
+                <div class="fleet-info-item__value">{{ dropoff.full_name|default:task.order.customer_name }}</div>
+            </div>
+            {% endif %}
+            {% if dropoff.mobile_no or task.order.customer_phone %}
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Phone</div>
+                <div class="fleet-info-item__value">{{ dropoff.mobile_no|default:task.order.customer_phone }}</div>
+            </div>
+            {% endif %}
+            {% else %}
+            {% if task.order.dl_zone %}
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Zone</div>
+                <div class="fleet-info-item__value">{{ task.order.dl_zone }}</div>
+            </div>
+            {% endif %}
+            {% if task.order.customer_name %}
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Customer</div>
+                <div class="fleet-info-item__value">{{ task.order.customer_name }}</div>
+            </div>
+            {% endif %}
+            {% if task.order.customer_phone %}
+            <div class="fleet-info-item">
+                <div class="fleet-info-item__label">Phone</div>
+                <div class="fleet-info-item__value">{{ task.order.customer_phone }}</div>
+            </div>
+            {% endif %}
+            {% endif %}
+            {% if task.order.cod_amount %}
+            <div class="fleet-info-item" style="background:var(--fleet-warning-light); border-color:var(--fleet-warning);">
+                <div class="fleet-info-item__label" style="color:var(--fleet-warning);">COD Amount</div>
+                <div class="fleet-info-item__value">{{ task.order.cod_amount|floatformat:2 }} QR</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Quick Action Buttons -->
+<div style="display:flex; gap:var(--spacing-sm); margin-bottom:var(--spacing-md);">
+    {% with phone=dropoff.mobile_no|default:task.order.customer_phone %}
+    {% if phone %}
+    <a href="tel:{{ phone }}"
+       class="fleet-btn fleet-btn--outline" style="flex:1; min-width:0;"
+       onclick="haptic([5])">
+        <i class="fa-solid fa-phone"></i>
+    </a>
+    <button type="button"
+            id="btn-whatsapp"
+            class="fleet-btn" style="flex:1; min-width:0; background:#25D366; color:#fff; border:none;"
+            data-phone="{{ phone }}"
+            onclick="haptic([5])">
+        <i class="fa-brands fa-whatsapp"></i>
+    </button>
+    {% endif %}
+    {% endwith %}
+    <button type="button" id="btn-open-maps" class="fleet-btn fleet-btn--dark" style="flex:2;"
+            onclick="haptic([10])">
+        <i class="fa-solid fa-diamond-turn-right me-2"></i>Navigate
+    </button>
+</div>
+
+{% if task.dl_task_status not in 'delivered,failed,cancelled' %}
+<!-- Update Status Button -->
+<button type="button" class="fleet-btn fleet-btn--dark fleet-btn--block"
+        onclick="openStatusSheet(); haptic([10]);"
+        style="background: var(--fleet-dark);">
+    <i class="fa-solid fa-circle-check me-2"></i>Update Task Status
+</button>
+{% endif %}
+
+<!-- Status Update Bottom Sheet Overlay -->
+<div id="statusOverlay" class="filter-overlay" onclick="closeStatusSheet()"></div>
+
+<!-- Status Update Bottom Sheet -->
+<div id="statusSheet" class="filter-modal">
+    <div class="filter-modal__handle"></div>
+    <div class="filter-modal__header">
+        <h3 class="filter-modal__title">
+            <i class="fa-solid fa-list-check me-2"></i>Update Status
+        </h3>
+        <button type="button" onclick="closeStatusSheet()" class="fleet-btn-icon" style="width:32px;height:32px;">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <!-- Current status indicator -->
+    <div style="text-align:center; margin-bottom:var(--spacing-lg);">
+        <span style="font-size:var(--font-size-xs); color:var(--fleet-grey-500); font-weight:600; text-transform:uppercase;">Current Status</span>
+        <div style="font-size:var(--font-size-base); font-weight:800; color:var(--fleet-dark); margin-top:4px;">
+            {{ task.get_dl_task_status_display }}
+        </div>
+    </div>
+
+    <!-- Status buttons -->
+    <div style="display:flex; flex-direction:column; gap:var(--spacing-sm);">
+
+        <!-- Picked Up -->
+        {% if task.dl_task_status in 'picked_up,start_ride,out_for_delivery,in_transit,contacted,non_reachable' %}
+        <button type="button" class="fleet-btn" disabled
+                style="background:var(--fleet-success-light); color:var(--fleet-success); border:none; justify-content:space-between;">
+            <span><i class="fa-solid fa-box me-2"></i>Picked Up</span>
+            <i class="fa-solid fa-circle-check"></i>
+        </button>
+        {% else %}
+        <button type="button" id="btn-picked-up" data-task-id="{{ task.id }}"
+                class="fleet-btn fleet-btn--outline"
+                onclick="haptic([5]); updateStatus(this, '{{ task.id }}', 'picked_up', 'picked_up')">
+            <i class="fa-solid fa-box me-2"></i>Picked Up
+        </button>
+        {% endif %}
+
+        <!-- Start Ride -->
+        {% if task.dl_task_status in 'start_ride,out_for_delivery,in_transit,contacted,non_reachable' %}
+        <button type="button" class="fleet-btn" disabled
+                style="background:var(--fleet-success-light); color:var(--fleet-success); border:none; justify-content:space-between;">
+            <span><i class="fa-solid fa-play me-2"></i>Start Ride</span>
+            <i class="fa-solid fa-circle-check"></i>
+        </button>
+        {% else %}
+        <button type="button" id="btn-start-ride" data-task-id="{{ task.id }}"
+                class="fleet-btn fleet-btn--outline"
+                onclick="haptic([5]); updateStatus(this, '{{ task.id }}', 'out_for_delivery', 'out_for_delivery', '1')">
+            <i class="fa-solid fa-play me-2"></i>Start Ride
+        </button>
+        {% endif %}
+
+        <!-- Contacted -->
+        {% if task.dl_task_status == 'contacted' %}
+        <button type="button" class="fleet-btn" disabled
+                style="background:var(--fleet-success-light); color:var(--fleet-success); border:none; justify-content:space-between;">
+            <span><i class="fa-solid fa-phone-volume me-2"></i>Contacted & Confirmed</span>
+            <i class="fa-solid fa-circle-check"></i>
+        </button>
+        {% else %}
+        <button type="button" id="btn-contacted" data-task-id="{{ task.id }}"
+                class="fleet-btn fleet-btn--outline"
+                onclick="haptic([5]); updateStatus(this, '{{ task.id }}', 'contacted', 'contacted')">
+            <i class="fa-solid fa-phone-volume me-2"></i>Contacted & Confirmed
+        </button>
+        {% endif %}
+
+        <!-- Non Reachable -->
+        {% if task.dl_task_status == 'non_reachable' %}
+        <button type="button" class="fleet-btn" disabled
+                style="background:var(--fleet-warning-light); color:var(--fleet-warning); border:none; justify-content:space-between;">
+            <span><i class="fa-solid fa-phone-slash me-2"></i>Non Reachable</span>
+            <i class="fa-solid fa-circle-check"></i>
+        </button>
+        {% else %}
+        <button type="button" id="btn-non-reachable" data-task-id="{{ task.id }}"
+                class="fleet-btn fleet-btn--outline"
+                style="border-color:var(--fleet-warning); color:var(--fleet-warning);"
+                onclick="haptic([5]); updateStatus(this, '{{ task.id }}', 'non_reachable', 'non_reachable')">
+            <i class="fa-solid fa-phone-slash me-2"></i>Non Reachable
+        </button>
+        {% endif %}
+
+        <div style="height:1px; background:var(--fleet-grey-100); margin: var(--spacing-xs) 0;"></div>
+
+        <!-- Delivered -->
+        {% if task.dl_task_status == 'delivered' %}
+        <button type="button" class="fleet-btn" disabled
+                style="background:var(--fleet-success); color:#fff; border:none; justify-content:space-between;">
+            <span><i class="fa-solid fa-check me-2"></i>Delivered</span>
+            <i class="fa-solid fa-circle-check"></i>
+        </button>
+        {% else %}
+        <button type="button" id="btn-delivered" data-task-id="{{ task.id }}"
+                class="fleet-btn" style="background:var(--fleet-success); color:#fff; border:none;"
+                onclick="haptic([10,50,10]); confirmComplete('{{ task.id }}', 'delivered')">
+            <i class="fa-solid fa-check me-2"></i>Mark as Delivered
+        </button>
+        {% endif %}
+
+        <!-- Failed -->
+        {% if task.dl_task_status == 'failed' %}
+        <button type="button" class="fleet-btn" disabled
+                style="background:var(--fleet-danger-light); color:var(--fleet-danger); border:none; justify-content:space-between;">
+            <span><i class="fa-solid fa-xmark me-2"></i>Failed</span>
+            <i class="fa-solid fa-circle-check"></i>
+        </button>
+        {% else %}
+        <button type="button" id="btn-failed" data-task-id="{{ task.id }}"
+                class="fleet-btn fleet-btn--outline"
+                style="border-color:var(--fleet-danger); color:var(--fleet-danger);"
+                onclick="haptic([5]); confirmComplete('{{ task.id }}', 'failed')">
+            <i class="fa-solid fa-xmark me-2"></i>Mark as Failed
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Task Activity Log -->
+{% if task_status_history %}
+<div class="fleet-card fade-in" style="margin-top: var(--spacing-lg);">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title"><i class="fa-solid fa-timeline me-2" style="color:var(--fleet-primary);"></i>Task History</h3>
+    </div>
+    <div class="fleet-card__body" style="padding-top:0;">
+        <ul class="task-history-list">
+            {% for entry in task_status_history %}
+            <li class="task-history-item">
+                <!-- Timeline dot -->
+                <div class="task-history-dot
+                    {% if entry.field_name == 'dl_task_publish' %}task-history-dot--publish
+                    {% elif entry.new_value == 'delivered' %}task-history-dot--success
+                    {% elif entry.new_value == 'failed' %}task-history-dot--danger
+                    {% elif entry.new_value in 'accepted,picked_up' %}task-history-dot--info
+                    {% else %}task-history-dot--default{% endif %}">
+                    {% if entry.field_name == 'dl_task_publish' %}
+                    <i class="fa-solid fa-rocket"></i>
+                    {% elif entry.new_value == 'delivered' %}
+                    <i class="fa-solid fa-circle-check"></i>
+                    {% elif entry.new_value == 'failed' %}
+                    <i class="fa-solid fa-circle-xmark"></i>
+                    {% elif entry.new_value == 'accepted' %}
+                    <i class="fa-solid fa-clipboard-check"></i>
+                    {% elif entry.new_value == 'picked_up' %}
+                    <i class="fa-solid fa-box"></i>
+                    {% elif entry.new_value in 'out_for_delivery,in_transit,start_ride' %}
+                    <i class="fa-solid fa-truck-fast"></i>
+                    {% elif entry.new_value == 'contacted' %}
+                    <i class="fa-solid fa-phone-volume"></i>
+                    {% elif entry.new_value == 'non_reachable' %}
+                    <i class="fa-solid fa-phone-slash"></i>
+                    {% else %}
+                    <i class="fa-solid fa-circle-dot"></i>
+                    {% endif %}
+                </div>
+                <!-- Content -->
+                <div class="task-history-content">
+                    <div class="task-history-title">{{ entry.new_display }}</div>
+                    <div class="task-history-meta">
+                        {{ entry.created_at|timesince }} ago
+                        {% if entry.changed_by %}
+                        · <span class="task-history-by">{{ entry.changed_by.get_full_name|default:entry.changed_by.username }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <!-- Time -->
+                <div class="task-history-time">{{ entry.created_at|date:"H:i" }}</div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    /* Map full bleed */
+    #fleet-nav-map {
+        height: 50vh;
+        margin: calc(-1 * var(--spacing-md)) calc(-1 * var(--spacing-md)) 0;
+        border-radius: 0;
+        z-index: 1;
+    }
+    /* Override Leaflet z-index conflicts with fleet bottom nav */
+    .leaflet-pane { z-index: 2 !important; }
+    .leaflet-top, .leaflet-bottom { z-index: 3 !important; }
+
+    /* Info grid (reuse fleet pattern) */
+    .fleet-info-grid {
+        display: grid;
+        gap: var(--spacing-sm);
+    }
+    .fleet-info-item {
+        padding: var(--spacing-sm) var(--spacing-md);
+        background: var(--fleet-grey-50);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--fleet-grey-100);
+    }
+    .fleet-info-item__label {
+        font-size: var(--font-size-xs);
+        color: var(--fleet-grey-500);
+        font-weight: 600;
+        margin-bottom: 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .fleet-info-item__value {
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        color: var(--fleet-dark);
+    }
+
+    /* Task Activity Timeline */
+    .task-history-list {
+        list-style: none;
+        margin: 0;
+        padding: var(--spacing-sm) 0 0;
+        position: relative;
+    }
+    .task-history-list::before {
+        content: '';
+        position: absolute;
+        left: 15px;
+        top: var(--spacing-sm);
+        bottom: var(--spacing-sm);
+        width: 2px;
+        background: var(--fleet-grey-100);
+    }
+    .task-history-item {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+        padding: 6px 0 6px var(--spacing-xs);
+        position: relative;
+    }
+    .task-history-dot {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        flex-shrink: 0;
+        position: relative;
+        z-index: 1;
+    }
+    .task-history-dot--publish  { background: #ede9fe; color: #7c3aed; }
+    .task-history-dot--success  { background: #dcfce7; color: #16a34a; }
+    .task-history-dot--danger   { background: #fee2e2; color: #dc2626; }
+    .task-history-dot--info     { background: #dbeafe; color: #2563eb; }
+    .task-history-dot--default  { background: var(--fleet-grey-100); color: var(--fleet-grey-500); }
+    .task-history-content {
+        flex: 1;
+        padding-top: 4px;
+    }
+    .task-history-title {
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        color: var(--fleet-dark);
+        line-height: 1.2;
+    }
+    .task-history-meta {
+        font-size: var(--font-size-xs);
+        color: var(--fleet-grey-400);
+        margin-top: 2px;
+    }
+    .task-history-by {
+        color: var(--fleet-primary);
+        font-weight: 600;
+    }
+    .task-history-time {
+        font-size: var(--font-size-xs);
+        color: var(--fleet-grey-400);
+        font-weight: 600;
+        padding-top: 6px;
+        flex-shrink: 0;
+    }
+</style>
+{% endblock %}
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function() {
+    // Coordinates
+    var dropoffLat = {{ dropoff.dl_latitude|default:"0" }};
+    var dropoffLng = {{ dropoff.dl_longitude|default:"0" }};
+    var pickupLat  = {{ pickup_lat|default:"0" }};
+    var pickupLng  = {{ pickup_lon|default:"0" }};
+
+    var hasDropoff = (dropoffLat !== 0 && dropoffLng !== 0);
+    var hasPickup  = (pickupLat  !== 0 && pickupLng  !== 0);
+
+    // Address fallback for Google Maps text search
+    var addrParts = [];
+    {% if dropoff.dl_zone %}addrParts.push('Zone {{ dropoff.dl_zone }}');{% endif %}
+    {% if dropoff.area_name %}addrParts.push('{{ dropoff.area_name }}');{% endif %}
+    {% if dropoff.dl_street %}addrParts.push('Street {{ dropoff.dl_street }}');{% endif %}
+    {% if dropoff.dl_building %}addrParts.push('Building {{ dropoff.dl_building }}');{% endif %}
+    {% if task.order.dl_zone %}if (!addrParts.length) addrParts.push('Zone {{ task.order.dl_zone }}');{% endif %}
+    {% if task.order.customer_address %}if (!addrParts.length) addrParts.push('{{ task.order.customer_address }}');{% endif %}
+    addrParts.push('Qatar');
+    var addressText = addrParts.join(', ');
+
+    // Qatar center defaults
+    if (!hasDropoff) { dropoffLat = 25.2854; dropoffLng = 51.5310; }
+    if (!hasPickup)  { pickupLat  = 25.2760; pickupLng  = 51.5200; }
+
+    // Init map
+    var map = L.map('fleet-nav-map').setView([dropoffLat, dropoffLng], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19
+    }).addTo(map);
+
+    // Markers
+    var dotHtml = function(color) {
+        return '<div style="width:20px;height:20px;border-radius:50%;background:' + color + ';border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);"></div>';
+    };
+    var mkIcon = function(color) {
+        return L.divIcon({ className: '', html: dotHtml(color), iconSize:[20,20], iconAnchor:[10,10] });
+    };
+
+    if (hasDropoff || true) {
+        L.marker([dropoffLat, dropoffLng], { icon: mkIcon('var(--fleet-danger, #ef4444)') })
+            .addTo(map)
+            .bindPopup('<strong>Delivery</strong><br>{{ dropoff.area_name|default:"Dropoff" }}');
+    }
+    if (hasPickup) {
+        L.marker([pickupLat, pickupLng], { icon: mkIcon('var(--fleet-success, #10b981)') })
+            .addTo(map)
+            .bindPopup('<strong>Pickup</strong><br>{{ pickup.pickup_location_title|default:"Pickup" }}');
+    }
+
+    if (hasDropoff && hasPickup) {
+        map.fitBounds([[pickupLat, pickupLng], [dropoffLat, dropoffLng]], {padding:[50,50]});
+    }
+
+    // Google Maps navigate
+    document.getElementById('btn-open-maps').addEventListener('click', function() {
+        var url = hasDropoff
+            ? 'https://www.google.com/maps/dir/?api=1&destination=' + dropoffLat + ',' + dropoffLng + '&travelmode=driving'
+            : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addressText);
+        window.open(url, '_blank');
+    });
+
+    // WhatsApp location share
+    var waBtn = document.getElementById('btn-whatsapp');
+    if (waBtn) {
+        waBtn.addEventListener('click', function() {
+            var phone = (this.dataset.phone || '').replace(/\D/g, '');
+            if (phone.length === 8) phone = '974' + phone;
+            var locUrl = hasDropoff
+                ? 'https://www.google.com/maps?q=' + dropoffLat + ',' + dropoffLng
+                : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addressText);
+            var msg = 'Hello! I am your EzzyDelivery driver. Your delivery location: ' + locUrl;
+            window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+        });
+    }
+})();
+
+function getCsrf() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+}
+
+function openStatusSheet() {
+    document.getElementById('statusSheet').classList.add('open');
+    document.getElementById('statusOverlay').classList.add('open');
+}
+function closeStatusSheet() {
+    document.getElementById('statusSheet').classList.remove('open');
+    document.getElementById('statusOverlay').classList.remove('open');
+}
+
+function updateStatus(btn, taskId, status, displayStatus, dmsStatus) {
+    btn.disabled = true;
+    var origHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Updating...';
+
+    var body = { status: status };
+    if (dmsStatus) body.dms_status = dmsStatus;
+
+    fetch('/api/driver/tasks/' + taskId + '/status/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrf()
+        },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success !== false) {
+            haptic([10, 50, 10]);
+            showToast('Status updated!', 'success');
+            closeStatusSheet();
+            setTimeout(() => location.reload(), 800);
+        } else {
+            showToast(data.error || 'Could not update status', 'error');
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    })
+    .catch(() => {
+        showToast('Network error. Please try again.', 'error');
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+    });
+}
+
+function confirmComplete(taskId, status) {
+    var msg = status === 'delivered'
+        ? 'Mark this delivery as Delivered?'
+        : 'Mark this delivery as Failed?';
+    if (!confirm(msg)) return;
+
+    var btn = document.getElementById(status === 'delivered' ? 'btn-delivered' : 'btn-failed');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Updating...';
+
+    fetch('/api/driver/tasks/' + taskId + '/complete/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrf()
+        },
+        body: JSON.stringify({ status: status })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success !== false) {
+            haptic([10, 50, 10]);
+            showToast(status === 'delivered' ? 'Delivery completed!' : 'Delivery marked failed', status === 'delivered' ? 'success' : 'warning');
+            closeStatusSheet();
+            setTimeout(() => { window.location.href = '{% url "fleet:driver_tasks" %}?tab=history'; }, 1500);
+        } else {
+            showToast(data.error || 'Could not complete task', 'error');
+            btn.disabled = false;
+            btn.innerHTML = status === 'delivered'
+                ? '<i class="fa-solid fa-check me-2"></i>Mark as Delivered'
+                : '<i class="fa-solid fa-xmark me-2"></i>Mark as Failed';
+        }
+    })
+    .catch(() => {
+        showToast('Network error. Please try again.', 'error');
+        btn.disabled = false;
+    });
+}
+</script>
+
+{% endblock %}

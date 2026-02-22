@@ -73,4 +73,36 @@ urlpatterns = [
           fleet_views.pickup_scanner, name='pickup_scanner'),
      path('pickup/scan/',
           fleet_views.pickup_scan_process, name='pickup_scan_process'),
+
+     # Notifications
+     path('notifications/',
+          fleet_views.driver_notifications, name='driver_notifications'),
+     path('notifications/mark-read/',
+          fleet_views.notifications_mark_read, name='notifications_mark_read'),
+     path('notifications/count/',
+          fleet_views.notifications_unread_count, name='notifications_unread_count'),
+
+     # Settings & Help
+     path('settings/',
+          fleet_views.driver_settings, name='driver_settings'),
+     path('help/',
+          fleet_views.driver_help, name='driver_help'),
+
+     # Driver Tasks (migrated from delivery app)
+     path('tasks/',
+          fleet_views.driver_tasks, name='driver_tasks'),
+     path('tasks/take-scan/',
+          fleet_views.fleet_task_take_scan, name='fleet_task_take_scan'),
+     path('tasks/assign/',
+          fleet_views.fleet_assign_driver, name='fleet_assign_driver'),
+     path('tasks/accept/',
+          fleet_views.fleet_accept_task, name='fleet_accept_task'),
+     path('tasks/start/',
+          fleet_views.fleet_start_ride, name='fleet_start_ride'),
+     path('tasks/postpone/',
+          fleet_views.fleet_postpone_task, name='fleet_postpone_task'),
+     path('tasks/<int:task_id>/timeline/',
+          fleet_views.fleet_task_timeline, name='fleet_task_timeline'),
+     path('tasks/<int:task_id>/navigate/',
+          fleet_views.fleet_task_navigation, name='fleet_task_navigation'),
 ]

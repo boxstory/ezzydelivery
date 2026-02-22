@@ -1,0 +1,158 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+
+{% block title %}Help & Support{% endblock %}
+{% block page_title %}Help & Support{% endblock %}
+
+{% block header_actions %}
+<button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
+    <i class="fa-solid fa-rotate-right"></i>
+</button>
+<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+    <i class="fa-solid fa-bell"></i>
+    {% if unread_notifications > 0 %}
+    <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
+    {% endif %}
+</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Contact Card -->
+<div class="fleet-card fade-in">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-headset me-2"></i>
+            Contact Support
+        </h3>
+    </div>
+    <div class="fleet-card__body">
+        <p style="font-size:var(--font-size-sm); color:var(--fleet-grey-600); margin-bottom:var(--spacing-lg);">
+            Our team is available 7 days a week, 8 AM – 10 PM (Qatar time).
+        </p>
+        <div style="display:flex; flex-direction:column; gap:var(--spacing-sm);">
+            <a href="https://wa.me/97430001000"
+               class="fleet-btn fleet-btn--block"
+               style="background:var(--fleet-success); color:#fff; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:var(--spacing-sm);">
+                <i class="fa-brands fa-whatsapp" style="font-size:var(--font-size-lg);"></i>
+                WhatsApp Support
+            </a>
+            <a href="mailto:support@ezzydelivery.qa"
+               class="fleet-btn fleet-btn--outline fleet-btn--block"
+               style="text-decoration:none; display:flex; align-items:center; justify-content:center; gap:var(--spacing-sm);">
+                <i class="fa-solid fa-envelope"></i>
+                support@ezzydelivery.qa
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- FAQ -->
+<div class="fleet-card slide-up" style="animation-delay:0.1s;">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-circle-question me-2"></i>
+            Frequently Asked Questions
+        </h3>
+    </div>
+    <div class="fleet-card__body" style="padding:0;">
+        {% for faq in faqs %}
+        <details class="faq-item" style="border-bottom:{% if not forloop.last %}1px solid var(--fleet-grey-100){% else %}none{% endif %};">
+            <summary style="padding:var(--spacing-md) var(--spacing-lg);
+                           font-size:var(--font-size-sm); font-weight:700;
+                           color:var(--fleet-dark); cursor:pointer; list-style:none;
+                           display:flex; align-items:center; justify-content:space-between; gap:var(--spacing-sm);">
+                <span>{{ faq.question }}</span>
+                <i class="fa-solid fa-chevron-down faq-chevron"
+                   style="font-size:var(--font-size-xs); color:var(--fleet-grey-400); flex-shrink:0; transition:transform var(--transition-base);"></i>
+            </summary>
+            <div style="padding:0 var(--spacing-lg) var(--spacing-md);
+                        font-size:var(--font-size-sm); color:var(--fleet-grey-700); line-height:1.6;">
+                {{ faq.answer }}
+            </div>
+        </details>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Quick Links -->
+<div class="fleet-card slide-up" style="animation-delay:0.2s;">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-link me-2"></i>
+            Quick Links
+        </h3>
+    </div>
+    <div class="fleet-card__body" style="padding:0;">
+        <ul class="fleet-list" style="margin:0;">
+            <li class="fleet-list-item"
+                style="border-radius:0; border:none; border-bottom:1px solid var(--fleet-grey-100); margin-bottom:0;"
+                onclick="window.location.href='{% url 'fleet:driver_documents' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--info">
+                    <i class="fa-solid fa-file-lines"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">My Documents</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color:var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+            <li class="fleet-list-item"
+                style="border-radius:0; border:none; border-bottom:1px solid var(--fleet-grey-100); margin-bottom:0;"
+                onclick="window.location.href='{% url 'fleet:vehicle_own' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--warning">
+                    <i class="fa-solid fa-car"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">My Vehicles</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color:var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+            <li class="fleet-list-item"
+                style="border-radius:0; border:none; border-bottom:1px solid var(--fleet-grey-100); margin-bottom:0;"
+                onclick="window.location.href='{% url 'fleet:cod_collection' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--success">
+                    <i class="fa-solid fa-money-bill-wave"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">COD Collection</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color:var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+            <li class="fleet-list-item"
+                style="border-radius:0; border:none; margin-bottom:0;"
+                onclick="window.location.href='{% url 'fleet:driver_earnings' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--danger">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">My Earnings</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color:var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- App version -->
+<div style="text-align:center; padding:var(--spacing-xl) 0; color:var(--fleet-grey-400); font-size:var(--font-size-xs);">
+    EzzyDelivery Driver App v1.0.0
+</div>
+
+{% block extra_css %}
+<style>
+    details.faq-item[open] .faq-chevron {
+        transform: rotate(180deg);
+    }
+    details.faq-item summary::-webkit-details-marker { display: none; }
+</style>
+{% endblock %}
+
+{% endblock %}

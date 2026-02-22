@@ -18,10 +18,19 @@ def driver_wallet_status(request):
     context = {
         'driver_wallet_warning': None,
         'driver_wallet_blocked': False,
+        'unread_notifications': 0,
     }
 
     if not request.user.is_authenticated:
         return context
+
+    # Only run on fleet pages — avoid DB hit on every page across the site
+    if not request.path.startswith('/fleet/'):
+        return context
+
+    # Avoid duplicate query within the same request
+    if hasattr(request, '_driver_wallet_status_context'):
+        return request._driver_wallet_status_context
 
     try:
         driver = fleet_models.Driver.objects.get(user_id=request.user.id)
@@ -35,7 +44,12 @@ def driver_wallet_status(request):
         context['driver_available_credit'] = wallet_status.get('available_credit', 0)
         context['driver_usage_percentage'] = wallet_status.get('usage_percentage', 0)
 
+        context['unread_notifications'] = fleet_models.DriverNotification.objects.filter(
+            driver=driver, is_read=False
+        ).count()
+
     except fleet_models.Driver.DoesNotExist:
         pass
 
+    request._driver_wallet_status_context = context
     return context

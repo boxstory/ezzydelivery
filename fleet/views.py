@@ -152,9 +152,61 @@ def fleet_dashboard(request):
         stats_today = WalletService.get_driver_statistics(driver, days=1)
 
         # Get recent transactions (last 10)
-        recent_transactions = fleet_models.CODTransaction.objects.filter(
+        recent_transactions = fleet_models.DriverTransaction.objects.filter(
             driver=driver
         ).order_by('-created_at')[:10]
+
+        unread_notifications = fleet_models.DriverNotification.objects.filter(
+            driver=driver, is_read=False
+        ).count()
+
+        # Build combined activity timeline
+        from delivery import models as _dl_act
+        _task_events = list(
+            _dl_act.DeliveryTask.objects.filter(
+                driver=driver,
+                dl_task_status__in=['delivered', 'failed', 'accepted', 'out_for_delivery'],
+                completed_at__isnull=False,
+            ).select_related('order', 'order__business').order_by('-completed_at')[:10]
+        )
+        _txn_events = list(recent_transactions)
+        _notif_events = list(
+            fleet_models.DriverNotification.objects.filter(driver=driver).order_by('-created_at')[:10]
+        )
+        _timeline = []
+        for t in _task_events:
+            _timeline.append({'type': 'task', 'obj': t, 'ts': t.completed_at})
+        for t in _txn_events:
+            _timeline.append({'type': 'txn', 'obj': t, 'ts': t.created_at})
+        for n in _notif_events:
+            _timeline.append({'type': 'notif', 'obj': n, 'ts': n.created_at})
+        _timeline.sort(key=lambda x: x['ts'], reverse=True)
+        activity_timeline = _timeline[:12]
+
+        profile_picture, _ = core_models.ProfilePicture.objects.get_or_create(
+            user_id=request.user.id, defaults={'profile': profile}
+        )
+
+        # Task counts for dashboard summary
+        from delivery import models as delivery_models
+        assigned_task_ids = delivery_models.AssignedDriver.objects.filter(
+            driver=driver
+        ).values_list('dl_task_id', flat=True)
+
+        new_tasks_count = delivery_models.DeliveryTask.objects.filter(
+            dl_task_status__in=['pending', 'for_review'],
+            dl_task_publish=True,
+        ).exclude(id__in=assigned_task_ids).count()
+
+        assigned_tasks_count = delivery_models.DeliveryTask.objects.filter(
+            id__in=assigned_task_ids,
+            dl_task_status='assigned',
+        ).count()
+
+        my_tasks_count = delivery_models.DeliveryTask.objects.filter(
+            id__in=assigned_task_ids,
+            dl_task_status__in=['accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable'],
+        ).count()
 
         context = {
             'profile': profile,
@@ -168,6 +220,12 @@ def fleet_dashboard(request):
             'recent_transactions': recent_transactions,
             'total_deliveries': getattr(driver, 'total_deliveries', 0),
             'total_earnings': wallet_status.get('total_earnings', 0),
+            'unread_notifications': unread_notifications,
+            'profile_picture': profile_picture,
+            'new_tasks_count': new_tasks_count,
+            'assigned_tasks_count': assigned_tasks_count,
+            'my_tasks_count': my_tasks_count,
+            'activity_timeline': activity_timeline,
         }
         return render(request, 'fleet/fleet_dashboard_pwa.html', context)
 
@@ -296,8 +354,21 @@ def vehicle_own(request):
     vehicles = fleet_models.DriverVehicle.objects.filter(
         driver_id=driver.driver_id)
     logger.debug(f'vehicle_own found {vehicles.count()} vehicles')
+
+    documents = fleet_models.DriverDocument.objects.filter(driver=driver).order_by('document_type')
+
+    profile_picture = None
+    try:
+        from core.models import ProfilePicture
+        profile_picture = ProfilePicture.objects.get(user=request.user)
+    except Exception:
+        pass
+
     context = {
         'vehicles': vehicles,
+        'driver': driver,
+        'documents': documents,
+        'profile_picture': profile_picture,
     }
     return render(request, 'fleet/parts/vehicle_own.html', context)
 
@@ -311,7 +382,7 @@ def vehicle_add(request):
     except fleet_models.Driver.DoesNotExist:
         messages.error(request, 'Driver profile not found. Please create a driver profile first.')
         return redirect('webpages:join_driver')
-    form = fleet_forms.DriverVehicleForm(request.POST or None)
+    form = fleet_forms.DriverVehicleForm(request.POST or None, request.FILES or None)
     if request.method == 'POST':
         if form.is_valid():
             logger.debug("VehicleForm is valid")
@@ -363,10 +434,10 @@ def vehicle_update(request, vehicle_id):
         return redirect('/fleet/vehicle_own/')
     logger.debug(f'vehicle_update for vehicle={driver_vehicle}')
     form = fleet_forms.DriverVehicleForm(
-        request.POST or None, instance=driver_vehicle)
+        request.POST or None, request.FILES or None, instance=driver_vehicle)
     if request.method == 'POST':
         form = fleet_forms.DriverVehicleForm(
-            request.POST, instance=driver_vehicle)
+            request.POST, request.FILES, instance=driver_vehicle)
 
         if form.is_valid():
             logger.debug("VehicleForm is valid")
@@ -399,7 +470,7 @@ def cod_collection(request):
         cod_transactions = fleet_models.DriverTransaction.objects.filter(
             driver=driver,
             transaction_type='cod_deposit'
-        ).select_related('delivery_task').order_by('-created_at')[:20]
+        ).order_by('-created_at')[:20]
 
         # Get COD currently in hand (not yet settled/deposited)
         # Only show COD that hasn't been submitted to admin yet
@@ -437,7 +508,7 @@ def cod_collection(request):
         from orders.models import Order
         cod_orders = Order.objects.filter(
             id__in=cod_in_hand_list.values_list('order_id', flat=True)
-        ).select_related('delivery_task').order_by('-created_at')
+        ).select_related('business', 'pickup_location').order_by('-created_at')
 
         context = {
             'driver': driver,
@@ -1668,6 +1739,28 @@ def driver_profile_mobile(request):
             'preferred_zone_groups__zones'
         ).get(user_id=request.user.id)
 
+        # Handle avatar/profile picture upload
+        if request.method == 'POST' and 'avatar' in request.FILES:
+            profile = driver.profile
+            profile_picture, _ = core_models.ProfilePicture.objects.get_or_create(
+                user_id=request.user.id, defaults={'profile': profile}
+            )
+            uploaded_file = request.FILES['avatar']
+            # Validate image type
+            if not uploaded_file.content_type.startswith('image/'):
+                from django.http import JsonResponse
+                return JsonResponse({'success': False, 'error': 'Invalid file type'}, status=400)
+            # Delete old file if exists
+            if profile_picture.profile_picture:
+                try:
+                    profile_picture.profile_picture.delete(save=False)
+                except Exception:
+                    pass
+            profile_picture.profile_picture = uploaded_file
+            profile_picture.save()
+            messages.success(request, 'Profile picture updated successfully.')
+            return redirect('fleet:driver_profile_mobile')
+
         # Handle zone group preference update
         if request.method == 'POST' and 'update_zones' in request.POST:
             selected_group_ids = request.POST.getlist('preferred_zone_groups')
@@ -1717,6 +1810,10 @@ def driver_profile_mobile(request):
         total_deliveries = stats.get('total_deliveries', 0)
         total_earnings = wallet_status.get('total_earnings', 0)
 
+        unread_notifications = fleet_models.DriverNotification.objects.filter(
+            driver=driver, is_read=False
+        ).count()
+
         context = {
             'driver': driver,
             'profile': profile,
@@ -1730,6 +1827,7 @@ def driver_profile_mobile(request):
             'preferred_group_ids': preferred_group_ids,
             'total_deliveries': total_deliveries,
             'total_earnings': total_earnings,
+            'unread_notifications': unread_notifications,
         }
 
         return render(request, 'fleet/driver_profile_pwa.html', context)
@@ -1785,7 +1883,7 @@ def pickup_scan_process(request):
     try:
         import json
         data = json.loads(request.body) if request.content_type == 'application/json' else request.POST
-        scanned_code = data.get('code', '').strip()
+        scanned_code = (data.get('code') or data.get('barcode') or '').strip()
 
         if not scanned_code:
             return JsonResponse({'success': False, 'error': 'No code provided'})
@@ -1863,3 +1961,797 @@ def pickup_scan_process(request):
     except Exception as e:
         logger.error(f"Error processing pickup scan: {e}")
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+# =============================================================================
+# NOTIFICATIONS
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def driver_notifications(request):
+    """
+    Display driver notifications list.
+    """
+    from django.http import Http404
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        show_unread_only = request.GET.get('filter') == 'unread'
+        notifications_qs = fleet_models.DriverNotification.objects.filter(driver=driver)
+        if show_unread_only:
+            notifications_qs = notifications_qs.filter(is_read=False)
+
+        unread_count = fleet_models.DriverNotification.objects.filter(
+            driver=driver, is_read=False
+        ).count()
+
+        context = {
+            'notifications': notifications_qs[:100],
+            'unread_count': unread_count,
+            'show_unread_only': show_unread_only,
+        }
+        return render(request, 'fleet/driver_notifications_pwa.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, "Driver profile not found.")
+        return redirect('core:main_dashboard')
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def notifications_mark_read(request):
+    """
+    AJAX endpoint: mark one or all notifications as read.
+    POST body: { notification_id: <int> } OR { mark_all: true }
+    """
+    from django.http import JsonResponse as _JsonResponse
+    if request.method != 'POST':
+        return _JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        data = json.loads(request.body) if request.body else {}
+
+        if data.get('mark_all'):
+            fleet_models.DriverNotification.objects.filter(
+                driver=driver, is_read=False
+            ).update(is_read=True, read_at=timezone.now())
+        else:
+            notification_id = data.get('notification_id')
+            if notification_id:
+                fleet_models.DriverNotification.objects.filter(
+                    id=notification_id, driver=driver
+                ).update(is_read=True, read_at=timezone.now())
+
+        unread_count = fleet_models.DriverNotification.objects.filter(
+            driver=driver, is_read=False
+        ).count()
+        return _JsonResponse({'success': True, 'unread_count': unread_count})
+
+    except fleet_models.Driver.DoesNotExist:
+        return _JsonResponse({'error': 'Driver not found'}, status=404)
+    except (json.JSONDecodeError, ValueError):
+        return _JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def notifications_unread_count(request):
+    """
+    AJAX endpoint: return unread notification count.
+    """
+    from django.http import JsonResponse as _JsonResponse
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        count = fleet_models.DriverNotification.objects.filter(
+            driver=driver, is_read=False
+        ).count()
+        return _JsonResponse({'unread_count': count})
+    except fleet_models.Driver.DoesNotExist:
+        return _JsonResponse({'unread_count': 0})
+
+
+# =============================================================================
+# SETTINGS
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def driver_settings(request):
+    """
+    Driver settings page: availability status and account links.
+    POST: update driver_availability.
+    """
+    try:
+        driver = fleet_models.Driver.objects.select_related('user', 'profile').get(
+            user_id=request.user.id
+        )
+
+        if request.method == 'POST':
+            new_availability = request.POST.get('driver_availability', '').strip()
+            valid_choices = [c[0] for c in fleet_models.DRIVER_AVAILABILITY_CHOICES]
+            if new_availability in valid_choices:
+                driver.driver_availability = new_availability
+                driver.save(update_fields=['driver_availability'])
+                logger.info(f"Driver {driver.driver_id} updated availability to {new_availability}")
+                messages.success(request, "Availability updated successfully.")
+            else:
+                messages.warning(request, "Invalid availability option.")
+            return redirect('fleet:driver_settings')
+
+        availability_choices = fleet_models.DRIVER_AVAILABILITY_CHOICES
+        context = {
+            'driver': driver,
+            'availability_choices': availability_choices,
+        }
+        return render(request, 'fleet/driver_settings_pwa.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, "Driver profile not found.")
+        return redirect('core:main_dashboard')
+
+
+# =============================================================================
+# HELP & SUPPORT
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def driver_help(request):
+    """
+    Help & Support page with FAQs and contact info.
+    """
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        faqs = [
+            {
+                'question': 'How do I collect COD from a customer?',
+                'answer': 'When you complete a delivery, collect the exact COD amount from the customer. Mark the order as delivered in the Tasks screen. The COD amount will appear in your COD Collection page automatically.',
+            },
+            {
+                'question': 'How do I submit COD to the office?',
+                'answer': 'Go to COD → Submit COD. Select the orders you are submitting cash for, enter the total amount, and tap Submit. Keep the receipt you receive for your records.',
+            },
+            {
+                'question': 'How do I scan a pickup barcode?',
+                'answer': 'Tap the Scan button in the bottom navigation. Point your camera at the barcode on the package. The app will confirm the pickup automatically. Make sure you have good lighting.',
+            },
+            {
+                'question': 'How do I add a vehicle?',
+                'answer': 'Go to Profile → My Vehicles → Add Vehicle. Enter your vehicle registration number, type, model, and colour. Your vehicle will be reviewed by the team.',
+            },
+            {
+                'question': 'How do I update my documents?',
+                'answer': 'Go to Profile → My Documents. Tap on any document to update it or upload a new one. Make sure documents are clear and not expired. QID, driving licence, and passport are required.',
+            },
+            {
+                'question': 'When will my earnings be settled?',
+                'answer': 'Earnings are settled weekly every Thursday. You will receive a notification when your settlement is processed. You can track pending earnings in the Earnings section.',
+            },
+            {
+                'question': 'What is the COD credit limit?',
+                'answer': 'Your COD credit limit is the maximum COD you can hold at one time. When you approach your limit, you must submit COD to the office before accepting new deliveries. Your current limit is shown on the dashboard.',
+            },
+            {
+                'question': 'How do I change my availability status?',
+                'answer': 'Go to Profile → Settings. Select your current availability: Available, Offline, On Break, or On Delivery. Set yourself to Offline when you are not working.',
+            },
+        ]
+
+        context = {
+            'driver': driver,
+            'faqs': faqs,
+        }
+        return render(request, 'fleet/driver_help_pwa.html', context)
+
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, "Driver profile not found.")
+        return redirect('core:main_dashboard')
+
+
+# =============================================================================
+# DRIVER TASK VIEWS (migrated from delivery app)
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def driver_tasks(request):
+    """
+    PWA task list for drivers — replaces delivery:all_delivery_tasks.
+    URL: /fleet/tasks/
+    """
+    from django.db.models import Prefetch
+    from delivery import models as delivery_models
+
+    try:
+        driver = fleet_models.Driver.objects.select_related('user').get(user_id=request.user.id)
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, "Driver profile not found.")
+        return redirect('core:main_dashboard')
+
+    # Filter params (defaults: Active tab + All Areas)
+    tab = request.GET.get('tab', 'accepted')
+    area_filter = request.GET.get('area', 'all')
+    type_filter = request.GET.get('type', 'all')
+    status_filter = request.GET.get('status', 'all')
+    sort_by = request.GET.get('sort', 'date')
+    zone_filter = request.GET.get('zone', '')
+
+    base_qs = delivery_models.DeliveryTask.objects.select_related(
+        'order', 'order__business', 'order__pickup_location', 'driver', 'dl_to_address',
+    ).prefetch_related(
+        'assigneddriver_set', 'assigneddriver_set__driver',
+        'order__order_items', 'order__order_items__product', 'task_qrcode',
+        'order__address_verifications',
+    )
+
+    all_tasks = base_qs.filter(
+        dl_task_publish=True, driver__isnull=True,
+        dl_task_status__in=['pending', 'for_review'],
+        order__verification_status='verified',
+    ).exclude(
+        dl_task_status__in=['delivered', 'cancelled', 'failed']
+    ).exclude(order__order_status='cancelled').order_by('-id')
+
+    assigned_tasks = base_qs.filter(
+        driver=driver, dl_task_status='assigned',
+        order__verification_status='verified',
+    ).exclude(order__order_status='cancelled').order_by('-id')
+
+    accepted_tasks = base_qs.filter(
+        driver=driver,
+        dl_task_status__in=['accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable'],
+        order__verification_status='verified',
+    ).exclude(order__order_status='cancelled').order_by('-id')
+
+    history_tasks = base_qs.filter(
+        driver=driver, dl_task_status__in=['delivered', 'failed', 'cancelled']
+    ).order_by('-id')
+
+    # Area filter
+    if area_filter == 'doha':
+        all_tasks = all_tasks.filter(dl_to_address__dl_zone__lte=50)
+        assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone__lte=50)
+        accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone__lte=50)
+        history_tasks = history_tasks.filter(dl_to_address__dl_zone__lte=50)
+    elif area_filter == 'my_zone':
+        my_zones = list(
+            delivery_models.ZoneName.objects.filter(
+                zone_groups__in=driver.preferred_zone_groups.all(),
+                zone_groups__is_active=True
+            ).values_list('zone_number', flat=True).distinct()
+        )
+        if my_zones:
+            all_tasks = all_tasks.filter(dl_to_address__dl_zone__in=my_zones)
+            assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone__in=my_zones)
+            accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone__in=my_zones)
+            history_tasks = history_tasks.filter(dl_to_address__dl_zone__in=my_zones)
+    elif area_filter == 'qatar':
+        all_tasks = all_tasks.filter(dl_to_address__dl_zone__gt=50)
+        assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone__gt=50)
+        accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone__gt=50)
+        history_tasks = history_tasks.filter(dl_to_address__dl_zone__gt=50)
+
+    # Zone filter
+    if zone_filter and zone_filter.isdigit():
+        zone_num = int(zone_filter)
+        all_tasks = all_tasks.filter(dl_to_address__dl_zone=zone_num)
+        assigned_tasks = assigned_tasks.filter(dl_to_address__dl_zone=zone_num)
+        accepted_tasks = accepted_tasks.filter(dl_to_address__dl_zone=zone_num)
+        history_tasks = history_tasks.filter(dl_to_address__dl_zone=zone_num)
+
+    # Type filter
+    if type_filter == 'pnd':
+        all_tasks = all_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
+        assigned_tasks = assigned_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
+        accepted_tasks = accepted_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
+        history_tasks = history_tasks.filter(dl_speed__in=['On Demand', 'Same Day'])
+
+    # Status filter
+    if status_filter and status_filter != 'all':
+        if status_filter == 'in_transit':
+            accepted_tasks = accepted_tasks.filter(dl_task_status__in=['in_transit', 'out_for_delivery', 'start_ride'])
+        elif status_filter == 'failed':
+            history_tasks = history_tasks.filter(dl_task_status__in=['failed', 'cancelled'])
+        elif status_filter == 'delivered':
+            history_tasks = history_tasks.filter(dl_task_status='delivered')
+        elif status_filter == 'accepted':
+            accepted_tasks = accepted_tasks.filter(dl_task_status='accepted')
+        elif status_filter == 'picked_up':
+            accepted_tasks = accepted_tasks.filter(dl_task_status='picked_up')
+        elif status_filter == 'contacted':
+            accepted_tasks = accepted_tasks.filter(dl_task_status='contacted')
+        elif status_filter == 'non_reachable':
+            accepted_tasks = accepted_tasks.filter(dl_task_status='non_reachable')
+
+    # Sort
+    if sort_by == 'zone':
+        sort_order = ['dl_to_address__dl_zone', '-dl_task_date', '-id']
+    elif sort_by == 'status':
+        sort_order = ['dl_task_status', '-dl_task_date', '-id']
+    else:
+        sort_order = ['-dl_task_date', '-id']
+
+    all_tasks = all_tasks.order_by(*sort_order)
+    assigned_tasks = assigned_tasks.order_by(*sort_order)
+    accepted_tasks = accepted_tasks.order_by(*sort_order)
+    history_tasks = history_tasks.order_by(*sort_order)
+
+    all_count = all_tasks.count()
+    assigned_count = assigned_tasks.count()
+    accepted_count = accepted_tasks.count()
+    history_count = history_tasks.count()
+
+    if tab == 'all':
+        cards = all_tasks[:50]
+    elif tab == 'assigned':
+        cards = assigned_tasks[:50]
+    elif tab == 'accepted':
+        cards = accepted_tasks[:50]
+    else:
+        cards = history_tasks[:50]
+
+    # Available zones dropdown
+    zone_numbers = delivery_models.DeliveryTask.objects.filter(
+        dl_to_address__isnull=False
+    ).values_list('dl_to_address__dl_zone', flat=True).distinct()
+    zone_numbers = [z for z in zone_numbers if z is not None][:50]
+
+    available_zones = delivery_models.ZoneName.objects.filter(
+        zone_number__in=zone_numbers
+    ).prefetch_related(
+        Prefetch(
+            'zone_groups',
+            queryset=delivery_models.ZoneGroup.objects.filter(is_active=True).order_by('display_order'),
+            to_attr='active_groups',
+        )
+    ).order_by('zone_number')
+
+    zone_group_map = {
+        zone.zone_number: zone.active_groups[0].name
+        for zone in available_zones if zone.active_groups
+    }
+    zone_name_map = {
+        zone.zone_number: zone.zone_name
+        for zone in available_zones
+    }
+
+    context = {
+        'driver': driver,
+        'cards': cards,
+        'all_count': all_count,
+        'assigned_count': assigned_count,
+        'accepted_count': accepted_count,
+        'history_count': history_count,
+        'current_tab': tab,
+        'area_filter': area_filter,
+        'type_filter': type_filter,
+        'status_filter': status_filter,
+        'sort_by': sort_by,
+        'zone_filter': zone_filter,
+        'available_zones': available_zones,
+        'zone_group_map': zone_group_map,
+        'zone_name_map': zone_name_map,
+    }
+    return render(request, 'fleet/driver_tasks_pwa.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def fleet_task_take_scan(request):
+    """
+    AJAX: Driver takes a task via QR/barcode scan.
+    POST: task_id + scanned code → assigns driver and sets status=accepted.
+    Returns task info for 3-second confirmation display.
+    URL: /fleet/tasks/take-scan/
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    import json as _json
+    from delivery import models as delivery_models
+    from orders import models as orders_models
+
+    try:
+        data = _json.loads(request.body) if request.content_type == 'application/json' else request.POST
+        task_id = data.get('task_id', '').strip()
+        scanned_code = data.get('code', '').strip()
+
+        if not task_id:
+            return JsonResponse({'success': False, 'error': 'Task ID required'})
+        if not scanned_code:
+            return JsonResponse({'success': False, 'error': 'No scan code provided'})
+
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        task = delivery_models.DeliveryTask.objects.select_related(
+            'order', 'order__business', 'pickup_location'
+        ).get(id=task_id)
+
+        # Verify the scanned code matches this task (task number, order number, or barcode)
+        task_num = (task.dl_task_number or '').lower()
+        order_num = (task.order.order_number if task.order else '') or ''
+        code_lower = scanned_code.lower()
+
+        code_matches = (
+            code_lower in task_num
+            or task_num in code_lower
+            or code_lower in order_num.lower()
+            or order_num.lower() in code_lower
+        )
+
+        # Also check OrderBarcode
+        if not code_matches:
+            barcode_match = orders_models.OrderBarcode.objects.filter(
+                barcode_value=scanned_code, order=task.order
+            ).exists()
+            code_matches = barcode_match
+
+        if not code_matches:
+            return JsonResponse({
+                'success': False,
+                'error': f'Scanned code does not match this task. Got: {scanned_code}'
+            })
+
+        # Already taken?
+        if task.dl_task_status not in ('pending', 'for_review'):
+            return JsonResponse({
+                'success': False,
+                'error': f'Task is already {task.get_dl_task_status_display()}'
+            })
+
+        # Assign driver and set to accepted
+        from django.db import transaction as db_transaction
+        with db_transaction.atomic():
+            task.driver = driver
+            task.dl_task_status = 'accepted'
+            task.save(update_fields=['driver', 'dl_task_status'])
+
+            delivery_models.AssignedDriver.objects.get_or_create(
+                dl_task=task,
+                driver=driver,
+            )
+
+        logger.info(f"Driver {driver.driver_id} took task {task.id} via QR scan")
+
+        return JsonResponse({
+            'success': True,
+            'task_id': task.id,
+            'task_number': task.dl_task_number or str(task.id),
+            'order_number': task.order.order_number if task.order else '',
+            'business': task.order.business.business_name if task.order and task.order.business else '',
+            'customer': task.order.customer_name if task.order else '',
+            'zone': task.order.dl_zone if task.order else '',
+            'street': task.order.dl_street if task.order else '',
+            'building': task.order.dl_building if task.order else '',
+            'cod': str(task.order.cod_amount) if task.order and task.order.cod_amount else '',
+            'pickup': task.pickup_location.pickup_location_title if task.pickup_location else '',
+            'message': 'Task accepted! You are now assigned.',
+        })
+
+    except fleet_models.Driver.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+    except delivery_models.DeliveryTask.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Task not found'})
+    except _json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'})
+    except Exception as e:
+        logger.error(f"fleet_task_take_scan error: {e}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def fleet_assign_driver(request):
+    """
+    AJAX: Driver self-assigns to a task.
+    POST: task_id → creates AssignedDriver, sets status=accepted.
+    URL: /fleet/tasks/assign/
+    """
+    from delivery import views as delivery_views
+    return delivery_views.assign_driver(request)
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def fleet_accept_task(request):
+    """
+    AJAX: Accept an assigned task (status assigned → accepted).
+    URL: /fleet/tasks/accept/
+    """
+    from delivery import views as delivery_views
+    return delivery_views.accept_task(request)
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def fleet_start_ride(request):
+    """
+    AJAX: Start ride — update task to out_for_delivery.
+    Returns redirect_url pointing to /fleet/tasks/<id>/navigate/.
+    URL: /fleet/tasks/start/
+    """
+    from delivery import models as delivery_models
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    task_id = request.POST.get('task_id')
+    if not task_id:
+        return JsonResponse({'success': False, 'error': 'Task ID required'})
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id)
+
+        assigned = (
+            delivery_models.AssignedDriver.objects.filter(dl_task_id=task_id, driver=driver).exists()
+            or task.driver_id == driver.pk
+        )
+        if not assigned:
+            return JsonResponse({'success': False, 'error': 'Task not assigned to you'})
+
+        if task.order and task.order.order_status == 'cancelled':
+            return JsonResponse({'success': False, 'error': 'Order is cancelled — cannot start ride'})
+        if task.order and task.order.verification_status != 'verified':
+            return JsonResponse({'success': False, 'error': 'Order not verified — cannot start ride'})
+
+        task.dl_task_status = 'out_for_delivery'
+        task.save(update_fields=['dl_task_status'])
+
+        return JsonResponse({'success': True, 'redirect_url': f'/fleet/tasks/{task_id}/navigate/'})
+
+    except fleet_models.Driver.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+    except delivery_models.DeliveryTask.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Task not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def fleet_postpone_task(request):
+    """
+    AJAX: Postpone (reschedule) a delivery task to a new date.
+    POST: task_id, new_date (YYYY-MM-DD)
+    URL: /fleet/tasks/postpone/
+    """
+    from delivery import models as delivery_models
+    import datetime
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    task_id  = request.POST.get('task_id')
+    new_date = request.POST.get('new_date')
+
+    if not task_id or not new_date:
+        return JsonResponse({'success': False, 'error': 'task_id and new_date required'})
+
+    try:
+        parsed_date = datetime.date.fromisoformat(new_date)
+        if parsed_date <= datetime.date.today():
+            return JsonResponse({'success': False, 'error': 'New date must be in the future'})
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'Invalid date format. Use YYYY-MM-DD'})
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id)
+
+        assigned = (
+            delivery_models.AssignedDriver.objects.filter(dl_task_id=task_id, driver=driver).exists()
+            or task.driver_id == driver.pk
+        )
+        if not assigned:
+            return JsonResponse({'success': False, 'error': 'Task not assigned to you'})
+
+        if task.dl_task_status in ('delivered', 'failed', 'cancelled'):
+            return JsonResponse({'success': False, 'error': 'Cannot postpone a completed task'})
+
+        task.dl_task_date = parsed_date
+        task.save(update_fields=['dl_task_date'])
+        return JsonResponse({'success': True, 'new_date': str(parsed_date)})
+
+    except fleet_models.Driver.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Driver profile not found'})
+    except delivery_models.DeliveryTask.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Task not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def fleet_task_timeline(request, task_id):
+    """
+    AJAX: Return status/activity timeline for a delivery task.
+    Pulls from OrderStatusHistory filtered to delivery-related fields.
+    IDOR-protected: driver must be assigned to the task.
+    URL: GET /fleet/tasks/<task_id>/timeline/
+    """
+    from orders.models import OrderStatusHistory
+    from delivery.models import DeliveryTask, AssignedDriver
+    from django.http import JsonResponse
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+        task = DeliveryTask.objects.select_related('order').get(id=task_id)
+
+        # Allow view if driver is assigned to task, OR if task is published (any driver can see timeline)
+        assigned = (
+            AssignedDriver.objects.filter(dl_task_id=task_id, driver=driver).exists()
+            or task.driver_id == driver.pk
+            or task.dl_task_publish
+        )
+        if not assigned:
+            return JsonResponse({'success': False, 'error': 'Task not accessible'}, status=403)
+
+        # Pull only delivery-relevant status history (skip order_status, verification, etc.)
+        history = OrderStatusHistory.objects.filter(
+            order_id=task.order_id,
+            field_name__in=['dl_task_status', 'dl_task_publish', 'task_status'],
+        ).select_related('changed_by').order_by('created_at')
+
+        # Human-readable label overrides for specific field+value combos
+        EVENT_LABELS = {
+            ('task_status',  'dl_task_listed'):    'Published to Fleet',
+            ('dl_task_status', 'pending'):         'Task Listed',
+            ('dl_task_status', 'for_review'):      'Under Review',
+            ('dl_task_status', 'assigned'):        'Driver Assigned',
+            ('dl_task_status', 'accepted'):        'Task Accepted',
+            ('dl_task_status', 'picked_up'):       'Parcel Picked Up',
+            ('dl_task_status', 'start_ride'):      'Ride Started',
+            ('dl_task_status', 'out_for_delivery'):'Out for Delivery',
+            ('dl_task_status', 'in_transit'):      'In Transit',
+            ('dl_task_status', 'contacted'):       'Customer Contacted',
+            ('dl_task_status', 'non_reachable'):   'Customer Non-Reachable',
+            ('dl_task_status', 'delivered'):       'Delivered',
+            ('dl_task_status', 'failed'):          'Delivery Failed',
+            ('dl_task_status', 'cancelled'):       'Cancelled',
+            ('dl_task_publish', 'True'):           'Published to Fleet',
+        }
+
+        STATUS_ICONS = {
+            'dl_task_listed':   'fa-rocket',
+            'True':             'fa-rocket',
+            'pending':          'fa-hourglass-start',
+            'for_review':       'fa-magnifying-glass',
+            'assigned':         'fa-user-check',
+            'accepted':         'fa-thumbs-up',
+            'picked_up':        'fa-box-open',
+            'start_ride':       'fa-truck',
+            'out_for_delivery': 'fa-truck-fast',
+            'in_transit':       'fa-truck-fast',
+            'contacted':        'fa-phone-volume',
+            'non_reachable':    'fa-phone-slash',
+            'delivered':        'fa-circle-check',
+            'failed':           'fa-circle-xmark',
+            'cancelled':        'fa-ban',
+        }
+
+        STATUS_COLORS = {
+            'dl_task_listed':   '#7c3aed',
+            'True':             '#7c3aed',
+            'pending':          '#64748b',
+            'for_review':       '#f59e0b',
+            'assigned':         '#f59e0b',
+            'accepted':         '#0ea5e9',
+            'picked_up':        '#8b5cf6',
+            'start_ride':       '#6366f1',
+            'out_for_delivery': '#6366f1',
+            'in_transit':       '#6366f1',
+            'contacted':        '#10b981',
+            'non_reachable':    '#f97316',
+            'delivered':        '#16a34a',
+            'failed':           '#dc2626',
+            'cancelled':        '#dc2626',
+        }
+
+        events = []
+        for h in history:
+            by_name = None
+            if h.changed_by_id:
+                u = h.changed_by
+                by_name = u.get_full_name() or u.username
+
+            ts_local = timezone.localtime(h.created_at)
+            ts_str = ts_local.strftime('%d %b %Y, %I:%M %p').lstrip('0').replace(' 0', ' ')
+
+            new_val = h.new_value or ''
+            label = EVENT_LABELS.get((h.field_name, new_val), h.new_display or new_val.replace('_', ' ').title())
+
+            events.append({
+                'field':   h.field_name,
+                'label':   label,
+                'old':     '',
+                'new':     label,
+                'new_val': new_val,
+                'by':      by_name,
+                'notes':   h.notes or '',
+                'ts':      ts_str,
+                'icon':    STATUS_ICONS.get(new_val, 'fa-circle-dot'),
+                'color':   STATUS_COLORS.get(new_val, '#718096'),
+            })
+
+        return JsonResponse({'success': True, 'events': events})
+
+    except fleet_models.Driver.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Driver not found'}, status=404)
+    except DeliveryTask.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Task not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required(login_url='/accounts/login/')
+@driver_required
+def fleet_task_navigation(request, task_id):
+    """
+    Navigation map for a delivery task.
+    IDOR-protected: driver must be assigned to the task.
+    URL: /fleet/tasks/<task_id>/navigate/
+    """
+    from delivery import models as delivery_models
+
+    try:
+        driver = fleet_models.Driver.objects.get(user_id=request.user.id)
+
+        task = delivery_models.DeliveryTask.objects.select_related(
+            'order', 'order__business', 'pickup_location', 'dl_to_address'
+        ).get(id=task_id)
+
+        assigned = (
+            delivery_models.AssignedDriver.objects.filter(dl_task_id=task_id, driver=driver).exists()
+            or task.driver_id == driver.pk
+        )
+        if not assigned:
+            messages.error(request, "You are not assigned to this task.")
+            return redirect('fleet:driver_tasks')
+
+        dropoff = task.dl_to_address
+        if not dropoff:
+            dropoff = delivery_models.DlAddressUpdate.objects.filter(order=task.order).first()
+
+        pickup = task.pickup_location
+        pickup_lat = None
+        pickup_lon = None
+        if pickup and pickup.pickup_lat and pickup.pickup_lon:
+            pickup_lat = pickup.pickup_lat
+            pickup_lon = pickup.pickup_lon
+        else:
+            from warehouse.models import Warehouse
+            warehouse = Warehouse.objects.filter(is_active=True).first()
+            if warehouse and warehouse.latitude and warehouse.longitude:
+                pickup_lat = warehouse.latitude
+                pickup_lon = warehouse.longitude
+
+        from orders import models as orders_models
+        task_status_history = orders_models.OrderStatusHistory.objects.filter(
+            order=task.order,
+            field_name__in=['dl_task_publish', 'dl_task_status'],
+        ).select_related('changed_by').order_by('created_at')
+
+        context = {
+            'task': task,
+            'driver': driver,
+            'pickup': task.pickup_location,
+            'dropoff': dropoff,
+            'pickup_lat': pickup_lat,
+            'pickup_lon': pickup_lon,
+            'task_status_history': task_status_history,
+        }
+        return render(request, 'fleet/task_navigation_pwa.html', context)
+
+    except delivery_models.AssignedDriver.DoesNotExist:
+        messages.error(request, "You are not assigned to this task.")
+        return redirect('fleet:driver_tasks')
+    except fleet_models.Driver.DoesNotExist:
+        messages.error(request, "Driver profile not found.")
+        return redirect('core:main_dashboard')
+    except delivery_models.DeliveryTask.DoesNotExist:
+        messages.error(request, "Task not found.")
+        return redirect('fleet:driver_tasks')

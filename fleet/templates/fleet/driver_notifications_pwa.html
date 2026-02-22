@@ -1,0 +1,191 @@
+{% extends "fleet/pwa_base.html" %}
+{% load static %}
+
+{% block title %}Notifications{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+
+{% block header_actions %}
+{% if notifications %}
+<button type="button" class="fleet-btn-icon" id="markAllReadBtn" title="Mark all as read">
+    <i class="fa-solid fa-check-double"></i>
+</button>
+{% endif %}
+<button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
+    <i class="fa-solid fa-rotate-right"></i>
+</button>
+<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+    <i class="fa-solid fa-bell"></i>
+    {% if unread_notifications > 0 %}
+    <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
+    {% endif %}
+</a>
+{% endblock %}
+
+{% block content %}
+<!-- Summary bar -->
+<div class="fade-in" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--spacing-md);">
+    <div style="font-size:var(--font-size-sm); color:var(--fleet-grey-600);">
+        {% if unread_count > 0 %}
+            <span style="color:var(--fleet-danger); font-weight:700;">{{ unread_count }} unread</span>
+        {% else %}
+            All caught up
+        {% endif %}
+    </div>
+    <div style="display:flex; gap:var(--spacing-sm);">
+        <a href="{% url 'fleet:driver_notifications' %}"
+           class="fleet-badge {% if not show_unread_only %}fleet-badge--dark{% else %}fleet-badge--ghost{% endif %}"
+           style="text-decoration:none; padding:var(--spacing-xs) var(--spacing-sm); cursor:pointer;">
+            All
+        </a>
+        <a href="{% url 'fleet:driver_notifications' %}?filter=unread"
+           class="fleet-badge {% if show_unread_only %}fleet-badge--dark{% else %}fleet-badge--ghost{% endif %}"
+           style="text-decoration:none; padding:var(--spacing-xs) var(--spacing-sm); cursor:pointer;">
+            Unread
+        </a>
+    </div>
+</div>
+
+<!-- Notifications list -->
+{% if notifications %}
+<div class="fleet-card slide-up" style="padding:0;">
+    <ul class="fleet-list" style="margin:0;">
+        {% for notif in notifications %}
+        <li class="fleet-list-item notif-item {% if not notif.is_read %}notif-item--unread{% endif %}"
+            data-id="{{ notif.id }}"
+            style="border-radius:0; border:none; border-bottom:1px solid var(--fleet-grey-100); margin-bottom:0;
+                   {% if not notif.is_read %}background:var(--fleet-primary-light, #fffbea);{% endif %}
+                   {% if forloop.last %}border-bottom:none;{% endif %}
+                   cursor:pointer;"
+            onclick="markRead({{ notif.id }}, this)">
+            <!-- Icon by type -->
+            <div class="fleet-list-item__icon
+                {% if notif.notification_type == 'delivery_assigned' %}fleet-stat__icon--info
+                {% elif notif.notification_type == 'cod_collected' %}fleet-stat__icon--warning
+                {% elif notif.notification_type == 'earnings_settled' %}fleet-stat__icon--success
+                {% elif notif.notification_type == 'alert' %}fleet-stat__icon--danger
+                {% else %}fleet-stat__icon--default{% endif %}">
+                <i class="fa-solid
+                    {% if notif.notification_type == 'delivery_assigned' %}fa-truck-fast
+                    {% elif notif.notification_type == 'cod_collected' %}fa-money-bill-wave
+                    {% elif notif.notification_type == 'earnings_settled' %}fa-wallet
+                    {% elif notif.notification_type == 'alert' %}fa-triangle-exclamation
+                    {% else %}fa-bell{% endif %}">
+                </i>
+            </div>
+            <div class="fleet-list-item__content">
+                <div class="fleet-list-item__title" style="{% if not notif.is_read %}font-weight:800;{% endif %}">
+                    {{ notif.title }}
+                </div>
+                <div class="fleet-list-item__subtitle" style="margin-top:2px;">
+                    {{ notif.message|truncatechars:80 }}
+                </div>
+                <div style="font-size:var(--font-size-xs); color:var(--fleet-grey-400); margin-top:var(--spacing-xs);">
+                    {{ notif.created_at|timesince }} ago
+                </div>
+            </div>
+            <div class="fleet-list-item__action" style="flex-shrink:0;">
+                {% if not notif.is_read %}
+                <span style="width:10px; height:10px; border-radius:50%; background:var(--fleet-primary); display:inline-block;"></span>
+                {% else %}
+                <i class="fa-solid fa-chevron-right" style="color:var(--fleet-grey-300);"></i>
+                {% endif %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% else %}
+<!-- Empty state -->
+<div class="fleet-empty fade-in" style="margin-top:var(--spacing-2xl);">
+    <div class="fleet-empty__icon">
+        <i class="fa-solid fa-bell-slash"></i>
+    </div>
+    <div class="fleet-empty__title">No Notifications</div>
+    <div class="fleet-empty__subtitle">
+        {% if show_unread_only %}You have no unread notifications.{% else %}You are all caught up!{% endif %}
+    </div>
+    {% if show_unread_only %}
+    <a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn fleet-btn--outline" style="margin-top:var(--spacing-lg);">
+        View All
+    </a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const MARK_READ_URL = "{% url 'fleet:notifications_mark_read' %}";
+    const CSRF_TOKEN = "{{ csrf_token }}";
+
+    function markRead(notifId, el) {
+        haptic([5]);
+        if (el.classList.contains('notif-item--unread')) {
+            fetch(MARK_READ_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': CSRF_TOKEN,
+                },
+                body: JSON.stringify({ notification_id: notifId }),
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    el.classList.remove('notif-item--unread');
+                    el.style.background = '';
+                    const dot = el.querySelector('.fleet-list-item__action span');
+                    if (dot) {
+                        dot.outerHTML = '<i class="fa-solid fa-chevron-right" style="color:var(--fleet-grey-300);"></i>';
+                    }
+                    const title = el.querySelector('.fleet-list-item__title');
+                    if (title) title.style.fontWeight = '';
+                    updateUnreadBadge(data.unread_count);
+                }
+            })
+            .catch(() => {});
+        }
+    }
+
+    function updateUnreadBadge(count) {
+        const summary = document.querySelector('[data-unread-summary]');
+        if (summary) {
+            summary.textContent = count > 0 ? count + ' unread' : 'All caught up';
+        }
+    }
+
+    // Mark all as read
+    const markAllBtn = document.getElementById('markAllReadBtn');
+    if (markAllBtn) {
+        markAllBtn.addEventListener('click', function () {
+            haptic([10, 30, 10]);
+            fetch(MARK_READ_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': CSRF_TOKEN,
+                },
+                body: JSON.stringify({ mark_all: true }),
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    document.querySelectorAll('.notif-item--unread').forEach(el => {
+                        el.classList.remove('notif-item--unread');
+                        el.style.background = '';
+                        const dot = el.querySelector('.fleet-list-item__action span');
+                        if (dot) {
+                            dot.outerHTML = '<i class="fa-solid fa-chevron-right" style="color:var(--fleet-grey-300);"></i>';
+                        }
+                        const title = el.querySelector('.fleet-list-item__title');
+                        if (title) title.style.fontWeight = '';
+                    });
+                    showToast('All notifications marked as read', 'success');
+                }
+            })
+            .catch(() => showToast('Something went wrong', 'danger'));
+        });
+    }
+</script>
+{% endblock %}
