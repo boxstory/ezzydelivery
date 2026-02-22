@@ -425,8 +425,14 @@ def pickup_location_choose(request):
     if not business:
         messages.error(request, "No business associated with your account")
         return redirect('core:main_dashboard')
+
+    pending_warehouse_link = warehouse_models.SellerWarehouseLink.objects.filter(
+        business=business, is_active=False
+    ).select_related('warehouse').first()
+
     return render(request, 'business/parts/pickup_location_choose.html', {
         'business': business,
+        'pending_warehouse_link': pending_warehouse_link,
     })
 
 

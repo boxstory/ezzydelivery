@@ -360,6 +360,7 @@ class OrderStatusHistory(models.Model):
         ('cod_status_by_staff', 'COD Status'),
         ('dl_task_status', 'Delivery Task Status'),
         ('dl_task_status_dms', 'DMS Status'),
+        ('dl_task_publish', 'Published to Fleet'),
     ]
 
     order = models.ForeignKey(

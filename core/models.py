@@ -160,9 +160,10 @@ def user_directory_path(instance, filename):
         filename: Original filename
 
     Returns:
-        str: Path in format '{instance.path}/{filename}'
+        str: Path in format 'core/user/{user_id}/{filename}'
     """
-    return '%s/%s' % (instance.path, filename)
+    user_id = getattr(instance, 'user_id', None) or getattr(instance, 'user', {id: 'unknown'})
+    return 'core/user/%s/%s' % (user_id, filename)
 
 
 class ProfilePicture(models.Model):

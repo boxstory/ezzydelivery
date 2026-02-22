@@ -103,6 +103,16 @@ def seo_defaults(request):
     Add default SEO metadata to all templates
     Views can override these by passing their own meta dict
     """
+    # Skip SEO processing on non-public paths — no SEO meta needed there
+    _skip_prefixes = ('/fleet/', '/dashboard/', '/warehouse/', '/workforce/', '/api/', '/admin/', '/__debug__/', '/media/', '/static/')
+    if any(request.path.startswith(p) for p in _skip_prefixes):
+        return {
+            'seo': {},
+            'site_name': SEOMetadata.SITE_NAME,
+            'business_phone': SEOMetadata.BUSINESS_PHONE,
+            'business_email': SEOMetadata.BUSINESS_EMAIL,
+        }
+
     # Get current path for canonical URL
     current_url = request.build_absolute_uri()
 
@@ -185,3 +195,34 @@ def user_business(request):
     Views can also use: from core.context_processors import get_cached_business
     """
     return {'user_business': get_cached_business(request)}
+
+
+def driver_pending_tasks(request):
+    """
+    Inject pending_tasks_count for fleet PWA bottom nav badge.
+    Only queries for authenticated users on /fleet/ paths.
+    """
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
+        return {'pending_tasks_count': 0}
+
+    # Only run on fleet URLs to avoid overhead on every page
+    path = request.path
+    if not path.startswith('/fleet/'):
+        return {'pending_tasks_count': 0}
+
+    # Check request cache to avoid duplicate queries per request
+    if hasattr(request, '_driver_pending_tasks_count'):
+        return {'pending_tasks_count': request._driver_pending_tasks_count}
+
+    try:
+        from fleet.models import Driver
+        from delivery.models import DeliveryTask
+        driver = Driver.objects.only('driver_id').get(user_id=request.user.id)
+        count = DeliveryTask.objects.filter(
+            driver=driver,
+            dl_task_status__in=['assigned', 'accepted']
+        ).count()
+        request._driver_pending_tasks_count = count
+        return {'pending_tasks_count': count}
+    except Exception:
+        return {'pending_tasks_count': 0}

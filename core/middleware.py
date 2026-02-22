@@ -86,52 +86,28 @@ class SessionTimeoutMiddleware:
 
 class SessionWarningMiddleware:
     """
-    Middleware to inject session timeout warning into dashboard pages
-    Adds a JavaScript variable with session expiry information
+    Middleware to inject session timeout warning into dashboard pages.
+    Stores time_remaining on the request so templates can read it directly,
+    avoiding expensive HTML decode/encode on every response.
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        response = self.get_response(request)
-
-        # Only inject for authenticated users on dashboard pages
-        if (request.user.is_authenticated and
-            'dashboard' in request.path and
-            response.get('Content-Type', '').startswith('text/html')):
-
-            # Get last activity from session
+        # Pre-compute session time remaining and stash on request
+        # Templates can use {{ request.session_time_remaining }} if needed
+        if request.user.is_authenticated and 'dashboard' in request.path:
             last_activity = request.session.get('last_activity')
-
             if last_activity:
                 if isinstance(last_activity, str):
                     last_activity = timezone.datetime.fromisoformat(last_activity)
-
                 if timezone.is_naive(last_activity):
                     last_activity = timezone.make_aware(last_activity)
+                elapsed = (timezone.now() - last_activity).total_seconds()
+                request.session_time_remaining = max(0, int(3600 - elapsed))
 
-                # Calculate time remaining (in seconds)
-                time_since_activity = timezone.now() - last_activity
-                time_remaining = 3600 - int(time_since_activity.total_seconds())
-
-                # Inject session info into response
-                if time_remaining > 0 and hasattr(response, 'content'):
-                    session_script = f'''
-                    <script>
-                        // Session timeout configuration
-                        window.SESSION_TIMEOUT = {time_remaining};
-                        window.SESSION_WARNING_TIME = 300; // Show warning 5 minutes before timeout
-                    </script>
-                    '''
-
-                    # Insert before closing </head> tag
-                    content = response.content.decode('utf-8')
-                    if '</head>' in content:
-                        content = content.replace('</head>', session_script + '</head>')
-                        response.content = content.encode('utf-8')
-
-        return response
+        return self.get_response(request)
 
 
 class QueryInspectorMiddleware:

@@ -420,14 +420,14 @@ def accept_task(request):
         try:
             # Verify user is a driver
             driver = fleet_models.Driver.objects.get(user_id=request.user.id)
-            logger.info(f"Driver found: {driver.id}")
+            logger.info(f"Driver found: {driver.driver_id}")
 
             # Get task by ID
             task = delivery_models.DeliveryTask.objects.get(id=task_id)
             logger.info(f"Task found: {task.id}, status={task.dl_task_status}, driver={task.driver_id}")
 
             # Check if task is assigned to this driver
-            is_assigned = (task.driver_id == driver.id) if task.driver_id else False
+            is_assigned = (task.driver_id == driver.driver_id) if task.driver_id else False
             if not is_assigned:
                 is_assigned = delivery_models.AssignedDriver.objects.filter(dl_task=task, driver=driver).exists()
 
@@ -442,7 +442,7 @@ def accept_task(request):
                 # Create AssignedDriver record if not exists
                 if not delivery_models.AssignedDriver.objects.filter(dl_task=task, driver=driver).exists():
                     delivery_models.AssignedDriver.objects.create(driver=driver, dl_task=task)
-                logger.info(f"Driver {driver.id} assigned to task {task_id}")
+                logger.info(f"Driver {driver.driver_id} assigned to task {task_id}")
 
             # Block if order is cancelled or not verified
             if task.order_id:
@@ -457,7 +457,7 @@ def accept_task(request):
             task.dl_task_status = 'accepted'
             task.dl_task_status_dms = '7'  # Accepted/Acknowledged in DMS
             task.save(update_fields=['dl_task_status', 'dl_task_status_dms', 'driver'])
-            logger.info(f"Task {task_id} accepted by driver {driver.id}")
+            logger.info(f"Task {task_id} accepted by driver {driver.driver_id}")
 
             return JsonResponse({"success": True})
 

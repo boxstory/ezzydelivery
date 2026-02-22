@@ -212,10 +212,7 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
             if old_dl is not None and old_dl != new_dl:
                 log_delivery_task_status_change(instance, 'dl_task_status', old_dl, new_dl, DL_STATUS_DISPLAY)
 
-            old_dms = getattr(instance, '_old_dl_task_status_dms', None)
-            new_dms = instance.dl_task_status_dms
-            if old_dms is not None and old_dms != new_dms:
-                log_delivery_task_status_change(instance, 'dl_task_status_dms', old_dms, new_dms, DMS_STATUS_DISPLAY)
+            # DMS status logging removed per request
         except Exception as e:
             logger.error(f"Error logging delivery task status history: {e}")
 
