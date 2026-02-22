@@ -247,6 +247,8 @@ class DriverVehicle(models.Model):
     )
     vehicle_status = models.CharField(
         max_length=100, choices=VEHICLE_STATUS, default='Inactive', db_index=True)  # INDEX: Filtered for active vehicles
+    vehicle_photo = models.ImageField(
+        upload_to='fleet/vehicles/', blank=True, null=True)
     vehicle_date = models.DateField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -671,3 +673,108 @@ class ZoneEarningsRate(models.Model):
         verbose_name_plural = "Zone Earnings Rates"
         unique_together = ['order_type', 'pickup_zone', 'delivery_zone']
         ordering = ['order_type', 'delivery_zone__zone_number']
+
+
+# =============================================================================
+# DRIVER NOTIFICATIONS
+# =============================================================================
+
+NOTIFICATION_TYPE_CHOICES = [
+    ('delivery_assigned', 'Delivery Assigned'),
+    ('cod_collected', 'COD Collected'),
+    ('earnings_settled', 'Earnings Settled'),
+    ('alert', 'Alert'),
+    ('system', 'System'),
+]
+
+
+class DriverNotification(models.Model):
+    """In-app notifications for drivers."""
+    driver = models.ForeignKey(
+        Driver, on_delete=models.CASCADE, related_name='notifications'
+    )
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    notification_type = models.CharField(
+        max_length=30, choices=NOTIFICATION_TYPE_CHOICES, default='system'
+    )
+    is_read = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"[{self.driver}] {self.title}"
+
+    class Meta:
+        verbose_name = "Driver Notification"
+        verbose_name_plural = "Driver Notifications"
+        ordering = ['-created_at']
+
+
+class DriverActivityLog(models.Model):
+    """
+    Audit log for all driver actions — task events, COD, login, status changes.
+    Used for dashboard activity timeline and compliance tracking.
+    """
+
+    ACTIVITY_TYPES = [
+        # Task lifecycle
+        ('task_taken',        'Task Taken'),
+        ('task_accepted',     'Task Accepted'),
+        ('task_picked_up',    'Task Picked Up'),
+        ('task_start_ride',   'Start Ride'),
+        ('task_out_delivery', 'Out for Delivery'),
+        ('task_delivered',    'Task Delivered'),
+        ('task_failed',       'Task Failed'),
+        ('task_contacted',    'Customer Contacted'),
+        ('task_non_reachable','Customer Non-Reachable'),
+        # COD / financial
+        ('cod_collected',     'COD Collected'),
+        ('cod_submitted',     'COD Submitted'),
+        ('earning_credited',  'Earning Credited'),
+        ('settlement',        'Wallet Settlement'),
+        # Account / profile
+        ('login',             'Login'),
+        ('logout',            'Logout'),
+        ('profile_updated',   'Profile Updated'),
+        ('document_uploaded', 'Document Uploaded'),
+        ('vehicle_added',     'Vehicle Added'),
+        # Scan
+        ('pickup_scanned',    'Pickup Scanned'),
+    ]
+
+    driver = models.ForeignKey(
+        Driver, on_delete=models.CASCADE, related_name='activity_logs', db_index=True
+    )
+    activity_type = models.CharField(
+        max_length=30, choices=ACTIVITY_TYPES, db_index=True
+    )
+    # Optional FK to related task (null for non-task events)
+    task = models.ForeignKey(
+        'delivery.DeliveryTask', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='driver_activity_logs'
+    )
+    # Optional FK to related transaction
+    transaction = models.ForeignKey(
+        DriverTransaction, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='activity_logs'
+    )
+    # Human-readable description of what happened
+    description = models.CharField(max_length=500, blank=True)
+    # Extra structured data (amounts, old/new values, etc.)
+    meta = models.JSONField(default=dict, blank=True)
+    # IP / device info (optional, for audit)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    def __str__(self):
+        return f"[{self.driver}] {self.get_activity_type_display()} @ {self.created_at:%Y-%m-%d %H:%M}"
+
+    class Meta:
+        verbose_name = "Driver Activity Log"
+        verbose_name_plural = "Driver Activity Logs"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['driver', '-created_at']),
+            models.Index(fields=['activity_type', '-created_at']),
+        ]
