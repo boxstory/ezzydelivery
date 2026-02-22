@@ -1,63 +1,89 @@
-{% extends "fleet_dashboard_base.html" %}
+{% extends "fleet/pwa_base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+
+{% block title %}My Documents{% endblock %}
+{% block page_title %}Documents{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'fleet:driver_documents_upload' fleet_id=request.user.id %}" class="fleet-btn-icon">
+    <i class="fa-solid fa-plus"></i>
+</a>
+<button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
+    <i class="fa-solid fa-rotate-right"></i>
+</button>
+<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+    <i class="fa-solid fa-bell"></i>
+    {% if unread_notifications > 0 %}
+    <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
+    {% endif %}
+</a>
+{% endblock %}
+
 {% block content %}
-<div class="flex-fill p-2">
-  <div class=" h4 p-3" id="fleet_documents_header_title"> Documents Listings</div>
-  <div class="table-responsive m-2 m-md-3">
-    <table class="table table-responsive table-striped table-hover" id="fleet_documents_table_all">
-      <thead id="fleet_documents_thead_all">
-        <tr class="bg-dark text-light">
-          <th scope="col">Type</th>
-          <th scope="col">Doc No</th>
-          <th scope="col">Expiry</th>
-          <th scope="col">Actions</th>
-        </tr>
-      </thead>
-      <tbody id="fleet_documents_tbody_all">
+<div class="fleet-section">
+    {% if documents %}
+    <div class="fleet-list">
         {% for document in documents %}
-        <tr class="py-2">
-          <td>{{ document.document_type }}</td>
-          <td>**{{ document.document_no|slice:"-5:" }}</td>
-          <td>{{ document.document_expiry_date|date:'M-y' }}</td>
-          <td class="px-0 px-md-2">
-            <!-- delete link neeeds to setup later ********************************************************* -->
-            <button type="button " class="btn btn-dark  w-md-25 " data-bs-toggle="modal"
-              data-bs-target="#LogoModal{{ document.id }}">
-              <i class="fa-solid fa-image"></i>
-            </button>
-            <a href="{% url 'fleet:driver_documents_update' fleet_id=request.user.id doc_id=document.id %}"
-              class="btn btn-outline-dark">
-              <i class="fa-solid fa-pen"></i></a>
-            <a href="{% url 'fleet:driver_documents_delete' fleet_id=request.user.id doc_id=document.id %}"
-              class="btn btn-outline-dark">
-              <i class="fa-solid fa-remove"></i></a>
-          </td>
-
-          <!-- Button trigger modal -->
-
-          <!-- Modal -->
-          <div class="modal fade" id="fleet_documents_modal_view_{{ document.id }}" tabindex="-1" role="dialog" aria-modal="true"
-            aria-labelledby="fleet_documents_modal_view_label_{{ document.id }}" aria-hidden="true">
-            <div class="modal-dialog" role="document">
-              <div class="modal-content">
-                <div class="modal-header" id="fleet_documents_modal_view_header_{{ document.id }}">
-                  <h5 class="modal-title" id="fleet_documents_modal_view_label_{{ document.id }}">Image Update</h5>
-                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body" id="fleet_documents_modal_view_body_{{ document.id }}">
-                  <img class='col-12' src="{{ document.document_file.url }}" loading="lazy" alt="{{ document.document_type|default:'Document' }} image">
-                </div>
-              </div>
+        <div class="fleet-list-item">
+            <div class="fleet-list-item__icon fleet-list-item__icon--primary">
+                <i class="fa-solid fa-file-lines"></i>
             </div>
-          </div>
-        </tr>
+            <div class="fleet-list-item__body">
+                <div class="fleet-list-item__title">{{ document.document_type }}</div>
+                <div class="fleet-list-item__meta">
+                    <span>**{{ document.document_no|slice:"-5:" }}</span>
+                    <span class="fleet-list-item__dot"></span>
+                    <span>Exp: {{ document.document_expiry_date|date:'M Y' }}</span>
+                </div>
+            </div>
+            <div class="fleet-list-item__actions">
+                <button type="button" class="fleet-btn-icon fleet-btn-icon--sm"
+                    data-bs-toggle="modal" data-bs-target="#fleet_documents_modal_view_{{ document.id }}"
+                    title="View Document">
+                    <i class="fa-solid fa-image"></i>
+                </button>
+                <a href="{% url 'fleet:driver_documents_update' fleet_id=request.user.id doc_id=document.id %}"
+                    class="fleet-btn-icon fleet-btn-icon--sm" title="Edit">
+                    <i class="fa-solid fa-pen"></i>
+                </a>
+                <a href="{% url 'fleet:driver_documents_delete' fleet_id=request.user.id doc_id=document.id %}"
+                    class="fleet-btn-icon fleet-btn-icon--sm fleet-btn-icon--danger" title="Delete">
+                    <i class="fa-solid fa-trash"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Document View Modal -->
+        <div class="modal fade" id="fleet_documents_modal_view_{{ document.id }}" tabindex="-1"
+            aria-labelledby="fleet_documents_modal_view_label_{{ document.id }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="fleet_documents_modal_view_label_{{ document.id }}">
+                            {{ document.document_type }}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-2">
+                        <img class="w-100 rounded" src="{{ document.document_file.url }}" loading="lazy"
+                            alt="{{ document.document_type|default:'Document' }} image">
+                    </div>
+                </div>
+            </div>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
-    <a href="{% url 'fleet:driver_documents_upload' fleet_id=request.user.id %}" class="">
-      <div class="btn btn-outline-dark text-decoration-none" id="fleet_documents_btn_add">ADD DOCUMENTS</div>
+    </div>
+    {% else %}
+    <div class="fleet-empty">
+        <i class="fa-solid fa-file-circle-xmark fleet-empty__icon"></i>
+        <p class="fleet-empty__title">No Documents</p>
+        <p class="fleet-empty__text">Upload your documents to get verified</p>
+    </div>
+    {% endif %}
+
+    <a href="{% url 'fleet:driver_documents_upload' fleet_id=request.user.id %}" class="fleet-btn fleet-btn--primary fleet-btn--full mt-4">
+        <i class="fa-solid fa-plus me-2"></i>Add Document
     </a>
-  </div>
 </div>
-{% endblock content %}
+{% endblock %}

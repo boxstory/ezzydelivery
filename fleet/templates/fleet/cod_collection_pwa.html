@@ -8,6 +8,15 @@
 <a href="{% url 'fleet:cod_export' %}" class="fleet-btn-icon">
     <i class="fa-solid fa-download"></i>
 </a>
+<button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
+    <i class="fa-solid fa-rotate-right"></i>
+</button>
+<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+    <i class="fa-solid fa-bell"></i>
+    {% if unread_notifications > 0 %}
+    <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
+    {% endif %}
+</a>
 {% endblock %}
 
 {% block content %}
@@ -119,7 +128,7 @@
         margin-bottom: var(--spacing-lg);
         padding: var(--spacing-xs);
         background: var(--fleet-grey-100);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-sm);
     }
 
     .fleet-tab {
@@ -129,7 +138,8 @@
         color: var(--fleet-grey-600);
         font-size: var(--font-size-sm);
         font-weight: 600;
-        border-radius: var(--radius-lg);
+        border-radius: var(--radius-sm);
+
         transition: all var(--transition-base);
         cursor: pointer;
     }

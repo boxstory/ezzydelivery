@@ -1,204 +1,141 @@
-{% extends "fleet_dashboard_base.html" %}
+{% extends "fleet/pwa_base.html" %}
 {% load static %}
 
-{% block title %}Transaction History - {% endblock %}
+{% block title %}Transactions{% endblock %}
+{% block page_title %}Transactions{% endblock %}
+
+{% block header_actions %}
+<button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
+    <i class="fa-solid fa-rotate-right"></i>
+</button>
+{% endblock %}
 
 {% block content %}
-<!-- Mobile PWA Transaction History View - V2 REDESIGN 20260118 -->
-<div class="d-md-none pwa-page pwa-page--transactions">
 
-  <!-- Summary Banner -->
-  <div class="txn-summary">
-    <div class="txn-summary__item">
-      <span class="txn-summary__label">Balance</span>
-      <span class="txn-summary__value">{{ wallet_status.wallet_balance|default:0|floatformat:0 }}</span>
+<!-- Balance Hero -->
+<div class="txn-hero fade-in">
+    <div class="txn-hero__item">
+        <span class="txn-hero__label">Wallet Balance</span>
+        <span class="txn-hero__val txn-hero__val--green">QR {{ wallet_status.wallet_balance|default:0|floatformat:0 }}</span>
     </div>
-    <div class="txn-summary__divider"></div>
-    <div class="txn-summary__item">
-      <span class="txn-summary__label">COD</span>
-      <span class="txn-summary__value txn-summary__value--warning">{{ wallet_status.cod_in_hand|default:0|floatformat:0 }}</span>
+    <div class="txn-hero__divider"></div>
+    <div class="txn-hero__item">
+        <span class="txn-hero__label">COD In-Hand</span>
+        <span class="txn-hero__val txn-hero__val--orange">QR {{ wallet_status.cod_in_hand|default:0|floatformat:0 }}</span>
     </div>
-    <div class="txn-summary__divider"></div>
-    <div class="txn-summary__item">
-      <span class="txn-summary__label">Pending</span>
-      <span class="txn-summary__value">{{ wallet_status.pending_earnings|default:0|floatformat:0 }}</span>
+    <div class="txn-hero__divider"></div>
+    <div class="txn-hero__item">
+        <span class="txn-hero__label">Pending</span>
+        <span class="txn-hero__val">QR {{ wallet_status.pending_earnings|default:0|floatformat:0 }}</span>
     </div>
-  </div>
+</div>
 
-  <!-- Type Tabs -->
-  <div class="txn-tabs">
+<!-- Type Tabs -->
+<div class="txn-tabs slide-up">
     <a href="?type=all&days={{ selected_days }}" class="txn-tab {% if selected_type == 'all' %}txn-tab--active{% endif %}">All</a>
     <a href="?type=earning&days={{ selected_days }}" class="txn-tab {% if selected_type == 'earning' %}txn-tab--active{% endif %}">Earned</a>
     <a href="?type=cod_collection&days={{ selected_days }}" class="txn-tab {% if selected_type == 'cod_collection' %}txn-tab--active{% endif %}">COD In</a>
     <a href="?type=cod_deposit&days={{ selected_days }}" class="txn-tab {% if selected_type == 'cod_deposit' or selected_type == 'cod_driver_settle' %}txn-tab--active{% endif %}">COD Out</a>
     <a href="?type=cod_return&days={{ selected_days }}" class="txn-tab {% if selected_type == 'cod_return' %}txn-tab--active{% endif %}">Returns</a>
-  </div>
+</div>
 
-  <!-- Period Selector -->
-  <div class="txn-period">
+<!-- Period Selector -->
+<div class="txn-period slide-up">
     <a href="?type={{ selected_type }}&days=7" class="txn-period__btn {% if selected_days == 7 %}txn-period__btn--active{% endif %}">7 Days</a>
     <a href="?type={{ selected_type }}&days=30" class="txn-period__btn {% if selected_days == 30 %}txn-period__btn--active{% endif %}">30 Days</a>
     <a href="?type={{ selected_type }}&days=90" class="txn-period__btn {% if selected_days == 90 %}txn-period__btn--active{% endif %}">90 Days</a>
-  </div>
+</div>
 
-  <!-- Transaction List -->
-  <div class="txn-list">
+<!-- Transaction List -->
+<div class="fleet-card slide-up">
     {% if transactions %}
-    <div class="txn-list__header">
-      <span>{{ transactions|length }} transaction{{ transactions|length|pluralize }}</span>
-      <span>Last {{ selected_days }} days</span>
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">{{ transactions|length }} Transaction{{ transactions|length|pluralize }}</h3>
+        <span style="font-size:var(--font-size-xs); color:var(--fleet-grey-400);">Last {{ selected_days }} days</span>
     </div>
-    {% endif %}
-
-    {% for txn in transactions %}
-    <div class="txn-item">
-      <div class="txn-item__icon txn-item__icon--{% if txn.transaction_type == 'earning' %}green{% elif txn.transaction_type == 'bonus' %}blue{% elif txn.transaction_type == 'cod_collection' %}orange{% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}yellow{% elif txn.transaction_type == 'cod_return' %}orange{% elif txn.transaction_type == 'settlement' %}purple{% elif txn.transaction_type == 'deduction' %}red{% elif txn.transaction_type == 'delivery_charge' or txn.transaction_type == 'fulfillment_charge' %}blue{% else %}gray{% endif %}">
-        {% if txn.transaction_type == 'earning' %}<i class="fas fa-coins"></i>
-        {% elif txn.transaction_type == 'bonus' %}<i class="fas fa-gift"></i>
-        {% elif txn.transaction_type == 'cod_collection' %}<i class="fas fa-arrow-down"></i>
-        {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}<i class="fas fa-arrow-up"></i>
-        {% elif txn.transaction_type == 'cod_return' %}<i class="fas fa-rotate-left"></i>
-        {% elif txn.transaction_type == 'cod_client_settle' %}<i class="fas fa-handshake"></i>
-        {% elif txn.transaction_type == 'settlement' %}<i class="fas fa-university"></i>
-        {% elif txn.transaction_type == 'deduction' %}<i class="fas fa-minus"></i>
-        {% elif txn.transaction_type == 'delivery_charge' %}<i class="fas fa-truck"></i>
-        {% elif txn.transaction_type == 'fulfillment_charge' %}<i class="fas fa-box"></i>
-        {% elif txn.transaction_type == 'inventory_handling' %}<i class="fas fa-warehouse"></i>
-        {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
-      </div>
-      <div class="txn-item__info">
-        <div class="txn-item__title">{{ txn.get_transaction_type_display }}</div>
-        <div class="txn-item__meta">
-          <span style="font-family: monospace; font-size: 0.7rem;">{{ txn.transaction_code|default:"-" }}</span>
-          <span class="txn-item__dot"></span>
-          {{ txn.created_at|date:"d M" }}
-        </div>
-      </div>
-      <div class="txn-item__amount {% if txn.amount >= 0 %}txn-item__amount--plus{% else %}txn-item__amount--minus{% endif %}">
-        {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} <small>QR</small>
-      </div>
-    </div>
-    {% empty %}
-    <div class="txn-empty">
-      <i class="fas fa-receipt"></i>
-      <p>No transactions found</p>
-      <span>Try changing the filters above</span>
-    </div>
-    {% endfor %}
-  </div>
-
-</div>
-
-<!-- Desktop View -->
-<div class="d-none d-md-block">
-  <div class="container-fluid py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h1 class="h3 mb-0">Transaction History</h1>
-            <p class="text-muted">View all your financial transactions</p>
-        </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="row mb-3">
-        <div class="col-12">
-            <form method="GET" class="d-flex gap-2 flex-wrap">
-                <select name="type" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
-                    <option value="all" {% if selected_type == 'all' %}selected{% endif %}>All Types</option>
-                    {% for type_val, type_label in transaction_types %}
-                    <option value="{{ type_val }}" {% if selected_type == type_val %}selected{% endif %}>{{ type_label }}</option>
-                    {% endfor %}
-                </select>
-                <select name="days" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
-                    <option value="7" {% if selected_days == 7 %}selected{% endif %}>7 Days</option>
-                    <option value="30" {% if selected_days == 30 %}selected{% endif %}>30 Days</option>
-                    <option value="90" {% if selected_days == 90 %}selected{% endif %}>90 Days</option>
-                    <option value="365" {% if selected_days == 365 %}selected{% endif %}>1 Year</option>
-                </select>
-            </form>
-        </div>
-    </div>
-
-    <!-- Wallet Summary -->
-    {% if wallet_status %}
-    <div class="d-flex flex-wrap gap-3 mb-4">
-        <div class="card border-0 shadow-sm border-start border-4 border-success flex-fill p-0" style="min-width: 180px;">
-            <div class="card-body">
-                <h6 class="text-muted mb-1 small">Wallet Balance</h6>
-                <h4 class="mb-0 text-success">{{ wallet_status.wallet_balance|default:0|floatformat:0 }} QR</h4>
+    <div class="fleet-card__body" style="padding: 0;">
+        {% for txn in transactions %}
+        {% with ttype=txn.transaction_type %}
+        <div class="txn-row {% if not forloop.last %}txn-row--border{% endif %}">
+            <div class="txn-row__icon txn-row__icon--{% if ttype == 'earning' %}green{% elif ttype == 'bonus' %}blue{% elif ttype == 'cod_collection' or ttype == 'cod_return' %}orange{% elif ttype == 'cod_deposit' or ttype == 'cod_driver_settle' %}yellow{% elif ttype == 'settlement' %}purple{% elif ttype == 'deduction' %}red{% elif ttype == 'delivery_charge' or ttype == 'fulfillment_charge' %}blue{% else %}grey{% endif %}">
+                {% if ttype == 'earning' %}<i class="fa-solid fa-coins"></i>
+                {% elif ttype == 'bonus' %}<i class="fa-solid fa-gift"></i>
+                {% elif ttype == 'cod_collection' %}<i class="fa-solid fa-arrow-down"></i>
+                {% elif ttype == 'cod_deposit' or ttype == 'cod_driver_settle' %}<i class="fa-solid fa-arrow-up"></i>
+                {% elif ttype == 'cod_return' %}<i class="fa-solid fa-rotate-left"></i>
+                {% elif ttype == 'cod_client_settle' %}<i class="fa-solid fa-handshake"></i>
+                {% elif ttype == 'settlement' %}<i class="fa-solid fa-building-columns"></i>
+                {% elif ttype == 'deduction' %}<i class="fa-solid fa-minus"></i>
+                {% elif ttype == 'delivery_charge' %}<i class="fa-solid fa-truck"></i>
+                {% elif ttype == 'fulfillment_charge' %}<i class="fa-solid fa-box"></i>
+                {% else %}<i class="fa-solid fa-arrow-right-arrow-left"></i>{% endif %}
+            </div>
+            <div class="txn-row__body">
+                <span class="txn-row__title">{{ txn.get_transaction_type_display }}</span>
+                <span class="txn-row__meta">
+                    {% if txn.transaction_code %}<span class="txn-row__code">{{ txn.transaction_code }}</span> · {% endif %}
+                    {{ txn.created_at|date:"d M, Y" }}
+                </span>
+            </div>
+            <div class="txn-row__amount {% if txn.amount >= 0 %}txn-row__amount--plus{% else %}txn-row__amount--minus{% endif %}">
+                {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }}<small> QR</small>
             </div>
         </div>
-        <div class="card border-0 shadow-sm border-start border-4 border-warning flex-fill p-0" style="min-width: 180px;">
-            <div class="card-body">
-                <h6 class="text-muted mb-1 small">COD in Hand</h6>
-                <h4 class="mb-0 text-warning">{{ wallet_status.cod_in_hand|default:0|floatformat:0 }} QR</h4>
+        {% endwith %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="fleet-card__body">
+        <div class="fleet-empty" style="padding: var(--spacing-xl) 0;">
+            <div style="font-size:2.5rem; color:var(--fleet-grey-300); margin-bottom:var(--spacing-md);">
+                <i class="fa-solid fa-receipt"></i>
             </div>
-        </div>
-        <div class="card border-0 shadow-sm border-start border-4 border-info flex-fill p-0" style="min-width: 180px;">
-            <div class="card-body">
-                <h6 class="text-muted mb-1 small">Pending Earnings</h6>
-                <h4 class="mb-0 text-info">{{ wallet_status.pending_earnings|default:0|floatformat:0 }} QR</h4>
-            </div>
+            <p class="fleet-empty__title">No Transactions</p>
+            <p class="fleet-empty__text">Try changing the filters above</p>
         </div>
     </div>
     {% endif %}
-
-    <!-- Transactions Table -->
-    <div class="row">
-        <div class="col-12">
-            <div class="listing-container">
-                <div class="listing-header">
-                    <h6 class="listing-title"><i class="fa-solid fa-receipt text-primary"></i>Transactions</h6>
-                    <span class="listing-badge">{{ transactions|length }} items</span>
-                </div>
-                <table class="listing-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Code</th>
-                            <th>Type</th>
-                            <th>Description</th>
-                            <th>Task</th>
-                            <th class="text-end">Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for txn in transactions %}
-                        <tr>
-                            <td>{{ txn.created_at|date:"d M" }}<br><small class="text-muted">{{ txn.created_at|time:"H:i" }}</small></td>
-                            <td><code>{{ txn.transaction_code|default:"-" }}</code></td>
-                            <td>
-                                <span class="listing-status {% if txn.transaction_type == 'earning' %}success{% elif txn.transaction_type == 'cod_collection' or txn.transaction_type == 'cod_return' %}warning{% elif txn.transaction_type == 'deduction' %}danger{% else %}primary{% endif %}">
-                                    {% if txn.transaction_type == 'earning' %}<i class="fas fa-coins"></i>
-                                    {% elif txn.transaction_type == 'bonus' %}<i class="fas fa-gift"></i>
-                                    {% elif txn.transaction_type == 'cod_collection' %}<i class="fas fa-arrow-down"></i>
-                                    {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}<i class="fas fa-arrow-up"></i>
-                                    {% elif txn.transaction_type == 'cod_return' %}<i class="fas fa-rotate-left"></i>
-                                    {% elif txn.transaction_type == 'settlement' %}<i class="fas fa-university"></i>
-                                    {% elif txn.transaction_type == 'deduction' %}<i class="fas fa-minus"></i>
-                                    {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
-                                </span>
-                                {{ txn.get_transaction_type_display }}
-                            </td>
-                            <td class="text-2line" title="{{ txn.description|default:'' }}">{{ txn.description|default:"-" }}</td>
-                            <td>{% if txn.delivery_task %}<code>{{ txn.delivery_task.dl_task_number }}</code>{% else %}-{% endif %}</td>
-                            <td class="text-end fw-bold {% if txn.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
-                                {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} QR
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="6" class="listing-empty">
-                                <i class="fas fa-receipt"></i>
-                                No transactions found
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-  </div>
 </div>
+
+<style>
+    .txn-hero {
+        background: var(--fleet-dark); border-radius: var(--radius-md);
+        display: flex; align-items: stretch;
+        margin-bottom: var(--spacing-md); overflow: hidden;
+    }
+    .txn-hero__item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--spacing-sm) var(--spacing-xs); gap: 2px; }
+    .txn-hero__divider { width: 1px; background: rgba(255,255,255,0.12); margin: var(--spacing-md) 0; }
+    .txn-hero__label { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.05em; }
+    .txn-hero__val { font-size: var(--font-size-base); font-weight: 800; color: #fff; }
+    .txn-hero__val--green { color: var(--fleet-success); }
+    .txn-hero__val--orange { color: var(--fleet-warning); }
+
+    .txn-tabs { display: flex; gap: var(--spacing-xs); overflow-x: auto; margin-bottom: var(--spacing-sm); padding-bottom: 2px; scrollbar-width: none; }
+    .txn-tabs::-webkit-scrollbar { display: none; }
+    .txn-tab { padding: 6px 14px; border-radius: var(--radius-sm); font-size: var(--font-size-xs); font-weight: 600; white-space: nowrap; text-decoration: none; flex-shrink: 0; background: var(--fleet-grey-100); color: var(--fleet-grey-600); border: 1px solid var(--fleet-grey-200); transition: all 0.15s; }
+    .txn-tab--active { background: var(--fleet-dark); color: #fff; border-color: var(--fleet-dark); }
+
+    .txn-period { display: flex; gap: var(--spacing-xs); margin-bottom: var(--spacing-md); }
+    .txn-period__btn { flex: 1; padding: 5px; border-radius: var(--radius-sm); font-size: var(--font-size-xs); font-weight: 600; text-align: center; text-decoration: none; background: var(--fleet-grey-100); color: var(--fleet-grey-600); border: 1px solid var(--fleet-grey-200); }
+    .txn-period__btn--active { background: var(--fleet-primary); color: #fff; border-color: var(--fleet-primary); }
+
+    .txn-row { display: flex; align-items: center; gap: var(--spacing-sm); padding: 7px var(--spacing-md); }
+    .txn-row--border { border-bottom: 1px solid var(--fleet-grey-100); }
+    .txn-row__icon { width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: var(--font-size-sm); flex-shrink: 0; }
+    .txn-row__icon--green { background: var(--fleet-success-light); color: var(--fleet-success); }
+    .txn-row__icon--blue { background: #e8f0fe; color: var(--fleet-primary); }
+    .txn-row__icon--orange { background: #fff4e5; color: #e07b00; }
+    .txn-row__icon--yellow { background: #fffbeb; color: #b45309; }
+    .txn-row__icon--purple { background: #f5f3ff; color: #7c3aed; }
+    .txn-row__icon--red { background: var(--fleet-danger-light); color: var(--fleet-danger); }
+    .txn-row__icon--grey { background: var(--fleet-grey-100); color: var(--fleet-grey-500); }
+    .txn-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .txn-row__title { font-size: var(--font-size-sm); font-weight: 700; color: var(--fleet-dark); }
+    .txn-row__meta { font-size: var(--font-size-xs); color: var(--fleet-grey-500); }
+    .txn-row__code { font-family: monospace; background: var(--fleet-grey-100); padding: 1px 5px; border-radius: var(--radius-sm); font-size: 10px; }
+    .txn-row__amount { font-size: var(--font-size-sm); font-weight: 800; white-space: nowrap; flex-shrink: 0; }
+    .txn-row__amount small { font-size: 10px; font-weight: 500; }
+    .txn-row__amount--plus { color: var(--fleet-success); }
+    .txn-row__amount--minus { color: var(--fleet-danger); }
+</style>
 {% endblock %}

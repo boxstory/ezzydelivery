@@ -1,272 +1,202 @@
-{% extends "fleet_dashboard_base.html" %}
+{% extends "fleet/pwa_base.html" %}
 {% load static %}
-{% block extra_css %}
-<link href="{% static 'fleet/css/fleet-bem.css' %}" rel="stylesheet" type="text/css" />
-{% endblock extra_css %}
+
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports{% endblock %}
 
 {% block content %}
-<div class="flt-reports">
-    <!-- Hero Banner -->
-    <div class="flt__hero" id="fleet_reports_section_header">
-        <div class="flt__hero-inner">
-            <div class="flt__hero-left">
-                <h1 class="flt__hero-title" id="fleet_reports_header_title">
-                    <i class="fa-solid fa-file-pdf"></i> Download Reports
-                </h1>
-                <p class="flt__hero-sub">{{ driver.user.get_full_name }}</p>
-            </div>
+
+<!-- Report Cards -->
+{% with reports=True %}
+
+<!-- Earnings Report -->
+<div class="rpt-card fade-in">
+    <div class="rpt-card__header">
+        <div class="rpt-card__icon" style="background:var(--fleet-success-light); color:var(--fleet-success);">
+            <i class="fa-solid fa-coins"></i>
+        </div>
+        <div>
+            <div class="rpt-card__title">Earnings Report</div>
+            <div class="rpt-card__sub">Delivery income & payouts</div>
         </div>
     </div>
-
-    <!-- Report Types -->
-    <div class="flt__report-grid">
-        {% for report in report_types %}
-        <div class="flt__card">
-            <div class="flt__card-body">
-                <div class="flt__report-head">
-                    <div class="flt__report-icon">
-                        <i class="fa-solid {{ report.icon }}"></i>
-                    </div>
-                    <div class="flt__report-meta">
-                        <h5 class="flt__report-name">{{ report.name }}</h5>
-                        <p class="flt__report-desc">{{ report.description }}</p>
-                    </div>
-                </div>
-
-                <!-- Date Range Selector -->
-                <form method="post" action="{% url 'fleet:driver_reports' %}" class="flt__report-form" novalidate>
-                    {% csrf_token %}
-                    <input type="hidden" name="report_type" value="{{ report.id }}">
-                    <div class="flt__report-form__fields">
-                        <div class="flt__report-form__field">
-                            <label class="flt__form-label">From Date</label>
-                            <input type="date" class="flt__form-input" name="date_from" required>
-                        </div>
-                        <div class="flt__report-form__field">
-                            <label class="flt__form-label">To Date</label>
-                            <input type="date" class="flt__form-input" name="date_to" required>
-                        </div>
-                        <div class="flt__report-form__submit">
-                            <button type="submit" class="flt__btn flt__btn--primary flt__btn--icon">
-                                <i class="fa-solid fa-download"></i>
-                            </button>
-                        </div>
-                    </div>
-                </form>
-
-                <!-- Quick Download Buttons -->
-                <div class="flt__report-quick">
-                    <button type="button" class="flt__chip btn-quick-download" data-report-type="{{ report.id }}" data-days="7">
-                        <i class="fa-solid fa-calendar-week"></i> Last 7 Days
-                    </button>
-                    <button type="button" class="flt__chip btn-quick-download" data-report-type="{{ report.id }}" data-days="30">
-                        <i class="fa-solid fa-calendar-days"></i> Last 30 Days
-                    </button>
-                    <button type="button" class="flt__chip btn-quick-download" data-report-type="{{ report.id }}" data-days="90">
-                        <i class="fa-solid fa-calendar"></i> Last 90 Days
-                    </button>
-                </div>
+    <!-- Quick download pills -->
+    <div class="rpt-card__quick">
+        <button onclick="quickDownload('earnings', 7)" class="rpt-quick-btn">7 Days</button>
+        <button onclick="quickDownload('earnings', 30)" class="rpt-quick-btn">30 Days</button>
+        <button onclick="quickDownload('earnings', 90)" class="rpt-quick-btn">90 Days</button>
+    </div>
+    <!-- Custom date range -->
+    <form method="post" action="/fleet/reports/download/earnings/" class="rpt-card__form">
+        {% csrf_token %}
+        <div class="rpt-date-row">
+            <div class="rpt-date-field">
+                <label class="rpt-date-label">From</label>
+                <input type="date" name="date_from" class="rpt-date-input">
             </div>
+            <div class="rpt-date-field">
+                <label class="rpt-date-label">To</label>
+                <input type="date" name="date_to" class="rpt-date-input">
+            </div>
+        </div>
+        <button type="submit" class="fleet-btn fleet-btn--dark fleet-btn--block" style="background:var(--fleet-success);">
+            <i class="fa-solid fa-download me-2"></i>Download Custom Range
+        </button>
+    </form>
+</div>
+
+<!-- COD Report -->
+<div class="rpt-card fade-in" style="animation-delay:100ms;">
+    <div class="rpt-card__header">
+        <div class="rpt-card__icon" style="background:#fff4e5; color:#b45309;">
+            <i class="fa-solid fa-money-bill-wave"></i>
+        </div>
+        <div>
+            <div class="rpt-card__title">COD Report</div>
+            <div class="rpt-card__sub">Cash on delivery transactions</div>
+        </div>
+    </div>
+    <div class="rpt-card__quick">
+        <button onclick="quickDownload('cod', 7)" class="rpt-quick-btn">7 Days</button>
+        <button onclick="quickDownload('cod', 30)" class="rpt-quick-btn">30 Days</button>
+        <button onclick="quickDownload('cod', 90)" class="rpt-quick-btn">90 Days</button>
+    </div>
+    <form method="post" action="/fleet/reports/download/cod/" class="rpt-card__form">
+        {% csrf_token %}
+        <div class="rpt-date-row">
+            <div class="rpt-date-field">
+                <label class="rpt-date-label">From</label>
+                <input type="date" name="date_from" class="rpt-date-input">
+            </div>
+            <div class="rpt-date-field">
+                <label class="rpt-date-label">To</label>
+                <input type="date" name="date_to" class="rpt-date-input">
+            </div>
+        </div>
+        <button type="submit" class="fleet-btn fleet-btn--dark fleet-btn--block" style="background:#b45309;">
+            <i class="fa-solid fa-download me-2"></i>Download Custom Range
+        </button>
+    </form>
+</div>
+
+<!-- Delivery Report -->
+<div class="rpt-card fade-in" style="animation-delay:200ms;">
+    <div class="rpt-card__header">
+        <div class="rpt-card__icon" style="background:#e8f0fe; color:var(--fleet-primary);">
+            <i class="fa-solid fa-truck-fast"></i>
+        </div>
+        <div>
+            <div class="rpt-card__title">Delivery Report</div>
+            <div class="rpt-card__sub">Task history & status breakdown</div>
+        </div>
+    </div>
+    <div class="rpt-card__quick">
+        <button onclick="quickDownload('deliveries', 7)" class="rpt-quick-btn">7 Days</button>
+        <button onclick="quickDownload('deliveries', 30)" class="rpt-quick-btn">30 Days</button>
+        <button onclick="quickDownload('deliveries', 90)" class="rpt-quick-btn">90 Days</button>
+    </div>
+    <form method="post" action="/fleet/reports/download/deliveries/" class="rpt-card__form">
+        {% csrf_token %}
+        <div class="rpt-date-row">
+            <div class="rpt-date-field">
+                <label class="rpt-date-label">From</label>
+                <input type="date" name="date_from" class="rpt-date-input">
+            </div>
+            <div class="rpt-date-field">
+                <label class="rpt-date-label">To</label>
+                <input type="date" name="date_to" class="rpt-date-input">
+            </div>
+        </div>
+        <button type="submit" class="fleet-btn fleet-btn--dark fleet-btn--block">
+            <i class="fa-solid fa-download me-2"></i>Download Custom Range
+        </button>
+    </form>
+</div>
+
+{% endwith %}
+
+<!-- COD Settlements -->
+{% if settlements %}
+<div class="fleet-card slide-up">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title"><i class="fa-solid fa-building-columns me-2"></i>COD Settlements</h3>
+    </div>
+    <div class="fleet-card__body" style="padding: 0;">
+        {% for s in settlements %}
+        <div class="rpt-settle {% if not forloop.last %}rpt-settle--border{% endif %}">
+            <div class="rpt-settle__body">
+                <span class="rpt-settle__date">{{ s.created_at|date:"M d, Y" }}</span>
+                <span class="fleet-badge {% if s.status == 'settled' %}fleet-badge--success{% elif s.status == 'pending' %}fleet-badge--warning{% else %}fleet-badge--secondary{% endif %}">
+                    {{ s.get_status_display }}
+                </span>
+            </div>
+            <span class="rpt-settle__amount">QR {{ s.amount }}</span>
+            <a href="/fleet/cod_transaction_pdf/?settlement_id={{ s.pk }}" class="rpt-settle__receipt" title="Receipt">
+                <i class="fa-solid fa-receipt"></i>
+            </a>
         </div>
         {% endfor %}
     </div>
-
-    <!-- Recent Settlements -->
-    {% if settlements %}
-    <div class="flt__card" id="fleet_reports_card_settlements">
-        <div class="flt__card-header">
-            <i class="fa-solid fa-file-invoice"></i> Recent Settlement Reports
-        </div>
-        <div class="flt__card-body flt__card-body--flush">
-            <div class="listing-container">
-                <table class="listing-table" id="fleet_reports_table_settlements">
-                    <thead id="fleet_reports_thead_settlements">
-                        <tr>
-                            <th>Settlement ID</th>
-                            <th>Period</th>
-                            <th class="text-end">Amount</th>
-                            <th>Paid Date</th>
-                            <th class="text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for settlement in settlements %}
-                        <tr>
-                            <td><code>#{{ settlement.id }}</code></td>
-                            <td>{{ settlement.period_start|date:"M d" }} - {{ settlement.period_end|date:"M d, Y" }}</td>
-                            <td class="text-end fw-bold text-success">{{ settlement.amount|floatformat:2 }} QR</td>
-                            <td class="text-muted">{{ settlement.paid_at|date:"M d, Y" }}</td>
-                            <td class="text-center">
-                                <button type="button" class="flt__btn flt__btn--sm flt__btn--outline btn-download-settlement" data-settlement-id="{{ settlement.id }}">
-                                    <i class="fa-solid fa-download me-1"></i>Download
-                                </button>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Export Formats -->
-    <div class="flt__card">
-        <div class="flt__card-header">
-            <i class="fa-solid fa-file-export"></i> Export Formats
-        </div>
-        <div class="flt__card-body">
-            <p class="flt__card-desc">All reports can be downloaded in the following formats:</p>
-            <div class="flt__format-grid">
-                <div class="flt__format-item">
-                    <div class="flt__format-item__icon flt__format-item__icon--danger">
-                        <i class="fa-solid fa-file-pdf"></i>
-                    </div>
-                    <span class="flt__format-item__name">PDF</span>
-                    <span class="flt__format-item__desc">Printable format</span>
-                </div>
-                <div class="flt__format-item">
-                    <div class="flt__format-item__icon flt__format-item__icon--success">
-                        <i class="fa-solid fa-file-excel"></i>
-                    </div>
-                    <span class="flt__format-item__name">Excel</span>
-                    <span class="flt__format-item__desc">Spreadsheet format</span>
-                </div>
-                <div class="flt__format-item">
-                    <div class="flt__format-item__icon flt__format-item__icon--primary">
-                        <i class="fa-solid fa-file-csv"></i>
-                    </div>
-                    <span class="flt__format-item__name">CSV</span>
-                    <span class="flt__format-item__desc">Data export</span>
-                </div>
-                <div class="flt__format-item">
-                    <div class="flt__format-item__icon flt__format-item__icon--info">
-                        <i class="fa-solid fa-file-lines"></i>
-                    </div>
-                    <span class="flt__format-item__name">Text</span>
-                    <span class="flt__format-item__desc">Simple format</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Help Section -->
-    <div class="flt__card flt__card--accent">
-        <div class="flt__card-header">
-            <i class="fa-solid fa-info-circle"></i> Report Information
-        </div>
-        <div class="flt__card-body">
-            <ul class="flt__info-list">
-                <li>
-                    <strong>Earnings Report:</strong> Includes detailed breakdown of delivery fees, COD handling charges, bonuses, and deductions.
-                </li>
-                <li>
-                    <strong>Delivery Report:</strong> Complete list of all deliveries with timestamps, addresses, and status updates.
-                </li>
-                <li>
-                    <strong>Transaction Report:</strong> All financial transactions including COD collections, deposits, and settlements.
-                </li>
-                <li>
-                    <strong>Performance Report:</strong> Metrics including completion rates, customer ratings, and performance trends.
-                </li>
-            </ul>
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="flt__actions-bar">
-        <a href="{% url 'fleet:driver_performance' %}" class="flt__btn flt__btn--outline">
-            <i class="fa-solid fa-gauge-high me-1"></i>View Performance
-        </a>
-        <a href="{% url 'fleet:driver_analytics' %}" class="flt__btn flt__btn--outline">
-            <i class="fa-solid fa-chart-pie me-1"></i>View Analytics
-        </a>
-        <a href="{% url 'fleet:fleet_dashboard' %}" class="flt__btn flt__btn--ghost">
-            <i class="fa-solid fa-arrow-left me-1"></i>Back to Dashboard
-        </a>
-    </div>
 </div>
-{% endblock content %}
+{% endif %}
 
-{% block extra_js %}
+<style>
+    .rpt-card {
+        background: var(--fleet-white); border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm); border: 1px solid var(--fleet-grey-100);
+        margin-bottom: var(--spacing-md); padding: var(--spacing-sm) var(--spacing-md);
+    }
+    .rpt-card__header { display: flex; align-items: center; gap: var(--spacing-md); margin-bottom: var(--spacing-md); }
+    .rpt-card__icon { width: 44px; height: 44px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+    .rpt-card__title { font-size: var(--font-size-base); font-weight: 800; color: var(--fleet-dark); }
+    .rpt-card__sub { font-size: var(--font-size-xs); color: var(--fleet-grey-500); margin-top: 2px; }
+
+    .rpt-card__quick { display: flex; gap: var(--spacing-xs); margin-bottom: var(--spacing-md); }
+    .rpt-quick-btn {
+        flex: 1; padding: 7px 0; border-radius: var(--radius-sm); border: 1px solid var(--fleet-grey-200);
+        background: var(--fleet-grey-100); color: var(--fleet-grey-700);
+        font-size: var(--font-size-xs); font-weight: 700; cursor: pointer;
+        transition: all 0.15s;
+    }
+    .rpt-quick-btn:active { background: var(--fleet-dark); color: #fff; border-color: var(--fleet-dark); }
+
+    .rpt-card__form { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+    .rpt-date-row { display: flex; gap: var(--spacing-sm); }
+    .rpt-date-field { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .rpt-date-label { font-size: 11px; font-weight: 600; color: var(--fleet-grey-500); text-transform: uppercase; letter-spacing: 0.04em; }
+    .rpt-date-input {
+        padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--fleet-grey-200);
+        background: var(--fleet-grey-50); font-size: var(--font-size-sm);
+        color: var(--fleet-dark); width: 100%; outline: none;
+    }
+    .rpt-date-input:focus { border-color: var(--fleet-primary); background: var(--fleet-white); }
+
+    .rpt-settle { display: flex; align-items: center; gap: var(--spacing-sm); padding: 6px var(--spacing-md); }
+    .rpt-settle--border { border-bottom: 1px solid var(--fleet-grey-100); }
+    .rpt-settle__body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .rpt-settle__date { font-size: var(--font-size-sm); font-weight: 600; color: var(--fleet-dark); }
+    .rpt-settle__amount { font-size: var(--font-size-sm); font-weight: 800; color: var(--fleet-dark); white-space: nowrap; }
+    .rpt-settle__receipt { width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--fleet-grey-100); color: var(--fleet-grey-600); display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: var(--font-size-sm); flex-shrink: 0; }
+    .rpt-settle__receipt:active { background: var(--fleet-dark); color: #fff; }
+</style>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Get CSRF token
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-    const csrftoken = getCookie('csrftoken');
-
-    // Quick download function
-    function quickDownload(reportType, days) {
-        const today = new Date();
-        const fromDate = new Date(today);
-        fromDate.setDate(fromDate.getDate() - days);
-
-        const dateFrom = fromDate.toISOString().split('T')[0];
-        const dateTo = today.toISOString().split('T')[0];
-
-        // Create and submit form
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '{% url "fleet:driver_reports" %}';
-
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = 'csrfmiddlewaretoken';
-        csrfInput.value = csrftoken;
-
-        const typeInput = document.createElement('input');
-        typeInput.type = 'hidden';
-        typeInput.name = 'report_type';
-        typeInput.value = reportType;
-
-        const fromInput = document.createElement('input');
-        fromInput.type = 'hidden';
-        fromInput.name = 'date_from';
-        fromInput.value = dateFrom;
-
-        const toInput = document.createElement('input');
-        toInput.type = 'hidden';
-        toInput.name = 'date_to';
-        toInput.value = dateTo;
-
-        form.appendChild(csrfInput);
-        form.appendChild(typeInput);
-        form.appendChild(fromInput);
-        form.appendChild(toInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    }
-
-    // Event delegation for quick download buttons
-    document.querySelectorAll('.btn-quick-download[data-report-type]').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            const reportType = this.dataset.reportType;
-            const days = parseInt(this.dataset.days, 10);
-            quickDownload(reportType, days);
-        });
-    });
-
-    // Event delegation for settlement download buttons
-    document.querySelectorAll('.btn-download-settlement[data-settlement-id]').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            const settlementId = this.dataset.settlementId;
-            window.location.href = '/fleet/settlement/' + settlementId + '/download/';
-        });
-    });
-});
+function quickDownload(reportType, days) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/fleet/reports/download/' + reportType + '/';
+    const csrf = document.createElement('input');
+    csrf.type = 'hidden';
+    csrf.name = 'csrfmiddlewaretoken';
+    csrf.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const daysInput = document.createElement('input');
+    daysInput.type = 'hidden';
+    daysInput.name = 'quick_days';
+    daysInput.value = days;
+    form.appendChild(csrf);
+    form.appendChild(daysInput);
+    document.body.appendChild(form);
+    form.submit();
+}
 </script>
-{% endblock extra_js %}
+{% endblock %}

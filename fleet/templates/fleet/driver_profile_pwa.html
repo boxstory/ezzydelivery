@@ -5,6 +5,15 @@
 {% block page_title %}Profile{% endblock %}
 
 {% block header_actions %}
+<button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
+    <i class="fa-solid fa-rotate-right"></i>
+</button>
+<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+    <i class="fa-solid fa-bell"></i>
+    {% if unread_notifications > 0 %}
+    <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
+    {% endif %}
+</a>
 <a href="{% url 'account_logout' %}" class="fleet-btn-icon">
     <i class="fa-solid fa-right-from-bracket"></i>
 </a>
@@ -16,10 +25,10 @@
     <div class="fleet-profile-header__bg"></div>
     <div class="fleet-profile-header__content">
         <div class="fleet-profile-header__avatar">
-            {% if driver.profile_picture %}
-            <img src="{{ driver.profile_picture.url }}" alt="{{ driver.driver_first_name }}">
+            {% if profile_picture and profile_picture.profile_picture %}
+            <img src="{{ profile_picture.profile_picture.url }}" alt="{{ driver.driver_first_name }}" id="avatarPreview">
             {% else %}
-            <i class="fa-solid fa-user"></i>
+            <img src="{% static 'webpages/img/drivers.png' %}" alt="Default Driver" id="avatarPreview">
             {% endif %}
             <button type="button" class="fleet-profile-header__edit-avatar" onclick="document.getElementById('avatarInput').click()">
                 <i class="fa-solid fa-camera"></i>
@@ -100,7 +109,7 @@
                 </div>
             </li>
 
-            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:driver_performance' %}'">
+            <li class="fleet-list-item" style="border-radius: 0; border: none; margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:driver_performance' %}'">
                 <div class="fleet-list-item__icon fleet-stat__icon--success">
                     <i class="fa-solid fa-chart-line"></i>
                 </div>
@@ -113,52 +122,142 @@
                 </div>
             </li>
 
-            <li class="fleet-list-item" style="border-radius: 0; border: none; margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:transaction_history' %}'">
-                <div class="fleet-list-item__icon fleet-stat__icon--danger">
-                    <i class="fa-solid fa-clock-rotate-left"></i>
+        </ul>
+    </div>
+</div>
+
+<!-- Earnings & Finance -->
+<div class="fleet-card slide-up" style="animation-delay: 0.3s;">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title">
+            <i class="fa-solid fa-wallet me-2" style="color: var(--fleet-warning);"></i>
+            Earnings & Finance
+        </h3>
+    </div>
+    <div class="fleet-card__body" style="padding: 0;">
+        <ul class="fleet-list" style="margin: 0;">
+
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:driver_earnings' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--warning">
+                    <i class="fa-solid fa-wallet"></i>
                 </div>
                 <div class="fleet-list-item__content">
-                    <div class="fleet-list-item__title">Transaction History</div>
-                    <div class="fleet-list-item__subtitle">View all transactions</div>
+                    <div class="fleet-list-item__title">My Earnings</div>
+                    <div class="fleet-list-item__subtitle">Summary, wallet & payouts</div>
                 </div>
                 <div class="fleet-list-item__action">
                     <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
                 </div>
             </li>
+
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:transaction_history' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--info">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Transaction History</div>
+                    <div class="fleet-list-item__subtitle">All credits & debits</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:fleet_finance_summary' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--success">
+                    <i class="fa-solid fa-chart-pie"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Finance Summary</div>
+                    <div class="fleet-list-item__subtitle">COD, settlements & overview</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:driver_analytics' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--danger">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Analytics</div>
+                    <div class="fleet-list-item__subtitle">Trends, peak hours & insights</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+
+            <li class="fleet-list-item" style="border-radius: 0; border: none; margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:driver_reports' %}'">
+                <div class="fleet-list-item__icon" style="background: var(--fleet-grey-100); color: var(--fleet-grey-600);">
+                    <i class="fa-solid fa-file-pdf"></i>
+                </div>
+                <div class="fleet-list-item__content">
+                    <div class="fleet-list-item__title">Download Reports</div>
+                    <div class="fleet-list-item__subtitle">PDF & CSV exports</div>
+                </div>
+                <div class="fleet-list-item__action">
+                    <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
+                </div>
+            </li>
+
         </ul>
     </div>
 </div>
 
 <!-- Account Information -->
-<div class="fleet-card slide-up" style="animation-delay: 0.3s;">
+<div class="fleet-card slide-up" style="animation-delay: 0.5s;">
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">
             <i class="fa-solid fa-user-circle me-2"></i>
             Account Information
         </h3>
     </div>
-    <div class="fleet-card__body">
-        <div class="fleet-info-grid">
-            <div class="fleet-info-item">
-                <div class="fleet-info-item__label">Driver ID</div>
-                <div class="fleet-info-item__value">#{{ driver.driver_id }}</div>
-            </div>
-
-            <div class="fleet-info-item">
-                <div class="fleet-info-item__label">Phone</div>
-                <div class="fleet-info-item__value">{{ driver.phone_number|default:"Not set" }}</div>
-            </div>
-
-            <div class="fleet-info-item">
-                <div class="fleet-info-item__label">Email</div>
-                <div class="fleet-info-item__value">{{ driver.user.email|default:"Not set" }}</div>
-            </div>
-
-            <div class="fleet-info-item">
-                <div class="fleet-info-item__label">Join Date</div>
-                <div class="fleet-info-item__value">{{ driver.created_at|date:"M d, Y" }}</div>
-            </div>
-        </div>
+    <div class="fleet-card__body" style="padding: 0;">
+        <ul class="fleet-list" style="margin: 0;">
+            <li class="fleet-info-row" style="border-bottom: 1px solid var(--fleet-grey-100);">
+                <div class="fleet-info-row__icon" style="background: #e8f0fe; color: var(--fleet-primary);">
+                    <i class="fa-solid fa-id-badge"></i>
+                </div>
+                <div class="fleet-info-row__body">
+                    <span class="fleet-info-row__label">Driver ID</span>
+                    <span class="fleet-info-row__value">#{{ driver.driver_id }}</span>
+                </div>
+            </li>
+            <li class="fleet-info-row" style="border-bottom: 1px solid var(--fleet-grey-100);">
+                <div class="fleet-info-row__icon" style="background: #e8f8ef; color: #128c3e;">
+                    <i class="fa-solid fa-phone"></i>
+                </div>
+                <div class="fleet-info-row__body">
+                    <span class="fleet-info-row__label">Phone</span>
+                    <span class="fleet-info-row__value">{{ driver.phone_number|default:"Not set" }}</span>
+                </div>
+                {% if driver.phone_number %}
+                <a href="tel:{{ driver.phone_number }}" class="fleet-info-row__action" onclick="event.stopPropagation();">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                </a>
+                {% endif %}
+            </li>
+            <li class="fleet-info-row" style="border-bottom: 1px solid var(--fleet-grey-100);">
+                <div class="fleet-info-row__icon" style="background: #fff4e5; color: var(--fleet-warning);">
+                    <i class="fa-solid fa-envelope"></i>
+                </div>
+                <div class="fleet-info-row__body">
+                    <span class="fleet-info-row__label">Email</span>
+                    <span class="fleet-info-row__value">{{ driver.user.email|default:"Not set" }}</span>
+                </div>
+            </li>
+            <li class="fleet-info-row">
+                <div class="fleet-info-row__icon" style="background: var(--fleet-grey-100); color: var(--fleet-grey-600);">
+                    <i class="fa-solid fa-calendar-days"></i>
+                </div>
+                <div class="fleet-info-row__body">
+                    <span class="fleet-info-row__label">Member Since</span>
+                    <span class="fleet-info-row__value">{{ driver.created_at|date:"M d, Y" }}</span>
+                </div>
+            </li>
+        </ul>
     </div>
 </div>
 
@@ -172,32 +271,35 @@
     </div>
     <div class="fleet-card__body" style="padding: 0;">
         <ul class="fleet-list" style="margin: 0;">
-            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="showToast('Feature coming soon!', 'info')">
-                <div class="fleet-list-item__icon" style="background: var(--fleet-grey-100); color: var(--fleet-grey-600);">
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:driver_notifications' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--info">
                     <i class="fa-solid fa-bell"></i>
                 </div>
                 <div class="fleet-list-item__content">
                     <div class="fleet-list-item__title">Notifications</div>
                 </div>
-                <div class="fleet-list-item__action">
+                <div class="fleet-list-item__action" style="display:flex; align-items:center; gap:var(--spacing-xs);">
+                    {% if unread_notifications > 0 %}
+                    <span class="fleet-badge fleet-badge--danger" style="font-size:var(--font-size-xs);">{{ unread_notifications }}</span>
+                    {% endif %}
                     <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
                 </div>
             </li>
 
-            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="showToast('Feature coming soon!', 'info')">
-                <div class="fleet-list-item__icon" style="background: var(--fleet-grey-100); color: var(--fleet-grey-600);">
-                    <i class="fa-solid fa-shield"></i>
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:driver_settings' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--warning">
+                    <i class="fa-solid fa-gear"></i>
                 </div>
                 <div class="fleet-list-item__content">
-                    <div class="fleet-list-item__title">Privacy & Security</div>
+                    <div class="fleet-list-item__title">Settings</div>
                 </div>
                 <div class="fleet-list-item__action">
                     <i class="fa-solid fa-chevron-right" style="color: var(--fleet-grey-400);"></i>
                 </div>
             </li>
 
-            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="showToast('Contact support at support@ezzydelivery.qa', 'info')">
-                <div class="fleet-list-item__icon" style="background: var(--fleet-grey-100); color: var(--fleet-grey-600);">
+            <li class="fleet-list-item" style="border-radius: 0; border: none; border-bottom: 1px solid var(--fleet-grey-100); margin-bottom: 0;" onclick="window.location.href='{% url 'fleet:driver_help' %}'">
+                <div class="fleet-list-item__icon fleet-stat__icon--success">
                     <i class="fa-solid fa-headset"></i>
                 </div>
                 <div class="fleet-list-item__content">
@@ -234,7 +336,7 @@
     .fleet-profile-header {
         position: relative;
         background: var(--fleet-white);
-        border-radius: var(--radius-2xl);
+        border-radius: var(--radius-md);
         overflow: hidden;
         margin-bottom: var(--spacing-lg);
         box-shadow: var(--shadow-md);
@@ -254,7 +356,7 @@
     .fleet-profile-header__avatar {
         width: 100px;
         height: 100px;
-        border-radius: var(--radius-full);
+        border-radius: var(--radius-sm);
         background: linear-gradient(135deg, var(--fleet-primary) 0%, var(--fleet-primary-dark) 100%);
         display: inline-flex;
         align-items: center;
@@ -282,7 +384,7 @@
         right: 0;
         width: 32px;
         height: 32px;
-        border-radius: var(--radius-full);
+        border-radius: var(--radius-sm);
         background: var(--fleet-primary);
         border: 3px solid var(--fleet-white);
         color: var(--fleet-dark);
@@ -312,65 +414,60 @@
         gap: var(--spacing-sm);
     }
 
-    /* Info Grid */
-    .fleet-info-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: var(--spacing-md);
+    /* Account Info Rows */
+    .fleet-info-row {
+        display: flex; align-items: center; gap: var(--spacing-sm);
+        padding: var(--spacing-sm) var(--spacing-md);
+        list-style: none;
     }
-
-    .fleet-info-item {
-        padding: var(--spacing-md);
-        background: var(--fleet-grey-50);
-        border-radius: var(--radius-lg);
-        border: 1px solid var(--fleet-grey-100);
+    .fleet-info-row__icon {
+        width: 34px; height: 34px; border-radius: var(--radius-sm);
+        display: flex; align-items: center; justify-content: center;
+        font-size: var(--font-size-sm); flex-shrink: 0;
     }
-
-    .fleet-info-item__label {
-        font-size: var(--font-size-xs);
-        color: var(--fleet-grey-600);
-        font-weight: 600;
-        margin-bottom: var(--spacing-xs);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+    .fleet-info-row__body {
+        flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0;
     }
-
-    .fleet-info-item__value {
-        font-size: var(--font-size-base);
-        font-weight: 700;
-        color: var(--fleet-dark);
+    .fleet-info-row__label {
+        font-size: var(--font-size-xs); color: var(--fleet-grey-500);
+        font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .fleet-info-row__value {
+        font-size: var(--font-size-sm); font-weight: 700; color: var(--fleet-dark);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .fleet-info-row__action {
+        color: var(--fleet-grey-400); font-size: var(--font-size-sm);
+        text-decoration: none; flex-shrink: 0;
+        padding: var(--spacing-xs);
     }
 </style>
 
 <script>
     function uploadAvatar(input) {
-        if (input.files && input.files[0]) {
-            const file = input.files[0];
+        if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
 
-            // Validate file type
-            if (!file.type.match('image.*')) {
-                showToast('Please select an image file', 'warning');
-                return;
-            }
-
-            // Validate file size (max 5MB)
-            if (file.size > 5 * 1024 * 1024) {
-                showToast('Image size must be less than 5MB', 'warning');
-                return;
-            }
-
-            // Preview and confirm
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                if (confirm('Upload this image as your profile picture?')) {
-                    // Submit form
-                    document.getElementById('avatarForm').submit();
-                    showToast('Uploading...', 'info');
-                    haptic([10, 50, 10]);
-                }
-            };
-            reader.readAsDataURL(file);
+        if (!file.type.startsWith('image/')) {
+            showToast('Please select an image file', 'warning');
+            return;
         }
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('Image must be less than 5MB', 'warning');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            // Live preview immediately
+            const preview = document.getElementById('avatarPreview');
+            if (preview) preview.src = e.target.result;
+            // Submit
+            haptic([10, 50, 10]);
+            showToast('Uploading photo...', 'info');
+            document.getElementById('avatarForm').submit();
+        };
+        reader.readAsDataURL(file);
     }
 </script>
 {% endblock %}

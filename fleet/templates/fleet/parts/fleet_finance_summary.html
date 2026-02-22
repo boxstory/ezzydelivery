@@ -1,422 +1,157 @@
-{% extends "fleet_dashboard_base.html" %}
+{% extends "fleet/pwa_base.html" %}
 {% load static %}
 
-{% block title %}Finance Summary{% endblock %}
+{% block title %}Finance{% endblock %}
+{% block page_title %}Finance{% endblock %}
+
+{% block header_actions %}
+<button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
+    <i class="fa-solid fa-rotate-right"></i>
+</button>
+{% endblock %}
 
 {% block content %}
-<!-- Mobile PWA Finance Summary -->
-<div class="pwa-content d-md-none">
-  <div class="pwa-section-header">
-    <h3 class="pwa-section-title">Finance</h3>
-    <span class="pwa-text-muted">Overview</span>
-  </div>
 
-  <!-- Period Filter Pills -->
-  <div class="pwa-filter-pills">
-    <a href="?days=7" class="pwa-filter-pill {% if selected_days == 7 %}pwa-filter-pill--active{% endif %}">7 Days</a>
-    <a href="?days=30" class="pwa-filter-pill {% if selected_days == 30 or not selected_days %}pwa-filter-pill--active{% endif %}">30 Days</a>
-    <a href="?days=90" class="pwa-filter-pill {% if selected_days == 90 %}pwa-filter-pill--active{% endif %}">90 Days</a>
-  </div>
-
-  <!-- Wallet Card -->
-  <div class="pwa-wallet-card">
-    <div class="pwa-wallet-card__header">
-      <span class="pwa-wallet-card__label">Wallet Balance</span>
-      <i class="fa-solid fa-wallet"></i>
-    </div>
-    <div class="pwa-wallet-card__balance">{{ wallet_status.wallet_balance|floatformat:2 }} QR</div>
-    <div class="pwa-wallet-card__footer">
-      <div class="pwa-wallet-card__stat">
-        <span class="pwa-wallet-card__stat-label">Credit Limit</span>
-        <span class="pwa-wallet-card__stat-value">{{ wallet_status.credit_limit|floatformat:0 }}</span>
-      </div>
-      <div class="pwa-wallet-card__stat">
-        <span class="pwa-wallet-card__stat-label">Available</span>
-        <span class="pwa-wallet-card__stat-value">{{ wallet_status.available_credit|floatformat:0 }}</span>
-      </div>
-      <div class="pwa-wallet-card__stat">
-        <span class="pwa-wallet-card__stat-label">Usage</span>
-        <span class="pwa-wallet-card__stat-value">{{ wallet_status.usage_percentage|floatformat:0 }}%</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- COD Pipeline -->
-  <div class="pwa-section-header mt-4">
-    <h4 class="pwa-section-title">COD Pipeline</h4>
-  </div>
-  <div class="pwa-stats-row">
-    <div class="pwa-stat-card">
-      <div class="pwa-stat-card__icon" style="background: var(--brand-warning-light, #fff3cd);">
-        <i class="fas fa-arrow-down" style="color: var(--brand-warning, #ffc107);"></i>
-      </div>
-      <div class="pwa-stat-card__value">{{ cod_collected|floatformat:0 }}</div>
-      <div class="pwa-stat-card__label">Collected</div>
-    </div>
-    <div class="pwa-stat-card">
-      <div class="pwa-stat-card__icon" style="background: var(--brand-success-light, #d1e7dd);">
-        <i class="fas fa-arrow-up" style="color: var(--brand-success, #198754);"></i>
-      </div>
-      <div class="pwa-stat-card__value">{{ cod_deposited|floatformat:0 }}</div>
-      <div class="pwa-stat-card__label">Deposited</div>
-    </div>
-    <div class="pwa-stat-card">
-      <div class="pwa-stat-card__icon" style="background: #fce4ec;">
-        <i class="fas fa-rotate-left" style="color: #e53935;"></i>
-      </div>
-      <div class="pwa-stat-card__value">{{ cod_returned|floatformat:0 }}</div>
-      <div class="pwa-stat-card__label">Returned</div>
-    </div>
-  </div>
-  <div class="pwa-wallet-card mt-2" style="background: linear-gradient(135deg, #ff9800, #f57c00);">
-    <div class="pwa-wallet-card__header">
-      <span class="pwa-wallet-card__label">COD in Hand</span>
-      <i class="fa-solid fa-hand-holding-dollar"></i>
-    </div>
-    <div class="pwa-wallet-card__balance">{{ wallet_status.cod_in_hand|floatformat:2 }} QR</div>
-  </div>
-
-  <!-- Earnings Summary -->
-  <div class="pwa-section-header mt-4">
-    <h4 class="pwa-section-title">Earnings</h4>
-  </div>
-  <div class="pwa-transaction-list">
-    <div class="pwa-transaction-item">
-      <div class="pwa-transaction-item__icon pwa-transaction-item__icon--success">
-        <i class="fas fa-coins"></i>
-      </div>
-      <div class="pwa-transaction-item__details">
-        <div class="pwa-transaction-item__title">Total Earned</div>
-        <div class="pwa-transaction-item__subtitle">Last {{ selected_days }} days</div>
-      </div>
-      <div class="pwa-transaction-item__amount pwa-text-success">{{ earnings_total|floatformat:2 }} QR</div>
-    </div>
-    <div class="pwa-transaction-item">
-      <div class="pwa-transaction-item__icon" style="background: #e8eaf6;"><i class="fas fa-university" style="color: #5c6bc0;"></i></div>
-      <div class="pwa-transaction-item__details">
-        <div class="pwa-transaction-item__title">Settlements Paid</div>
-      </div>
-      <div class="pwa-transaction-item__amount">{{ settlements_total|floatformat:2 }} QR</div>
-    </div>
-    <div class="pwa-transaction-item">
-      <div class="pwa-transaction-item__icon" style="background: #e8f5e9;"><i class="fas fa-gift" style="color: #43a047;"></i></div>
-      <div class="pwa-transaction-item__details">
-        <div class="pwa-transaction-item__title">Bonuses</div>
-      </div>
-      <div class="pwa-transaction-item__amount pwa-text-success">{{ bonuses_total|floatformat:2 }} QR</div>
-    </div>
-    <div class="pwa-transaction-item">
-      <div class="pwa-transaction-item__icon pwa-transaction-item__icon--danger">
-        <i class="fas fa-minus"></i>
-      </div>
-      <div class="pwa-transaction-item__details">
-        <div class="pwa-transaction-item__title">Deductions</div>
-      </div>
-      <div class="pwa-transaction-item__amount" style="color: var(--brand-danger, #dc3545);">{{ deductions_total|floatformat:2 }} QR</div>
-    </div>
-  </div>
-  <div class="pwa-wallet-card mt-2" style="background: linear-gradient(135deg, #4caf50, #388e3c);">
-    <div class="pwa-wallet-card__header">
-      <span class="pwa-wallet-card__label">Pending Earnings</span>
-      <i class="fa-solid fa-clock"></i>
-    </div>
-    <div class="pwa-wallet-card__balance">{{ wallet_status.pending_earnings|floatformat:2 }} QR</div>
-  </div>
-
-  <!-- Recent Transactions -->
-  <div class="pwa-section-header mt-4">
-    <h4 class="pwa-section-title">Recent Transactions</h4>
-    <a href="{% url 'fleet:transaction_history' %}" class="pwa-text-muted">View All</a>
-  </div>
-
-  <div class="txn-list">
-    {% for txn in recent_transactions %}
-    <div class="txn-item">
-      <div class="txn-item__icon txn-item__icon--{% if txn.transaction_type == 'earning' %}green{% elif txn.transaction_type == 'bonus' %}blue{% elif txn.transaction_type == 'cod_collection' %}orange{% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}yellow{% elif txn.transaction_type == 'cod_return' %}orange{% elif txn.transaction_type == 'settlement' %}purple{% elif txn.transaction_type == 'deduction' %}red{% else %}gray{% endif %}">
-        {% if txn.transaction_type == 'earning' %}<i class="fas fa-coins"></i>
-        {% elif txn.transaction_type == 'bonus' %}<i class="fas fa-gift"></i>
-        {% elif txn.transaction_type == 'cod_collection' %}<i class="fas fa-arrow-down"></i>
-        {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}<i class="fas fa-arrow-up"></i>
-        {% elif txn.transaction_type == 'cod_return' %}<i class="fas fa-rotate-left"></i>
-        {% elif txn.transaction_type == 'settlement' %}<i class="fas fa-university"></i>
-        {% elif txn.transaction_type == 'deduction' %}<i class="fas fa-minus"></i>
-        {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
-      </div>
-      <div class="txn-item__info">
-        <div class="txn-item__title">{{ txn.get_transaction_type_display }}</div>
-        <div class="txn-item__meta">
-          <span style="font-family: monospace; font-size: 0.7rem;">{{ txn.transaction_code|default:"-" }}</span>
-          <span class="txn-item__dot"></span>
-          {{ txn.created_at|date:"d M" }}
-        </div>
-      </div>
-      <div class="txn-item__amount {% if txn.amount >= 0 %}txn-item__amount--plus{% else %}txn-item__amount--minus{% endif %}">
-        {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} <small>QR</small>
-      </div>
-    </div>
-    {% empty %}
-    <div class="txn-empty">
-      <i class="fas fa-receipt"></i>
-      <p>No transactions yet</p>
-    </div>
-    {% endfor %}
-  </div>
-
-  <!-- Quick Actions -->
-  <div class="pwa-section-header mt-4">
-    <h4 class="pwa-section-title">Quick Actions</h4>
-  </div>
-  <div class="d-flex gap-2 flex-wrap mb-4">
-    <a href="{% url 'fleet:cod_submission' %}" class="btn btn-warning btn-sm flex-fill"><i class="fas fa-arrow-up me-1"></i> Submit COD</a>
-    <a href="{% url 'fleet:cod_collection' %}" class="btn btn-outline-warning btn-sm flex-fill"><i class="fas fa-money-bill me-1"></i> COD History</a>
-    <a href="{% url 'fleet:driver_earnings' %}" class="btn btn-outline-success btn-sm flex-fill"><i class="fas fa-coins me-1"></i> Earnings</a>
-    <a href="{% url 'fleet:transaction_history' %}" class="btn btn-outline-primary btn-sm flex-fill"><i class="fas fa-list me-1"></i> All Transactions</a>
-  </div>
+<!-- Wallet Hero -->
+<div class="fin-hero fade-in">
+    <span class="fin-hero__label">Wallet Balance</span>
+    <span class="fin-hero__amount">QR {{ driver.wallet_balance|default:"0.00" }}</span>
+    <span class="fin-hero__cod">
+        <i class="fa-solid fa-money-bill-wave me-1"></i>
+        COD In-Hand: QR {{ driver.cod_in_hand|default:"0.00" }}
+    </span>
 </div>
 
-<!-- Desktop View -->
-<div class="d-none d-md-block">
-  <div class="container-fluid py-4">
-    <div class="row mb-4">
-      <div class="col-12 d-flex justify-content-between align-items-center">
-        <div>
-          <h1 class="h3 mb-0">Finance Summary</h1>
-          <p class="text-muted mb-0">Overview of your financial activity</p>
+<!-- COD Pipeline -->
+<div class="fleet-stats slide-up">
+    <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--warning">
+            <i class="fa-solid fa-clock"></i>
         </div>
-        <form method="GET" class="d-flex gap-2">
-          <select name="days" class="form-select" style="max-width: 160px;" onchange="this.form.submit()">
-            <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
-            <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
-            <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
-            <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
-          </select>
-        </form>
-      </div>
+        <div class="fleet-stat__value" style="color:var(--fleet-warning);">{{ cod_stats.pending_count|default:0 }}</div>
+        <div class="fleet-stat__label">Pending COD</div>
     </div>
-
-    <!-- Wallet Overview Cards -->
-    <div class="row mb-4">
-      <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
-          <div class="card-body">
-            <div class="d-flex justify-content-between">
-              <h6 class="text-muted mb-2">Wallet Balance</h6>
-              <i class="fas fa-wallet text-primary"></i>
-            </div>
-            <h3 class="mb-1">{{ wallet_status.wallet_balance|floatformat:2 }} QR</h3>
-            <small class="text-muted">Credit Limit: {{ wallet_status.credit_limit|floatformat:0 }} QR</small>
-          </div>
+    <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--info">
+            <i class="fa-solid fa-hand-holding-dollar"></i>
         </div>
-      </div>
-      <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
-          <div class="card-body">
-            <div class="d-flex justify-content-between">
-              <h6 class="text-muted mb-2">COD in Hand</h6>
-              <i class="fas fa-hand-holding-dollar text-warning"></i>
-            </div>
-            <h3 class="mb-1">{{ wallet_status.cod_in_hand|floatformat:2 }} QR</h3>
-            <small class="text-muted">Available Credit: {{ wallet_status.available_credit|floatformat:0 }} QR</small>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
-          <div class="card-body">
-            <div class="d-flex justify-content-between">
-              <h6 class="text-muted mb-2">Pending Earnings</h6>
-              <i class="fas fa-clock text-success"></i>
-            </div>
-            <h3 class="mb-1">{{ wallet_status.pending_earnings|floatformat:2 }} QR</h3>
-            <small class="text-muted">Total: {{ wallet_status.total_earnings|floatformat:0 }} QR</small>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card border-0 shadow-sm h-100 border-start border-4 {% if wallet_status.is_blocked %}border-danger{% elif wallet_status.is_warning %}border-warning{% else %}border-info{% endif %}">
-          <div class="card-body">
-            <div class="d-flex justify-content-between">
-              <h6 class="text-muted mb-2">Wallet Usage</h6>
-              <i class="fas fa-gauge-high {% if wallet_status.is_blocked %}text-danger{% elif wallet_status.is_warning %}text-warning{% else %}text-info{% endif %}"></i>
-            </div>
-            <h3 class="mb-1">{{ wallet_status.usage_percentage|floatformat:1 }}%</h3>
-            <small class="{% if wallet_status.is_blocked %}text-danger{% elif wallet_status.is_warning %}text-warning{% else %}text-muted{% endif %}">
-              {% if wallet_status.is_blocked %}Wallet Blocked{% elif wallet_status.is_warning %}Warning - Submit COD{% else %}Normal{% endif %}
-            </small>
-          </div>
-        </div>
-      </div>
+        <div class="fleet-stat__value" style="color:var(--fleet-info);">{{ cod_stats.collected_count|default:0 }}</div>
+        <div class="fleet-stat__label">Collected</div>
     </div>
-
-    <div class="row mb-4">
-      <!-- COD Pipeline -->
-      <div class="col-md-6 mb-3">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">COD Pipeline</h5>
-            <a href="{% url 'fleet:cod_collection' %}" class="btn btn-sm btn-outline-warning">View Details</a>
-          </div>
-          <div class="card-body">
-            <div class="row text-center">
-              <div class="col-4">
-                <div class="p-3 rounded" style="background: #fff3cd;">
-                  <i class="fas fa-arrow-down fa-2x text-warning mb-2 d-block"></i>
-                  <h4 class="mb-0">{{ cod_collected|floatformat:0 }}</h4>
-                  <small class="text-muted">Collected</small>
-                </div>
-              </div>
-              <div class="col-4">
-                <div class="p-3 rounded" style="background: #d1e7dd;">
-                  <i class="fas fa-arrow-up fa-2x text-success mb-2 d-block"></i>
-                  <h4 class="mb-0">{{ cod_deposited|floatformat:0 }}</h4>
-                  <small class="text-muted">Deposited</small>
-                </div>
-              </div>
-              <div class="col-4">
-                <div class="p-3 rounded" style="background: #fce4ec;">
-                  <i class="fas fa-rotate-left fa-2x mb-2 d-block" style="color: #e53935;"></i>
-                  <h4 class="mb-0">{{ cod_returned|floatformat:0 }}</h4>
-                  <small class="text-muted">Returned</small>
-                </div>
-              </div>
-            </div>
-            <div class="mt-3">
-              <a href="{% url 'fleet:cod_submission' %}" class="btn btn-warning w-100">
-                <i class="fas fa-arrow-up me-1"></i> Submit COD to Admin
-              </a>
-            </div>
-          </div>
+    <div class="fleet-stat">
+        <div class="fleet-stat__icon fleet-stat__icon--success">
+            <i class="fa-solid fa-circle-check"></i>
         </div>
-      </div>
-
-      <!-- Earnings Summary -->
-      <div class="col-md-6 mb-3">
-        <div class="listing-container h-100">
-          <div class="listing-header">
-            <h6 class="listing-title"><i class="fas fa-coins text-success"></i>Earnings Summary</h6>
-            <a href="{% url 'fleet:driver_earnings' %}" class="btn btn-sm btn-outline-success">View Details</a>
-          </div>
-          <table class="listing-table">
-            <tbody>
-              <tr>
-                <td><span class="listing-status success"><i class="fas fa-coins"></i></span> Delivery Earnings</td>
-                <td class="text-end fw-bold text-success">{{ earnings_total|floatformat:2 }} QR</td>
-              </tr>
-              <tr>
-                <td><span class="listing-status info"><i class="fas fa-gift"></i></span> Bonuses</td>
-                <td class="text-end fw-bold text-info">{{ bonuses_total|floatformat:2 }} QR</td>
-              </tr>
-              <tr>
-                <td><span class="listing-status danger"><i class="fas fa-minus"></i></span> Deductions</td>
-                <td class="text-end fw-bold text-danger">{{ deductions_total|floatformat:2 }} QR</td>
-              </tr>
-              <tr>
-                <td><span class="listing-status"><i class="fas fa-university"></i></span> Settlements Paid</td>
-                <td class="text-end fw-bold">{{ settlements_total|floatformat:2 }} QR</td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr>
-                <td class="fw-bold"><i class="fas fa-clock text-success me-2"></i> Pending Earnings</td>
-                <td class="text-end fw-bold text-success" style="font-size: 1.1rem;">{{ wallet_status.pending_earnings|floatformat:2 }} QR</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
+        <div class="fleet-stat__value" style="color:var(--fleet-success);">{{ cod_stats.settled_count|default:0 }}</div>
+        <div class="fleet-stat__label">Settled</div>
     </div>
-
-    <!-- Transaction Breakdown + Recent Transactions -->
-    <div class="row">
-      <!-- Transaction Breakdown by Type -->
-      <div class="col-md-4 mb-3">
-        <div class="listing-container h-100">
-          <div class="listing-header">
-            <h6 class="listing-title"><i class="fas fa-chart-pie me-2 text-primary"></i>Transaction Breakdown</h6>
-          </div>
-          <table class="listing-table">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th class="text-center">Count</th>
-                <th class="text-end">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for tc in type_counts %}
-              <tr>
-                <td>{{ tc.transaction_type|title }}</td>
-                <td class="text-center"><span class="badge bg-secondary">{{ tc.count }}</span></td>
-                <td class="text-end fw-bold {% if tc.total >= 0 %}text-success{% else %}text-danger{% endif %}">
-                  {{ tc.total|floatformat:0 }} QR
-                </td>
-              </tr>
-              {% empty %}
-              <tr>
-                <td colspan="3" class="listing-empty">No transactions in this period</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Recent Transactions -->
-      <div class="col-md-8 mb-3">
-        <div class="listing-container h-100">
-          <div class="listing-header">
-            <h6 class="listing-title"><i class="fas fa-receipt me-2 text-primary"></i>Recent Transactions</h6>
-            <a href="{% url 'fleet:transaction_history' %}" class="btn btn-sm btn-outline-primary">View All</a>
-          </div>
-          <table class="listing-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Code</th>
-                <th>Type</th>
-                <th>Description</th>
-                <th class="text-end">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for txn in recent_transactions %}
-              <tr>
-                <td>{{ txn.created_at|date:"d M" }}<br><span class="text-muted" style="font-size: 0.65rem;">{{ txn.created_at|time:"H:i" }}</span></td>
-                <td><code>{{ txn.transaction_code|default:"-" }}</code></td>
-                <td>
-                  <span class="listing-status
-                    {% if txn.transaction_type == 'earning' %}success
-                    {% elif txn.transaction_type == 'cod_collection' or txn.transaction_type == 'cod_return' %}warning
-                    {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}primary
-                    {% elif txn.transaction_type == 'deduction' %}danger
-                    {% else %}{% endif %}">
-                    {% if txn.transaction_type == 'earning' %}<i class="fas fa-coins"></i>
-                    {% elif txn.transaction_type == 'cod_collection' %}<i class="fas fa-arrow-down"></i>
-                    {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}<i class="fas fa-arrow-up"></i>
-                    {% elif txn.transaction_type == 'settlement' %}<i class="fas fa-university"></i>
-                    {% elif txn.transaction_type == 'deduction' %}<i class="fas fa-minus"></i>
-                    {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
-                  </span>
-                  {{ txn.get_transaction_type_display }}
-                </td>
-                <td class="text-2line" title="{{ txn.description|default:'' }}">{{ txn.description|default:"-" }}</td>
-                <td class="text-end fw-bold {% if txn.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
-                  {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} QR
-                </td>
-              </tr>
-              {% empty %}
-              <tr>
-                <td colspan="5" class="listing-empty">
-                  <i class="fas fa-receipt"></i>
-                  No transactions found
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
+
+<!-- Earnings Breakdown -->
+<div class="fleet-card slide-up">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title"><i class="fa-solid fa-chart-pie me-2" style="color:var(--fleet-warning);"></i>Earnings Breakdown</h3>
+    </div>
+    <div class="fleet-card__body" style="padding: 0;">
+        <div class="fin-row fin-row--border">
+            <div class="fin-row__icon" style="background:#e8f8ef; color:var(--fleet-success);"><i class="fa-solid fa-calendar-check"></i></div>
+            <span class="fin-row__label">This Month</span>
+            <span class="fin-row__val">QR {{ earnings.this_month|default:"0.00" }}</span>
+        </div>
+        <div class="fin-row fin-row--border">
+            <div class="fin-row__icon" style="background:var(--fleet-grey-100); color:var(--fleet-grey-500);"><i class="fa-solid fa-calendar-xmark"></i></div>
+            <span class="fin-row__label">Last Month</span>
+            <span class="fin-row__val">QR {{ earnings.last_month|default:"0.00" }}</span>
+        </div>
+        <div class="fin-row fin-row--border">
+            <div class="fin-row__icon" style="background:#e8f0fe; color:var(--fleet-primary);"><i class="fa-solid fa-truck-fast"></i></div>
+            <span class="fin-row__label">Total Deliveries</span>
+            <span class="fin-row__val">{{ earnings.total_deliveries|default:0 }}</span>
+        </div>
+        <div class="fin-row">
+            <div class="fin-row__icon" style="background:#fff4e5; color:var(--fleet-warning);"><i class="fa-solid fa-coins"></i></div>
+            <span class="fin-row__label">Avg per Delivery</span>
+            <span class="fin-row__val">QR {{ earnings.avg_per_delivery|default:"0.00" }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Transactions -->
+<div class="fleet-card slide-up">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title"><i class="fa-solid fa-clock-rotate-left me-2"></i>Recent Transactions</h3>
+        <a href="{% url 'fleet:transaction_history' %}" style="font-size:var(--font-size-xs); font-weight:600; color:var(--fleet-primary); text-decoration:none;">View All</a>
+    </div>
+    <div class="fleet-card__body" style="padding: 0;">
+        {% if recent_transactions %}
+        {% for txn in recent_transactions %}
+        <div class="fin-txn {% if not forloop.last %}fin-txn--border{% endif %}">
+            <div class="fin-txn__body">
+                <span class="fin-txn__title">{{ txn.get_transaction_type_display }}</span>
+                <span class="fin-txn__date">{{ txn.created_at|date:"M d, Y" }}</span>
+            </div>
+            <span class="fin-txn__amount {% if txn.amount >= 0 %}fin-txn__amount--plus{% else %}fin-txn__amount--minus{% endif %}">
+                {% if txn.amount >= 0 %}+{% endif %}QR {{ txn.amount }}
+            </span>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div style="text-align:center; padding:var(--spacing-xl) 0; color:var(--fleet-grey-400); font-size:var(--font-size-sm);">
+            No transactions yet
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="fin-actions slide-up">
+    <a href="{% url 'fleet:cod_collection' %}" class="fin-action-btn fin-action-btn--warning">
+        <i class="fa-solid fa-money-bill-wave"></i>
+        <span>COD In-Hand</span>
+    </a>
+    <a href="{% url 'fleet:driver_earnings' %}" class="fin-action-btn fin-action-btn--success">
+        <i class="fa-solid fa-chart-line"></i>
+        <span>Earnings</span>
+    </a>
+    <a href="{% url 'fleet:driver_reports' %}" class="fin-action-btn fin-action-btn--dark">
+        <i class="fa-solid fa-download"></i>
+        <span>Reports</span>
+    </a>
+</div>
+
+<style>
+    .fin-hero {
+        background: linear-gradient(135deg, var(--fleet-dark) 0%, var(--fleet-navy, #1a2340) 100%);
+        border-radius: var(--radius-md); padding: var(--spacing-md) var(--spacing-md);
+        text-align: center; margin-bottom: var(--spacing-md);
+        display: flex; flex-direction: column; align-items: center; gap: var(--spacing-xs);
+    }
+    .fin-hero__label { font-size: var(--font-size-xs); font-weight: 600; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.06em; }
+    .fin-hero__amount { font-size: 2.25rem; font-weight: 900; color: #fff; line-height: 1.1; }
+    .fin-hero__cod { font-size: var(--font-size-sm); font-weight: 600; color: var(--fleet-warning); background: rgba(255,255,255,0.08); padding: 5px 14px; border-radius: var(--radius-sm); }
+
+    .fin-row { display: flex; align-items: center; gap: var(--spacing-sm); padding: 7px var(--spacing-md); }
+    .fin-row--border { border-bottom: 1px solid var(--fleet-grey-100); }
+    .fin-row__icon { width: 34px; height: 34px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: var(--font-size-sm); flex-shrink: 0; }
+    .fin-row__label { flex: 1; font-size: var(--font-size-sm); color: var(--fleet-grey-600); font-weight: 500; }
+    .fin-row__val { font-size: var(--font-size-sm); font-weight: 800; color: var(--fleet-dark); }
+
+    .fin-txn { display: flex; align-items: center; gap: var(--spacing-sm); padding: 7px var(--spacing-md); }
+    .fin-txn--border { border-bottom: 1px solid var(--fleet-grey-100); }
+    .fin-txn__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .fin-txn__title { font-size: var(--font-size-sm); font-weight: 600; color: var(--fleet-dark); }
+    .fin-txn__date { font-size: var(--font-size-xs); color: var(--fleet-grey-400); }
+    .fin-txn__amount { font-size: var(--font-size-sm); font-weight: 800; flex-shrink: 0; }
+    .fin-txn__amount--plus { color: var(--fleet-success); }
+    .fin-txn__amount--minus { color: var(--fleet-danger); }
+
+    .fin-actions { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-sm); margin-bottom: var(--spacing-md); }
+    .fin-action-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: var(--spacing-sm) var(--spacing-xs); border-radius: var(--radius-sm); text-decoration: none; font-size: var(--font-size-xs); font-weight: 700; transition: opacity 0.15s; }
+    .fin-action-btn i { font-size: 1.2rem; }
+    .fin-action-btn span { white-space: nowrap; }
+    .fin-action-btn:active { opacity: 0.75; }
+    .fin-action-btn--warning { background: var(--fleet-warning-light); color: #b45309; }
+    .fin-action-btn--success { background: var(--fleet-success-light); color: var(--fleet-success); }
+    .fin-action-btn--dark { background: var(--fleet-dark); color: #fff; }
+</style>
 {% endblock %}

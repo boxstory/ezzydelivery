@@ -68,11 +68,11 @@
   --font-size-4xl: 2.25rem;
 
   /* Border Radius */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
+  --radius-sm: 0.2rem;
+  --radius-md: 0.3rem;
+  --radius-lg: 0.4rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.6rem;
   --radius-full: 9999px;
 
   /* Shadows */
@@ -112,8 +112,8 @@
   z-index: var(--z-header);
   background: var(--fleet-white);
   border-bottom: 1px solid var(--fleet-grey-200);
-  padding: var(--spacing-md);
-  padding-top: calc(var(--spacing-md) + env(safe-area-inset-top, 0px));
+  padding: .125rem;
+  padding-top: calc(calc(var(--spacing-md) / 2) + env(safe-area-inset-top, 0px));
   backdrop-filter: blur(10px);
   background: rgba(255, 255, 255, 0.9);
 }
@@ -124,6 +124,21 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
+  gap: 0.5rem;
+}
+
+.fleet-pwa__header-logo {
+  flex-shrink: 0;
+  padding-left: var(--spacing-sm);
+}
+
+.fleet-pwa__logo-img {
+  height: 32px;
+  width: 32px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  display: block;
 }
 
 .fleet-pwa__title {
@@ -131,6 +146,8 @@
   font-weight: 700;
   color: var(--fleet-dark);
   margin: 0;
+  flex: 1;
+  text-align: left;
 }
 
 .fleet-pwa__header-actions {
@@ -141,7 +158,7 @@
 .fleet-pwa__content {
   max-width: 600px;
   margin: 0 auto;
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm);
 }
 
 /* ============================================================================
@@ -150,9 +167,9 @@
 
 .fleet-wallet {
   background: linear-gradient(135deg, var(--fleet-dark) 0%, var(--fleet-navy) 100%);
-  border-radius: var(--radius-2xl);
-  padding: var(--spacing-xl);
-  margin-bottom: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-bottom: var(--spacing-md);
   box-shadow: var(--shadow-xl);
   color: var(--fleet-white);
   position: relative;
@@ -183,56 +200,109 @@
   }
 }
 
+.fleet-wallet__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-xs);
+}
+
+.fleet-wallet__dual {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: var(--spacing-xs);
+}
+
+.fleet-wallet__half {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fleet-wallet__half:last-child {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.fleet-wallet__divider {
+  width: 1px;
+  background: rgba(255,255,255,0.15);
+  margin: 0 var(--spacing-sm);
+}
+
 .fleet-wallet__label {
-  font-size: var(--font-size-sm);
-  opacity: 0.9;
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
   font-weight: 500;
-  margin-bottom: var(--spacing-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.fleet-wallet__balance {
-  font-size: var(--font-size-4xl);
+.fleet-wallet__cod-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+}
+
+.fleet-wallet__cod-pill-label {
+  font-size: 10px;
+  opacity: 0.7;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.fleet-wallet__cod-pill-val {
+  font-size: var(--font-size-sm);
   font-weight: 800;
-  line-height: 1.2;
-  margin-bottom: var(--spacing-md);
+  color: var(--fleet-warning);
+}
+
+.fleet-wallet__balance {
+  font-size: var(--font-size-3xl);
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: var(--spacing-xs);
   color: var(--fleet-primary);
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .fleet-wallet__balance small {
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-base);
   font-weight: 500;
   opacity: 0.9;
-  margin-left: var(--spacing-xs);
+  margin-left: 4px;
 }
 
 .fleet-wallet__stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: var(--spacing-md);
-  padding-top: var(--spacing-md);
+  padding-top: var(--spacing-xs);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .fleet-wallet__stat {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .fleet-wallet__stat-value {
-  display: block;
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-sm);
   font-weight: 700;
   color: var(--fleet-primary);
-  margin-bottom: var(--spacing-xs);
 }
 
 .fleet-wallet__stat-label {
-  display: block;
-  font-size: var(--font-size-xs);
-  opacity: 0.8;
+  font-size: 10px;
+  opacity: 0.7;
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 /* ============================================================================
@@ -249,7 +319,7 @@
 .fleet-quick-action {
   background: var(--fleet-white);
   border: none;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-sm);
   padding: var(--spacing-md);
   text-align: center;
   text-decoration: none;
@@ -307,7 +377,7 @@
 
 .fleet-card {
   background: var(--fleet-white);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-sm);
   padding: var(--spacing-lg);
   margin-bottom: var(--spacing-md);
   box-shadow: var(--shadow-sm);
@@ -374,7 +444,7 @@
 
 .fleet-stat {
   background: var(--fleet-white);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   padding: var(--spacing-lg);
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--fleet-grey-100);
@@ -451,7 +521,7 @@
 
 .fleet-list-item {
   background: var(--fleet-white);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   padding: var(--spacing-md);
   margin-bottom: var(--spacing-sm);
   display: flex;
@@ -514,16 +584,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-radius: var(--radius-lg);
-  font-size: var(--font-size-base);
+  gap: var(--spacing-xs);
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   text-decoration: none;
   border: none;
   cursor: pointer;
   transition: all var(--transition-base);
-  min-height: 44px;
+  min-height: 38px;
   text-align: center;
 }
 
@@ -586,7 +656,7 @@
 .fleet-btn-icon {
   width: 44px;
   height: 44px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -611,7 +681,7 @@
   align-items: center;
   gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   font-size: var(--font-size-xs);
   font-weight: 600;
   line-height: 1;
@@ -697,9 +767,16 @@
   transform: translateX(-50%);
   width: 32px;
   height: 3px;
-  background: var(--fleet-primary);
+  background: currentColor;
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 }
+
+/* Per-tab active colours */
+.fleet-bottom-nav__item--home.active   { color: #2563eb; }
+.fleet-bottom-nav__item--tasks.active  { color: #10b981; }
+.fleet-bottom-nav__item--scan.active   { color: #7c3aed; }
+.fleet-bottom-nav__item--cod.active    { color: #f59e0b; }
+.fleet-bottom-nav__item--profile.active { color: #0ea5e9; }
 
 .fleet-bottom-nav__icon {
   font-size: 1.1rem;
@@ -717,7 +794,7 @@
   right: calc(50% - 16px);
   min-width: 18px;
   height: 18px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   background: var(--fleet-danger);
   color: var(--fleet-white);
   font-size: 10px;
@@ -748,7 +825,7 @@
   width: 100%;
   padding: var(--spacing-md);
   border: 2px solid var(--fleet-grey-200);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   font-size: var(--font-size-base);
   color: var(--fleet-grey-900);
   background: var(--fleet-white);
@@ -836,7 +913,7 @@
 .fleet-empty__icon {
   width: 80px;
   height: 80px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   background: var(--fleet-grey-100);
   color: var(--fleet-grey-400);
   display: flex;
@@ -866,7 +943,7 @@
 .fleet-swipe-card {
   position: relative;
   background: var(--fleet-white);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-sm);
   margin-bottom: var(--spacing-md);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
@@ -965,7 +1042,7 @@
 
 .fleet-timeline__content {
   background: var(--fleet-white);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   padding: var(--spacing-md);
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--fleet-grey-100);
@@ -1007,7 +1084,7 @@
 .fleet-progress {
   height: 8px;
   background: var(--fleet-grey-200);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   overflow: hidden;
   position: relative;
 }
@@ -1015,7 +1092,7 @@
 .fleet-progress__bar {
   height: 100%;
   background: var(--fleet-primary);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   transition: width var(--transition-slow);
   position: relative;
   overflow: hidden;
@@ -1085,7 +1162,7 @@
   position: absolute;
   inset: 0;
   border: 3px solid var(--fleet-primary);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-sm);
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
 }
 
@@ -1126,7 +1203,7 @@
   right: var(--spacing-lg);
   width: 48px;
   height: 48px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(10px);
   border: none;
@@ -1225,3 +1302,353 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================================
+   UTILITY: SECTION HELPERS
+   ============================================================================ */
+
+.fleet-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.fleet-section-title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fleet-grey-500);
+  display: block;
+  margin-bottom: var(--spacing-xs);
+}
+
+.fleet-link {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--fleet-primary-dark);
+  text-decoration: none;
+}
+
+/* ============================================================================
+   LIST ITEMS (Documents, Vehicles)
+   ============================================================================ */
+
+.fleet-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.fleet-list-item {
+  background: var(--fleet-white);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--fleet-grey-100);
+}
+
+.fleet-list-item__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.fleet-list-item__icon--primary { background: rgba(247,192,0,0.15); color: var(--fleet-primary-dark); }
+.fleet-list-item__icon--success  { background: var(--fleet-success-light); color: var(--fleet-success); }
+.fleet-list-item__icon--warning  { background: var(--fleet-warning-light); color: var(--fleet-warning); }
+.fleet-list-item__icon--danger   { background: var(--fleet-danger-light); color: var(--fleet-danger); }
+.fleet-list-item__icon--info     { background: var(--fleet-info-light); color: var(--fleet-info); }
+
+.fleet-list-item__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.fleet-list-item__title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--fleet-grey-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fleet-list-item__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+  font-size: var(--font-size-xs);
+  color: var(--fleet-grey-500);
+  margin-top: 2px;
+}
+
+.fleet-list-item__dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--fleet-grey-400);
+  display: inline-block;
+}
+
+.fleet-list-item__actions {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+/* ============================================================================
+   BUTTON VARIANTS
+   ============================================================================ */
+
+.fleet-btn--full { width: 100%; }
+.fleet-btn--warning {
+  background: var(--fleet-warning);
+  color: var(--fleet-dark);
+  border: none;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+.fleet-btn--danger {
+  background: var(--fleet-danger);
+  color: var(--fleet-white);
+  border: none;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.fleet-btn-icon--sm {
+  width: 34px;
+  height: 34px;
+  font-size: 0.85rem;
+}
+
+.fleet-btn-icon--danger {
+  color: var(--fleet-danger);
+}
+.fleet-btn-icon--warning {
+  color: var(--fleet-warning);
+}
+
+/* ============================================================================
+   EMPTY STATE
+   ============================================================================ */
+
+.fleet-empty {
+  text-align: center;
+  padding: var(--spacing-2xl) var(--spacing-lg);
+  color: var(--fleet-grey-400);
+}
+
+.fleet-empty__icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.5;
+}
+
+.fleet-empty__title {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--fleet-grey-600);
+  margin-bottom: var(--spacing-xs);
+}
+
+.fleet-empty__text {
+  font-size: var(--font-size-sm);
+  color: var(--fleet-grey-400);
+}
+
+/* ============================================================================
+   WALLET HERO (Finance, COD pages)
+   ============================================================================ */
+
+.fleet-wallet-hero {
+  background: linear-gradient(135deg, var(--fleet-dark) 0%, var(--fleet-dark-light) 100%);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  color: var(--fleet-white);
+}
+
+.fleet-wallet-hero--warning {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+}
+
+.fleet-wallet-hero--success {
+  background: linear-gradient(135deg, #4caf50, #388e3c);
+}
+
+.fleet-wallet-hero__label {
+  font-size: var(--font-size-sm);
+  opacity: 0.8;
+  margin-bottom: var(--spacing-xs);
+}
+
+.fleet-wallet-hero__balance {
+  font-size: var(--font-size-3xl);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.fleet-wallet-hero__balance span {
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.fleet-wallet-hero__row {
+  display: flex;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid rgba(255,255,255,0.15);
+}
+
+.fleet-wallet-hero__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fleet-wallet-hero__stat-label {
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
+}
+
+.fleet-wallet-hero__stat-value {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+/* ============================================================================
+   STAT GRID (3-column)
+   ============================================================================ */
+
+.fleet-stat-grid {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.fleet-stat-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.fleet-stat-card {
+  background: var(--fleet-white);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-md);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--fleet-grey-100);
+}
+
+.fleet-stat-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--spacing-sm);
+  font-size: 1rem;
+}
+
+.fleet-stat-card__icon--warning { background: var(--fleet-warning-light); color: var(--fleet-warning); }
+.fleet-stat-card__icon--success { background: var(--fleet-success-light); color: var(--fleet-success); }
+.fleet-stat-card__icon--danger  { background: var(--fleet-danger-light); color: var(--fleet-danger); }
+.fleet-stat-card__icon--primary { background: rgba(247,192,0,0.15); color: var(--fleet-primary-dark); }
+.fleet-stat-card__icon--info    { background: var(--fleet-info-light); color: var(--fleet-info); }
+
+.fleet-stat-card__value {
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: var(--fleet-grey-900);
+}
+
+.fleet-stat-card__label {
+  font-size: var(--font-size-xs);
+  color: var(--fleet-grey-500);
+  font-weight: 600;
+}
+
+/* ============================================================================
+   ACTION GRID (Quick Action buttons)
+   ============================================================================ */
+
+.fleet-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-sm);
+}
+
+/* ============================================================================
+   TRANSACTION CODE
+   ============================================================================ */
+
+.txn-item__code {
+  font-family: monospace;
+  font-size: 0.7rem;
+}
+
+/* ============================================================================
+   MOVE TOAST & SPLASH INLINE STYLES TO EXTERNAL CSS
+   ============================================================================ */
+
+.toast-container {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 1rem);
+  left: 1rem;
+  right: 1rem;
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  pointer-events: none;
+}
+
+.fleet-toast {
+  background: var(--fleet-white);
+  padding: var(--spacing-md) 1.25rem;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-xl);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all var(--transition-base);
+  pointer-events: auto;
+}
+
+.fleet-toast.show { opacity: 1; transform: translateY(0); }
+.fleet-toast--success { color: var(--fleet-success); border-left: 4px solid var(--fleet-success); }
+.fleet-toast--warning { color: var(--fleet-warning); border-left: 4px solid var(--fleet-warning); }
+.fleet-toast--danger  { color: var(--fleet-danger);  border-left: 4px solid var(--fleet-danger); }
+.fleet-toast--info    { color: var(--fleet-info);    border-left: 4px solid var(--fleet-info); }
+.fleet-toast i        { font-size: 1.25rem; }
+

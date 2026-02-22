@@ -1,273 +1,188 @@
-{% extends "fleet_dashboard_base.html" %}
+{% extends "fleet/pwa_base.html" %}
 {% load static %}
 {% load core_filters %}
-{% block extra_css %}
-<link href="{% static 'fleet/css/fleet-bem.css' %}" rel="stylesheet" type="text/css" />
-{% endblock extra_css %}
+
+{% block title %}Performance{% endblock %}
+{% block page_title %}Performance{% endblock %}
+
+{% block header_actions %}
+<button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
+    <i class="fa-solid fa-rotate-right"></i>
+</button>
+{% endblock %}
 
 {% block content %}
-<div class="flt-perf">
-    <!-- Hero Banner -->
-    <div class="flt__hero" id="fleet_performance_section_header">
-        <div class="flt__hero-inner">
-            <div class="flt__hero-left">
-                <h1 class="flt__hero-title" id="fleet_performance_header_title">
-                    <i class="fa-solid fa-gauge-high"></i> My Performance
-                </h1>
-                <p class="flt__hero-sub">{{ driver.user.get_full_name }}</p>
-            </div>
-            <div class="flt__hero-right">
-                <div class="flt__hero-stat">
-                    <span class="flt__hero-stat__num">{{ performance_metrics.completion_rate|floatformat:1 }}%</span>
-                    <span class="flt__hero-stat__label">Completion</span>
-                </div>
-                <div class="flt__hero-stat flt__hero-stat--ok">
-                    <span class="flt__hero-stat__num">{{ performance_metrics.average_rating|floatformat:1 }}</span>
-                    <span class="flt__hero-stat__label">Rating</span>
-                </div>
-            </div>
+
+<!-- Period Filter Pills -->
+<div class="perf-period-row">
+    {% for val, label in period_choices %}
+    <a href="?period={{ val }}" class="perf-period-pill {% if period == val %}perf-period-pill--active{% endif %}">{{ label }}</a>
+    {% endfor %}
+</div>
+
+<!-- Hero Metric: Completion Rate -->
+<div class="perf-hero fade-in">
+    <div class="perf-hero__ring-wrap">
+        <svg class="perf-hero__ring" viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="34" fill="none" stroke="var(--fleet-grey-100)" stroke-width="8"/>
+            <circle cx="40" cy="40" r="34" fill="none" stroke="var(--fleet-success)" stroke-width="8"
+                stroke-dasharray="213.6"
+                stroke-dashoffset="{{ stats.completion_rate|default:0|floatformat:0|add:0 }}"
+                stroke-linecap="round"
+                transform="rotate(-90 40 40)"
+                id="completionRing"
+                data-rate="{{ stats.completion_rate|default:0 }}"/>
+        </svg>
+        <div class="perf-hero__ring-label">
+            <span class="perf-hero__ring-pct">{{ stats.completion_rate|default:0 }}%</span>
+            <span class="perf-hero__ring-sub">Complete</span>
         </div>
     </div>
-
-    <!-- Period Filter -->
-    <div class="flt__card" id="fleet_performance_card_filter">
-        <div class="flt__card-header">
-            <i class="fa-solid fa-calendar"></i> Time Period
+    <div class="perf-hero__metrics">
+        <div class="perf-hero__metric">
+            <span class="perf-hero__metric-val" style="color:var(--fleet-warning);">{{ stats.cod_rate|default:0 }}%</span>
+            <span class="perf-hero__metric-lbl">COD Rate</span>
         </div>
-        <div class="flt__card-body">
-            <form method="get" class="d-flex align-items-center gap-3 flex-wrap" id="fleet_performance_form_filter">
-                <label class="flt__filter-label">
-                    <i class="fa-solid fa-calendar me-1"></i>Period:
-                </label>
-                <select name="period" class="flt__select" onchange="this.form.submit()">
-                    {% for value, label in period_options %}
-                    <option value="{{ value }}" {% if selected_period == value %}selected{% endif %}>
-                        {{ label }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </form>
+        <div class="perf-hero__metric">
+            <span class="perf-hero__metric-val" style="color:var(--fleet-info);">
+                {% if stats.avg_rating %}{{ stats.avg_rating|floatformat:1 }}{% else %}—{% endif %}
+            </span>
+            <span class="perf-hero__metric-lbl">Avg Rating</span>
         </div>
-    </div>
-
-    <!-- Performance Overview Cards -->
-    <div class="flt__stat-row">
-        <div class="flt__stat-card" id="fleet_performance_card_completion_rate">
-            <div class="flt__stat-card__icon flt__stat-card__icon--primary">
-                <i class="fa-solid fa-clipboard-check"></i>
-            </div>
-            <div class="flt__stat-card__body">
-                <div class="flt__stat-card__value">{{ performance_metrics.completion_rate|floatformat:1 }}%</div>
-                <div class="flt__stat-card__label">Completion Rate</div>
-                <div class="flt__stat-card__sub">{{ performance_metrics.completed_tasks }} of {{ performance_metrics.total_tasks }} tasks</div>
-            </div>
+        <div class="perf-hero__metric">
+            <span class="perf-hero__metric-val" style="color:var(--fleet-dark);">QR {{ stats.total_earnings|default:"0" }}</span>
+            <span class="perf-hero__metric-lbl">Earnings</span>
         </div>
-        <div class="flt__stat-card">
-            <div class="flt__stat-card__icon flt__stat-card__icon--success">
-                <i class="fa-solid fa-money-bill-wave"></i>
-            </div>
-            <div class="flt__stat-card__body">
-                <div class="flt__stat-card__value">{{ performance_metrics.cod_collection_rate|floatformat:1 }}%</div>
-                <div class="flt__stat-card__label">COD Collection Rate</div>
-                <div class="flt__stat-card__sub">Efficient cash handling</div>
-            </div>
-        </div>
-        <div class="flt__stat-card">
-            <div class="flt__stat-card__icon flt__stat-card__icon--warning">
-                <i class="fa-solid fa-star"></i>
-            </div>
-            <div class="flt__stat-card__body">
-                <div class="flt__stat-card__value">{{ performance_metrics.average_rating|floatformat:1 }}</div>
-                <div class="flt__stat-card__label">Average Rating</div>
-                <div class="flt__stat-card__sub">Based on {{ performance_metrics.total_reviews }} reviews</div>
-            </div>
-        </div>
-        <div class="flt__stat-card">
-            <div class="flt__stat-card__icon flt__stat-card__icon--info">
-                <i class="fa-solid fa-coins"></i>
-            </div>
-            <div class="flt__stat-card__body">
-                <div class="flt__stat-card__value">{{ stats.total_earnings|floatformat:0 }} QR</div>
-                <div class="flt__stat-card__label">Total Earnings</div>
-                <div class="flt__stat-card__sub">In this period</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Task Status Breakdown -->
-    <div class="flt__card">
-        <div class="flt__card-header">
-            <i class="fa-solid fa-chart-pie"></i> Task Status Breakdown
-        </div>
-        <div class="flt__card-body">
-            <div class="flt__breakdown-grid">
-                <div class="flt__breakdown-item">
-                    <div class="flt__breakdown-item__icon flt__breakdown-item__icon--primary">
-                        <i class="fa-solid fa-clipboard-check"></i>
-                    </div>
-                    <div class="flt__breakdown-item__num">{{ performance_metrics.total_tasks }}</div>
-                    <div class="flt__breakdown-item__label">Total Tasks</div>
-                </div>
-                <div class="flt__breakdown-item">
-                    <div class="flt__breakdown-item__icon flt__breakdown-item__icon--success">
-                        <i class="fa-solid fa-circle-check"></i>
-                    </div>
-                    <div class="flt__breakdown-item__num">{{ performance_metrics.completed_tasks }}</div>
-                    <div class="flt__breakdown-item__label">Completed</div>
-                </div>
-                <div class="flt__breakdown-item">
-                    <div class="flt__breakdown-item__icon flt__breakdown-item__icon--danger">
-                        <i class="fa-solid fa-circle-xmark"></i>
-                    </div>
-                    <div class="flt__breakdown-item__num">{{ performance_metrics.failed_tasks }}</div>
-                    <div class="flt__breakdown-item__label">Failed</div>
-                </div>
-                <div class="flt__breakdown-item">
-                    <div class="flt__breakdown-item__icon flt__breakdown-item__icon--warning">
-                        <i class="fa-solid fa-spinner"></i>
-                    </div>
-                    <div class="flt__breakdown-item__num">{{ performance_metrics.in_progress }}</div>
-                    <div class="flt__breakdown-item__label">In Progress</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Daily Performance (Last 7 Days) -->
-    <div class="flt__card" id="fleet_performance_card_daily">
-        <div class="flt__card-header" id="fleet_performance_title_daily">
-            <i class="fa-solid fa-chart-line"></i> Daily Performance (Last 7 Days)
-        </div>
-        <div class="flt__card-body flt__card-body--flush">
-            <div class="listing-container">
-                <table class="listing-table" id="fleet_performance_table_daily">
-                    <thead id="fleet_performance_thead_daily">
-                        <tr>
-                            <th>Date</th>
-                            <th class="text-center">Total</th>
-                            <th class="text-center">Completed</th>
-                            <th class="text-center">Failed</th>
-                            <th class="text-center">Success Rate</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for day in daily_stats %}
-                        <tr>
-                            <td class="fw-bold">{{ day.date }}</td>
-                            <td class="text-center">{{ day.total }}</td>
-                            <td class="text-center">
-                                <span class="listing-status success">{{ day.completed }}</span>
-                            </td>
-                            <td class="text-center">
-                                <span class="listing-status danger">{{ day.failed }}</span>
-                            </td>
-                            <td class="text-center">
-                                {% if day.total > 0 %}
-                                {% widthratio day.completed day.total 100 %}%
-                                {% else %}
-                                N/A
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center text-muted py-3">No daily stats available</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Wallet & Financial Row -->
-    <div class="flt__two-col">
-        <!-- Wallet Performance -->
-        <div class="flt__card">
-            <div class="flt__card-header">
-                <i class="fa-solid fa-wallet"></i> Wallet Status
-            </div>
-            <div class="flt__card-body">
-                <div class="flt__progress-row">
-                    <span class="flt__progress-row__label">Credit Usage</span>
-                    <span class="flt__progress-row__value">{{ wallet_status.usage_percentage|floatformat:1 }}%</span>
-                </div>
-                <div class="flt__progress-bar">
-                    <div class="flt__progress-bar__fill {% if wallet_status.is_blocked %}flt__progress-bar__fill--danger{% elif wallet_status.is_warning %}flt__progress-bar__fill--warning{% else %}flt__progress-bar__fill--success{% endif %}"
-                         data-width="{{ wallet_status.usage_percentage }}"></div>
-                </div>
-                <div class="flt__wallet-stats">
-                    <div class="flt__wallet-stat">
-                        <span class="flt__wallet-stat__label">Available Credit</span>
-                        <span class="flt__wallet-stat__value flt__wallet-stat__value--success">{{ wallet_status.available_credit }} QR</span>
-                    </div>
-                    <div class="flt__wallet-stat">
-                        <span class="flt__wallet-stat__label">COD In Hand</span>
-                        <span class="flt__wallet-stat__value flt__wallet-stat__value--warning">{{ wallet_status.cod_in_hand }} QR</span>
-                    </div>
-                    <div class="flt__wallet-stat">
-                        <span class="flt__wallet-stat__label">Pending Earnings</span>
-                        <span class="flt__wallet-stat__value flt__wallet-stat__value--primary">{{ wallet_status.pending_earnings }} QR</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Financial Summary -->
-        <div class="flt__card">
-            <div class="flt__card-header">
-                <i class="fa-solid fa-sack-dollar"></i> Financial Summary
-            </div>
-            <div class="flt__card-body">
-                <div class="flt__field">
-                    <span class="flt__field__label">Total COD Collected</span>
-                    <span class="flt__field__value flt__field__value--warning">{{ stats.total_cod_collected|floatformat:2 }} QR</span>
-                </div>
-                <div class="flt__field">
-                    <span class="flt__field__label">Total Earnings</span>
-                    <span class="flt__field__value flt__field__value--success">{{ stats.total_earnings|floatformat:2 }} QR</span>
-                </div>
-                <div class="flt__field flt__field--no-border">
-                    <span class="flt__field__label">Successful Deliveries</span>
-                    <span class="flt__field__value flt__field__value--primary">{{ stats.successful_deliveries }}</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="flt__actions-bar">
-        <a href="{% url 'fleet:driver_analytics' %}" class="flt__btn flt__btn--primary">
-            <i class="fa-solid fa-chart-pie me-1"></i>View Analytics
-        </a>
-        <a href="{% url 'fleet:driver_reports' %}" class="flt__btn flt__btn--outline">
-            <i class="fa-solid fa-file-pdf me-1"></i>Download Reports
-        </a>
-        <a href="{% url 'fleet:driver_earnings' %}" class="flt__btn flt__btn--outline-success">
-            <i class="fa-solid fa-coins me-1"></i>View Earnings
-        </a>
-        <a href="{% url 'fleet:fleet_dashboard' %}" class="flt__btn flt__btn--ghost">
-            <i class="fa-solid fa-arrow-left me-1"></i>Back to Dashboard
-        </a>
     </div>
 </div>
-{% endblock content %}
 
-{% block extra_js %}
+<!-- Task Breakdown -->
+<div class="fleet-card slide-up">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title"><i class="fa-solid fa-chart-bar me-2"></i>Task Breakdown</h3>
+    </div>
+    <div class="fleet-card__body" style="padding: var(--spacing-sm) 0 0;">
+        <div class="perf-breakdown">
+            <div class="perf-breakdown__item">
+                <span class="perf-breakdown__val" style="color:var(--fleet-success);">{{ task_counts.delivered|default:0 }}</span>
+                <div class="perf-breakdown__bar-wrap">
+                    <div class="perf-breakdown__bar perf-breakdown__bar--success"
+                        style="width:{% if task_counts.total %}{{ task_counts.delivered|default:0|floatformat:0 }}{% else %}0{% endif %}%"></div>
+                </div>
+                <span class="perf-breakdown__lbl">Delivered</span>
+            </div>
+            <div class="perf-breakdown__item">
+                <span class="perf-breakdown__val" style="color:var(--fleet-danger);">{{ task_counts.failed|default:0 }}</span>
+                <div class="perf-breakdown__bar-wrap">
+                    <div class="perf-breakdown__bar perf-breakdown__bar--danger"
+                        style="width:{% if task_counts.total %}{{ task_counts.failed|default:0|floatformat:0 }}{% else %}0{% endif %}%"></div>
+                </div>
+                <span class="perf-breakdown__lbl">Failed</span>
+            </div>
+            <div class="perf-breakdown__item">
+                <span class="perf-breakdown__val" style="color:var(--fleet-warning);">{{ task_counts.returned|default:0 }}</span>
+                <div class="perf-breakdown__bar-wrap">
+                    <div class="perf-breakdown__bar perf-breakdown__bar--warning"
+                        style="width:{% if task_counts.total %}{{ task_counts.returned|default:0|floatformat:0 }}{% else %}0{% endif %}%"></div>
+                </div>
+                <span class="perf-breakdown__lbl">Returned</span>
+            </div>
+            <div class="perf-breakdown__item">
+                <span class="perf-breakdown__val" style="color:var(--fleet-grey-600);">{{ task_counts.total|default:0 }}</span>
+                <div class="perf-breakdown__bar-wrap">
+                    <div class="perf-breakdown__bar" style="width:100%; background:var(--fleet-grey-200);"></div>
+                </div>
+                <span class="perf-breakdown__lbl">Total</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Daily Stats -->
+{% if daily_stats %}
+<div class="fleet-card slide-up">
+    <div class="fleet-card__header">
+        <h3 class="fleet-card__title"><i class="fa-solid fa-calendar-days me-2"></i>Daily Stats</h3>
+    </div>
+    <div class="fleet-card__body" style="padding: 0;">
+        {% for day in daily_stats %}
+        <div class="perf-day {% if not forloop.last %}perf-day--border{% endif %}">
+            <span class="perf-day__date">{{ day.date|date:"M d" }}</span>
+            <div class="perf-day__bar-wrap">
+                <div class="perf-day__bar" style="width:{% if daily_stats %}{{ day.delivered|default:0 }}{% else %}0{% endif %}%;"></div>
+            </div>
+            <div class="perf-day__nums">
+                <span class="perf-day__done">{{ day.delivered }}</span>
+                <span class="perf-day__sep">/</span>
+                <span class="perf-day__total">{{ day.total }}</span>
+            </div>
+            <span class="perf-day__earn">QR {{ day.earnings|default:"0" }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<style>
+    .perf-period-row { display: flex; gap: var(--spacing-xs); overflow-x: auto; padding-bottom: var(--spacing-xs); margin-bottom: var(--spacing-md); scrollbar-width: none; }
+    .perf-period-row::-webkit-scrollbar { display: none; }
+    .perf-period-pill {
+        padding: 6px 14px; border-radius: var(--radius-sm); font-size: var(--font-size-xs); font-weight: 600;
+        white-space: nowrap; text-decoration: none; flex-shrink: 0;
+        background: var(--fleet-grey-100); color: var(--fleet-grey-600);
+        border: 1px solid var(--fleet-grey-200);
+    }
+    .perf-period-pill--active { background: var(--fleet-dark); color: #fff; border-color: var(--fleet-dark); }
+
+    .perf-hero {
+        background: var(--fleet-white); border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm); border: 1px solid var(--fleet-grey-100);
+        display: flex; align-items: center; gap: var(--spacing-md);
+        padding: var(--spacing-sm) var(--spacing-md); margin-bottom: var(--spacing-md);
+    }
+    .perf-hero__ring-wrap { position: relative; width: 80px; height: 80px; flex-shrink: 0; }
+    .perf-hero__ring { width: 80px; height: 80px; }
+    .perf-hero__ring-label {
+        position: absolute; inset: 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+    }
+    .perf-hero__ring-pct { font-size: var(--font-size-sm); font-weight: 800; color: var(--fleet-dark); line-height: 1; }
+    .perf-hero__ring-sub { font-size: 9px; color: var(--fleet-grey-500); font-weight: 600; text-transform: uppercase; }
+    .perf-hero__metrics { flex: 1; display: flex; flex-direction: column; gap: var(--spacing-sm); }
+    .perf-hero__metric { display: flex; align-items: center; justify-content: space-between; }
+    .perf-hero__metric-val { font-size: var(--font-size-base); font-weight: 800; }
+    .perf-hero__metric-lbl { font-size: var(--font-size-xs); color: var(--fleet-grey-500); font-weight: 500; }
+
+    .perf-breakdown { display: flex; gap: var(--spacing-xs); padding: 0 var(--spacing-sm) var(--spacing-sm); }
+    .perf-breakdown__item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .perf-breakdown__val { font-size: var(--font-size-lg); font-weight: 800; line-height: 1; }
+    .perf-breakdown__bar-wrap { width: 100%; height: 4px; background: var(--fleet-grey-100); border-radius: var(--radius-sm); overflow: hidden; }
+    .perf-breakdown__bar { height: 100%; border-radius: var(--radius-sm); min-width: 4px; }
+    .perf-breakdown__bar--success { background: var(--fleet-success); }
+    .perf-breakdown__bar--danger { background: var(--fleet-danger); }
+    .perf-breakdown__bar--warning { background: var(--fleet-warning); }
+    .perf-breakdown__lbl { font-size: 10px; color: var(--fleet-grey-500); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+
+    .perf-day { display: flex; align-items: center; gap: var(--spacing-sm); padding: 6px var(--spacing-md); }
+    .perf-day--border { border-bottom: 1px solid var(--fleet-grey-100); }
+    .perf-day__date { font-size: var(--font-size-xs); font-weight: 600; color: var(--fleet-grey-500); width: 36px; flex-shrink: 0; }
+    .perf-day__bar-wrap { flex: 1; height: 6px; background: var(--fleet-grey-100); border-radius: var(--radius-sm); overflow: hidden; }
+    .perf-day__bar { height: 100%; background: var(--fleet-success); border-radius: var(--radius-sm); min-width: 4px; }
+    .perf-day__nums { font-size: var(--font-size-xs); white-space: nowrap; flex-shrink: 0; }
+    .perf-day__done { font-weight: 700; color: var(--fleet-success); }
+    .perf-day__sep { color: var(--fleet-grey-300); }
+    .perf-day__total { color: var(--fleet-grey-500); }
+    .perf-day__earn { font-size: var(--font-size-xs); font-weight: 700; color: var(--fleet-dark); white-space: nowrap; flex-shrink: 0; }
+</style>
+
 <script>
-// Auto-refresh performance data every 5 minutes
-setInterval(function() {
-    location.reload();
-}, 300000);
-
-// Animate progress bars on load
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.flt__progress-bar__fill').forEach(function(bar) {
-        var width = bar.getAttribute('data-width');
-        if (width) {
-            bar.style.width = width + '%';
-        }
-    });
-});
+    // Animate SVG ring
+    const ring = document.getElementById('completionRing');
+    if (ring) {
+        const rate = parseFloat(ring.dataset.rate) || 0;
+        const circumference = 213.6;
+        ring.style.strokeDashoffset = circumference - (rate / 100) * circumference;
+    }
+    setTimeout(function() { window.location.reload(); }, 300000);
 </script>
-{% endblock extra_js %}
+{% endblock %}

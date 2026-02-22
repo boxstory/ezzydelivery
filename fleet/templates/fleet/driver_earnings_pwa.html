@@ -5,9 +5,22 @@
 {% block page_title %}Earnings{% endblock %}
 
 {% block header_actions %}
-<button type="button" class="fleet-btn-icon" onclick="openFilterModal()">
+<button type="button" class="fleet-btn-icon" onclick="openFilterModal()" id="filterBtn"
+        {% if selected_status != 'all' or selected_settlement != 'all' %}style="color:var(--fleet-primary);"{% endif %}>
     <i class="fa-solid fa-sliders"></i>
+    {% if selected_status != 'all' or selected_settlement != 'all' %}
+    <span class="fleet-bottom-nav__badge" style="background:var(--fleet-primary);">!</span>
+    {% endif %}
 </button>
+<button type="button" class="fleet-btn-icon" onclick="window.location.reload()">
+    <i class="fa-solid fa-rotate-right"></i>
+</button>
+<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+    <i class="fa-solid fa-bell"></i>
+    {% if unread_notifications > 0 %}
+    <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
+    {% endif %}
+</a>
 {% endblock %}
 
 {% block content %}
@@ -213,7 +226,7 @@
         margin-bottom: var(--spacing-lg);
         padding: var(--spacing-xs);
         background: var(--fleet-grey-100);
-        border-radius: var(--radius-xl);
+        border-radius: var(--radius-sm);
     }
 
     .fleet-tab {
@@ -223,7 +236,8 @@
         color: var(--fleet-grey-600);
         font-size: var(--font-size-sm);
         font-weight: 600;
-        border-radius: var(--radius-lg);
+        border-radius: var(--radius-sm);
+
         transition: all var(--transition-base);
         cursor: pointer;
     }
@@ -252,8 +266,37 @@
     }
 
     function openFilterModal() {
-        // Implement filter modal
-        showToast('Advanced filters coming soon!', 'info');
+        haptic([5]);
+        document.getElementById('filterModal').classList.add('open');
+        document.getElementById('filterOverlay').classList.add('open');
+    }
+
+    function closeFilterModal() {
+        document.getElementById('filterModal').classList.remove('open');
+        document.getElementById('filterOverlay').classList.remove('open');
+    }
+
+    function applyFilters() {
+        haptic([10]);
+        const status = document.querySelector('input[name="status_filter"]:checked').value;
+        const settlement = document.querySelector('input[name="settlement_filter"]:checked').value;
+        const url = new URL(window.location);
+        url.searchParams.set('days', '{{ filter_days|default:7 }}');
+        if (status === 'all') url.searchParams.delete('status');
+        else url.searchParams.set('status', status);
+        if (settlement === 'all') url.searchParams.delete('settlement');
+        else url.searchParams.set('settlement', settlement);
+        url.searchParams.delete('page');
+        window.location = url;
+    }
+
+    function clearFilters() {
+        haptic([5]);
+        const url = new URL(window.location);
+        url.searchParams.delete('status');
+        url.searchParams.delete('settlement');
+        url.searchParams.delete('page');
+        window.location = url;
     }
 
     // Animate chart bars on load
@@ -264,4 +307,140 @@
         });
     });
 </script>
+
+<!-- Filter Modal -->
+<div id="filterOverlay" class="filter-overlay" onclick="closeFilterModal()"></div>
+<div id="filterModal" class="filter-modal">
+    <div class="filter-modal__handle"></div>
+    <div class="filter-modal__header">
+        <h3 class="filter-modal__title">Filter Earnings</h3>
+        <button type="button" onclick="closeFilterModal()" class="fleet-btn-icon" style="width:32px;height:32px;">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <!-- Delivery Status -->
+    <div class="filter-modal__section">
+        <div class="filter-modal__label">Delivery Status</div>
+        <div class="filter-radio-group">
+            <label class="filter-radio {% if selected_status == 'all' or not selected_status %}filter-radio--active{% endif %}">
+                <input type="radio" name="status_filter" value="all" {% if selected_status == 'all' or not selected_status %}checked{% endif %}>
+                All
+            </label>
+            <label class="filter-radio {% if selected_status == 'delivered' %}filter-radio--active{% endif %}">
+                <input type="radio" name="status_filter" value="delivered" {% if selected_status == 'delivered' %}checked{% endif %}>
+                Delivered
+            </label>
+            <label class="filter-radio {% if selected_status == 'returned' %}filter-radio--active{% endif %}">
+                <input type="radio" name="status_filter" value="returned" {% if selected_status == 'returned' %}checked{% endif %}>
+                Returned
+            </label>
+        </div>
+    </div>
+
+    <!-- Settlement Status -->
+    <div class="filter-modal__section">
+        <div class="filter-modal__label">Settlement</div>
+        <div class="filter-radio-group">
+            <label class="filter-radio {% if selected_settlement == 'all' or not selected_settlement %}filter-radio--active{% endif %}">
+                <input type="radio" name="settlement_filter" value="all" {% if selected_settlement == 'all' or not selected_settlement %}checked{% endif %}>
+                All
+            </label>
+            <label class="filter-radio {% if selected_settlement == 'pending' %}filter-radio--active{% endif %}">
+                <input type="radio" name="settlement_filter" value="pending" {% if selected_settlement == 'pending' %}checked{% endif %}>
+                Pending
+            </label>
+            <label class="filter-radio {% if selected_settlement == 'settled' %}filter-radio--active{% endif %}">
+                <input type="radio" name="settlement_filter" value="settled" {% if selected_settlement == 'settled' %}checked{% endif %}>
+                Settled
+            </label>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex; gap:var(--spacing-sm); margin-top:var(--spacing-lg);">
+        <button type="button" onclick="clearFilters()" class="fleet-btn fleet-btn--outline" style="flex:1;">
+            Clear
+        </button>
+        <button type="button" onclick="applyFilters()" class="fleet-btn fleet-btn--dark" style="flex:2;">
+            Apply Filters
+        </button>
+    </div>
+</div>
+
+<style>
+    .filter-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.4);
+        z-index: 1050;
+    }
+    .filter-overlay.open { display: block; }
+
+    .filter-modal {
+        position: fixed;
+        bottom: -100%;
+        left: 0;
+        right: 0;
+        background: var(--fleet-white);
+        border-radius: var(--radius-md) var(--radius-2xl) 0 0;
+        padding: var(--spacing-md) var(--spacing-lg) calc(var(--spacing-xl) + env(safe-area-inset-bottom));
+        z-index: 1051;
+        transition: bottom var(--transition-base);
+        box-shadow: var(--shadow-2xl);
+    }
+    .filter-modal.open { bottom: 0; }
+
+    .filter-modal__handle {
+        width: 40px; height: 4px;
+        background: var(--fleet-grey-200);
+        border-radius: var(--radius-sm);
+        margin: 0 auto var(--spacing-md);
+    }
+    .filter-modal__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--spacing-lg);
+    }
+    .filter-modal__title {
+        font-size: var(--font-size-lg);
+        font-weight: 800;
+        color: var(--fleet-dark);
+    }
+    .filter-modal__section { margin-bottom: var(--spacing-lg); }
+    .filter-modal__label {
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+        color: var(--fleet-grey-500);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: var(--spacing-sm);
+    }
+    .filter-radio-group {
+        display: flex;
+        gap: var(--spacing-sm);
+        flex-wrap: wrap;
+    }
+    .filter-radio {
+        display: flex;
+        align-items: center;
+        padding: var(--spacing-sm) var(--spacing-md);
+        border: 2px solid var(--fleet-grey-200);
+        border-radius: var(--radius-sm);
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        color: var(--fleet-grey-600);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+    .filter-radio input { display: none; }
+    .filter-radio--active,
+    .filter-radio:has(input:checked) {
+        border-color: var(--fleet-primary);
+        background: var(--fleet-primary);
+        color: var(--fleet-dark);
+    }
+</style>
 {% endblock %}

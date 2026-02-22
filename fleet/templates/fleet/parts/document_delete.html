@@ -1,14 +1,38 @@
-{% extends "fleet_dashboard_base.html" %}
+{% extends "fleet/pwa_base.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
-{% block content %} <div class="flex-fill p-2">
-  <h1 id="fleet_document_delete_header_title">driver document delete</h1>
-  <div class="p-3" id="fleet_document_delete_section_info">{{ document.id }} {{ document.qid_no }}</div>
-  <!-- delete link neeeds to setup later ********************************************************* -->
-  <a href="">
-    <div class="btn btn-dark" id="fleet_document_delete_btn_upload">
-      <i class="fa fa-add"></i> driver_documents_upload
+
+{% block title %}Delete Document{% endblock %}
+{% block page_title %}Delete Document{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'fleet:driver_documents' %}" class="fleet-btn-icon">
+    <i class="fa-solid fa-arrow-left"></i>
+</a>
+<a href="{% url 'fleet:driver_notifications' %}" class="fleet-btn-icon" style="position:relative; text-decoration:none;">
+    <i class="fa-solid fa-bell"></i>
+    {% if unread_notifications > 0 %}
+    <span class="fleet-bottom-nav__badge">{{ unread_notifications }}</span>
+    {% endif %}
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="fleet-section">
+    <div class="fleet-card">
+        <div class="fleet-card__body text-center">
+            <div class="fleet-empty__icon mb-3" style="color: var(--fleet-danger); font-size: 3rem;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h5 class="fw-bold mb-2">Delete Document?</h5>
+            <p class="text-muted mb-4">This action cannot be undone.</p>
+            <form method="post" id="fleet_document_delete_form_main">
+                {% csrf_token %}
+                <a href="{% url 'fleet:driver_documents' %}" class="fleet-btn fleet-btn--ghost fleet-btn--full mb-2">Cancel</a>
+                <button type="submit" class="fleet-btn fleet-btn--danger fleet-btn--full">
+                    <i class="fa-solid fa-trash me-2"></i>Delete Document
+                </button>
+            </form>
+        </div>
     </div>
-  </a>
 </div>
-{% endblock content %}
+{% endblock %}
