@@ -652,6 +652,21 @@
     }
     .td-nr-help__note i { flex-shrink: 0; margin-top: 1px; }
 
+    /* ── Time Slot Selector (Postpone) ──────────────────── */
+    .td-time-slots { display: flex; flex-direction: column; gap: 8px; }
+    .td-time-slot {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 12px;
+        border: 1.5px solid var(--fleet-grey-200); border-radius: var(--radius-sm);
+        cursor: pointer; transition: border-color .15s, background .15s;
+    }
+    .td-time-slot input[type="radio"] { display: none; }
+    .td-time-slot span { font-size: var(--font-size-sm); font-weight: 600; color: var(--fleet-dark); pointer-events: none; }
+    .td-time-slot span i { color: var(--fleet-grey-400); margin-right: 4px; }
+    .td-time-slot:has(input:checked) { border-color: var(--fleet-primary); background: rgba(0,119,255,0.06); }
+    .td-time-slot:has(input:checked) span { color: var(--fleet-primary); }
+    .td-time-slot:has(input:checked) span i { color: var(--fleet-primary); }
+
     /* ── Activity Timeline ──────────────────────────────── */
     .td-timeline-header {
         font-size: var(--font-size-sm); font-weight: 700; color: var(--fleet-dark);
@@ -1192,6 +1207,9 @@
 
     // ── Postpone Sub-Sheet ─────────────────────────────────
     window.openTdPostpone = function() {
+        // Reset fields
+        document.querySelectorAll('input[name="tdPostponeTime"]').forEach(r => r.checked = false);
+        document.getElementById('tdPostponeTimeNote').value = '';
         document.getElementById('tdPostponeOverlay').classList.add('open');
         document.getElementById('tdPostponeSheet').classList.add('open');
     };
@@ -1211,8 +1229,15 @@
         fd.append('task_id', _tdCurrentTaskId);
         fd.append('new_date', newDate);
         fd.append('csrfmiddlewaretoken', csrf);
+        const timeSlot = document.querySelector('input[name="tdPostponeTime"]:checked')?.value || '';
+        const timeNote = document.getElementById('tdPostponeTimeNote').value.trim();
+        if (timeSlot) fd.append('preferred_time', timeSlot);
+        if (timeNote) fd.append('time_note', timeNote);
         fetch('/fleet/tasks/postpone/', { method: 'POST', body: fd })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) return r.text().then(t => { throw new Error('HTTP ' + r.status + ': ' + t.substring(0, 200)); });
+            return r.json();
+        })
         .then(data => {
             if (!data.success) { showToast(data.error || 'Could not postpone', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-regular fa-calendar-check me-2"></i>Confirm Postpone'; return; }
             if (typeof haptic === 'function') haptic([10, 50, 10]);
@@ -1220,7 +1245,7 @@
             window.closeTdPostpone();
             setTimeout(() => { window.closeTaskDetail(); window.location.reload(); }, 900);
         })
-        .catch(() => { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-regular fa-calendar-check me-2"></i>Confirm Postpone'; });
+        .catch(err => { console.error('Postpone error:', err); showToast('Error: ' + err.message, 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-regular fa-calendar-check me-2"></i>Confirm Postpone'; });
     };
 
     // ── Non-Reachable Sub-Sheet ────────────────────────────

@@ -51,7 +51,7 @@ Related:
 import logging
 from django.db import connection
 from django.shortcuts import redirect, render
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -2552,8 +2552,21 @@ def fleet_postpone_task(request):
         if task.dl_task_status in ('delivered', 'failed', 'cancelled'):
             return JsonResponse({'success': False, 'error': 'Cannot postpone a completed task'})
 
+        update_fields = ['dl_task_date']
         task.dl_task_date = parsed_date
-        task.save(update_fields=['dl_task_date'])
+
+        valid_slots = ('9am-1pm', '2pm-6pm', '6pm-10pm')
+        preferred_time = request.POST.get('preferred_time', '').strip()
+        if preferred_time in valid_slots:
+            task.preferred_time = preferred_time
+            update_fields.append('preferred_time')
+
+        time_note = request.POST.get('time_note', '').strip()
+        if time_note:
+            task.dl_task_description = ('Postpone note: ' + time_note)[:100]
+            update_fields.append('dl_task_description')
+
+        task.save(update_fields=update_fields)
         return JsonResponse({'success': True, 'new_date': str(parsed_date)})
 
     except fleet_models.Driver.DoesNotExist:
