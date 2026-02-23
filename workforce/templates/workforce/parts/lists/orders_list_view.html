@@ -7,7 +7,7 @@
 <link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-    <div class=" col-12 p-3">
+    <div class="p-3" style="min-width:0;max-width:100%">
         <!-- Page Header -->
         <header class="page-header">
             <div class="page-header-left">
@@ -328,20 +328,21 @@
 
         <!-- Orders List -->
         {% if orders %}
+            <div class="orc-scroll">
             <div class="orc-list" id="ordersListContainer">
-                <!-- Select All Header -->
-                <div class="orc-row" style="background: var(--brand-grey-100); font-weight: 600; font-size: 0.75rem;">
+                <!-- Header Row -->
+                <div class="orc-head">
                     <div class="orc-checkbox">
                         <input type="checkbox" id="selectAllOrders" title="Select all orders" onchange="toggleSelectAll(this)">
                     </div>
-                    <div class="orc-id">ORDER</div>
-                    <div class="orc-customer">CUSTOMER</div>
-                    <div class="orc-address">ADDRESS</div>
-                    <div class="orc-products">PRODUCTS</div>
+                    <div class="orc-id">Order</div>
+                    <div class="orc-customer">Customer</div>
+                    <div class="orc-address">Address</div>
+                    <div class="orc-products">Items</div>
                     <div class="orc-amount">COD</div>
-                    <div class="orc-date">DATE</div>
-                    <div class="orc-status">STATUS</div>
-                    <div class="orc-actions">ACTIONS</div>
+                    <div class="orc-date">Date</div>
+                    <div class="orc-status">Status</div>
+                    <div class="orc-actions"></div>
                 </div>
                 {% for order in orders %}
                 <div class="orc-row" data-order-id="{{ order.id }}" data-order-number="{{ order.order_number }}" data-customer-phone="{{ order.customer_phone }}" data-customer-address="{{ order.customer_address }}">
@@ -355,27 +356,29 @@
                         <span class="orc-seller">{{ order.business.business_name }}</span>
                     </div>
                     <div class="orc-customer">
-                        <span class="orc-name">{{ order.customer_name|truncatechars:16 }}</span>
+                        <span class="orc-name">{{ order.customer_name|truncatechars:18 }}</span>
                         <span class="orc-phone">{{ order.customer_phone }}</span>
                     </div>
                     <div class="orc-address" title="{{ order.customer_address }}">
                         {% if order.dl_zone or order.dl_street or order.dl_building %}
-                        <span class="orc-zone">Z{{ order.dl_zone|default:"-" }}/S{{ order.dl_street|default:"-" }}/B{{ order.dl_building|default:"-" }}</span>
+                        <span class="orc-zone">Z{{ order.dl_zone|default:"-" }} / S{{ order.dl_street|default:"-" }} / B{{ order.dl_building|default:"-" }}</span>
                         {% endif %}
-                        <span class="orc-addr-text">{{ order.customer_address|truncatechars:25 }}</span>
+                        <span class="orc-addr-text">{{ order.customer_address }}</span>
                     </div>
                     <div class="orc-products">
                         {% for item in order.order_items.all %}
                         <div class="orc-product-item">
-                            <span class="orc-product-name">{{ item.product_name|truncatechars:15 }}</span>
-                            <span class="orc-product-qty">×{{ item.product_quantity }}</span>
+                            <span class="orc-product-name">{{ item.display_name|truncatechars:14 }}</span>
+                            <span class="orc-product-qty">{{ item.quantity }}</span>
                         </div>
                         {% empty %}
-                        <span class="orc-product-item" style="color:#94a3b8;">No items</span>
+                        <span class="orc-product-item orc-product-item--empty">—</span>
                         {% endfor %}
                     </div>
-                    <div class="orc-amount">{{ order.cod_amount|default:"0" }} <small>QAR</small></div>
-                    <div class="orc-date">{{ order.order_date|date:"d/m" }}</div>
+                    <div class="orc-amount">
+                        {% if order.cod_amount %}<span class="orc-amount__val">{{ order.cod_amount }}</span><span class="orc-amount__cur">QR</span>{% else %}<span class="orc-amount__nil">—</span>{% endif %}
+                    </div>
+                    <div class="orc-date">{{ order.order_date|date:"d M" }}</div>
                     <div class="orc-status">
                         <div class="orc-status-line">
                             {% if order.order_status == 'to_review' %}<span class="st st-warn">To Review</span>
@@ -443,6 +446,7 @@
                     </div>
                 </div>
                 {% endfor %}
+            </div>
             </div>
             <!-- Pagination -->
             {% include "includes/components/_pagination.html" with page_obj=orders filter_params=filter_params %}

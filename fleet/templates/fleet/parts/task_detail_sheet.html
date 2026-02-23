@@ -34,7 +34,6 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                 <strong id="tdDate"></strong>
             </div>
             <div id="tdCodBox" class="td-cod-badge" style="display:none;">
-                <i class="fa-solid fa-money-bill-wave"></i>
                 <span id="tdCod"></span>
             </div>
         </div>
@@ -632,7 +631,6 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
 
         // Status progression buttons
         const STATUS_STEPS = [
-            { key: 'picked_up',    label: 'Picked Up',  icon: 'fa-box',          cls: 'td-status-btn--pickedup',   api: 'picked_up' },
             { key: 'in_transit',   label: 'In Transit', icon: 'fa-truck-fast',   cls: 'td-status-btn--transit',    api: 'in_transit' },
             { key: 'contacted',    label: 'Contacted',  icon: 'fa-phone-volume', cls: 'td-status-btn--contacted',  api: 'contacted' },
             { key: 'non_reachable',label: 'No Answer',  icon: 'fa-phone-slash',  cls: 'td-status-btn--noreachable',api: 'non_reachable', useSheet: true },
@@ -641,8 +639,7 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const doneIdx = DONE_ORDER.indexOf(st);
 
         statusBtns.innerHTML = STATUS_STEPS.map(step => {
-            const isDone = (step.key === 'picked_up' && ['picked_up','in_transit','out_for_delivery','start_ride','contacted','non_reachable'].includes(st))
-                || (step.key === 'in_transit' && ['in_transit','out_for_delivery','start_ride','contacted','non_reachable'].includes(st));
+            const isDone = (step.key === 'in_transit' && ['in_transit','out_for_delivery','start_ride','contacted','non_reachable'].includes(st));
             if (isDone) {
                 return `<button class="td-status-btn td-status-btn--done" disabled>
                     <i class="fa-solid fa-check"></i>${step.label}
@@ -794,7 +791,7 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         document.querySelectorAll('.td-reason-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         const ta = document.getElementById('tdFailReason');
-        if (!ta.value) ta.value = reason;
+        ta.value = reason;
     };
 
     window.submitFailed = function() {

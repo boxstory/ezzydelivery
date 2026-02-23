@@ -454,12 +454,7 @@ INTERNAL_IPS = [
 ]
 
 def show_toolbar(request):
-    if not DEBUG:
-        return False
-    # Don't inject toolbar on PWA fleet pages (no Django template base with toolbar container)
-    if request.path.startswith('/fleet/'):
-        return False
-    return True
+    return False
 
 DEBUG_TOOLBAR_CONFIG = {
     'SHOW_TOOLBAR_CALLBACK': show_toolbar,

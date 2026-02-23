@@ -320,6 +320,19 @@ class OrderItem(models.Model):
             self.total_price = self.unit_price * self.quantity
         super().save(*args, **kwargs)
 
+    @property
+    def display_name(self):
+        """Return a human-readable product name for templates."""
+        if self.product:
+            return self.product.item_name
+        if self.notes:
+            # notes format: "13__SPECIAL OUD____BUK006" → extract middle part
+            parts = self.notes.split('__')
+            if len(parts) >= 2:
+                return parts[1].strip()
+            return self.notes
+        return 'Item'
+
     def __str__(self):
         return f"{self.order.order_number} - {self.product} x {self.quantity}" if self.product else f"{self.order.order_number} - Item"
 
