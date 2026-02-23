@@ -43,22 +43,6 @@
             <span class="fleet-wallet__balance">{{ wallet_status.available_credit|floatformat:0|default:"0" }} <small>QR</small></span>
         </div>
     </div>
-    {% if wallet_status.pending_earnings or wallet_status.usage_percentage %}
-    <div class="fleet-wallet__stats">
-        {% if wallet_status.pending_earnings %}
-        <div class="fleet-wallet__stat">
-            <span class="fleet-wallet__stat-value">{{ wallet_status.pending_earnings|floatformat:0 }} QR</span>
-            <span class="fleet-wallet__stat-label">Pending</span>
-        </div>
-        {% endif %}
-        {% if wallet_status.usage_percentage %}
-        <div class="fleet-wallet__stat">
-            <span class="fleet-wallet__stat-value">{{ wallet_status.usage_percentage|floatformat:0 }}%</span>
-            <span class="fleet-wallet__stat-label">Usage</span>
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
 </div>
 
 <!-- Quick Actions -->
@@ -209,25 +193,33 @@
 <!-- Today's Stats -->
 <div class="fleet-stats slide-up" style="animation-delay: 0.3s">
     <div class="fleet-stat">
-        <div class="fleet-stat__icon fleet-stat__icon--success">
-            <i class="fa-solid fa-truck-fast"></i>
+        <div class="fleet-stat__top">
+            <div class="fleet-stat__icon fleet-stat__icon--success">
+                <i class="fa-solid fa-truck-fast"></i>
+            </div>
+            <div class="fleet-stat__value">{{ stats_today.total_deliveries|default:0 }}</div>
         </div>
-        <div class="fleet-stat__value">{{ stats_today.total_deliveries|default:0 }}</div>
         <div class="fleet-stat__label">Today's Deliveries</div>
-        {% if stats_today.change_percent %}
-        <div class="fleet-stat__change {% if stats_today.change_percent > 0 %}fleet-stat__change--up{% else %}fleet-stat__change--down{% endif %}">
-            <i class="fa-solid fa-arrow-{% if stats_today.change_percent > 0 %}up{% else %}down{% endif %} me-1"></i>
-            {{ stats_today.change_percent|floatformat:1 }}%
-        </div>
-        {% endif %}
     </div>
 
     <div class="fleet-stat">
-        <div class="fleet-stat__icon fleet-stat__icon--warning">
-            <i class="fa-solid fa-coins"></i>
+        <div class="fleet-stat__top">
+            <div class="fleet-stat__icon fleet-stat__icon--warning">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <div class="fleet-stat__value">{{ my_tasks_count|default:0 }}</div>
         </div>
-        <div class="fleet-stat__value">{{ stats_today.earnings|floatformat:0|default:0 }}</div>
-        <div class="fleet-stat__label">Today's Earnings</div>
+        <div class="fleet-stat__label">Pending Tasks</div>
+    </div>
+
+    <div class="fleet-stat">
+        <div class="fleet-stat__top">
+            <div class="fleet-stat__icon fleet-stat__icon--danger">
+                <i class="fa-solid fa-money-bill-wave"></i>
+            </div>
+            <div class="fleet-stat__value">{{ stats_today.total_cod_collected|floatformat:0|default:0 }}</div>
+        </div>
+        <div class="fleet-stat__label">Today's COD</div>
     </div>
 </div>
 

@@ -189,6 +189,22 @@ class PricingEnquiry(models.Model):
     pickup_location_time_slab = models.CharField(max_length=200, blank=True, null=True)
     number_of_pickup_times_in_day = models.CharField(max_length=200, default='1', blank=True, null=True)
 
+    # Product value — added to step 1
+    average_order_value_qar = models.CharField(max_length=50, blank=True, null=True)  # e.g. "Below 100", "100-500"
+    business_operating_age = models.CharField(max_length=50, blank=True, null=True)  # New / <1yr / 1-3yrs / 3yr+
+    business_location_country = models.CharField(max_length=100, blank=True, null=True)  # shown when not in Qatar
+
+    # Operations & Orders — extended fields
+    current_courier_provider = models.CharField(max_length=200, blank=True, null=True)
+    is_return_logistics_required = models.BooleanField(default=False)
+    delivery_coverage = models.CharField(max_length=50, blank=True, null=True)  # Doha Only / All Qatar / Both
+    preferred_start_date = models.CharField(max_length=50, blank=True, null=True)  # stored as string e.g. "Within 1 month"
+
+    # Delivery & Pickup — extended fields
+    order_management_system = models.CharField(max_length=200, blank=True, null=True)  # Shopify / WooCommerce / etc.
+    preferred_communication_channel = models.CharField(max_length=100, blank=True, null=True)  # WhatsApp / Email / Phone
+    is_delivery_free_to_customers = models.CharField(max_length=50, blank=True, null=True)  # Free / Paid / Mixed
+
     # date created
     date_created = models.DateField(auto_now_add=True, null=True)
     date_modified = models.DateField(auto_now=True, null=True)

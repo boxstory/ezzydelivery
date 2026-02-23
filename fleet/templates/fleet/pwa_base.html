@@ -83,11 +83,11 @@
                 <a href="{% url 'fleet:driver_tasks' %}" class="fleet-bottom-nav__item fleet-bottom-nav__item--tasks {% if request.resolver_match.url_name in 'driver_tasks,fleet_task_navigation' %}active{% endif %}">
                     <span class="fleet-bottom-nav__icon">
                         <i class="fa-solid fa-list-check"></i>
+                        {% if pending_tasks_count %}
+                        <span class="fleet-bottom-nav__badge">{{ pending_tasks_count }}</span>
+                        {% endif %}
                     </span>
                     <span class="fleet-bottom-nav__label">Tasks</span>
-                    {% if pending_tasks_count %}
-                    <span class="fleet-bottom-nav__badge">{{ pending_tasks_count }}</span>
-                    {% endif %}
                 </a>
 
                 <a href="{% url 'fleet:pickup_scanner' %}" class="fleet-bottom-nav__item fleet-bottom-nav__item--scan {% if request.resolver_match.url_name == 'pickup_scanner' %}active{% endif %}">

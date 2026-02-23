@@ -193,6 +193,17 @@ def delivery_inquiry(request):
                 pickup_Location_area_name=inquiry_data.get('pickup_Location_area_name', ''),
                 pickup_location_time_slab=inquiry_data.get('pickup_location_time_slab', ''),
                 number_of_pickup_times_in_day=inquiry_data.get('number_of_pickup_times_in_day', '1'),
+                # Extended fields
+                average_order_value_qar=inquiry_data.get('average_order_value_qar', ''),
+                business_operating_age=inquiry_data.get('business_operating_age', ''),
+                business_location_country=inquiry_data.get('business_location_country', ''),
+                current_courier_provider=inquiry_data.get('current_courier_provider', ''),
+                is_return_logistics_required=inquiry_data.get('is_return_logistics_required', 'False') == 'True',
+                delivery_coverage=inquiry_data.get('delivery_coverage', ''),
+                preferred_start_date=inquiry_data.get('preferred_start_date', ''),
+                order_management_system=inquiry_data.get('order_management_system', ''),
+                preferred_communication_channel=inquiry_data.get('preferred_communication_channel', ''),
+                is_delivery_free_to_customers=inquiry_data.get('is_delivery_free_to_customers', ''),
             )
 
             # Clear session

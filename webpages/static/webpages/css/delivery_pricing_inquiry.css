@@ -238,7 +238,6 @@
   border: 1px solid rgba(255, 255, 255, 0.8);
   animation: card-fade-in 0.8s ease-out 0.2s backwards;
   position: relative;
-  overflow: hidden;
 }
 
 .pricing-form-card::before {
@@ -605,6 +604,10 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
+  .radio-group--inline {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .form-navigation {
     flex-direction: column-reverse;
     gap: 0.75rem;
@@ -686,6 +689,191 @@ textarea:focus {
   }
 }
 
+/* ============================================================================
+   SELECT DROPDOWN - MATCH PREMIUM CARD STYLE
+   ============================================================================ */
+.form-select {
+  border-radius: 0.875rem;
+  border: 2px solid #e0e0e0;
+  padding: 1rem 3rem 1rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #424242;
+  background-color: white;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23001f3f' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1.25rem center;
+  background-size: 1.125rem;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  line-height: 1.5;
+}
+
+.form-select:hover {
+  border-color: #f7c000;
+  background-color: rgba(247, 192, 0, 0.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.form-select:focus {
+  border-color: #f7c000;
+  box-shadow: 0 0 0 4px rgba(247, 192, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08);
+  outline: none;
+  background-color: #fffef8;
+}
+
+.form-select option {
+  font-weight: 500;
+  color: #424242;
+  padding: 0.5rem;
+}
+
+.form-select option:first-child {
+  color: #9e9e9e;
+}
+
+/* ============================================================================
+   CUSTOM STYLED DROPDOWN (replaces native select options list)
+   ============================================================================ */
+.custom-select-wrapper {
+  position: relative;
+}
+
+/* The visible trigger button */
+.custom-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 1rem 1.25rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 0.875rem;
+  background: white;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #424242;
+  cursor: pointer;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  user-select: none;
+}
+
+.custom-select-trigger.placeholder {
+  color: #9e9e9e;
+  font-weight: 500;
+}
+
+.custom-select-trigger:hover {
+  border-color: #f7c000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.custom-select-trigger.open {
+  border-color: #f7c000;
+  box-shadow: 0 0 0 4px rgba(247, 192, 0, 0.15);
+  border-radius: 0.875rem 0.875rem 0 0;
+}
+
+.custom-select-trigger .trigger-chevron {
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  color: #001f3f;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.custom-select-trigger.open .trigger-chevron {
+  transform: rotate(180deg);
+}
+
+/* The dropdown options panel */
+.custom-select-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 2px solid #f7c000;
+  border-top: none;
+  border-radius: 0 0 0.875rem 0.875rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+  overflow: hidden;
+  display: none;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.custom-select-options.open {
+  display: block;
+  animation: dropdown-open 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes dropdown-open {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Individual option item */
+.custom-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #424242;
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.custom-select-option:last-child {
+  border-bottom: none;
+}
+
+.custom-select-option:hover {
+  background: rgba(247, 192, 0, 0.08);
+  color: #001f3f;
+  font-weight: 600;
+}
+
+.custom-select-option.selected {
+  background: linear-gradient(135deg, rgba(247, 192, 0, 0.15) 0%, rgba(229, 176, 0, 0.08) 100%);
+  color: #001f3f;
+  font-weight: 700;
+}
+
+.custom-select-option.selected::after {
+  content: '\2713';
+  width: 1.25rem;
+  height: 1.25rem;
+  background: #f7c000;
+  color: #001f3f;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+/* Scrollbar styling for options panel */
+.custom-select-options::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-select-options::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+.custom-select-options::-webkit-scrollbar-thumb {
+  background: #f7c000;
+  border-radius: 2px;
+}
+
 /* Help text styling */
 .help-text {
   font-size: 0.875rem;
@@ -698,4 +886,61 @@ textarea:focus {
 :focus-visible {
   outline: 2px solid #f7c000;
   outline-offset: 2px;
+}
+
+/* ============================================================================
+   BUBBLE MULTI-SELECT
+   ============================================================================ */
+.bubble-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+}
+
+.bubble {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.85rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 2rem;
+  background: #fff;
+  color: #555;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 180ms ease;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.bubble:hover {
+  border-color: #f7c000;
+  color: #001f3f;
+  background: rgba(247, 192, 0, 0.06);
+}
+
+.bubble--active {
+  border-color: #f7c000;
+  background: #f7c000;
+  color: #001f3f;
+  font-weight: 700;
+}
+
+.bubble--active::before {
+  content: '\2713';
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+@media (max-width: 576px) {
+  .bubble-select {
+    gap: 0.35rem;
+  }
+  .bubble {
+    font-size: 0.75rem;
+    padding: 0.38rem 0.7rem;
+  }
 }

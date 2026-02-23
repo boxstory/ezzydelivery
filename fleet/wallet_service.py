@@ -420,26 +420,41 @@ class WalletService:
     @staticmethod
     def get_wallet_status(driver):
         """
-        Get comprehensive wallet status information
-
-        Args:
-            driver: Driver instance
-
-        Returns:
-            dict with wallet status details
+        Get comprehensive wallet status information.
+        COD in hand and wallet balance are computed live from DeliveryTask
+        to avoid stale cached field values.
         """
+        # Live COD: collected but not yet settled
+        live_cod = delivery_models.DeliveryTask.objects.filter(
+            driver=driver,
+            cod_collected=True,
+            cod_settled=False,
+        ).aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0.00')
+
+        # Live wallet balance from transactions
+        txn_balance = fleet_models.DriverTransaction.objects.filter(
+            driver=driver
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        live_wallet = max(txn_balance, Decimal('0.00'))
+
+        credit_limit = driver.credit_limit
+        available_credit = max(credit_limit - live_cod, Decimal('0.00'))
+        usage_pct = (live_cod / credit_limit * 100) if credit_limit else Decimal('0')
+        is_warning = usage_pct >= 80
+        is_blocked = live_cod >= credit_limit
+
         return {
-            'wallet_balance': driver.wallet_balance,
-            'credit_limit': driver.credit_limit,
-            'available_credit': driver.available_credit,
-            'cod_in_hand': driver.cod_in_hand,
+            'wallet_balance': live_wallet,
+            'credit_limit': credit_limit,
+            'available_credit': available_credit,
+            'cod_in_hand': live_cod,
             'pending_earnings': driver.pending_earnings,
             'total_earnings': driver.total_earnings,
-            'usage_percentage': driver.wallet_usage_percentage,
-            'is_warning': driver.is_wallet_warning,
-            'is_blocked': driver.is_wallet_blocked,
-            'warning_message': "Warning: Wallet usage at 80% or above" if driver.is_wallet_warning else None,
-            'block_message': "Wallet exhausted. Submit COD to continue accepting orders." if driver.is_wallet_blocked else None
+            'usage_percentage': usage_pct,
+            'is_warning': is_warning,
+            'is_blocked': is_blocked,
+            'warning_message': "Warning: Wallet usage at 80% or above" if is_warning else None,
+            'block_message': "Wallet exhausted. Submit COD to continue accepting orders." if is_blocked else None
         }
 
     @staticmethod
@@ -586,7 +601,14 @@ class WalletService:
         Returns:
             dict with statistics
         """
-        start_date = timezone.now() - timedelta(days=days)
+        if days == 1:
+            # "Today" means calendar day midnight-to-now, not last 24h
+            today = timezone.localdate()
+            start_date = timezone.make_aware(
+                timezone.datetime.combine(today, timezone.datetime.min.time())
+            )
+        else:
+            start_date = timezone.now() - timedelta(days=days)
 
         deliveries = DeliveryTask.objects.filter(
             driver=driver,

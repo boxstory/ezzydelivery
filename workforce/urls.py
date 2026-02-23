@@ -199,4 +199,10 @@ urlpatterns = [
     path('tools/qnas-lookup/', workforce_views.qnas_lookup_tool, name='qnas_lookup_tool'),
     path('tools/qnas-test/', workforce_views.qnas_test, name='qnas_test'),
 
+    # Forms / Inquiries
+    path('forms/pricing-inquiries/', workforce_views.pricing_inquiries_list, name='pricing_inquiries_list'),
+    path('forms/pricing-inquiries/<int:inquiry_id>/', workforce_views.pricing_inquiry_detail, name='pricing_inquiry_detail'),
+    path('forms/whatsapp-inquiries/', workforce_views.whatsapp_inquiries_list, name='whatsapp_inquiries_list'),
+    path('forms/whatsapp-inquiries/<int:inquiry_id>/', workforce_views.whatsapp_inquiry_detail, name='whatsapp_inquiry_detail'),
+
 ]

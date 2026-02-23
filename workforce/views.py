@@ -77,6 +77,7 @@ from core import models as core_models
 from orders import models as orders_models
 from delivery import models as delivery_models
 from fleet import models as fleet_models
+from webpages import models as webpages_models
 
 from business import forms as business_forms
 from core.context_processors import get_cached_profile, get_cached_business
@@ -6835,3 +6836,108 @@ def qnas_test(request):
     QNAS API connection test page - diagnostics and troubleshooting
     """
     return render(request, "workforce/qnas_test.html")
+
+
+# =============================================================================
+# FORMS / INQUIRIES
+# =============================================================================
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pricing_inquiries_list(request):
+    """List all 3PL pricing inquiry form submissions."""
+    inquiries = webpages_models.PricingEnquiry.objects.all().order_by('-date_created')
+
+    search = request.GET.get('search', '').strip()
+    if search:
+        inquiries = inquiries.filter(
+            Q(full_name__icontains=search) |
+            Q(business_name__icontains=search) |
+            Q(business_contact_number__icontains=search) |
+            Q(product_category__icontains=search)
+        )
+
+    cod_filter = request.GET.get('cod', '').strip()
+    if cod_filter == '1':
+        inquiries = inquiries.filter(is_required_COD_service=True)
+    elif cod_filter == '0':
+        inquiries = inquiries.filter(is_required_COD_service=False)
+
+    fulfillment_filter = request.GET.get('fulfillment', '').strip()
+    if fulfillment_filter == '1':
+        inquiries = inquiries.filter(
+            Q(is_required_fulfillment_service_for_operate_from_outside_qatar=True) |
+            Q(is_required_fulfillment_service_for_make_hub_in_doha=True)
+        )
+
+    total_count = webpages_models.PricingEnquiry.objects.count()
+    cod_count = webpages_models.PricingEnquiry.objects.filter(is_required_COD_service=True).count()
+    fulfillment_count = webpages_models.PricingEnquiry.objects.filter(
+        Q(is_required_fulfillment_service_for_operate_from_outside_qatar=True) |
+        Q(is_required_fulfillment_service_for_make_hub_in_doha=True)
+    ).count()
+
+    page_obj = paginate_queryset(request, inquiries, items_per_page=20)
+
+    context = {
+        'page_title': 'Pricing Inquiries',
+        'page_obj': page_obj,
+        'search': search,
+        'cod_filter': cod_filter,
+        'fulfillment_filter': fulfillment_filter,
+        'total_count': total_count,
+        'cod_count': cod_count,
+        'fulfillment_count': fulfillment_count,
+    }
+    return render(request, 'workforce/forms/pricing_inquiries_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def whatsapp_inquiries_list(request):
+    """List all WhatsApp quick inquiry submissions."""
+    inquiries = webpages_models.WhatsAppInquiry.objects.all().order_by('-created_at')
+
+    search = request.GET.get('search', '').strip()
+    if search:
+        inquiries = inquiries.filter(
+            Q(company_name__icontains=search) |
+            Q(contact_person__icontains=search) |
+            Q(contact_number__icontains=search) |
+            Q(product_category__icontains=search)
+        )
+
+    total_count = webpages_models.WhatsAppInquiry.objects.count()
+    page_obj = paginate_queryset(request, inquiries, items_per_page=20)
+
+    context = {
+        'page_title': 'WhatsApp Inquiries',
+        'page_obj': page_obj,
+        'search': search,
+        'total_count': total_count,
+    }
+    return render(request, 'workforce/forms/whatsapp_inquiries_list.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def pricing_inquiry_detail(request, inquiry_id):
+    """Full detail view for a single PricingEnquiry submission."""
+    inquiry = get_object_or_404(webpages_models.PricingEnquiry, pk=inquiry_id)
+    context = {
+        'page_title': f'Pricing Inquiry – {inquiry.business_name}',
+        'inquiry': inquiry,
+    }
+    return render(request, 'workforce/forms/pricing_inquiry_detail.html', context)
+
+
+@login_required(login_url='/accounts/login/')
+@staff_required
+def whatsapp_inquiry_detail(request, inquiry_id):
+    """Full detail view for a single WhatsAppInquiry submission."""
+    inquiry = get_object_or_404(webpages_models.WhatsAppInquiry, pk=inquiry_id)
+    context = {
+        'page_title': f'WhatsApp Inquiry – {inquiry.company_name}',
+        'inquiry': inquiry,
+    }
+    return render(request, 'workforce/forms/whatsapp_inquiry_detail.html', context)

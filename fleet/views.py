@@ -187,26 +187,23 @@ def fleet_dashboard(request):
             user_id=request.user.id, defaults={'profile': profile}
         )
 
-        # Task counts for dashboard summary
+        # Task counts for dashboard summary — mirrors driver_tasks view logic exactly
         from delivery import models as delivery_models
-        assigned_task_ids = delivery_models.AssignedDriver.objects.filter(
-            driver=driver
-        ).values_list('dl_task_id', flat=True)
-
         new_tasks_count = delivery_models.DeliveryTask.objects.filter(
-            dl_task_status__in=['pending', 'for_review'],
             dl_task_publish=True,
-        ).exclude(id__in=assigned_task_ids).count()
+            driver__isnull=True,
+            dl_task_status__in=['pending', 'for_review'],
+        ).exclude(order__order_status='cancelled').count()
 
         assigned_tasks_count = delivery_models.DeliveryTask.objects.filter(
-            id__in=assigned_task_ids,
+            driver=driver,
             dl_task_status='assigned',
-        ).count()
+        ).exclude(order__order_status='cancelled').count()
 
         my_tasks_count = delivery_models.DeliveryTask.objects.filter(
-            id__in=assigned_task_ids,
+            driver=driver,
             dl_task_status__in=['accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable'],
-        ).count()
+        ).exclude(order__order_status='cancelled').count()
 
         context = {
             'profile': profile,

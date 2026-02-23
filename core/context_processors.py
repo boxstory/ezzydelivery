@@ -220,7 +220,7 @@ def driver_pending_tasks(request):
         driver = Driver.objects.only('driver_id').get(user_id=request.user.id)
         count = DeliveryTask.objects.filter(
             driver=driver,
-            dl_task_status__in=['assigned', 'accepted']
+            dl_task_status__in=['assigned', 'accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable']
         ).count()
         request._driver_pending_tasks_count = count
         return {'pending_tasks_count': count}

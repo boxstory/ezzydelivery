@@ -92,10 +92,58 @@
                    value="{{ saved_data.social_profile }}" placeholder="Instagram/Facebook URL">
           </div>
           <div class="col-md-12">
-            <label class="form-label" for="product_category">Product Category *</label>
-            <input type="text" class="form-control" id="product_category" name="product_category"
-                   value="{{ saved_data.product_category }}" required
-                   placeholder="e.g., Electronics, Fashion, Food, etc.">
+            <label class="form-label">Product Category *</label>
+            <input type="hidden" name="product_category" id="product_category" value="{{ saved_data.product_category }}" required>
+            <div class="bubble-select" data-target="product_category">
+              {% with cats=saved_data.product_category|default:"" %}
+              <button type="button" class="bubble{% if 'Fashion' in cats %} bubble--active{% endif %}" data-value="Fashion & Clothing">Fashion & Clothing</button>
+              <button type="button" class="bubble{% if 'Electronics' in cats %} bubble--active{% endif %}" data-value="Electronics & Gadgets">Electronics & Gadgets</button>
+              <button type="button" class="bubble{% if 'Food' in cats %} bubble--active{% endif %}" data-value="Food & Beverages">Food & Beverages</button>
+              <button type="button" class="bubble{% if 'Beauty' in cats %} bubble--active{% endif %}" data-value="Beauty & Cosmetics">Beauty & Cosmetics</button>
+              <button type="button" class="bubble{% if 'Home' in cats %} bubble--active{% endif %}" data-value="Home & Furniture">Home & Furniture</button>
+              <button type="button" class="bubble{% if 'Health' in cats %} bubble--active{% endif %}" data-value="Health & Wellness">Health & Wellness</button>
+              <button type="button" class="bubble{% if 'Sports' in cats %} bubble--active{% endif %}" data-value="Sports & Outdoor">Sports & Outdoor</button>
+              <button type="button" class="bubble{% if 'Jewellery' in cats %} bubble--active{% endif %}" data-value="Jewellery & Accessories">Jewellery & Accessories</button>
+              <button type="button" class="bubble{% if 'Books' in cats %} bubble--active{% endif %}" data-value="Books & Stationery">Books & Stationery</button>
+              <button type="button" class="bubble{% if 'Toys' in cats %} bubble--active{% endif %}" data-value="Toys & Kids">Toys & Kids</button>
+              <button type="button" class="bubble{% if 'Gifts' in cats %} bubble--active{% endif %}" data-value="Gifts & Flowers">Gifts & Flowers</button>
+              <button type="button" class="bubble{% if 'Other' in cats %} bubble--active{% endif %}" data-value="Other">Other</button>
+              {% endwith %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Average Order Value (QAR) *</label>
+            <input type="hidden" name="average_order_value_qar" id="average_order_value_qar" value="{{ saved_data.average_order_value_qar }}" required>
+            <div class="custom-select-wrapper" data-target="average_order_value_qar">
+              <div class="custom-select-trigger {% if not saved_data.average_order_value_qar %}placeholder{% endif %}">
+                <span>{% if saved_data.average_order_value_qar %}{{ saved_data.average_order_value_qar }} QAR{% else %}Select range{% endif %}</span>
+                <i class="fa-solid fa-chevron-down trigger-chevron"></i>
+              </div>
+              <div class="custom-select-options">
+                <div class="custom-select-option {% if saved_data.average_order_value_qar == 'Below 50' %}selected{% endif %}" data-value="Below 50">Below 50 QAR</div>
+                <div class="custom-select-option {% if saved_data.average_order_value_qar == '50-100' %}selected{% endif %}" data-value="50-100">50 – 100 QAR</div>
+                <div class="custom-select-option {% if saved_data.average_order_value_qar == '100-300' %}selected{% endif %}" data-value="100-300">100 – 300 QAR</div>
+                <div class="custom-select-option {% if saved_data.average_order_value_qar == '300-500' %}selected{% endif %}" data-value="300-500">300 – 500 QAR</div>
+                <div class="custom-select-option {% if saved_data.average_order_value_qar == '500-1000' %}selected{% endif %}" data-value="500-1000">500 – 1000 QAR</div>
+                <div class="custom-select-option {% if saved_data.average_order_value_qar == 'Above 1000' %}selected{% endif %}" data-value="Above 1000">Above 1000 QAR</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">How long have you been operating? *</label>
+            <input type="hidden" name="business_operating_age" id="business_operating_age" value="{{ saved_data.business_operating_age }}" required>
+            <div class="custom-select-wrapper" data-target="business_operating_age">
+              <div class="custom-select-trigger {% if not saved_data.business_operating_age %}placeholder{% endif %}">
+                <span>{% if saved_data.business_operating_age %}{{ saved_data.business_operating_age }}{% else %}Select{% endif %}</span>
+                <i class="fa-solid fa-chevron-down trigger-chevron"></i>
+              </div>
+              <div class="custom-select-options">
+                <div class="custom-select-option {% if saved_data.business_operating_age == 'New (not started yet)' %}selected{% endif %}" data-value="New (not started yet)">New (not started yet)</div>
+                <div class="custom-select-option {% if saved_data.business_operating_age == 'Less than 1 year' %}selected{% endif %}" data-value="Less than 1 year">Less than 1 year</div>
+                <div class="custom-select-option {% if saved_data.business_operating_age == '1-3 years' %}selected{% endif %}" data-value="1-3 years">1 – 3 years</div>
+                <div class="custom-select-option {% if saved_data.business_operating_age == 'More than 3 years' %}selected{% endif %}" data-value="More than 3 years">More than 3 years</div>
+              </div>
+            </div>
           </div>
           <div class="col-md-12">
             <label class="form-label">Is this a personalized product? *</label>
@@ -112,23 +160,9 @@
               </div>
             </div>
           </div>
+          <!-- Always visible — triggers the chain -->
           <div class="col-md-12">
-            <label class="form-label">Is your company registered in Qatar? *</label>
-            <div class="radio-group">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_registered_company_in_qatar" id="registered_yes"
-                       value="True" {% if saved_data.is_registered_company_in_qatar == 'True' %}checked{% endif %} required>
-                <label class="form-check-label" for="registered_yes">Yes</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="is_registered_company_in_qatar" id="registered_no"
-                       value="False" {% if saved_data.is_registered_company_in_qatar == 'False' or not saved_data.is_registered_company_in_qatar %}checked{% endif %}>
-                <label class="form-check-label" for="registered_no">No</label>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-12">
-            <label class="form-label">Is your business located in Qatar? *</label>
+            <label class="form-label">Is your business located in Qatar?</label>
             <div class="radio-group">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_located_in_qatar" id="located_yes"
@@ -137,8 +171,48 @@
               </div>
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_located_in_qatar" id="located_no"
-                       value="False" {% if saved_data.is_located_in_qatar == 'False' or not saved_data.is_located_in_qatar %}checked{% endif %}>
+                       value="False" {% if saved_data.is_located_in_qatar == 'False' %}checked{% endif %}>
                 <label class="form-check-label" for="located_no">No</label>
+              </div>
+            </div>
+          </div>
+          <!-- Shown when located in Qatar = Yes -->
+          <div class="col-md-12" id="is_registered_company_in_qatar_field" style="{% if saved_data.is_located_in_qatar != 'True' %}display:none;{% endif %}">
+            <label class="form-label">Is your company registered in Qatar?</label>
+            <div class="radio-group">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_registered_company_in_qatar" id="registered_yes"
+                       value="True" {% if saved_data.is_registered_company_in_qatar == 'True' %}checked{% endif %}>
+                <label class="form-check-label" for="registered_yes">Yes</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_registered_company_in_qatar" id="registered_no"
+                       value="False" {% if saved_data.is_registered_company_in_qatar == 'False' %}checked{% endif %}>
+                <label class="form-check-label" for="registered_no">No</label>
+              </div>
+            </div>
+          </div>
+          <!-- Shown when located in Qatar = No -->
+          <div class="col-md-12" id="business_location_country_field" style="{% if saved_data.is_located_in_qatar != 'False' %}display:none;{% endif %}">
+            <label class="form-label">Where is your business located?</label>
+            <input type="hidden" name="business_location_country" id="business_location_country" value="{{ saved_data.business_location_country }}">
+            <div class="custom-select-wrapper" data-target="business_location_country">
+              <div class="custom-select-trigger {% if not saved_data.business_location_country %}placeholder{% endif %}">
+                <span>{{ saved_data.business_location_country|default:"Select country" }}</span>
+                <i class="fa-solid fa-chevron-down trigger-chevron"></i>
+              </div>
+              <div class="custom-select-options">
+                <div class="custom-select-option {% if saved_data.business_location_country == 'UAE' %}selected{% endif %}" data-value="UAE">UAE</div>
+                <div class="custom-select-option {% if saved_data.business_location_country == 'Saudi Arabia' %}selected{% endif %}" data-value="Saudi Arabia">Saudi Arabia</div>
+                <div class="custom-select-option {% if saved_data.business_location_country == 'Kuwait' %}selected{% endif %}" data-value="Kuwait">Kuwait</div>
+                <div class="custom-select-option {% if saved_data.business_location_country == 'Bahrain' %}selected{% endif %}" data-value="Bahrain">Bahrain</div>
+                <div class="custom-select-option {% if saved_data.business_location_country == 'Oman' %}selected{% endif %}" data-value="Oman">Oman</div>
+                <div class="custom-select-option {% if saved_data.business_location_country == 'Turkey' %}selected{% endif %}" data-value="Turkey">Turkey</div>
+                <div class="custom-select-option {% if saved_data.business_location_country == 'China' %}selected{% endif %}" data-value="China">China</div>
+                <div class="custom-select-option {% if saved_data.business_location_country == 'India' %}selected{% endif %}" data-value="India">India</div>
+                <div class="custom-select-option {% if saved_data.business_location_country == 'UK' %}selected{% endif %}" data-value="UK">UK</div>
+                <div class="custom-select-option {% if saved_data.business_location_country == 'USA' %}selected{% endif %}" data-value="USA">USA</div>
+                <div class="custom-select-option {% if saved_data.business_location_country == 'Other' %}selected{% endif %}" data-value="Other">Other</div>
               </div>
             </div>
           </div>
@@ -172,69 +246,57 @@
         <h2 class="form-section-title">Operations & Orders Details</h2>
 
         <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label" for="avarage_number_of_order_last_week">Orders Last Week</label>
-            <select class="form-select" id="avarage_number_of_order_last_week" name="avarage_number_of_order_last_week">
-              <option value="">Select range</option>
-              <option value="1-4" {% if saved_data.avarage_number_of_order_last_week == '1-4' %}selected{% endif %}>1 to 4</option>
-              <option value="5-25" {% if saved_data.avarage_number_of_order_last_week == '5-25' %}selected{% endif %}>5 to 25</option>
-              <option value="26-60" {% if saved_data.avarage_number_of_order_last_week == '26-60' %}selected{% endif %}>26 to 60</option>
-              <option value="61-100" {% if saved_data.avarage_number_of_order_last_week == '61-100' %}selected{% endif %}>61 to 100</option>
-              <option value="100-200" {% if saved_data.avarage_number_of_order_last_week == '100-200' %}selected{% endif %}>100 to 200</option>
-              <option value="200-300" {% if saved_data.avarage_number_of_order_last_week == '200-300' %}selected{% endif %}>200 to 300</option>
-              <option value="300-500" {% if saved_data.avarage_number_of_order_last_week == '300-500' %}selected{% endif %}>300 to 500</option>
-              <option value="500-1000" {% if saved_data.avarage_number_of_order_last_week == '500-1000' %}selected{% endif %}>500 to 1000</option>
-              <option value="1000-1500" {% if saved_data.avarage_number_of_order_last_week == '1000-1500' %}selected{% endif %}>1000 to 1500</option>
-              <option value="1500+" {% if saved_data.avarage_number_of_order_last_week == '1500+' %}selected{% endif %}>1500+</option>
-            </select>
+          <div class="col-md-12">
+            <label class="form-label">Orders Last Week</label>
+            <input type="hidden" name="avarage_number_of_order_last_week" id="avarage_number_of_order_last_week" value="{{ saved_data.avarage_number_of_order_last_week }}">
+            <div class="bubble-select bubble-select--single" data-target="avarage_number_of_order_last_week">
+              {% with v=saved_data.avarage_number_of_order_last_week %}
+              <button type="button" class="bubble{% if v == '1-10' %} bubble--active{% endif %}" data-value="1-10">1–10</button>
+              <button type="button" class="bubble{% if v == '11-30' %} bubble--active{% endif %}" data-value="11-30">11–30</button>
+              <button type="button" class="bubble{% if v == '31-100' %} bubble--active{% endif %}" data-value="31-100">31–100</button>
+              <button type="button" class="bubble{% if v == '101-300' %} bubble--active{% endif %}" data-value="101-300">101–300</button>
+              <button type="button" class="bubble{% if v == '300+' %} bubble--active{% endif %}" data-value="300+">300+</button>
+              {% endwith %}
+            </div>
           </div>
-          <div class="col-md-6">
-            <label class="form-label" for="avarage_number_of_order_done_last_month">Orders Last Month</label>
-            <select class="form-select" id="avarage_number_of_order_done_last_month" name="avarage_number_of_order_done_last_month">
-              <option value="">Select range</option>
-              <option value="1-4" {% if saved_data.avarage_number_of_order_done_last_month == '1-4' %}selected{% endif %}>1 to 4</option>
-              <option value="5-25" {% if saved_data.avarage_number_of_order_done_last_month == '5-25' %}selected{% endif %}>5 to 25</option>
-              <option value="26-60" {% if saved_data.avarage_number_of_order_done_last_month == '26-60' %}selected{% endif %}>26 to 60</option>
-              <option value="61-100" {% if saved_data.avarage_number_of_order_done_last_month == '61-100' %}selected{% endif %}>61 to 100</option>
-              <option value="100-200" {% if saved_data.avarage_number_of_order_done_last_month == '100-200' %}selected{% endif %}>100 to 200</option>
-              <option value="200-300" {% if saved_data.avarage_number_of_order_done_last_month == '200-300' %}selected{% endif %}>200 to 300</option>
-              <option value="300-500" {% if saved_data.avarage_number_of_order_done_last_month == '300-500' %}selected{% endif %}>300 to 500</option>
-              <option value="500-1000" {% if saved_data.avarage_number_of_order_done_last_month == '500-1000' %}selected{% endif %}>500 to 1000</option>
-              <option value="1000-1500" {% if saved_data.avarage_number_of_order_done_last_month == '1000-1500' %}selected{% endif %}>1000 to 1500</option>
-              <option value="1500+" {% if saved_data.avarage_number_of_order_done_last_month == '1500+' %}selected{% endif %}>1500+</option>
-            </select>
+          <div class="col-md-12">
+            <label class="form-label">Orders Last Month</label>
+            <input type="hidden" name="avarage_number_of_order_done_last_month" id="avarage_number_of_order_done_last_month" value="{{ saved_data.avarage_number_of_order_done_last_month }}">
+            <div class="bubble-select bubble-select--single" data-target="avarage_number_of_order_done_last_month">
+              {% with v=saved_data.avarage_number_of_order_done_last_month %}
+              <button type="button" class="bubble{% if v == '1-25' %} bubble--active{% endif %}" data-value="1-25">1–25</button>
+              <button type="button" class="bubble{% if v == '26-100' %} bubble--active{% endif %}" data-value="26-100">26–100</button>
+              <button type="button" class="bubble{% if v == '101-300' %} bubble--active{% endif %}" data-value="101-300">101–300</button>
+              <button type="button" class="bubble{% if v == '301-1000' %} bubble--active{% endif %}" data-value="301-1000">301–1000</button>
+              <button type="button" class="bubble{% if v == '1000+' %} bubble--active{% endif %}" data-value="1000+">1000+</button>
+              {% endwith %}
+            </div>
           </div>
-          <div class="col-md-6">
-            <label class="form-label" for="avarage_number_of_order_expect_next_month">Expected Orders Next Month</label>
-            <select class="form-select" id="avarage_number_of_order_expect_next_month" name="avarage_number_of_order_expect_next_month">
-              <option value="">Select range</option>
-              <option value="1-4" {% if saved_data.avarage_number_of_order_expect_next_month == '1-4' %}selected{% endif %}>1 to 4</option>
-              <option value="5-25" {% if saved_data.avarage_number_of_order_expect_next_month == '5-25' %}selected{% endif %}>5 to 25</option>
-              <option value="26-60" {% if saved_data.avarage_number_of_order_expect_next_month == '26-60' %}selected{% endif %}>26 to 60</option>
-              <option value="61-100" {% if saved_data.avarage_number_of_order_expect_next_month == '61-100' %}selected{% endif %}>61 to 100</option>
-              <option value="100-200" {% if saved_data.avarage_number_of_order_expect_next_month == '100-200' %}selected{% endif %}>100 to 200</option>
-              <option value="200-300" {% if saved_data.avarage_number_of_order_expect_next_month == '200-300' %}selected{% endif %}>200 to 300</option>
-              <option value="300-500" {% if saved_data.avarage_number_of_order_expect_next_month == '300-500' %}selected{% endif %}>300 to 500</option>
-              <option value="500-1000" {% if saved_data.avarage_number_of_order_expect_next_month == '500-1000' %}selected{% endif %}>500 to 1000</option>
-              <option value="1000-1500" {% if saved_data.avarage_number_of_order_expect_next_month == '1000-1500' %}selected{% endif %}>1000 to 1500</option>
-              <option value="1500+" {% if saved_data.avarage_number_of_order_expect_next_month == '1500+' %}selected{% endif %}>1500+</option>
-            </select>
+          <div class="col-md-12">
+            <label class="form-label">Expected Orders Next Month</label>
+            <input type="hidden" name="avarage_number_of_order_expect_next_month" id="avarage_number_of_order_expect_next_month" value="{{ saved_data.avarage_number_of_order_expect_next_month }}">
+            <div class="bubble-select bubble-select--single" data-target="avarage_number_of_order_expect_next_month">
+              {% with v=saved_data.avarage_number_of_order_expect_next_month %}
+              <button type="button" class="bubble{% if v == '1-25' %} bubble--active{% endif %}" data-value="1-25">1–25</button>
+              <button type="button" class="bubble{% if v == '26-100' %} bubble--active{% endif %}" data-value="26-100">26–100</button>
+              <button type="button" class="bubble{% if v == '101-300' %} bubble--active{% endif %}" data-value="101-300">101–300</button>
+              <button type="button" class="bubble{% if v == '301-1000' %} bubble--active{% endif %}" data-value="301-1000">301–1000</button>
+              <button type="button" class="bubble{% if v == '1000+' %} bubble--active{% endif %}" data-value="1000+">1000+</button>
+              {% endwith %}
+            </div>
           </div>
-          <div class="col-md-6">
-            <label class="form-label" for="orders_expected_in_next_3_months_milestone">3-Month Milestone</label>
-            <select class="form-select" id="orders_expected_in_next_3_months_milestone" name="orders_expected_in_next_3_months_milestone">
-              <option value="">Select range</option>
-              <option value="1-4" {% if saved_data.orders_expected_in_next_3_months_milestone == '1-4' %}selected{% endif %}>1 to 4</option>
-              <option value="5-25" {% if saved_data.orders_expected_in_next_3_months_milestone == '5-25' %}selected{% endif %}>5 to 25</option>
-              <option value="26-60" {% if saved_data.orders_expected_in_next_3_months_milestone == '26-60' %}selected{% endif %}>26 to 60</option>
-              <option value="61-100" {% if saved_data.orders_expected_in_next_3_months_milestone == '61-100' %}selected{% endif %}>61 to 100</option>
-              <option value="100-200" {% if saved_data.orders_expected_in_next_3_months_milestone == '100-200' %}selected{% endif %}>100 to 200</option>
-              <option value="200-300" {% if saved_data.orders_expected_in_next_3_months_milestone == '200-300' %}selected{% endif %}>200 to 300</option>
-              <option value="300-500" {% if saved_data.orders_expected_in_next_3_months_milestone == '300-500' %}selected{% endif %}>300 to 500</option>
-              <option value="500-1000" {% if saved_data.orders_expected_in_next_3_months_milestone == '500-1000' %}selected{% endif %}>500 to 1000</option>
-              <option value="1000-1500" {% if saved_data.orders_expected_in_next_3_months_milestone == '1000-1500' %}selected{% endif %}>1000 to 1500</option>
-              <option value="1500+" {% if saved_data.orders_expected_in_next_3_months_milestone == '1500+' %}selected{% endif %}>1500+</option>
-            </select>
+          <div class="col-md-12">
+            <label class="form-label">3-Month Growth Milestone</label>
+            <input type="hidden" name="orders_expected_in_next_3_months_milestone" id="orders_expected_in_next_3_months_milestone" value="{{ saved_data.orders_expected_in_next_3_months_milestone }}">
+            <div class="bubble-select bubble-select--single" data-target="orders_expected_in_next_3_months_milestone">
+              {% with v=saved_data.orders_expected_in_next_3_months_milestone %}
+              <button type="button" class="bubble{% if v == 'Below 100' %} bubble--active{% endif %}" data-value="Below 100">Below 100</button>
+              <button type="button" class="bubble{% if v == '100-500' %} bubble--active{% endif %}" data-value="100-500">100–500</button>
+              <button type="button" class="bubble{% if v == '500-1000' %} bubble--active{% endif %}" data-value="500-1000">500–1000</button>
+              <button type="button" class="bubble{% if v == '1000-3000' %} bubble--active{% endif %}" data-value="1000-3000">1000–3000</button>
+              <button type="button" class="bubble{% if v == '3000+' %} bubble--active{% endif %}" data-value="3000+">3000+</button>
+              {% endwith %}
+            </div>
           </div>
           <div class="col-md-12">
             <label class="form-label">Do you require COD (Cash on Delivery) service? *</label>
@@ -281,6 +343,70 @@
               </div>
             </div>
           </div>
+          <div class="col-md-6">
+            <label class="form-label">Current Courier / 3PL Provider</label>
+            <input type="hidden" name="current_courier_provider" id="current_courier_provider" value="{{ saved_data.current_courier_provider }}">
+            <div class="custom-select-wrapper" data-target="current_courier_provider">
+              <div class="custom-select-trigger {% if not saved_data.current_courier_provider %}placeholder{% endif %}">
+                <span>{{ saved_data.current_courier_provider|default:"Select provider" }}</span>
+                <i class="fa-solid fa-chevron-down trigger-chevron"></i>
+              </div>
+              <div class="custom-select-options">
+                <div class="custom-select-option {% if saved_data.current_courier_provider == 'None' %}selected{% endif %}" data-value="None">None (No current provider)</div>
+                <div class="custom-select-option {% if saved_data.current_courier_provider == 'DHL' %}selected{% endif %}" data-value="DHL">DHL</div>
+                <div class="custom-select-option {% if saved_data.current_courier_provider == 'Aramex' %}selected{% endif %}" data-value="Aramex">Aramex</div>
+                <div class="custom-select-option {% if saved_data.current_courier_provider == 'QPOST' %}selected{% endif %}" data-value="QPOST">Qatar Post (QPOST)</div>
+                <div class="custom-select-option {% if saved_data.current_courier_provider == 'Other' %}selected{% endif %}" data-value="Other">Other</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Delivery Coverage</label>
+            <input type="hidden" name="delivery_coverage" id="delivery_coverage" value="{{ saved_data.delivery_coverage }}">
+            <div class="custom-select-wrapper" data-target="delivery_coverage">
+              <div class="custom-select-trigger {% if not saved_data.delivery_coverage %}placeholder{% endif %}">
+                <span>{{ saved_data.delivery_coverage|default:"Select coverage" }}</span>
+                <i class="fa-solid fa-chevron-down trigger-chevron"></i>
+              </div>
+              <div class="custom-select-options">
+                <div class="custom-select-option {% if saved_data.delivery_coverage == 'Doha Only' %}selected{% endif %}" data-value="Doha Only">Doha Only</div>
+                <div class="custom-select-option {% if saved_data.delivery_coverage == 'All Qatar' %}selected{% endif %}" data-value="All Qatar">All Qatar</div>
+                <div class="custom-select-option {% if saved_data.delivery_coverage == 'Both' %}selected{% endif %}" data-value="Both">Both (Doha + Qatar)</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label">Do you require return / reverse logistics? *</label>
+            <div class="radio-group">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_return_logistics_required"
+                       id="return_yes" value="True" {% if saved_data.is_return_logistics_required == 'True' %}checked{% endif %}>
+                <label class="form-check-label" for="return_yes">Yes</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="is_return_logistics_required"
+                       id="return_no" value="False" {% if saved_data.is_return_logistics_required == 'False' or not saved_data.is_return_logistics_required %}checked{% endif %}>
+                <label class="form-check-label" for="return_no">No</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">When do you want to start?</label>
+            <input type="hidden" name="preferred_start_date" id="preferred_start_date" value="{{ saved_data.preferred_start_date }}">
+            <div class="custom-select-wrapper" data-target="preferred_start_date">
+              <div class="custom-select-trigger {% if not saved_data.preferred_start_date %}placeholder{% endif %}">
+                <span>{{ saved_data.preferred_start_date|default:"Select timeline" }}</span>
+                <i class="fa-solid fa-chevron-down trigger-chevron"></i>
+              </div>
+              <div class="custom-select-options">
+                <div class="custom-select-option {% if saved_data.preferred_start_date == 'Immediately' %}selected{% endif %}" data-value="Immediately">Immediately</div>
+                <div class="custom-select-option {% if saved_data.preferred_start_date == 'Within 2 weeks' %}selected{% endif %}" data-value="Within 2 weeks">Within 2 weeks</div>
+                <div class="custom-select-option {% if saved_data.preferred_start_date == 'Within 1 month' %}selected{% endif %}" data-value="Within 1 month">Within 1 month</div>
+                <div class="custom-select-option {% if saved_data.preferred_start_date == '1-3 months' %}selected{% endif %}" data-value="1-3 months">1 – 3 months</div>
+                <div class="custom-select-option {% if saved_data.preferred_start_date == 'Just exploring' %}selected{% endif %}" data-value="Just exploring">Just exploring</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="form-navigation">
@@ -299,9 +425,17 @@
 
         <div class="row g-3">
           <div class="col-md-12">
-            <label class="form-label" for="speed_delivery_offer_to_customers">Delivery Speed Offered to Customers</label>
-            <input type="text" class="form-control" id="speed_delivery_offer_to_customers" name="speed_delivery_offer_to_customers"
-                   value="{{ saved_data.speed_delivery_offer_to_customers }}" placeholder="e.g., Same Day, Next Day, 2-3 Days">
+            <label class="form-label">Delivery Speed Offered to Customers</label>
+            <input type="hidden" name="speed_delivery_offer_to_customers" id="speed_delivery_offer_to_customers" value="{{ saved_data.speed_delivery_offer_to_customers }}">
+            <div class="bubble-select" data-target="speed_delivery_offer_to_customers">
+              {% with speeds=saved_data.speed_delivery_offer_to_customers|default:"" %}
+              <button type="button" class="bubble{% if 'Same Day' in speeds %} bubble--active{% endif %}" data-value="Same Day">Same Day</button>
+              <button type="button" class="bubble{% if 'Next Day' in speeds %} bubble--active{% endif %}" data-value="Next Day">Next Day</button>
+              <button type="button" class="bubble{% if '2-3 Days' in speeds %} bubble--active{% endif %}" data-value="2-3 Days">2–3 Days</button>
+              <button type="button" class="bubble{% if 'Standard' in speeds %} bubble--active{% endif %}" data-value="Standard (3-5 Days)">Standard (3–5 Days)</button>
+              <button type="button" class="bubble{% if 'Express' in speeds %} bubble--active{% endif %}" data-value="Express (Few Hours)">Express (Few Hours)</button>
+              {% endwith %}
+            </div>
           </div>
           <div class="col-md-12">
             <label class="form-label">Frequent same-day pick and delivery required? *</label>
@@ -319,18 +453,32 @@
             </div>
           </div>
           <div class="col-md-6">
-            <label class="form-label" for="preferred_delivery_time_window">Preferred Delivery Time Window</label>
-            <input type="text" class="form-control" id="preferred_delivery_time_window" name="preferred_delivery_time_window"
-                   value="{{ saved_data.preferred_delivery_time_window }}" placeholder="e.g., 9AM - 6PM">
+            <label class="form-label">Preferred Delivery Time Window</label>
+            <input type="hidden" name="preferred_delivery_time_window" id="preferred_delivery_time_window" value="{{ saved_data.preferred_delivery_time_window }}">
+            <div class="bubble-select" data-target="preferred_delivery_time_window">
+              {% with v=saved_data.preferred_delivery_time_window %}
+              <button type="button" class="bubble{% if v == 'Morning (8AM–12PM)' %} bubble--active{% endif %}" data-value="Morning (8AM–12PM)">Morning</button>
+              <button type="button" class="bubble{% if v == 'Afternoon (12PM–5PM)' %} bubble--active{% endif %}" data-value="Afternoon (12PM–5PM)">Afternoon</button>
+              <button type="button" class="bubble{% if v == 'Evening (5PM–9PM)' %} bubble--active{% endif %}" data-value="Evening (5PM–9PM)">Evening</button>
+              <button type="button" class="bubble{% if v == 'Any Time' %} bubble--active{% endif %}" data-value="Any Time">Any Time</button>
+              {% endwith %}
+            </div>
           </div>
           <div class="col-md-6">
-            <label class="form-label" for="typical_package_size">Typical Package Size</label>
-            <input type="text" class="form-control" id="typical_package_size" name="typical_package_size"
-                   value="{{ saved_data.typical_package_size }}" placeholder="e.g., Small packets, Boxes">
+            <label class="form-label">Typical Package Size</label>
+            <input type="hidden" name="typical_package_size" id="typical_package_size" value="{{ saved_data.typical_package_size }}">
+            <div class="bubble-select" data-target="typical_package_size">
+              {% with v=saved_data.typical_package_size %}
+              <button type="button" class="bubble{% if v == 'Small (Envelopes / Packets)' %} bubble--active{% endif %}" data-value="Small (Envelopes / Packets)">Small</button>
+              <button type="button" class="bubble{% if v == 'Medium (Shoe Box Size)' %} bubble--active{% endif %}" data-value="Medium (Shoe Box Size)">Medium</button>
+              <button type="button" class="bubble{% if v == 'Large (Appliances / Bulky)' %} bubble--active{% endif %}" data-value="Large (Appliances / Bulky)">Large</button>
+              <button type="button" class="bubble{% if v == 'Mixed Sizes' %} bubble--active{% endif %}" data-value="Mixed Sizes">Mixed</button>
+              {% endwith %}
+            </div>
           </div>
           <div class="col-md-12">
             <label class="form-label">Special handling required? *</label>
-            <div class="radio-group">
+            <div class="radio-group radio-group--inline">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_special_handling_required"
                        id="special_yes" value="True" {% if saved_data.is_special_handling_required == 'True' %}checked{% endif %}>
@@ -344,34 +492,84 @@
             </div>
           </div>
           <div class="col-md-6">
-            <label class="form-label" for="type_of_pickup_location">Type of Pickup Location</label>
-            <select class="form-select" id="type_of_pickup_location" name="type_of_pickup_location">
-              <option value="">Select type</option>
-              <option value="Home" {% if saved_data.type_of_pickup_location == 'Home' %}selected{% endif %}>Home</option>
-              <option value="Office" {% if saved_data.type_of_pickup_location == 'Office' %}selected{% endif %}>Office</option>
-              <option value="Store" {% if saved_data.type_of_pickup_location == 'Store' %}selected{% endif %}>Store</option>
-              <option value="Multiple Store" {% if saved_data.type_of_pickup_location == 'Multiple Store' %}selected{% endif %}>Multiple Stores</option>
-              <option value="Fulfillment" {% if saved_data.type_of_pickup_location == 'Fulfillment' %}selected{% endif %}>Fulfillment Center</option>
-            </select>
+            <label class="form-label">Type of Pickup Location</label>
+            <input type="hidden" name="type_of_pickup_location" id="type_of_pickup_location" value="{{ saved_data.type_of_pickup_location }}">
+            <div class="bubble-select" data-target="type_of_pickup_location">
+              {% with v=saved_data.type_of_pickup_location %}
+              <button type="button" class="bubble{% if v == 'Home' %} bubble--active{% endif %}" data-value="Home">Home</button>
+              <button type="button" class="bubble{% if v == 'Office' %} bubble--active{% endif %}" data-value="Office">Office</button>
+              <button type="button" class="bubble{% if v == 'Store' %} bubble--active{% endif %}" data-value="Store">Store</button>
+              <button type="button" class="bubble{% if v == 'Multiple Store' %} bubble--active{% endif %}" data-value="Multiple Store">Multi Store</button>
+              <button type="button" class="bubble{% if v == 'Fulfillment' %} bubble--active{% endif %}" data-value="Fulfillment">Fulfillment Center</button>
+              {% endwith %}
+            </div>
           </div>
           <div class="col-md-6">
-            <label class="form-label" for="pickup_Location_area_name">Pickup Location Area</label>
-            <input type="text" class="form-control" id="pickup_Location_area_name" name="pickup_Location_area_name"
+            <label class="form-label">Pickup Location Area</label>
+            <input type="text" class="form-control" name="pickup_Location_area_name" id="pickup_Location_area_name"
                    value="{{ saved_data.pickup_Location_area_name }}" placeholder="e.g., Al Sadd, West Bay">
           </div>
           <div class="col-md-6">
-            <label class="form-label" for="pickup_location_time_slab">Pickup Time Slot</label>
-            <input type="text" class="form-control" id="pickup_location_time_slab" name="pickup_location_time_slab"
-                   value="{{ saved_data.pickup_location_time_slab }}" placeholder="e.g., 9AM - 12PM">
+            <label class="form-label">Pickup Time Slot</label>
+            <input type="hidden" name="pickup_location_time_slab" id="pickup_location_time_slab" value="{{ saved_data.pickup_location_time_slab }}">
+            <div class="bubble-select" data-target="pickup_location_time_slab">
+              {% with v=saved_data.pickup_location_time_slab %}
+              <button type="button" class="bubble{% if v == 'Morning (8AM–12PM)' %} bubble--active{% endif %}" data-value="Morning (8AM–12PM)">Morning</button>
+              <button type="button" class="bubble{% if v == 'Afternoon (12PM–5PM)' %} bubble--active{% endif %}" data-value="Afternoon (12PM–5PM)">Afternoon</button>
+              <button type="button" class="bubble{% if v == 'Evening (5PM–9PM)' %} bubble--active{% endif %}" data-value="Evening (5PM–9PM)">Evening</button>
+              <button type="button" class="bubble{% if v == 'Flexible' %} bubble--active{% endif %}" data-value="Flexible">Flexible</button>
+              {% endwith %}
+            </div>
           </div>
           <div class="col-md-6">
-            <label class="form-label" for="number_of_pickup_times_in_day">Number of Pickups Per Day</label>
-            <select class="form-select" id="number_of_pickup_times_in_day" name="number_of_pickup_times_in_day">
-              <option value="1" {% if saved_data.number_of_pickup_times_in_day == '1' or not saved_data.number_of_pickup_times_in_day %}selected{% endif %}>1 time</option>
-              <option value="2" {% if saved_data.number_of_pickup_times_in_day == '2' %}selected{% endif %}>2 times</option>
-              <option value="3" {% if saved_data.number_of_pickup_times_in_day == '3' %}selected{% endif %}>3 times</option>
-              <option value="4+" {% if saved_data.number_of_pickup_times_in_day == '4+' %}selected{% endif %}>4+ times</option>
-            </select>
+            <label class="form-label">Number of Pickups Per Day</label>
+            <input type="hidden" name="number_of_pickup_times_in_day" id="number_of_pickup_times_in_day" value="{{ saved_data.number_of_pickup_times_in_day|default:'1' }}">
+            <div class="bubble-select bubble-select--single" data-target="number_of_pickup_times_in_day">
+              {% with v=saved_data.number_of_pickup_times_in_day %}
+              <button type="button" class="bubble{% if v == '1-2' %} bubble--active{% endif %}" data-value="1-3">1–3</button>
+              <button type="button" class="bubble{% if v == '3-5' %} bubble--active{% endif %}" data-value="3-5">3–5</button>
+              <button type="button" class="bubble{% if v == '6-10' %} bubble--active{% endif %}" data-value="6-10">6–10</button>
+              <button type="button" class="bubble{% if v == '11-20' %} bubble--active{% endif %}" data-value="11-20">11–20</button>
+              <button type="button" class="bubble{% if v == '20+' %} bubble--active{% endif %}" data-value="20+">20+</button>
+              {% endwith %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">How do you manage orders?</label>
+            <input type="hidden" name="order_management_system" id="order_management_system" value="{{ saved_data.order_management_system }}">
+            <div class="bubble-select" data-target="order_management_system">
+              {% with v=saved_data.order_management_system %}
+              <button type="button" class="bubble{% if v == 'Shopify' %} bubble--active{% endif %}" data-value="Shopify">Shopify</button>
+              <button type="button" class="bubble{% if v == 'WooCommerce' %} bubble--active{% endif %}" data-value="WooCommerce">WooCommerce</button>
+<button type="button" class="bubble{% if v == 'Instagram / WhatsApp' %} bubble--active{% endif %}" data-value="Instagram / WhatsApp">Instagram / WhatsApp</button>
+              <button type="button" class="bubble{% if v == 'Spreadsheet / Manual' %} bubble--active{% endif %}" data-value="Spreadsheet / Manual">Spreadsheet</button>
+              <button type="button" class="bubble{% if v == 'Custom System' %} bubble--active{% endif %}" data-value="Custom System">Custom / ERP</button>
+              <button type="button" class="bubble{% if v == 'Other' %} bubble--active{% endif %}" data-value="Other">Other</button>
+              {% endwith %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Preferred Communication Channel</label>
+            <input type="hidden" name="preferred_communication_channel" id="preferred_communication_channel" value="{{ saved_data.preferred_communication_channel }}">
+            <div class="bubble-select" data-target="preferred_communication_channel">
+              {% with v=saved_data.preferred_communication_channel %}
+              <button type="button" class="bubble{% if v == 'WhatsApp' %} bubble--active{% endif %}" data-value="WhatsApp">WhatsApp</button>
+              <button type="button" class="bubble{% if v == 'Phone Call' %} bubble--active{% endif %}" data-value="Phone Call">Phone Call</button>
+              <button type="button" class="bubble{% if v == 'Email' %} bubble--active{% endif %}" data-value="Email">Email</button>
+              <button type="button" class="bubble{% if v == 'Any' %} bubble--active{% endif %}" data-value="Any">Any</button>
+              {% endwith %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Do you provide free delivery to customers? *</label>
+            <input type="hidden" name="is_delivery_free_to_customers" id="is_delivery_free_to_customers" value="{{ saved_data.is_delivery_free_to_customers }}" required>
+            <div class="bubble-select" data-target="is_delivery_free_to_customers">
+              {% with v=saved_data.is_delivery_free_to_customers %}
+              <button type="button" class="bubble{% if v == 'Free' %} bubble--active{% endif %}" data-value="Free">Yes – Free</button>
+              <button type="button" class="bubble{% if v == 'Paid' %} bubble--active{% endif %}" data-value="Paid">No – Paid</button>
+              <button type="button" class="bubble{% if v == 'Mixed' %} bubble--active{% endif %}" data-value="Mixed">Mixed</button>
+              {% endwith %}
+            </div>
           </div>
         </div>
 
@@ -438,6 +636,111 @@
 
 {% block extra_js %}
 <script>
+// ── Custom Dropdown ─────────────────────────────────────────────────────────
+(function () {
+  function initCustomSelects() {
+    document.querySelectorAll('.custom-select-wrapper').forEach(function (wrapper) {
+      var trigger = wrapper.querySelector('.custom-select-trigger');
+      var options = wrapper.querySelector('.custom-select-options');
+      var targetId = wrapper.dataset.target;
+      var hiddenInput = document.getElementById(targetId);
+
+      trigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var isOpen = options.classList.contains('open');
+        // close all others
+        document.querySelectorAll('.custom-select-options.open').forEach(function (el) {
+          el.classList.remove('open');
+          el.previousElementSibling.classList.remove('open');
+        });
+        if (!isOpen) {
+          options.classList.add('open');
+          trigger.classList.add('open');
+        }
+      });
+
+      options.querySelectorAll('.custom-select-option').forEach(function (opt) {
+        opt.addEventListener('click', function () {
+          var val = opt.dataset.value;
+          var label = opt.textContent.trim();
+          // update hidden input
+          if (hiddenInput) hiddenInput.value = val;
+          // update trigger text
+          trigger.querySelector('span').textContent = label;
+          trigger.classList.remove('placeholder');
+          // mark selected
+          options.querySelectorAll('.custom-select-option').forEach(function (o) { o.classList.remove('selected'); });
+          opt.classList.add('selected');
+          // close
+          options.classList.remove('open');
+          trigger.classList.remove('open');
+        });
+      });
+    });
+
+    // close on outside click
+    document.addEventListener('click', function () {
+      document.querySelectorAll('.custom-select-options.open').forEach(function (el) {
+        el.classList.remove('open');
+        el.previousElementSibling.classList.remove('open');
+      });
+    });
+  }
+
+  initCustomSelects();
+})();
+
+// ── Bubble Select (multi + single mode) ─────────────────────────────────────
+(function () {
+  document.querySelectorAll('.bubble-select').forEach(function (group) {
+    var targetId = group.dataset.target;
+    var hiddenInput = document.getElementById(targetId);
+    var isSingle = group.classList.contains('bubble-select--single');
+
+    group.querySelectorAll('.bubble').forEach(function (bubble) {
+      bubble.addEventListener('click', function () {
+        if (isSingle) {
+          // Deselect all, then select clicked (toggle off if already active)
+          var wasActive = bubble.classList.contains('bubble--active');
+          group.querySelectorAll('.bubble').forEach(function (b) { b.classList.remove('bubble--active'); });
+          if (!wasActive) bubble.classList.add('bubble--active');
+          hiddenInput.value = wasActive ? '' : bubble.dataset.value;
+        } else {
+          bubble.classList.toggle('bubble--active');
+          var selected = [];
+          group.querySelectorAll('.bubble--active').forEach(function (b) { selected.push(b.dataset.value); });
+          hiddenInput.value = selected.join(', ');
+        }
+      });
+    });
+  });
+})();
+
+// Toggle fields based on "Is your business located in Qatar?"
+// Yes → show "Is your company registered in Qatar?", hide "Where is your business located?"
+// No  → hide "Is your company registered in Qatar?", show "Where is your business located?"
+function toggleLocationFields() {
+    const locatedYes = document.getElementById('located_yes');
+    const locatedNo = document.getElementById('located_no');
+    const registeredField = document.getElementById('is_registered_company_in_qatar_field');
+    const locationCountryField = document.getElementById('business_location_country_field');
+    if (locatedYes && locatedYes.checked) {
+        if (registeredField) registeredField.style.display = '';
+        if (locationCountryField) locationCountryField.style.display = 'none';
+    } else if (locatedNo && locatedNo.checked) {
+        if (registeredField) registeredField.style.display = 'none';
+        if (locationCountryField) locationCountryField.style.display = '';
+    } else {
+        // nothing selected yet — hide both
+        if (registeredField) registeredField.style.display = 'none';
+        if (locationCountryField) locationCountryField.style.display = 'none';
+    }
+}
+document.querySelectorAll('input[name="is_located_in_qatar"]').forEach(function(radio) {
+    radio.addEventListener('change', toggleLocationFields);
+});
+toggleLocationFields(); // sync on page load
+
 // WhatsApp Form Submission
 document.getElementById('whatsappForm').addEventListener('submit', function(e) {
     e.preventDefault();

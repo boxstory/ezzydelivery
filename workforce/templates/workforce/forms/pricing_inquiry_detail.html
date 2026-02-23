@@ -1,0 +1,348 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
+{% endblock extra_css %}
+
+{% block content %}
+<div class="col-12 p-3">
+
+  <!-- BREADCRUMB -->
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'workforce:pricing_inquiries_list' %}"
+           hx-get="{% url 'workforce:pricing_inquiries_list' %}"
+           hx-target="#main-content"
+           hx-select="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true">Pricing Inquiries</a>
+      </li>
+      <li class="breadcrumb-item active">{{ inquiry.business_name }}</li>
+    </ol>
+  </nav>
+
+  <!-- HERO CARD -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+      <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center"
+           style="width:60px;height:60px;flex-shrink:0;">
+        <i class="fa-solid fa-store text-primary fa-xl"></i>
+      </div>
+      <div class="flex-grow-1">
+        <h3 class="mb-0 fw-bold">{{ inquiry.business_name }}</h3>
+        <div class="text-muted">{{ inquiry.full_name }}</div>
+        <div class="mt-1 d-flex flex-wrap gap-2">
+          {% if inquiry.is_required_COD_service %}
+          <span class="badge bg-success">COD Required</span>
+          {% endif %}
+          {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar or inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}
+          <span class="badge bg-warning text-dark">Fulfillment Required</span>
+          {% endif %}
+          {% if inquiry.is_registered_company_in_qatar %}
+          <span class="badge bg-info text-dark">Registered in Qatar</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="text-end">
+        <div class="text-muted small">Submitted</div>
+        <div class="fw-semibold">{{ inquiry.date_created|date:"d M Y" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- CONTACT & BUSINESS -->
+    <div class="col-12 col-md-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent fw-semibold">
+          <i class="fa-solid fa-address-card me-2 text-primary"></i>Contact & Business
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-5 text-muted small">Full Name</dt>
+            <dd class="col-7 small">{{ inquiry.full_name }}</dd>
+
+            <dt class="col-5 text-muted small">Business Name</dt>
+            <dd class="col-7 small fw-semibold">{{ inquiry.business_name }}</dd>
+
+            {% if inquiry.business_operating_age %}
+            <dt class="col-5 text-muted small">Operating Since</dt>
+            <dd class="col-7 small">{{ inquiry.business_operating_age }}</dd>
+            {% endif %}
+
+            <dt class="col-5 text-muted small">Contact Number</dt>
+            <dd class="col-7 small">
+              <a href="tel:{{ inquiry.business_contact_number }}" class="text-decoration-none">
+                {{ inquiry.business_contact_number }}
+              </a>
+            </dd>
+
+            {% if inquiry.operation_team_contact_number %}
+            <dt class="col-5 text-muted small">Ops Contact</dt>
+            <dd class="col-7 small">
+              <a href="tel:{{ inquiry.operation_team_contact_number }}" class="text-decoration-none">
+                {{ inquiry.operation_team_contact_number }}
+              </a>
+            </dd>
+            {% endif %}
+
+            {% if inquiry.website_url %}
+            <dt class="col-5 text-muted small">Website</dt>
+            <dd class="col-7 small">
+              <a href="{{ inquiry.website_url }}" target="_blank" class="text-primary">
+                <i class="fa-solid fa-external-link-alt me-1"></i>{{ inquiry.website_url|truncatechars:40 }}
+              </a>
+            </dd>
+            {% endif %}
+
+            {% if inquiry.social_profile %}
+            <dt class="col-5 text-muted small">Social</dt>
+            <dd class="col-7 small">
+              <a href="{{ inquiry.social_profile }}" target="_blank" class="text-primary">
+                <i class="fa-solid fa-external-link-alt me-1"></i>{{ inquiry.social_profile|truncatechars:40 }}
+              </a>
+            </dd>
+            {% endif %}
+
+            {% if inquiry.average_order_value_qar %}
+            <dt class="col-5 text-muted small">Avg Order Value</dt>
+            <dd class="col-7 small fw-semibold text-success">{{ inquiry.average_order_value_qar }} QAR</dd>
+            {% endif %}
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCT & COMPANY STATUS -->
+    <div class="col-12 col-md-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent fw-semibold">
+          <i class="fa-solid fa-box-open me-2 text-warning"></i>Product & Company Status
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-6 text-muted small">Product Category</dt>
+            <dd class="col-6 small">{{ inquiry.product_category }}</dd>
+
+            <dt class="col-6 text-muted small">Personalized Product</dt>
+            <dd class="col-6 small">
+              {% if inquiry.is_personalized_product %}
+              <span class="badge bg-info text-dark">Yes</span>
+              {% else %}<span class="text-muted">No</span>{% endif %}
+            </dd>
+
+            <dt class="col-6 text-muted small">Registered in Qatar</dt>
+            <dd class="col-6 small">
+              {% if inquiry.is_registered_company_in_qatar %}<span class="badge bg-success">Yes</span>
+              {% else %}<span class="badge bg-secondary">No</span>{% endif %}
+            </dd>
+
+            <dt class="col-6 text-muted small">Located in Qatar</dt>
+            <dd class="col-6 small">
+              {% if inquiry.is_located_in_qatar %}<span class="badge bg-success">Yes</span>
+              {% else %}<span class="badge bg-secondary">No</span>{% endif %}
+            </dd>
+
+            <dt class="col-6 text-muted small">Team in Qatar</dt>
+            <dd class="col-6 small">
+              {% if inquiry.is_team_available_in_qatar %}<span class="badge bg-success">Yes</span>
+              {% else %}<span class="badge bg-secondary">No</span>{% endif %}
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- SERVICES REQUIRED -->
+    <div class="col-12 col-md-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent fw-semibold">
+          <i class="fa-solid fa-gears me-2 text-success"></i>Services Required
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-7 text-muted small">COD Service</dt>
+            <dd class="col-5 small">
+              {% if inquiry.is_required_COD_service %}<span class="badge bg-success">Required</span>
+              {% else %}<span class="text-muted small">Not required</span>{% endif %}
+            </dd>
+
+            <dt class="col-7 text-muted small">Fulfillment (Outside Qatar)</dt>
+            <dd class="col-5 small">
+              {% if inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar %}
+              <span class="badge bg-warning text-dark">Required</span>
+              {% else %}<span class="text-muted small">No</span>{% endif %}
+            </dd>
+
+            <dt class="col-7 text-muted small">Fulfillment (Hub in Doha)</dt>
+            <dd class="col-5 small">
+              {% if inquiry.is_required_fulfillment_service_for_make_hub_in_doha %}
+              <span class="badge bg-warning text-dark">Required</span>
+              {% else %}<span class="text-muted small">No</span>{% endif %}
+            </dd>
+
+            <dt class="col-7 text-muted small">Same-Day Pick & Deliver</dt>
+            <dd class="col-5 small">
+              {% if inquiry.is_frequent_same_day_pick_and_delivery_required %}
+              <span class="badge bg-primary">Required</span>
+              {% else %}<span class="text-muted small">No</span>{% endif %}
+            </dd>
+
+            <dt class="col-7 text-muted small">Special Handling</dt>
+            <dd class="col-5 small">
+              {% if inquiry.is_special_handling_required %}
+              <span class="badge bg-danger">Required</span>
+              {% else %}<span class="text-muted small">No</span>{% endif %}
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORDER VOLUMES -->
+    <div class="col-12 col-md-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent fw-semibold">
+          <i class="fa-solid fa-chart-bar me-2 text-info"></i>Order Volumes
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-7 text-muted small">Orders Last Week</dt>
+            <dd class="col-5 small fw-semibold">{{ inquiry.avarage_number_of_order_last_week|default:"—" }}</dd>
+
+            <dt class="col-7 text-muted small">Orders Last Month</dt>
+            <dd class="col-5 small fw-semibold">{{ inquiry.avarage_number_of_order_done_last_month|default:"—" }}</dd>
+
+            <dt class="col-7 text-muted small">Expected Next Month</dt>
+            <dd class="col-5 small fw-semibold">{{ inquiry.avarage_number_of_order_expect_next_month|default:"—" }}</dd>
+
+            <dt class="col-7 text-muted small">3-Month Milestone</dt>
+            <dd class="col-5 small fw-semibold">{{ inquiry.orders_expected_in_next_3_months_milestone|default:"—" }}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPERATIONS EXTENDED -->
+    <div class="col-12 col-md-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent fw-semibold">
+          <i class="fa-solid fa-truck-ramp-box me-2 text-secondary"></i>Operations Info
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-6 text-muted small">Current Provider</dt>
+            <dd class="col-6 small">{{ inquiry.current_courier_provider|default:"—" }}</dd>
+
+            <dt class="col-6 text-muted small">Delivery Coverage</dt>
+            <dd class="col-6 small">{{ inquiry.delivery_coverage|default:"—" }}</dd>
+
+            <dt class="col-6 text-muted small">Return Logistics</dt>
+            <dd class="col-6 small">
+              {% if inquiry.is_return_logistics_required %}
+              <span class="badge bg-warning text-dark">Required</span>
+              {% else %}<span class="text-muted small">Not required</span>{% endif %}
+            </dd>
+
+            <dt class="col-6 text-muted small">Preferred Start</dt>
+            <dd class="col-6 small fw-semibold {% if inquiry.preferred_start_date == 'Immediately' %}text-danger{% endif %}">
+              {{ inquiry.preferred_start_date|default:"—" }}
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- DELIVERY DETAILS -->
+    <div class="col-12 col-md-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent fw-semibold">
+          <i class="fa-solid fa-truck-fast me-2 text-primary"></i>Delivery Details
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-5 text-muted small">Delivery Speed</dt>
+            <dd class="col-7 small">{{ inquiry.speed_delivery_offer_to_customers|default:"—" }}</dd>
+
+            <dt class="col-5 text-muted small">Time Window</dt>
+            <dd class="col-7 small">{{ inquiry.preferred_delivery_time_window|default:"—" }}</dd>
+
+            <dt class="col-5 text-muted small">Package Size</dt>
+            <dd class="col-7 small">{{ inquiry.typical_package_size|default:"—" }}</dd>
+
+            <dt class="col-5 text-muted small">Order System</dt>
+            <dd class="col-7 small">{{ inquiry.order_management_system|default:"—" }}</dd>
+
+            <dt class="col-5 text-muted small">Preferred Contact</dt>
+            <dd class="col-7 small">
+              {% if inquiry.preferred_communication_channel %}
+              {% if inquiry.preferred_communication_channel == 'WhatsApp' %}
+              <i class="fa-brands fa-whatsapp text-success me-1"></i>
+              {% elif inquiry.preferred_communication_channel == 'Email' %}
+              <i class="fa-solid fa-envelope text-primary me-1"></i>
+              {% elif inquiry.preferred_communication_channel == 'Phone Call' %}
+              <i class="fa-solid fa-phone text-info me-1"></i>
+              {% endif %}
+              {{ inquiry.preferred_communication_channel }}
+              {% else %}—{% endif %}
+            </dd>
+
+            <dt class="col-5 text-muted small">Delivery to Customers</dt>
+            <dd class="col-7 small">
+              {% if inquiry.is_delivery_free_to_customers == 'Free' %}
+              <span class="badge bg-success">Free</span>
+              {% elif inquiry.is_delivery_free_to_customers == 'Paid' %}
+              <span class="badge bg-secondary">Customers Pay</span>
+              {% elif inquiry.is_delivery_free_to_customers == 'Mixed' %}
+              <span class="badge bg-info text-dark">Mixed</span>
+              {% else %}—{% endif %}
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- PICKUP DETAILS -->
+    <div class="col-12 col-md-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent fw-semibold">
+          <i class="fa-solid fa-location-dot me-2 text-danger"></i>Pickup Details
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-5 text-muted small">Pickup Type</dt>
+            <dd class="col-7 small">{{ inquiry.type_of_pickup_location|default:"—" }}</dd>
+
+            <dt class="col-5 text-muted small">Pickup Area</dt>
+            <dd class="col-7 small">{{ inquiry.pickup_Location_area_name|default:"—" }}</dd>
+
+            <dt class="col-5 text-muted small">Pickup Time Slab</dt>
+            <dd class="col-7 small">{{ inquiry.pickup_location_time_slab|default:"—" }}</dd>
+
+            <dt class="col-5 text-muted small">Pickups/Day</dt>
+            <dd class="col-7 small">{{ inquiry.number_of_pickup_times_in_day|default:"1" }}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /row -->
+
+  <!-- BACK BUTTON -->
+  <div class="mt-4">
+    <a href="{% url 'workforce:pricing_inquiries_list' %}"
+       class="btn btn-outline-secondary btn-sm"
+       hx-get="{% url 'workforce:pricing_inquiries_list' %}"
+       hx-target="#main-content"
+       hx-select="#main-content"
+       hx-swap="outerHTML"
+       hx-push-url="true">
+      <i class="fa-solid fa-arrow-left me-1"></i>Back to Pricing Inquiries
+    </a>
+  </div>
+
+</div>
+{% endblock %}

@@ -1014,6 +1014,43 @@
           </ul>
         </div>
       </li>
+      <!-- FORMS / INQUIRIES -->
+      <li id="workforce_sidebar_menu_forms" class="nav-item">
+        <a id="workforce_sidebar_link_forms" class="nav-link btn nav-link-collapse" data-bs-toggle="collapse" data-bs-target="#submenu-forms" href="#">
+          <i class="fa-solid fa-envelope-open-text me-2"></i>
+          <span>Forms</span>
+          <i class="fa-solid fa-chevron-down ms-auto transition-rotate"></i>
+        </a>
+        <div class="collapse submenu {% if request.resolver_match.url_name in 'pricing_inquiries_list,pricing_inquiry_detail,whatsapp_inquiries_list,whatsapp_inquiry_detail' %}show{% endif %}" id="submenu-forms">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_pricing_inquiries" class="nav-link btn submenu-link {% if request.resolver_match.url_name in 'pricing_inquiries_list,pricing_inquiry_detail' %}active{% endif %}"
+                 href="{% url 'workforce:pricing_inquiries_list' %}"
+                 hx-get="{% url 'workforce:pricing_inquiries_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-solid fa-file-alt me-2"></i>
+                Pricing Inquiries
+              </a>
+            </li>
+            <li class="nav-item">
+              <a id="workforce_sidebar_link_whatsapp_inquiries" class="nav-link btn submenu-link {% if request.resolver_match.url_name in 'whatsapp_inquiries_list,whatsapp_inquiry_detail' %}active{% endif %}"
+                 href="{% url 'workforce:whatsapp_inquiries_list' %}"
+                 hx-get="{% url 'workforce:whatsapp_inquiries_list' %}"
+                 hx-target="#main-content"
+                 hx-select="#main-content"
+                 hx-swap="outerHTML"
+                 hx-push-url="true">
+                <i class="fa-brands fa-whatsapp me-2"></i>
+                WhatsApp Inquiries
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
       <li id="workforce_sidebar_menu_contacts" class="nav-item">
         <a id="workforce_sidebar_link_contacts" class="nav-link btn nav-link-single {% if request.resolver_match.url_name == 'staff_contacts' %}active{% endif %}"
            href="{% url 'workforce:staff_contacts' %}"
