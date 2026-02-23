@@ -74,25 +74,19 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
             <div class="td-section__icon td-section__icon--green"><i class="fa-solid fa-circle-dot"></i></div>
             <div class="td-section__content">
                 <span class="td-label">Pickup From</span>
-                <div class="td-loc-row">
-                    <strong id="tdPickup" style="flex:1;min-width:0;"></strong>
-                    <a id="tdPickupMapBtn" href="#" target="_blank" class="td-map-btn td-map-btn--grey" title="Open in Maps">
-                        <i class="fa-solid fa-map-location-dot"></i>
-                    </a>
-                </div>
+                <strong id="tdPickup"></strong>
             </div>
+            <a id="tdPickupMapBtn" href="#" target="_blank" class="td-map-tile td-map-tile--grey" title="Open Pickup in Maps">
+                <i class="fa-solid fa-location-pin td-map-tile__pin"></i>
+                <span class="td-map-tile__label">Maps</span>
+            </a>
         </div>
 
         <!-- Dropoff -->
         <div class="td-section">
             <div class="td-section__icon td-section__icon--red"><i class="fa-solid fa-location-dot"></i></div>
             <div class="td-section__content">
-                <div class="td-loc-row">
-                    <span class="td-label">Deliver To</span>
-                    <a id="tdDropMapBtn" href="#" target="_blank" class="td-map-btn td-map-btn--grey" title="Open in Maps">
-                        <i class="fa-solid fa-map-location-dot"></i>
-                    </a>
-                </div>
+                <span class="td-label">Deliver To</span>
                 <div id="tdAddrLine1" class="td-addr-line1" style="display:none;">
                     <strong id="tdAddrStructured"></strong>
                     <span id="tdAccuracyBadge" class="td-accuracy-badge"></span>
@@ -105,6 +99,10 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                     </span>
                 </div>
             </div>
+            <a id="tdDropMapBtn" href="#" target="_blank" class="td-map-tile td-map-tile--grey" title="Open Dropoff in Maps">
+                <i class="fa-solid fa-location-pin td-map-tile__pin"></i>
+                <span class="td-map-tile__label">Maps</span>
+            </a>
         </div>
 
         <!-- Address Validation Status -->
@@ -431,10 +429,10 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const pLat = d.pickupLat, pLng = d.pickupLng;
         if (pLat && pLng && parseFloat(pLat) !== 0 && parseFloat(pLng) !== 0) {
             pickupMapBtn.href = 'https://www.google.com/maps?q=' + pLat + ',' + pLng;
-            pickupMapBtn.className = 'td-map-btn td-map-btn--green';
+            pickupMapBtn.className = 'td-map-tile td-map-tile--green';
         } else {
             pickupMapBtn.removeAttribute('href');
-            pickupMapBtn.className = 'td-map-btn td-map-btn--grey';
+            pickupMapBtn.className = 'td-map-tile td-map-tile--grey';
         }
 
         // Delivery address
@@ -538,14 +536,14 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         const bestLng  = av.order_lng || av.lng || av.dl_lng || d.lng;
         const pinColor = (av.coords_accuracy && ACCURACY_LABEL[av.coords_accuracy]) ? ACCURACY_LABEL[av.coords_accuracy].color : '#718096';
 
-        // Dropoff map button
+        // Dropoff map tile
         const dropMapBtn = document.getElementById('tdDropMapBtn');
         if (bestLat && bestLng && parseFloat(bestLat) !== 0 && parseFloat(bestLng) !== 0) {
             dropMapBtn.href = 'https://www.google.com/maps?q=' + bestLat + ',' + bestLng;
-            dropMapBtn.className = 'td-map-btn td-map-btn--blue';
+            dropMapBtn.className = 'td-map-tile td-map-tile--blue';
         } else {
             dropMapBtn.removeAttribute('href');
-            dropMapBtn.className = 'td-map-btn td-map-btn--grey';
+            dropMapBtn.className = 'td-map-tile td-map-tile--grey';
         }
 
         if (bestLat && bestLng && parseFloat(bestLat) !== 0) {
