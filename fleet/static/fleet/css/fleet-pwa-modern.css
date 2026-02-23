@@ -18,8 +18,8 @@
 
 :root {
   /* Brand Colors */
-  --fleet-primary: #f7c000;
-  --fleet-primary-dark: #d4a600;
+  --fleet-primary: #001f3f;
+  --fleet-primary-dark: #001233;
   --fleet-dark: #001f3f;
   --fleet-dark-light: #003366;
   --fleet-navy: #0a2540;
@@ -2405,6 +2405,9 @@
 .task-card__strip-item--cod {
   background: #fff7e6;
   color: #e67e22;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 10px;
 }
 
 .task-card__strip-item--earn {
@@ -2485,6 +2488,78 @@
   background: #f59e0b;
   color: #fff;
   margin-left: 0;
+}
+
+/* ============================================================================
+   FLEET MODAL — base dialog styles
+   ============================================================================ */
+
+.fleet-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.fleet-modal__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, .45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.fleet-modal__content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--fleet-white, #fff);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, .15);
+  animation: fleetModalSlideUp .25s ease-out;
+}
+
+@keyframes fleetModalSlideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.fleet-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--fleet-grey-100, #f1f5f9);
+}
+
+.fleet-modal__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--fleet-dark, #1e293b);
+}
+
+.fleet-modal__body {
+  padding: 16px 20px;
+}
+
+.fleet-btn-icon {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: var(--fleet-grey-500, #64748b);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.fleet-btn-icon:active {
+  opacity: .6;
 }
 
 /* ============================================================================
@@ -3096,6 +3171,7 @@
 
 .td-row--meta {
   display: flex;
+  align-items: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) 0;
 }
@@ -3214,6 +3290,25 @@
 .td-stat--cod {
   background: #fff7e6;
   color: #e67e22;
+}
+
+/* COD badge — top-right in meta row */
+.td-cod-badge {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff7e6;
+  color: #e67e22;
+  font-size: 1.25rem;
+  font-weight: 800;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+}
+
+.td-cod-badge i {
+  font-size: 1rem;
 }
 
 .td-stat--earn {

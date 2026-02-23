@@ -172,7 +172,7 @@
                     <div class="fleet-list-item__subtitle">{{ event.ts|timesince }} ago{% if event.obj.description %} · {{ event.obj.description|truncatechars:40 }}{% endif %}</div>
                 </div>
                 <div class="fleet-list-item__action">
-                    <span style="font-weight:700; {% if event.obj.amount > 0 %}color:var(--fleet-success){% else %}color:var(--fleet-danger){% endif %}">
+                    <span class="{% if event.obj.amount > 0 %}fleet-timeline__amount--positive{% else %}fleet-timeline__amount--negative{% endif %}">
                         {% if event.obj.amount > 0 %}+{% endif %}{{ event.obj.amount|floatformat:0 }} QR
                     </span>
                 </div>
@@ -240,45 +240,45 @@
         </a>
     </div>
     <div class="fleet-card__body">
-        <div class="fleet-stats" style="grid-template-columns: repeat(4, 1fr);">
-            <div class="fleet-stat" style="padding: 0.75rem;">
-                <div class="fleet-stat__icon fleet-stat__icon--info" style="width: 32px; height: 32px; font-size: 1rem; margin-bottom: 0.5rem;">
+        <div class="fleet-stats fleet-stats--4col">
+            <div class="fleet-stat fleet-stat--compact">
+                <div class="fleet-stat__icon fleet-stat__icon--info">
                     <i class="fa-solid fa-box"></i>
                 </div>
-                <div class="fleet-stat__value" style="font-size: 1.25rem;">{{ stats_7_days.total_deliveries|default:0 }}</div>
-                <div class="fleet-stat__label" style="font-size: 0.625rem;">Deliveries</div>
+                <div class="fleet-stat__value">{{ stats_7_days.total_deliveries|default:0 }}</div>
+                <div class="fleet-stat__label">Deliveries</div>
             </div>
 
-            <div class="fleet-stat" style="padding: 0.75rem;">
-                <div class="fleet-stat__icon fleet-stat__icon--success" style="width: 32px; height: 32px; font-size: 1rem; margin-bottom: 0.5rem;">
+            <div class="fleet-stat fleet-stat--compact">
+                <div class="fleet-stat__icon fleet-stat__icon--success">
                     <i class="fa-solid fa-check"></i>
                 </div>
-                <div class="fleet-stat__value" style="font-size: 1.25rem;">{{ stats_7_days.success_rate|floatformat:0|default:0 }}%</div>
-                <div class="fleet-stat__label" style="font-size: 0.625rem;">Success</div>
+                <div class="fleet-stat__value">{{ stats_7_days.success_rate|floatformat:0|default:0 }}%</div>
+                <div class="fleet-stat__label">Success</div>
             </div>
 
-            <div class="fleet-stat" style="padding: 0.75rem;">
-                <div class="fleet-stat__icon fleet-stat__icon--warning" style="width: 32px; height: 32px; font-size: 1rem; margin-bottom: 0.5rem;">
+            <div class="fleet-stat fleet-stat--compact">
+                <div class="fleet-stat__icon fleet-stat__icon--warning">
                     <i class="fa-solid fa-star"></i>
                 </div>
-                <div class="fleet-stat__value" style="font-size: 1.25rem;">{{ driver.driver_rating|floatformat:1|default:"0.0" }}</div>
-                <div class="fleet-stat__label" style="font-size: 0.625rem;">Rating</div>
+                <div class="fleet-stat__value">{{ driver.driver_rating|floatformat:1|default:"0.0" }}</div>
+                <div class="fleet-stat__label">Rating</div>
             </div>
 
-            <div class="fleet-stat" style="padding: 0.75rem;">
-                <div class="fleet-stat__icon fleet-stat__icon--danger" style="width: 32px; height: 32px; font-size: 1rem; margin-bottom: 0.5rem;">
+            <div class="fleet-stat fleet-stat--compact">
+                <div class="fleet-stat__icon fleet-stat__icon--danger">
                     <i class="fa-solid fa-money-bill"></i>
                 </div>
-                <div class="fleet-stat__value" style="font-size: 1.25rem;">{{ stats_7_days.total_cod_collected|floatformat:0|default:0 }}</div>
-                <div class="fleet-stat__label" style="font-size: 0.625rem;">COD</div>
+                <div class="fleet-stat__value">{{ stats_7_days.total_cod_collected|floatformat:0|default:0 }}</div>
+                <div class="fleet-stat__label">COD</div>
             </div>
         </div>
 
         <!-- Progress bar for weekly goal -->
-        <div style="margin-top: 1rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                <span style="font-size: 0.875rem; font-weight: 600; color: var(--fleet-grey-700);">Weekly Goal</span>
-                <span style="font-size: 0.875rem; font-weight: 700; color: var(--fleet-primary);">{{ stats_7_days.total_deliveries|default:0 }}/100</span>
+        <div class="fleet-weekly-goal">
+            <div class="fleet-weekly-goal__header">
+                <span class="fleet-weekly-goal__label">Weekly Goal</span>
+                <span class="fleet-weekly-goal__value">{{ stats_7_days.total_deliveries|default:0 }}/100</span>
             </div>
             <div class="fleet-progress">
                 <div class="fleet-progress__bar" style="width: {% widthratio stats_7_days.total_deliveries|default:0 100 100 %}%;"></div>
@@ -313,141 +313,6 @@
     </div>
 </div>
 {% endif %}
-
-<style>
-    /* Activity Timeline */
-    .fleet-timeline__ref {
-        font-size: var(--font-size-xs);
-        color: var(--fleet-grey-400);
-        font-weight: 500;
-        margin-left: 4px;
-    }
-    .fleet-timeline__earn {
-        font-size: var(--font-size-sm);
-        font-weight: 700;
-        color: var(--fleet-success);
-    }
-    .fleet-timeline__unread-dot {
-        display: inline-block;
-        width: 8px; height: 8px;
-        border-radius: 50%;
-        background: var(--fleet-primary);
-    }
-    .fleet-timeline .fleet-list-item {
-        align-items: flex-start;
-        padding: var(--spacing-sm) 0;
-    }
-    .fleet-timeline .fleet-list-item__content {
-        padding-top: 2px;
-    }
-
-    /* Task Summary Strip */
-    .fleet-task-summary {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: var(--spacing-sm);
-        margin-bottom: var(--spacing-md);
-    }
-    .fleet-task-summary__item {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: var(--spacing-md) var(--spacing-sm);
-        border-radius: var(--radius-sm);
-        text-decoration: none;
-        overflow: hidden;
-        transition: transform 0.15s, box-shadow 0.15s;
-        box-shadow: var(--shadow-sm);
-    }
-    .fleet-task-summary__item:active { transform: scale(0.97); }
-    .fleet-task-summary__item--new     { background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%); color: #fff; }
-    .fleet-task-summary__item--assigned { background: linear-gradient(135deg, #92400e 0%, #d97706 100%); color: #fff; }
-    .fleet-task-summary__item--active  { background: linear-gradient(135deg, #065f46 0%, #10b981 100%); color: #fff; }
-    .fleet-task-summary__count {
-        font-size: 2rem;
-        font-weight: 900;
-        line-height: 1;
-        margin-bottom: 2px;
-    }
-    .fleet-task-summary__label {
-        font-size: var(--font-size-xs);
-        font-weight: 600;
-        opacity: 0.9;
-        text-align: center;
-    }
-    .fleet-task-summary__icon {
-        position: absolute;
-        bottom: -4px;
-        right: 6px;
-        font-size: 2rem;
-        opacity: 0.15;
-    }
-    .fleet-task-summary__dot {
-        position: absolute;
-        top: 8px; right: 8px;
-        width: 8px; height: 8px;
-        border-radius: 50%;
-        background: #fde68a;
-        animation: pulse 1.5s ease-in-out infinite;
-    }
-    .fleet-task-summary__dot--active { background: #a7f3d0; }
-
-    /* Greeting Section */
-    .fleet-greeting {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: var(--spacing-lg);
-        padding: var(--spacing-md);
-        background: var(--fleet-white);
-        border-radius: var(--radius-sm);
-        box-shadow: var(--shadow-sm);
-    }
-
-    .fleet-greeting__text {
-        flex: 1;
-    }
-
-    .fleet-greeting__time {
-        display: block;
-        font-size: var(--font-size-sm);
-        color: var(--fleet-grey-600);
-        font-weight: 500;
-        margin-bottom: var(--spacing-xs);
-    }
-
-    .fleet-greeting__name {
-        font-size: var(--font-size-2xl);
-        font-weight: 800;
-        color: var(--fleet-dark);
-        margin: 0;
-    }
-
-    .fleet-greeting__avatar {
-        width: 56px;
-        height: 56px;
-        border-radius: var(--radius-sm);
-        background: linear-gradient(135deg, var(--fleet-primary) 0%, var(--fleet-primary-dark) 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        box-shadow: var(--shadow-md);
-    }
-
-    .fleet-greeting__avatar img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .fleet-greeting__avatar i {
-        font-size: var(--font-size-2xl);
-        color: var(--fleet-dark);
-    }
-</style>
 
 <script>
     // Notification bell links to /fleet/notifications/

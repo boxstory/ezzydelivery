@@ -163,96 +163,6 @@
     </div>
 </div>
 
-<style>
-    /* Chart Styles */
-    .fleet-chart {
-        display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: var(--spacing-xs);
-        height: 200px;
-        padding: var(--spacing-md) 0;
-    }
-
-    .fleet-chart__bar-container {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: var(--spacing-sm);
-        height: 100%;
-    }
-
-    .fleet-chart__bar {
-        width: 100%;
-        background: linear-gradient(to top, var(--fleet-primary), var(--fleet-primary-dark));
-        border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-        position: relative;
-        min-height: 20px;
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
-        padding-top: var(--spacing-xs);
-        transition: all var(--transition-base);
-        animation: grow-bar 0.6s ease-out;
-    }
-
-    @keyframes grow-bar {
-        from {
-            height: 0;
-            opacity: 0;
-        }
-    }
-
-    .fleet-chart__value {
-        font-size: var(--font-size-xs);
-        font-weight: 700;
-        color: var(--fleet-dark);
-    }
-
-    .fleet-chart__label {
-        font-size: var(--font-size-xs);
-        color: var(--fleet-grey-600);
-        font-weight: 600;
-        text-align: center;
-        margin-top: auto;
-    }
-
-    /* Tabs */
-    .fleet-tabs {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: var(--spacing-sm);
-        margin-bottom: var(--spacing-lg);
-        padding: var(--spacing-xs);
-        background: var(--fleet-grey-100);
-        border-radius: var(--radius-sm);
-    }
-
-    .fleet-tab {
-        padding: var(--spacing-sm) var(--spacing-md);
-        border: none;
-        background: transparent;
-        color: var(--fleet-grey-600);
-        font-size: var(--font-size-sm);
-        font-weight: 600;
-        border-radius: var(--radius-sm);
-
-        transition: all var(--transition-base);
-        cursor: pointer;
-    }
-
-    .fleet-tab.active {
-        background: var(--fleet-white);
-        color: var(--fleet-primary);
-        box-shadow: var(--shadow-sm);
-    }
-
-    .fleet-tab:active {
-        transform: scale(0.95);
-    }
-</style>
-
 <script>
     function filterByDays(days) {
         haptic([10]);
@@ -358,89 +268,14 @@
     </div>
 
     <!-- Actions -->
-    <div style="display:flex; gap:var(--spacing-sm); margin-top:var(--spacing-lg);">
-        <button type="button" onclick="clearFilters()" class="fleet-btn fleet-btn--outline" style="flex:1;">
+    <div class="fleet-modal__actions">
+        <button type="button" onclick="clearFilters()" class="fleet-btn fleet-btn--outline">
             Clear
         </button>
-        <button type="button" onclick="applyFilters()" class="fleet-btn fleet-btn--dark" style="flex:2;">
+        <button type="button" onclick="applyFilters()" class="fleet-btn fleet-btn--dark">
             Apply Filters
         </button>
     </div>
 </div>
 
-<style>
-    .filter-overlay {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.4);
-        z-index: 1050;
-    }
-    .filter-overlay.open { display: block; }
-
-    .filter-modal {
-        position: fixed;
-        bottom: -100%;
-        left: 0;
-        right: 0;
-        background: var(--fleet-white);
-        border-radius: var(--radius-md) var(--radius-2xl) 0 0;
-        padding: var(--spacing-md) var(--spacing-lg) calc(var(--spacing-xl) + env(safe-area-inset-bottom));
-        z-index: 1051;
-        transition: bottom var(--transition-base);
-        box-shadow: var(--shadow-2xl);
-    }
-    .filter-modal.open { bottom: 0; }
-
-    .filter-modal__handle {
-        width: 40px; height: 4px;
-        background: var(--fleet-grey-200);
-        border-radius: var(--radius-sm);
-        margin: 0 auto var(--spacing-md);
-    }
-    .filter-modal__header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: var(--spacing-lg);
-    }
-    .filter-modal__title {
-        font-size: var(--font-size-lg);
-        font-weight: 800;
-        color: var(--fleet-dark);
-    }
-    .filter-modal__section { margin-bottom: var(--spacing-lg); }
-    .filter-modal__label {
-        font-size: var(--font-size-xs);
-        font-weight: 700;
-        color: var(--fleet-grey-500);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-bottom: var(--spacing-sm);
-    }
-    .filter-radio-group {
-        display: flex;
-        gap: var(--spacing-sm);
-        flex-wrap: wrap;
-    }
-    .filter-radio {
-        display: flex;
-        align-items: center;
-        padding: var(--spacing-sm) var(--spacing-md);
-        border: 2px solid var(--fleet-grey-200);
-        border-radius: var(--radius-sm);
-        font-size: var(--font-size-sm);
-        font-weight: 600;
-        color: var(--fleet-grey-600);
-        cursor: pointer;
-        transition: all var(--transition-fast);
-    }
-    .filter-radio input { display: none; }
-    .filter-radio--active,
-    .filter-radio:has(input:checked) {
-        border-color: var(--fleet-primary);
-        background: var(--fleet-primary);
-        color: var(--fleet-dark);
-    }
-</style>
 {% endblock %}

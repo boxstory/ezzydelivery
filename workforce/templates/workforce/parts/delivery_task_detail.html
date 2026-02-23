@@ -105,12 +105,12 @@
                                 <div class="dtd__route__dot dtd__route__dot--pickup"></div>
                                 <span class="dtd__route__type">Pickup</span>
                                 {% if task.pickup_location %}
-                                    {% include "includes/components/_ai_parse_button.html" with address=task.pickup_location.pickup_location_title|default:""|add:" "|add:task.pickup_location.pickup_area|default:"" lat=task.pickup_location.pickup_lat lng=task.pickup_location.pickup_lon title="Pickup Location" %}
+                                    {% include "includes/components/_ai_parse_button.html" with address=task.pickup_location.pickup_location_title|default:""|add:" "|add:task.pickup_location.locality|default:"" lat=task.pickup_location.pickup_lat lng=task.pickup_location.pickup_lon title="Pickup Location" %}
                                 {% endif %}
                             </div>
                             <div class="dtd__route__name">{% if task.pickup_location %}{{ task.pickup_location.pickup_location_title|default:"Seller Location" }}{% else %}Seller Location{% endif %}</div>
-                            {% if task.pickup_location and task.pickup_location.pickup_area %}
-                            <div class="dtd__route__addr">{{ task.pickup_location.pickup_area }}</div>
+                            {% if task.pickup_location and task.pickup_location.locality %}
+                            <div class="dtd__route__addr">{{ task.pickup_location.locality }}</div>
                             {% endif %}
                         </div>
                          

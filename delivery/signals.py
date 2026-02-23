@@ -44,20 +44,13 @@ def delivery_task_pre_save(sender, instance, **kwargs):
                         )
                         instance.dl_task_status_dms = old.dl_task_status_dms
 
-                # Block when order is NOT verified (allow cancellation only)
+                # Log when order is NOT verified (but allow status changes)
                 elif order.verification_status != 'verified':
-                    if instance.dl_task_status != old.dl_task_status and instance.dl_task_status != 'cancelled':
-                        logger.warning(
-                            f"Blocked delivery status change '{old.dl_task_status}' -> '{instance.dl_task_status}' "
-                            f"for task {instance.dl_task_number}: order not verified (status={order.verification_status})"
+                    if instance.dl_task_status != old.dl_task_status:
+                        logger.info(
+                            f"Delivery status change '{old.dl_task_status}' -> '{instance.dl_task_status}' "
+                            f"for task {instance.dl_task_number}: order not yet verified (status={order.verification_status})"
                         )
-                        instance.dl_task_status = old.dl_task_status
-                    if instance.dl_task_status_dms != old.dl_task_status_dms and instance.dl_task_status_dms != '9':
-                        logger.warning(
-                            f"Blocked DMS status change '{old.dl_task_status_dms}' -> '{instance.dl_task_status_dms}' "
-                            f"for task {instance.dl_task_number}: order not verified"
-                        )
-                        instance.dl_task_status_dms = old.dl_task_status_dms
         except DeliveryTask.DoesNotExist:
             pass
 
