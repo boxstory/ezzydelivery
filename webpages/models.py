@@ -205,6 +205,9 @@ class PricingEnquiry(models.Model):
     preferred_communication_channel = models.CharField(max_length=100, blank=True, null=True)  # WhatsApp / Email / Phone
     is_delivery_free_to_customers = models.CharField(max_length=50, blank=True, null=True)  # Free / Paid / Mixed
 
+    # Completion status — False for partial (in-progress), True for fully submitted
+    is_complete = models.BooleanField(default=False)
+
     # date created
     date_created = models.DateField(auto_now_add=True, null=True)
     date_modified = models.DateField(auto_now=True, null=True)

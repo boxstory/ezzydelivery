@@ -3,7 +3,48 @@
  * Verifies if zone/street/building exists in QNAS and shows coordinates
  */
 
-async function verifyQNAS(zone, street, building, recordId) {
+/**
+ * Save QNAS status to the order via the update-coords endpoint
+ * @param {number} orderId - Order ID to update
+ * @param {string} status - 'verified', 'not_found', or 'error'
+ */
+async function _saveQnasStatus(orderId, status) {
+    if (!orderId) return;
+    try {
+        const csrfToken = _getCsrfToken();
+        await fetch(`${window.location.origin}/workforce/orders/${orderId}/update-coords/`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ qnas_status: status })
+        });
+        // Update any visible status badges on the page
+        _updateQnasStatusBadges(orderId, status);
+    } catch (e) {
+        console.error('[QNAS] Failed to save qnas_status:', e);
+    }
+}
+
+/**
+ * Update all QNAS status badges on the page for a given order
+ */
+function _updateQnasStatusBadges(orderId, status) {
+    const badges = document.querySelectorAll(`[data-qnas-badge="${orderId}"]`);
+    const config = {
+        verified:  { cls: 'odp__qnas-status--verified',   icon: 'fa-check-circle',        label: 'Verified' },
+        not_found: { cls: 'odp__qnas-status--not_found',  icon: 'fa-exclamation-triangle', label: 'Not Found' },
+        error:     { cls: 'odp__qnas-status--error',      icon: 'fa-times-circle',         label: 'Error' },
+    };
+    const c = config[status];
+    if (!c) return;
+    badges.forEach(badge => {
+        badge.className = 'odp__qnas-status ' + c.cls;
+        badge.innerHTML = `<i class="fa-solid ${c.icon} me-1"></i>${c.label}`;
+        badge.style.display = '';
+    });
+}
+
+async function verifyQNAS(zone, street, building, recordId, orderId) {
     const btnId = `qnasVerifyBtn${recordId}`;
     const resultId = `qnasResult${recordId}`;
     const coordsId = `qnasCoords${recordId}`;
@@ -46,6 +87,7 @@ async function verifyQNAS(zone, street, building, recordId) {
             if (resultSpan) {
                 resultSpan.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-exclamation-triangle me-1"></i>Not Found</span>';
             }
+            _saveQnasStatus(orderId, 'not_found');
             return;
         }
 
@@ -59,6 +101,7 @@ async function verifyQNAS(zone, street, building, recordId) {
             if (resultSpan) {
                 resultSpan.innerHTML = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-map-pin me-1"></i>Found but no coordinates</span>';
             }
+            _saveQnasStatus(orderId, 'not_found');
             return;
         }
 
@@ -86,6 +129,7 @@ async function verifyQNAS(zone, street, building, recordId) {
             `;
         }
 
+        _saveQnasStatus(orderId, 'verified');
         console.log('[QNAS Verify] Success:', { zone, street, building, lat, lng, isExactMatch, totalBuildings: data.total_buildings });
 
     } catch (error) {
@@ -97,6 +141,7 @@ async function verifyQNAS(zone, street, building, recordId) {
         if (resultSpan) {
             resultSpan.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Check Failed</span>';
         }
+        _saveQnasStatus(orderId, 'error');
     }
 }
 
@@ -119,6 +164,7 @@ async function verifyAndUpdateCoords(zone, street, building, orderId) {
 
         if (!resp.ok || !data.success || !data.latitude || !data.longitude) {
             container.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Not found in QNAS</span>';
+            _saveQnasStatus(orderId, 'not_found');
             return;
         }
 
@@ -128,7 +174,7 @@ async function verifyAndUpdateCoords(zone, street, building, orderId) {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify({ latitude: data.latitude, longitude: data.longitude })
+            body: JSON.stringify({ latitude: data.latitude, longitude: data.longitude, qnas_status: 'verified' })
         });
         const saveData = await saveResp.json();
 
@@ -144,6 +190,7 @@ async function verifyAndUpdateCoords(zone, street, building, orderId) {
     } catch (error) {
         console.error('[QNAS] verifyAndUpdateCoords error:', error);
         container.innerHTML = '<span class="badge bg-danger"><i class="fa-solid fa-times me-1"></i>Error</span>';
+        _saveQnasStatus(orderId, 'error');
     }
 }
 
@@ -529,9 +576,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const street = btn.dataset.street;
         const building = btn.dataset.building || '';
         const recordId = btn.dataset.recordId;
+        const orderId = btn.dataset.orderId || '';
 
         if (zone && street && recordId) {
-            verifyQNAS(zone, street, building, recordId);
+            verifyQNAS(zone, street, building, recordId, orderId);
         }
     });
 });

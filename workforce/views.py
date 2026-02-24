@@ -219,11 +219,13 @@ def wf_dashboard(request):
     driver_stats = Driver.objects.aggregate(
         active=Count(Case(When(driver_status='approved', then=1), output_field=IntegerField())),
         pending=Count(Case(When(driver_status='pending', then=1), output_field=IntegerField())),
-        cod_in_hand=Sum('wallet_balance'),
     )
     active_drivers = driver_stats['active']
     pending_drivers = driver_stats['pending']
-    cod_in_hand = driver_stats['cod_in_hand'] or 0
+    # COD in hand: sum of collected but unsettled COD from delivery tasks
+    cod_in_hand = DeliveryTask.objects.filter(
+        cod_collected=True, cod_settled=False
+    ).aggregate(total=Sum('cod_collected_amount'))['total'] or 0
 
     seller_stats = Business.objects.aggregate(
         active=Count(Case(When(business_status='Approved', then=1), output_field=IntegerField())),
@@ -235,13 +237,15 @@ def wf_dashboard(request):
     # Recent orders (last 10 updated)
     orders = Order.objects.select_related('business').order_by('-updated_at')[:10]
 
-    # Orders trend data for the last 7 days - single query with aggregation
+    # Orders trend data for the last 7 days - based on delivered_at date
+    from django.db.models.functions import TruncDate
     week_ago = today - timedelta(days=6)
     order_counts_by_date = dict(
-        Order.objects.filter(order_date__gte=week_ago, order_date__lte=today)
-        .values('order_date')
+        Order.objects.filter(delivered_at__date__gte=week_ago, delivered_at__date__lte=today)
+        .annotate(delivered_date=TruncDate('delivered_at'))
+        .values('delivered_date')
         .annotate(count=Count('id'))
-        .values_list('order_date', 'count')
+        .values_list('delivered_date', 'count')
     )
     orders_trend = []
     max_orders = 1  # Prevent division by zero
@@ -2760,13 +2764,18 @@ def user_verification_list(request):
         .annotate(cnt=Count('id'))
         .values_list('verification_status', 'cnt')
     )
-    total_count = sum(status_counts.values())
+    status_counts['not_applied'] = core_models.Profile.objects.filter(
+        verification_applied_at__isnull=True
+    ).count()
+    total_count = sum(v for k, v in status_counts.items() if k != 'not_applied')
 
     # Get all profiles based on filter
     verification_filter = request.GET.get('status', 'all')
 
     profiles = core_models.Profile.objects.select_related('user')
-    if verification_filter in ('pending', 'under_review', 'verified', 'rejected', 'incomplete'):
+    if verification_filter == 'not_applied':
+        profiles = profiles.filter(verification_applied_at__isnull=True)
+    elif verification_filter in ('pending', 'under_review', 'verified', 'rejected', 'incomplete'):
         profiles = profiles.filter(verification_status=verification_filter)
 
     # Order by application date (most recent first)
@@ -2843,6 +2852,13 @@ def update_verification_status(request, profile_id):
             return JsonResponse({
                 'success': False,
                 'error': 'Status is required'
+            }, status=400)
+
+        # Block approval if user has never applied
+        if new_status == 'verified' and not profile.verification_applied_at:
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot verify — user has not yet applied for verification.'
             }, status=400)
 
         # Update verification status
@@ -3288,11 +3304,24 @@ def fleet_cod_in_hand(request):
             )
         )
     else:
-        # No date filter - show current cod_in_hand
-        from django.db.models import F
+        # No date filter - calculate actual COD from DeliveryTask (collected but not settled)
+        from django.db.models import OuterRef, Subquery
+
+        cod_subquery = delivery_models.DeliveryTask.objects.filter(
+            driver_id=OuterRef('driver_id'),
+            cod_collected=True,
+            cod_settled=False,
+        ).values('driver').annotate(
+            total=Sum('cod_collected_amount')
+        ).values('total')
+
         # Show all drivers (not just approved) for COD tracking
         drivers = fleet_models.Driver.objects.all().select_related('user').annotate(
-            period_cod=F('cod_in_hand')
+            period_cod=Coalesce(
+                Subquery(cod_subquery),
+                Value(0),
+                output_field=DecimalField()
+            )
         )
 
     # COD filter (yes/no/custom) - filters on period_cod (which is either cod_in_hand or calculated from date range)
@@ -3386,15 +3415,54 @@ def fleet_cod_in_hand(request):
 @staff_required
 def fleet_drivers_earnings(request):
     """View for drivers earnings"""
+    from django.db.models import Sum, Count, Max, Value, DecimalField, IntegerField, OuterRef, Subquery
+    from django.db.models.functions import Coalesce
+    from delivery import models as delivery_models
+
+    # Subquery: count of completed deliveries per driver (after last settlement)
+    deliveries_sub = delivery_models.DeliveryTask.objects.filter(
+        driver_id=OuterRef('driver_id'),
+        dl_task_status='delivered',
+    ).values('driver').annotate(cnt=Count('id')).values('cnt')
+
+    # Subquery: pending earnings (COD collected, not settled)
+    earnings_sub = delivery_models.DeliveryTask.objects.filter(
+        driver_id=OuterRef('driver_id'),
+        cod_collected=True,
+        cod_settled=False,
+    ).values('driver').annotate(total=Sum('cod_collected_amount')).values('total')
+
+    # Subquery: last settlement date
+    last_settled_sub = fleet_models.DriverTransaction.objects.filter(
+        driver_id=OuterRef('pk'),
+        transaction_type='settlement',
+    ).order_by('-created_at').values('created_at')[:1]
+
     drivers = fleet_models.Driver.objects.filter(
         driver_status='approved'
-    ).select_related('user').order_by('user__first_name')
+    ).select_related('user').annotate(
+        deliveries_after_settlement=Coalesce(
+            Subquery(deliveries_sub), Value(0), output_field=IntegerField()
+        ),
+        real_pending_earnings=Coalesce(
+            Subquery(earnings_sub), Value(0), output_field=DecimalField()
+        ),
+        last_settled_date=Subquery(last_settled_sub),
+    ).order_by('user__first_name')
+
+    # Totals for summary stats
+    agg = drivers.aggregate(
+        total_earnings=Sum('real_pending_earnings'),
+        total_deliveries=Sum('deliveries_after_settlement'),
+    )
 
     drivers_with_pagination = paginate_queryset(request, drivers, items_per_page=20)
 
     context = {
         'drivers': drivers_with_pagination,
         'page_title': 'Drivers Earnings',
+        'total_earnings': agg['total_earnings'] or 0,
+        'total_deliveries': agg['total_deliveries'] or 0,
     }
     return render(request, 'workforce/fleet_drivers_earnings.html', context)
 
@@ -3904,7 +3972,18 @@ def fleet_transactions(request):
     deposited_refs = set()
 
     if selected_driver:
-        # Get all transactions for totals (not filtered)
+        from delivery import models as delivery_models
+
+        # Real COD from DeliveryTask (source of truth)
+        dl_tasks = delivery_models.DeliveryTask.objects.filter(driver=selected_driver)
+        total_cod = dl_tasks.filter(
+            cod_collected=True
+        ).aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0.00')
+        cod_unsettled = dl_tasks.filter(
+            cod_collected=True, cod_settled=False
+        ).aggregate(total=Sum('cod_collected_amount'))['total'] or Decimal('0.00')
+
+        # Get all transactions for earnings totals and deposit refs
         all_txns = fleet_models.DriverTransaction.objects.filter(driver=selected_driver)
 
         # Fetch all COD deposit reference numbers in one query to avoid N+1
@@ -3913,12 +3992,7 @@ def fleet_transactions(request):
         )
 
         for txn in all_txns:
-            if txn.transaction_type == 'cod_collection':
-                total_cod += abs(txn.amount)
-                # COD not yet deposited - check against pre-fetched set
-                if txn.reference_number not in deposited_refs:
-                    cod_unsettled += abs(txn.amount)
-            elif txn.transaction_type == 'earning':
+            if txn.transaction_type == 'earning':
                 total_earnings += txn.amount
                 # Earnings not yet settled
                 if not txn.settlement_id:

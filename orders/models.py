@@ -151,6 +151,13 @@ class Order(models.Model):
     dl_street = models.PositiveIntegerField(blank=True, null=True, default=None)
     latitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
     longitude = models.DecimalField(max_digits=19, decimal_places=15, blank=True, null=True)
+    QNAS_STATUS = [
+        ('not_checked', 'Not Checked'),
+        ('verified', 'Verified'),
+        ('not_found', 'Not Found'),
+        ('error', 'Error'),
+    ]
+    qnas_status = models.CharField(max_length=15, choices=QNAS_STATUS, default='not_checked', blank=True)
     COORDS_ACCURACY = [
         ('exact', 'Exact (Building)'),
         ('street', 'Street Level'),

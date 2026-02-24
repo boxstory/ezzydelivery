@@ -2,16 +2,18 @@
 QNAS Verification Button Component
 
 Usage in Order Detail:
-{% include "includes/components/_qnas_verify_button.html" with zone=order.dl_zone street=order.dl_street building=order.dl_building record_id=order.id record_type="order" %}
+{% include "includes/components/_qnas_verify_button.html" with zone=order.dl_zone street=order.dl_street building=order.dl_building record_id=order.id order_id=order.id qnas_status=order.qnas_status record_type="order" %}
 
 Usage in Delivery Task Detail:
-{% include "includes/components/_qnas_verify_button.html" with zone=task.order.dl_zone street=task.order.dl_street building=task.order.dl_building record_id=task.id record_type="task" %}
+{% include "includes/components/_qnas_verify_button.html" with zone=task.order.dl_zone street=task.order.dl_street building=task.order.dl_building record_id=task.id order_id=task.order.id qnas_status=task.order.qnas_status record_type="task" %}
 
 Parameters:
 - zone: Zone number (required)
 - street: Street number (required)
 - building: Building number (optional)
 - record_id: Unique ID for this record (required)
+- order_id: Order ID for persisting QNAS status (required)
+- qnas_status: Current QNAS status from order model (optional)
 - record_type: "order" or "task" (optional, defaults to "order")
 - auto_verify: Set to "true" to auto-verify on page load (optional)
 - show_inline: Set to "true" to show button inline instead of block (optional, defaults to true)
@@ -19,13 +21,22 @@ Parameters:
 
 {% if zone and street %}
 <div class="qnas-verify-wrapper {% if show_inline == 'false' %}mt-2{% endif %}">
-    <button type="button"
-            class="btn btn-sm btn-outline-primary qnas-verify-btn"
-            onclick="verifyQNAS({{ zone }}, {{ street }}, '{{ building|default:"" }}', {{ record_id }})"
-            id="qnasVerifyBtn{{ record_id }}"
-            {% if auto_verify %}data-auto-verify="true" data-zone="{{ zone }}" data-street="{{ street }}" data-building="{{ building|default:"" }}" data-record-id="{{ record_id }}"{% endif %}>
-        <i class="fa-solid fa-check-circle me-1"></i>Verify QNAS
-    </button>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <button type="button"
+                class="btn btn-sm btn-outline-primary qnas-verify-btn"
+                onclick="verifyQNAS({{ zone }}, {{ street }}, '{{ building|default:"" }}', {{ record_id }}, {{ order_id|default:record_id }})"
+                id="qnasVerifyBtn{{ record_id }}"
+                {% if auto_verify %}data-auto-verify="true" data-zone="{{ zone }}" data-street="{{ street }}" data-building="{{ building|default:"" }}" data-record-id="{{ record_id }}" data-order-id="{{ order_id|default:record_id }}"{% endif %}>
+            <i class="fa-solid fa-check-circle me-1"></i>Verify QNAS
+        </button>
+        {% if qnas_status and qnas_status != 'not_checked' %}
+        <span class="odp__qnas-status odp__qnas-status--{{ qnas_status }}" data-qnas-badge="{{ order_id|default:record_id }}">
+            {% if qnas_status == 'verified' %}<i class="fa-solid fa-check-circle me-1"></i>Verified{% elif qnas_status == 'not_found' %}<i class="fa-solid fa-exclamation-triangle me-1"></i>Not Found{% elif qnas_status == 'error' %}<i class="fa-solid fa-times-circle me-1"></i>Error{% endif %}
+        </span>
+        {% else %}
+        <span class="odp__qnas-status odp__qnas-status--not_checked" data-qnas-badge="{{ order_id|default:record_id }}" style="display:none;"></span>
+        {% endif %}
+    </div>
     <div id="qnasResult{{ record_id }}" class="mt-1"></div>
     <div id="qnasCoords{{ record_id }}" class="qnas-coords-display mt-1"></div>
 </div>

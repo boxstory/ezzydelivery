@@ -98,8 +98,60 @@ def delivery_pricing(request):
     }
     return render(request, 'webpages/3pl_pricing.html', data)
 
+def _save_step1_to_db(inquiry, data):
+    """Save step 1 fields to a PricingEnquiry instance."""
+    inquiry.full_name = data.get('full_name', '')
+    inquiry.business_name = data.get('business_name', '')
+    inquiry.business_contact_number = data.get('business_contact_number', '')
+    inquiry.operation_team_contact_number = data.get('operation_team_contact_number', '')
+    inquiry.website_url = data.get('website_url', '')
+    inquiry.social_profile = data.get('social_profile', '')
+    inquiry.product_category = data.get('product_category', '')
+    inquiry.is_personalized_product = data.get('is_personalized_product', 'False') == 'True'
+    inquiry.is_located_in_qatar = data.get('is_located_in_qatar', 'False') == 'True'
+    inquiry.is_registered_company_in_qatar = data.get('is_registered_company_in_qatar', 'False') == 'True'
+    inquiry.business_location_country = data.get('business_location_country', '')
+    inquiry.is_team_available_in_qatar = data.get('is_team_available_in_qatar', 'False') == 'True'
+    inquiry.average_order_value_qar = data.get('average_order_value_qar', '')
+    inquiry.business_operating_age = data.get('business_operating_age', '')
+    inquiry.save()
+
+
+def _save_step2_to_db(inquiry, data):
+    """Save step 2 fields to a PricingEnquiry instance."""
+    inquiry.avarage_number_of_order_last_week = data.get('avarage_number_of_order_last_week', '')
+    inquiry.avarage_number_of_order_done_last_month = data.get('avarage_number_of_order_done_last_month', '')
+    inquiry.avarage_number_of_order_expect_next_month = data.get('avarage_number_of_order_expect_next_month', '')
+    inquiry.orders_expected_in_next_3_months_milestone = data.get('orders_expected_in_next_3_months_milestone', '')
+    inquiry.is_required_COD_service = data.get('is_required_COD_service', 'False') == 'True'
+    inquiry.is_required_fulfillment_service_for_operate_from_outside_qatar = data.get('is_required_fulfillment_service_for_operate_from_outside_qatar', 'False') == 'True'
+    inquiry.is_required_fulfillment_service_for_make_hub_in_doha = data.get('is_required_fulfillment_service_for_make_hub_in_doha', 'False') == 'True'
+    inquiry.current_courier_provider = data.get('current_courier_provider', '')
+    inquiry.delivery_coverage = data.get('delivery_coverage', '')
+    inquiry.is_return_logistics_required = data.get('is_return_logistics_required', 'False') == 'True'
+    inquiry.preferred_start_date = data.get('preferred_start_date', '')
+    inquiry.save()
+
+
+def _save_step3_to_db(inquiry, data):
+    """Save step 3 fields to a PricingEnquiry instance."""
+    inquiry.speed_delivery_offer_to_customers = data.get('speed_delivery_offer_to_customers', '')
+    inquiry.is_frequent_same_day_pick_and_delivery_required = data.get('is_frequent_same_day_pick_and_delivery_required', 'False') == 'True'
+    inquiry.preferred_delivery_time_window = data.get('preferred_delivery_time_window', '')
+    inquiry.typical_package_size = data.get('typical_package_size', '')
+    inquiry.is_special_handling_required = data.get('is_special_handling_required', 'False') == 'True'
+    inquiry.type_of_pickup_location = data.get('type_of_pickup_location', '')
+    inquiry.pickup_Location_area_name = data.get('pickup_Location_area_name', '')
+    inquiry.pickup_location_time_slab = data.get('pickup_location_time_slab', '')
+    inquiry.number_of_pickup_times_in_day = data.get('number_of_pickup_times_in_day', '1')
+    inquiry.order_management_system = data.get('order_management_system', '')
+    inquiry.preferred_communication_channel = data.get('preferred_communication_channel', '')
+    inquiry.is_delivery_free_to_customers = data.get('is_delivery_free_to_customers', '')
+    inquiry.save()
+
+
 def delivery_inquiry(request):
-    """Multi-step pricing inquiry form"""
+    """Multi-step pricing inquiry form — saves to DB on each step."""
     # Initialize session data if not exists
     if 'inquiry_data' not in request.session:
         request.session['inquiry_data'] = {}
@@ -150,68 +202,64 @@ def delivery_inquiry(request):
 
         request.session['inquiry_data'].update(step_data)
         request.session['inquiry_step'] = current_step
+        request.session.modified = True
+
+        # Get or create the DB inquiry record
+        inquiry_id = request.session.get('inquiry_id')
+        inquiry = None
+        if inquiry_id:
+            try:
+                inquiry = PricingEnquiry.objects.get(id=inquiry_id)
+            except PricingEnquiry.DoesNotExist:
+                inquiry = None
+
+        # Merge session data for DB save (covers fields from prior steps)
+        all_data = request.session.get('inquiry_data', {})
 
         # Handle navigation
         if 'next_step' in request.POST:
+            if current_step == 1:
+                if inquiry is None:
+                    # Create new partial record
+                    inquiry = PricingEnquiry(is_complete=False)
+                _save_step1_to_db(inquiry, all_data)
+                request.session['inquiry_id'] = inquiry.id
+                request.session.modified = True
+            elif current_step == 2:
+                if inquiry:
+                    _save_step2_to_db(inquiry, all_data)
+
             next_step = current_step + 1
             return redirect(f'/3pl/inquiry/?step={next_step}')
 
         elif 'prev_step' in request.POST:
+            # Save current step data to DB before going back
+            if inquiry:
+                if current_step == 2:
+                    _save_step2_to_db(inquiry, all_data)
+                elif current_step == 3:
+                    _save_step3_to_db(inquiry, all_data)
+
             prev_step = max(1, current_step - 1)
             return redirect(f'/3pl/inquiry/?step={prev_step}')
 
         elif 'submit_final' in request.POST:
-            # Save complete inquiry
-            inquiry_data = request.session.get('inquiry_data', {})
+            if inquiry is None:
+                # Fallback: create from all session data (shouldn't normally happen)
+                inquiry = PricingEnquiry(is_complete=False)
+                _save_step1_to_db(inquiry, all_data)
+                _save_step2_to_db(inquiry, all_data)
 
-            # Create pricing enquiry instance
-            pricing_enquiry = PricingEnquiry.objects.create(
-                full_name=inquiry_data.get('full_name', ''),
-                business_name=inquiry_data.get('business_name', ''),
-                business_contact_number=inquiry_data.get('business_contact_number', ''),
-                operation_team_contact_number=inquiry_data.get('operation_team_contact_number', ''),
-                website_url=inquiry_data.get('website_url', ''),
-                social_profile=inquiry_data.get('social_profile', ''),
-                product_category=inquiry_data.get('product_category', ''),
-                is_personalized_product=inquiry_data.get('is_personalized_product', 'False') == 'True',
-                is_registered_company_in_qatar=inquiry_data.get('is_registered_company_in_qatar', 'False') == 'True',
-                is_located_in_qatar=inquiry_data.get('is_located_in_qatar', 'False') == 'True',
-                is_team_available_in_qatar=inquiry_data.get('is_team_available_in_qatar', 'False') == 'True',
-                is_required_COD_service=inquiry_data.get('is_required_COD_service', 'False') == 'True',
-                is_required_fulfillment_service_for_operate_from_outside_qatar=inquiry_data.get('is_required_fulfillment_service_for_operate_from_outside_qatar', 'False') == 'True',
-                is_required_fulfillment_service_for_make_hub_in_doha=inquiry_data.get('is_required_fulfillment_service_for_make_hub_in_doha', 'False') == 'True',
-                avarage_number_of_order_last_week=inquiry_data.get('avarage_number_of_order_last_week', ''),
-                avarage_number_of_order_done_last_month=inquiry_data.get('avarage_number_of_order_done_last_month', ''),
-                avarage_number_of_order_expect_next_month=inquiry_data.get('avarage_number_of_order_expect_next_month', ''),
-                orders_expected_in_next_3_months_milestone=inquiry_data.get('orders_expected_in_next_3_months_milestone', ''),
-                speed_delivery_offer_to_customers=inquiry_data.get('speed_delivery_offer_to_customers', ''),
-                is_frequent_same_day_pick_and_delivery_required=inquiry_data.get('is_frequent_same_day_pick_and_delivery_required', 'False') == 'True',
-                preferred_delivery_time_window=inquiry_data.get('preferred_delivery_time_window', ''),
-                typical_package_size=inquiry_data.get('typical_package_size', ''),
-                is_special_handling_required=inquiry_data.get('is_special_handling_required', 'False') == 'True',
-                type_of_pickup_location=inquiry_data.get('type_of_pickup_location', ''),
-                pickup_Location_area_name=inquiry_data.get('pickup_Location_area_name', ''),
-                pickup_location_time_slab=inquiry_data.get('pickup_location_time_slab', ''),
-                number_of_pickup_times_in_day=inquiry_data.get('number_of_pickup_times_in_day', '1'),
-                # Extended fields
-                average_order_value_qar=inquiry_data.get('average_order_value_qar', ''),
-                business_operating_age=inquiry_data.get('business_operating_age', ''),
-                business_location_country=inquiry_data.get('business_location_country', ''),
-                current_courier_provider=inquiry_data.get('current_courier_provider', ''),
-                is_return_logistics_required=inquiry_data.get('is_return_logistics_required', 'False') == 'True',
-                delivery_coverage=inquiry_data.get('delivery_coverage', ''),
-                preferred_start_date=inquiry_data.get('preferred_start_date', ''),
-                order_management_system=inquiry_data.get('order_management_system', ''),
-                preferred_communication_channel=inquiry_data.get('preferred_communication_channel', ''),
-                is_delivery_free_to_customers=inquiry_data.get('is_delivery_free_to_customers', ''),
-            )
+            _save_step3_to_db(inquiry, all_data)
+            inquiry.is_complete = True
+            inquiry.save()
 
             # Clear session
             request.session.pop('inquiry_data', None)
             request.session.pop('inquiry_step', None)
+            request.session.pop('inquiry_id', None)
 
-            messages.success(request, "Thank you! Your inquiry has been submitted successfully. Our team will contact you soon.")
-            return redirect('/')
+            return redirect('webpages:inquiry_success')
 
     # Get saved data from session
     saved_data = request.session.get('inquiry_data', {})
@@ -232,6 +280,15 @@ def delivery_inquiry(request):
         'total_steps': 3,
     }
     return render(request, 'webpages/delivery_pricing_inquiry.html', data)
+
+
+def inquiry_success(request):
+    """Success page shown after completing the 3PL pricing inquiry."""
+    meta = SEOMetadata.get_page_meta(
+        title="Inquiry Submitted | EzzyDelivery Qatar",
+        description="Your 3PL pricing inquiry has been submitted successfully. Our team will reach out within 24 hours.",
+    )
+    return render(request, 'webpages/inquiry_success.html', {'seo': meta})
 
 
 def about(request):

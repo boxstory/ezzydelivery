@@ -21,6 +21,7 @@ urlpatterns = [
     path('qcommerce/', webpages_views.qcommerce, name='qcommerce'),
     path('3pl/pricing/', webpages_views.delivery_pricing, name='delivery_pricing'),
     path('3pl/inquiry/', webpages_views.delivery_inquiry, name='delivery_inquiry'),
+    path('3pl/inquiry/success/', webpages_views.inquiry_success, name='inquiry_success'),
     path('affiliate/', webpages_views.affiliate, name='affiliate_marketing'),
 
 

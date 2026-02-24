@@ -161,11 +161,20 @@
                                     <div class="odp__field">
                                         <span class="odp__field__label">QNAS</span>
                                         <div class="odp__field__value d-flex flex-column gap-1">
-                                            <button type="button" class="dtd__addr__qnas-btn"
-                                                    id="qnasVerifyBtn{{ task.id }}"
-                                                    onclick="verifyQNAS({{ task.order.dl_zone|default:0 }}, {{ task.order.dl_street|default:0 }}, '{{ task.order.dl_building|default:"" }}', {{ task.id }})">
-                                                <i class="fa-solid fa-satellite-dish"></i> Verify
-                                            </button>
+                                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                <button type="button" class="dtd__addr__qnas-btn"
+                                                        id="qnasVerifyBtn{{ task.id }}"
+                                                        onclick="verifyQNAS({{ task.order.dl_zone|default:0 }}, {{ task.order.dl_street|default:0 }}, '{{ task.order.dl_building|default:"" }}', {{ task.id }}, {{ task.order.id }})">
+                                                    <i class="fa-solid fa-satellite-dish"></i> Verify
+                                                </button>
+                                                {% if task.order.qnas_status and task.order.qnas_status != 'not_checked' %}
+                                                <span class="odp__qnas-status odp__qnas-status--{{ task.order.qnas_status }}" data-qnas-badge="{{ task.order.id }}">
+                                                    {% if task.order.qnas_status == 'verified' %}<i class="fa-solid fa-check-circle me-1"></i>Verified{% elif task.order.qnas_status == 'not_found' %}<i class="fa-solid fa-exclamation-triangle me-1"></i>Not Found{% elif task.order.qnas_status == 'error' %}<i class="fa-solid fa-times-circle me-1"></i>Error{% endif %}
+                                                </span>
+                                                {% else %}
+                                                <span class="odp__qnas-status" data-qnas-badge="{{ task.order.id }}" style="display:none;"></span>
+                                                {% endif %}
+                                            </div>
                                             <div id="qnasResult{{ task.id }}" class="small mt-1"></div>
                                             <div id="qnasCoords{{ task.id }}" class="small mt-1"></div>
                                         </div>

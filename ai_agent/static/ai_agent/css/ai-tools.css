@@ -99,15 +99,109 @@
     border-color: rgba(255, 255, 255, 0.4);
 }
 
-/* ---------- AI TOOL BUTTONS (ORDER ROW + DETAIL) ---------- */
-.orc-btn.orc-btn-ai {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+/* ---------- TOOLBAR DIVIDER ---------- */
+.ai-toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.3);
+    margin: 0 0.25rem;
 }
 
+/* ---------- STATUS DROPDOWN ---------- */
+.ai-status-dropdown {
+    position: relative;
+}
+
+.ai-toolbar-actions .btn-status-change {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    color: white;
+    padding: 0.4rem 0.75rem;
+    font-weight: 600;
+}
+.ai-toolbar-actions .btn-status-change:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.ai-status-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 200px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+    padding: 0.4rem;
+    z-index: 200;
+}
+.ai-status-menu.show { display: block; animation: aiSlideDown 0.2s ease; }
+
+.ai-status-menu button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: transparent;
+    color: #333;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.ai-status-menu button:hover { background: #f3f4f6; }
+
+.st-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.st-dot--warn { background: #f59e0b; }
+.st-dot--info { background: #3b82f6; }
+.st-dot--ok   { background: #10b981; }
+.st-dot--err  { background: #ef4444; }
+
+/* ---------- BULK TOAST ---------- */
+.ai-bulk-toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    padding: 0.65rem 1.25rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    box-shadow: 0 4px 20px rgba(16,185,129,0.35);
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.ai-bulk-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ---------- AI TOOL BUTTONS (ORDER ROW + DETAIL) ---------- */
+.orc__btn--ai,
+.orc-btn.orc-btn-ai {
+    border-color: #c7d2fe;
+    color: #6366f1;
+}
+.orc__btn--ai:hover,
 .orc-btn.orc-btn-ai:hover {
-    background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
-    transform: scale(1.1);
+    background: #6366f1;
+    border-color: #6366f1;
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(99,102,241,0.25);
 }
 
 /* ---------- AI RESULTS MODAL ---------- */
