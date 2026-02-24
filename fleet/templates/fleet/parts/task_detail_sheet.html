@@ -360,14 +360,6 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         zone_center: { label: 'Zone Center',       pct: 25,  color: '#e67e22' },
         ai_estimate: { label: 'AI Estimate',       pct: 10,  color: '#e74c3c' },
     };
-    const VS_LABEL = {
-        pending:              { label: 'Pending Verification',    icon: 'fa-clock',                cls: 'pending'   },
-        address_verified:     { label: 'Address Verified',        icon: 'fa-circle-check',         cls: 'verified'  },
-        address_needs_update: { label: 'Address Needs Update',    icon: 'fa-triangle-exclamation', cls: 'needs'     },
-        customer_contacted:   { label: 'Customer Contacted',      icon: 'fa-phone',                cls: 'contacted' },
-        verified:             { label: 'Verified by Staff',       icon: 'fa-shield-halved',        cls: 'verified'  },
-        rejected:             { label: 'Rejected',                icon: 'fa-ban',                  cls: 'needs'     },
-    };
 
     window.tdOpenWa = function(el) {
         const url = el.dataset.waUrl;
@@ -502,10 +494,25 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
         let av = {};
         try { av = JSON.parse(addrScript ? addrScript.textContent : '{}'); } catch(e) {}
 
-        const vs = VS_LABEL[av.verification_status] || { label: av.verification_status || 'Unknown', icon: 'fa-circle-question', cls: 'default' };
-        addrBox.className = 'td-addr-verify td-addr-verify--' + vs.cls;
+        // Badge based on QNAS status or accuracy
+        const QNAS_BADGE = {
+            verified:  { label: 'QNAS Verified',  icon: 'fa-check-circle',        cls: 'verified' },
+            not_found: { label: 'QNAS Not Found', icon: 'fa-exclamation-triangle', cls: 'needs'    },
+            error:     { label: 'QNAS Error',     icon: 'fa-times-circle',         cls: 'needs'    },
+        };
+        const qb = QNAS_BADGE[av.qnas_status];
+        const accInfo = av.coords_accuracy && ACCURACY_LABEL[av.coords_accuracy];
+        let badgeLabel, badgeIcon, badgeCls;
+        if (qb) {
+            badgeLabel = qb.label; badgeIcon = qb.icon; badgeCls = qb.cls;
+        } else if (accInfo) {
+            badgeLabel = accInfo.label; badgeIcon = 'fa-location-crosshairs'; badgeCls = 'verified';
+        } else {
+            badgeLabel = 'Location Info'; badgeIcon = 'fa-map-pin'; badgeCls = 'default';
+        }
+        addrBox.className = 'td-addr-verify td-addr-verify--' + badgeCls;
         addrBadge.className = 'td-addr-verify__badge';
-        addrBadge.innerHTML = `<i class="fa-solid ${vs.icon}"></i> ${vs.label}`;
+        addrBadge.innerHTML = `<i class="fa-solid ${badgeIcon}"></i> ${badgeLabel}`;
 
         let rows = '';
         const oZone = av.order_zone, oStreet = av.order_street, oBuilding = av.order_building;
@@ -529,6 +536,19 @@ The card element must have data-* attributes as defined in driver_tasks_pwa.html
                         <div class="td-accuracy-bar__fill" style="width:${acc.pct}%;background:${acc.color};"></div>
                     </div>
                 </div>
+            </div>`;
+        }
+        // QNAS status row
+        const QNAS_LABEL = {
+            verified:  { label: 'Verified',  icon: 'fa-check-circle',        color: '#27ae60' },
+            not_found: { label: 'Not Found', icon: 'fa-exclamation-triangle', color: '#e74c3c' },
+            error:     { label: 'Error',     icon: 'fa-times-circle',         color: '#f39c12' },
+        };
+        if (av.qnas_status && QNAS_LABEL[av.qnas_status]) {
+            const qs = QNAS_LABEL[av.qnas_status];
+            rows += `<div class="td-addr-verify__row">
+                <i class="fa-solid fa-satellite-dish"></i>
+                <span>QNAS: <strong style="color:${qs.color}"><i class="fa-solid ${qs.icon} me-1"></i>${qs.label}</strong></span>
             </div>`;
         }
         const bestLat  = av.order_lat || av.lat || av.dl_lat || d.lat;

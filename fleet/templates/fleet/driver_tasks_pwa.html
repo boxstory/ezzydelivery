@@ -143,8 +143,6 @@
 </script>
 {% with av=card.order.address_verifications.first %}
 <script type="application/json" class="task-address-data">{% spaceless %}{
-  "verification_status":"{{ card.order.verification_status }}",
-  "address_verified":{% if card.order.address_verified %}true{% else %}false{% endif %},
   {% if av %}
   "result":"{{ av.verification_result }}",
   "verified_address":"{{ av.verified_address|default:''|escapejs }}",
@@ -166,7 +164,8 @@
   "order_zone":"{{ card.order.dl_zone|default:'' }}",
   "order_street":"{{ card.order.dl_street|default:'' }}",
   "order_building":"{{ card.order.dl_building|default:'' }}",
-  "coords_accuracy":"{{ card.order.coords_accuracy|default:'' }}"
+  "coords_accuracy":"{{ card.order.coords_accuracy|default:'' }}",
+  "qnas_status":"{{ card.order.qnas_status|default:'' }}"
 }{% endspaceless %}
 </script>
 {% endwith %}

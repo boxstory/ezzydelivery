@@ -2192,16 +2192,16 @@ def driver_tasks(request):
     ).exclude(order__order_status='cancelled').order_by('-id')
 
     assigned_tasks = base_qs.filter(
-        driver=driver, dl_task_status='assigned',
+        driver=driver, dl_task_status='assigned', dl_task_publish=True,
     ).exclude(order__order_status='cancelled').order_by('-id')
 
     accepted_tasks = base_qs.filter(
-        driver=driver,
+        driver=driver, dl_task_publish=True,
         dl_task_status__in=['accepted', 'picked_up', 'start_ride', 'out_for_delivery', 'in_transit', 'contacted', 'non_reachable'],
     ).exclude(order__order_status='cancelled').order_by('-id')
 
     history_tasks = base_qs.filter(
-        driver=driver, dl_task_status__in=['delivered', 'failed', 'cancelled']
+        driver=driver, dl_task_publish=True, dl_task_status__in=['delivered', 'failed', 'cancelled']
     ).order_by('-id')
 
     # Area filter
@@ -2388,6 +2388,10 @@ def fleet_task_take_scan(request):
                 'error': f'Scanned code does not match this task. Got: {scanned_code}'
             })
 
+        # Block if task is not published to fleet
+        if not task.dl_task_publish:
+            return JsonResponse({'success': False, 'error': 'Task is not published to fleet yet'})
+
         # Already taken?
         if task.dl_task_status not in ('pending', 'for_review'):
             return JsonResponse({
@@ -2487,6 +2491,8 @@ def fleet_start_ride(request):
         if not assigned:
             return JsonResponse({'success': False, 'error': 'Task not assigned to you'})
 
+        if not task.dl_task_publish:
+            return JsonResponse({'success': False, 'error': 'Task is not published to fleet yet'})
         if task.order and task.order.order_status == 'cancelled':
             return JsonResponse({'success': False, 'error': 'Order is cancelled — cannot start ride'})
         task.dl_task_status = 'out_for_delivery'
@@ -2539,6 +2545,9 @@ def fleet_postpone_task(request):
         )
         if not assigned:
             return JsonResponse({'success': False, 'error': 'Task not assigned to you'})
+
+        if not task.dl_task_publish:
+            return JsonResponse({'success': False, 'error': 'Task is not published to fleet yet'})
 
         if task.dl_task_status in ('delivered', 'failed', 'cancelled'):
             return JsonResponse({'success': False, 'error': 'Cannot postpone a completed task'})

@@ -375,6 +375,10 @@ def assign_driver(request):
                     driver=driver, dl_task=task
                 )
 
+                # Block if task is not published to fleet
+                if not task.dl_task_publish:
+                    return JsonResponse({"success": False, "error": "Task is not published to fleet yet"})
+
                 # Block if order is cancelled
                 if task.order and task.order.order_status == 'cancelled':
                     return JsonResponse({"success": False, "error": "Order is cancelled"})
@@ -440,12 +444,15 @@ def accept_task(request):
                     delivery_models.AssignedDriver.objects.create(driver=driver, dl_task=task)
                 logger.info(f"Driver {driver.driver_id} assigned to task {task_id}")
 
-            # Block if order is cancelled or not verified
+            # Block if task is not published to fleet
+            if not task.dl_task_publish:
+                return JsonResponse({"success": False, "error": "Task is not published to fleet yet"})
+
+            # Block if order is cancelled
             if task.order_id:
-                order_vals = orders_models.Order.objects.filter(id=task.order_id).values_list('order_status', 'verification_status').first()
-                if order_vals:
-                    if order_vals[0] == 'cancelled':
-                        return JsonResponse({"success": False, "error": "Order is cancelled — cannot accept task"})
+                order_status = orders_models.Order.objects.filter(id=task.order_id).values_list('order_status', flat=True).first()
+                if order_status == 'cancelled':
+                    return JsonResponse({"success": False, "error": "Order is cancelled — cannot accept task"})
             # Update task status to accepted
             task.dl_task_status = 'accepted'
             task.dl_task_status_dms = '7'  # Accepted/Acknowledged in DMS
@@ -489,6 +496,10 @@ def start_ride(request):
                 return JsonResponse({"success": False, "error": "Task not assigned to you"})
 
             task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id)
+
+            # Block if task is not published to fleet
+            if not task.dl_task_publish:
+                return JsonResponse({"success": False, "error": "Task is not published to fleet yet"})
 
             # Block if order is cancelled
             if task.order and task.order.order_status == 'cancelled':

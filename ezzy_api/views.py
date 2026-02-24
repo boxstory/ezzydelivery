@@ -246,10 +246,10 @@ def driver_tasks(request):
         date_filter = request.query_params.get('date', None)
 
         # N+1 FIX: Use select_related to fetch related objects in one query
-        # Only show tasks for verified, non-cancelled orders
+        # Only show tasks published to fleet
         tasks = delivery_models.DeliveryTask.objects.filter(
             driver=driver,
-            order__verification_status='verified',
+            dl_task_publish=True,
         ).exclude(
             order__order_status='cancelled'
         ).select_related(
@@ -324,7 +324,13 @@ def driver_accept_task(request, task_id):
         driver = fleet_models.Driver.objects.get(user=request.user)
 
         with transaction.atomic():
-            task = delivery_models.DeliveryTask.objects.select_for_update().get(id=task_id)
+            task = delivery_models.DeliveryTask.objects.select_related('order').select_for_update().get(id=task_id)
+
+            # Lock check: Task must be published to fleet
+            if not task.dl_task_publish:
+                return Response({
+                    'error': 'Task is not published to fleet yet.'
+                }, status=status.HTTP_403_FORBIDDEN)
 
             if task.driver and task.driver != driver:
                 return Response(
@@ -384,6 +390,12 @@ def driver_reject_task(request, task_id):
         ).distinct().first()
         if not task:
             raise delivery_models.DeliveryTask.DoesNotExist()
+
+        # Lock check: Task must be published to fleet
+        if not task.dl_task_publish:
+            return Response({
+                'error': 'Task is not published to fleet yet.'
+            }, status=status.HTTP_403_FORBIDDEN)
 
         # Lock check: Prevent status change if task is Successful AND COD is settled
         if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
@@ -446,16 +458,16 @@ def driver_update_task_status(request, task_id):
         if not task:
             raise delivery_models.DeliveryTask.DoesNotExist()
 
+        # Lock check: Task must be published to fleet
+        if not task.dl_task_publish:
+            return Response({
+                'error': 'Task is not published to fleet yet.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
         # Lock check: Prevent status change if order is cancelled
         if task.order and task.order.order_status == 'cancelled':
             return Response({
                 'error': 'Task is locked. Order is cancelled — no delivery status changes allowed.'
-            }, status=status.HTTP_403_FORBIDDEN)
-
-        # Lock check: Prevent status change if order is not verified
-        if task.order and task.order.verification_status != 'verified':
-            return Response({
-                'error': 'Task is locked. Order must be verified before delivery status can be updated.'
             }, status=status.HTTP_403_FORBIDDEN)
 
         # Lock check: Prevent status change if task is Successful AND COD is settled
@@ -807,16 +819,16 @@ def dms_update_task_status(request):
     try:
         task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id)
 
+        # Lock check: Order must be published before task status can change
+        if task.order and task.order.order_status in ('to_review', 'to_publish'):
+            return Response({
+                'error': 'Task is locked. Order must be published before delivery status can be updated.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
         # Lock check: Prevent status change if order is cancelled
         if task.order and task.order.order_status == 'cancelled':
             return Response({
                 'error': 'Task is locked. Order is cancelled — no delivery status changes allowed.'
-            }, status=status.HTTP_403_FORBIDDEN)
-
-        # Lock check: Prevent status change if order is not verified
-        if task.order and task.order.verification_status != 'verified':
-            return Response({
-                'error': 'Task is locked. Order must be verified before delivery status can be updated.'
             }, status=status.HTTP_403_FORBIDDEN)
 
         # Lock check: Prevent status change on settled tasks
@@ -970,16 +982,16 @@ def driver_complete_task(request, task_id):
                 )
             raise delivery_models.DeliveryTask.DoesNotExist()
 
+        # Lock check: Task must be published to fleet
+        if not task.dl_task_publish:
+            return Response({
+                'error': 'Task is not published to fleet yet.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
         # Lock check: Prevent status change if order is cancelled
         if task.order and task.order.order_status == 'cancelled':
             return Response({
                 'error': 'Task is locked. Order is cancelled — no delivery status changes allowed.'
-            }, status=status.HTTP_403_FORBIDDEN)
-
-        # Lock check: Prevent status change if order is not verified
-        if task.order and task.order.verification_status != 'verified':
-            return Response({
-                'error': 'Task is locked. Order must be verified before delivery status can be updated.'
             }, status=status.HTTP_403_FORBIDDEN)
 
         # Lock check: Prevent status change if task is Successful AND COD is settled
@@ -1102,6 +1114,12 @@ def driver_upload_task_document(request, task_id):
         ).distinct().first()
         if not task:
             raise delivery_models.DeliveryTask.DoesNotExist()
+
+        # Lock check: Task must be published to fleet
+        if not task.dl_task_publish:
+            return Response({
+                'error': 'Task is not published to fleet yet.'
+            }, status=status.HTTP_403_FORBIDDEN)
 
         # Lock check: Prevent uploads on completed+settled tasks
         if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
@@ -2156,16 +2174,16 @@ def webhook_receive_task_status_update(request):
         try:
             task = delivery_models.DeliveryTask.objects.select_related('order').get(id=task_id)
 
+            # Lock check: Order must be published before task status can change
+            if task.order and task.order.order_status in ('to_review', 'to_publish'):
+                return Response({
+                    'error': 'Task is locked. Order must be published before delivery status can be updated.'
+                }, status=status.HTTP_403_FORBIDDEN)
+
             # Lock check: Prevent status change if order is cancelled
             if task.order and task.order.order_status == 'cancelled':
                 return Response({
                     'error': 'Task is locked. Order is cancelled — no delivery status changes allowed.'
-                }, status=status.HTTP_403_FORBIDDEN)
-
-            # Lock check: Prevent status change if order is not verified
-            if task.order and task.order.verification_status != 'verified':
-                return Response({
-                    'error': 'Task is locked. Order must be verified before delivery status can be updated.'
                 }, status=status.HTTP_403_FORBIDDEN)
 
             # Lock check: Prevent status change if task is Successful AND COD is settled
@@ -2257,16 +2275,16 @@ def webhook_receive_task_completion(request):
             with transaction.atomic():
                 task = delivery_models.DeliveryTask.objects.select_related('order', 'order__business').select_for_update().get(id=task_id)
 
+                # Lock check: Order must be published before task status can change
+                if task.order and task.order.order_status in ('to_review', 'to_publish'):
+                    return Response({
+                        'error': 'Task is locked. Order must be published before delivery status can be updated.'
+                    }, status=status.HTTP_403_FORBIDDEN)
+
                 # Lock check: Prevent status change if order is cancelled
                 if task.order and task.order.order_status == 'cancelled':
                     return Response({
                         'error': 'Task is locked. Order is cancelled — no delivery status changes allowed.'
-                    }, status=status.HTTP_403_FORBIDDEN)
-
-                # Lock check: Prevent status change if order is not verified
-                if task.order and task.order.verification_status != 'verified':
-                    return Response({
-                        'error': 'Task is locked. Order must be verified before delivery status can be updated.'
                     }, status=status.HTTP_403_FORBIDDEN)
 
                 # Lock check: Prevent status change if task is Successful AND COD is settled

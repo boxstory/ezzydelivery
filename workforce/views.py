@@ -764,12 +764,6 @@ def submit_to_task(request, order_id):
         id=order_id
     )
 
-    # Check if order is verified
-    if order.verification_status != 'verified':
-        from django.contrib import messages
-        messages.warning(request, 'Order must be verified before creating delivery task')
-        return redirect(reverse('workforce:wf_orders_all'))
-    
     # Use the automated function that handles DMS push
     delivery_task = _create_delivery_task_from_order(order)
     
@@ -882,59 +876,6 @@ def verify_order_address(request, order_id):
     }
     return render(request, 'workforce/parts/verify_address.html', context)
 
-
-@login_required(login_url='/accounts/login/')
-@staff_required
-def verify_order(request, order_id):
-    """Verify order - workforce view"""
-    from django.utils import timezone
-    from orders.models import OrderVerificationLog
-    from orders.signals import _create_delivery_task_from_order
-
-    order = get_object_or_404(
-        orders_models.Order.objects.select_related('business'),
-        id=order_id
-    )
-
-    if request.method == 'POST':
-        verification_notes = request.POST.get('verification_notes', '')
-
-        # Update order verification status
-        order.verification_status = 'verified'
-        order.verified_by = request.user
-        order.verified_at = timezone.now()
-        order.verification_notes = verification_notes
-        order.save()
-
-        # Log verification
-        OrderVerificationLog.objects.create(
-            order=order,
-            verified_by=request.user,
-            action='order_verified',
-            notes=verification_notes,
-            new_status='verified'
-        )
-
-        # Create delivery task (will be triggered by signal)
-        delivery_task = _create_delivery_task_from_order(order)
-
-        # Return updated row HTML for HTMX
-        if request.headers.get('HX-Request'):
-            return render(request, 'orders/parts/order_row.html', {'order': order})
-
-        from django.contrib import messages
-        if delivery_task:
-            messages.success(request, f'Order verified and delivery task created: {delivery_task.dl_task_number}')
-        else:
-            messages.success(request, 'Order verified successfully')
-
-        return redirect(reverse('workforce:wf_orders_all'))
-
-    # GET request - show verification form
-    context = {
-        'order': order,
-    }
-    return render(request, 'workforce/parts/verify_order.html', context)
 
 
 @login_required(login_url='/accounts/login/')
@@ -2316,6 +2257,67 @@ def update_order_status(request, order_id):
         }, status=400)
 
 
+@login_required(login_url='/accounts/login/')
+@staff_required
+@require_http_methods(["POST"])
+def bulk_update_order_status(request):
+    """Bulk update order status for multiple orders"""
+    VALID_ORDER_STATUSES = [
+        'to_review', 'to_publish', 'published', 'processing', 'ready_to_pickup',
+        'in_transit', 'delivered', 'failed', 'cancelled', 'returned', 'reported'
+    ]
+    try:
+        data = json.loads(request.body)
+        order_ids = data.get('order_ids', [])
+        status = data.get('status')
+
+        if not order_ids:
+            return JsonResponse({
+                'success': False,
+                'error': 'No orders selected'
+            }, status=400)
+
+        if not status:
+            return JsonResponse({
+                'success': False,
+                'error': 'Status is required'
+            }, status=400)
+
+        if status not in VALID_ORDER_STATUSES:
+            return JsonResponse({
+                'success': False,
+                'error': f'Invalid status: {status}'
+            }, status=400)
+
+        orders = orders_models.Order.objects.filter(id__in=order_ids)
+        updated = 0
+        for order in orders:
+            old_status = order.order_status
+            if old_status != status:
+                order.order_status = status
+                order.save(update_fields=['order_status'])
+                from orders.models import OrderVerificationLog
+                OrderVerificationLog.objects.create(
+                    order=order,
+                    verified_by=request.user,
+                    action='order_status_updated',
+                    notes=f'Bulk status change from {old_status} to {status} by {request.user.username}',
+                )
+                updated += 1
+
+        return JsonResponse({
+            'success': True,
+            'message': f'{updated} order(s) updated to {status}',
+            'updated_count': updated
+        })
+    except Exception as e:
+        logger.exception("Error in bulk order status update: %s", str(e))
+        return JsonResponse({
+            'success': False,
+            'error': 'An error occurred while updating orders'
+        }, status=400)
+
+
 @require_http_methods(["POST"])
 @login_required(login_url='/accounts/login/')
 @staff_required
@@ -2363,25 +2365,37 @@ def add_order_comment(request, order_id):
 @login_required(login_url='account_login')
 @require_POST
 def update_order_coords(request, order_id):
-    """AJAX endpoint to update order latitude/longitude from QNAS verification"""
+    """AJAX endpoint to update order latitude/longitude and/or qnas_status from QNAS verification"""
     try:
         order = get_object_or_404(orders_models.Order, id=order_id)
         data = json.loads(request.body)
         latitude = data.get('latitude')
         longitude = data.get('longitude')
+        qnas_status = data.get('qnas_status')
 
-        if not latitude or not longitude:
-            return JsonResponse({'success': False, 'error': 'Latitude and longitude are required'}, status=400)
+        update_fields = []
 
-        order.latitude = latitude
-        order.longitude = longitude
-        order.save(update_fields=['latitude', 'longitude'])
+        if latitude and longitude:
+            order.latitude = latitude
+            order.longitude = longitude
+            update_fields.extend(['latitude', 'longitude'])
 
-        return JsonResponse({
-            'success': True,
-            'latitude': float(order.latitude),
-            'longitude': float(order.longitude),
-        })
+        if qnas_status and qnas_status in dict(orders_models.Order.QNAS_STATUS):
+            order.qnas_status = qnas_status
+            update_fields.append('qnas_status')
+
+        if not update_fields:
+            return JsonResponse({'success': False, 'error': 'No valid fields to update'}, status=400)
+
+        order.save(update_fields=update_fields)
+
+        response_data = {'success': True, 'qnas_status': order.qnas_status}
+        if order.latitude:
+            response_data['latitude'] = float(order.latitude)
+        if order.longitude:
+            response_data['longitude'] = float(order.longitude)
+
+        return JsonResponse(response_data)
     except Http404:
         raise
     except Exception as e:

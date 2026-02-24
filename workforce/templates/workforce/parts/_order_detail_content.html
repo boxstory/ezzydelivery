@@ -49,18 +49,6 @@ Parameters:
             </div>
             <div class="col-6">
                 <div class="odp__field">
-                    <span class="odp__field__label">Verification</span>
-                    {% if order.verification_status == 'pending' %}
-                    <span class="odp__badge odp__badge--warning">Pending</span>
-                    {% elif order.verification_status == 'verified' %}
-                    <span class="odp__badge odp__badge--success">Verified</span>
-                    {% else %}
-                    <span class="odp__badge odp__badge--muted">{{ order.verification_status }}</span>
-                    {% endif %}
-                </div>
-            </div>
-            <div class="col-6">
-                <div class="odp__field">
                     <span class="odp__field__label">Business</span>
                     <span class="odp__field__value">{{ order.business.business_name }}</span>
                 </div>
@@ -109,33 +97,14 @@ Parameters:
             </div>
         </div>
         <div class="row g-0">
-            <div class="col-6">
+            <div class="col-12">
                 <div class="odp__field">
                     <span class="odp__field__label">Address</span>
-                    <span class="odp__field__value">{{ order.customer_address }}</span>
-                </div>
-            </div>
-            <div class="col-6">
-                <div class="odp__field">
-                    <span class="odp__field__label">Lat / Long</span>
-                    <div class="odp__field__value" id="orderLatLng{{ order.id }}">
-                        {% if order.latitude and order.longitude %}
-                        <a href="https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="text-decoration-none">
-                            <i class="fa-solid fa-map-pin me-1 text-success"></i>{{ order.latitude }}, {{ order.longitude }}
-                        </a>
-                        {% else %}
-                        <span class="text-muted small me-2"><i class="fa-solid fa-location-crosshairs me-1"></i>Not Available</span>
-                        <div class="d-flex gap-2 mt-1">
-                            <button type="button" class="btn btn-sm btn-outline-info" onclick="EzzyAIParse.parse({ address: '{{ order.customer_address|escapejs }}', zone: '{{ order.dl_zone|default:"" }}', street: '{{ order.dl_street|default:"" }}', building: '{{ order.dl_building|default:"" }}', orderId: '{{ order.id }}', orderNumber: '{{ order.order_number }}', showMap: true })">
-                                <i class="fa-solid fa-robot me-1"></i>AI Parse
-                            </button>
-                            {% if order.dl_zone and order.dl_street %}
-                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="verifyAndUpdateCoords({{ order.dl_zone }}, {{ order.dl_street }}, '{{ order.dl_building|default:"" }}', {{ order.id }})">
-                                <i class="fa-solid fa-satellite-dish me-1"></i>QNAS Verify
-                            </button>
-                            {% endif %}
-                        </div>
-                        {% endif %}
+                    <div class="odp__field__value d-flex align-items-start gap-2">
+                        <span>{{ order.customer_address }}</span>
+                        <button type="button" class="odp__btn-ai-parse" onclick="EzzyAIParse.parse({ address: '{{ order.customer_address|escapejs }}', zone: '{{ order.dl_zone|default:"" }}', street: '{{ order.dl_street|default:"" }}', building: '{{ order.dl_building|default:"" }}', orderId: '{{ order.id }}', orderNumber: '{{ order.order_number }}', showMap: true })" title="AI Parse Location">
+                            <i class="fa-solid fa-robot"></i> AI Parse
+                        </button>
                     </div>
                 </div>
             </div>
@@ -163,7 +132,34 @@ Parameters:
                 <div class="odp__field">
                     <span class="odp__field__label">QNAS</span>
                     <div class="odp__field__value">
-                        {% include "includes/components/_qnas_verify_button.html" with zone=order.dl_zone street=order.dl_street building=order.dl_building record_id=order.id show_inline="false" %}
+                        {% include "includes/components/_qnas_verify_button.html" with zone=order.dl_zone street=order.dl_street building=order.dl_building record_id=order.id order_id=order.id qnas_status=order.qnas_status show_inline="false" %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row g-0">
+            <div class="col-12">
+                <div class="odp__field">
+                    <span class="odp__field__label">Lat / Long</span>
+                    <div class="odp__field__value odp__latlong-row" id="orderLatLng{{ order.id }}">
+                        {% if order.latitude and order.longitude %}
+                        <a href="https://www.google.com/maps?q={{ order.latitude }},{{ order.longitude }}" target="_blank" class="odp__latlong-link">
+                            <i class="fa-solid fa-map-pin"></i> {{ order.latitude }}, {{ order.longitude }}
+                        </a>
+                        {% if order.coords_accuracy %}
+                        <span class="odp__loc-acc odp__loc-acc--{{ order.coords_accuracy }}">
+                            <i class="fa-solid fa-location-crosshairs"></i>
+                            {% if order.coords_accuracy == 'exact' %}100% Exact{% elif order.coords_accuracy == 'street' %}75% Street{% elif order.coords_accuracy == 'landmark' %}50% Landmark{% elif order.coords_accuracy == 'zone_center' %}25% Zone Center{% elif order.coords_accuracy == 'ai_estimate' %}~60% AI Estimate{% endif %}
+                        </span>
+                        {% endif %}
+                        {% else %}
+                        <span class="text-muted small"><i class="fa-solid fa-location-crosshairs me-1"></i>Not Available</span>
+                        {% if order.dl_zone and order.dl_street %}
+                        <button type="button" class="odp__btn-qnas-sm" onclick="verifyAndUpdateCoords({{ order.dl_zone }}, {{ order.dl_street }}, '{{ order.dl_building|default:"" }}', {{ order.id }})">
+                            <i class="fa-solid fa-satellite-dish"></i> QNAS Verify
+                        </button>
+                        {% endif %}
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -270,23 +266,6 @@ Parameters:
 <!-- Action Buttons -->
 {% if show_actions|default:True %}
 <div class="odp__actions">
-    {% if order.verification_status == 'pending' %}
-    <button type="button"
-            class="odp__btn odp__btn--success"
-            hx-post="/workforce/orders/{{ order.id }}/verify/"
-            hx-confirm="Verify this order?"
-            {% if context_mode == 'modal' %}
-            hx-target="closest .order-detail-panel-scroll"
-            hx-swap="outerHTML"
-            {% else %}
-            hx-target="#main-content"
-            hx-select="#main-content"
-            hx-swap="outerHTML"
-            {% endif %}>
-        <i class="fa-solid fa-check me-1"></i> Verify Order
-    </button>
-    {% endif %}
-
     {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
     <button type="button"
             class="odp__btn odp__btn--info"

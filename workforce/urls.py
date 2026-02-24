@@ -42,7 +42,6 @@ urlpatterns = [
     path('orders/published/', workforce_views.orders_published, name='wf_orders_published'),
     path('orders/pending-verification/', workforce_views.orders_pending_verification, name='orders_pending_verification'),
     path('orders/<int:order_id>/verify-address/', workforce_views.verify_order_address, name='verify_order_address'),
-    path('orders/<int:order_id>/verify/', workforce_views.verify_order, name='verify_order'),
     path('orders/submit_to_task/<int:order_id>/', workforce_views.submit_to_task, name='submit_to_task'),
 
     # Order detail and actions
@@ -55,6 +54,7 @@ urlpatterns = [
     # AJAX endpoints for orders
     path('orders/<int:order_id>/publish/', workforce_views.publish_order_to_delivery, name='publish_order_to_delivery'),
     path('orders/<int:order_id>/update-status/', workforce_views.update_order_status, name='update_order_status'),
+    path('orders/bulk-update-status/', workforce_views.bulk_update_order_status, name='bulk_update_order_status'),
     path('orders/<int:order_id>/add-comment/', workforce_views.add_order_comment, name='add_order_comment'),
     path('orders/<int:order_id>/update-coords/', workforce_views.update_order_coords, name='update_order_coords'),
 

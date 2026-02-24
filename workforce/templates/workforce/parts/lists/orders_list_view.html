@@ -320,6 +320,20 @@
                 <button type="button" class="btn" onclick="aiEstimateDelivery()" title="Estimate delivery times">
                     <i class="fa-solid fa-clock"></i> Estimate Time
                 </button>
+                <div class="ai-toolbar-divider"></div>
+                <div class="ai-status-dropdown" id="statusDropdownWrap">
+                    <button type="button" class="btn btn-status-change" onclick="toggleStatusDropdown(event)">
+                        <i class="fa-solid fa-arrow-right-arrow-left"></i> Set Status <i class="fa-solid fa-caret-down ms-1"></i>
+                    </button>
+                    <div class="ai-status-menu" id="statusDropdownMenu">
+                        <button type="button" onclick="bulkSetOrderStatus('to_review')"><span class="st-dot st-dot--warn"></span> Hold for Review</button>
+                        <button type="button" onclick="bulkSetOrderStatus('ready_to_pickup')"><span class="st-dot st-dot--info"></span> Ready to Pickup</button>
+                        <button type="button" onclick="bulkSetOrderStatus('to_publish')"><span class="st-dot st-dot--info"></span> To Publish</button>
+                        <button type="button" onclick="bulkSetOrderStatus('delivered')"><span class="st-dot st-dot--ok"></span> Delivered</button>
+                        <button type="button" onclick="bulkSetOrderStatus('cancelled')"><span class="st-dot st-dot--err"></span> Cancelled</button>
+                        <button type="button" onclick="bulkSetOrderStatus('reported')"><span class="st-dot st-dot--err"></span> Reported</button>
+                    </div>
+                </div>
                 <button type="button" class="btn btn-clear" onclick="clearOrderSelection()">
                     <i class="fa-solid fa-xmark"></i> Clear
                 </button>
@@ -329,58 +343,75 @@
         <!-- Orders List -->
         {% if orders %}
             <div class="orc-scroll">
-            <div class="orc-list" id="ordersListContainer">
-                <!-- Header Row -->
-                <div class="orc-head">
-                    <div class="orc-checkbox">
-                        <input type="checkbox" id="selectAllOrders" title="Select all orders" onchange="toggleSelectAll(this)">
-                    </div>
-                    <div class="orc-id">Order</div>
-                    <div class="orc-customer">Customer</div>
-                    <div class="orc-address">Address</div>
-                    <div class="orc-products">Items</div>
-                    <div class="orc-amount">COD</div>
-                    <div class="orc-date">Date</div>
-                    <div class="orc-status">Status</div>
-                    <div class="orc-actions"></div>
+            <div class="orc__list" id="ordersListContainer">
+                <!-- Header -->
+                <div class="orc__head">
+                    <div class="orc__hcell orc__hcell--chk"><input type="checkbox" class="orc__chk" id="selectAllOrders" title="Select all orders" onchange="toggleSelectAll(this)"></div>
+                    <div class="orc__hcell">Order</div>
+                    <div class="orc__hcell">Customer</div>
+                    <div class="orc__hcell orc__hcell--addr">Address</div>
+                    <div class="orc__hcell orc__hcell--items">Items</div>
+                    <div class="orc__hcell orc__hcell--right">COD</div>
+                    <div class="orc__hcell orc__hcell--center">Date</div>
+                    <div class="orc__hcell">Status</div>
+                    <div class="orc__hcell orc__hcell--right"></div>
                 </div>
+                <!-- Rows -->
                 {% for order in orders %}
-                <div class="orc-row" data-order-id="{{ order.id }}" data-order-number="{{ order.order_number }}" data-customer-phone="{{ order.customer_phone }}" data-customer-address="{{ order.customer_address }}">
-                    <div class="orc-checkbox">
-                        <input type="checkbox" class="order-select-checkbox" data-order-id="{{ order.id }}" onchange="updateOrderSelection()">
+                <div class="orc__row" data-order-id="{{ order.id }}" data-order-number="{{ order.order_number }}" data-customer-phone="{{ order.customer_phone }}" data-customer-address="{{ order.customer_address }}">
+                    <div class="orc__cell orc__cell--chk"><input type="checkbox" class="orc__chk order-select-checkbox" data-order-id="{{ order.id }}" onchange="updateOrderSelection()"></div>
+                    <div class="orc__cell orc__cell--id">
+                        <a class="orc__id-link" href="{% url 'workforce:order_detail' order.id %}" hx-get="{% url 'workforce:order_detail' order.id %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">{{ order.order_number|default:order.client_order_code }}</a>
+                        <span class="orc__seller">{{ order.business.business_name }}</span>
                     </div>
-                    <div class="orc-id">
-                        <a href="{% url 'workforce:order_detail' order.id %}"
-                           hx-get="{% url 'workforce:order_detail' order.id %}"
-                           hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">{{ order.order_number|default:order.client_order_code }}</a>
-                        <span class="orc-seller">{{ order.business.business_name }}</span>
+                    <div class="orc__cell orc__cell--cust">
+                        <span class="orc__cname">{{ order.customer_name|truncatechars:18 }}</span>
+                        <span class="orc__cphone">{{ order.customer_phone }}</span>
                     </div>
-                    <div class="orc-customer">
-                        <span class="orc-name">{{ order.customer_name|truncatechars:18 }}</span>
-                        <span class="orc-phone">{{ order.customer_phone }}</span>
-                    </div>
-                    <div class="orc-address" title="{{ order.customer_address }}">
-                        {% if order.dl_zone or order.dl_street or order.dl_building %}
-                        <span class="orc-zone">Z{{ order.dl_zone|default:"-" }} / S{{ order.dl_street|default:"-" }} / B{{ order.dl_building|default:"-" }}</span>
+                    <div class="orc__cell orc__cell--addr" title="{{ order.customer_address }}">
+                        {% if order.dl_zone or order.dl_street or order.dl_building or order.coords_accuracy %}
+                        <span class="orc__zone-line">
+                            {% if order.dl_zone or order.dl_street or order.dl_building %}
+                            <span class="orc__zone">Z{{ order.dl_zone|default:"-" }} / S{{ order.dl_street|default:"-" }} / B{{ order.dl_building|default:"-" }}</span>
+                            {% endif %}
+                            {% if order.coords_accuracy %}
+                            <span class="orc__loc-acc orc__loc-acc--{{ order.coords_accuracy }}">
+                                <i class="fa-solid fa-location-crosshairs"></i>
+                                {% if order.coords_accuracy == 'exact' %}100%{% elif order.coords_accuracy == 'street' %}75%{% elif order.coords_accuracy == 'landmark' %}50%{% elif order.coords_accuracy == 'zone_center' %}25%{% elif order.coords_accuracy == 'ai_estimate' %}~60%{% endif %}
+                            </span>
+                            {% endif %}
+                        </span>
                         {% endif %}
-                        <span class="orc-addr-text">{{ order.customer_address }}</span>
+                        <span class="orc__addr">{{ order.customer_address }}</span>
+                        {% if order.latitude and order.longitude %}
+                        <span class="orc__coords">
+                            <i class="fa-solid fa-map-pin"></i>
+                            {{ order.latitude|floatformat:4 }}, {{ order.longitude|floatformat:4 }}
+                            {% if order.coords_accuracy %}
+                            <span class="orc__loc-acc orc__loc-acc--{{ order.coords_accuracy }}">{% if order.coords_accuracy == 'exact' %}Exact{% elif order.coords_accuracy == 'street' %}Street{% elif order.coords_accuracy == 'landmark' %}Landmark{% elif order.coords_accuracy == 'zone_center' %}Zone{% elif order.coords_accuracy == 'ai_estimate' %}AI Est.{% endif %}</span>
+                            {% endif %}
+                        </span>
+                        {% endif %}
                     </div>
-                    <div class="orc-products">
+                    <div class="orc__cell orc__cell--items">
+                        <div class="orc__items">
                         {% for item in order.order_items.all %}
-                        <div class="orc-product-item">
-                            <span class="orc-product-name">{{ item.display_name|truncatechars:14 }}</span>
-                            <span class="orc-product-qty">{{ item.quantity }}</span>
+                        <div class="orc__pill">
+                            <span class="orc__pill-name">{{ item.display_name|truncatechars:14 }}</span>
+                            <span class="orc__pill-qty">{{ item.quantity }}</span>
                         </div>
                         {% empty %}
-                        <span class="orc-product-item orc-product-item--empty">—</span>
+                        <span class="orc__pill--empty">—</span>
                         {% endfor %}
+                        </div>
                     </div>
-                    <div class="orc-amount">
-                        {% if order.cod_amount %}<span class="orc-amount__val">{{ order.cod_amount }}</span><span class="orc-amount__cur">QR</span>{% else %}<span class="orc-amount__nil">—</span>{% endif %}
+                    <div class="orc__cell orc__cell--cod">
+                        {% if order.cod_amount %}<span class="orc__cod-val">{{ order.cod_amount }}</span><span class="orc__cod-cur">QR</span>{% else %}<span class="orc__cod-nil">—</span>{% endif %}
                     </div>
-                    <div class="orc-date">{{ order.order_date|date:"d M" }}</div>
-                    <div class="orc-status">
-                        <div class="orc-status-line">
+                    <div class="orc__cell orc__cell--date"><span class="orc__date">{{ order.order_date|date:"d M" }}</span></div>
+                    <div class="orc__cell orc__cell--status">
+                        <div class="orc__statuses">
+                        <div class="orc__st-line">
                             {% if order.order_status == 'to_review' %}<span class="st st-warn">To Review</span>
                             {% elif order.order_status == 'to_publish' %}<span class="st st-info">To Publish</span>
                             {% elif order.order_status == 'ready_to_pickup' %}<span class="st st-info">Ready</span>
@@ -390,59 +421,30 @@
                             {% elif order.order_status == 'fulfilled' %}<span class="st st-ok">Fulfilled</span>
                             {% elif order.order_status == 'cancelled' %}<span class="st st-err">Cancelled</span>
                             {% else %}<span class="st">{{ order.order_status }}</span>{% endif %}
-                            {% if order.verification_status == 'verified' %}<span class="st st-ok-o">V</span>{% endif %}
                         </div>
                         {% with task=order.delivery_task.all.0 %}
                         {% if task %}
-                        <div class="orc-status-line">
+                        <div class="orc__st-line">
                             {% if task.dl_task_status_dms %}<span class="st st-dms">{{ task.get_dl_task_status_dms_display }}</span>{% endif %}
                         </div>
-                        <div class="orc-status-line">
+                        <div class="orc__st-line">
                             <span class="st st-task">{{ task.get_dl_task_status_display }}</span>
                         </div>
                         {% endif %}
                         {% endwith %}
+                        </div>
                     </div>
-                    <div class="orc-actions">
-                        <button type="button" class="orc-btn" title="View" onclick="openOrderDetailPanel({{ order.id }})">
-                            <i class="fa-solid fa-eye"></i>
-                        </button>
-                        <a href="{% url 'workforce:order_edit' order.id %}"
-                           hx-get="{% url 'workforce:order_edit' order.id %}"
-                           hx-target="#main-content"
-                           hx-select="#main-content"
-                           hx-swap="outerHTML"
-                           hx-push-url="true"
-                           class="orc-btn orc-btn-edit" title="Edit">
-                            <i class="fa-solid fa-pen"></i>
-                        </a>
-                        {% if order.verification_status == 'pending' %}
-                        <button type="button" class="orc-btn orc-btn-ok" title="Verify"
-                                hx-post="{% url 'workforce:verify_order' order.id %}"
-                                hx-target="closest .orc-row" hx-swap="outerHTML" hx-confirm="Verify?">
-                            <i class="fa-solid fa-check"></i>
-                        </button>
-                        {% endif %}
+                    <div class="orc__cell orc__cell--act">
+                        <button type="button" class="orc__btn" title="View" onclick="openOrderDetailPanel({{ order.id }})"><i class="fa-solid fa-eye"></i></button>
+                        <a href="{% url 'workforce:order_edit' order.id %}" hx-get="{% url 'workforce:order_edit' order.id %}" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true" class="orc__btn orc__btn--edit" title="Edit"><i class="fa-solid fa-pen"></i></a>
                         {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
-                        <button type="button" class="orc-btn orc-btn-info" title="Publish"
-                                hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}"
-                                hx-target="closest .orc-row" hx-swap="outerHTML" hx-confirm="Publish?">
-                            <i class="fa-solid fa-paper-plane"></i>
-                        </button>
+                        <button type="button" class="orc__btn orc__btn--info" title="Publish" hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML" hx-confirm="Publish?"><i class="fa-solid fa-paper-plane"></i></button>
                         {% endif %}
                         {% if order.order_status != 'cancelled' and order.order_status != 'published' %}
-                        <button type="button" class="orc-btn orc-btn-err" title="Cancel"
-                                hx-post="{% url 'workforce:cancel_order' order.id %}"
-                                hx-target="closest .orc-row" hx-swap="outerHTML" hx-confirm="Cancel order?">
-                            <i class="fa-solid fa-times"></i>
-                        </button>
+                        <button type="button" class="orc__btn orc__btn--err" title="Cancel" hx-post="{% url 'workforce:cancel_order' order.id %}" hx-target="closest .orc__row" hx-swap="outerHTML" hx-confirm="Cancel order?"><i class="fa-solid fa-times"></i></button>
                         {% endif %}
-                        <a href="https://wa.me/{{ order.customer_phone|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="orc-btn orc-btn-wa" title="WhatsApp">
-                            <i class="fa-brands fa-whatsapp"></i>
-                        </a>
-                        <button type="button" class="orc-btn orc-btn-ai" title="AI Tools" onclick="openAIToolsForOrder({{ order.id }}, '{{ order.order_number }}')">
-                            <i class="fa-solid fa-robot"></i>
-                        </button>
+                        <a href="https://wa.me/{{ order.customer_phone|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="orc__btn orc__btn--wa" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
+                        <button type="button" class="orc__btn orc__btn--ai" title="AI Tools" onclick="openAIToolsForOrder({{ order.id }}, '{{ order.order_number }}')"><i class="fa-solid fa-robot"></i></button>
                     </div>
                 </div>
                 {% endfor %}
@@ -1091,7 +1093,7 @@
     function updateOrderSelection() {
         const checkboxes = document.querySelectorAll('.order-select-checkbox:checked');
         selectedOrders = Array.from(checkboxes).map(cb => {
-            const row = cb.closest('.orc-row');
+            const row = cb.closest('.orc__row');
             return {
                 id: row.dataset.orderId,
                 orderNumber: row.dataset.orderNumber,
@@ -1126,6 +1128,91 @@
         checkboxes.forEach(cb => cb.checked = false);
         document.getElementById('selectAllOrders').checked = false;
         updateOrderSelection();
+    }
+
+    // Toggle status dropdown
+    function toggleStatusDropdown(e) {
+        e.stopPropagation();
+        const menu = document.getElementById('statusDropdownMenu');
+        menu.classList.toggle('show');
+    }
+
+    // Close dropdown on outside click
+    document.addEventListener('click', function(e) {
+        const wrap = document.getElementById('statusDropdownWrap');
+        if (wrap && !wrap.contains(e.target)) {
+            document.getElementById('statusDropdownMenu').classList.remove('show');
+        }
+    });
+
+    // Bulk set order status
+    async function bulkSetOrderStatus(status) {
+        document.getElementById('statusDropdownMenu').classList.remove('show');
+        if (selectedOrders.length === 0) {
+            alert('Please select at least one order');
+            return;
+        }
+        const statusLabels = {
+            'to_review': 'Hold for Review',
+            'ready_to_pickup': 'Ready to Pickup',
+            'to_publish': 'To Publish',
+            'delivered': 'Delivered',
+            'cancelled': 'Cancelled',
+            'reported': 'Reported'
+        };
+        const label = statusLabels[status] || status;
+        if (!confirm(`Set ${selectedOrders.length} order(s) to "${label}"?`)) return;
+
+        const orderIds = selectedOrders.map(o => parseInt(o.id));
+        try {
+            const resp = await fetch("{% url 'workforce:bulk_update_order_status' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ order_ids: orderIds, status: status })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                // Update status badges in-place
+                selectedOrders.forEach(o => {
+                    const row = document.querySelector(`.orc__row[data-order-id="${o.id}"]`);
+                    if (row) {
+                        const stLine = row.querySelector('.orc__st-line');
+                        if (stLine) {
+                            const badge = stLine.querySelector('.st');
+                            if (badge) {
+                                badge.className = 'st ' + getStatusClass(status);
+                                badge.textContent = label;
+                            }
+                        }
+                    }
+                });
+                clearOrderSelection();
+                // Show brief toast
+                const toast = document.createElement('div');
+                toast.className = 'ai-bulk-toast';
+                toast.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${data.message}`;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.classList.add('show'), 10);
+                setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+            } else {
+                alert(data.error || 'Failed to update status');
+            }
+        } catch (err) {
+            console.error('Bulk status update error:', err);
+            alert('Error updating order status');
+        }
+    }
+
+    function getStatusClass(status) {
+        const map = {
+            'to_review': 'st-warn', 'ready_to_pickup': 'st-info', 'to_publish': 'st-info',
+            'publish': 'st-info', 'published': 'st-ok', 'delivered': 'st-ok',
+            'fulfilled': 'st-ok', 'cancelled': 'st-err', 'reported': 'st-err'
+        };
+        return map[status] || '';
     }
 
     // Open AI modal (legacy mode or simple)
@@ -1529,7 +1616,7 @@
 
     // Open AI tools for a single order
     function openAIToolsForOrder(orderId, orderNumber) {
-        const row = document.querySelector(`.orc-row[data-order-id="${orderId}"]`);
+        const row = document.querySelector(`.orc__row[data-order-id="${orderId}"]`);
 
         // Store order data in a variable instead of embedding in onclick handlers
         currentSingleOrderData = {
