@@ -756,15 +756,6 @@ class WfOrderStatusTest(WorkforceTestMixin, TestCase):
             content_type='application/json')
         self.assertEqual(resp.status_code, 404)
 
-    def test_verify_order(self):
-        """#61: Verify order marks as verified"""
-        self.order.verification_status = 'pending'
-        self.order.save()
-        resp = self.client.post(
-            reverse('workforce:verify_order',
-                    kwargs={'order_id': self.order.id}),
-            {'verification_notes': 'Looks good'})
-        self.assertIn(resp.status_code, [200, 302])
 
 
 # =============================================================================

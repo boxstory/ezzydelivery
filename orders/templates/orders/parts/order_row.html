@@ -35,13 +35,6 @@
         <a href="{% url 'workforce:order_detail' order.id %}#edit" class="orc-btn orc-btn-edit" title="Edit">
             <i class="fa-solid fa-pen"></i>
         </a>
-        {% if order.verification_status == 'pending' %}
-        <button type="button" class="orc-btn orc-btn-ok" title="Verify"
-                hx-post="{% url 'workforce:verify_order' order.id %}"
-                hx-target="closest .orc-row" hx-swap="outerHTML" hx-confirm="Verify?">
-            <i class="fa-solid fa-check"></i>
-        </button>
-        {% endif %}
         {% if order.order_status == 'to_review' or order.order_status == 'to_publish' %}
         <button type="button" class="orc-btn orc-btn-info" title="Publish"
                 hx-post="{% url 'workforce:publish_order_to_delivery' order.id %}"
