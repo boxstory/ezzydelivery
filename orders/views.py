@@ -1289,10 +1289,20 @@ def order_details(request, order_id):
         delivery_task = order.delivery_task.first()
         order_items = orders_models.OrderItem.objects.filter(order=order)
 
+        # Get failure reason from status history if task failed
+        fail_notes = None
+        if delivery_task and delivery_task.dl_task_status == 'failed':
+            fail_entry = orders_models.OrderStatusHistory.objects.filter(
+                order=order, field_name='dl_task_status', new_value='failed'
+            ).exclude(notes='').exclude(notes__isnull=True).order_by('-created_at').first()
+            if fail_entry:
+                fail_notes = fail_entry.notes
+
         data = {
             'order': order,
             'delivery_task': delivery_task,
             'order_items': order_items,
+            'fail_notes': fail_notes,
             'can_edit_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_EDIT),
             'can_delete_order': user_has_business_permission(request.user, BusinessPermissions.ORDER_DELETE),
         }

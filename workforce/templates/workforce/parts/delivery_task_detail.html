@@ -285,6 +285,11 @@
                                 <span><i class="fa-regular fa-user"></i> {{ entry.changed_by.get_full_name|default:entry.changed_by.username }}</span>
                                 {% endif %}
                             </div>
+                            {% if entry.notes %}
+                            <div class="dtd__update__note {% if entry.new_value == 'failed' or entry.new_value == 'cancelled' %}dtd__update__note--danger{% endif %}">
+                                <i class="fa-regular fa-message"></i> {{ entry.notes }}
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                     {% endfor %}
