@@ -466,7 +466,7 @@ def _log_order_created(instance):
     )
 
 
-def log_delivery_task_status_change(task, field_name, old_val, new_val, display_dict):
+def log_delivery_task_status_change(task, field_name, old_val, new_val, display_dict, notes=None):
     """Log a delivery task status change to the order's status history."""
     OrderStatusHistory = orders_models.OrderStatusHistory
     try:
@@ -477,6 +477,7 @@ def log_delivery_task_status_change(task, field_name, old_val, new_val, display_
             new_value=new_val or '',
             old_display=display_dict.get(old_val, old_val or ''),
             new_display=display_dict.get(new_val, new_val or ''),
+            notes=notes or '',
         )
     except Exception as e:
         logger.error(f"Error logging delivery task status change: {e}")

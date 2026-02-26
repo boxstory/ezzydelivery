@@ -120,14 +120,14 @@
 {% endblock %}
 
 {% block content %}
-<div class="qnas-tool">
-    <div class="qnas-tool__card">
-        <div class="qnas-tool__header">
-            <div class="qnas-tool__icon">
+<div class="wf-qnas__wrapper">
+    <div class="wf-qnas__card">
+        <div class="wf-qnas__header">
+            <div class="wf-qnas__icon">
                 <i class="fa-solid fa-map-location-dot"></i>
             </div>
-            <h1 class="qnas-tool__title">QNAS Coordinate Lookup</h1>
-            <p class="qnas-tool__subtitle">Enter Zone, Street, and Building to get precise coordinates from QNAS database</p>
+            <h1 class="wf-qnas__title">QNAS Coordinate Lookup</h1>
+            <p class="wf-qnas__subtitle">Enter Zone, Street, and Building to get precise coordinates from QNAS database</p>
         </div>
 
         <form id="qnasLookupForm" onsubmit="lookupCoordinates(event)">
@@ -172,8 +172,8 @@ async function lookupCoordinates(event) {
 
     // Show loading
     resultDiv.innerHTML = `
-        <div class="qnas-loading">
-            <div class="spinner"></div>
+        <div class="wf-qnas__loading">
+            <div class="wf-qnas__spinner"></div>
             <p class="text-muted">Querying QNAS database...</p>
         </div>
     `;
@@ -193,7 +193,7 @@ async function lookupCoordinates(event) {
 
         if (!Array.isArray(buildings) || buildings.length === 0) {
             resultDiv.innerHTML = `
-                <div class="qnas-error">
+                <div class="wf-qnas__error">
                     <strong><i class="fa-solid fa-exclamation-triangle me-2"></i>No Results Found</strong>
                     <p class="mb-0 mt-2">QNAS database has no buildings for Zone ${zone}, Street ${street}</p>
                 </div>
@@ -218,7 +218,7 @@ async function lookupCoordinates(event) {
 
         if (isNaN(lat) || isNaN(lng)) {
             resultDiv.innerHTML = `
-                <div class="qnas-error">
+                <div class="wf-qnas__error">
                     <strong><i class="fa-solid fa-exclamation-triangle me-2"></i>Invalid Coordinates</strong>
                     <p class="mb-0 mt-2">Building found but coordinates are missing or invalid</p>
                 </div>
@@ -228,33 +228,33 @@ async function lookupCoordinates(event) {
 
         // Display result
         resultDiv.innerHTML = `
-            <div class="qnas-result">
-                <div class="qnas-result__title">
+            <div class="wf-qnas__result">
+                <div class="wf-qnas__result-title">
                     <i class="fa-solid fa-check-circle text-success"></i>
                     Coordinates Found
                     ${isExactMatch ? '<span class="badge bg-success">Exact Match</span>' : '<span class="badge bg-warning">Street Level</span>'}
                 </div>
 
-                <div class="qnas-result__coords">
+                <div class="wf-qnas__result-coords">
                     <i class="fa-solid fa-location-dot me-2"></i>${lat.toFixed(6)}, ${lng.toFixed(6)}
                 </div>
 
-                <div class="qnas-result__info">
-                    <div class="qnas-result__item">
-                        <span class="qnas-result__label">Zone</span>
-                        <span class="qnas-result__value">${zone}</span>
+                <div class="wf-qnas__result-info">
+                    <div class="wf-qnas__result-item">
+                        <span class="wf-qnas__result-label">Zone</span>
+                        <span class="wf-qnas__result-value">${zone}</span>
                     </div>
-                    <div class="qnas-result__item">
-                        <span class="qnas-result__label">Street</span>
-                        <span class="qnas-result__value">${street}</span>
+                    <div class="wf-qnas__result-item">
+                        <span class="wf-qnas__result-label">Street</span>
+                        <span class="wf-qnas__result-value">${street}</span>
                     </div>
-                    <div class="qnas-result__item">
-                        <span class="qnas-result__label">Building</span>
-                        <span class="qnas-result__value">${selectedBuilding.building_number || '—'}</span>
+                    <div class="wf-qnas__result-item">
+                        <span class="wf-qnas__result-label">Building</span>
+                        <span class="wf-qnas__result-value">${selectedBuilding.building_number || '—'}</span>
                     </div>
-                    <div class="qnas-result__item">
-                        <span class="qnas-result__label">Buildings Found</span>
-                        <span class="qnas-result__value">${buildings.length}</span>
+                    <div class="wf-qnas__result-item">
+                        <span class="wf-qnas__result-label">Buildings Found</span>
+                        <span class="wf-qnas__result-value">${buildings.length}</span>
                     </div>
                 </div>
 
@@ -272,7 +272,7 @@ async function lookupCoordinates(event) {
     } catch (error) {
         console.error('QNAS Lookup Error:', error);
         resultDiv.innerHTML = `
-            <div class="qnas-error">
+            <div class="wf-qnas__error">
                 <strong><i class="fa-solid fa-exclamation-triangle me-2"></i>Lookup Failed</strong>
                 <p class="mb-0 mt-2">${error.message}</p>
             </div>

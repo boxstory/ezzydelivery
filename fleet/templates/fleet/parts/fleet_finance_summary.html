@@ -28,21 +28,21 @@
         <div class="fleet-stat__icon fleet-stat__icon--warning">
             <i class="fa-solid fa-clock"></i>
         </div>
-        <div class="fleet-stat__value" style="color:var(--fleet-warning);">{{ cod_stats.pending_count|default:0 }}</div>
+        <div class="fleet-stat__value fleet-stat__value--warning">{{ cod_stats.pending_count|default:0 }}</div>
         <div class="fleet-stat__label">Pending COD</div>
     </div>
     <div class="fleet-stat">
         <div class="fleet-stat__icon fleet-stat__icon--info">
             <i class="fa-solid fa-hand-holding-dollar"></i>
         </div>
-        <div class="fleet-stat__value" style="color:var(--fleet-info);">{{ cod_stats.collected_count|default:0 }}</div>
+        <div class="fleet-stat__value fleet-stat__value--info">{{ cod_stats.collected_count|default:0 }}</div>
         <div class="fleet-stat__label">Collected</div>
     </div>
     <div class="fleet-stat">
         <div class="fleet-stat__icon fleet-stat__icon--success">
             <i class="fa-solid fa-circle-check"></i>
         </div>
-        <div class="fleet-stat__value" style="color:var(--fleet-success);">{{ cod_stats.settled_count|default:0 }}</div>
+        <div class="fleet-stat__value fleet-stat__value--success">{{ cod_stats.settled_count|default:0 }}</div>
         <div class="fleet-stat__label">Settled</div>
     </div>
 </div>
@@ -50,26 +50,26 @@
 <!-- Earnings Breakdown -->
 <div class="fleet-card fleet-slide-up">
     <div class="fleet-card__header">
-        <h3 class="fleet-card__title"><i class="fa-solid fa-chart-pie me-2" style="color:var(--fleet-warning);"></i>Earnings Breakdown</h3>
+        <h3 class="fleet-card__title"><i class="fa-solid fa-chart-pie me-2 fleet-card__title-icon--warning"></i>Earnings Breakdown</h3>
     </div>
-    <div class="fleet-card__body" style="padding: 0;">
+    <div class="fleet-card__body fleet-card__body--no-pad">
         <div class="ffs__row ffs__row--border">
-            <div class="ffs__row-icon" style="background:#e8f8ef; color:var(--fleet-success);"><i class="fa-solid fa-calendar-check"></i></div>
+            <div class="ffs__row-icon ffs__row-icon--success"><i class="fa-solid fa-calendar-check"></i></div>
             <span class="ffs__row-label">This Month</span>
             <span class="ffs__row-val">QR {{ earnings.this_month|default:"0.00" }}</span>
         </div>
         <div class="ffs__row ffs__row--border">
-            <div class="ffs__row-icon" style="background:var(--fleet-grey-100); color:var(--fleet-grey-500);"><i class="fa-solid fa-calendar-xmark"></i></div>
+            <div class="ffs__row-icon ffs__row-icon--neutral"><i class="fa-solid fa-calendar-xmark"></i></div>
             <span class="ffs__row-label">Last Month</span>
             <span class="ffs__row-val">QR {{ earnings.last_month|default:"0.00" }}</span>
         </div>
         <div class="ffs__row ffs__row--border">
-            <div class="ffs__row-icon" style="background:#e8f0fe; color:var(--fleet-primary);"><i class="fa-solid fa-truck-fast"></i></div>
+            <div class="ffs__row-icon ffs__row-icon--primary"><i class="fa-solid fa-truck-fast"></i></div>
             <span class="ffs__row-label">Total Deliveries</span>
             <span class="ffs__row-val">{{ earnings.total_deliveries|default:0 }}</span>
         </div>
         <div class="ffs__row">
-            <div class="ffs__row-icon" style="background:#fff4e5; color:var(--fleet-warning);"><i class="fa-solid fa-coins"></i></div>
+            <div class="ffs__row-icon ffs__row-icon--warning"><i class="fa-solid fa-coins"></i></div>
             <span class="ffs__row-label">Avg per Delivery</span>
             <span class="ffs__row-val">QR {{ earnings.avg_per_delivery|default:"0.00" }}</span>
         </div>
@@ -80,9 +80,9 @@
 <div class="fleet-card fleet-slide-up">
     <div class="fleet-card__header">
         <h3 class="fleet-card__title"><i class="fa-solid fa-clock-rotate-left me-2"></i>Recent Transactions</h3>
-        <a href="{% url 'fleet:transaction_history' %}" style="font-size:var(--font-size-xs); font-weight:600; color:var(--fleet-primary); text-decoration:none;">View All</a>
+        <a href="{% url 'fleet:transaction_history' %}" class="ffs__view-all">View All</a>
     </div>
-    <div class="fleet-card__body" style="padding: 0;">
+    <div class="fleet-card__body fleet-card__body--no-pad">
         {% if recent_transactions %}
         {% for txn in recent_transactions %}
         <div class="ffs__txn {% if not forloop.last %}ffs__txn--border{% endif %}">
@@ -96,9 +96,7 @@
         </div>
         {% endfor %}
         {% else %}
-        <div style="text-align:center; padding:var(--spacing-xl) 0; color:var(--fleet-grey-400); font-size:var(--font-size-sm);">
-            No transactions yet
-        </div>
+        <div class="ffs__empty">No transactions yet</div>
         {% endif %}
     </div>
 </div>

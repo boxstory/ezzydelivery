@@ -1011,6 +1011,9 @@ def driver_complete_task(request, task_id):
         
         # Update task status with DMS mapping
         task.dl_task_status = status_value
+        # Attach notes so delivery/signals.py can pass them to OrderStatusHistory
+        if notes:
+            task._status_notes = notes
         DMS_STATUS_MAP = {
             'accepted': '7',      # Accepted/Acknowledged
             'delivered': '2',     # Successful
