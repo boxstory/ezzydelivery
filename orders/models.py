@@ -379,7 +379,6 @@ class OrderStatusHistory(models.Model):
         ('verification_status', 'Verification Status'),
         ('cod_status_by_staff', 'COD Status'),
         ('dl_task_status', 'Delivery Task Status'),
-        ('dl_task_status_dms', 'DMS Status'),
         ('dl_task_publish', 'Published to Fleet'),
     ]
 

@@ -382,8 +382,7 @@ class AssignmentService:
                 task = DeliveryTask.objects.get(order=batch_order.order)
                 task.driver = rider
                 task.dl_task_status = 'in_transit'
-                task.dl_task_status_dms = '0'  # Assigned
-                task.save(update_fields=['driver', 'dl_task_status', 'dl_task_status_dms', 'updated_at'])
+                task.save(update_fields=['driver', 'dl_task_status', 'updated_at'])
                 logger.debug(f"Updated delivery task for order {batch_order.order.order_number}")
             except DeliveryTask.DoesNotExist:
                 logger.warning(f"No delivery task found for order {batch_order.order.order_number}")

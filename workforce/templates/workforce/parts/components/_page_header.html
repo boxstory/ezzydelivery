@@ -1,20 +1,10 @@
-<!-- Page Header Component
-Usage: {% include "workforce/parts/components/_page_header.html" with title="Page Title" icon="fa-icon" subtitle="Optional subtitle" count=count_var count_label="items" %}
--->
-<header class="pg-hdr">
-    <div class="pg-hdr__left">
-        <h2><i class="fa-solid {{ icon|default:'fa-file' }} me-1"></i>{{ title }}</h2>
-        {% if subtitle %}<span class="pg-hdr__subtitle">| {{ subtitle }}</span>{% endif %}
+{# Shared Page Hero — include with title, icon, subtitle, note args #}
+<div class="wfd__hero">
+    <div class="wfd__hero-content">
+        <h1 class="wfd__hero-title">
+            <i class="fa-solid {{ icon|default:'fa-file' }}"></i>{{ title }}
+        </h1>
+        {% if subtitle %}<p class="wfd__hero-subtitle">{{ subtitle }}</p>{% endif %}
+        {% if note %}<p class="wfd__hero-note"><i class="fa-solid fa-circle-info"></i>{{ note }}</p>{% endif %}
     </div>
-    {% if count is not None or actions %}
-    <div class="pg-hdr__right">
-        {% if actions %}{{ actions }}{% endif %}
-        {% if count is not None %}
-        <div class="pg-hdr__count">
-            <span class="pg-hdr__count-value">{{ count|default:"0" }}</span>
-            <span class="pg-hdr__count-label">{{ count_label|default:"items" }}</span>
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
-</header>
+</div>

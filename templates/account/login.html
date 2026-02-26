@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="{% static 'account/css/login.css' %}">
 {% endblock %}
 
-{% block account_content %}
+{% block content %}
 <div class="auth__container" id="account_login_container_main">
     <div class="auth__card" id="account_login_card_main">
         <div class="auth__header" id="account_login_header">
@@ -70,10 +70,12 @@
 
                 <div class="d-flex justify-content-between align-items-center mb-3" id="account_login_options_container">
                     <div class="auth__form-check" id="account_login_remember_container">
-                        {{ form.remember }}
-                        <label class="form-check-label" for="{{ form.remember.id_for_label }}">
-                            {{ form.remember.label }}
-                        </label>
+                        {% if form.remember %}
+                            {{ form.remember }}
+                            <label class="form-check-label" for="{{ form.remember.id_for_label }}">
+                                {{ form.remember.label }}
+                            </label>
+                        {% endif %}
                     </div>
 
                     <div class="auth__forgot-link">

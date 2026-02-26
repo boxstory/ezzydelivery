@@ -15,7 +15,7 @@ class DriverAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Basic Information', {
-            'fields': ('user', 'profile', 'driver_code', 'driver_code_dms',
+            'fields': ('user', 'profile', 'driver_code',
                       'driver_phone', 'driver_whatsapp', 'driver_bio')
         }),
         ('License & Status', {

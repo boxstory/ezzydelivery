@@ -565,8 +565,8 @@ class OrderSignalTestCase(TransactionTestCase):
             pickup_location=self.pickup_location
         )
 
-        # Verify order
-        order.verification_status = 'verified'
+        # Publishing order triggers delivery task creation signal
+        order.order_status = 'publish'
         order.save()
 
         # Check that task creation was called

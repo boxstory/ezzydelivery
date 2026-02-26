@@ -127,7 +127,6 @@ class Driver(models.Model):
     driver_id = models.PositiveSmallIntegerField(primary_key=True)
 
     driver_code = models.CharField(max_length=100, blank=True, null=True, db_index=True)  # INDEX: Searched/filtered often
-    driver_code_dms = models.CharField(max_length=100, blank=True, null=True)
     driver_phone = models.CharField(max_length=100)
     driver_whatsapp = models.CharField(max_length=100)
     driver_bio = models.CharField(max_length=225, blank=True, null=True)

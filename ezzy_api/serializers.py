@@ -43,7 +43,7 @@ class DriverSerializer(serializers.ModelSerializer):
     class Meta:
         model = fleet_models.Driver
         fields = [
-            'driver_id', 'driver_code', 'driver_code_dms', 'driver_phone', 'driver_whatsapp',
+            'driver_id', 'driver_code', 'driver_phone', 'driver_whatsapp',
             'driver_bio', 'driver_languages', 'driver_license_number', 'driver_rating',
             'driver_rating_count', 'driver_status', 'driver_availability', 'profile', 'driver_vehicle', 'driver_document',
             'created_at', 'updated_at'
@@ -80,12 +80,12 @@ class DeliveryTaskListSerializer(serializers.ModelSerializer):
     customer_phone = serializers.CharField(source='order.customer_phone', read_only=True)
     customer_address = serializers.CharField(source='order.customer_address', read_only=True)
     cod_amount = serializers.IntegerField(source='order.cod_amount', read_only=True)
-    
+
     class Meta:
         model = delivery_models.DeliveryTask
         fields = [
-            'id', 'dl_task_number', 'dl_task_number_dms', 'dl_task_description',
-            'dl_task_status', 'dl_task_status_dms', 'dl_task_date', 'order_number',
+            'id', 'dl_task_number', 'dl_task_description',
+            'dl_task_status', 'dl_task_date', 'order_number',
             'customer_name', 'customer_phone', 'customer_address', 'cod_amount',
             'dl_price', 'dl_category', 'dl_speed', 'created_at', 'updated_at'
         ]
@@ -110,11 +110,11 @@ class OrderListSerializer(serializers.ModelSerializer):
 class DriverListSerializer(serializers.ModelSerializer):
     driver_name = serializers.SerializerMethodField()
     vehicle_type = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = fleet_models.Driver
         fields = [
-            'driver_id', 'driver_code', 'driver_code_dms', 'driver_phone',
+            'driver_id', 'driver_code', 'driver_phone',
             'driver_whatsapp', 'driver_status', 'driver_availability', 'driver_rating', 'driver_rating_count',
             'driver_name', 'vehicle_type'
         ]
@@ -140,13 +140,9 @@ class TaskStatusUpdateSerializer(serializers.Serializer):
         'for_review', 'pending', 'assigned', 'accepted', 'picked_up',
         'start_ride', 'out_for_delivery', 'in_transit', 'contacted',
         'non_reachable', 'address_pending', 'customer_confiration_pending',
-        'customer_delaying', 'dl_pending_payment', 'publish_to_dms',
+        'customer_delaying', 'dl_pending_payment',
         'delivered', 'failed', 'rejected', 'cancelled',
     ])
-    dms_status = serializers.ChoiceField(
-        choices=['0', '1', '2', '3', '4', '6', '7', '8', '9', '10'],
-        required=False
-    )
     notes = serializers.CharField(required=False, allow_blank=True)
 
 
@@ -301,7 +297,6 @@ class WebhookTaskStatusUpdateSerializer(serializers.Serializer):
         'start_ride', 'out_for_delivery', 'in_transit', 'contacted',
         'non_reachable', 'delivered', 'failed', 'rejected', 'cancelled',
     ])
-    dms_status = serializers.CharField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
     timestamp = serializers.DateTimeField(required=False)
     driver_id = serializers.IntegerField(required=False)

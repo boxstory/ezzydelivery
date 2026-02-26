@@ -137,14 +137,12 @@ class WorkforceTestMixin:
                 dl_longitude=Decimal('0'))
         return delivery_models.DeliveryTask.objects.create(
             dl_task_number=order.order_number or f'DL-{order.id}',
-            dl_task_number_dms=order.order_number or f'DMS-{order.id}',
             dl_task_description=f'Delivery for {order.order_number}',
             order=order,
             business=order.business,
             dl_address_update=addr,
             driver=driver,
             dl_task_status=status,
-            dl_task_status_dms='6',
             dl_task_status_client='for_review',
             pickup_location=order.pickup_location)
 
@@ -342,7 +340,7 @@ class WfOrderListTest(WorkforceTestMixin, TestCase):
 
     def test_orders_dms_updated_loads(self):
         """#23: DMS updated orders page loads"""
-        resp = self.client.get(reverse('workforce:wf_orders_dms_updated'))
+        resp = self.client.get(reverse('workforce:dl_list_published_to_dms'))
         self.assertEqual(resp.status_code, 200)
 
     def test_orders_reported_loads(self):
@@ -589,7 +587,7 @@ class WfOrderDetailEditTest(WorkforceTestMixin, TestCase):
 
     def test_cancel_published_order_fails(self):
         """#45: Cancel published order → 400"""
-        self.order.order_status = 'published'
+        self.order.order_status = 'publish'
         self.order.save()
         resp = self.client.post(
             reverse('workforce:cancel_order',
@@ -725,7 +723,7 @@ class WfOrderStatusTest(WorkforceTestMixin, TestCase):
         data = json.loads(resp.content)
         self.assertTrue(data['success'])
         self.order.refresh_from_db()
-        self.assertEqual(self.order.order_status, 'published')
+        self.assertEqual(self.order.order_status, 'publish')
 
     def test_add_comment_success(self):
         """#58: Add comment to order"""
@@ -829,18 +827,18 @@ class WfDeliveryTaskTest(WorkforceTestMixin, TestCase):
         self.assertEqual(resp.status_code, 404)
 
     def test_publish_task_to_dms(self):
-        """#70: Publish task to DMS"""
+        """#70: Publish task to delivery fleet"""
         resp = self.client.post(
-            reverse('workforce:publish_task_to_dms',
+            reverse('workforce:publish_task_to_fleets',
                     kwargs={'task_id': self.task.id}))
         self.assertEqual(resp.status_code, 200)
         data = json.loads(resp.content)
         self.assertTrue(data['success'])
 
     def test_publish_task_to_driver_app(self):
-        """#71: Publish task to driver app"""
+        """#71: Publish task to driver app (unpublish fleets)"""
         resp = self.client.post(
-            reverse('workforce:publish_task_to_driver_app',
+            reverse('workforce:unpublish_task_from_fleets',
                     kwargs={'task_id': self.task.id}))
         self.assertEqual(resp.status_code, 200)
         data = json.loads(resp.content)
@@ -904,9 +902,9 @@ class WfBulkOperationsTest(WorkforceTestMixin, TestCase):
         self.staff_login()
 
     def test_bulk_publish_dms(self):
-        """#76: Bulk publish to DMS"""
+        """#76: Bulk publish to delivery fleets"""
         resp = self.client.post(
-            reverse('workforce:bulk_publish_dms'),
+            reverse('workforce:bulk_publish_fleets'),
             json.dumps({'task_ids': [self.task.id]}),
             content_type='application/json')
         self.assertEqual(resp.status_code, 200)
@@ -1139,9 +1137,11 @@ class WfUserVerificationTest(WorkforceTestMixin, TestCase):
 
     def test_verify_user_activates_business(self):
         """#104: Verify user activates their business"""
+        from django.utils import timezone
         biz = self.create_business(bid=8001, status='Pending on Review')
         biz_profile = biz.profile
         biz_profile.verification_status = 'pending'
+        biz_profile.verification_applied_at = timezone.now()
         biz_profile.save()
         resp = self.client.post(
             reverse('workforce:update_verification_status',
@@ -1156,9 +1156,11 @@ class WfUserVerificationTest(WorkforceTestMixin, TestCase):
 
     def test_verify_user_activates_driver(self):
         """#105: Verify user activates their driver"""
+        from django.utils import timezone
         driver = self.create_driver(status='pending', code='PND01')
         drv_profile = driver.profile
         drv_profile.verification_status = 'pending'
+        drv_profile.verification_applied_at = timezone.now()
         drv_profile.save()
         resp = self.client.post(
             reverse('workforce:update_verification_status',

@@ -10,15 +10,15 @@
 {% block content %}
 <div class="col-12 p-3">
     <!-- Page Header -->
-    <header class="pg-hdr">
-        <div class="pg-hdr__left">
+    <header class="oli__hero">
+        <div class="oli__hero__left">
             <h2><i class="fa-solid fa-clock-rotate-left me-1"></i>Incompleted Tasks</h2>
-            <span class="pg-hdr__subtitle">| Pending delivery tasks</span>
+            <span class="oli__hero__subtitle">| Pending delivery tasks</span>
         </div>
-        <div class="pg-hdr__right">
-            <div class="pg-hdr__count">
-                <span class="pg-hdr__count-value">{{ dl_tasks.paginator.count|default:"0" }}</span>
-                <span class="pg-hdr__count-label">pending</span>
+        <div class="oli__hero__right">
+            <div class="oli__hero__count">
+                <span class="oli__hero__count-value">{{ dl_tasks.paginator.count|default:"0" }}</span>
+                <span class="oli__hero__count-label">pending</span>
             </div>
         </div>
     </header>
@@ -217,11 +217,6 @@
                         {{ dl.get_dl_task_status_client_display }}
                     </span>
                     {% endif %}
-                    {% if dl.dl_task_status_dms %}
-                    <span class="status-badge status-{{ dl.dl_task_status_dms }}">
-                        DMS: {{ dl.get_dl_task_status_dms_display }}
-                    </span>
-                    {% endif %}
                 </div>
             </div>
 
@@ -247,10 +242,7 @@
                 </div>
                 <div class="tsk-card__detail">
                     <div class="tsk-card__detail-label">DMS Task Number</div>
-                    <div class="tsk-card__detail-value">
-                        <i class="fa-solid fa-code me-1 text-muted"></i>{{ dl.dl_task_number_dms|default:"N/A" }}
-                    </div>
-                </div>
+</div>
             </div>
 
             <!-- Location Section -->
@@ -310,15 +302,6 @@
 
                     <!-- Publish to Driver App -->
                     <div class="col-md-6 col-lg-3">
-                        {% if dl.dl_task_status_dms == '6' or dl.dl_task_status_dms == '0' or dl.dl_task_status_dms == '7' %}
-                        <button class="btn btn-success btn-sm w-100" disabled>
-                            <i class="fa-solid fa-check-circle me-1"></i>In Driver App
-                        </button>
-                        {% else %}
-                        <button type="button" class="btn btn-info btn-sm w-100 btn-publish-driver-app" data-task-id="{{ dl.id }}">
-                            <i class="fa-solid fa-mobile-screen me-1"></i>Publish to App
-                        </button>
-                        {% endif %}
                     </div>
 
                     <!-- Update Status -->

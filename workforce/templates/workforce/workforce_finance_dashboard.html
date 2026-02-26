@@ -3,47 +3,70 @@
 
 {% block title %}Finance Dashboard{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/workforce_finance_dashboard.css' %}?v=20260226a">
+{% endblock %}
+
 {% block content %}
 <div class="col-12 p-3">
-  <!-- Hero Header -->
-  <div class="wfd__hero">
+
+  <!-- ── Hero ──────────────────────────────────────────── -->
+  <div class="wfd__hero mb-4">
     <div class="wfd__hero-content">
       <h1 class="wfd__hero-title">
         <i class="fas fa-chart-line wfd__hero-icon"></i>Finance Dashboard
       </h1>
-      <p class="wfd__hero-subtitle">Overview of financial transactions and balances</p>
+      <p class="wfd__hero-subtitle">COD pipeline, earnings and delivery performance</p>
+      <div class="wfd__hero-stats mt-2">
+        <div class="wfd__hero-stat wfd__hero-stat--warn">
+          <span class="wfd__hero-stat__num">{{ active_drivers_count }}</span>
+          <span class="wfd__hero-stat__label">Active Drivers</span>
+        </div>
+        <div class="wfd__hero-stat wfd__hero-stat--ok">
+          <span class="wfd__hero-stat__num">{{ total_deliveries|default:0 }}</span>
+          <span class="wfd__hero-stat__label">Deliveries</span>
+        </div>
+        <div class="wfd__hero-stat wfd__hero-stat--info">
+          <span class="wfd__hero-stat__num">{{ success_rate|default:0|floatformat:0 }}%</span>
+          <span class="wfd__hero-stat__label">Success</span>
+        </div>
+        <div class="wfd__hero-stat wfd__hero-stat--muted">
+          <span class="wfd__hero-stat__num">{{ selected_days }}d</span>
+          <span class="wfd__hero-stat__label">Period</span>
+        </div>
+      </div>
     </div>
     <div class="wfd__hero-actions">
-      <form method="GET" class="d-flex gap-2">
+      <form method="GET">
         <select name="days" class="form-select form-select-sm wfd__period-select" onchange="this.form.submit()">
-          <option value="7" {% if selected_days == 7 %}selected{% endif %}>Last 7 Days</option>
-          <option value="30" {% if selected_days == 30 %}selected{% endif %}>Last 30 Days</option>
-          <option value="90" {% if selected_days == 90 %}selected{% endif %}>Last 90 Days</option>
+          <option value="7"   {% if selected_days == 7   %}selected{% endif %}>Last 7 Days</option>
+          <option value="30"  {% if selected_days == 30  %}selected{% endif %}>Last 30 Days</option>
+          <option value="90"  {% if selected_days == 90  %}selected{% endif %}>Last 90 Days</option>
           <option value="365" {% if selected_days == 365 %}selected{% endif %}>Last Year</option>
         </select>
       </form>
     </div>
   </div>
 
-  <!-- COD with Fleet Section -->
+  <!-- ── COD with Fleet ────────────────────────────────── -->
   <div class="wfd__section-header">
     <div class="d-flex align-items-center gap-2">
       <i class="fas fa-users wfd__section-icon"></i>
-      <h5 class="wfd__section-title">COD WITH FLEET</h5>
+      <h5 class="wfd__section-title">COD with Fleet</h5>
     </div>
-    <span class="wfd__section-badge">{{ active_drivers_count }} Active Drivers</span>
+    <span class="wfd__section-badge">{{ drivers_with_cod_count }} Drivers Holding Cash</span>
   </div>
 
-  <div class="row mb-4 g-3">
+  <div class="row g-3 mb-4">
     <div class="col-xl-3 col-md-6">
       <div class="wfd__fleet-card">
         <div class="wfd__fleet-icon wfd__fleet-icon--warning">
-          <i class="fas fa-users"></i>
+          <i class="fas fa-sack-dollar"></i>
         </div>
-        <div class="wfd__fleet-amount">{{ driver_totals.total_cod_in_hand|default:0|floatformat:2 }}</div>
-        <div class="wfd__fleet-currency">QAR</div>
-        <div class="wfd__fleet-label">Total COD in Fleet</div>
-        <div class="wfd__fleet-sublabel">Cash with {{ active_drivers_count }} drivers</div>
+        <div class="wfd__fleet-amount">{{ driver_totals.total_cod_in_hand|default:0|floatformat:0 }}</div>
+        <div class="wfd__fleet-currency">QAR Total</div>
+        <div class="wfd__fleet-label">COD in Fleet</div>
+        <div class="wfd__fleet-sublabel">Across {{ active_drivers_count }} drivers</div>
       </div>
     </div>
     <div class="col-xl-3 col-md-6">
@@ -51,9 +74,9 @@
         <div class="wfd__fleet-icon wfd__fleet-icon--info">
           <i class="fas fa-calculator"></i>
         </div>
-        <div class="wfd__fleet-amount">{% widthratio driver_totals.total_cod_in_hand|default:0 active_drivers_count 1 %}</div>
-        <div class="wfd__fleet-currency">QAR</div>
-        <div class="wfd__fleet-label">Avg per Driver</div>
+        <div class="wfd__fleet-amount">{% if active_drivers_count > 0 %}{% widthratio driver_totals.total_cod_in_hand|default:0 active_drivers_count 1 %}{% else %}0{% endif %}</div>
+        <div class="wfd__fleet-currency">QAR Average</div>
+        <div class="wfd__fleet-label">Per Driver</div>
         <div class="wfd__fleet-sublabel">Distribution ratio</div>
       </div>
     </div>
@@ -70,10 +93,10 @@
     </div>
     <div class="col-xl-3 col-md-6">
       <div class="wfd__fleet-card">
-        <div class="wfd__fleet-icon wfd__fleet-icon--primary">
+        <div class="wfd__fleet-icon wfd__fleet-icon--danger">
           <i class="fas fa-clock"></i>
         </div>
-        <div class="wfd__fleet-amount">{{ driver_totals.total_pending_earnings|default:0|floatformat:2 }}</div>
+        <div class="wfd__fleet-amount">{{ driver_totals.total_pending_earnings|default:0|floatformat:0 }}</div>
         <div class="wfd__fleet-currency">QAR</div>
         <div class="wfd__fleet-label">Pending Settlement</div>
         <div class="wfd__fleet-sublabel">Awaiting processing</div>
@@ -81,107 +104,142 @@
     </div>
   </div>
 
-  <!-- COD Pipeline Stats -->
+  <!-- ── COD Pipeline ──────────────────────────────────── -->
   <div class="wfd__section-header">
     <div class="d-flex align-items-center gap-2">
       <i class="fas fa-money-bill-transfer wfd__section-icon"></i>
-      <h5 class="wfd__section-title">COD PIPELINE</h5>
+      <h5 class="wfd__section-title">COD Pipeline</h5>
     </div>
-    <div class="d-flex gap-2">
-      <a href="?days=30" class="wfd__period-pill {% if selected_days == 30 %}wfd__period-pill--active{% endif %}">30 Days</a>
-      <a href="?days=60" class="wfd__period-pill {% if selected_days == 60 %}wfd__period-pill--active{% endif %}">60 Days</a>
-      <a href="?days=90" class="wfd__period-pill {% if selected_days == 90 %}wfd__period-pill--active{% endif %}">90 Days</a>
+    <div class="d-flex gap-1 flex-wrap">
+      <a href="?days=30"  class="wfd__period-pill {% if selected_days == 30  %}wfd__period-pill--active{% endif %}">30d</a>
+      <a href="?days=60"  class="wfd__period-pill {% if selected_days == 60  %}wfd__period-pill--active{% endif %}">60d</a>
+      <a href="?days=90"  class="wfd__period-pill {% if selected_days == 90  %}wfd__period-pill--active{% endif %}">90d</a>
+      <a href="?days=365" class="wfd__period-pill {% if selected_days == 365 %}wfd__period-pill--active{% endif %}">1yr</a>
     </div>
   </div>
 
-  <div class="row mb-4 g-3">
+  <!-- Flow bar -->
+  <div class="wfd__flow-bar mb-3">
+    <div class="wfd__flow-item">
+      <div class="wfd__flow-item__dot" style="background:#f7c000;"></div>
+      <div class="wfd__flow-item__amount">{{ cod_collected|floatformat:0 }}</div>
+      <div class="wfd__flow-item__label">Collected</div>
+    </div>
+    <div class="wfd__flow-item">
+      <div class="wfd__flow-item__dot" style="background:#fd7e14;"></div>
+      <div class="wfd__flow-item__amount">{{ driver_totals.total_cod_in_hand|default:0|floatformat:0 }}</div>
+      <div class="wfd__flow-item__label">In Hand</div>
+    </div>
+    <div class="wfd__flow-item">
+      <div class="wfd__flow-item__dot" style="background:#0dcaf0;"></div>
+      <div class="wfd__flow-item__amount">{{ cod_in_bank|floatformat:0 }}</div>
+      <div class="wfd__flow-item__label">In Bank</div>
+    </div>
+    <div class="wfd__flow-item">
+      <div class="wfd__flow-item__dot" style="background:#198754;"></div>
+      <div class="wfd__flow-item__amount">{{ cod_driver_settled|floatformat:0 }}</div>
+      <div class="wfd__flow-item__label">Settled</div>
+    </div>
+    <div class="wfd__flow-item">
+      <div class="wfd__flow-item__dot" style="background:#dc3545;"></div>
+      <div class="wfd__flow-item__amount">{{ cod_to_settle|floatformat:0 }}</div>
+      <div class="wfd__flow-item__label">To Settle</div>
+    </div>
+    <div class="wfd__flow-item">
+      <div class="wfd__flow-item__dot" style="background:#6c757d;"></div>
+      <div class="wfd__flow-item__amount">{{ cod_returned|floatformat:0 }}</div>
+      <div class="wfd__flow-item__label">Returns</div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__pipeline-card">
-        <div class="wfd__pipeline-icon"><i class="fas fa-money-bill-wave fa-2x text-warning"></i></div>
+        <div class="wfd__pipeline-icon"><i class="fas fa-money-bill-wave fa-lg text-warning"></i></div>
         <div class="wfd__pipeline-amount">{{ cod_collected|floatformat:0 }}</div>
         <div class="wfd__pipeline-currency">QAR</div>
         <div class="wfd__pipeline-label">Total Collected</div>
         <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="wfd__pipeline-btn wfd__pipeline-btn--warning">
-          <i class="fas fa-eye me-1"></i> View
+          <i class="fas fa-eye me-1"></i>View
         </a>
       </div>
     </div>
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__pipeline-card">
-        <div class="wfd__pipeline-icon"><i class="fas fa-hand-holding-dollar fa-2x text-warning"></i></div>
+        <div class="wfd__pipeline-icon"><i class="fas fa-hand-holding-dollar fa-lg text-warning"></i></div>
         <div class="wfd__pipeline-amount">{{ driver_totals.total_cod_in_hand|default:0|floatformat:0 }}</div>
         <div class="wfd__pipeline-currency">QAR</div>
         <div class="wfd__pipeline-label">COD in Hand</div>
         <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="wfd__pipeline-btn wfd__pipeline-btn--warning">
-          <i class="fas fa-eye me-1"></i> View
+          <i class="fas fa-eye me-1"></i>View
         </a>
       </div>
     </div>
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__pipeline-card">
-        <div class="wfd__pipeline-icon"><i class="fas fa-building-columns fa-2x text-info"></i></div>
+        <div class="wfd__pipeline-icon"><i class="fas fa-building-columns fa-lg text-info"></i></div>
         <div class="wfd__pipeline-amount">{{ cod_in_bank|floatformat:0 }}</div>
         <div class="wfd__pipeline-currency">QAR</div>
         <div class="wfd__pipeline-label">COD in Bank</div>
         <a href="{% url 'workforce:fleet_transactions' %}?type=cod_deposit" class="wfd__pipeline-btn wfd__pipeline-btn--info">
-          <i class="fas fa-eye me-1"></i> View
+          <i class="fas fa-eye me-1"></i>View
         </a>
       </div>
     </div>
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__pipeline-card">
-        <div class="wfd__pipeline-icon"><i class="fas fa-users fa-2x text-primary"></i></div>
-        <div class="wfd__pipeline-amount">{{ driver_totals.total_cod_in_hand|default:0|floatformat:0 }}</div>
+        <div class="wfd__pipeline-icon"><i class="fas fa-circle-check fa-lg text-success"></i></div>
+        <div class="wfd__pipeline-amount">{{ cod_driver_settled|floatformat:0 }}</div>
         <div class="wfd__pipeline-currency">QAR</div>
-        <div class="wfd__pipeline-label">With Fleet</div>
-        <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="wfd__pipeline-btn wfd__pipeline-btn--primary">
-          <i class="fas fa-eye me-1"></i> View
+        <div class="wfd__pipeline-label">Driver Settled</div>
+        <a href="{% url 'workforce:fleet_transactions' %}?type=cod_driver_settle" class="wfd__pipeline-btn wfd__pipeline-btn--primary">
+          <i class="fas fa-eye me-1"></i>View
         </a>
       </div>
     </div>
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__pipeline-card">
-        <div class="wfd__pipeline-icon"><i class="fas fa-clock fa-2x text-danger"></i></div>
+        <div class="wfd__pipeline-icon"><i class="fas fa-clock fa-lg text-danger"></i></div>
         <div class="wfd__pipeline-amount">{{ cod_to_settle|floatformat:0 }}</div>
         <div class="wfd__pipeline-currency">QAR</div>
         <div class="wfd__pipeline-label">To Settle</div>
         <a href="{% url 'workforce:cod_settlement_report' %}" class="wfd__pipeline-btn wfd__pipeline-btn--danger">
-          <i class="fas fa-file-invoice me-1"></i> Report
+          <i class="fas fa-file-invoice me-1"></i>Report
         </a>
       </div>
     </div>
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__pipeline-card">
-        <div class="wfd__pipeline-icon"><i class="fas fa-rotate-left fa-2x text-secondary"></i></div>
+        <div class="wfd__pipeline-icon"><i class="fas fa-rotate-left fa-lg text-secondary"></i></div>
         <div class="wfd__pipeline-amount">{{ cod_returned|floatformat:0 }}</div>
         <div class="wfd__pipeline-currency">QAR</div>
         <div class="wfd__pipeline-label">Returns</div>
         <a href="{% url 'workforce:fleet_transactions' %}?type=cod_return" class="wfd__pipeline-btn wfd__pipeline-btn--secondary">
-          <i class="fas fa-eye me-1"></i> View
+          <i class="fas fa-eye me-1"></i>View
         </a>
       </div>
     </div>
   </div>
 
-  <!-- Financial Metrics -->
+  <!-- ── Financial Metrics ──────────────────────────────── -->
   <div class="wfd__section-header">
     <div class="d-flex align-items-center gap-2">
-      <i class="fas fa-chart-line wfd__section-icon"></i>
-      <h5 class="wfd__section-title">FINANCIAL METRICS</h5>
+      <i class="fas fa-coins wfd__section-icon"></i>
+      <h5 class="wfd__section-title">Financial Metrics</h5>
     </div>
-    <div class="d-flex gap-2">
-      <a href="?days=7" class="wfd__period-pill {% if selected_days == 7 %}wfd__period-pill--active{% endif %}">7 Days</a>
-      <a href="?days=30" class="wfd__period-pill {% if selected_days == 30 %}wfd__period-pill--active{% endif %}">30 Days</a>
-      <a href="?days=90" class="wfd__period-pill {% if selected_days == 90 %}wfd__period-pill--active{% endif %}">90 Days</a>
-      <a href="?days=365" class="wfd__period-pill {% if selected_days == 365 %}wfd__period-pill--active{% endif %}">365 Days</a>
+    <div class="d-flex gap-1 flex-wrap">
+      <a href="?days=7"   class="wfd__period-pill {% if selected_days == 7   %}wfd__period-pill--active{% endif %}">7d</a>
+      <a href="?days=30"  class="wfd__period-pill {% if selected_days == 30  %}wfd__period-pill--active{% endif %}">30d</a>
+      <a href="?days=90"  class="wfd__period-pill {% if selected_days == 90  %}wfd__period-pill--active{% endif %}">90d</a>
+      <a href="?days=365" class="wfd__period-pill {% if selected_days == 365 %}wfd__period-pill--active{% endif %}">1yr</a>
     </div>
   </div>
 
-  <div class="row mb-4 g-3">
+  <div class="row g-3 mb-4">
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__metric-card">
         <i class="fas fa-coins wfd__metric-icon text-success"></i>
-        <div class="wfd__metric-value">{{ earnings_total|floatformat:0 }}</div>
+        <div class="wfd__metric-value text-success">{{ earnings_total|floatformat:0 }}</div>
         <div class="wfd__metric-unit">QAR</div>
         <div class="wfd__metric-label">Earnings</div>
       </div>
@@ -196,8 +254,8 @@
     </div>
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__metric-card wfd__metric-card--highlight">
-        <i class="fas fa-clock wfd__metric-icon text-success"></i>
-        <div class="wfd__metric-value text-success">{{ driver_totals.total_pending_earnings|default:0|floatformat:0 }}</div>
+        <i class="fas fa-hourglass-half wfd__metric-icon text-warning"></i>
+        <div class="wfd__metric-value text-warning">{{ driver_totals.total_pending_earnings|default:0|floatformat:0 }}</div>
         <div class="wfd__metric-unit">QAR</div>
         <div class="wfd__metric-label">Pending</div>
       </div>
@@ -212,7 +270,7 @@
     </div>
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__metric-card">
-        <i class="fas fa-arrow-right wfd__metric-icon text-danger"></i>
+        <i class="fas fa-arrow-up-right-from-square wfd__metric-icon text-danger"></i>
         <div class="wfd__metric-value text-danger">{{ bills_payable|floatformat:0 }}</div>
         <div class="wfd__metric-unit">QAR</div>
         <div class="wfd__metric-label">Payable</div>
@@ -220,7 +278,7 @@
     </div>
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__metric-card">
-        <i class="fas fa-arrow-left wfd__metric-icon text-success"></i>
+        <i class="fas fa-arrow-down-to-line wfd__metric-icon text-success"></i>
         <div class="wfd__metric-value text-success">{{ bills_receivable|floatformat:0 }}</div>
         <div class="wfd__metric-unit">QAR</div>
         <div class="wfd__metric-label">Receivable</div>
@@ -228,24 +286,24 @@
     </div>
   </div>
 
-  <!-- Performance Metrics -->
+  <!-- ── Performance Metrics ────────────────────────────── -->
   <div class="wfd__section-header">
     <div class="d-flex align-items-center gap-2">
       <i class="fas fa-gauge-high wfd__section-icon"></i>
-      <h5 class="wfd__section-title">PERFORMANCE METRICS</h5>
+      <h5 class="wfd__section-title">Performance Metrics</h5>
     </div>
-    <div class="d-flex gap-2">
-      <a href="?days=7" class="wfd__period-pill {% if selected_days == 7 %}wfd__period-pill--active{% endif %}">7 Days</a>
-      <a href="?days=30" class="wfd__period-pill {% if selected_days == 30 %}wfd__period-pill--active{% endif %}">30 Days</a>
-      <a href="?days=90" class="wfd__period-pill {% if selected_days == 90 %}wfd__period-pill--active{% endif %}">90 Days</a>
-      <a href="?days=365" class="wfd__period-pill {% if selected_days == 365 %}wfd__period-pill--active{% endif %}">365 Days</a>
+    <div class="d-flex gap-1 flex-wrap">
+      <a href="?days=7"   class="wfd__period-pill {% if selected_days == 7   %}wfd__period-pill--active{% endif %}">7d</a>
+      <a href="?days=30"  class="wfd__period-pill {% if selected_days == 30  %}wfd__period-pill--active{% endif %}">30d</a>
+      <a href="?days=90"  class="wfd__period-pill {% if selected_days == 90  %}wfd__period-pill--active{% endif %}">90d</a>
+      <a href="?days=365" class="wfd__period-pill {% if selected_days == 365 %}wfd__period-pill--active{% endif %}">1yr</a>
     </div>
   </div>
 
-  <div class="row mb-4 g-3">
+  <div class="row g-3 mb-4">
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__metric-card">
-        <i class="fas fa-truck-fast wfd__metric-icon text-primary"></i>
+        <i class="fas fa-circle-check wfd__metric-icon text-success"></i>
         <div class="wfd__metric-value">{{ total_deliveries|default:0 }}</div>
         <div class="wfd__metric-unit">Orders</div>
         <div class="wfd__metric-label">Completed</div>
@@ -277,28 +335,34 @@
     </div>
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__metric-card wfd__metric-card--highlight">
-        <i class="fas fa-user-check wfd__metric-icon text-success"></i>
-        <div class="wfd__metric-value text-success">{{ active_drivers|default:0 }}</div>
+        <i class="fas fa-motorcycle wfd__metric-icon text-primary"></i>
+        <div class="wfd__metric-value text-primary">{{ active_drivers|default:0 }}</div>
         <div class="wfd__metric-unit">Drivers</div>
         <div class="wfd__metric-label">Active</div>
       </div>
     </div>
     <div class="col-xl-2 col-md-4 col-6">
       <div class="wfd__metric-card">
-        <i class="fas fa-percentage wfd__metric-icon text-primary"></i>
-        <div class="wfd__metric-value">{{ success_rate|default:0|floatformat:1 }}%</div>
+        <i class="fas fa-percent wfd__metric-icon text-success"></i>
+        <div class="wfd__metric-value {% if success_rate >= 90 %}text-success{% elif success_rate >= 70 %}text-warning{% else %}text-danger{% endif %}">
+          {{ success_rate|default:0|floatformat:1 }}%
+        </div>
         <div class="wfd__metric-unit">Rate</div>
         <div class="wfd__metric-label">Success</div>
       </div>
     </div>
   </div>
 
-  <!-- Top COD Drivers + Transaction Breakdown -->
-  <div class="row mb-4 g-3">
+  <!-- ── Tables row ─────────────────────────────────────── -->
+  <div class="row g-3 mb-4">
+
+    <!-- Top COD Drivers -->
     <div class="col-md-5">
       <div class="wfd__table-card">
         <div class="wfd__table-header">
-          <h6 class="wfd__table-title"><i class="fas fa-ranking-star wfd__section-icon"></i>TOP COD IN HAND</h6>
+          <h6 class="wfd__table-title">
+            <i class="fas fa-ranking-star wfd__section-icon"></i>Top COD in Hand
+          </h6>
           <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="wfd__view-all-btn">View All</a>
         </div>
         <table class="wfd__table">
@@ -319,22 +383,23 @@
                 <div class="wfd__driver-code">{{ d.driver_code }}</div>
               </td>
               <td class="text-end fw-bold text-warning">{{ d.cod_in_hand|floatformat:0 }} QR</td>
-              <td class="text-end">{{ d.wallet_balance|floatformat:0 }} QR</td>
+              <td class="text-end text-muted">{{ d.wallet_balance|floatformat:0 }} QR</td>
             </tr>
             {% empty %}
-            <tr>
-              <td colspan="3" class="wfd__empty-cell">No drivers with COD</td>
-            </tr>
+            <tr><td colspan="3" class="wfd__empty-cell"><i class="fas fa-inbox me-1"></i>No drivers with COD</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     </div>
 
+    <!-- Transaction Breakdown -->
     <div class="col-md-7">
       <div class="wfd__table-card">
         <div class="wfd__table-header">
-          <h6 class="wfd__table-title"><i class="fas fa-chart-pie wfd__section-icon"></i>TRANSACTION BREAKDOWN</h6>
+          <h6 class="wfd__table-title">
+            <i class="fas fa-chart-pie wfd__section-icon"></i>Transaction Breakdown
+          </h6>
           <a href="{% url 'workforce:fleet_transactions' %}" class="wfd__view-all-btn">View All</a>
         </div>
         <table class="wfd__table">
@@ -354,24 +419,24 @@
                   {% elif tb.transaction_type == 'cod_collection' or tb.transaction_type == 'cod_return' %}wfd__txn-type--warning
                   {% elif tb.transaction_type == 'cod_deposit' or tb.transaction_type == 'cod_driver_settle' %}wfd__txn-type--primary
                   {% elif tb.transaction_type == 'deduction' %}wfd__txn-type--danger
-                  {% endif %}">
+                  {% else %}wfd__txn-type--secondary{% endif %}">
                   {% if tb.transaction_type == 'earning' %}<i class="fas fa-coins"></i>
                   {% elif tb.transaction_type == 'cod_collection' %}<i class="fas fa-arrow-down"></i>
                   {% elif tb.transaction_type == 'cod_deposit' or tb.transaction_type == 'cod_driver_settle' %}<i class="fas fa-arrow-up"></i>
                   {% elif tb.transaction_type == 'deduction' %}<i class="fas fa-minus"></i>
                   {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
                 </span>
-                {{ tb.transaction_type|title }}
+                {{ tb.transaction_type|title|cut:"_" }}
               </td>
-              <td class="text-center">{{ tb.count }}</td>
+              <td class="text-center">
+                <span class="badge bg-light text-secondary fw-semibold">{{ tb.count }}</span>
+              </td>
               <td class="text-end fw-bold {% if tb.total >= 0 %}text-success{% else %}text-danger{% endif %}">
                 {{ tb.total|floatformat:0 }} QR
               </td>
             </tr>
             {% empty %}
-            <tr>
-              <td colspan="3" class="wfd__empty-cell">No transactions in period</td>
-            </tr>
+            <tr><td colspan="3" class="wfd__empty-cell"><i class="fas fa-receipt me-1"></i>No transactions in period</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -379,10 +444,12 @@
     </div>
   </div>
 
-  <!-- Recent Transactions -->
+  <!-- ── Recent Transactions ────────────────────────────── -->
   <div class="wfd__table-card mb-4">
     <div class="wfd__table-header">
-      <h6 class="wfd__table-title"><i class="fas fa-list wfd__section-icon"></i>RECENT TRANSACTIONS</h6>
+      <h6 class="wfd__table-title">
+        <i class="fas fa-list wfd__section-icon"></i>Recent Transactions
+      </h6>
       <a href="{% url 'workforce:fleet_transactions' %}" class="wfd__view-all-btn">View All</a>
     </div>
     <div class="table-responsive">
@@ -401,14 +468,17 @@
         <tbody>
           {% for txn in recent_transactions %}
           <tr>
-            <td>{{ txn.created_at|date:"d M" }}<br><span class="wfd__txn-time">{{ txn.created_at|time:"H:i" }}</span></td>
+            <td>
+              {{ txn.created_at|date:"d M" }}<br>
+              <span class="wfd__txn-time">{{ txn.created_at|time:"H:i" }}</span>
+            </td>
             <td><code class="wfd__txn-code">{{ txn.transaction_code|default:"-" }}</code></td>
             <td>
               {% if txn.driver %}
               <a href="{% url 'workforce:driver_detail' txn.driver.driver_id %}" class="wfd__driver-link">
                 {{ txn.driver.user.first_name|default:"-" }}
               </a>
-              {% else %}-{% endif %}
+              {% else %}<span class="text-muted">—</span>{% endif %}
             </td>
             <td>
               <span class="wfd__txn-type
@@ -416,7 +486,7 @@
                 {% elif txn.transaction_type == 'cod_collection' or txn.transaction_type == 'cod_return' %}wfd__txn-type--warning
                 {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}wfd__txn-type--primary
                 {% elif txn.transaction_type == 'deduction' %}wfd__txn-type--danger
-                {% endif %}">
+                {% else %}wfd__txn-type--secondary{% endif %}">
                 {% if txn.transaction_type == 'earning' %}<i class="fas fa-coins"></i>
                 {% elif txn.transaction_type == 'cod_collection' %}<i class="fas fa-arrow-down"></i>
                 {% elif txn.transaction_type == 'cod_deposit' or txn.transaction_type == 'cod_driver_settle' %}<i class="fas fa-arrow-up"></i>
@@ -424,10 +494,12 @@
                 {% elif txn.transaction_type == 'deduction' %}<i class="fas fa-minus"></i>
                 {% else %}<i class="fas fa-exchange-alt"></i>{% endif %}
               </span>
-              {{ txn.get_transaction_type_display }}
+              <span class="small">{{ txn.get_transaction_type_display }}</span>
             </td>
-            <td class="wfd__cell-truncate" title="{{ txn.description|default:'' }}">{{ txn.description|default:"-" }}</td>
-            <td class="wfd__cell-truncate" title="{{ txn.business.business_name|default:'' }}">{% if txn.business %}{{ txn.business.business_name }}{% else %}-{% endif %}</td>
+            <td class="wfd__cell-truncate" title="{{ txn.description|default:'' }}">{{ txn.description|default:"—" }}</td>
+            <td class="wfd__cell-truncate" title="{{ txn.business.business_name|default:'' }}">
+              {% if txn.business %}{{ txn.business.business_name }}{% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
             <td class="text-end fw-bold {% if txn.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
               {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }} QR
             </td>
@@ -435,7 +507,7 @@
           {% empty %}
           <tr>
             <td colspan="7" class="wfd__empty-cell">
-              <i class="fas fa-receipt"></i> No transactions found
+              <i class="fas fa-receipt me-1"></i>No transactions found
             </td>
           </tr>
           {% endfor %}
@@ -444,22 +516,23 @@
     </div>
   </div>
 
-  <!-- Quick Links -->
+  <!-- ── Quick Links ────────────────────────────────────── -->
   <div class="wfd__quick-links">
     <div class="d-flex gap-2 flex-wrap justify-content-center">
       <a href="{% url 'workforce:fleet_cod_in_hand' %}" class="wfd__quick-link wfd__quick-link--warning">
-        <i class="fas fa-hand-holding-dollar"></i> COD in Hand
+        <i class="fas fa-hand-holding-dollar"></i>COD in Hand
       </a>
       <a href="{% url 'workforce:fleet_drivers_earnings' %}" class="wfd__quick-link wfd__quick-link--success">
-        <i class="fas fa-coins"></i> Driver Earnings
+        <i class="fas fa-coins"></i>Driver Earnings
       </a>
       <a href="{% url 'workforce:fleet_transactions' %}" class="wfd__quick-link wfd__quick-link--primary">
-        <i class="fas fa-list"></i> All Transactions
+        <i class="fas fa-list"></i>All Transactions
       </a>
       <a href="{% url 'workforce:cod_settlement_report' %}" class="wfd__quick-link wfd__quick-link--secondary">
-        <i class="fas fa-file-invoice"></i> COD Settlement
+        <i class="fas fa-file-invoice"></i>COD Settlement
       </a>
     </div>
   </div>
+
 </div>
 {% endblock %}

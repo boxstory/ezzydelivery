@@ -387,16 +387,14 @@ def _create_delivery_task_from_order(order):
                 address_update.dl_longitude = lng
                 address_update.save(update_fields=['dl_latitude', 'dl_longitude'])
 
-        # Create delivery task (DMS push will be handled automatically by delivery_task_post_save_receiver signal)
+        # Create delivery task
         delivery_task = DeliveryTask.objects.create(
             dl_task_number=order.order_number,
-            dl_task_number_dms=order.order_number,
             dl_task_description=f"Delivery for {order.order_number}",
             order=order,
             business=order.business,
             dl_address_update=address_update,
             dl_task_status='for_review',
-            dl_task_status_dms='6',  # Unassigned
             dl_task_status_client='for_review',
             pickup_location=order.pickup_location,
         )
@@ -405,8 +403,6 @@ def _create_delivery_task_from_order(order):
         order.task_created = True
         order.task_status = 'dl_task_listed'
         order.save(update_fields=['task_created', 'task_status'])
-
-        # Note: DMS push is handled by delivery/signals.py to avoid duplicate API calls
 
         return delivery_task
     except Exception as e:

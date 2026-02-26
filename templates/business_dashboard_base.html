@@ -204,6 +204,30 @@
 
       // Re-initialize after HTMX swaps (in case sidebar is replaced)
       document.body.addEventListener('htmx:afterSettle', initSidebarToggle);
+
+      // Accordion: auto-collapse other submenus when one opens
+      function initSidebarAccordion() {
+        const sidebarNav = document.getElementById('client_sidebar_nav_main');
+        if (!sidebarNav) return;
+        // Remove old listener to avoid duplicates after HTMX
+        sidebarNav.removeEventListener('show.bs.collapse', sidebarNav._accordionHandler);
+        sidebarNav._accordionHandler = function(e) {
+          const allCollapses = sidebarNav.querySelectorAll('.collapse');
+          allCollapses.forEach(function(other) {
+            if (other !== e.target && other.classList.contains('show')) {
+              bootstrap.Collapse.getOrCreateInstance(other, { toggle: false }).hide();
+            }
+          });
+        };
+        sidebarNav.addEventListener('show.bs.collapse', sidebarNav._accordionHandler);
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSidebarAccordion);
+      } else {
+        initSidebarAccordion();
+      }
+      document.body.addEventListener('htmx:afterSettle', initSidebarAccordion);
     </script>
     <!-- AI Address Parse (global utility) -->
     <script src="{% static 'ai_agent/js/ai-address-parse.js' %}?v=20260219b"></script>

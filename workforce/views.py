@@ -91,14 +91,6 @@ DeliveryTask = delivery_models.DeliveryTask
 Driver = fleet_models.Driver
 DriverDocument = fleet_models.DriverDocument
 
-# ShipDay API integration
-from decouple import config
-try:
-    from shipday import Shipday
-    API_KEY = config("SHIPDAY_API_KEY", default="")
-    shipday_obj = Shipday(api_key=API_KEY) if API_KEY else None
-except ImportError:
-    shipday_obj = None
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +172,7 @@ def wf_dashboard(request):
         logger.warning(f"User {request.user.id} has no profile. Redirecting to profile creation.")
         return redirect('core:profile_view')
 
-    today = timezone.now().date()
+    today = timezone.localdate()
 
     # Order Statistics - single aggregate query instead of 5 separate counts
     from django.db.models import Case, When, IntegerField
@@ -325,8 +317,6 @@ def all_orders(request):
         orders = orders.filter(order_status=c_status)
 
     # Filter by DMS Status
-    if dms_status:
-        orders = orders.filter(delivery_task__dl_task_status_dms=dms_status)
 
     # Annotate with comment count (for now, all comments are counted as unread)
     orders = orders.annotate(unread_comments_count=Count('order_comments'))
@@ -405,8 +395,6 @@ def fulfilled_clients_orders(request):
         orders = orders.filter(customer_phone__icontains=mobile)
     if c_status:
         orders = orders.filter(order_status=c_status)
-    if dms_status:
-        orders = orders.filter(delivery_task__dl_task_status_dms=dms_status)
 
     # Annotate with comment count
     orders = orders.annotate(unread_comments_count=Count('order_comments'))
@@ -459,11 +447,11 @@ def non_fulfilled_clients_orders(request):
     """Orders from businesses without fulfillment service"""
     from django.db.models import Count
 
-    # Filter orders from businesses without fulfillment service
+    # Filter orders from businesses without active fulfillment service
     orders = orders_models.Order.objects.select_related(
         'business', 'pickup_location'
-    ).prefetch_related('order_comments', 'delivery_task', 'order_items').filter(
-        business__fulfillment_service_enabled=False
+    ).prefetch_related('order_comments', 'delivery_task', 'order_items').exclude(
+        business__fulfillment_service_status='active'
     )
 
     # Apply filters based on GET parameters
@@ -484,8 +472,6 @@ def non_fulfilled_clients_orders(request):
         orders = orders.filter(customer_phone__icontains=mobile)
     if c_status:
         orders = orders.filter(order_status=c_status)
-    if dms_status:
-        orders = orders.filter(delivery_task__dl_task_status_dms=dms_status)
 
     # Annotate with comment count
     orders = orders.annotate(unread_comments_count=Count('order_comments'))
@@ -493,8 +479,8 @@ def non_fulfilled_clients_orders(request):
     orders = paginate_queryset(request, orders)
 
     # Get all non-fulfillment businesses for filter
-    all_businesses = business_models.Business.objects.filter(
-        fulfillment_service_enabled=False
+    all_businesses = business_models.Business.objects.exclude(
+        fulfillment_service_status='active'
     ).order_by('business_name')
 
     # Build filter_params string for pagination
@@ -565,8 +551,6 @@ def export_orders_csv(request):
         orders = orders.filter(customer_phone__icontains=mobile)
     if c_status:
         orders = orders.filter(order_status=c_status)
-    if dms_status:
-        orders = orders.filter(delivery_task__dl_task_status_dms=dms_status)
     if date_from:
         orders = orders.filter(order_date__gte=date_from)
     if date_to:
@@ -1310,8 +1294,6 @@ def dl_list_all(request):
         )
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
-    if dms_status:
-        dl_tasks = dl_tasks.filter(dl_task_status_dms=dms_status)
     if date_from:
         dl_tasks = dl_tasks.filter(dl_task_date__gte=date_from)
     if date_to:
@@ -1409,8 +1391,6 @@ def fulfilled_clients_tasks(request):
         )
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
-    if dms_status:
-        dl_tasks = dl_tasks.filter(dl_task_status_dms=dms_status)
     if date_from:
         dl_tasks = dl_tasks.filter(dl_task_date__gte=date_from)
     if date_to:
@@ -1461,8 +1441,8 @@ def non_fulfilled_clients_tasks(request):
         'order__order_items',
         'order__order_items__product',
         'task_qrcode',
-    ).filter(
-        order__business__fulfillment_service_enabled=False
+    ).exclude(
+        order__business__fulfillment_service_status='active'
     ).order_by('-created_at')
 
     # Get filter parameters
@@ -1491,8 +1471,6 @@ def non_fulfilled_clients_tasks(request):
         )
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
-    if dms_status:
-        dl_tasks = dl_tasks.filter(dl_task_status_dms=dms_status)
     if date_from:
         dl_tasks = dl_tasks.filter(dl_task_date__gte=date_from)
     if date_to:
@@ -1542,8 +1520,6 @@ def dl_list_incompleted_details(request):
         'order__order_items',
     ).exclude(
         dl_task_status__in=['delivered', 'cancelled']
-    ).exclude(
-        dl_task_status_dms__in=['2', '9']  # 2=Successful, 9=Cancel
     ).order_by('-created_at')
 
     # Get filter parameters
@@ -1571,8 +1547,6 @@ def dl_list_incompleted_details(request):
         )
     if c_status:
         dl_tasks = dl_tasks.filter(dl_task_status_client=c_status)
-    if dms_status:
-        dl_tasks = dl_tasks.filter(dl_task_status_dms=dms_status)
     if date_from:
         dl_tasks = dl_tasks.filter(dl_task_date__gte=date_from)
     if date_to:
@@ -1889,7 +1863,7 @@ def cancel_order(request, order_id):
             id=order_id
         )
 
-        if order.order_status == 'publish':
+        if order.order_status in ('publish', 'published'):
             return JsonResponse({
                 'success': False,
                 'error': 'Cannot cancel a published order'
@@ -1904,9 +1878,8 @@ def cancel_order(request, order_id):
         delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
         if delivery_task and delivery_task.dl_task_status != 'cancelled':
             delivery_task.dl_task_status = 'cancelled'
-            delivery_task.dl_task_status_dms = '9'  # Cancel in DMS
             delivery_task.dl_task_status_client = '9'  # Cancel for client
-            delivery_task.save(update_fields=['dl_task_status', 'dl_task_status_dms', 'dl_task_status_client'])
+            delivery_task.save(update_fields=['dl_task_status', 'dl_task_status_client'])
 
         # Log the cancellation
         orders_models.OrderVerificationLog.objects.create(
@@ -2426,7 +2399,7 @@ def delivery_task_detail(request, task_id):
     # Status timeline from OrderStatusHistory (exclude DMS — logged by ShipDay, not useful)
     status_history = orders_models.OrderStatusHistory.objects.filter(
         order=task.order
-    ).exclude(field_name='dl_task_status_dms').select_related('changed_by').order_by('created_at')
+    ).select_related('changed_by').order_by('created_at')
 
     # Verification logs as fallback
     verification_logs = orders_models.OrderVerificationLog.objects.filter(
@@ -2577,7 +2550,6 @@ def assign_driver_to_task(request, task_id):
 
         task.driver = driver
         task.dl_task_status = 'assigned'
-        task.dl_task_status_dms = '0'  # Assigned
         task.save()
 
         driver_name = driver.user.get_full_name() if driver.user else driver.driver_code
@@ -2633,7 +2605,7 @@ def update_task_status(request, task_id):
         )
 
         # Lock check: Prevent status change on settled tasks
-        if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
+        if task.dl_task_status == 'delivered' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
             return JsonResponse({
                 'success': False,
                 'error': 'Task is locked. Status cannot be changed after delivery is successful and COD is settled.'
@@ -6088,7 +6060,7 @@ def delivery_task_edit(request, task_id):
     if request.method == 'POST':
         try:
             # Lock check: Prevent editing settled tasks
-            if task.dl_task_status_dms == '2' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
+            if task.dl_task_status == 'delivered' and task.order and task.order.cod_status_by_staff == 'cod_settled_with_business':
                 messages.error(request, 'Task is locked. Cannot edit after delivery is successful and COD is settled.')
                 return redirect(request.path)
 
@@ -6318,7 +6290,7 @@ def bulk_publish_app(request):
         # Update all selected tasks to be available in driver app
         updated = delivery_models.DeliveryTask.objects.filter(
             id__in=task_ids
-        ).update(dl_task_status_dms='6')  # Unassigned - available for drivers
+        ).update()  # Unassigned - available for drivers
 
         return JsonResponse({
             'success': True,
@@ -6368,24 +6340,17 @@ def bulk_update_status(request):
             }, status=400)
 
         # DMS status mapping for sync
-        DMS_STATUS_MAP = {
-            'delivered': '2', 'cancelled': '9', 'rejected': '8',
-            'failed': '3', 'accepted': '7',
-        }
 
         # Update all selected tasks (excluding locked tasks)
         tasks = delivery_models.DeliveryTask.objects.select_related('order').filter(
             id__in=task_ids
         ).exclude(
-            dl_task_status_dms='2',
             order__cod_status_by_staff='cod_settled_with_business'
         )
         updated = 0
         for task in tasks:
             task.dl_task_status = status
-            if status in DMS_STATUS_MAP:
-                task.dl_task_status_dms = DMS_STATUS_MAP[status]
-            task.save(update_fields=['dl_task_status', 'dl_task_status_dms'])
+            task.save(update_fields=['dl_task_status'])
             updated += 1
 
         return JsonResponse({
@@ -6451,7 +6416,6 @@ def bulk_export_tasks(request):
             _sanitize_csv_value(task.order.customer_address if task.order else ''),
             _sanitize_csv_value(str(task.driver) if task.driver else ''),
             _sanitize_csv_value(task.get_dl_task_status_client_display() if hasattr(task, 'get_dl_task_status_client_display') else task.dl_task_status_client),
-            _sanitize_csv_value(task.get_dl_task_status_dms_display() if hasattr(task, 'get_dl_task_status_dms_display') else task.dl_task_status_dms),
             _sanitize_csv_value(task.pickup_location.pickup_location_title if task.pickup_location else ''),
             _sanitize_csv_value(task.order.cod_amount if task.order else ''),
             _sanitize_csv_value(task.notes if hasattr(task, 'notes') else ''),

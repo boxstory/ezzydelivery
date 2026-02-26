@@ -455,8 +455,7 @@ def accept_task(request):
                     return JsonResponse({"success": False, "error": "Order is cancelled — cannot accept task"})
             # Update task status to accepted
             task.dl_task_status = 'accepted'
-            task.dl_task_status_dms = '7'  # Accepted/Acknowledged in DMS
-            task.save(update_fields=['dl_task_status', 'dl_task_status_dms', 'driver'])
+            task.save(update_fields=['dl_task_status', 'driver'])
             logger.info(f"Task {task_id} accepted by driver {driver.driver_id}")
 
             return JsonResponse({"success": True})

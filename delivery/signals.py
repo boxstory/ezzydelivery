@@ -24,7 +24,6 @@ def delivery_task_pre_save(sender, instance, **kwargs):
         try:
             old = DeliveryTask.objects.get(pk=instance.pk)
             instance._old_dl_task_status = old.dl_task_status
-            instance._old_dl_task_status_dms = old.dl_task_status_dms
 
             # Lock delivery statuses based on order state
             if instance.order_id:
@@ -37,12 +36,6 @@ def delivery_task_pre_save(sender, instance, **kwargs):
                             f"for task {instance.dl_task_number}: order is cancelled"
                         )
                         instance.dl_task_status = old.dl_task_status
-                    if instance.dl_task_status_dms != '9' and instance.dl_task_status_dms != old.dl_task_status_dms:
-                        logger.warning(
-                            f"Blocked DMS status change '{old.dl_task_status_dms}' -> '{instance.dl_task_status_dms}' "
-                            f"for task {instance.dl_task_number}: order is cancelled"
-                        )
-                        instance.dl_task_status_dms = old.dl_task_status_dms
 
                 # Log when order is NOT verified (but allow status changes)
                 elif order.verification_status != 'verified':
@@ -95,13 +88,9 @@ def _sync_order_status_from_task(task):
         logger.exception(f"Error syncing order status from task {task.id}: {e}")
 
 
-# Active DL task statuses that mean the driver is busy
+# Active DL task statuses that mean the driver is physically on the road
 ACTIVE_TASK_STATUSES = [
-    'assigned', 'accepted', 'picked_up', 'start_ride',
-    'in_transit', 'out_for_delivery', 'contacted',
-    'non_reachable', 'address_pending',
-    'customer_confiration_pending', 'customer_delaying',
-    'dl_pending_payment',
+    'picked_up', 'start_ride', 'in_transit', 'out_for_delivery',
 ]
 
 # Terminal DL task statuses that mean the task is done
@@ -146,20 +135,9 @@ def _sync_driver_availability(task):
 
 @receiver(post_save, sender=DeliveryTask)
 def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs):
-    """Handle delivery task creation/update and push to DMS with error handling"""
+    """Handle delivery task creation/update side effects"""
 
     if created:
-        # Push to DMS when task is created
-        try:
-            from ezzy_api.views import _push_task_to_dms
-            result = _push_task_to_dms(instance)
-            if result:
-                logger.info(f"Task {instance.dl_task_number} successfully pushed to DMS on creation")
-            else:
-                logger.warning(f"Failed to push task {instance.dl_task_number} to DMS on creation")
-        except Exception as e:
-            logger.exception(f"Error pushing task {instance.dl_task_number} to DMS in signal: {str(e)}")
-
         # Auto-create shipping label when delivery task is created
         try:
             from delivery.label_utils import create_shipping_label
@@ -181,32 +159,17 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
         except Exception as e:
             logger.exception(f"Error creating QR code for task {instance.dl_task_number}: {str(e)}")
 
-    # Update DMS when task status changes
-    elif not created and 'dl_task_status_dms' in (kwargs.get('update_fields') or []):
-        try:
-            from ezzy_api.views import _push_task_to_dms
-            result = _push_task_to_dms(instance)
-            if result:
-                logger.info(f"Task {instance.dl_task_number} status update pushed to DMS")
-            else:
-                logger.warning(f"Failed to push task {instance.dl_task_number} status update to DMS")
-        except Exception as e:
-            logger.exception(f"Error pushing task update to DMS in signal: {str(e)}")
-
     # Log delivery task status changes to order status history
     if not created and instance.order_id:
         try:
             from orders.signals import log_delivery_task_status_change
             DL_STATUS_DISPLAY = dict(DeliveryTask.dl_task_status.field.choices)
-            DMS_STATUS_DISPLAY = dict(DeliveryTask.dl_task_status_dms.field.choices)
 
             old_dl = getattr(instance, '_old_dl_task_status', None)
             new_dl = instance.dl_task_status
             if old_dl is not None and old_dl != new_dl:
                 status_notes = getattr(instance, '_status_notes', None)
                 log_delivery_task_status_change(instance, 'dl_task_status', old_dl, new_dl, DL_STATUS_DISPLAY, notes=status_notes)
-
-            # DMS status logging removed per request
         except Exception as e:
             logger.error(f"Error logging delivery task status history: {e}")
 

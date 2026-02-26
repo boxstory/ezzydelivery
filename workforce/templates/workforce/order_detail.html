@@ -113,29 +113,7 @@
                             <label class="form-label text-muted small">DMS Status</label>
                             <p class="mb-0">
                                 {% if delivery_task %}
-                                    {% if delivery_task.dl_task_status_dms == '0' %}
-                                    <span class="badge bg-primary fs-6"><i class="fa-solid fa-user me-1"></i>Assigned</span>
-                                    {% elif delivery_task.dl_task_status_dms == '1' %}
-                                    <span class="badge bg-info fs-6"><i class="fa-solid fa-play me-1"></i>Started</span>
-                                    {% elif delivery_task.dl_task_status_dms == '2' %}
-                                    <span class="badge bg-success fs-6"><i class="fa-solid fa-check me-1"></i>Successful</span>
-                                    {% elif delivery_task.dl_task_status_dms == '3' %}
-                                    <span class="badge bg-danger fs-6"><i class="fa-solid fa-times me-1"></i>Failed</span>
-                                    {% elif delivery_task.dl_task_status_dms == '4' %}
-                                    <span class="badge bg-warning text-dark fs-6"><i class="fa-solid fa-truck me-1"></i>In Progress</span>
-                                    {% elif delivery_task.dl_task_status_dms == '6' %}
-                                    <span class="badge bg-secondary fs-6"><i class="fa-solid fa-user-slash me-1"></i>Unassigned</span>
-                                    {% elif delivery_task.dl_task_status_dms == '7' %}
-                                    <span class="badge bg-info fs-6"><i class="fa-solid fa-thumbs-up me-1"></i>Accepted</span>
-                                    {% elif delivery_task.dl_task_status_dms == '8' %}
-                                    <span class="badge bg-danger fs-6"><i class="fa-solid fa-ban me-1"></i>Declined</span>
-                                    {% elif delivery_task.dl_task_status_dms == '9' %}
-                                    <span class="badge bg-danger fs-6"><i class="fa-solid fa-times-circle me-1"></i>Cancelled</span>
-                                    {% elif delivery_task.dl_task_status_dms == '10' %}
-                                    <span class="badge bg-dark fs-6"><i class="fa-solid fa-trash me-1"></i>Deleted</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary fs-6">{{ delivery_task.get_dl_task_status_dms_display|default:"-" }}</span>
-                                    {% endif %}
+                                    {{ delivery_task.get_dl_task_status_display }}
                                 {% else %}
                                 <span class="text-muted">Not published</span>
                                 {% endif %}

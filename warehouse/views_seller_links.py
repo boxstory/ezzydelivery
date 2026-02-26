@@ -8,7 +8,8 @@ Staff-only access to create, view, edit, and delete seller-warehouse connections
 
 import logging
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.decorators import login_required
+from core.decorators import staff_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q, Count, Prefetch
@@ -19,13 +20,8 @@ from business import models as business_models
 logger = logging.getLogger('warehouse')
 
 
-def is_staff_or_superuser(user):
-    """Check if user is staff or superuser - required for seller-warehouse link management"""
-    return user.is_staff or user.is_superuser
-
-
 @login_required
-@user_passes_test(is_staff_or_superuser)
+@staff_required
 def seller_warehouse_links(request):
     """
     List all seller-warehouse links with filtering and search.
@@ -112,7 +108,7 @@ def seller_warehouse_links(request):
 
 
 @login_required
-@user_passes_test(is_staff_or_superuser)
+@staff_required
 def seller_warehouse_link_detail(request, pk):
     """
     View details of a specific seller-warehouse link.
@@ -161,7 +157,7 @@ def seller_warehouse_link_detail(request, pk):
 
 
 @login_required
-@user_passes_test(is_staff_or_superuser)
+@staff_required
 def seller_warehouse_link_add(request):
     """
     Create a new seller-warehouse link.
@@ -268,7 +264,7 @@ def seller_warehouse_link_add(request):
 
 
 @login_required
-@user_passes_test(is_staff_or_superuser)
+@staff_required
 def seller_warehouse_link_edit(request, pk):
     """
     Edit an existing seller-warehouse link.
@@ -337,7 +333,7 @@ def seller_warehouse_link_edit(request, pk):
 
 
 @login_required
-@user_passes_test(is_staff_or_superuser)
+@staff_required
 def seller_warehouse_link_delete(request, pk):
     """
     Delete a seller-warehouse link.

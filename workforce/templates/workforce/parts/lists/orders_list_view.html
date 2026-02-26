@@ -7,16 +7,16 @@
 <link href="{% static 'workforce/css/workforce.css' %}" rel="stylesheet" type="text/css" />
 {% endblock extra_css %}
 {% block content %}
-    <div class="p-3" style="min-width:0;max-width:100%">
+    <div style="min-width:0;max-width:100%">
         <!-- Page Header -->
-        <header class="pg-hdr">
-            <div class="pg-hdr__left">
+        <header class="oli__hero">
+            <div class="oli__hero__left">
                 <h2><i class="fa-solid fa-list-check me-1"></i>All Orders</h2>
             </div>
-            <div class="pg-hdr__right">
-                <div class="pg-hdr__count">
-                    <span class="pg-hdr__count-value">{{ orders.paginator.count|default:"0" }}</span>
-                    <span class="pg-hdr__count-label">orders</span>
+            <div class="oli__hero__right">
+                <div class="oli__hero__count">
+                    <span class="oli__hero__count-value">{{ orders.paginator.count|default:"0" }}</span>
+                    <span class="oli__hero__count-label">orders</span>
                 </div>
             </div>
         </header>
@@ -411,27 +411,26 @@
                     <div class="orc__cell orc__cell--date"><span class="orc__date">{{ order.order_date|date:"d M" }}</span></div>
                     <div class="orc__cell orc__cell--status">
                         <div class="orc__statuses">
-                        <div class="orc__st-line">
-                            {% if order.order_status == 'to_review' %}<span class="st st-warn">To Review</span>
-                            {% elif order.order_status == 'to_publish' %}<span class="st st-info">To Publish</span>
-                            {% elif order.order_status == 'ready_to_pickup' %}<span class="st st-info">Ready</span>
-                            {% elif order.order_status == 'publish' %}<span class="st st-info">Publish</span>
-                            {% elif order.order_status == 'published' %}<span class="st st-ok">Published</span>
-                            {% elif order.order_status == 'delivered' %}<span class="st st-ok">Delivered</span>
-                            {% elif order.order_status == 'fulfilled' %}<span class="st st-ok">Fulfilled</span>
-                            {% elif order.order_status == 'cancelled' %}<span class="st st-err">Cancelled</span>
-                            {% else %}<span class="st">{{ order.order_status }}</span>{% endif %}
-                        </div>
-                        {% with task=order.delivery_task.all.0 %}
-                        {% if task %}
-                        <div class="orc__st-line">
-                            {% if task.dl_task_status_dms %}<span class="st st-dms">{{ task.get_dl_task_status_dms_display }}</span>{% endif %}
-                        </div>
-                        <div class="orc__st-line">
-                            <span class="st st-task">{{ task.get_dl_task_status_display }}</span>
-                        </div>
-                        {% endif %}
-                        {% endwith %}
+                            <div class="orc__st-row">
+                                <span class="orc__st-label">Order</span>
+                                {% if order.order_status == 'to_review' %}<span class="st st-warn">To Review</span>
+                                {% elif order.order_status == 'to_publish' %}<span class="st st-info">To Publish</span>
+                                {% elif order.order_status == 'ready_to_pickup' %}<span class="st st-info">Ready</span>
+                                {% elif order.order_status == 'publish' %}<span class="st st-info">Publish</span>
+                                {% elif order.order_status == 'published' %}<span class="st st-ok">Published</span>
+                                {% elif order.order_status == 'delivered' %}<span class="st st-ok">Delivered</span>
+                                {% elif order.order_status == 'fulfilled' %}<span class="st st-ok">Fulfilled</span>
+                                {% elif order.order_status == 'cancelled' %}<span class="st st-err">Cancelled</span>
+                                {% else %}<span class="st">{{ order.order_status }}</span>{% endif %}
+                            </div>
+                            {% with task=order.delivery_task.all.0 %}
+                            {% if task %}
+                            <div class="orc__st-row">
+                                <span class="orc__st-label">Delivery</span>
+                                <span class="st st-task">{{ task.get_dl_task_status_display }}</span>
+                            </div>
+                            {% endif %}
+                            {% endwith %}
                         </div>
                     </div>
                     <div class="orc__cell orc__cell--act">

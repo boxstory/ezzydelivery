@@ -34,6 +34,20 @@ body {
   }
 }
 
+/* Content area transition for smooth sidebar collapse */
+.biz-dash__content {
+  transition: width 0.25s ease, max-width 0.25s ease;
+}
+
+/* When sidebar is collapsed, content fills the freed space */
+@media (min-width: 768px) {
+  .bsb__sidebar.collapsed ~ .biz-dash__content,
+  .bsb__sidebar.collapsed + .biz-dash__content {
+    width: calc(100% - 3.5rem);
+    max-width: calc(100% - 3.5rem);
+  }
+}
+
 /* Mobile fixes - ensure content displays */
 /* Using .business-dashboard parent selector for increased specificity to override Bootstrap */
 @media (max-width: 767.98px) {

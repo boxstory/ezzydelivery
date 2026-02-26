@@ -259,7 +259,7 @@ def delivery_task_pre_save_handler(sender, instance, *args, **kwargs):
         try:
             from delivery.models import DeliveryTask
             old_instance = DeliveryTask.objects.get(pk=instance.pk)
-            _old_delivery_status[instance.pk] = old_instance.dl_task_status_dms
+            _old_delivery_status[instance.pk] = old_instance.dl_task_status
         except sender.DoesNotExist:
             pass
 
@@ -274,8 +274,8 @@ def delivery_task_post_save_handler(sender, instance, created, *args, **kwargs):
 
     old_status = _old_delivery_status.pop(instance.pk, None)
 
-    # Fulfill stock when delivery is successful (DMS status '2')
-    if old_status != '2' and instance.dl_task_status_dms == '2':
+    # Fulfill stock when delivery is successful
+    if old_status != 'delivered' and instance.dl_task_status == 'delivered':
         if instance.order:
             with transaction.atomic():
                 fulfill_stock_reservation(instance.order)

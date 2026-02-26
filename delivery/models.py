@@ -18,22 +18,10 @@ Models:
         - ShippingLabel: Auto-generated shipping labels for packages
 
 Delivery Status Flow:
-    Order Created → for_review → pending → publish_to_dms → in_transit → delivered
+    Order Created → for_review → pending → in_transit → delivered
                                        ↘ address_pending (if address needs update)
                                        ↘ customer_confirmation_pending
                                        ↘ cancelled/rejected
-
-DMS Status Codes:
-    0: Assigned
-    1: Started
-    2: Successful
-    3: Failed
-    4: InProgress/Arrived
-    6: Unassigned
-    7: Accepted/Acknowledged
-    8: Decline
-    9: Cancel
-    10: Deleted
 
 Related:
     - orders.models.Order: Source order for delivery task
@@ -86,7 +74,6 @@ class DlAddressUpdate(models.Model):
 
         Task Reference:
             - dl_task_number: Delivery task code
-            - dms_id: External DMS system ID
             - order: Parent order
             - time_slot: Preferred delivery time
 
@@ -107,7 +94,6 @@ class DlAddressUpdate(models.Model):
     is_flat = models.BooleanField(default=False)
     is_office = models.BooleanField(default=False)
     dl_task_number = models.CharField(max_length=100)
-    dms_id = models.CharField(max_length=100, blank=True, null=True)
     time_slot = models.CharField(max_length=100, blank=True, null=True)
     order = models.ForeignKey(orders_models.Order, on_delete=models.DO_NOTHING, related_name='delivery_addresses')
 
@@ -147,28 +133,12 @@ class DeliveryTask(models.Model):
         ('rejected', 'Rejected'),
         ('cancelled', 'Cancelled'),
     )
-    dl_task_status_dms = (
-        ('0', 'Assigned'),
-        ('1', 'Started'),
-        ('2', 'Successful'),
-        ('3', 'Failed'),
-        ('4', 'InProgress/Arrived'),
-        ('6', 'Unassigned'),
-        ('7', 'Accepted/Acknowledged'),
-        ('8', 'Decline'),
-        ('9', 'Cancel'),
-        ('10', 'Deleted'),
-    )
-
     dl_task_publish = models.BooleanField(default=False)
     dl_task_number = models.CharField(max_length=100)
-    dl_task_number_dms = models.CharField(max_length=100)
     dl_task_description = models.CharField(max_length=100)
     dl_task_status_client = models.CharField(
         max_length=100, choices=dl_task_status_client)
     dl_task_status = models.CharField(max_length=100, choices=dl_task_status)
-    dl_task_status_dms = models.CharField(
-        max_length=100, default='6', choices=dl_task_status_dms)
     dl_task_date = models.DateField(auto_now_add=True)
     order = models.ForeignKey(orders_models.Order, on_delete=models.DO_NOTHING, related_name='delivery_task')
     dl_address_update = models.ForeignKey(

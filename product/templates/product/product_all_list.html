@@ -125,11 +125,27 @@ Products
     <article class="pal__card" id="product_list_card_{{ product.id }}">
       <!-- Product Header -->
       <div class="pal__card-header" id="product_list_card_header_{{ product.id }}">
-        <h3 class="pal__card-name" id="product_list_card_name_{{ product.id }}">
-          <i class="fa-solid fa-tag"></i>
-          {{ product.item_name }}
-        </h3>
-        <p class="pal__card-sku" id="product_list_card_sku_{{ product.id }}">SKU: {{ product.item_sku }}</p>
+        <div class="pal__card-header-inner">
+          <div class="pal__card-header-text">
+            <h3 class="pal__card-name" id="product_list_card_name_{{ product.id }}">
+              <i class="fa-solid fa-tag"></i>
+              {{ product.item_name }}
+            </h3>
+            <p class="pal__card-sku" id="product_list_card_sku_{{ product.id }}">SKU: {{ product.item_sku }}</p>
+          </div>
+          {% if product.product_image %}
+          <button class="pal__thumb-btn"
+                  data-img="{{ product.product_image.url }}"
+                  data-name="{{ product.item_name }}"
+                  aria-label="View image for {{ product.item_name }}">
+            <img src="{{ product.product_image.url }}" alt="{{ product.item_name }}" class="pal__thumb-img">
+          </button>
+          {% else %}
+          <div class="pal__thumb-btn pal__thumb-btn--empty">
+            <i class="fa-solid fa-image"></i>
+          </div>
+          {% endif %}
+        </div>
       </div>
 
       <!-- Product Body -->
@@ -160,20 +176,25 @@ Products
           </span>
         </div>
 
-        {% if product.qty %}
         <div class="pal__detail-row" id="product_list_card_detail_stock_{{ product.id }}">
           <span class="pal__label">Stock</span>
-          <span class="pal__value">
-            {% if product.qty > 10 %}
-              <span class="pal__badge in-stock">In Stock</span>
-            {% elif product.qty > 0 %}
-              <span class="pal__badge low-stock">Low Stock</span>
+          <span class="pal__stock-cell">
+            {% if product.qty is not None %}
+              {% if product.qty > 10 %}
+                <span class="pal__badge in-stock">In Stock</span>
+                <span class="pal__stock-qty">{{ product.qty }} units</span>
+              {% elif product.qty > 0 %}
+                <span class="pal__badge low-stock">Low Stock</span>
+                <span class="pal__stock-qty pal__stock-qty--low">{{ product.qty }} units</span>
+              {% else %}
+                <span class="pal__badge out-of-stock">Out of Stock</span>
+                <span class="pal__stock-qty pal__stock-qty--out">0 units</span>
+              {% endif %}
             {% else %}
-              <span class="pal__badge out-of-stock">Out of Stock</span>
+              <span class="pal__badge">No Data</span>
             {% endif %}
           </span>
         </div>
-        {% endif %}
       </div>
 
       <!-- Product Footer -->
@@ -205,7 +226,46 @@ Products
 </div>
 </div><!-- end desktop view -->
 
+<!-- Product Image Lightbox Modal -->
+<div id="pal_img_modal" class="pal__modal" role="dialog" aria-modal="true" aria-label="Product image">
+  <div class="pal__modal-backdrop" id="pal_modal_backdrop"></div>
+  <div class="pal__modal-box">
+    <button class="pal__modal-close" id="pal_modal_close" aria-label="Close">&times;</button>
+    <p class="pal__modal-name" id="pal_modal_name"></p>
+    <img src="" alt="" class="pal__modal-img" id="pal_modal_img">
+  </div>
+</div>
+
 <script>
+// Product image lightbox
+(function () {
+  const modal = document.getElementById('pal_img_modal');
+  const modalImg = document.getElementById('pal_modal_img');
+  const modalName = document.getElementById('pal_modal_name');
+  const closeBtn = document.getElementById('pal_modal_close');
+  const backdrop = document.getElementById('pal_modal_backdrop');
+
+  document.querySelectorAll('.pal__thumb-btn[data-img]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      modalImg.src = btn.dataset.img;
+      modalImg.alt = btn.dataset.name;
+      modalName.textContent = btn.dataset.name;
+      modal.classList.add('pal__modal--open');
+    });
+  });
+
+  function closeModal() {
+    modal.classList.remove('pal__modal--open');
+    modalImg.src = '';
+  }
+
+  closeBtn.addEventListener('click', closeModal);
+  backdrop.addEventListener('click', closeModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeModal();
+  });
+})();
+
 // Remember view preference using localStorage
 (function() {
   const viewToggle = document.querySelector('.pal__view-toggle');

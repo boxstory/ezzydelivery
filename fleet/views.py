@@ -1480,10 +1480,10 @@ def driver_performance(request):
         # Calculate detailed metrics
         performance_metrics = {
             'total_tasks': deliveries.count(),
-            'completed_tasks': deliveries.filter(dl_task_status_dms='2').count(),
-            'failed_tasks': deliveries.filter(dl_task_status_dms='3').count(),
-            'in_progress': deliveries.filter(dl_task_status_dms__in=['0', '1', '4', '7']).count(),
-            'cancelled_tasks': deliveries.filter(dl_task_status_dms='9').count(),
+            'completed_tasks': deliveries.filter(dl_task_status='delivered').count(),
+            'failed_tasks': deliveries.filter(dl_task_status='failed').count(),
+            'in_progress': deliveries.filter(dl_task_status__in=['picked_up', 'start_ride', 'in_transit', 'out_for_delivery']).count(),
+            'cancelled_tasks': deliveries.filter(dl_task_status='cancelled').count(),
         }
 
         # Calculate completion rate
@@ -1510,8 +1510,8 @@ def driver_performance(request):
             daily_stats.append({
                 'date': day_start.strftime('%a %d'),
                 'total': day_deliveries.count(),
-                'completed': day_deliveries.filter(dl_task_status_dms='2').count(),
-                'failed': day_deliveries.filter(dl_task_status_dms='3').count(),
+                'completed': day_deliveries.filter(dl_task_status='delivered').count(),
+                'failed': day_deliveries.filter(dl_task_status='failed').count(),
             })
 
         context = {

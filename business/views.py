@@ -381,32 +381,15 @@ def pickup_location_list(request):
             business_id=business.business_id
         ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
-        # Also get warehouse locations from active seller-warehouse links
-        warehouse_locations = []
-        from warehouse.models import SellerWarehouseLink, WarehouseLocation
-
-        warehouse_links = SellerWarehouseLink.objects.filter(
-            business=business, is_active=True
-        ).select_related('warehouse', 'default_location')
-
-        for link in warehouse_links:
-            wh_locs = WarehouseLocation.objects.filter(
-                warehouse=link.warehouse,
-                is_active=True
-            ).select_related('warehouse')
-            warehouse_locations.extend(wh_locs)
-
-        # Combine locations: warehouse locations first, then regular pickup locations
         all_locations = list(pickup_locations)
 
-        if not all_locations and not warehouse_locations:
+        if not all_locations:
             return redirect('business:pickup_location_choose')
 
-        logger.info(f"User {request.user.id} viewing {len(all_locations)} pickup locations and {len(warehouse_locations)} warehouse locations for business {business.business_id}")
+        logger.info(f"User {request.user.id} viewing {len(all_locations)} pickup locations for business {business.business_id}")
 
         context = {
             'stores': all_locations,
-            'warehouse_locations': warehouse_locations,
             'business': business,
             'fulfillment_enabled': business.fulfillment_service_enabled,
         }

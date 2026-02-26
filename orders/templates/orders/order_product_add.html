@@ -1,512 +1,401 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'orders/css/order-product-add.css' %}">
+{% endblock extra_css %}
+
 {% block content %}
 <div class="opa" id="orders_add_product_container_main">
-    <!-- Hero Header -->
-    <div class="opa__hero">
-        <div class="opa__hero-content">
-            <div class="opa__hero-left">
-                <h1 class="opa__title">
-                    <i class="fas fa-boxes"></i>
-                    Add Products to Order
-                </h1>
-                <p class="opa__subtitle">Add one or more products to order #{{ order.client_order_code }}</p>
-            </div>
-            <div class="opa__hero-actions">
-                <a href="{% url 'orders:order_update' order.id %}" class="opa__btn opa__btn--outline">
-                    <i class="fas fa-edit"></i> Edit Order
-                </a>
-                <a href="{% url 'orders:orders_all_list' %}" class="opa__btn opa__btn--outline">
-                    <i class="fas fa-arrow-left"></i> Back to Orders
-                </a>
-            </div>
-        </div>
+
+  <!-- Hero -->
+  <div class="opa__hero">
+    <div class="opa__hero-inner">
+      <div class="opa__hero-icon">
+        <i class="fa-solid fa-boxes-stacked"></i>
+      </div>
+      <div class="opa__hero-text">
+        <h1 class="opa__hero-title">Add Products</h1>
+        <p class="opa__hero-sub">Order <span class="opa__hero-code">#{{ order.client_order_code }}</span> &mdash; {{ order.customer_name }}</p>
+      </div>
     </div>
-
-    <!-- Order Summary Card -->
-    <div class="opa__card">
-        <div class="opa__card-header">
-            <i class="fas fa-file-invoice"></i>
-            <span>Order Details</span>
-        </div>
-        <div class="opa__card-body">
-            <div class="opa__info-grid">
-                <div class="opa__info-row">
-                    <span class="opa__info-label">Customer</span>
-                    <span class="opa__info-value">{{ order.customer_name }}</span>
-                </div>
-                <div class="opa__info-row">
-                    <span class="opa__info-label">Phone</span>
-                    <span class="opa__info-value">{{ order.customer_phone }}</span>
-                </div>
-                <div class="opa__info-row">
-                    <span class="opa__info-label">Order ID</span>
-                    <span class="opa__info-value">{{ order.client_order_code }}</span>
-                </div>
-                <div class="opa__info-row">
-                    <span class="opa__info-label">Date</span>
-                    <span class="opa__info-value">{{ order.order_date }}</span>
-                </div>
-                <div class="opa__info-row">
-                    <span class="opa__info-label">Status</span>
-                    <span class="opa__info-value">
-                        <span class="opa__status-badge">{{ order.get_order_status_display }}</span>
-                    </span>
-                </div>
-            </div>
-        </div>
+    <div class="opa__hero-actions">
+      <a href="{% url 'orders:order_update' order.id %}" class="opa__action-btn opa__action-btn--ghost">
+        <i class="fa-solid fa-pen-to-square"></i> Edit Order
+      </a>
+      <a href="{% url 'orders:orders_all_list' %}" class="opa__action-btn opa__action-btn--ghost">
+        <i class="fa-solid fa-arrow-left"></i> Back
+      </a>
     </div>
+  </div>
 
-    <!-- Existing Products (if any) -->
-    {% if existing_items %}
-    <div class="opa__card">
-        <div class="opa__card-header">
-            <i class="fas fa-shopping-cart"></i>
-            <span>Current Products</span>
-            <span class="opa__count">{{ existing_items.count }}</span>
+  <div class="opa__layout">
+
+    <!-- LEFT: Order Summary -->
+    <aside class="opa__sidebar">
+      <div class="opa__panel">
+        <div class="opa__panel-head">
+          <i class="fa-solid fa-file-invoice"></i>
+          <span>Order Info</span>
         </div>
-        <div class="opa__table-wrap">
-            <table class="opa__table">
-                <thead>
-                    <tr>
-                        <th class="opa__th">Product</th>
-                        <th class="opa__th">SKU</th>
-                        <th class="opa__th">Qty</th>
-                        <th class="opa__th">Unit Price</th>
-                        <th class="opa__th">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in existing_items %}
-                    <tr class="opa__row">
-                        <td class="opa__td opa__td--product">{{ item.product.brand_name }} {{ item.product.item_name }}</td>
-                        <td class="opa__td"><code class="opa__sku">{{ item.product.item_sku }}</code></td>
-                        <td class="opa__td">{{ item.quantity }}</td>
-                        <td class="opa__td">{{ item.unit_price|default:"0.00" }} QAR</td>
-                        <td class="opa__td opa__td--total">{{ item.total_price|default:"0.00" }} QAR</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Add Products Form -->
-    <div class="opa__card">
-        <div class="opa__card-header">
-            <i class="fas fa-plus-circle"></i>
-            <span>Add New Products</span>
-            <span class="opa__count" id="product_count_badge">2 products</span>
-        </div>
-
-        <form method="POST" id="add_products_form" class="opa__form" novalidate>
-            {% csrf_token %}
-
-            <div class="products-container" id="products_container">
-                <!-- Product Row 1 -->
-                <div class="product-row" data-row-index="0">
-                    <div class="product-row-header">
-                        <span class="product-row-number">Product #1</span>
-                        <button type="button" class="btn-remove-product" title="Remove this product" disabled>
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="product-row-fields">
-                        <div class="field-group field-product">
-                            <label class="form-label">
-                                <i class="fas fa-box me-1"></i>Product <span class="opa__required">*</span>
-                            </label>
-                            <select name="product_id[]" class="product-select" required>
-                                <option value="">Select a product...</option>
-                            </select>
-                            <div class="product-info-display" style="display: none;">
-                                <span class="sku-badge"></span>
-                                {% if inventory_enabled %}
-                                <span class="inventory-badge"></span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="field-group field-quantity">
-                            <label class="form-label">
-                                <i class="fas fa-hashtag me-1"></i>Qty
-                            </label>
-                            <input type="number" name="quantity[]" class="form-control quantity-input" value="1" min="1" required>
-                        </div>
-                        <div class="field-group field-price">
-                            <label class="form-label">
-                                <i class="fas fa-tag me-1"></i>Unit Price (QAR)
-                            </label>
-                            <input type="number" name="unit_price[]" class="form-control price-input" step="0.01" min="0" placeholder="Auto-filled">
-                        </div>
-                        <div class="field-group field-total">
-                            <label class="form-label">
-                                <i class="fas fa-calculator me-1"></i>Total
-                            </label>
-                            <div class="total-display">0.00 QAR</div>
-                        </div>
-                        <div class="field-group field-notes">
-                            <label class="form-label">
-                                <i class="fas fa-sticky-note me-1"></i>Notes
-                            </label>
-                            <input type="text" name="notes[]" class="form-control notes-input" placeholder="Optional notes">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Product Row 2 -->
-                <div class="product-row" data-row-index="1">
-                    <div class="product-row-header">
-                        <span class="product-row-number">Product #2</span>
-                        <button type="button" class="btn-remove-product" title="Remove this product">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="product-row-fields">
-                        <div class="field-group field-product">
-                            <label class="form-label">
-                                <i class="fas fa-box me-1"></i>Product
-                            </label>
-                            <select name="product_id[]" class="product-select">
-                                <option value="">Select a product...</option>
-                            </select>
-                            <div class="product-info-display" style="display: none;">
-                                <span class="sku-badge"></span>
-                                {% if inventory_enabled %}
-                                <span class="inventory-badge"></span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="field-group field-quantity">
-                            <label class="form-label">
-                                <i class="fas fa-hashtag me-1"></i>Qty
-                            </label>
-                            <input type="number" name="quantity[]" class="form-control quantity-input" value="1" min="1">
-                        </div>
-                        <div class="field-group field-price">
-                            <label class="form-label">
-                                <i class="fas fa-tag me-1"></i>Unit Price (QAR)
-                            </label>
-                            <input type="number" name="unit_price[]" class="form-control price-input" step="0.01" min="0" placeholder="Auto-filled">
-                        </div>
-                        <div class="field-group field-total">
-                            <label class="form-label">
-                                <i class="fas fa-calculator me-1"></i>Total
-                            </label>
-                            <div class="total-display">0.00 QAR</div>
-                        </div>
-                        <div class="field-group field-notes">
-                            <label class="form-label">
-                                <i class="fas fa-sticky-note me-1"></i>Notes
-                            </label>
-                            <input type="text" name="notes[]" class="form-control notes-input" placeholder="Optional notes">
-                        </div>
-                    </div>
-                </div>
+        <div class="opa__panel-body">
+          <dl class="opa__dl">
+            <div class="opa__dl-row">
+              <dt>Order ID</dt>
+              <dd><code class="opa__code">{{ order.client_order_code }}</code></dd>
             </div>
+            <div class="opa__dl-row">
+              <dt>Customer</dt>
+              <dd>{{ order.customer_name }}</dd>
+            </div>
+            <div class="opa__dl-row">
+              <dt>Phone</dt>
+              <dd>{{ order.customer_phone }}</dd>
+            </div>
+            <div class="opa__dl-row">
+              <dt>Date</dt>
+              <dd>{{ order.order_date }}</dd>
+            </div>
+            <div class="opa__dl-row">
+              <dt>Status</dt>
+              <dd><span class="opa__status">{{ order.get_order_status_display }}</span></dd>
+            </div>
+          </dl>
+        </div>
+      </div>
 
-            <!-- Add More Button -->
-            <div class="add-product-btn-container">
-                <button type="button" class="btn-add-product" id="btn_add_product">
-                    <i class="fas fa-plus me-2"></i>Add Another Product
+      {% if existing_items %}
+      <div class="opa__panel">
+        <div class="opa__panel-head">
+          <i class="fa-solid fa-cart-shopping"></i>
+          <span>Current Items</span>
+          <span class="opa__badge">{{ existing_items.count }}</span>
+        </div>
+        <div class="opa__panel-body opa__panel-body--flush">
+          <table class="opa__existing-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in existing_items %}
+              <tr>
+                <td>
+                  <span class="opa__item-name">{{ item.product.item_name }}</span>
+                  <code class="opa__sku">{{ item.product.item_sku }}</code>
+                </td>
+                <td class="opa__qty">{{ item.quantity }}</td>
+                <td class="opa__total">{{ item.total_price|default:"0.00" }} QAR</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </aside>
+
+    <!-- RIGHT: Add Products Form -->
+    <main class="opa__main">
+      <div class="opa__panel">
+        <div class="opa__panel-head">
+          <i class="fa-solid fa-plus-circle"></i>
+          <span>Add Products</span>
+          <span class="opa__badge" id="opa_product_count_badge">2</span>
+        </div>
+
+        <form method="POST" id="opa_add_products_form" novalidate>
+          {% csrf_token %}
+
+          <div class="opa__rows" id="opa_products_container">
+
+            <!-- Row 1 -->
+            <div class="opa__row" data-row-index="0">
+              <div class="opa__row-label">
+                <span class="opa__row-num">Product #1</span>
+                <button type="button" class="opa__row-remove" title="Remove" disabled>
+                  <i class="fa-solid fa-xmark"></i>
                 </button>
+              </div>
+              <div class="opa__row-fields">
+                <div class="opa__field opa__field--product">
+                  <label class="opa__label">Product <span class="opa__req">*</span></label>
+                  <select name="product_id[]" class="opa__product-select" required>
+                    <option value="">Search products…</option>
+                  </select>
+                  <div class="opa__product-meta" hidden>
+                    <span class="opa__meta-sku"></span>
+                    {% if inventory_enabled %}<span class="opa__meta-stock"></span>{% endif %}
+                  </div>
+                </div>
+                <div class="opa__field opa__field--qty">
+                  <label class="opa__label">Qty</label>
+                  <input type="number" name="quantity[]" class="form-control opa__qty-input" value="1" min="1" required>
+                </div>
+                <div class="opa__field opa__field--price">
+                  <label class="opa__label">Unit Price <small class="opa__label-sub">QAR</small></label>
+                  <input type="number" name="unit_price[]" class="form-control opa__price-input" step="0.01" min="0" placeholder="Auto">
+                </div>
+                <div class="opa__field opa__field--line-total">
+                  <label class="opa__label">Line Total</label>
+                  <div class="opa__line-total">0.00</div>
+                </div>
+                <div class="opa__field opa__field--notes">
+                  <label class="opa__label">Notes</label>
+                  <input type="text" name="notes[]" class="form-control opa__notes-input" placeholder="Optional">
+                </div>
+              </div>
             </div>
 
-            <!-- Order Total -->
-            <div class="order-total-section">
-                <div class="order-total-row">
-                    <span class="order-total-label">Order Total:</span>
-                    <span class="order-total-value" id="order_total">0.00 QAR</span>
-                </div>
-            </div>
-
-            <!-- Submit Buttons -->
-            {% if order.order_status == 'publish' %}
-            <div class="opa__submit-row">
-                <div class="opa__published-notice">
-                    <i class="fas fa-check-circle"></i>
-                    This order has already been published
-                </div>
-            </div>
-            {% else %}
-            <div class="opa__submit-row">
-                <a href="{% url 'orders:orders_all_list' %}" class="opa__btn opa__btn--outline opa__btn--lg">
-                    <i class="fas fa-times"></i> Cancel
-                </a>
-                <button type="submit" class="opa__btn opa__btn--primary opa__btn--lg" id="btn_submit_products">
-                    <i class="fas fa-save"></i> Save Products
+            <!-- Row 2 -->
+            <div class="opa__row" data-row-index="1">
+              <div class="opa__row-label">
+                <span class="opa__row-num">Product #2</span>
+                <button type="button" class="opa__row-remove" title="Remove">
+                  <i class="fa-solid fa-xmark"></i>
                 </button>
+              </div>
+              <div class="opa__row-fields">
+                <div class="opa__field opa__field--product">
+                  <label class="opa__label">Product</label>
+                  <select name="product_id[]" class="opa__product-select">
+                    <option value="">Search products…</option>
+                  </select>
+                  <div class="opa__product-meta" hidden>
+                    <span class="opa__meta-sku"></span>
+                    {% if inventory_enabled %}<span class="opa__meta-stock"></span>{% endif %}
+                  </div>
+                </div>
+                <div class="opa__field opa__field--qty">
+                  <label class="opa__label">Qty</label>
+                  <input type="number" name="quantity[]" class="form-control opa__qty-input" value="1" min="1">
+                </div>
+                <div class="opa__field opa__field--price">
+                  <label class="opa__label">Unit Price <small class="opa__label-sub">QAR</small></label>
+                  <input type="number" name="unit_price[]" class="form-control opa__price-input" step="0.01" min="0" placeholder="Auto">
+                </div>
+                <div class="opa__field opa__field--line-total">
+                  <label class="opa__label">Line Total</label>
+                  <div class="opa__line-total">0.00</div>
+                </div>
+                <div class="opa__field opa__field--notes">
+                  <label class="opa__label">Notes</label>
+                  <input type="text" name="notes[]" class="form-control opa__notes-input" placeholder="Optional">
+                </div>
+              </div>
             </div>
-            {% endif %}
+
+          </div>{# /opa__rows #}
+
+          <!-- Add Row Button -->
+          <div class="opa__add-row-wrap">
+            <button type="button" class="opa__add-row-btn" id="opa_btn_add_row">
+              <i class="fa-solid fa-plus"></i> Add Another Product
+            </button>
+          </div>
+
+          <!-- Order Total Bar -->
+          <div class="opa__total-bar">
+            <span class="opa__total-label"><i class="fa-solid fa-calculator"></i> Order Total</span>
+            <span class="opa__total-value" id="opa_order_total">0.00 QAR</span>
+          </div>
+
+          <!-- Submit -->
+          {% if order.order_status == 'publish' %}
+          <div class="opa__footer">
+            <div class="opa__notice opa__notice--success">
+              <i class="fa-solid fa-circle-check"></i>
+              This order has already been published
+            </div>
+          </div>
+          {% else %}
+          <div class="opa__footer">
+            <a href="{% url 'orders:orders_all_list' %}" class="opa__submit-btn opa__submit-btn--cancel">
+              <i class="fa-solid fa-xmark"></i> Cancel
+            </a>
+            <button type="submit" class="opa__submit-btn opa__submit-btn--save" id="opa_btn_submit">
+              <i class="fa-solid fa-floppy-disk"></i> Save Products
+            </button>
+          </div>
+          {% endif %}
+
         </form>
-    </div>
+      </div>
+    </main>
+
+  </div>{# /opa__layout #}
 </div>
 {% endblock content %}
 
-{% block extra_css %}{% endblock extra_css %}
-
 {% block extra_js %}
 <script>
-$(document).ready(function() {
+(function () {
   const inventoryEnabled = {{ inventory_enabled|yesno:"true,false" }};
-  let productRowCount = 2;
+  const productSearchUrl = '{% url "orders:product_search_api" %}';
 
-  // Initialize Select2 for product dropdowns
-  function initializeSelect2(selectElement) {
-    $(selectElement).select2({
-      placeholder: 'Select a product...',
+  function initSelect2(sel) {
+    $(sel).select2({
+      placeholder: 'Search products…',
       minimumInputLength: 0,
       allowClear: true,
       ajax: {
-        url: '{% url "orders:product_search_api" %}',
+        url: productSearchUrl,
         dataType: 'json',
         delay: 200,
-        data: function(params) {
-          return {
-            q: params.term || ''
-          };
-        },
-        processResults: function(data) {
-          return {
-            results: data.results.map(function(item) {
-              return {
-                id: item.id,
-                text: item.text,
-                sku: item.sku,
-                price: item.price,
-                unit: item.unit,
-                inventory: item.inventory
-              };
-            })
-          };
-        },
+        data: p => ({ q: p.term || '' }),
+        processResults: d => ({
+          results: d.results.map(i => ({
+            id: i.id, text: i.text, sku: i.sku,
+            price: i.price, unit: i.unit, inventory: i.inventory
+          }))
+        }),
         cache: true
       },
-      templateResult: formatProductOption,
-      templateSelection: formatProductSelection
+      templateResult: renderOption,
+      templateSelection: s => s.text || 'Search products…'
     });
 
-    // Handle product selection - auto-populate price
-    $(selectElement).on('select2:select', function(e) {
-      const data = e.params.data;
-      const row = $(this).closest('.product-row');
-
-      // Auto-fill price from product
-      row.find('.price-input').val(data.price);
-
-      // Show product info (SKU, inventory)
-      const infoDisplay = row.find('.product-info-display');
-      infoDisplay.show();
-      infoDisplay.find('.sku-badge').text('SKU: ' + data.sku);
-
-      if (inventoryEnabled && data.inventory !== null) {
-        const inventoryBadge = infoDisplay.find('.inventory-badge');
-        if (data.inventory > 10) {
-          inventoryBadge.removeClass('low-stock out-of-stock').addClass('in-stock');
-          inventoryBadge.text('Stock: ' + data.inventory);
-        } else if (data.inventory > 0) {
-          inventoryBadge.removeClass('in-stock out-of-stock').addClass('low-stock');
-          inventoryBadge.text('Low Stock: ' + data.inventory);
-        } else {
-          inventoryBadge.removeClass('in-stock low-stock').addClass('out-of-stock');
-          inventoryBadge.text('Out of Stock');
-        }
+    $(sel).on('select2:select', function (e) {
+      const d = e.params.data;
+      const row = $(this).closest('.opa__row');
+      row.find('.opa__price-input').val(d.price);
+      const meta = row.find('.opa__product-meta');
+      meta.removeAttr('hidden');
+      meta.find('.opa__meta-sku').text('SKU: ' + d.sku);
+      if (inventoryEnabled && d.inventory !== null) {
+        const s = meta.find('.opa__meta-stock');
+        s.removeClass('opa__meta-stock--ok opa__meta-stock--low opa__meta-stock--out');
+        if (d.inventory > 10) { s.addClass('opa__meta-stock--ok').text('In Stock: ' + d.inventory); }
+        else if (d.inventory > 0) { s.addClass('opa__meta-stock--low').text('Low Stock: ' + d.inventory); }
+        else { s.addClass('opa__meta-stock--out').text('Out of Stock'); }
       }
-
-      // Calculate total
-      calculateRowTotal(row);
+      recalcRow(row);
     });
 
-    // Handle clearing selection
-    $(selectElement).on('select2:clear', function() {
-      const row = $(this).closest('.product-row');
-      row.find('.price-input').val('');
-      row.find('.product-info-display').hide();
-      calculateRowTotal(row);
+    $(sel).on('select2:clear', function () {
+      const row = $(this).closest('.opa__row');
+      row.find('.opa__price-input').val('');
+      row.find('.opa__product-meta').attr('hidden', true);
+      recalcRow(row);
     });
   }
 
-  // Format product option in dropdown
-  function formatProductOption(product) {
-    if (!product.id) return product.text;
-
-    let inventoryClass = '';
-    let inventoryText = '';
-
-    if (inventoryEnabled && product.inventory !== null) {
-      if (product.inventory > 10) {
-        inventoryClass = '';
-        inventoryText = 'In Stock: ' + product.inventory;
-      } else if (product.inventory > 0) {
-        inventoryClass = 'low';
-        inventoryText = 'Low Stock: ' + product.inventory;
-      } else {
-        inventoryClass = 'out';
-        inventoryText = 'Out of Stock';
-      }
+  function renderOption(p) {
+    if (!p.id) return p.text;
+    let stockHtml = '';
+    if (inventoryEnabled && p.inventory !== null) {
+      const cls = p.inventory > 10 ? 'ok' : (p.inventory > 0 ? 'low' : 'out');
+      const label = p.inventory > 10 ? 'In Stock: ' + p.inventory : (p.inventory > 0 ? 'Low: ' + p.inventory : 'Out of Stock');
+      stockHtml = `<span class="opa__opt-stock opa__opt-stock--${cls}">${label}</span>`;
     }
-
-    const $option = $(`
-      <div class="product-option">
-        <span class="product-option-name">${product.text}</span>
-        <div class="product-option-meta">
-          <span class="product-option-sku">${product.sku}</span>
-          <span class="product-option-price">${product.price} QAR</span>
-          ${inventoryEnabled && product.inventory !== null ?
-            `<span class="product-option-inventory ${inventoryClass}">${inventoryText}</span>` : ''}
-        </div>
+    return $(`<div class="opa__opt">
+      <span class="opa__opt-name">${p.text}</span>
+      <div class="opa__opt-meta">
+        <code class="opa__opt-sku">${p.sku}</code>
+        <span class="opa__opt-price">${p.price} QAR</span>
+        ${stockHtml}
       </div>
-    `);
-
-    return $option;
+    </div>`);
   }
 
-  // Format selected product
-  function formatProductSelection(product) {
-    return product.text || 'Select a product...';
+  function recalcRow(row) {
+    const qty = parseFloat(row.find('.opa__qty-input').val()) || 0;
+    const price = parseFloat(row.find('.opa__price-input').val()) || 0;
+    row.find('.opa__line-total').text((qty * price).toFixed(2) + ' QAR');
+    recalcTotal();
   }
 
-  // Calculate row total
-  function calculateRowTotal(row) {
-    const quantity = parseFloat(row.find('.quantity-input').val()) || 0;
-    const price = parseFloat(row.find('.price-input').val()) || 0;
-    const total = (quantity * price).toFixed(2);
-    row.find('.total-display').text(total + ' QAR');
-    calculateOrderTotal();
-  }
-
-  // Calculate order total
-  function calculateOrderTotal() {
-    let orderTotal = 0;
-    $('.product-row').each(function() {
-      const quantity = parseFloat($(this).find('.quantity-input').val()) || 0;
-      const price = parseFloat($(this).find('.price-input').val()) || 0;
-      orderTotal += quantity * price;
+  function recalcTotal() {
+    let total = 0;
+    $('.opa__row').each(function () {
+      total += (parseFloat($(this).find('.opa__qty-input').val()) || 0)
+             * (parseFloat($(this).find('.opa__price-input').val()) || 0);
     });
-    $('#order_total').text(orderTotal.toFixed(2) + ' QAR');
+    $('#opa_order_total').text(total.toFixed(2) + ' QAR');
   }
 
-  // Update product count badge
-  function updateProductCountBadge() {
-    const count = $('.product-row').length;
-    $('#product_count_badge').text(count + ' product' + (count !== 1 ? 's' : ''));
-  }
-
-  // Update row numbers
-  function updateRowNumbers() {
-    $('.product-row').each(function(index) {
-      $(this).find('.product-row-number').text('Product #' + (index + 1));
-      $(this).attr('data-row-index', index);
+  function refreshRowNumbers() {
+    $('.opa__row').each(function (i) {
+      $(this).find('.opa__row-num').text('Product #' + (i + 1));
+      $(this).attr('data-row-index', i);
     });
-    updateRemoveButtons();
-    updateProductCountBadge();
+    const count = $('.opa__row').length;
+    $('#opa_product_count_badge').text(count);
+    $('.opa__row-remove').prop('disabled', count <= 1);
   }
 
-  // Update remove buttons (disable if only 1 row)
-  function updateRemoveButtons() {
-    const rowCount = $('.product-row').length;
-    if (rowCount <= 1) {
-      $('.btn-remove-product').prop('disabled', true);
-    } else {
-      $('.btn-remove-product').prop('disabled', false);
-    }
-  }
-
-  // Add new product row
-  $('#btn_add_product').on('click', function() {
-    productRowCount++;
-    const newRowIndex = $('.product-row').length;
-
-    const newRow = $(`
-      <div class="product-row" data-row-index="${newRowIndex}">
-        <div class="product-row-header">
-          <span class="product-row-number">Product #${newRowIndex + 1}</span>
-          <button type="button" class="btn-remove-product" title="Remove this product">
-            <i class="fas fa-times"></i>
+  function buildRow(index) {
+    return $(`
+      <div class="opa__row" data-row-index="${index}">
+        <div class="opa__row-label">
+          <span class="opa__row-num">Product #${index + 1}</span>
+          <button type="button" class="opa__row-remove" title="Remove">
+            <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
-        <div class="product-row-fields">
-          <div class="field-group field-product">
-            <label class="form-label">
-              <i class="fas fa-box me-1"></i>Product
-            </label>
-            <select name="product_id[]" class="product-select">
-              <option value="">Select a product...</option>
+        <div class="opa__row-fields">
+          <div class="opa__field opa__field--product">
+            <label class="opa__label">Product</label>
+            <select name="product_id[]" class="opa__product-select">
+              <option value="">Search products…</option>
             </select>
-            <div class="product-info-display" style="display: none;">
-              <span class="sku-badge"></span>
-              ${inventoryEnabled ? '<span class="inventory-badge"></span>' : ''}
+            <div class="opa__product-meta" hidden>
+              <span class="opa__meta-sku"></span>
+              ${inventoryEnabled ? '<span class="opa__meta-stock"></span>' : ''}
             </div>
           </div>
-          <div class="field-group field-quantity">
-            <label class="form-label">
-              <i class="fas fa-hashtag me-1"></i>Qty
-            </label>
-            <input type="number" name="quantity[]" class="form-control quantity-input" value="1" min="1">
+          <div class="opa__field opa__field--qty">
+            <label class="opa__label">Qty</label>
+            <input type="number" name="quantity[]" class="form-control opa__qty-input" value="1" min="1">
           </div>
-          <div class="field-group field-price">
-            <label class="form-label">
-              <i class="fas fa-tag me-1"></i>Unit Price (QAR)
-            </label>
-            <input type="number" name="unit_price[]" class="form-control price-input" step="0.01" min="0" placeholder="Auto-filled">
+          <div class="opa__field opa__field--price">
+            <label class="opa__label">Unit Price <small class="opa__label-sub">QAR</small></label>
+            <input type="number" name="unit_price[]" class="form-control opa__price-input" step="0.01" min="0" placeholder="Auto">
           </div>
-          <div class="field-group field-total">
-            <label class="form-label">
-              <i class="fas fa-calculator me-1"></i>Total
-            </label>
-            <div class="total-display">0.00 QAR</div>
+          <div class="opa__field opa__field--line-total">
+            <label class="opa__label">Line Total</label>
+            <div class="opa__line-total">0.00</div>
           </div>
-          <div class="field-group field-notes">
-            <label class="form-label">
-              <i class="fas fa-sticky-note me-1"></i>Notes
-            </label>
-            <input type="text" name="notes[]" class="form-control notes-input" placeholder="Optional notes">
+          <div class="opa__field opa__field--notes">
+            <label class="opa__label">Notes</label>
+            <input type="text" name="notes[]" class="form-control opa__notes-input" placeholder="Optional">
           </div>
         </div>
       </div>
     `);
+  }
 
-    $('#products_container').append(newRow);
+  // Init existing selects
+  $('.opa__product-select').each(function () { initSelect2(this); });
 
-    // Initialize Select2 on new select
-    initializeSelect2(newRow.find('.product-select'));
-
-    // Update row numbers and buttons
-    updateRowNumbers();
-
-    // Scroll to new row
-    newRow[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-    // Focus on the new product select
-    setTimeout(function() {
-      newRow.find('.product-select').select2('open');
-    }, 300);
+  // Add row
+  $('#opa_btn_add_row').on('click', function () {
+    const idx = $('.opa__row').length;
+    const row = buildRow(idx);
+    $('#opa_products_container').append(row);
+    initSelect2(row.find('.opa__product-select'));
+    refreshRowNumbers();
+    row[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => row.find('.opa__product-select').select2('open'), 300);
   });
 
-  // Remove product row
-  $(document).on('click', '.btn-remove-product', function() {
-    if ($('.product-row').length <= 1) return;
-
-    $(this).closest('.product-row').remove();
-    updateRowNumbers();
-    calculateOrderTotal();
+  // Remove row
+  $(document).on('click', '.opa__row-remove', function () {
+    if ($('.opa__row').length <= 1) return;
+    $(this).closest('.opa__row').remove();
+    refreshRowNumbers();
+    recalcTotal();
   });
 
-  // Recalculate on quantity/price change
-  $(document).on('input', '.quantity-input, .price-input', function() {
-    const row = $(this).closest('.product-row');
-    calculateRowTotal(row);
+  // Recalc on input
+  $(document).on('input', '.opa__qty-input, .opa__price-input', function () {
+    recalcRow($(this).closest('.opa__row'));
   });
 
-  // Initialize all existing Select2 elements
-  $('.product-select').each(function() {
-    initializeSelect2(this);
-  });
-
-  // Initial setup
-  updateRemoveButtons();
-  updateProductCountBadge();
-});
+  refreshRowNumbers();
+})();
 </script>
 {% endblock extra_js %}

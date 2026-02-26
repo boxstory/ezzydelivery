@@ -51,7 +51,9 @@ class BusinessTestMixin:
         business = business_models.Business.objects.create(
             business_id=business_id, user=user, profile=profile,
             business_name=name, business_code=code,
-            business_status='active')
+            business_status='active',
+            fulfillment_service_enabled=False,
+            fulfillment_service_status='none')
         business_models.BusinessProfile.objects.get_or_create(
             business=business)
         return business

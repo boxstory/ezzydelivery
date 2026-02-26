@@ -127,7 +127,6 @@ class DriverTestMixin:
         """Create a DeliveryTask."""
         defaults = {
             'dl_task_number': task_number,
-            'dl_task_number_dms': f'DMS-{task_number}',
             'dl_task_description': 'Test delivery task',
             'order': order,
             'business': business,
@@ -135,7 +134,6 @@ class DriverTestMixin:
             'driver': driver,
             'dl_task_status': status,
             'dl_task_status_client': 'for_review',
-            'dl_task_status_dms': '6',
             'dl_price': 25,
         }
         defaults.update(kwargs)

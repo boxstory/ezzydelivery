@@ -53,6 +53,7 @@ import hmac
 import json
 import logging
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -637,8 +638,8 @@ def bulk_order_entry(request):
     ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
     if not pickup_locations.exists():
-        messages.warning(request, "Please add a pickup location first.")
-        return redirect('business:pickup_location_add')
+        messages.warning(request, "Please add a pickup location or link a fulfillment center first.")
+        return redirect('business:pickup_location_list')
 
     if request.method == 'POST':
         # Process bulk order data
@@ -746,8 +747,38 @@ def add_order(request):
     ).order_by('-is_fulfilment_center', 'pickup_location_title')
 
     if not pickup_locations:
-        logger.debug("No pickup locations, redirecting to add")
-        return redirect('business:pickup_location_add')
+        # If fulfillment is active, try to auto-create the missing pickup location from the warehouse link
+        if business.fulfillment_service_status == 'active':
+            from warehouse.models import SellerWarehouseLink
+            link = SellerWarehouseLink.objects.filter(
+                business_id=business.business_id, is_active=True
+            ).select_related('default_location__warehouse').first()
+            if link and link.default_location:
+                wl = link.default_location
+                pickup_location, _ = business_models.PickupLocation.objects.update_or_create(
+                    business=business,
+                    warehouse=wl.warehouse,
+                    defaults={
+                        'pickup_location_title': f"{wl.warehouse.name} - Fulfillment",
+                        'locality': wl.address or wl.warehouse.city or 'Warehouse Location',
+                        'is_fulfilment_center': True,
+                        'pickup_status': 'active',
+                        'pickup_zone_no': wl.zone_number,
+                        'pickup_lat': wl.latitude,
+                        'pickup_lon': wl.longitude,
+                    }
+                )
+                logger.info(f"Auto-created missing fulfillment pickup location for business {business.business_id}")
+                pickup_locations = business_models.PickupLocation.objects.filter(
+                    business_id=business.business_id
+                ).order_by('-is_fulfilment_center', 'pickup_location_title')
+            else:
+                messages.warning(request, "Please add a pickup location or link a fulfillment center first.")
+                return redirect('business:pickup_location_list')
+        else:
+            logger.debug("No pickup locations, redirecting to stores setup")
+            messages.warning(request, "Please add a pickup location or link a fulfillment center first.")
+            return redirect('business:pickup_location_list')
     else:
         if request.method == 'POST':
             logger.debug("Processing POST form for add_order")
@@ -1536,8 +1567,7 @@ def update_order_status(request, order_id=None):
             ).exclude(
                 dl_task_status__in=['delivered', 'cancelled', 'failed']
             ).update(
-                dl_task_status='cancelled',
-                dl_task_status_dms='9'
+                dl_task_status='cancelled'
             )
 
         logger.debug(f'Order {order_id} status updated from {old_status} to {status}')
@@ -1593,8 +1623,7 @@ def bulk_update_order_status(request):
             ).exclude(
                 dl_task_status__in=['delivered', 'cancelled', 'failed']
             ).update(
-                dl_task_status='cancelled',
-                dl_task_status_dms='9'
+                dl_task_status='cancelled'
             )
 
         logger.info(f'Bulk status update: {updated} orders set to {status} by user {request.user.id}')

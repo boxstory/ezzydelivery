@@ -130,11 +130,9 @@ class WarehouseInventoryAdjustmentTest(TestCase):
             order=self.order,
             business=self.business,
             dl_task_number='TEST-ORDER-001',
-            dl_task_number_dms='TEST-ORDER-001',
             dl_task_description='Test Delivery',
             dl_task_status='pending',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6',
             dl_address_update=self.address,
             pickup_location=self.pickup_location
         )

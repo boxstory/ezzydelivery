@@ -759,19 +759,16 @@ class Scenario11_DeliveryTasks(DriverUITestBase):
         # Create some delivery tasks
         self.task_pending = delivery_models.DeliveryTask.objects.create(
             dl_task_number='TASK-001',
-            dl_task_number_dms='DMS-001',
             dl_task_description='Deliver package to Zone 70',
             order=self.order,
             business=self.business,
             pickup_location=self.pickup,
             dl_task_status='pending',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6',
             dl_price=25,
         )
         self.task_assigned = delivery_models.DeliveryTask.objects.create(
             dl_task_number='TASK-002',
-            dl_task_number_dms='DMS-002',
             dl_task_description='Deliver package to Zone 71',
             order=self.order,
             business=self.business,
@@ -779,7 +776,6 @@ class Scenario11_DeliveryTasks(DriverUITestBase):
             driver=self.driver,
             dl_task_status='assigned',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6',
             dl_price=30,
         )
         delivery_models.AssignedDriver.objects.create(
@@ -956,14 +952,12 @@ class Scenario17_FullDriverWorkflow(DriverUITestBase):
         # Create a pending task
         self.task = delivery_models.DeliveryTask.objects.create(
             dl_task_number='FULL-001',
-            dl_task_number_dms='DMS-FULL-001',
             dl_task_description='Full workflow test task',
             order=self.order,
             business=self.business,
             pickup_location=self.pickup,
             dl_task_status='pending',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6',
             dl_price=25,
         )
 

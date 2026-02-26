@@ -885,6 +885,15 @@
         const submenuLinks = document.querySelectorAll('.wf-sidebar__submenu-link');
         let activeCollapseId = null;
 
+        // Clear all existing active states first (stale from template rendering or previous nav)
+        document.querySelectorAll('.wf-sidebar__submenu-link.active, .nav-link-single.active').forEach(el => {
+            el.classList.remove('active');
+            el.removeAttribute('aria-current');
+        });
+        document.querySelectorAll('.wf-sidebar__nav .nav-item.active').forEach(el => {
+            el.classList.remove('active');
+        });
+
         // Find active link and mark it
         submenuLinks.forEach(link => {
             const linkHref = link.getAttribute('href');
@@ -918,17 +927,8 @@
             const toggle = document.querySelector(`[data-bs-target="#${collapseId}"]`);
             const chevron = toggle?.querySelector('.fa-chevron-down');
 
-            // Determine if this collapse should be open
-            let shouldBeOpen = false;
-
-            // Priority 1: Contains active page
-            if (collapseId === activeCollapseId) {
-                shouldBeOpen = true;
-            }
-            // Priority 2: Saved state (if not the active page's section)
-            else if (savedState[collapseId] !== undefined) {
-                shouldBeOpen = savedState[collapseId];
-            }
+            // Only open the submenu that contains the active page
+            let shouldBeOpen = (collapseId === activeCollapseId);
 
             // Apply state
             if (shouldBeOpen) {
@@ -965,6 +965,21 @@
                 }
             });
         });
+
+        // Accordion: collapse others when one opens
+        const sidebarNav = document.getElementById('workforce_sidebar_nav');
+        if (sidebarNav) {
+            sidebarNav.addEventListener('show.bs.collapse', function(e) {
+                allCollapses.forEach(function(other) {
+                    if (other !== e.target && other.classList.contains('show')) {
+                        const otherId = other.getAttribute('id');
+                        const bsOther = bootstrap.Collapse.getOrCreateInstance(other, { toggle: false });
+                        bsOther.hide();
+                        updateCollapseState(otherId, false);
+                    }
+                });
+            });
+        }
 
         // Add keyboard navigation
         initKeyboardNav();

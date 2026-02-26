@@ -577,7 +577,6 @@ class Command(BaseCommand):
                 user=user,
                 profile=user.profile,
                 driver_code=f"DRV{str(i+1).zfill(4)}",
-                driver_code_dms=f"DMS{str(i+1).zfill(4)}",
                 driver_phone=str(user.profile.phone),
                 driver_whatsapp=str(user.profile.whatsapp),
                 driver_bio=f"Experienced delivery driver in {user.profile.zone_name or 'Doha'}",
@@ -852,17 +851,14 @@ class Command(BaseCommand):
                 task_status = 'delivered'
                 task_status_dms = '2'
             else:
-                task_status = random.choice(['pending', 'publish_to_dms', 'in_transit'])
-                task_status_dms = random.choice(['0', '1', '4', '7'])
+                task_status = random.choice(['pending', 'in_transit'])
 
             delivery_task = DeliveryTask.objects.create(
                 dl_task_publish=True,
                 dl_task_number=dl_address.dl_task_number,
-                dl_task_number_dms=f"DMS{str(tasks_created + 1).zfill(6)}",
                 dl_task_description=f"Delivery to {order.customer_name} in {QATAR_ZONES.get(zone, 'Doha')}",
                 dl_task_status_client='for_review' if task_status == 'pending' else '2' if task_status == 'delivered' else '0',
                 dl_task_status=task_status,
-                dl_task_status_dms=task_status_dms,
                 order=order,
                 dl_address_update=dl_address,
                 driver=driver,

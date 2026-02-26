@@ -122,14 +122,12 @@ class DeliveryTaskModelTestCase(TestCase):
         """Test basic delivery task creation"""
         task = DeliveryTask.objects.create(
             dl_task_number='TASK-001',
-            dl_task_number_dms='DMS-001',
             dl_task_description='Test delivery',
             order=self.order,
             business=self.business,
             pickup_location=self.pickup_location,
             dl_task_status='pending',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6'
         )
 
         self.assertIsNotNone(task.id)
@@ -141,13 +139,11 @@ class DeliveryTaskModelTestCase(TestCase):
         """Test __str__ method"""
         task = DeliveryTask.objects.create(
             dl_task_number='TASK-002',
-            dl_task_number_dms='DMS-002',
             dl_task_description='Test delivery 2',
             order=self.order,
             business=self.business,
             dl_task_status='pending',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6'
         )
 
         str_repr = str(task)
@@ -157,18 +153,16 @@ class DeliveryTaskModelTestCase(TestCase):
         """Test assigning driver to task"""
         task = DeliveryTask.objects.create(
             dl_task_number='TASK-003',
-            dl_task_number_dms='DMS-003',
             dl_task_description='Test delivery 3',
             order=self.order,
             business=self.business,
             driver=self.driver,
-            dl_task_status='publish_to_dms',
+            dl_task_status='in_transit',
             dl_task_status_client='0',
-            dl_task_status_dms='0'
         )
 
         self.assertEqual(task.driver, self.driver)
-        self.assertEqual(task.dl_task_status, 'publish_to_dms')
+        self.assertEqual(task.dl_task_status, 'in_transit')
 
 
 class DeliveryTaskStatusTestCase(TestCase):
@@ -224,13 +218,11 @@ class DeliveryTaskStatusTestCase(TestCase):
         """Test task status through different states"""
         task = DeliveryTask.objects.create(
             dl_task_number='STAT-001',
-            dl_task_number_dms='DMS-STAT-001',
             dl_task_description='Status test',
             order=self.order,
             business=self.business,
             dl_task_status='for_review',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6'
         )
 
         # Pending
@@ -239,64 +231,51 @@ class DeliveryTaskStatusTestCase(TestCase):
         self.assertEqual(task.dl_task_status, 'pending')
 
         # Publish to DMS
-        task.dl_task_status = 'publish_to_dms'
-        task.dl_task_status_dms = '0'  # Assigned
+        task.dl_task_status = 'in_transit'
         task.save()
-        self.assertEqual(task.dl_task_status, 'publish_to_dms')
-        self.assertEqual(task.dl_task_status_dms, '0')
+        self.assertEqual(task.dl_task_status, 'in_transit')
 
         # In transit
         task.dl_task_status = 'in_transit'
-        task.dl_task_status_dms = '1'  # Started
         task.save()
         self.assertEqual(task.dl_task_status, 'in_transit')
 
         # Delivered
         task.dl_task_status = 'delivered'
-        task.dl_task_status_dms = '2'  # Successful
         task.save()
         self.assertEqual(task.dl_task_status, 'delivered')
-        self.assertEqual(task.dl_task_status_dms, '2')
 
     def test_task_rejection(self):
         """Test task rejection"""
         task = DeliveryTask.objects.create(
             dl_task_number='STAT-002',
-            dl_task_number_dms='DMS-STAT-002',
             dl_task_description='Rejection test',
             order=self.order,
             business=self.business,
             dl_task_status='pending',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6'
         )
 
         task.dl_task_status = 'rejected'
-        task.dl_task_status_dms = '8'  # Decline
         task.save()
 
         self.assertEqual(task.dl_task_status, 'rejected')
-        self.assertEqual(task.dl_task_status_dms, '8')
 
     def test_task_cancellation(self):
         """Test task cancellation"""
         task = DeliveryTask.objects.create(
             dl_task_number='STAT-003',
-            dl_task_number_dms='DMS-STAT-003',
             dl_task_description='Cancellation test',
             order=self.order,
             business=self.business,
             dl_task_status='pending',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6'
         )
 
         task.dl_task_status = 'cancelled'
-        task.dl_task_status_dms = '9'  # Cancel
         task.save()
 
         self.assertEqual(task.dl_task_status, 'cancelled')
-        self.assertEqual(task.dl_task_status_dms, '9')
 
 
 class DlAddressUpdateTestCase(TestCase):
@@ -481,19 +460,16 @@ class DriverAssignmentTestCase(TestCase):
         """Test assigning driver to delivery task"""
         task = DeliveryTask.objects.create(
             dl_task_number='ASSIGN-001',
-            dl_task_number_dms='DMS-ASSIGN-001',
             dl_task_description='Assignment test',
             order=self.order,
             business=self.business,
             dl_task_status='pending',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6'
         )
 
         # Assign driver
         task.driver = self.driver1
-        task.dl_task_status = 'publish_to_dms'
-        task.dl_task_status_dms = '0'
+        task.dl_task_status = 'in_transit'
         task.save()
 
         self.assertEqual(task.driver, self.driver1)
@@ -537,14 +513,12 @@ class DriverAssignmentTestCase(TestCase):
 
         task = DeliveryTask.objects.create(
             dl_task_number='ASSIGN-002',
-            dl_task_number_dms='DMS-ASSIGN-002',
             dl_task_description='Reassignment test',
             order=self.order,
             business=self.business,
             driver=self.driver1,
-            dl_task_status='publish_to_dms',
+            dl_task_status='in_transit',
             dl_task_status_client='0',
-            dl_task_status_dms='0'
         )
 
         # Reassign to driver2
@@ -610,13 +584,11 @@ class DMSPushTestCase(TransactionTestCase):
 
         task = DeliveryTask.objects.create(
             dl_task_number='DMS-001',
-            dl_task_number_dms='DMS-001',
             dl_task_description='DMS push test',
             order=self.order,
             business=self.business,
             dl_task_status='pending',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6'
         )
 
         # Signal should trigger DMS push
@@ -726,14 +698,12 @@ class DeliveryTaskPricingTestCase(TestCase):
         """Test assigning delivery price"""
         task = DeliveryTask.objects.create(
             dl_task_number='PRICE-001',
-            dl_task_number_dms='DMS-PRICE-001',
             dl_task_description='Price test',
             order=self.order,
             business=self.business,
             dl_price=25,
             dl_task_status='pending',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6'
         )
 
         self.assertEqual(task.dl_price, 25)
@@ -742,7 +712,6 @@ class DeliveryTaskPricingTestCase(TestCase):
         """Test delivery category and speed options"""
         task = DeliveryTask.objects.create(
             dl_task_number='PRICE-002',
-            dl_task_number_dms='DMS-PRICE-002',
             dl_task_description='Category test',
             order=self.order,
             business=self.business,
@@ -751,7 +720,6 @@ class DeliveryTaskPricingTestCase(TestCase):
             dl_waight=2,
             dl_task_status='pending',
             dl_task_status_client='for_review',
-            dl_task_status_dms='6'
         )
 
         self.assertEqual(task.dl_category, 'Food')

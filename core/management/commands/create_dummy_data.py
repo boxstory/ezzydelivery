@@ -476,14 +476,11 @@ class Command(BaseCommand):
 
         task_statuses = [
             'for_review', 'pending', 'address_pending', 'customer_confiration_pending',
-            'publish_to_dms', 'in_transit', 'delivered', 'delivered', 'cancelled', 'rejected'
+            'in_transit', 'delivered', 'delivered', 'cancelled', 'rejected'
         ]
-
-        dms_statuses = ['0', '1', '2', '2', '3', '4', '6', '7', '8', '9']
 
         for i, order in enumerate(orders):
             task_status = task_statuses[i % len(task_statuses)]
-            dms_status = dms_statuses[i % len(dms_statuses)]
             zone = random.choice(QATAR_ZONES)
 
             # Create delivery address
@@ -514,10 +511,9 @@ class Command(BaseCommand):
                     'business': business,
                     'pickup_location': order.pickup_location,
                     'driver': driver if task_status in ['in_transit', 'delivered'] else None,
-                    'dl_task_publish': task_status in ['publish_to_dms', 'in_transit', 'delivered'],
+                    'dl_task_publish': task_status in ['in_transit', 'delivered'],
                     'dl_task_description': f'Delivery for order {order.order_number}',
                     'dl_task_status': task_status,
-                    'dl_task_status_dms': dms_status,
                     'dl_task_date': timezone.now().date() + timedelta(days=random.randint(0, 3)),
                     'dl_address_update': dl_address,
                     'dl_to_address': dl_address,

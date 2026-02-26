@@ -619,8 +619,8 @@ class WalletService:
             total_deliveries=Count('id'),
             total_earnings=Sum('driver_earnings'),
             total_cod_collected=Sum('cod_collected_amount'),
-            successful=Count('id', filter=Q(dl_task_status_dms='2')),
-            failed=Count('id', filter=Q(dl_task_status_dms='3'))
+            successful=Count('id', filter=Q(dl_task_status='delivered')),
+            failed=Count('id', filter=Q(dl_task_status='failed'))
         )
 
         return {
