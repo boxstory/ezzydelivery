@@ -431,10 +431,10 @@
 }
 
 /* ============================================================================
-   KANBAN BOARD VIEW
+   KANBAN BOARD VIEW (okb = order kanban board)
    ============================================================================ */
 
-.kanban-board {
+.okb {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: var(--ez-space-4);
@@ -443,13 +443,13 @@
 }
 
 @media (min-width: 1200px) {
-  .kanban-board {
+  .okb {
     grid-template-columns: repeat(4, 1fr);
   }
 }
 
 /* Kanban Column */
-.kanban-column {
+.okb__column {
   background: var(--ez-grey-100);
   border-radius: var(--ez-radius-xl);
   padding: var(--ez-space-4);
@@ -458,7 +458,7 @@
   flex-direction: column;
 }
 
-.kanban-column__header {
+.okb__col-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -467,7 +467,7 @@
   border-bottom: 2px solid var(--ez-grey-300);
 }
 
-.kanban-column__title {
+.okb__col-title {
   font-size: var(--ez-font-lg);
   font-weight: var(--ez-font-weight-bold);
   color: var(--ez-grey-800);
@@ -476,7 +476,7 @@
   gap: var(--ez-space-2);
 }
 
-.kanban-column__count {
+.okb__col-count {
   background: var(--ez-navy-500);
   color: var(--ez-white);
   border-radius: var(--ez-radius-full);
@@ -488,24 +488,24 @@
 }
 
 /* Kanban Column Color Variations */
-.kanban-column--review {
+.okb__column--review {
   border-top: 4px solid var(--ez-warning);
 }
 
-.kanban-column--confirmed {
+.okb__column--confirmed {
   border-top: 4px solid var(--ez-info);
 }
 
-.kanban-column--published {
+.okb__column--published {
   border-top: 4px solid var(--ez-success);
 }
 
-.kanban-column--cancelled {
+.okb__column--cancelled {
   border-top: 4px solid var(--ez-error);
 }
 
 /* Kanban Card Container */
-.kanban-cards {
+.okb__cards {
   flex: 1;
   overflow-y: auto;
   display: flex;
@@ -514,7 +514,7 @@
 }
 
 /* Kanban Card */
-.kanban-card {
+.okb__card {
   background: var(--ez-white);
   border-radius: var(--ez-radius-lg);
   padding: var(--ez-space-4);
@@ -524,34 +524,34 @@
   border-left: 4px solid var(--ez-grey-300);
 }
 
-.kanban-card:hover {
+.okb__card:hover {
   box-shadow: var(--ez-shadow-md);
   transform: translateY(-2px);
 }
 
-.kanban-card:active {
+.okb__card:active {
   cursor: grabbing;
 }
 
-.kanban-card--dragging {
+.okb__card--dragging {
   opacity: 0.5;
   cursor: grabbing;
 }
 
-.kanban-card__header {
+.okb__card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: var(--ez-space-3);
 }
 
-.kanban-card__number {
+.okb__card-number {
   font-weight: var(--ez-font-weight-bold);
   color: var(--ez-navy-500);
   font-size: var(--ez-font-base);
 }
 
-.kanban-card__badge {
+.okb__card-badge {
   padding: var(--ez-space-1) var(--ez-space-2);
   border-radius: var(--ez-radius-sm);
   font-size: var(--ez-font-xs);
@@ -560,21 +560,21 @@
   color: var(--ez-grey-700);
 }
 
-.kanban-card__customer {
+.okb__card-customer {
   font-size: var(--ez-font-base);
   font-weight: var(--ez-font-weight-semibold);
   color: var(--ez-grey-800);
   margin-bottom: var(--ez-space-2);
 }
 
-.kanban-card__meta {
+.okb__card-meta {
   display: flex;
   flex-direction: column;
   gap: var(--ez-space-1);
   margin-bottom: var(--ez-space-3);
 }
 
-.kanban-card__meta-item {
+.okb__card-meta-item {
   display: flex;
   align-items: center;
   gap: var(--ez-space-2);
@@ -582,13 +582,13 @@
   color: var(--ez-grey-600);
 }
 
-.kanban-card__meta-item i {
+.okb__card-meta-item i {
   color: var(--ez-grey-400);
   width: 16px;
   text-align: center;
 }
 
-.kanban-card__footer {
+.okb__card-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -596,27 +596,27 @@
   border-top: 1px solid var(--ez-grey-200);
 }
 
-.kanban-card__cod {
+.okb__card-cod {
   font-weight: var(--ez-font-weight-bold);
   color: var(--ez-error);
   font-size: var(--ez-font-base);
 }
 
-.kanban-card__date {
+.okb__card-date {
   font-size: var(--ez-font-xs);
   color: var(--ez-grey-500);
 }
 
 /* ============================================================================
-   ORDER TIMELINE
+   ORDER TIMELINE (otl = order timeline)
    ============================================================================ */
 
-.order-timeline {
+.otl {
   position: relative;
   padding: var(--ez-space-6) 0;
 }
 
-.order-timeline::before {
+.otl::before {
   content: '';
   position: absolute;
   left: 24px;
@@ -626,17 +626,17 @@
   background: var(--ez-grey-200);
 }
 
-.timeline-item {
+.otl__item {
   position: relative;
   padding-left: var(--ez-space-16);
   padding-bottom: var(--ez-space-6);
 }
 
-.timeline-item:last-child {
+.otl__item:last-child {
   padding-bottom: 0;
 }
 
-.timeline-item__icon {
+.otl__item-icon {
   position: absolute;
   left: 0;
   width: 48px;
@@ -652,20 +652,20 @@
   z-index: 1;
 }
 
-.timeline-item--active .timeline-item__icon {
+.otl__item--active .otl__item-icon {
   background: var(--ez-primary-500);
   border-color: var(--ez-primary-500);
   color: var(--ez-navy-500);
   box-shadow: var(--ez-shadow-glow-yellow);
 }
 
-.timeline-item--completed .timeline-item__icon {
+.otl__item--completed .otl__item-icon {
   background: var(--ez-success);
   border-color: var(--ez-success);
   color: var(--ez-white);
 }
 
-.timeline-item__content {
+.otl__item-content {
   background: var(--ez-white);
   border-radius: var(--ez-radius-lg);
   padding: var(--ez-space-4);
@@ -673,26 +673,26 @@
   border: 1px solid var(--ez-grey-200);
 }
 
-.timeline-item__header {
+.otl__item-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: var(--ez-space-2);
 }
 
-.timeline-item__title {
+.otl__item-title {
   font-weight: var(--ez-font-weight-bold);
   color: var(--ez-grey-800);
   font-size: var(--ez-font-base);
 }
 
-.timeline-item__time {
+.otl__item-time {
   font-size: var(--ez-font-xs);
   color: var(--ez-grey-500);
   white-space: nowrap;
 }
 
-.timeline-item__description {
+.otl__item-desc {
   font-size: var(--ez-font-sm);
   color: var(--ez-grey-600);
   line-height: var(--ez-line-height-relaxed);
@@ -728,11 +728,11 @@
     font-size: var(--ez-font-xl);
   }
 
-  .kanban-board {
+  .okb {
     grid-template-columns: 1fr;
   }
 
-  .kanban-column {
+  .okb__column {
     min-height: auto;
   }
 
@@ -768,7 +768,7 @@
     border-width: 4px;
   }
 
-  .kanban-card {
+  .okb__card {
     border-width: 2px;
   }
 }
@@ -781,7 +781,7 @@
   }
 
   .wizard-step__circle,
-  .kanban-card,
+  .okb__card,
   .wizard-btn {
     transform: none !important;
   }

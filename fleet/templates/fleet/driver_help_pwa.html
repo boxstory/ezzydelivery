@@ -19,7 +19,7 @@
 {% block content %}
 
 <!-- Contact Card -->
-<div class="fleet-card fade-in">
+<div class="fleet-card fleet-fade-in">
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">
             <i class="fa-solid fa-headset me-2"></i>
@@ -48,7 +48,7 @@
 </div>
 
 <!-- FAQ -->
-<div class="fleet-card slide-up" style="animation-delay:0.1s;">
+<div class="fleet-card fleet-slide-up" style="animation-delay:0.1s;">
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">
             <i class="fa-solid fa-circle-question me-2"></i>
@@ -57,17 +57,12 @@
     </div>
     <div class="fleet-card__body" style="padding:0;">
         {% for faq in faqs %}
-        <details class="faq-item" style="border-bottom:{% if not forloop.last %}1px solid var(--fleet-grey-100){% else %}none{% endif %};">
-            <summary style="padding:var(--spacing-md) var(--spacing-lg);
-                           font-size:var(--font-size-sm); font-weight:700;
-                           color:var(--fleet-dark); cursor:pointer; list-style:none;
-                           display:flex; align-items:center; justify-content:space-between; gap:var(--spacing-sm);">
+        <details class="fhp__faq-item">
+            <summary class="fhp__faq-summary">
                 <span>{{ faq.question }}</span>
-                <i class="fa-solid fa-chevron-down faq-chevron"
-                   style="font-size:var(--font-size-xs); color:var(--fleet-grey-400); flex-shrink:0; transition:transform var(--transition-base);"></i>
+                <i class="fa-solid fa-chevron-down fhp__faq-chevron"></i>
             </summary>
-            <div style="padding:0 var(--spacing-lg) var(--spacing-md);
-                        font-size:var(--font-size-sm); color:var(--fleet-grey-700); line-height:1.6;">
+            <div class="fhp__faq-answer">
                 {{ faq.answer }}
             </div>
         </details>
@@ -76,7 +71,7 @@
 </div>
 
 <!-- Quick Links -->
-<div class="fleet-card slide-up" style="animation-delay:0.2s;">
+<div class="fleet-card fleet-slide-up" style="animation-delay:0.2s;">
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">
             <i class="fa-solid fa-link me-2"></i>
@@ -146,13 +141,5 @@
     EzzyDelivery Driver App v1.0.0
 </div>
 
-{% block extra_css %}
-<style>
-    details.faq-item[open] .faq-chevron {
-        transform: rotate(180deg);
-    }
-    details.faq-item summary::-webkit-details-marker { display: none; }
-</style>
-{% endblock %}
 
 {% endblock %}

@@ -22,7 +22,7 @@
 <div id="fleet-nav-map"></div>
 
 <!-- Task Summary Card -->
-<div class="fleet-card fade-in" style="margin-top: var(--spacing-lg);">
+<div class="fleet-card fleet-fade-in" style="margin-top: var(--spacing-lg);">
     <div class="fleet-card__header">
         <div style="display:flex; align-items:center; gap:var(--spacing-sm);">
             <div style="width:36px; height:36px; border-radius:var(--radius-sm);
@@ -157,13 +157,13 @@
 {% endif %}
 
 <!-- Status Update Bottom Sheet Overlay -->
-<div id="statusOverlay" class="filter-overlay" onclick="closeStatusSheet()"></div>
+<div id="statusOverlay" class="fleet-filter-overlay" onclick="closeStatusSheet()"></div>
 
 <!-- Status Update Bottom Sheet -->
-<div id="statusSheet" class="filter-modal">
-    <div class="filter-modal__handle"></div>
-    <div class="filter-modal__header">
-        <h3 class="filter-modal__title">
+<div id="statusSheet" class="fleet-filter-modal">
+    <div class="fleet-filter-modal__handle"></div>
+    <div class="fleet-filter-modal__header">
+        <h3 class="fleet-filter-modal__title">
             <i class="fa-solid fa-list-check me-2"></i>Update Status
         </h3>
         <button type="button" onclick="closeStatusSheet()" class="fleet-btn-icon" style="width:32px;height:32px;">
@@ -280,21 +280,21 @@
 
 <!-- Task Activity Log -->
 {% if task_status_history %}
-<div class="fleet-card fade-in" style="margin-top: var(--spacing-lg);">
+<div class="fleet-card fleet-fade-in" style="margin-top: var(--spacing-lg);">
     <div class="fleet-card__header">
         <h3 class="fleet-card__title"><i class="fa-solid fa-timeline me-2" style="color:var(--fleet-primary);"></i>Task History</h3>
     </div>
     <div class="fleet-card__body" style="padding-top:0;">
-        <ul class="task-history-list">
+        <ul class="task-history">
             {% for entry in task_status_history %}
-            <li class="task-history-item">
+            <li class="task-history__item">
                 <!-- Timeline dot -->
-                <div class="task-history-dot
-                    {% if entry.field_name == 'dl_task_publish' %}task-history-dot--publish
-                    {% elif entry.new_value == 'delivered' %}task-history-dot--success
-                    {% elif entry.new_value == 'failed' %}task-history-dot--danger
-                    {% elif entry.new_value in 'accepted,picked_up' %}task-history-dot--info
-                    {% else %}task-history-dot--default{% endif %}">
+                <div class="task-history__dot
+                    {% if entry.field_name == 'dl_task_publish' %}task-history__dot--publish
+                    {% elif entry.new_value == 'delivered' %}task-history__dot--success
+                    {% elif entry.new_value == 'failed' %}task-history__dot--danger
+                    {% elif entry.new_value in 'accepted,picked_up' %}task-history__dot--info
+                    {% else %}task-history__dot--default{% endif %}">
                     {% if entry.field_name == 'dl_task_publish' %}
                     <i class="fa-solid fa-rocket"></i>
                     {% elif entry.new_value == 'delivered' %}
@@ -316,17 +316,17 @@
                     {% endif %}
                 </div>
                 <!-- Content -->
-                <div class="task-history-content">
-                    <div class="task-history-title">{{ entry.new_display }}</div>
-                    <div class="task-history-meta">
+                <div class="task-history__content">
+                    <div class="task-history__title">{{ entry.new_display }}</div>
+                    <div class="task-history__meta">
                         {{ entry.created_at|timesince }} ago
                         {% if entry.changed_by %}
-                        · <span class="task-history-by">{{ entry.changed_by.get_full_name|default:entry.changed_by.username }}</span>
+                        · <span class="task-history__by">{{ entry.changed_by.get_full_name|default:entry.changed_by.username }}</span>
                         {% endif %}
                     </div>
                 </div>
                 <!-- Time -->
-                <div class="task-history-time">{{ entry.created_at|date:"H:i" }}</div>
+                <div class="task-history__time">{{ entry.created_at|date:"H:i" }}</div>
             </li>
             {% endfor %}
         </ul>
@@ -374,13 +374,13 @@
     }
 
     /* Task Activity Timeline */
-    .task-history-list {
+    .task-history {
         list-style: none;
         margin: 0;
         padding: var(--spacing-sm) 0 0;
         position: relative;
     }
-    .task-history-list::before {
+    .task-history::before {
         content: '';
         position: absolute;
         left: 15px;
@@ -389,14 +389,14 @@
         width: 2px;
         background: var(--fleet-grey-100);
     }
-    .task-history-item {
+    .task-history__item {
         display: flex;
         align-items: flex-start;
         gap: var(--spacing-sm);
         padding: 6px 0 6px var(--spacing-xs);
         position: relative;
     }
-    .task-history-dot {
+    .task-history__dot {
         width: 30px;
         height: 30px;
         border-radius: 50%;
@@ -408,31 +408,31 @@
         position: relative;
         z-index: 1;
     }
-    .task-history-dot--publish  { background: #ede9fe; color: #7c3aed; }
-    .task-history-dot--success  { background: #dcfce7; color: #16a34a; }
-    .task-history-dot--danger   { background: #fee2e2; color: #dc2626; }
-    .task-history-dot--info     { background: #dbeafe; color: #2563eb; }
-    .task-history-dot--default  { background: var(--fleet-grey-100); color: var(--fleet-grey-500); }
-    .task-history-content {
+    .task-history__dot--publish  { background: #ede9fe; color: #7c3aed; }
+    .task-history__dot--success  { background: #dcfce7; color: #16a34a; }
+    .task-history__dot--danger   { background: #fee2e2; color: #dc2626; }
+    .task-history__dot--info     { background: #dbeafe; color: #2563eb; }
+    .task-history__dot--default  { background: var(--fleet-grey-100); color: var(--fleet-grey-500); }
+    .task-history__content {
         flex: 1;
         padding-top: 4px;
     }
-    .task-history-title {
+    .task-history__title {
         font-size: var(--font-size-sm);
         font-weight: 700;
         color: var(--fleet-dark);
         line-height: 1.2;
     }
-    .task-history-meta {
+    .task-history__meta {
         font-size: var(--font-size-xs);
         color: var(--fleet-grey-400);
         margin-top: 2px;
     }
-    .task-history-by {
+    .task-history__by {
         color: var(--fleet-primary);
         font-weight: 600;
     }
-    .task-history-time {
+    .task-history__time {
         font-size: var(--font-size-xs);
         color: var(--fleet-grey-400);
         font-weight: 600;

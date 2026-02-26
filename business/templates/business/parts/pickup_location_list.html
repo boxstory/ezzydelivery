@@ -2,27 +2,27 @@
 {% load static %}
 
 {% block content %}
-<div class="col-12 pkl" id="client_location_list_container_main">
+<div class="col-12 bpl-list" id="client_location_list_container_main">
 
 <!-- Hero Header -->
-<div class="pkl__hero">
+<div class="bpl-list__hero">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div class="d-flex align-items-center gap-3">
-            <div class="pkl__hero-icon">
+            <div class="bpl-list__hero-icon">
                 <i class="fa-solid fa-location-dot"></i>
             </div>
             <div>
-                <h1 class="pkl__hero-title">Store Locations</h1>
-                <p class="pkl__hero-sub">Manage pickup and delivery points</p>
+                <h1 class="bpl-list__hero-title">Store Locations</h1>
+                <p class="bpl-list__hero-sub">Manage pickup and delivery points</p>
             </div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
             {% if fulfillment_enabled %}
-            <a href="{% url 'warehouse:seller_warehouse_link_add' %}" class="pkl__btn pkl__btn--fulfillment" id="client_location_list_btn_fulfillment">
+            <a href="{% url 'warehouse:seller_warehouse_link_add' %}" class="bpl-list__btn bpl-list__btn--fulfillment" id="client_location_list_btn_fulfillment">
                 <i class="fa-solid fa-warehouse"></i> Link Fulfillment Store
             </a>
             {% endif %}
-            <a href="{% url 'business:pickup_location_add' %}" class="pkl__btn pkl__btn--add" id="client_location_list_btn_new">
+            <a href="{% url 'business:pickup_location_add' %}" class="bpl-list__btn bpl-list__btn--add" id="client_location_list_btn_new">
                 <i class="fa-solid fa-plus"></i> Add Location
             </a>
         </div>
@@ -30,7 +30,7 @@
 </div>
 
 <!-- Info Callout -->
-<div class="pkl__callout">
+<div class="bpl-list__callout">
     <i class="fa-solid fa-circle-info"></i>
     <span>Add multiple pickup locations for your store. Customers can choose where to collect orders or request delivery from these locations.</span>
 </div>
@@ -40,70 +40,70 @@
 
     <!-- Warehouse Locations -->
     {% if warehouse_locations %}
-    <div class="pkl__group">
-        <div class="pkl__section-head">
+    <div class="bpl-list__group">
+        <div class="bpl-list__section-head">
             <i class="fa-solid fa-warehouse"></i>
             <span>Fulfillment Center Locations</span>
-            <span class="pkl__section-count">{{ warehouse_locations|length }}</span>
+            <span class="bpl-list__section-count">{{ warehouse_locations|length }}</span>
         </div>
-        <div class="pkl__grid" id="client_warehouse_locations_grid">
+        <div class="bpl-list__grid" id="client_warehouse_locations_grid">
             {% for wh_loc in warehouse_locations %}
-            <div class="pkl__card pkl__card--warehouse" id="client_warehouse_location_card_{{ wh_loc.id }}">
-                <div class="pkl__card__head">
+            <div class="bpl-list__card bpl-list__card--warehouse" id="client_warehouse_location_card_{{ wh_loc.id }}">
+                <div class="bpl-list__card__head">
                     <div class="d-flex align-items-center gap-2">
-                        <div class="pkl__avatar pkl__avatar--warehouse">
+                        <div class="bpl-list__avatar bpl-list__avatar--warehouse">
                             <i class="fa-solid fa-warehouse"></i>
                         </div>
                         <div>
-                            <span class="pkl__card-name">{{ wh_loc.warehouse.name }} - {{ wh_loc.name }}</span>
+                            <span class="bpl-list__card-name">{{ wh_loc.warehouse.name }} - {{ wh_loc.name }}</span>
                             {% if wh_loc.is_default %}
-                            <span class="pkl__tag pkl__tag--gold"><i class="fa-solid fa-star"></i> Default</span>
+                            <span class="bpl-list__tag bpl-list__tag--gold"><i class="fa-solid fa-star"></i> Default</span>
                             {% endif %}
                         </div>
                     </div>
                     {% if wh_loc.is_active %}
-                    <span class="pkl__status pkl__status--ok"><i class="fa-solid fa-circle-check"></i> Active</span>
+                    <span class="bpl-list__status bpl-list__status--ok"><i class="fa-solid fa-circle-check"></i> Active</span>
                     {% else %}
-                    <span class="pkl__status pkl__status--muted"><i class="fa-solid fa-circle-minus"></i> Inactive</span>
+                    <span class="bpl-list__status bpl-list__status--muted"><i class="fa-solid fa-circle-minus"></i> Inactive</span>
                     {% endif %}
                 </div>
 
                 {% if wh_loc.address %}
-                <div class="pkl__address">
+                <div class="bpl-list__address">
                     <i class="fa-solid fa-map-location-dot"></i> {{ wh_loc.address }}
                 </div>
                 {% endif %}
 
-                <div class="pkl__fields">
-                    <div class="pkl__field">
-                        <span class="pkl__field__label">Warehouse Code</span>
-                        <span class="pkl__field__value"><code class="pkl__code">{{ wh_loc.warehouse.code }}</code></span>
+                <div class="bpl-list__fields">
+                    <div class="bpl-list__field">
+                        <span class="bpl-list__field__label">Warehouse Code</span>
+                        <span class="bpl-list__field__value"><code class="bpl-list__code">{{ wh_loc.warehouse.code }}</code></span>
                     </div>
-                    <div class="pkl__field">
-                        <span class="pkl__field__label">Location Code</span>
-                        <span class="pkl__field__value"><code class="pkl__code">{{ wh_loc.code }}</code></span>
+                    <div class="bpl-list__field">
+                        <span class="bpl-list__field__label">Location Code</span>
+                        <span class="bpl-list__field__value"><code class="bpl-list__code">{{ wh_loc.code }}</code></span>
                     </div>
                     {% if wh_loc.zone_number %}
-                    <div class="pkl__field">
-                        <span class="pkl__field__label">Zone</span>
-                        <span class="pkl__field__value">{{ wh_loc.zone_number }}</span>
+                    <div class="bpl-list__field">
+                        <span class="bpl-list__field__label">Zone</span>
+                        <span class="bpl-list__field__value">{{ wh_loc.zone_number }}</span>
                     </div>
                     {% endif %}
                     {% if wh_loc.operating_hours %}
-                    <div class="pkl__field">
-                        <span class="pkl__field__label">Hours</span>
-                        <span class="pkl__field__value">{{ wh_loc.operating_hours }}</span>
+                    <div class="bpl-list__field">
+                        <span class="bpl-list__field__label">Hours</span>
+                        <span class="bpl-list__field__value">{{ wh_loc.operating_hours }}</span>
                     </div>
                     {% endif %}
                 </div>
 
                 {% if wh_loc.notes %}
-                <div class="pkl__note">
+                <div class="bpl-list__note">
                     <i class="fa-solid fa-info-circle"></i> {{ wh_loc.notes }}
                 </div>
                 {% endif %}
 
-                <div class="pkl__card__foot pkl__card__foot--managed">
+                <div class="bpl-list__card__foot bpl-list__card__foot--managed">
                     <i class="fa-solid fa-building"></i> Managed by Warehouse Team
                 </div>
             </div>
@@ -114,76 +114,76 @@
 
     <!-- Store Pickup Locations -->
     {% if stores %}
-    <div class="pkl__group">
-        <div class="pkl__section-head">
+    <div class="bpl-list__group">
+        <div class="bpl-list__section-head">
             <i class="fa-solid fa-store"></i>
             <span>Your Store Locations</span>
-            <span class="pkl__section-count">{{ stores|length }}</span>
+            <span class="bpl-list__section-count">{{ stores|length }}</span>
         </div>
-        <div class="pkl__grid" id="client_location_list_grid">
+        <div class="bpl-list__grid" id="client_location_list_grid">
             {% for store in stores %}
-            <div class="pkl__card" id="client_location_list_card_{{ store.id }}">
-                <div class="pkl__card__head">
+            <div class="bpl-list__card" id="client_location_list_card_{{ store.id }}">
+                <div class="bpl-list__card__head">
                     <div class="d-flex align-items-center gap-2">
-                        <div class="pkl__avatar">
+                        <div class="bpl-list__avatar">
                             <i class="fa-solid fa-store"></i>
                         </div>
-                        <span class="pkl__card-name">{{ store.pickup_location_title }}</span>
+                        <span class="bpl-list__card-name">{{ store.pickup_location_title }}</span>
                     </div>
                     {% if store.pickup_status == 'active' %}
-                    <span class="pkl__status pkl__status--ok"><i class="fa-solid fa-circle-check"></i> Active</span>
+                    <span class="bpl-list__status bpl-list__status--ok"><i class="fa-solid fa-circle-check"></i> Active</span>
                     {% else %}
-                    <span class="pkl__status pkl__status--muted"><i class="fa-solid fa-circle-minus"></i> Inactive</span>
+                    <span class="bpl-list__status bpl-list__status--muted"><i class="fa-solid fa-circle-minus"></i> Inactive</span>
                     {% endif %}
                 </div>
 
                 <!-- Map Link -->
                 {% if store.google_maps_link %}
-                <a href="{{ store.google_maps_link }}" target="_blank" class="pkl__map-link">
+                <a href="{{ store.google_maps_link }}" target="_blank" class="bpl-list__map-link">
                     <i class="fa-solid fa-map-location-dot"></i>
                     {{ store.locality|default:"View on Google Maps" }}
-                    <i class="fa-solid fa-arrow-up-right-from-square pkl__map-link__ext"></i>
+                    <i class="fa-solid fa-arrow-up-right-from-square bpl-list__map-link__ext"></i>
                 </a>
                 {% elif store.locality %}
-                <a href="https://maps.google.com/?q={{ store.locality }}" target="_blank" class="pkl__map-link">
+                <a href="https://maps.google.com/?q={{ store.locality }}" target="_blank" class="bpl-list__map-link">
                     <i class="fa-solid fa-map-location-dot"></i>
                     {{ store.locality }}
-                    <i class="fa-solid fa-arrow-up-right-from-square pkl__map-link__ext"></i>
+                    <i class="fa-solid fa-arrow-up-right-from-square bpl-list__map-link__ext"></i>
                 </a>
                 {% endif %}
 
                 <!-- Address Fields -->
-                <div class="pkl__fields">
-                    <div class="pkl__field">
-                        <span class="pkl__field__label">Building No</span>
-                        <span class="pkl__field__value">{{ store.pickup_building_no|default:"—" }}</span>
+                <div class="bpl-list__fields">
+                    <div class="bpl-list__field">
+                        <span class="bpl-list__field__label">Building No</span>
+                        <span class="bpl-list__field__value">{{ store.pickup_building_no|default:"—" }}</span>
                     </div>
-                    <div class="pkl__field">
-                        <span class="pkl__field__label">Zone No</span>
-                        <span class="pkl__field__value">{{ store.pickup_zone_no|default:"—" }}</span>
+                    <div class="bpl-list__field">
+                        <span class="bpl-list__field__label">Zone No</span>
+                        <span class="bpl-list__field__value">{{ store.pickup_zone_no|default:"—" }}</span>
                     </div>
-                    <div class="pkl__field">
-                        <span class="pkl__field__label">Street</span>
-                        <span class="pkl__field__value">{{ store.pickup_street_no|default:"—" }}</span>
+                    <div class="bpl-list__field">
+                        <span class="bpl-list__field__label">Street</span>
+                        <span class="bpl-list__field__value">{{ store.pickup_street_no|default:"—" }}</span>
                     </div>
-                    <div class="pkl__field">
-                        <span class="pkl__field__label">Area</span>
-                        <span class="pkl__field__value">{{ store.locality|default:"—" }}</span>
+                    <div class="bpl-list__field">
+                        <span class="bpl-list__field__label">Area</span>
+                        <span class="bpl-list__field__value">{{ store.locality|default:"—" }}</span>
                     </div>
                 </div>
 
                 <!-- Actions -->
-                <div class="pkl__card__foot">
-                    <a href="{% url 'orders:pick_from_here' store.id %}" class="pkl__act pkl__act--pick">
+                <div class="bpl-list__card__foot">
+                    <a href="{% url 'orders:pick_from_here' store.id %}" class="bpl-list__act bpl-list__act--pick">
                         <i class="fa-solid fa-box"></i> Pick
                     </a>
-                    <a href="{% url 'orders:deliver_to_here' store.id %}" class="pkl__act pkl__act--deliver">
+                    <a href="{% url 'orders:deliver_to_here' store.id %}" class="bpl-list__act bpl-list__act--deliver">
                         <i class="fa-solid fa-truck-fast"></i> Deliver
                     </a>
-                    <a href="{% url 'business:pickup_location_update' store.id %}" class="pkl__act pkl__act--edit">
+                    <a href="{% url 'business:pickup_location_update' store.id %}" class="bpl-list__act bpl-list__act--edit">
                         <i class="fa-solid fa-pen"></i> Edit
                     </a>
-                    <a href="{% url 'business:pickup_location_delete' store.id %}" class="pkl__act pkl__act--del"
+                    <a href="{% url 'business:pickup_location_delete' store.id %}" class="bpl-list__act bpl-list__act--del"
                        onclick="return confirm('Are you sure you want to delete this location?')">
                         <i class="fa-solid fa-trash"></i>
                     </a>
@@ -196,11 +196,11 @@
 
 {% else %}
     <!-- Empty State -->
-    <div class="pkl__empty" id="client_location_list_empty">
-        <div class="pkl__empty__icon"><i class="fa-solid fa-map-marker-alt"></i></div>
-        <h3 class="pkl__empty__title">No Locations Added Yet</h3>
-        <p class="pkl__empty__text">Add your first pickup location to start managing deliveries</p>
-        <a href="{% url 'business:pickup_location_add' %}" class="pkl__btn pkl__btn--add">
+    <div class="bpl-list__empty" id="client_location_list_empty">
+        <div class="bpl-list__empty__icon"><i class="fa-solid fa-map-marker-alt"></i></div>
+        <h3 class="bpl-list__empty__title">No Locations Added Yet</h3>
+        <p class="bpl-list__empty__text">Add your first pickup location to start managing deliveries</p>
+        <a href="{% url 'business:pickup_location_add' %}" class="bpl-list__btn bpl-list__btn--add">
             <i class="fa-solid fa-plus"></i> Add Your First Location
         </a>
     </div>

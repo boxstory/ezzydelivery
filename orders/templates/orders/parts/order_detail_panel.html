@@ -5,7 +5,7 @@
   <div class="odp__hero">
     <div class="odp__hero-main">
       <span class="odp__order-num">#{{ order.order_number }}</span>
-      <span class="ob ob--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
+      <span class="ob__ ob__--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
     </div>
     <div class="odp__hero-meta">
       <span class="odp__meta-item">
@@ -105,7 +105,7 @@
         <span class="odp__cod-value">{{ order.cod_amount }}</span>
       </div>
       <div class="odp__cod-status">
-        <span class="ob ob--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
+        <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
           <i class="fa-solid {% if order.cod_status_by_staff == 'fully_paid' %}fa-check{% elif order.cod_status_by_staff == 'partially_collected' %}fa-adjust{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}fa-handshake{% else %}fa-hourglass-half{% endif %}"></i>
           {% if order.cod_status_by_staff == 'fully_paid' %}Collected{% elif order.cod_status_by_staff == 'partially_collected' %}Partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}Settled{% else %}Pending{% endif %}
         </span>
@@ -149,7 +149,7 @@
     </div>
     <div class="odp__delivery">
       <div class="odp__dl-status-row">
-        <span class="ob ob--dl-{{ delivery_task.dl_task_status }}">
+        <span class="ob__ ob__--dl-{{ delivery_task.dl_task_status }}">
           <i class="fa-solid {% if delivery_task.dl_task_status == 'delivered' %}fa-check{% elif delivery_task.dl_task_status == 'assigned' %}fa-user{% elif delivery_task.dl_task_status == 'accepted' %}fa-user-check{% elif delivery_task.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery_task.dl_task_status == 'out_for_delivery' or delivery_task.dl_task_status == 'in_transit' or delivery_task.dl_task_status == 'start_ride' %}fa-truck{% elif delivery_task.dl_task_status == 'failed' or delivery_task.dl_task_status == 'non_reachable' %}fa-times{% elif delivery_task.dl_task_status == 'cancelled' or delivery_task.dl_task_status == 'rejected' %}fa-ban{% else %}fa-clock{% endif %}"></i>
           {{ delivery_task.get_dl_task_status_display }}
         </span>

@@ -8,64 +8,64 @@
 {% endblock %}
 
 {% block content %}
-<div class="verification-container" id="orders_verify_location_container_main">
-    <div class="verification-card" id="orders_verify_location_card_main">
-        <div class="verification-header" id="orders_verify_location_header">
-            <i class="fa-solid fa-map-location-dot verify-title"></i>
+<div class="ulv__container" id="orders_verify_location_container_main">
+    <div class="ulv__card" id="orders_verify_location_card_main">
+        <div class="ulv__header" id="orders_verify_location_header">
+            <i class="fa-solid fa-map-location-dot ulv__title-icon"></i>
             <h1>Verify Your Delivery Location</h1>
             <p>Order #{{ order.order_number }}</p>
         </div>
 
-        <div class="order-info" id="orders_verify_location_section_order_info">
-            <h2 class="verify-section-title">
+        <div class="ulv__order-info" id="orders_verify_location_section_order_info">
+            <h2 class="ulv__section-title">
                 Order Details
             </h2>
-            <div class="info-grid">
-                <div class="info-item">
-                    <div class="info-icon">
+            <div class="ulv__info-grid">
+                <div class="ulv__info-item">
+                    <div class="ulv__info-icon">
                         <i class="fa-solid fa-user"></i>
                     </div>
-                    <div class="info-content">
+                    <div class="ulv__info-content">
                         <h3>Customer Name</h3>
                         <p>{{ order.customer_name }}</p>
                     </div>
                 </div>
 
-                <div class="info-item">
-                    <div class="info-icon">
+                <div class="ulv__info-item">
+                    <div class="ulv__info-icon">
                         <i class="fa-solid fa-phone"></i>
                     </div>
-                    <div class="info-content">
+                    <div class="ulv__info-content">
                         <h3>Phone Number</h3>
                         <p>{{ order.customer_phone }}</p>
                     </div>
                 </div>
 
-                <div class="info-item">
-                    <div class="info-icon">
+                <div class="ulv__info-item">
+                    <div class="ulv__info-icon">
                         <i class="fa-solid fa-box"></i>
                     </div>
-                    <div class="info-content">
+                    <div class="ulv__info-content">
                         <h3>Items</h3>
                         <p>{{ order.order_items.count }} item(s)</p>
                     </div>
                 </div>
 
-                <div class="info-item">
-                    <div class="info-icon">
+                <div class="ulv__info-item">
+                    <div class="ulv__info-icon">
                         <i class="fa-solid fa-money-bill-wave"></i>
                     </div>
-                    <div class="info-content">
+                    <div class="ulv__info-content">
                         <h3>COD Amount</h3>
                         <p>{{ order.cod_amount }} QR</p>
                     </div>
                 </div>
 
-                <div class="info-item full-width-column">
-                    <div class="info-icon">
+                <div class="ulv__info-item ulv__info-item--full">
+                    <div class="ulv__info-icon">
                         <i class="fa-solid fa-location-dot"></i>
                     </div>
-                    <div class="info-content">
+                    <div class="ulv__info-content">
                         <h3>Current Address</h3>
                         <p>{{ address_verification.original_address }}</p>
                     </div>
@@ -73,8 +73,8 @@
             </div>
         </div>
 
-        <div class="map-section" id="orders_verify_location_section_map">
-            <div class="instructions" id="orders_verify_location_card_instructions">
+        <div class="ulv__map-section" id="orders_verify_location_section_map">
+            <div class="ulv__instructions" id="orders_verify_location_card_instructions">
                 <h3><i class="fa-solid fa-circle-info"></i> How to verify your location:</h3>
                 <ul>
                     <li>
@@ -96,28 +96,28 @@
                 </ul>
             </div>
 
-            <div class="map-container">
+            <div class="ulv__map-box">
                 <div id="map"></div>
             </div>
-            <button type="button" class="btn-get-location" id="orders_verify_location_btn_geolocation" onclick="getMyLocation()">
+            <button type="button" class="ulv__btn-geolocate" id="orders_verify_location_btn_geolocation" onclick="getMyLocation()">
                 <i class="fa-solid fa-crosshairs me-2"></i>
                 Get My Location
             </button>
         </div>
 
-        <form method="post" id="orders_verify_location_form_main" class="form-section" novalidate>
+        <form method="post" id="orders_verify_location_form_main" class="ulv__form-section" novalidate>
             {% csrf_token %}
 
             <input type="hidden" name="latitude" id="latitude" required>
             <input type="hidden" name="longitude" id="longitude" required>
 
-            <div class="form-group">
-                <label class="form-label" for="verified_address">
+            <div class="ulv__form-group">
+                <label class="ulv__form-label" for="verified_address">
                     <i class="fa-solid fa-location-dot"></i>
                     Delivery Address
                 </label>
                 <textarea
-                    class="form-control"
+                    class="ulv__form-control"
                     id="verified_address"
                     name="verified_address"
                     rows="3"
@@ -125,43 +125,43 @@
                     required>{{ address_verification.original_address }}</textarea>
             </div>
 
-            <div class="address-inputs">
-                <div class="form-group">
-                    <label class="form-label" for="zone_number">
+            <div class="ulv__address-inputs">
+                <div class="ulv__form-group">
+                    <label class="ulv__form-label" for="zone_number">
                         <i class="fa-solid fa-map"></i>
                         Zone Number
                     </label>
                     <input
                         type="number"
-                        class="form-control"
+                        class="ulv__form-control"
                         id="zone_number"
                         name="zone_number"
                         placeholder="Enter zone number"
                         value="{{ order.dl_zone|default:'' }}">
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label" for="street_number">
+                <div class="ulv__form-group">
+                    <label class="ulv__form-label" for="street_number">
                         <i class="fa-solid fa-road"></i>
                         Street Number
                     </label>
                     <input
                         type="number"
-                        class="form-control"
+                        class="ulv__form-control"
                         id="street_number"
                         name="street_number"
                         placeholder="Enter street number"
                         value="{{ order.dl_street|default:'' }}">
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label" for="building_number">
+                <div class="ulv__form-group">
+                    <label class="ulv__form-label" for="building_number">
                         <i class="fa-solid fa-building"></i>
                         Building Number
                     </label>
                     <input
                         type="number"
-                        class="form-control"
+                        class="ulv__form-control"
                         id="building_number"
                         name="building_number"
                         placeholder="Enter building number"
@@ -169,20 +169,20 @@
                 </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="notes">
+            <div class="ulv__form-group">
+                <label class="ulv__form-label" for="notes">
                     <i class="fa-solid fa-comment"></i>
                     Delivery Instructions (Optional)
                 </label>
                 <textarea
-                    class="form-control"
+                    class="ulv__form-control"
                     id="notes"
                     name="notes"
                     rows="3"
                     placeholder="E.g., Gate code, floor number, landmarks, etc."></textarea>
             </div>
 
-            <button type="submit" class="btn-verify" id="orders_verify_location_btn_submit">
+            <button type="submit" class="ulv__btn-verify" id="orders_verify_location_btn_submit">
                 <i class="fa-solid fa-check-circle me-2"></i>
                 Confirm Location
             </button>

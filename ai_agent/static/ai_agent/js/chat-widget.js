@@ -35,10 +35,10 @@
     if (!container) return;
 
     var wrapper = document.createElement('div');
-    wrapper.className = 'ai-chat-message ai-chat-message--' + role;
+    wrapper.className = 'ai-chat__message ai-chat__message--' + role;
 
     var content = document.createElement('div');
-    content.className = 'ai-chat-message-content';
+    content.className = 'ai-chat__message-content';
     content.textContent = text;
 
     wrapper.appendChild(content);
@@ -53,7 +53,7 @@
     if (!container) return null;
 
     var typing = document.createElement('div');
-    typing.className = 'ai-chat-typing';
+    typing.className = 'ai-chat__typing';
     typing.id = prefix + '_chat_typing';
     typing.innerHTML = '<span></span><span></span><span></span>';
     container.appendChild(typing);
@@ -71,7 +71,7 @@
     if (!container) return;
 
     var errorDiv = document.createElement('div');
-    errorDiv.className = 'ai-chat-error';
+    errorDiv.className = 'ai-chat__error';
     errorDiv.textContent = message || 'Something went wrong. Please try again.';
     container.appendChild(errorDiv);
     scrollToBottom(container);
@@ -80,19 +80,19 @@
   // --- Toggle ---
 
   function setupToggle(prefix) {
-    var header = document.querySelector('#' + prefix + '_dashboard_section_ai_chat .ai-chat-header');
+    var header = document.querySelector('#' + prefix + '_dashboard_section_ai_chat .ai-chat__header');
     var section = document.getElementById(prefix + '_dashboard_section_ai_chat');
     if (!header || !section) return;
 
     // Restore collapsed state from localStorage
     var storageKey = 'ai_chat_collapsed_' + prefix;
     if (localStorage.getItem(storageKey) === 'true') {
-      section.classList.add('collapsed');
+      section.classList.add('ai-chat--collapsed');
     }
 
     header.addEventListener('click', function () {
-      section.classList.toggle('collapsed');
-      localStorage.setItem(storageKey, section.classList.contains('collapsed'));
+      section.classList.toggle('ai-chat--collapsed');
+      localStorage.setItem(storageKey, section.classList.contains('ai-chat--collapsed'));
     });
   }
 
@@ -295,7 +295,7 @@
 
   // Auto-init: find all chat widgets on the page
   function autoInit() {
-    var sections = document.querySelectorAll('.ai-chat-section');
+    var sections = document.querySelectorAll('.ai-chat');
     sections.forEach(function (section) {
       var id = section.id || '';
       // Extract prefix: e.g., "workforce_dashboard_section_ai_chat" → "workforce"

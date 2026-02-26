@@ -1,25 +1,25 @@
 {% load static %}
 
 <!-- Order Timeline Section -->
-<div class="odt-card" id="order_details_card_timeline">
-  <div class="odt-card__header">
+<div class="odt__card" id="order_details_card_timeline">
+  <div class="odt__card__header">
     <i class="fa-solid fa-clock-rotate-left"></i>
     <span>Order Timeline</span>
   </div>
-  <div class="odt-card__body odt-card__body--timeline">
-    <div class="odt-timeline">
+  <div class="odt__card__body odt__card__body--timeline">
+    <div class="odt__timeline">
 
       <!-- Created -->
-      <div class="odt-timeline__item odt-timeline__item--done">
-        <div class="odt-timeline__dot">
+      <div class="odt__timeline__item odt__timeline__item--done">
+        <div class="odt__timeline__dot">
           <i class="fa-solid fa-plus"></i>
         </div>
-        <div class="odt-timeline__body">
-          <div class="odt-timeline__row">
-            <span class="odt-timeline__title">Order Created</span>
-            <span class="odt-timeline__time">{{ order.created_at|date:"d M Y, H:i" }}</span>
+        <div class="odt__timeline__body">
+          <div class="odt__timeline__row">
+            <span class="odt__timeline__title">Order Created</span>
+            <span class="odt__timeline__time">{{ order.created_at|date:"d M Y, H:i" }}</span>
           </div>
-          <div class="odt-timeline__desc">
+          <div class="odt__timeline__desc">
             Order #{{ order.order_number }} was created
             {% if order.client_order_code %}(Ref: {{ order.client_order_code }}){% endif %}
           </div>
@@ -28,18 +28,18 @@
 
       <!-- Verification Status -->
       {% if order.verification_status %}
-      <div class="odt-timeline__item {% if order.verification_status == 'verified' %}odt-timeline__item--done{% elif order.verification_status == 'pending' %}odt-timeline__item--active{% endif %}">
-        <div class="odt-timeline__dot">
+      <div class="odt__timeline__item {% if order.verification_status == 'verified' %}odt__timeline__item--done{% elif order.verification_status == 'pending' %}odt__timeline__item--active{% endif %}">
+        <div class="odt__timeline__dot">
           <i class="fa-solid fa-check-circle"></i>
         </div>
-        <div class="odt-timeline__body">
-          <div class="odt-timeline__row">
-            <span class="odt-timeline__title">Address Verification</span>
+        <div class="odt__timeline__body">
+          <div class="odt__timeline__row">
+            <span class="odt__timeline__title">Address Verification</span>
             {% if order.updated_at %}
-            <span class="odt-timeline__time">{{ order.updated_at|date:"d M Y, H:i" }}</span>
+            <span class="odt__timeline__time">{{ order.updated_at|date:"d M Y, H:i" }}</span>
             {% endif %}
           </div>
-          <div class="odt-timeline__desc">
+          <div class="odt__timeline__desc">
             Status: <strong>{{ order.get_verification_status_display }}</strong>
           </div>
         </div>
@@ -48,53 +48,53 @@
 
       <!-- Order Confirmed -->
       {% if order.order_status == 'ready_to_pickup' or order.order_status == 'publish' or order.task_status == 'assigned' or order.task_status == 'completed' %}
-      <div class="odt-timeline__item odt-timeline__item--done">
-        <div class="odt-timeline__dot">
+      <div class="odt__timeline__item odt__timeline__item--done">
+        <div class="odt__timeline__dot">
           <i class="fa-solid fa-clipboard-check"></i>
         </div>
-        <div class="odt-timeline__body">
-          <div class="odt-timeline__row">
-            <span class="odt-timeline__title">Order Confirmed</span>
-            <span class="odt-timeline__time">{{ order.updated_at|date:"d M Y, H:i" }}</span>
+        <div class="odt__timeline__body">
+          <div class="odt__timeline__row">
+            <span class="odt__timeline__title">Order Confirmed</span>
+            <span class="odt__timeline__time">{{ order.updated_at|date:"d M Y, H:i" }}</span>
           </div>
-          <div class="odt-timeline__desc">Order confirmed and ready for pickup/dispatch</div>
+          <div class="odt__timeline__desc">Order confirmed and ready for pickup/dispatch</div>
         </div>
       </div>
       {% endif %}
 
       <!-- Published to DMS -->
       {% if order.order_status == 'publish' or order.task_status == 'assigned' or order.task_status == 'completed' %}
-      <div class="odt-timeline__item odt-timeline__item--done">
-        <div class="odt-timeline__dot">
+      <div class="odt__timeline__item odt__timeline__item--done">
+        <div class="odt__timeline__dot">
           <i class="fa-solid fa-rocket"></i>
         </div>
-        <div class="odt-timeline__body">
-          <div class="odt-timeline__row">
-            <span class="odt-timeline__title">Published to Delivery</span>
-            <span class="odt-timeline__time">{{ order.updated_at|date:"d M Y, H:i" }}</span>
+        <div class="odt__timeline__body">
+          <div class="odt__timeline__row">
+            <span class="odt__timeline__title">Published to Delivery</span>
+            <span class="odt__timeline__time">{{ order.updated_at|date:"d M Y, H:i" }}</span>
           </div>
-          <div class="odt-timeline__desc">Order published to delivery management system</div>
+          <div class="odt__timeline__desc">Order published to delivery management system</div>
         </div>
       </div>
       {% endif %}
 
       <!-- Driver Assigned -->
       {% if delivery_task and delivery_task.driver %}
-      <div class="odt-timeline__item odt-timeline__item--done">
-        <div class="odt-timeline__dot">
+      <div class="odt__timeline__item odt__timeline__item--done">
+        <div class="odt__timeline__dot">
           <i class="fa-solid fa-user-check"></i>
         </div>
-        <div class="odt-timeline__body">
-          <div class="odt-timeline__row">
-            <span class="odt-timeline__title">Driver Assigned</span>
+        <div class="odt__timeline__body">
+          <div class="odt__timeline__row">
+            <span class="odt__timeline__title">Driver Assigned</span>
             {% if delivery_task.assigned_at %}
-            <span class="odt-timeline__time">{{ delivery_task.assigned_at|date:"d M Y, H:i" }}</span>
+            <span class="odt__timeline__time">{{ delivery_task.assigned_at|date:"d M Y, H:i" }}</span>
             {% endif %}
           </div>
-          <div class="odt-timeline__desc">
+          <div class="odt__timeline__desc">
             Assigned to: <strong>{{ delivery_task.driver.user.get_full_name|default:delivery_task.driver.driver_code }}</strong>
             {% if delivery_task.driver.driver_phone %}
-            <span class="odt-timeline__phone">
+            <span class="odt__timeline__phone">
               <i class="fa-solid fa-phone"></i> {{ delivery_task.driver.driver_phone }}
             </span>
             {% endif %}
@@ -105,51 +105,51 @@
 
       <!-- Picked Up -->
       {% if delivery_task and delivery_task.picked_up_at %}
-      <div class="odt-timeline__item odt-timeline__item--done">
-        <div class="odt-timeline__dot">
+      <div class="odt__timeline__item odt__timeline__item--done">
+        <div class="odt__timeline__dot">
           <i class="fa-solid fa-box-open"></i>
         </div>
-        <div class="odt-timeline__body">
-          <div class="odt-timeline__row">
-            <span class="odt-timeline__title">Picked Up</span>
-            <span class="odt-timeline__time">{{ delivery_task.picked_up_at|date:"d M Y, H:i" }}</span>
+        <div class="odt__timeline__body">
+          <div class="odt__timeline__row">
+            <span class="odt__timeline__title">Picked Up</span>
+            <span class="odt__timeline__time">{{ delivery_task.picked_up_at|date:"d M Y, H:i" }}</span>
           </div>
-          <div class="odt-timeline__desc">Package picked up from {{ order.pickup_location|default:"warehouse" }}</div>
+          <div class="odt__timeline__desc">Package picked up from {{ order.pickup_location|default:"warehouse" }}</div>
         </div>
       </div>
       {% endif %}
 
       <!-- In Transit -->
       {% if delivery_task and delivery_task.task_status == 'in_transit' %}
-      <div class="odt-timeline__item odt-timeline__item--active">
-        <div class="odt-timeline__dot">
+      <div class="odt__timeline__item odt__timeline__item--active">
+        <div class="odt__timeline__dot">
           <i class="fa-solid fa-truck"></i>
         </div>
-        <div class="odt-timeline__body">
-          <div class="odt-timeline__row">
-            <span class="odt-timeline__title">Out for Delivery</span>
-            <span class="odt-timeline__time odt-timeline__time--live">Now</span>
+        <div class="odt__timeline__body">
+          <div class="odt__timeline__row">
+            <span class="odt__timeline__title">Out for Delivery</span>
+            <span class="odt__timeline__time odt__timeline__time--live">Now</span>
           </div>
-          <div class="odt-timeline__desc">Package is on the way to destination</div>
+          <div class="odt__timeline__desc">Package is on the way to destination</div>
         </div>
       </div>
       {% endif %}
 
       <!-- Delivered -->
       {% if order.task_status == 'completed' or order.delivered_at %}
-      <div class="odt-timeline__item odt-timeline__item--done">
-        <div class="odt-timeline__dot odt-timeline__dot--success">
+      <div class="odt__timeline__item odt__timeline__item--done">
+        <div class="odt__timeline__dot odt__timeline__dot--success">
           <i class="fa-solid fa-check-double"></i>
         </div>
-        <div class="odt-timeline__body">
-          <div class="odt-timeline__row">
-            <span class="odt-timeline__title">Delivered Successfully</span>
-            <span class="odt-timeline__time">{{ order.delivered_at|date:"d M Y, H:i" }}</span>
+        <div class="odt__timeline__body">
+          <div class="odt__timeline__row">
+            <span class="odt__timeline__title">Delivered Successfully</span>
+            <span class="odt__timeline__time">{{ order.delivered_at|date:"d M Y, H:i" }}</span>
           </div>
-          <div class="odt-timeline__desc">
+          <div class="odt__timeline__desc">
             Order delivered to customer
             {% if delivery_task.cod_collected and order.cod_amount %}
-            <span class="odt-timeline__cod">
+            <span class="odt__timeline__cod">
               <i class="fa-solid fa-money-bill-wave"></i>
               COD Collected: QAR {{ delivery_task.cod_collected_amount|default:order.cod_amount }}
             </span>
@@ -161,16 +161,16 @@
 
       <!-- Cancelled -->
       {% if order.order_status == 'cancelled' %}
-      <div class="odt-timeline__item odt-timeline__item--danger">
-        <div class="odt-timeline__dot odt-timeline__dot--danger">
+      <div class="odt__timeline__item odt__timeline__item--danger">
+        <div class="odt__timeline__dot odt__timeline__dot--danger">
           <i class="fa-solid fa-ban"></i>
         </div>
-        <div class="odt-timeline__body">
-          <div class="odt-timeline__row">
-            <span class="odt-timeline__title">Order Cancelled</span>
-            <span class="odt-timeline__time">{{ order.updated_at|date:"d M Y, H:i" }}</span>
+        <div class="odt__timeline__body">
+          <div class="odt__timeline__row">
+            <span class="odt__timeline__title">Order Cancelled</span>
+            <span class="odt__timeline__time">{{ order.updated_at|date:"d M Y, H:i" }}</span>
           </div>
-          <div class="odt-timeline__desc">This order has been cancelled</div>
+          <div class="odt__timeline__desc">This order has been cancelled</div>
         </div>
       </div>
       {% endif %}

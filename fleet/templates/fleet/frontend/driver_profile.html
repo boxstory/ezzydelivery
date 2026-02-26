@@ -6,11 +6,11 @@
 {% block content %}
 <!-- frontend driver Profile page section -->
 <h1 class="h2 text-center fw-bolder bg-light py-3 m-0 w-100" id="fleet_driver_profile_header_title">Driver Profile</h1>
-<section class="section about-section bg-light" id="fleet_driver_profile_section_main">
+<section class="fdp__section bg-light" id="fleet_driver_profile_section_main">
     <div class="container">
         <div class="row align-items-center flex-row-reverse p-2">
             <div class="col-md-6">
-                <div class="about-text p-2">
+                <div class="fdp__about-text p-2">
                     <h2 class="h3 dark-color">
                         {{ profile.user.first_name }} {{ profile.user.last_name }}
                         ({{ driver.driver_code }})
@@ -26,39 +26,39 @@
                         {% endif %}
                     </h6>
 
-                    <div class="row about-list pt-3">
+                    <div class="row fdp__about-list pt-3">
                         <div class="col-6 col-md-6">
-                            <div class="media">
+                            <div class="fdp__media">
                                 <i class="fa-solid fa-cake-candles  pe-2"></i><label>Birthday</label>
                                 <p>{{ profile.date_of_birth }}</p>
                             </div>
-                            <div class="media">
+                            <div class="fdp__media">
                                 <i class="fa-solid fa-gauge pe-2"></i><label>Birth year</label>
                                 <p>{{ profile.date_of_birth|date:'Y' }}</p>
                             </div>
-                            <div class="media">
+                            <div class="fdp__media">
                                 <i class="fa-solid fa-location-pin pe-2"></i><label>Location</label>
                                 <p>{{ profile.zone_name }}</p>
                             </div>
-                            <div class="media">
+                            <div class="fdp__media">
                                 <i class="fa-solid fa-address-book pe-2"></i><label>Address</label>
                                 <p>{{ profile.address }}</p>
                             </div>
                         </div>
                         <div class="col-6 col-md-6">
-                            <div class="media">
+                            <div class="fdp__media">
                                 <i class="fa-solid fa-envelope pe-2"></i><label>E-mail</label>
                                 <p>Add me to see</p>
                             </div>
-                            <div class="media">
+                            <div class="fdp__media">
                                 <i class="fa-solid fa-phone pe-2"></i><label>Phone</label>
                                 <p>Add me to see</p>
                             </div>
-                            <div class="media">
+                            <div class="fdp__media">
                                 <i class="fa-solid fa-globe pe-2"></i><label>Nationality</label>
                                 <p>{{ profile.nationlity }}</p>
                             </div>
-                            <div class="media">
+                            <div class="fdp__media">
                                 <i class="fa-solid fa-layer-group pe-2"></i><label>Freelance</label>
                                 {% if profile.is_driver == True %}
                                 <p>Driver</p>
@@ -75,7 +75,7 @@
                 </div>
             </div>
             <div class="col-md-6 my-3">
-                <div class="about-avatar  d-flex justify-content-center">
+                <div class="fdp__about-avatar d-flex justify-content-center">
                     {% if profile.profile_picture %}
                     <img src="{{ profile_picture.profile_picture.url }}" loading="lazy" alt="{{ driver.user.first_name|default:'Driver' }} {{ driver.user.last_name|default:'' }} profile picture" class="img-fluid text-center" />
                     {% else %}
@@ -101,41 +101,41 @@
                     <div id="alert-message" class="alert alert-info mt-3  py-2 text-center d-none"></div>
                 </div>
             </div>
-            <!-- countersssss   -->
-            <div class="counter p-3">
+            <!-- counters -->
+            <div class="fdp__counter p-3">
                 <div class="row">
                     <div class="col-6 col-lg-3">
-                        <div class="count-data text-center">
+                        <div class="fdp__count-data text-center">
                             <h6 class="count h2" data-to="500" data-speed="500">200</h6>
-                            <p class="m-0px font-w-600">Rides Requested</p>
+                            <p>Rides Requested</p>
                         </div>
                     </div>
                     <div class="col-6 col-lg-3">
-                        <div class="count-data text-center">
+                        <div class="fdp__count-data text-center">
                             <h6 class="count h2" data-to="150" data-speed="150">170</h6>
-                            <p class="m-0px font-w-600">Rides Completed</p>
+                            <p>Rides Completed</p>
                         </div>
                     </div>
                     <div class="col-6 col-lg-3">
-                        <div class="count-data text-center">
+                        <div class="fdp__count-data text-center">
                             <h6 class="count h2" data-to="850" data-speed="850">2{{ driver_vehicle.id }}</h6>
-                            <p class="m-0px font-w-600">Vehicles</p>
+                            <p>Vehicles</p>
                         </div>
                     </div>
                     <div class="col-6 col-lg-3">
-                        <div class="count-data text-center">
+                        <div class="fdp__count-data text-center">
                             <h6 class="count h2" data-to="190" data-speed="190">68 (M)</h6>
-                            <p class="m-0px font-w-600">Qatar Experiance</p>
+                            <p>Qatar Experiance</p>
                         </div>
                     </div>
                 </div>
             </div>
             <!-- documents section -----------  -->
-            <div class="listing-container" id="fleet_driver_profile_section_documents">
-                <div class="listing-header">
-                    <h6 class="listing-title"><i class="fa-solid fa-file-alt text-primary"></i>Available Documents</h6>
+            <div class="fdp__listing-container" id="fleet_driver_profile_section_documents">
+                <div class="fdp__listing-header">
+                    <h6><i class="fa-solid fa-file-alt text-primary"></i>Available Documents</h6>
                 </div>
-                <table class="listing-table" id="fleet_driver_profile_table_documents">
+                <table class="fdp__listing-table" id="fleet_driver_profile_table_documents">
                     <thead id="fleet_driver_profile_thead_documents">
                         <tr>
                             <th>#</th>
@@ -161,11 +161,11 @@
                 </table>
             </div>
             <!-- vehicle section   -->
-            <div class="listing-container my-3" id="fleet_driver_profile_section_vehicles">
-                <div class="listing-header">
-                    <h6 class="listing-title"><i class="fa-solid fa-car text-primary"></i>Owned Vehicle Details</h6>
+            <div class="fdp__listing-container my-3" id="fleet_driver_profile_section_vehicles">
+                <div class="fdp__listing-header">
+                    <h6><i class="fa-solid fa-car text-primary"></i>Owned Vehicle Details</h6>
                 </div>
-                <table class="listing-table" id="fleet_driver_profile_table_vehicles">
+                <table class="fdp__listing-table" id="fleet_driver_profile_table_vehicles">
                     <thead id="fleet_driver_profile_thead_vehicles">
                         <tr>
                             <th>#</th>
@@ -180,13 +180,13 @@
                         <tr>
                             <td>{{ forloop.counter }}</td>
                             <td>
-                                <span class="listing-status primary"><i class="fa-solid fa-car"></i></span>
+                                <span class="fdp__status fdp__status--primary"><i class="fa-solid fa-car"></i></span>
                                 {{ vehicle.vehicle_type }}
                             </td>
                             <td>{{ vehicle.vehicle_model }}</td>
                             <td class="text-muted">{{ vehicle.vehicle_date }}</td>
                             <td>
-                                <span class="listing-status {% if vehicle.vehicle_status == 'active' %}success{% else %}warning{% endif %}">
+                                <span class="fdp__status {% if vehicle.vehicle_status == 'active' %}fdp__status--success{% else %}fdp__status--warning{% endif %}">
                                     {{ vehicle.vehicle_status }}
                                 </span>
                             </td>

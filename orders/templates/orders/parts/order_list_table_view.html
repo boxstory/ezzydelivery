@@ -2,73 +2,73 @@
 {% load custom_filters %}
 
 {% if not orders %}
-<div class="oal-empty">
-  <div class="oal-empty__icon"><i class="fa-solid fa-box-open"></i></div>
-  <p class="oal-empty__title">No orders found</p>
-  <p class="oal-empty__subtitle">Try adjusting your filters or create a new order</p>
+<div class="oal__empty">
+  <div class="oal__empty-icon"><i class="fa-solid fa-box-open"></i></div>
+  <p class="oal__empty-title">No orders found</p>
+  <p class="oal__empty-subtitle">Try adjusting your filters or create a new order</p>
 </div>
 {% else %}
-<div class="oal-table-wrap">
-  <table class="oal-table" id="orders_list_table_main">
+<div class="oal__table-wrap">
+  <table class="oal__table" id="orders_list_table_main">
     <thead>
       <tr>
-        <th class="oal-table__th oal-table__th--check">
-          <input type="checkbox" id="orders_bulk_select_all" class="oal-table__checkbox" title="Select all">
+        <th class="oal__table-th oal__table-th--check">
+          <input type="checkbox" id="orders_bulk_select_all" class="oal__table-checkbox" title="Select all">
         </th>
-        <th class="oal-table__th sortable-header" data-sort="order_number">
-          Order # <i class="fa-solid fa-sort oal-table__sort-icon"></i>
+        <th class="oal__table-th sortable-header" data-sort="order_number">
+          Order # <i class="fa-solid fa-sort oal__table-sort-icon"></i>
         </th>
-        <th class="oal-table__th sortable-header" data-sort="customer_name">
-          Customer <i class="fa-solid fa-sort oal-table__sort-icon"></i>
+        <th class="oal__table-th sortable-header" data-sort="customer_name">
+          Customer <i class="fa-solid fa-sort oal__table-sort-icon"></i>
         </th>
-        <th class="oal-table__th sortable-header" data-sort="dl_zone">
-          Zone <i class="fa-solid fa-sort oal-table__sort-icon"></i>
+        <th class="oal__table-th sortable-header" data-sort="dl_zone">
+          Zone <i class="fa-solid fa-sort oal__table-sort-icon"></i>
         </th>
-        <th class="oal-table__th sortable-header" data-sort="cod_amount">
-          COD <i class="fa-solid fa-sort oal-table__sort-icon"></i>
+        <th class="oal__table-th sortable-header" data-sort="cod_amount">
+          COD <i class="fa-solid fa-sort oal__table-sort-icon"></i>
         </th>
-        <th class="oal-table__th">Status</th>
-        <th class="oal-table__th oal-table__th--actions">Actions</th>
+        <th class="oal__table-th">Status</th>
+        <th class="oal__table-th oal__table-th--actions">Actions</th>
       </tr>
     </thead>
     <tbody>
       {% for order in orders %}
-      <tr class="oal-table__row" data-order-id="{{ order.id }}">
+      <tr class="oal__table-row" data-order-id="{{ order.id }}">
         <!-- Checkbox -->
-        <td class="oal-table__td oal-table__td--check">
-          <input type="checkbox" class="orders-bulk-checkbox oal-table__checkbox" value="{{ order.id }}">
+        <td class="oal__table-td oal__table-td--check">
+          <input type="checkbox" class="orders-bulk-checkbox oal__table-checkbox" value="{{ order.id }}">
         </td>
 
         <!-- Order # -->
-        <td class="oal-table__td oal-table__td--order" onclick="openOrderDetailPanel({{ order.id }})">
-          <span class="oal-table__order-num">{{ order.order_number }}</span>
-          <span class="oal-table__order-date">{{ order.order_date|date:"d/m/Y" }}</span>
+        <td class="oal__table-td oal__table-td--order" onclick="openOrderDetailPanel({{ order.id }})">
+          <span class="oal__table-order-num">{{ order.order_number }}</span>
+          <span class="oal__table-order-date">{{ order.order_date|date:"d/m/Y" }}</span>
         </td>
 
         <!-- Customer -->
-        <td class="oal-table__td">
-          <div class="oal-table__customer">
-            <span class="oal-table__customer-name">{{ order.customer_name }}</span>
-            <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="oal-table__wa-pill">
+        <td class="oal__table-td">
+          <div class="oal__table-customer">
+            <span class="oal__table-customer-name">{{ order.customer_name }}</span>
+            <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" class="oal__table-wa-pill">
               <i class="fa-brands fa-whatsapp"></i> {{ order.customer_phone }}
             </a>
           </div>
         </td>
 
         <!-- Zone -->
-        <td class="oal-table__td" title="{% if order.dl_street %}St {{ order.dl_street }}{% endif %}{% if order.dl_building %}, Bldg {{ order.dl_building }}{% endif %}{% if not order.dl_street and not order.dl_building %}{{ order.customer_address }}{% endif %}">
-          <div class="oal-table__zone-cell">
-            <span class="oal-table__zone-name">{% get_zone_display order %}</span>
-            <span class="oal-table__zone-addr">{% if order.dl_street %}St {{ order.dl_street }}{% endif %}{% if order.dl_building %}, Bldg {{ order.dl_building }}{% endif %}{% if not order.dl_street and not order.dl_building %}{{ order.customer_address|truncatechars:35 }}{% endif %}</span>
+        <td class="oal__table-td" title="{% if order.dl_street %}St {{ order.dl_street }}{% endif %}{% if order.dl_building %}, Bldg {{ order.dl_building }}{% endif %}{% if not order.dl_street and not order.dl_building %}{{ order.customer_address }}{% endif %}">
+          <div class="oal__table-zone-cell">
+            <span class="oal__table-zone-name">{% get_zone_display order %}</span>
+            <span class="oal__table-zone-addr">{% if order.dl_street %}St {{ order.dl_street }}{% endif %}{% if order.dl_building %}, Bldg {{ order.dl_building }}{% endif %}{% if not order.dl_street and not order.dl_building %}{{ order.customer_address|truncatechars:35 }}{% endif %}</span>
           </div>
         </td>
 
         <!-- COD -->
-        <td class="oal-table__td">
+        <td class="oal__table-td">
           {% if order.cod_amount %}
-          <div class="oal-table__cod-cell">
-            <span class="oal-table__cod-value">{{ order.cod_amount }} QR</span>
-            <span class="ob ob--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
+          <div class="oal__table-cod-cell">
+            <span class="oal__table-cod-value">{{ order.cod_amount }} QR</span>
+            <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
               {% if order.cod_status_by_staff == 'fully_paid' %}<i class="fa-solid fa-check"></i> Collected
               {% elif order.cod_status_by_staff == 'partially_collected' %}<i class="fa-solid fa-adjust"></i> Partial
               {% elif order.cod_status_by_staff == 'cod_settled_with_business' %}<i class="fa-solid fa-handshake"></i> Settled
@@ -77,20 +77,20 @@
             </span>
           </div>
           {% else %}
-          <span class="oal-table__no-cod">--</span>
+          <span class="oal__table-no-cod">--</span>
           {% endif %}
         </td>
 
         <!-- Status -->
-        <td class="oal-table__td status-cell" data-order-id="{{ order.id }}" data-current-status="{{ order.order_status }}">
-          <div class="oal-table__status-cell">
-            <span class="ob ob--{{ order.order_status }} status-cell__display">
+        <td class="oal__table-td status-cell" data-order-id="{{ order.id }}" data-current-status="{{ order.order_status }}">
+          <div class="oal__table-status-cell">
+            <span class="ob__ ob__--{{ order.order_status }} status-cell__display">
               <i class="fa-solid {% if order.order_status == 'publish' %}fa-rocket{% elif order.order_status == 'ready_to_pickup' %}fa-clipboard-check{% elif order.order_status == 'cancelled' %}fa-ban{% elif order.order_status == 'delivered' %}fa-check{% else %}fa-clock{% endif %}"></i>
               {{ order.get_order_status_display }}
               <i class="fa-solid fa-pen-to-square status-cell__edit-icon"></i>
             </span>
             {% with delivery=order.delivery_task.first %}
-            <span class="ob ob--dl-{% if delivery %}{{ delivery.dl_task_status }}{% elif order.task_created %}task_created{% elif order.order_status == 'publish' %}published{% else %}none{% endif %}">
+            <span class="ob__ ob__--dl-{% if delivery %}{{ delivery.dl_task_status }}{% elif order.task_created %}task_created{% elif order.order_status == 'publish' %}published{% else %}none{% endif %}">
               <i class="fa-solid {% if delivery and delivery.dl_task_status == 'delivered' %}fa-check{% elif delivery and delivery.dl_task_status == 'assigned' %}fa-user{% elif delivery and delivery.dl_task_status == 'accepted' %}fa-user-check{% elif delivery and delivery.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}fa-truck{% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}fa-times{% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}fa-ban{% elif order.task_created %}fa-clipboard-check{% elif order.order_status == 'publish' %}fa-paper-plane{% else %}fa-minus{% endif %}"></i>
               {% if delivery and delivery.dl_task_status == 'delivered' %}Delivered{% elif delivery and delivery.dl_task_status == 'assigned' %}Assigned{% elif delivery and delivery.dl_task_status == 'accepted' %}Accepted{% elif delivery and delivery.dl_task_status == 'picked_up' %}Picked Up{% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}In Transit{% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}Failed{% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}Cancelled{% elif order.task_created %}Task Created{% elif order.order_status == 'publish' %}In DL Task{% else %}No Task{% endif %}
             </span>
@@ -98,10 +98,10 @@
           </div>
           {% if order.order_status != 'delivered' and order.order_status != 'cancelled' %}
           <div class="status-popup" style="display:none;">
-            <div class="status-popup__option" data-status="to_review"><i class="fa-solid fa-clock oal-icon--warning"></i> Hold for Review</div>
-            <div class="status-popup__option" data-status="ready_to_pickup"><i class="fa-solid fa-clipboard-check oal-icon--info"></i> Ready to pickup</div>
-            <div class="status-popup__option" data-status="publish"><i class="fa-solid fa-rocket oal-icon--success"></i> Publish to DL Task</div>
-            <div class="status-popup__option" data-status="delivered"><i class="fa-solid fa-check oal-icon--success"></i> Delivered</div>
+            <div class="status-popup__option" data-status="to_review"><i class="fa-solid fa-clock oal__icon--warning"></i> Hold for Review</div>
+            <div class="status-popup__option" data-status="ready_to_pickup"><i class="fa-solid fa-clipboard-check oal__icon--info"></i> Ready to pickup</div>
+            <div class="status-popup__option" data-status="publish"><i class="fa-solid fa-rocket oal__icon--success"></i> Publish to DL Task</div>
+            <div class="status-popup__option" data-status="delivered"><i class="fa-solid fa-check oal__icon--success"></i> Delivered</div>
             <div class="status-popup__divider"></div>
             <div class="status-popup__option status-popup__option--danger" data-status="cancelled"><i class="fa-solid fa-ban"></i> Cancelled</div>
           </div>
@@ -109,14 +109,14 @@
         </td>
 
         <!-- Actions -->
-        <td class="oal-table__td oal-table__td--actions">
-          <div class="oal-table__actions">
+        <td class="oal__table-td oal__table-td--actions">
+          <div class="oal__table-actions">
             {% if order.order_status == 'publish' or order.order_status == 'delivered' or order.order_status == 'cancelled' %}
-            <span class="oal-action-btn oal-action-btn--disabled" title="Cannot edit {{ order.get_order_status_display }} orders"><i class="fa-solid fa-pen"></i></span>
-            <span class="oal-action-btn oal-action-btn--disabled" title="Cannot delete {{ order.get_order_status_display }} orders"><i class="fa-solid fa-trash"></i></span>
+            <span class="oal__action-btn oal__action-btn--disabled" title="Cannot edit {{ order.get_order_status_display }} orders"><i class="fa-solid fa-pen"></i></span>
+            <span class="oal__action-btn oal__action-btn--disabled" title="Cannot delete {{ order.get_order_status_display }} orders"><i class="fa-solid fa-trash"></i></span>
             {% else %}
-            <a href="{% url 'orders:order_update' order.id %}" class="oal-action-btn" title="Edit Order"><i class="fa-solid fa-pen"></i></a>
-            <a href="{% url 'orders:delete_order' order.id %}" class="oal-action-btn oal-action-btn--danger" title="Delete Order"><i class="fa-solid fa-trash"></i></a>
+            <a href="{% url 'orders:order_update' order.id %}" class="oal__action-btn" title="Edit Order"><i class="fa-solid fa-pen"></i></a>
+            <a href="{% url 'orders:delete_order' order.id %}" class="oal__action-btn oal__action-btn--danger" title="Delete Order"><i class="fa-solid fa-trash"></i></a>
             {% endif %}
           </div>
         </td>

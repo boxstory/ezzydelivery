@@ -9,20 +9,20 @@
 {% block content %}
     <div class="p-3" style="min-width:0;max-width:100%">
         <!-- Page Header -->
-        <header class="page-header">
-            <div class="page-header-left">
+        <header class="pg-hdr">
+            <div class="pg-hdr__left">
                 <h2><i class="fa-solid fa-list-check me-1"></i>All Orders</h2>
             </div>
-            <div class="page-header-right">
-                <div class="page-header-count">
-                    <span class="count-value">{{ orders.paginator.count|default:"0" }}</span>
-                    <span class="count-label">orders</span>
+            <div class="pg-hdr__right">
+                <div class="pg-hdr__count">
+                    <span class="pg-hdr__count-value">{{ orders.paginator.count|default:"0" }}</span>
+                    <span class="pg-hdr__count-label">orders</span>
                 </div>
             </div>
         </header>
         <!-- Filter Section -->
-        <div class="filter-section">
-            <div class="filter-toggle"
+        <div class="pg-filter">
+            <div class="pg-filter__toggle"
                  data-bs-toggle="collapse"
                  data-bs-target="#filterCollapse">
                 <div class="d-flex align-items-center gap-3">
@@ -30,7 +30,7 @@
                         <i class="fa-solid fa-filter me-2"></i>
                         <strong>Filter Orders</strong>
                     </div>
-                    <div id="activeFiltersCount" class="active-filters-count">
+                    <div id="activeFiltersCount" class="pg-filter__active-count">
                         <span class="badge bg-primary" id="filterCountBadge">0</span>
                         <span class="small text-muted ms-1">active filters</span>
                     </div>
@@ -241,57 +241,57 @@
             <span class="active-filters-label"><i class="fa-solid fa-filter me-1"></i>Active Filters:</span>
             <div class="active-filters-list">
                 {% if filters.business %}
-                <span class="filter-tag">
+                <span class="pg-filter__tag">
                     <strong>Business:</strong> {% for biz in all_businesses %}{% if biz.business_id|stringformat:"s" == filters.business %}{{ biz.business_name }}{% endif %}{% endfor %}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'business' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'business' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.cCode %}
-                <span class="filter-tag">
+                <span class="pg-filter__tag">
                     <strong>Business Code:</strong> {{ filters.cCode }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'cCode' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'cCode' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.dlCode %}
-                <span class="filter-tag">
+                <span class="pg-filter__tag">
                     <strong>DL Code:</strong> {{ filters.dlCode }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dlCode' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dlCode' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.mobile %}
-                <span class="filter-tag">
+                <span class="pg-filter__tag">
                     <strong>Mobile:</strong> {{ filters.mobile }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'mobile' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'mobile' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.customerName %}
-                <span class="filter-tag">
+                <span class="pg-filter__tag">
                     <strong>Customer:</strong> {{ filters.customerName }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'customerName' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'customerName' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.cStatus %}
-                <span class="filter-tag">
+                <span class="pg-filter__tag">
                     <strong>Status:</strong> {{ filters.cStatus }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'cStatus' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'cStatus' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.dmsStatus %}
-                <span class="filter-tag">
+                <span class="pg-filter__tag">
                     <strong>DMS:</strong> {{ filters.dmsStatus }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dmsStatus' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dmsStatus' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.dateFrom %}
-                <span class="filter-tag">
+                <span class="pg-filter__tag">
                     <strong>From:</strong> {{ filters.dateFrom }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dateFrom' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dateFrom' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
                 {% if filters.dateTo %}
-                <span class="filter-tag">
+                <span class="pg-filter__tag">
                     <strong>To:</strong> {{ filters.dateTo }}
-                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dateTo' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="filter-tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
+                    <a href="?{% for key, value in request.GET.items %}{% if key != 'dateTo' %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="pg-filter__tag-close" title="Remove filter"><i class="fa-solid fa-times"></i></a>
                 </span>
                 {% endif %}
             </div>
@@ -301,13 +301,13 @@
         </div>
         {% endif %}
         <!-- AI Agent Toolbar (shows when orders selected) -->
-        <div class="ai-actions-toolbar" id="aiActionsToolbar">
-            <div class="ai-toolbar-info">
+        <div class="aim__actions-toolbar" id="aiActionsToolbar">
+            <div class="aim__toolbar-info">
                 <i class="fa-solid fa-robot"></i>
                 <span>AI Tools</span>
                 <span class="selected-count"><span id="selectedOrderCount">0</span> orders selected</span>
             </div>
-            <div class="ai-toolbar-actions">
+            <div class="aim__toolbar-actions">
                 <button type="button" class="btn" onclick="runGlobalBulkParse()" title="Parse addresses from text">
                     <i class="fa-solid fa-location-dot"></i> Parse Addresses
                 </button>
@@ -320,12 +320,12 @@
                 <button type="button" class="btn" onclick="aiEstimateDelivery()" title="Estimate delivery times">
                     <i class="fa-solid fa-clock"></i> Estimate Time
                 </button>
-                <div class="ai-toolbar-divider"></div>
-                <div class="ai-status-dropdown" id="statusDropdownWrap">
+                <div class="aim__toolbar-divider"></div>
+                <div class="aim__status-dropdown" id="statusDropdownWrap">
                     <button type="button" class="btn btn-status-change" onclick="toggleStatusDropdown(event)">
                         <i class="fa-solid fa-arrow-right-arrow-left"></i> Set Status <i class="fa-solid fa-caret-down ms-1"></i>
                     </button>
-                    <div class="ai-status-menu" id="statusDropdownMenu">
+                    <div class="aim__status-menu" id="statusDropdownMenu">
                         <button type="button" onclick="bulkSetOrderStatus('to_review')"><span class="st-dot st-dot--warn"></span> Hold for Review</button>
                         <button type="button" onclick="bulkSetOrderStatus('ready_to_pickup')"><span class="st-dot st-dot--info"></span> Ready to Pickup</button>
                         <button type="button" onclick="bulkSetOrderStatus('to_publish')"><span class="st-dot st-dot--info"></span> To Publish</button>
@@ -476,17 +476,17 @@
     </div>
 
     <!-- AI Results Modal - Enhanced Process View -->
-    <div class="ai-modal" id="aiResultsModal">
-        <div class="ai-modal-overlay" onclick="closeAIModal()"></div>
-        <div class="ai-modal-content">
-            <div class="ai-modal-header">
+    <div class="aim__modal" id="aiResultsModal">
+        <div class="aim__modal-overlay" onclick="closeAIModal()"></div>
+        <div class="aim__modal-content">
+            <div class="aim__modal-header">
                 <h5><i class="fa-solid fa-robot"></i> <span id="aiModalTitle">AI Analysis</span></h5>
                 <button type="button" class="btn-close" onclick="closeAIModal()" aria-label="Close"></button>
             </div>
-            <div class="ai-modal-body" id="aiModalBody">
+            <div class="aim__modal-body" id="aiModalBody">
                 <!-- Content will be dynamically inserted -->
             </div>
-            <div class="ai-modal-footer" id="aiModalFooter">
+            <div class="aim__modal-footer" id="aiModalFooter">
                 <button type="button" class="btn btn-secondary" onclick="closeAIModal()">Close</button>
                 <button type="button" class="btn btn-primary" id="aiApplyBtn" style="display: none;" onclick="applyAIResults()">
                     <i class="fa-solid fa-check me-1"></i> Apply Changes
@@ -519,7 +519,7 @@
             src="{%static 'orders/js/orders_main.js' %}"></script>
     <script>
     // Filter toggle animation
-    const filterToggle = document.querySelector('.filter-toggle');
+    const filterToggle = document.querySelector('.pg-filter__toggle');
     const filterCollapse = document.getElementById('filterCollapse');
 
     if (filterToggle && filterCollapse) {
@@ -621,7 +621,7 @@
                 var key = entry[0];
                 var value = entry[1];
                 var tag = document.createElement('span');
-                tag.className = 'filter-tag';
+                tag.className = 'pg-filter__tag';
 
                 var strong = document.createElement('strong');
                 strong.textContent = filterLabels[key] + ':';
@@ -968,50 +968,50 @@
             const elapsed = Math.round((new Date() - this.startTime) / 1000);
 
             document.getElementById('aiModalBody').innerHTML = `
-                <div class="ai-process-container">
-                    <div class="ai-process-header">
-                        <div class="ai-process-icon ${progress === 100 ? 'success' : ''}">
+                <div class="aim__process-container">
+                    <div class="aim__process-header">
+                        <div class="aim__process-icon ${progress === 100 ? 'success' : ''}">
                             <i class="fa-solid ${progress === 100 ? 'fa-check' : 'fa-robot'}"></i>
                         </div>
-                        <div class="ai-process-title">${isProcessing ? 'Processing Orders...' : 'Analysis Complete'}</div>
-                        <div class="ai-process-subtitle">
+                        <div class="aim__process-title">${isProcessing ? 'Processing Orders...' : 'Analysis Complete'}</div>
+                        <div class="aim__process-subtitle">
                             ${isProcessing ? `Analyzing: ${this.currentOrderNumber}` : `${this.successCount} successful, ${this.errorCount} failed`}
                         </div>
                     </div>
 
-                    <div class="ai-progress-container">
-                        <div class="ai-progress-bar">
-                            <div class="ai-progress-fill" style="width: ${progress}%"></div>
+                    <div class="aim__progress-container">
+                        <div class="aim__progress-bar">
+                            <div class="aim__progress-fill" style="width: ${progress}%"></div>
                         </div>
-                        <div class="ai-progress-text">
+                        <div class="aim__progress-text">
                             <span>Order ${this.processedItems} of ${this.totalItems}</span>
                             <span>${progress}% complete • ${elapsed}s</span>
                         </div>
                     </div>
 
-                    <div class="ai-process-steps">
+                    <div class="aim__process-steps">
                         ${this.results.slice(-5).reverse().map(r => `
-                            <div class="ai-process-step ${r.success ? 'completed' : 'error'}">
-                                <div class="ai-step-indicator">
+                            <div class="aim__process-step ${r.success ? 'completed' : 'error'}">
+                                <div class="aim__step-indicator">
                                     <i class="fa-solid ${r.success ? 'fa-check' : 'fa-times'}"></i>
                                 </div>
-                                <div class="ai-step-content">
-                                    <div class="ai-step-title">${r.orderNumber}</div>
-                                    <div class="ai-step-status">
+                                <div class="aim__step-content">
+                                    <div class="aim__step-title">${r.orderNumber}</div>
+                                    <div class="aim__step-status">
                                         ${r.success ? '<i class="fa-solid fa-check text-success me-1"></i>Processed' : '<i class="fa-solid fa-times text-danger me-1"></i>Error'}
                                     </div>
                                 </div>
                             </div>
                         `).join('')}
                         ${isProcessing ? `
-                            <div class="ai-process-step active">
-                                <div class="ai-step-indicator">
+                            <div class="aim__process-step active">
+                                <div class="aim__step-indicator">
                                     <i class="fa-solid fa-gear fa-spin"></i>
                                 </div>
-                                <div class="ai-step-content">
-                                    <div class="ai-step-title">${this.currentOrderNumber}</div>
-                                    <div class="ai-step-status">
-                                        <span class="ai-step-spinner"></span>Processing...
+                                <div class="aim__step-content">
+                                    <div class="aim__step-title">${this.currentOrderNumber}</div>
+                                    <div class="aim__step-status">
+                                        <span class="aim__step-spinner"></span>Processing...
                                     </div>
                                 </div>
                             </div>
@@ -1019,7 +1019,7 @@
                     </div>
 
                     ${!isProcessing ? `
-                        <div class="ai-result-summary ${this.errorCount > 0 ? '' : ''}">
+                        <div class="aim__result-summary ${this.errorCount > 0 ? '' : ''}">
                             <h6><i class="fa-solid fa-clipboard-check me-1"></i>Summary</h6>
                             <p>${this.successCount} orders analyzed successfully${this.errorCount > 0 ? `, ${this.errorCount} errors` : ''}</p>
                         </div>
@@ -1034,36 +1034,36 @@
             const elapsed = Math.round((new Date() - this.startTime) / 1000);
 
             document.getElementById('aiModalBody').innerHTML = `
-                <div class="ai-process-container">
-                    <div class="ai-process-header">
-                        <div class="ai-process-icon success">
+                <div class="aim__process-container">
+                    <div class="aim__process-header">
+                        <div class="aim__process-icon success">
                             <i class="fa-solid fa-check"></i>
                         </div>
-                        <div class="ai-process-title">Analysis Complete</div>
-                        <div class="ai-process-subtitle">
+                        <div class="aim__process-title">Analysis Complete</div>
+                        <div class="aim__process-subtitle">
                             ${this.successCount} successful, ${this.errorCount} failed • ${elapsed}s
                         </div>
                     </div>
 
-                    <div class="ai-progress-container">
-                        <div class="ai-progress-bar">
-                            <div class="ai-progress-fill" style="width: 100%"></div>
+                    <div class="aim__progress-container">
+                        <div class="aim__progress-bar">
+                            <div class="aim__progress-fill" style="width: 100%"></div>
                         </div>
-                        <div class="ai-progress-text">
+                        <div class="aim__progress-text">
                             <span>Processed ${this.totalItems} orders</span>
                             <span>100% complete</span>
                         </div>
                     </div>
 
-                    <div class="ai-process-steps">
+                    <div class="aim__process-steps">
                         ${this.results.slice(-5).reverse().map(r => `
-                            <div class="ai-process-step ${r.success ? 'completed' : 'error'}">
-                                <div class="ai-step-indicator">
+                            <div class="aim__process-step ${r.success ? 'completed' : 'error'}">
+                                <div class="aim__step-indicator">
                                     <i class="fa-solid ${r.success ? 'fa-check' : 'fa-times'}"></i>
                                 </div>
-                                <div class="ai-step-content">
-                                    <div class="ai-step-title">${r.orderNumber}</div>
-                                    <div class="ai-step-status">
+                                <div class="aim__step-content">
+                                    <div class="aim__step-title">${r.orderNumber}</div>
+                                    <div class="aim__step-status">
                                         ${r.success ? '<i class="fa-solid fa-check text-success me-1"></i>Processed' : '<i class="fa-solid fa-times text-danger me-1"></i>Error'}
                                     </div>
                                 </div>
@@ -1071,7 +1071,7 @@
                         `).join('')}
                     </div>
 
-                    <div class="ai-result-output mt-3">
+                    <div class="aim__result-output mt-3">
                         <h6 class="mb-3"><i class="fa-solid fa-list-check me-1"></i>Results</h6>
                         ${resultsHtml}
                     </div>
@@ -1192,7 +1192,7 @@
                 clearOrderSelection();
                 // Show brief toast
                 const toast = document.createElement('div');
-                toast.className = 'ai-bulk-toast';
+                toast.className = 'aim__bulk-toast';
                 toast.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${data.message}`;
                 document.body.appendChild(toast);
                 setTimeout(() => toast.classList.add('show'), 10);
@@ -1219,17 +1219,17 @@
     function openAIModal(title) {
         document.getElementById('aiModalTitle').textContent = title;
         document.getElementById('aiModalBody').innerHTML = `
-            <div class="ai-process-container">
-                <div class="ai-process-header">
-                    <div class="ai-process-icon">
+            <div class="aim__process-container">
+                <div class="aim__process-header">
+                    <div class="aim__process-icon">
                         <i class="fa-solid fa-robot"></i>
                     </div>
-                    <div class="ai-process-title">AI Processing...</div>
-                    <div class="ai-process-subtitle">Please wait while AI analyzes the data</div>
+                    <div class="aim__process-title">AI Processing...</div>
+                    <div class="aim__process-subtitle">Please wait while AI analyzes the data</div>
                 </div>
-                <div class="ai-loading">
-                    <div class="ai-loading-spinner"></div>
-                    <div class="ai-loading-text">Analyzing...</div>
+                <div class="aim__loading">
+                    <div class="aim__loading-spinner"></div>
+                    <div class="aim__loading-text">Analyzing...</div>
                 </div>
             </div>
         `;
@@ -1292,12 +1292,12 @@
 
                     let issuesHtml = '';
                     if (result.issues && result.issues.length > 0) {
-                        issuesHtml = '<ul class="ai-issues-list mt-3">';
+                        issuesHtml = '<ul class="aim__issues-list mt-3">';
                         for (const issue of result.issues) {
                             issuesHtml += `
                                 <li>
                                     <i class="fa-solid fa-circle-exclamation"></i>
-                                    <div class="ai-issue-content">
+                                    <div class="aim__issue-content">
                                         <div class="issue-field">${issue.field}</div>
                                         <div class="issue-msg">${issue.issue}</div>
                                         ${issue.suggestion ? `<div class="issue-suggestion">${issue.suggestion}</div>` : ''}
@@ -1310,12 +1310,12 @@
 
                     let warningsHtml = '';
                     if (result.warnings && result.warnings.length > 0) {
-                        warningsHtml = '<ul class="ai-issues-list mt-2">';
+                        warningsHtml = '<ul class="aim__issues-list mt-2">';
                         for (const warning of result.warnings) {
                             warningsHtml += `
                                 <li>
                                     <i class="fa-solid fa-triangle-exclamation"></i>
-                                    <div class="ai-issue-content">
+                                    <div class="aim__issue-content">
                                         <div class="issue-field">${warning.field}</div>
                                         <div class="issue-msg">${warning.issue}</div>
                                         ${warning.suggestion ? `<div class="issue-suggestion">${warning.suggestion}</div>` : ''}
@@ -1327,26 +1327,26 @@
                     }
 
                     const cardHtml = `
-                        <div class="ai-result-card" data-order-id="${order.id}">
-                            <div class="ai-result-card-header">
+                        <div class="aim__result-card" data-order-id="${order.id}">
+                            <div class="aim__result-card-header">
                                 <i class="fa-solid fa-clipboard-check"></i>
                                 <strong>${order.orderNumber}</strong>
                                 <span class="ms-auto">${statusBadge}</span>
                             </div>
-                            <div class="ai-result-grid">
-                                <div class="ai-result-item">
+                            <div class="aim__result-grid">
+                                <div class="aim__result-item">
                                     <span class="label">Issues</span>
                                     <span class="value ${result.summary.total_issues > 0 ? 'danger' : 'success'}">${result.summary.total_issues}</span>
                                 </div>
-                                <div class="ai-result-item">
+                                <div class="aim__result-item">
                                     <span class="label">Warnings</span>
                                     <span class="value ${result.summary.total_warnings > 0 ? 'warning' : 'success'}">${result.summary.total_warnings}</span>
                                 </div>
-                                <div class="ai-result-item">
+                                <div class="aim__result-item">
                                     <span class="label">Customer</span>
                                     <span class="value">${result.summary.customer_name || '-'}</span>
                                 </div>
-                                <div class="ai-result-item">
+                                <div class="aim__result-item">
                                     <span class="label">Status</span>
                                     <span class="value">${result.summary.current_status}</span>
                                 </div>
@@ -1359,8 +1359,8 @@
                     AIBulkProcess.addResult(order.orderNumber, true, cardHtml);
                 } else {
                     const errorHtml = `
-                        <div class="ai-result-card" data-order-id="${order.id}">
-                            <div class="ai-result-card-header">
+                        <div class="aim__result-card" data-order-id="${order.id}">
+                            <div class="aim__result-card-header">
                                 <i class="fa-solid fa-circle-exclamation text-danger"></i>
                                 <strong>${order.orderNumber}</strong>
                             </div>
@@ -1372,8 +1372,8 @@
                 }
             } catch (error) {
                 const errorHtml = `
-                    <div class="ai-result-card" data-order-id="${order.id}">
-                        <div class="ai-result-card-header">
+                    <div class="aim__result-card" data-order-id="${order.id}">
+                        <div class="aim__result-card-header">
                             <i class="fa-solid fa-circle-exclamation text-danger"></i>
                             <strong>${order.orderNumber}</strong>
                         </div>
@@ -1406,8 +1406,8 @@
 
             if (!order.customerPhone) {
                 const warnHtml = `
-                    <div class="ai-result-card" data-order-id="${order.id}">
-                        <div class="ai-result-card-header">
+                    <div class="aim__result-card" data-order-id="${order.id}">
+                        <div class="aim__result-card-header">
                             <i class="fa-solid fa-shield-halved"></i>
                             <strong>${order.orderNumber}</strong>
                         </div>
@@ -1445,29 +1445,29 @@
                                      riskLevel.includes('elevated') ? 'elevated' : 'high';
 
                     const cardHtml = `
-                        <div class="ai-result-card" data-order-id="${order.id}">
-                            <div class="ai-result-card-header">
+                        <div class="aim__result-card" data-order-id="${order.id}">
+                            <div class="aim__result-card-header">
                                 <i class="fa-solid fa-shield-halved"></i>
                                 <strong>${order.orderNumber}</strong>
-                                <span class="ms-auto ai-risk-badge ${riskClass}">
+                                <span class="ms-auto aim__risk-badge ${riskClass}">
                                     <i class="fa-solid fa-circle"></i>
                                     ${riskLabels[riskLevel] || result.risk_level}
                                 </span>
                             </div>
-                            <div class="ai-result-grid">
-                                <div class="ai-result-item">
+                            <div class="aim__result-grid">
+                                <div class="aim__result-item">
                                     <span class="label">Risk Score</span>
                                     <span class="value">${(result.risk_score * 100).toFixed(0)}%</span>
                                 </div>
-                                <div class="ai-result-item">
+                                <div class="aim__result-item">
                                     <span class="label">Total Orders</span>
                                     <span class="value">${result.order_history.total_orders}</span>
                                 </div>
-                                <div class="ai-result-item">
+                                <div class="aim__result-item">
                                     <span class="label">Delivered</span>
                                     <span class="value success">${result.order_history.delivered_orders}</span>
                                 </div>
-                                <div class="ai-result-item">
+                                <div class="aim__result-item">
                                     <span class="label">Refused COD</span>
                                     <span class="value ${result.order_history.cod_refused_orders > 0 ? 'danger' : ''}">${result.order_history.cod_refused_orders}</span>
                                 </div>
@@ -1486,8 +1486,8 @@
                     AIBulkProcess.addResult(order.orderNumber, true, cardHtml);
                 } else {
                     const errorHtml = `
-                        <div class="ai-result-card" data-order-id="${order.id}">
-                            <div class="ai-result-card-header">
+                        <div class="aim__result-card" data-order-id="${order.id}">
+                            <div class="aim__result-card-header">
                                 <i class="fa-solid fa-circle-exclamation text-danger"></i>
                                 <strong>${order.orderNumber}</strong>
                             </div>
@@ -1499,8 +1499,8 @@
                 }
             } catch (error) {
                 const errorHtml = `
-                    <div class="ai-result-card" data-order-id="${order.id}">
-                        <div class="ai-result-card-header">
+                    <div class="aim__result-card" data-order-id="${order.id}">
+                        <div class="aim__result-card-header">
                             <i class="fa-solid fa-circle-exclamation text-danger"></i>
                             <strong>${order.orderNumber}</strong>
                         </div>
@@ -1546,25 +1546,25 @@
                 if (data.success) {
                     const result = data.data;
                     const cardHtml = `
-                        <div class="ai-result-card" data-order-id="${order.id}">
-                            <div class="ai-result-card-header">
+                        <div class="aim__result-card" data-order-id="${order.id}">
+                            <div class="aim__result-card-header">
                                 <i class="fa-solid fa-clock"></i>
                                 <strong>${order.orderNumber}</strong>
                             </div>
-                            <div class="ai-result-grid">
-                                <div class="ai-result-item">
+                            <div class="aim__result-grid">
+                                <div class="aim__result-item">
                                     <span class="label">Est. Time</span>
                                     <span class="value success">${result.estimate.min_minutes}-${result.estimate.max_minutes} min</span>
                                 </div>
-                                <div class="ai-result-item">
+                                <div class="aim__result-item">
                                     <span class="label">Expected</span>
                                     <span class="value">${result.arrival_window.expected}</span>
                                 </div>
-                                <div class="ai-result-item">
+                                <div class="aim__result-item">
                                     <span class="label">Pickup Zone</span>
                                     <span class="value">${result.pickup_zone?.number || '-'} (${result.pickup_zone?.name || ''})</span>
                                 </div>
-                                <div class="ai-result-item">
+                                <div class="aim__result-item">
                                     <span class="label">Delivery Zone</span>
                                     <span class="value">${result.delivery_zone?.number || '-'} (${result.delivery_zone?.name || ''})</span>
                                 </div>
@@ -1581,8 +1581,8 @@
                     AIBulkProcess.addResult(order.orderNumber, true, cardHtml);
                 } else {
                     const errorHtml = `
-                        <div class="ai-result-card" data-order-id="${order.id}">
-                            <div class="ai-result-card-header">
+                        <div class="aim__result-card" data-order-id="${order.id}">
+                            <div class="aim__result-card-header">
                                 <i class="fa-solid fa-circle-exclamation text-danger"></i>
                                 <strong>${order.orderNumber}</strong>
                             </div>
@@ -1594,8 +1594,8 @@
                 }
             } catch (error) {
                 const errorHtml = `
-                    <div class="ai-result-card" data-order-id="${order.id}">
-                        <div class="ai-result-card-header">
+                    <div class="aim__result-card" data-order-id="${order.id}">
+                        <div class="aim__result-card-header">
                             <i class="fa-solid fa-circle-exclamation text-danger"></i>
                             <strong>${order.orderNumber}</strong>
                         </div>
@@ -1630,23 +1630,23 @@
 
         const modalBody = document.getElementById('aiModalBody');
         modalBody.innerHTML = `
-            <div class="ai-tools-section">
+            <div class="aim__tools-section">
                 <h6><i class="fa-solid fa-robot"></i> AI Analysis Tools</h6>
                 <p class="text-muted small mb-3">Select a tool to analyze this order:</p>
-                <div class="ai-tools-buttons">
-                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderToolFromData('parse')">
+                <div class="aim__tools-buttons">
+                    <button type="button" class="aim__btn-tool" onclick="runSingleOrderToolFromData('parse')">
                         <i class="fa-solid fa-location-dot"></i> Parse Address
                     </button>
-                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderToolFromData('verify')">
+                    <button type="button" class="aim__btn-tool" onclick="runSingleOrderToolFromData('verify')">
                         <i class="fa-solid fa-clipboard-check"></i> Verify Order
                     </button>
-                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderToolFromData('cod')">
+                    <button type="button" class="aim__btn-tool" onclick="runSingleOrderToolFromData('cod')">
                         <i class="fa-solid fa-shield-halved"></i> COD Risk
                     </button>
-                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderToolFromData('delivery')">
+                    <button type="button" class="aim__btn-tool" onclick="runSingleOrderToolFromData('delivery')">
                         <i class="fa-solid fa-clock"></i> Estimate Time
                     </button>
-                    <button type="button" class="btn-ai-tool" onclick="runSingleOrderToolFromData('driver')">
+                    <button type="button" class="aim__btn-tool" onclick="runSingleOrderToolFromData('driver')">
                         <i class="fa-solid fa-motorcycle"></i> Suggest Driver
                     </button>
                 </div>
@@ -1674,9 +1674,9 @@
     async function runSingleOrderTool(orderId, orderNumber, phone, address, toolType) {
         const resultDiv = document.getElementById('singleOrderResult');
         resultDiv.innerHTML = `
-            <div class="ai-loading">
-                <div class="ai-loading-spinner"></div>
-                <div class="ai-loading-text">Analyzing...</div>
+            <div class="aim__loading">
+                <div class="aim__loading-spinner"></div>
+                <div class="aim__loading-text">Analyzing...</div>
             </div>
         `;
 
@@ -1756,21 +1756,21 @@
                 }
 
                 document.getElementById('aiModalBody').innerHTML = `
-                    <div class="ai-result-card">
-                        <div class="ai-result-card-header">
+                    <div class="aim__result-card">
+                        <div class="aim__result-card-header">
                             <i class="fa-solid fa-motorcycle"></i>
                             <strong>Driver Suggestions for ${orderNumber}</strong>
                         </div>
-                        <div class="ai-result-grid">
-                            <div class="ai-result-item">
+                        <div class="aim__result-grid">
+                            <div class="aim__result-item">
                                 <span class="label">Delivery Zone</span>
                                 <span class="value">${result.delivery_zone?.number || '-'} (${result.delivery_zone?.name || ''})</span>
                             </div>
-                            <div class="ai-result-item">
+                            <div class="aim__result-item">
                                 <span class="label">Available Drivers</span>
                                 <span class="value">${result.total_available_drivers}</span>
                             </div>
-                            <div class="ai-result-item">
+                            <div class="aim__result-item">
                                 <span class="label">Suggestions</span>
                                 <span class="value success">${result.count}</span>
                             </div>

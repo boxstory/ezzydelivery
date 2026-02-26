@@ -10,28 +10,28 @@
 {% block content %}
 <div class="col-12 p-3">
     <!-- Page Header -->
-    <header class="page-header">
-        <div class="page-header-left">
+    <header class="pg-hdr">
+        <div class="pg-hdr__left">
             <h2><i class="fa-solid fa-clock-rotate-left me-1"></i>Incompleted Tasks</h2>
-            <span class="page-header-subtitle">| Pending delivery tasks</span>
+            <span class="pg-hdr__subtitle">| Pending delivery tasks</span>
         </div>
-        <div class="page-header-right">
-            <div class="page-header-count">
-                <span class="count-value">{{ dl_tasks.paginator.count|default:"0" }}</span>
-                <span class="count-label">pending</span>
+        <div class="pg-hdr__right">
+            <div class="pg-hdr__count">
+                <span class="pg-hdr__count-value">{{ dl_tasks.paginator.count|default:"0" }}</span>
+                <span class="pg-hdr__count-label">pending</span>
             </div>
         </div>
     </header>
 
     <!-- Filter Section -->
-    <div class="filter-section">
-        <div class="filter-toggle" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+    <div class="pg-filter">
+        <div class="pg-filter__toggle" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
             <div class="d-flex align-items-center gap-3">
                 <div>
                     <i class="fa-solid fa-filter me-2"></i>
                     <strong>Filter Tasks</strong>
                 </div>
-                <div id="activeFiltersCount" class="active-filters-count">
+                <div id="activeFiltersCount" class="pg-filter__active-count">
                     <span class="badge bg-primary" id="filterCountBadge">0</span>
                     <span class="small text-muted ms-1">active filters</span>
                 </div>
@@ -186,7 +186,7 @@
                 </div>
 
                 <!-- Active Filters Display -->
-                <div id="activeFilterTags" class="active-filter-tags mt-3">
+                <div id="activeFilterTags" class="pg-filter__tags mt-3">
                     <div class="d-flex align-items-center gap-2 flex-wrap">
                         <span class="small fw-bold text-muted">Active Filters:</span>
                         <div id="filterTagsContainer" class="d-flex gap-2 flex-wrap"></div>
@@ -198,13 +198,13 @@
 
     <!-- Tasks List -->
     {% if dl_tasks %}
-    <div class="tasks-list">
+    <div class="tsk-card">
         {% for dl in dl_tasks %}
-        <div class="task-card">
+        <div class="tsk-card__item">
             <!-- Task Header -->
-            <div class="task-header">
+            <div class="tsk-card__header">
                 <div>
-                    <div class="task-id">
+                    <div class="tsk-card__id">
                         <i class="fa-solid fa-hashtag me-1"></i>{{ dl.dl_task_number }}
                     </div>
                     <small class="text-muted">
@@ -226,46 +226,46 @@
             </div>
 
             <!-- Task Details Grid -->
-            <div class="task-details">
-                <div class="detail-item">
-                    <div class="detail-label">Customer Name</div>
-                    <div class="detail-value">
+            <div class="tsk-card__details">
+                <div class="tsk-card__detail">
+                    <div class="tsk-card__detail-label">Customer Name</div>
+                    <div class="tsk-card__detail-value">
                         <i class="fa-solid fa-user me-1 text-muted"></i>{{ dl.order.customer_name|default:"N/A" }}
                     </div>
                 </div>
-                <div class="detail-item">
-                    <div class="detail-label">Mobile</div>
-                    <div class="detail-value">
+                <div class="tsk-card__detail">
+                    <div class="tsk-card__detail-label">Mobile</div>
+                    <div class="tsk-card__detail-value">
                         <i class="fa-solid fa-phone me-1 text-muted"></i>{{ dl.order.customer_phone|default:"N/A" }}
                     </div>
                 </div>
-                <div class="detail-item">
-                    <div class="detail-label">Order Status</div>
-                    <div class="detail-value">
+                <div class="tsk-card__detail">
+                    <div class="tsk-card__detail-label">Order Status</div>
+                    <div class="tsk-card__detail-value">
                         <i class="fa-solid fa-info-circle me-1 text-muted"></i>{{ dl.order_status|default:"N/A" }}
                     </div>
                 </div>
-                <div class="detail-item">
-                    <div class="detail-label">DMS Task Number</div>
-                    <div class="detail-value">
+                <div class="tsk-card__detail">
+                    <div class="tsk-card__detail-label">DMS Task Number</div>
+                    <div class="tsk-card__detail-value">
                         <i class="fa-solid fa-code me-1 text-muted"></i>{{ dl.dl_task_number_dms|default:"N/A" }}
                     </div>
                 </div>
             </div>
 
             <!-- Location Section -->
-            <div class="location-section d-flex justify-content-between">
-                <div class="location-item">
-                    <i class="fa-solid fa-location-dot location-icon text-success"></i>
-                    <div class="location-text">
+            <div class="tsk-card__location d-flex justify-content-between">
+                <div class="tsk-card__loc-item">
+                    <i class="fa-solid fa-location-dot tsk-card__loc-icon text-success"></i>
+                    <div class="tsk-card__loc-text">
                         <strong class="d-block mb-1">Pickup Location</strong>
                         {{ dl.pickup_location|default:"N/A" }}
                     </div>
                 </div>
                 {% if dl.order.customer_address %}
-                <div class="location-item">
-                    <i class="fa-solid fa-location-dot location-icon text-danger"></i>
-                    <div class="location-text">
+                <div class="tsk-card__loc-item">
+                    <i class="fa-solid fa-location-dot tsk-card__loc-icon text-danger"></i>
+                    <div class="tsk-card__loc-text">
                         <strong class="d-block mb-1">Delivery Address</strong>
                         {{ dl.order.customer_address }}
                     </div>
@@ -275,7 +275,7 @@
 
             <!-- Driver Info -->
             {% if dl.driver %}
-            <div class="driver-info">
+            <div class="tsk-card__driver">
                 <div>
                     <i class="fa-solid fa-user-tie me-2 text-primary"></i>
                     <strong>Driver:</strong> {{ dl.driver }}
@@ -285,7 +285,7 @@
             {% endif %}
 
             <!-- Quick Actions -->
-            <div class="quick-actions">
+            <div class="tsk-card__actions">
                 <div class="row g-2">
                     <!-- Contact Customer -->
                     <div class="col-md-6 col-lg-3">
@@ -351,7 +351,7 @@
             </div>
 
             <!-- Action Section -->
-            <div class="action-section">
+            <div class="tsk-card__action-bar">
                 <a href="#" class="btn btn-dark">
                     <i class="fa-solid fa-eye me-2"></i>View Details
                 </a>
@@ -391,7 +391,7 @@
     src="{% static 'orders/js/orders_main.js' %}"></script>
 <script>
     // Filter toggle animation
-    const filterToggle = document.querySelector('.filter-toggle');
+    const filterToggle = document.querySelector('.pg-filter__toggle');
     const filterCollapse = document.getElementById('filterCollapse');
 
     if (filterToggle && filterCollapse) {
@@ -503,7 +503,7 @@
                 var key = entry[0];
                 var value = entry[1];
                 var tag = document.createElement('span');
-                tag.className = 'filter-tag';
+                tag.className = 'pg-filter__tag';
 
                 var strong = document.createElement('strong');
                 strong.textContent = filterLabels[key] + ':';

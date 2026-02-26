@@ -16,7 +16,7 @@
 
 {% block content %}
 <!-- Hero Section -->
-<div class="pricing-hero">
+<div class="wppi__hero">
   <div class="container">
     <div class="text-center">
       <h1 class="display-4 fw-bold mb-3">Get Your Custom Delivery Quote</h1>
@@ -28,35 +28,35 @@
 
 <div class="container mb-5">
   <!-- Progress Indicator -->
-  <div class="progress-container">
-    <div class="step-indicator">
-      <div class="step-item {% if current_step == 1 %}active{% elif current_step > 1 %}completed{% endif %}">
-        <div class="step-circle">
+  <div class="wppi__progress">
+    <div class="wppi__steps">
+      <div class="wppi__step {% if current_step == 1 %}active{% elif current_step > 1 %}completed{% endif %}">
+        <div class="wppi__step-circle">
           {% if current_step > 1 %}<i class="fa fa-check"></i>{% else %}1{% endif %}
         </div>
-        <div class="step-label">Company & Product</div>
+        <div class="wppi__step-label">Company & Product</div>
       </div>
-      <div class="step-item {% if current_step == 2 %}active{% elif current_step > 2 %}completed{% endif %}">
-        <div class="step-circle">
+      <div class="wppi__step {% if current_step == 2 %}active{% elif current_step > 2 %}completed{% endif %}">
+        <div class="wppi__step-circle">
           {% if current_step > 2 %}<i class="fa fa-check"></i>{% else %}2{% endif %}
         </div>
-        <div class="step-label">Operations & Orders</div>
+        <div class="wppi__step-label">Operations & Orders</div>
       </div>
-      <div class="step-item {% if current_step == 3 %}active{% endif %}">
-        <div class="step-circle">3</div>
-        <div class="step-label">Delivery & Pickup</div>
+      <div class="wppi__step {% if current_step == 3 %}active{% endif %}">
+        <div class="wppi__step-circle">3</div>
+        <div class="wppi__step-label">Delivery & Pickup</div>
       </div>
     </div>
   </div>
 
   <!-- Multi-Step Form -->
-  <div class="pricing-form-card">
+  <div class="wppi__form-card">
     <form method="POST" id="inquiryForm" novalidate>
       {% csrf_token %}
 
       <!-- Step 1: Company & Product Details -->
-      <div class="step-content" id="step1" style="{% if current_step != 1 %}display: none;{% endif %}">
-        <h2 class="form-section-title">Company & Product Details</h2>
+      <div class="wppi__step-content" id="step1" style="{% if current_step != 1 %}display: none;{% endif %}">
+        <h2 class="wppi__section-title">Company & Product Details</h2>
 
         <div class="row g-3">
           <div class="col-md-6">
@@ -112,8 +112,8 @@
           <div class="col-md-6">
             <label class="form-label">Average Order Value (QAR) *</label>
             <input type="hidden" name="average_order_value_qar" id="average_order_value_qar" value="{{ saved_data.average_order_value_qar }}" required>
-            <div class="custom-select-wrapper" data-target="average_order_value_qar">
-              <div class="custom-select-trigger {% if not saved_data.average_order_value_qar %}placeholder{% endif %}">
+            <div class="wppi__select" data-target="average_order_value_qar">
+              <div class="wppi__select-trigger {% if not saved_data.average_order_value_qar %}placeholder{% endif %}">
                 <span>{% if saved_data.average_order_value_qar %}{{ saved_data.average_order_value_qar }} QAR{% else %}Select range{% endif %}</span>
                 <i class="fa-solid fa-chevron-down trigger-chevron"></i>
               </div>
@@ -130,8 +130,8 @@
           <div class="col-md-6">
             <label class="form-label">How long have you been operating? *</label>
             <input type="hidden" name="business_operating_age" id="business_operating_age" value="{{ saved_data.business_operating_age }}" required>
-            <div class="custom-select-wrapper" data-target="business_operating_age">
-              <div class="custom-select-trigger {% if not saved_data.business_operating_age %}placeholder{% endif %}">
+            <div class="wppi__select" data-target="business_operating_age">
+              <div class="wppi__select-trigger {% if not saved_data.business_operating_age %}placeholder{% endif %}">
                 <span>{% if saved_data.business_operating_age %}{{ saved_data.business_operating_age }}{% else %}Select{% endif %}</span>
                 <i class="fa-solid fa-chevron-down trigger-chevron"></i>
               </div>
@@ -145,7 +145,7 @@
           </div>
           <div class="col-md-12">
             <label class="form-label">Is this a personalized product? *</label>
-            <div class="radio-group radio-group--inline">
+            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_personalized_product" id="personalized_yes"
                        value="True" {% if saved_data.is_personalized_product == 'True' %}checked{% endif %} required>
@@ -161,7 +161,7 @@
           <!-- Always visible — triggers the chain -->
           <div class="col-md-12">
             <label class="form-label">Is your business located in Qatar?</label>
-            <div class="radio-group radio-group--inline">
+            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_located_in_qatar" id="located_yes"
                        value="True" {% if saved_data.is_located_in_qatar == 'True' %}checked{% endif %} required>
@@ -177,7 +177,7 @@
           <!-- Shown when located in Qatar = Yes -->
           <div class="col-md-12" id="is_registered_company_in_qatar_field" style="{% if saved_data.is_located_in_qatar != 'True' %}display:none;{% endif %}">
             <label class="form-label">Is your company registered in Qatar?</label>
-            <div class="radio-group radio-group--inline">
+            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_registered_company_in_qatar" id="registered_yes"
                        value="True" {% if saved_data.is_registered_company_in_qatar == 'True' %}checked{% endif %}>
@@ -194,8 +194,8 @@
           <div class="col-md-12" id="business_location_country_field" style="{% if saved_data.is_located_in_qatar != 'False' %}display:none;{% endif %}">
             <label class="form-label">Where is your business located?</label>
             <input type="hidden" name="business_location_country" id="business_location_country" value="{{ saved_data.business_location_country }}">
-            <div class="custom-select-wrapper" data-target="business_location_country">
-              <div class="custom-select-trigger {% if not saved_data.business_location_country %}placeholder{% endif %}">
+            <div class="wppi__select" data-target="business_location_country">
+              <div class="wppi__select-trigger {% if not saved_data.business_location_country %}placeholder{% endif %}">
                 <span>{{ saved_data.business_location_country|default:"Select country" }}</span>
                 <i class="fa-solid fa-chevron-down trigger-chevron"></i>
               </div>
@@ -216,7 +216,7 @@
           </div>
           <div class="col-md-12">
             <label class="form-label">Do you have a team available in Qatar? *</label>
-            <div class="radio-group radio-group--inline">
+            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_team_available_in_qatar" id="team_yes"
                        value="True" {% if saved_data.is_team_available_in_qatar == 'True' %}checked{% endif %} required>
@@ -231,7 +231,7 @@
           </div>
         </div>
 
-        <div class="form-navigation">
+        <div class="wppi__nav">
           <div></div>
           <button type="submit" name="next_step" class="btn btn-primary btn-lg">
             Next Step <i class="fa fa-arrow-right ms-2"></i>
@@ -240,8 +240,8 @@
       </div>
 
       <!-- Step 2: Operations & Orders -->
-      <div class="step-content" id="step2" style="{% if current_step != 2 %}display: none;{% endif %}">
-        <h2 class="form-section-title">Operations & Orders Details</h2>
+      <div class="wppi__step-content" id="step2" style="{% if current_step != 2 %}display: none;{% endif %}">
+        <h2 class="wppi__section-title">Operations & Orders Details</h2>
 
         <div class="row g-3">
           <div class="col-md-12">
@@ -298,7 +298,7 @@
           </div>
           <div class="col-md-12">
             <label class="form-label">Do you require COD (Cash on Delivery) service? *</label>
-            <div class="radio-group radio-group--inline">
+            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_required_COD_service" id="cod_yes"
                        value="True" {% if saved_data.is_required_COD_service == 'True' %}checked{% endif %}>
@@ -313,7 +313,7 @@
           </div>
           <div class="col-md-12">
             <label class="form-label">Do you need fulfillment service to operate from outside Qatar? *</label>
-            <div class="radio-group radio-group--inline">
+            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_operate_from_outside_qatar"
                        id="fulfillment_outside_yes" value="True" {% if saved_data.is_required_fulfillment_service_for_operate_from_outside_qatar == 'True' %}checked{% endif %}>
@@ -328,7 +328,7 @@
           </div>
           <div class="col-md-12">
             <label class="form-label">Do you need fulfillment service to make a hub in Doha? *</label>
-            <div class="radio-group radio-group--inline">
+            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_required_fulfillment_service_for_make_hub_in_doha"
                        id="fulfillment_hub_yes" value="True" {% if saved_data.is_required_fulfillment_service_for_make_hub_in_doha == 'True' %}checked{% endif %}>
@@ -344,8 +344,8 @@
           <div class="col-md-6">
             <label class="form-label">Current Courier / 3PL Provider</label>
             <input type="hidden" name="current_courier_provider" id="current_courier_provider" value="{{ saved_data.current_courier_provider }}">
-            <div class="custom-select-wrapper" data-target="current_courier_provider">
-              <div class="custom-select-trigger {% if not saved_data.current_courier_provider %}placeholder{% endif %}">
+            <div class="wppi__select" data-target="current_courier_provider">
+              <div class="wppi__select-trigger {% if not saved_data.current_courier_provider %}placeholder{% endif %}">
                 <span>{{ saved_data.current_courier_provider|default:"Select provider" }}</span>
                 <i class="fa-solid fa-chevron-down trigger-chevron"></i>
               </div>
@@ -361,8 +361,8 @@
           <div class="col-md-6">
             <label class="form-label">Delivery Coverage</label>
             <input type="hidden" name="delivery_coverage" id="delivery_coverage" value="{{ saved_data.delivery_coverage }}">
-            <div class="custom-select-wrapper" data-target="delivery_coverage">
-              <div class="custom-select-trigger {% if not saved_data.delivery_coverage %}placeholder{% endif %}">
+            <div class="wppi__select" data-target="delivery_coverage">
+              <div class="wppi__select-trigger {% if not saved_data.delivery_coverage %}placeholder{% endif %}">
                 <span>{{ saved_data.delivery_coverage|default:"Select coverage" }}</span>
                 <i class="fa-solid fa-chevron-down trigger-chevron"></i>
               </div>
@@ -375,7 +375,7 @@
           </div>
           <div class="col-md-12">
             <label class="form-label">Do you require return / reverse logistics? *</label>
-            <div class="radio-group radio-group--inline">
+            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_return_logistics_required"
                        id="return_yes" value="True" {% if saved_data.is_return_logistics_required == 'True' %}checked{% endif %}>
@@ -391,8 +391,8 @@
           <div class="col-md-6">
             <label class="form-label">When do you want to start?</label>
             <input type="hidden" name="preferred_start_date" id="preferred_start_date" value="{{ saved_data.preferred_start_date }}">
-            <div class="custom-select-wrapper" data-target="preferred_start_date">
-              <div class="custom-select-trigger {% if not saved_data.preferred_start_date %}placeholder{% endif %}">
+            <div class="wppi__select" data-target="preferred_start_date">
+              <div class="wppi__select-trigger {% if not saved_data.preferred_start_date %}placeholder{% endif %}">
                 <span>{{ saved_data.preferred_start_date|default:"Select timeline" }}</span>
                 <i class="fa-solid fa-chevron-down trigger-chevron"></i>
               </div>
@@ -407,7 +407,7 @@
           </div>
         </div>
 
-        <div class="form-navigation">
+        <div class="wppi__nav">
           <button type="submit" name="prev_step" class="btn btn-secondary btn-lg">
             <i class="fa fa-arrow-left me-2"></i> Previous
           </button>
@@ -418,8 +418,8 @@
       </div>
 
       <!-- Step 3: Delivery & Pickup Details -->
-      <div class="step-content" id="step3" style="{% if current_step != 3 %}display: none;{% endif %}">
-        <h2 class="form-section-title">Delivery & Pickup Details</h2>
+      <div class="wppi__step-content" id="step3" style="{% if current_step != 3 %}display: none;{% endif %}">
+        <h2 class="wppi__section-title">Delivery & Pickup Details</h2>
 
         <div class="row g-3">
           <div class="col-md-12">
@@ -437,7 +437,7 @@
           </div>
           <div class="col-md-12">
             <label class="form-label">Frequent same-day pick and delivery required? *</label>
-            <div class="radio-group radio-group--inline">
+            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_frequent_same_day_pick_and_delivery_required"
                        id="sameday_yes" value="True" {% if saved_data.is_frequent_same_day_pick_and_delivery_required == 'True' %}checked{% endif %}>
@@ -476,7 +476,7 @@
           </div>
           <div class="col-md-12">
             <label class="form-label">Special handling required? *</label>
-            <div class="radio-group radio-group--inline">
+            <div class="wppi__radio-group wppi__wppi__radio-group--inline">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="is_special_handling_required"
                        id="special_yes" value="True" {% if saved_data.is_special_handling_required == 'True' %}checked{% endif %}>
@@ -571,7 +571,7 @@
           </div>
         </div>
 
-        <div class="form-navigation">
+        <div class="wppi__nav">
           <button type="submit" name="prev_step" class="btn btn-secondary btn-lg">
             <i class="fa fa-arrow-left me-2"></i> Previous
           </button>
@@ -622,7 +622,7 @@
             <label for="wa_additional_info" class="form-label">Additional Information (Optional)</label>
             <textarea class="form-control" id="wa_additional_info" name="wa_additional_info" rows="3"></textarea>
           </div>
-          <button type="submit" class="btn btn-whatsapp w-100">
+          <button type="submit" class="btn wppi__btn--whatsapp w-100">
             <i class="fa-brands fa-whatsapp me-2"></i>Connect via WhatsApp
           </button>
         </form>
@@ -637,8 +637,8 @@
 // ── Custom Dropdown ─────────────────────────────────────────────────────────
 (function () {
   function initCustomSelects() {
-    document.querySelectorAll('.custom-select-wrapper').forEach(function (wrapper) {
-      var trigger = wrapper.querySelector('.custom-select-trigger');
+    document.querySelectorAll('.wppi__select').forEach(function (wrapper) {
+      var trigger = wrapper.querySelector('.wppi__select-trigger');
       var options = wrapper.querySelector('.custom-select-options');
       var targetId = wrapper.dataset.target;
       var hiddenInput = document.getElementById(targetId);

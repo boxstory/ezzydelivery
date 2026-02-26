@@ -4,30 +4,30 @@
 
 {% block store_content %}
 <!-- Stats Grid -->
-<div class="stat-grid">
-    <div class="stat-card holding">
-        <div class="stat-value">{{ batch_stats.holding|default:0 }}</div>
-        <div class="stat-label">Holding</div>
+<div class="dsp__stat-grid">
+    <div class="dsp__stat-card dsp__stat-card--holding">
+        <div class="dsp__stat-value">{{ batch_stats.holding|default:0 }}</div>
+        <div class="dsp__stat-label">Holding</div>
     </div>
-    <div class="stat-card ready">
-        <div class="stat-value">{{ batch_stats.ready|default:0 }}</div>
-        <div class="stat-label">Ready</div>
+    <div class="dsp__stat-card dsp__stat-card--ready">
+        <div class="dsp__stat-value">{{ batch_stats.ready|default:0 }}</div>
+        <div class="dsp__stat-label">Ready</div>
     </div>
-    <div class="stat-card assigned">
-        <div class="stat-value">{{ batch_stats.assigned|default:0 }}</div>
-        <div class="stat-label">Assigned</div>
+    <div class="dsp__stat-card dsp__stat-card--assigned">
+        <div class="dsp__stat-value">{{ batch_stats.assigned|default:0 }}</div>
+        <div class="dsp__stat-label">Assigned</div>
     </div>
-    <div class="stat-card in-progress">
-        <div class="stat-value">{{ batch_stats.in_progress|default:0 }}</div>
-        <div class="stat-label">In Progress</div>
+    <div class="dsp__stat-card dsp__stat-card--in-progress">
+        <div class="dsp__stat-value">{{ batch_stats.in_progress|default:0 }}</div>
+        <div class="dsp__stat-label">In Progress</div>
     </div>
-    <div class="stat-card completed">
-        <div class="stat-value">{{ batch_stats.completed|default:0 }}</div>
-        <div class="stat-label">Completed Today</div>
+    <div class="dsp__stat-card dsp__stat-card--completed">
+        <div class="dsp__stat-value">{{ batch_stats.completed|default:0 }}</div>
+        <div class="dsp__stat-label">Completed Today</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-value">{{ active_rider_count|default:0 }}</div>
-        <div class="stat-label">Active Riders</div>
+    <div class="dsp__stat-card">
+        <div class="dsp__stat-value">{{ active_rider_count|default:0 }}</div>
+        <div class="dsp__stat-label">Active Riders</div>
     </div>
 </div>
 
@@ -58,15 +58,15 @@
     </h5>
 
     {% if active_shifts %}
-    <div class="riders-grid">
+    <div class="dsp__riders-grid">
         {% for shift in active_shifts %}
-        <div class="rider-card">
-            <div class="rider-avatar">
+        <div class="dsp__rider-card">
+            <div class="dsp__rider-avatar">
                 {{ shift.rider.driver_code|slice:":2" }}
             </div>
-            <div class="rider-name">{{ shift.rider.user.first_name }} {{ shift.rider.user.last_name }}</div>
-            <div class="rider-code">{{ shift.rider.driver_code }}</div>
-            <div class="rider-stats">
+            <div class="dsp__rider-name">{{ shift.rider.user.first_name }} {{ shift.rider.user.last_name }}</div>
+            <div class="dsp__rider-code">{{ shift.rider.driver_code }}</div>
+            <div class="dsp__rider-stats">
                 <span><i class="fa-solid fa-box me-1"></i>{{ shift.orders_delivered }}</span>
                 <span><i class="fa-solid fa-boxes-stacked me-1"></i>{{ shift.batches_completed }}</span>
             </div>

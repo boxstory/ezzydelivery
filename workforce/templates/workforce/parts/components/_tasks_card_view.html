@@ -12,13 +12,13 @@ Each task should have:
 {% endcomment %}
 {% load custom_filters %}
 
-<div class="tasks-list" id="tasksContainer" style="display: none;">
+<div class="tsk-card" id="tasksContainer" style="display: none;">
     {% for dl in tasks %}
-    <div class="task-card">
+    <div class="tsk-card__item">
         <!-- Task Header -->
-        <div class="task-header">
+        <div class="tsk-card__header">
             <div>
-                <div class="task-id">
+                <div class="tsk-card__id">
                     <i class="fa-solid fa-hashtag me-1"></i>{{ dl.dl_task_number }}
                 </div>
                 <small class="text-muted">
@@ -39,46 +39,46 @@ Each task should have:
         </div>
 
         <!-- Task Details Grid -->
-        <div class="task-details">
-            <div class="detail-item">
-                <div class="detail-label">Customer Name</div>
-                <div class="detail-value">
+        <div class="tsk-card__details">
+            <div class="tsk-card__detail">
+                <div class="tsk-card__detail-label">Customer Name</div>
+                <div class="tsk-card__detail-value">
                     <i class="fa-solid fa-user me-1 text-muted"></i>{{ dl.order.customer_name|default:"N/A" }}
                 </div>
             </div>
-            <div class="detail-item">
-                <div class="detail-label">Mobile</div>
-                <div class="detail-value">
+            <div class="tsk-card__detail">
+                <div class="tsk-card__detail-label">Mobile</div>
+                <div class="tsk-card__detail-value">
                     <i class="fa-solid fa-phone me-1 text-muted"></i>{{ dl.order.customer_phone|default:"N/A" }}
                 </div>
             </div>
-            <div class="detail-item">
-                <div class="detail-label">Order Status</div>
-                <div class="detail-value">
+            <div class="tsk-card__detail">
+                <div class="tsk-card__detail-label">Order Status</div>
+                <div class="tsk-card__detail-value">
                     <i class="fa-solid fa-info-circle me-1 text-muted"></i>{{ dl.order_status|default:"N/A" }}
                 </div>
             </div>
-            <div class="detail-item">
-                <div class="detail-label">DMS Task Number</div>
-                <div class="detail-value">
+            <div class="tsk-card__detail">
+                <div class="tsk-card__detail-label">DMS Task Number</div>
+                <div class="tsk-card__detail-value">
                     <i class="fa-solid fa-code me-1 text-muted"></i>{{ dl.dl_task_number_dms|default:"N/A" }}
                 </div>
             </div>
         </div>
 
         <!-- Location Section -->
-        <div class="location-section d-flex justify-content-between">
-            <div class="location-item">
-                <i class="fa-solid fa-location-dot location-icon text-success"></i>
-                <div class="location-text">
+        <div class="tsk-card__location d-flex justify-content-between">
+            <div class="tsk-card__loc-item">
+                <i class="fa-solid fa-location-dot tsk-card__loc-icon text-success"></i>
+                <div class="tsk-card__loc-text">
                     <strong class="d-block mb-1">Pickup</strong>
                     {{ dl.pickup_location|default:"N/A" }}
                 </div>
             </div>
             {% if dl.order.customer_address %}
-            <div class="location-item">
-                <i class="fa-solid fa-location-dot location-icon text-danger"></i>
-                <div class="location-text">
+            <div class="tsk-card__loc-item">
+                <i class="fa-solid fa-location-dot tsk-card__loc-icon text-danger"></i>
+                <div class="tsk-card__loc-text">
                     <strong class="d-block mb-1">Delivery</strong>
                     {{ dl.order.customer_address }}
                 </div>
@@ -88,7 +88,7 @@ Each task should have:
 
         <!-- Driver Info -->
         {% if dl.driver %}
-        <div class="driver-info">
+        <div class="tsk-card__driver">
             <div>
                 <i class="fa-solid fa-user-tie me-2 text-primary"></i>
                 <strong>Driver:</strong> {{ dl.driver }}
@@ -98,7 +98,7 @@ Each task should have:
         {% endif %}
 
         <!-- Quick Actions -->
-        <div class="quick-actions">
+        <div class="tsk-card__actions">
             <div class="row g-2">
                 <div class="col-md-6 col-lg-3">
                     <a href="https://wa.me/{{ dl.order.customer_phone|whatsapp_number }}?text=Hi%20{{ dl.order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ dl.order.order_number|urlencode }}%20(Task:%20{{ dl.dl_task_number|urlencode }}).%20Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ dl.order.order_number|urlencode }}%26key={{ dl.order|verify_key }}"

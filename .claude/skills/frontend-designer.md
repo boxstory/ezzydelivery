@@ -140,6 +140,53 @@ Use this skill when designing UI components, creating landing pages, or building
 - Complex component states
 - Anything Bootstrap utilities can't express
 
+### 0b. Bootstrap-First BEM Rule — No Redundant Component Overrides
+
+**CRITICAL RULE:** When Bootstrap 5 already provides a component (btn, form-control, card, modal, nav-item, badge, alert, table, etc.), always use the Bootstrap class as the base. Do NOT rewrite Bootstrap defaults in BEM CSS. Only add a BEM class alongside Bootstrap when you need custom modifications that Bootstrap does not cover.
+
+**How to apply:**
+- Use Bootstrap's component class for all base styling (padding, display, borders, resets)
+- Add a BEM class only for brand-specific or custom visual tweaks (colors, gradients, shadows, custom states)
+- Never duplicate what Bootstrap already provides in your BEM CSS
+
+```html
+<!-- CORRECT: Bootstrap base + BEM for custom brand tweaks only -->
+<button class="btn bapi__btn-primary">Submit</button>
+<input class="form-control bapi__form-input" type="text">
+<div class="card bapi__card--highlight">...</div>
+<span class="badge bapi__badge--status">Active</span>
+
+<!-- WRONG: BEM class that re-declares Bootstrap defaults -->
+<button class="bapi__btn">Submit</button>
+```
+
+```css
+/* CORRECT: BEM only adds what Bootstrap doesn't provide */
+.bapi__btn-primary {
+  background: var(--brand-primary);
+  color: var(--brand-navy);
+}
+.bapi__btn-primary:hover {
+  background: var(--brand-primary-dark);
+}
+
+/* WRONG: Duplicating Bootstrap's .btn base styles */
+.bapi__btn {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+```
+
+**Quick checklist before writing BEM CSS for a component:**
+1. Does Bootstrap 5 have this component? (btn, card, modal, form-control, badge, alert, nav, table, etc.)
+2. If YES — use the Bootstrap class as base, only add BEM for custom visual modifications
+3. If NO — write full BEM component styles as needed
+
 ### 1. Mobile-First Responsive Design
 Always design for mobile first, then enhance for larger screens.
 

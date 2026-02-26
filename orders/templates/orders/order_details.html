@@ -175,9 +175,9 @@
           <span class="pwa-detail-row__label">Delivery Included</span>
           <span class="pwa-detail-row__value">
             {% if order.dl_included %}
-              <i class="fas fa-check-circle odt-icon--success"></i> Yes
+              <i class="fas fa-check-circle odt__icon--success"></i> Yes
             {% else %}
-              <i class="fas fa-times-circle odt-icon--muted"></i> No
+              <i class="fas fa-times-circle odt__icon--muted"></i> No
             {% endif %}
           </span>
         </div>
@@ -291,38 +291,38 @@
        Desktop View (>= 768px)
        ========================================== -->
   <div class="d-none d-md-block" id="order_details_container_main">
-    <div class="odt-page">
+    <div class="odt__page">
 
       <!-- Page Header -->
-      <div class="odt-page-header" id="order_details_header">
-        <div class="odt-page-header__left">
-          <a href="{% url 'orders:orders_all_list' %}" class="odt-back-btn" id="order_details_btn_back">
+      <div class="odt__page-header" id="order_details_header">
+        <div class="odt__page-header__left">
+          <a href="{% url 'orders:orders_all_list' %}" class="odt__back-btn" id="order_details_btn_back">
             <i class="fa-solid fa-arrow-left"></i>
           </a>
-          <div class="odt-page-header__title-group">
-            <h1 class="odt-page-header__title">#{{ order.order_number }}</h1>
+          <div class="odt__page-header__title-group">
+            <h1 class="odt__page-header__title">#{{ order.order_number }}</h1>
             {% if order.client_order_code %}
-            <span class="odt-page-header__ref">Ref: {{ order.client_order_code }}</span>
+            <span class="odt__page-header__ref">Ref: {{ order.client_order_code }}</span>
             {% endif %}
           </div>
-          <span class="ob ob--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
+          <span class="ob__ ob__--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
           {% with delivery=delivery_task %}
           {% if delivery %}
-          <span class="ob ob--dl-{{ delivery.dl_task_status }}">
+          <span class="ob__ ob__--dl-{{ delivery.dl_task_status }}">
             <i class="fa-solid {% if delivery.dl_task_status == 'delivered' %}fa-check{% elif delivery.dl_task_status == 'assigned' %}fa-user{% elif delivery.dl_task_status == 'accepted' %}fa-user-check{% elif delivery.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}fa-truck{% elif delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}fa-times{% elif delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}fa-ban{% else %}fa-clock{% endif %}"></i>
             {{ delivery.get_dl_task_status_display }}
           </span>
           {% endif %}
           {% endwith %}
         </div>
-        <div class="odt-page-header__actions" id="order_details_nav_actions">
+        <div class="odt__page-header__actions" id="order_details_nav_actions">
           {% if can_edit_order and order.order_status != 'publish' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
-          <a class="odt-header-btn odt-header-btn--secondary" href="{% url 'orders:order_update' order.id %}" id="order_details_btn_edit">
+          <a class="odt__header-btn odt__header-btn--secondary" href="{% url 'orders:order_update' order.id %}" id="order_details_btn_edit">
             <i class="fa-solid fa-pen"></i> Edit Order
           </a>
           {% endif %}
           {% if order.customer_whatsapp %}
-          <a class="odt-header-btn odt-header-btn--whatsapp" href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" hx-boost="false">
+          <a class="odt__header-btn odt__header-btn--whatsapp" href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank" hx-boost="false">
             <i class="fa-brands fa-whatsapp"></i> WhatsApp
           </a>
           {% endif %}
@@ -336,29 +336,29 @@
         <div class="col-lg-7">
 
           <!-- Customer Card -->
-          <div class="odt-card" id="order_details_card_customer">
-            <div class="odt-card__header">
+          <div class="odt__card" id="order_details_card_customer">
+            <div class="odt__card__header">
               <i class="fa-solid fa-user"></i>
               <span>Customer</span>
             </div>
-            <div class="odt-card__body">
-              <div class="odt-field">
-                <span class="odt-field__label">Customer Name</span>
-                <span class="odt-field__value odt-field__value--bold">{{ order.customer_name|default:"-" }}</span>
+            <div class="odt__card__body">
+              <div class="odt__field">
+                <span class="odt__field__label">Customer Name</span>
+                <span class="odt__field__value odt__field__value--bold">{{ order.customer_name|default:"-" }}</span>
               </div>
-              <div class="odt-field">
-                <span class="odt-field__label">Phone</span>
-                <span class="odt-field__value">
-                  <a href="tel:{{ order.customer_phone }}" class="odt-link" hx-boost="false">
+              <div class="odt__field">
+                <span class="odt__field__label">Phone</span>
+                <span class="odt__field__value">
+                  <a href="tel:{{ order.customer_phone }}" class="odt__link" hx-boost="false">
                     <i class="fa-solid fa-phone"></i> {{ order.customer_phone|default:"-" }}
                   </a>
                 </span>
               </div>
               {% if order.customer_whatsapp %}
-              <div class="odt-field">
-                <span class="odt-field__label">WhatsApp</span>
-                <span class="odt-field__value">
-                  <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}" target="_blank" class="odt-link odt-link--whatsapp" hx-boost="false">
+              <div class="odt__field">
+                <span class="odt__field__label">WhatsApp</span>
+                <span class="odt__field__value">
+                  <a href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}" target="_blank" class="odt__link odt__link--whatsapp" hx-boost="false">
                     <i class="fa-brands fa-whatsapp"></i> {{ order.customer_whatsapp }}
                   </a>
                 </span>
@@ -368,55 +368,55 @@
           </div>
 
           <!-- Route Card -->
-          <div class="odt-card" id="order_details_card_route">
-            <div class="odt-card__header">
+          <div class="odt__card" id="order_details_card_route">
+            <div class="odt__card__header">
               <i class="fa-solid fa-route"></i>
               <span>Route</span>
             </div>
-            <div class="odt-card__body">
-              <div class="odt-route">
+            <div class="odt__card__body">
+              <div class="odt__route">
                 {% if order.pickup_location %}
-                <div class="odt-route__stop">
-                  <div class="odt-route__icon odt-route__icon--pickup">
+                <div class="odt__route__stop">
+                  <div class="odt__route__icon odt__route__icon--pickup">
                     <i class="fa-solid fa-arrow-up"></i>
                   </div>
-                  <div class="odt-route__info">
-                    <span class="odt-route__label">Pickup</span>
-                    <span class="odt-route__value">{{ order.pickup_location.pickup_name }}</span>
+                  <div class="odt__route__info">
+                    <span class="odt__route__label">Pickup</span>
+                    <span class="odt__route__value">{{ order.pickup_location.pickup_name }}</span>
                     {% if order.pickup_location.pickup_address %}
-                    <span class="odt-route__addr">{{ order.pickup_location.pickup_address }}</span>
+                    <span class="odt__route__addr">{{ order.pickup_location.pickup_address }}</span>
                     {% endif %}
                   </div>
                 </div>
-                <div class="odt-route__line"></div>
+                <div class="odt__route__line"></div>
                 {% endif %}
-                <div class="odt-route__stop">
-                  <div class="odt-route__icon odt-route__icon--dropoff">
+                <div class="odt__route__stop">
+                  <div class="odt__route__icon odt__route__icon--dropoff">
                     <i class="fa-solid fa-arrow-down"></i>
                   </div>
-                  <div class="odt-route__info">
-                    <span class="odt-route__label">Drop-off
+                  <div class="odt__route__info">
+                    <span class="odt__route__label">Drop-off
                       {% include "includes/components/_ai_parse_button.html" with address=order.customer_address zone=order.dl_zone street=order.dl_street building=order.dl_building order_id=order.id order_number=order.order_number show_map="true" title="Drop-off Location" %}
                     </span>
-                    <span class="odt-route__value">
+                    <span class="odt__route__value">
                       {% if order.customer_address %}{{ order.customer_address }}{% else %}-{% endif %}
                     </span>
-                    <div class="odt-field-row odt-field-row--mt">
-                      <div class="odt-field odt-field--compact">
-                        <span class="odt-field__label">Zone</span>
-                        <span class="odt-field__value odt-field__value--zone">{% get_zone_display order %}</span>
+                    <div class="odt__field-row odt__field-row--mt">
+                      <div class="odt__field odt__field--compact">
+                        <span class="odt__field__label">Zone</span>
+                        <span class="odt__field__value odt__field__value--zone">{% get_zone_display order %}</span>
                       </div>
-                      <div class="odt-field odt-field--compact">
-                        <span class="odt-field__label">Street</span>
-                        <span class="odt-field__value">{{ order.dl_street|default:"-" }}</span>
+                      <div class="odt__field odt__field--compact">
+                        <span class="odt__field__label">Street</span>
+                        <span class="odt__field__value">{{ order.dl_street|default:"-" }}</span>
                       </div>
-                      <div class="odt-field odt-field--compact">
-                        <span class="odt-field__label">Bldg</span>
-                        <span class="odt-field__value">{{ order.dl_building|default:"-" }}</span>
+                      <div class="odt__field odt__field--compact">
+                        <span class="odt__field__label">Bldg</span>
+                        <span class="odt__field__value">{{ order.dl_building|default:"-" }}</span>
                       </div>
                     </div>
                     {% if order.customer_address %}
-                    <a href="https://maps.google.com/?q={{ order.customer_address|urlencode }}" target="_blank" class="odt-route__map-link" hx-boost="false">
+                    <a href="https://maps.google.com/?q={{ order.customer_address|urlencode }}" target="_blank" class="odt__route__map-link" hx-boost="false">
                       <i class="fa-solid fa-location-dot"></i> View on Map
                     </a>
                     {% endif %}
@@ -427,57 +427,57 @@
           </div>
 
           <!-- Order Information Card -->
-          <div class="odt-card" id="order_details_card_info">
-            <div class="odt-card__header">
+          <div class="odt__card" id="order_details_card_info">
+            <div class="odt__card__header">
               <i class="fa-solid fa-circle-info"></i>
               <span>Order Information</span>
             </div>
-            <div class="odt-card__body">
+            <div class="odt__card__body">
               <div class="row g-0">
-                <div class="col-sm-6 odt-card__col">
-                  <div class="odt-field">
-                    <span class="odt-field__label">Order Status</span>
-                    <span class="odt-field__value">
-                      <span class="ob ob--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
+                <div class="col-sm-6 odt__card__col">
+                  <div class="odt__field">
+                    <span class="odt__field__label">Order Status</span>
+                    <span class="odt__field__value">
+                      <span class="ob__ ob__--{{ order.order_status }}">{{ order.get_order_status_display }}</span>
                     </span>
                   </div>
-                  <div class="odt-field">
-                    <span class="odt-field__label">Task Status</span>
-                    <span class="odt-field__value">
-                      <span class="ob ob--task">{{ order.get_task_status_display }}</span>
+                  <div class="odt__field">
+                    <span class="odt__field__label">Task Status</span>
+                    <span class="odt__field__value">
+                      <span class="ob__ ob__--task">{{ order.get_task_status_display }}</span>
                     </span>
                   </div>
-                  <div class="odt-field">
-                    <span class="odt-field__label">Verification</span>
-                    <span class="odt-field__value">
+                  <div class="odt__field">
+                    <span class="odt__field__label">Verification</span>
+                    <span class="odt__field__value">
                       {% if order.verification_status == 'verified' %}
-                      <span class="odt-badge odt-badge--success"><i class="fa-solid fa-circle-check"></i> Verified</span>
+                      <span class="odt__badge odt__badge--success"><i class="fa-solid fa-circle-check"></i> Verified</span>
                       {% elif order.verification_status == 'pending' %}
-                      <span class="odt-badge odt-badge--warning"><i class="fa-solid fa-clock"></i> Pending</span>
+                      <span class="odt__badge odt__badge--warning"><i class="fa-solid fa-clock"></i> Pending</span>
                       {% else %}
-                      <span class="odt-badge odt-badge--muted">{{ order.get_verification_status_display|default:order.verification_status }}</span>
+                      <span class="odt__badge odt__badge--muted">{{ order.get_verification_status_display|default:order.verification_status }}</span>
                       {% endif %}
                     </span>
                   </div>
                 </div>
-                <div class="col-sm-6 odt-card__col odt-card__col--bordered">
-                  <div class="odt-field">
-                    <span class="odt-field__label">Order Date</span>
-                    <span class="odt-field__value">{{ order.order_date|date:"d M Y" }}</span>
+                <div class="col-sm-6 odt__card__col odt__card__col--bordered">
+                  <div class="odt__field">
+                    <span class="odt__field__label">Order Date</span>
+                    <span class="odt__field__value">{{ order.order_date|date:"d M Y" }}</span>
                   </div>
                   {% if order.deadline_date %}
-                  <div class="odt-field">
-                    <span class="odt-field__label">Deadline</span>
-                    <span class="odt-field__value">{{ order.deadline_date }}</span>
+                  <div class="odt__field">
+                    <span class="odt__field__label">Deadline</span>
+                    <span class="odt__field__value">{{ order.deadline_date }}</span>
                   </div>
                   {% endif %}
-                  <div class="odt-field">
-                    <span class="odt-field__label">Created</span>
-                    <span class="odt-field__value odt-field__value--muted">{{ order.created_at|date:"d M Y, H:i" }}</span>
+                  <div class="odt__field">
+                    <span class="odt__field__label">Created</span>
+                    <span class="odt__field__value odt__field__value--muted">{{ order.created_at|date:"d M Y, H:i" }}</span>
                   </div>
-                  <div class="odt-field">
-                    <span class="odt-field__label">Updated</span>
-                    <span class="odt-field__value odt-field__value--muted">{{ order.updated_at|date:"d M Y, H:i" }}</span>
+                  <div class="odt__field">
+                    <span class="odt__field__label">Updated</span>
+                    <span class="odt__field__value odt__field__value--muted">{{ order.updated_at|date:"d M Y, H:i" }}</span>
                   </div>
                 </div>
               </div>
@@ -485,29 +485,29 @@
           </div>
 
           <!-- Order Items -->
-          <div class="odt-card" id="order_details_card_items">
-            <div class="odt-card__header">
+          <div class="odt__card" id="order_details_card_items">
+            <div class="odt__card__header">
               <i class="fa-solid fa-box-open"></i>
               <span>Order Items{% if order_items %} ({{ order_items|length }}){% endif %}</span>
             </div>
-            <div class="odt-card__body odt-card__body--flush">
+            <div class="odt__card__body odt__card__body--flush">
               {% if order_items %}
-              <div class="odt-items">
-                <div class="odt-items__head">
-                  <span class="odt-items__head-name">Item</span>
-                  <span class="odt-items__head-qty">Qty</span>
-                  <span class="odt-items__head-price">Price</span>
+              <div class="odt__items">
+                <div class="odt__items__head">
+                  <span class="odt__items__head-name">Item</span>
+                  <span class="odt__items__head-qty">Qty</span>
+                  <span class="odt__items__head-price">Price</span>
                 </div>
                 {% for item in order_items %}
-                <div class="odt-items__row">
-                  <span class="odt-items__name">{{ item.product|default:item.notes|default:"Item"|truncatechars:50 }}</span>
-                  <span class="odt-items__qty">x{{ item.quantity }}</span>
-                  <span class="odt-items__price">{{ item.total_price|default:"0.00" }} QR</span>
+                <div class="odt__items__row">
+                  <span class="odt__items__name">{{ item.product|default:item.notes|default:"Item"|truncatechars:50 }}</span>
+                  <span class="odt__items__qty">x{{ item.quantity }}</span>
+                  <span class="odt__items__price">{{ item.total_price|default:"0.00" }} QR</span>
                 </div>
                 {% endfor %}
               </div>
               {% else %}
-              <div class="odt-items__empty">
+              <div class="odt__items__empty">
                 <i class="fa-solid fa-cube"></i>
                 No items recorded
               </div>
@@ -517,25 +517,25 @@
 
           <!-- Notes -->
           {% if order.order_notes %}
-          <div class="odt-card" id="order_details_card_notes">
-            <div class="odt-card__header">
+          <div class="odt__card" id="order_details_card_notes">
+            <div class="odt__card__header">
               <i class="fa-solid fa-note-sticky"></i>
               <span>Notes</span>
             </div>
-            <div class="odt-card__body">
-              <div class="odt-notes">{{ order.order_notes }}</div>
+            <div class="odt__card__body">
+              <div class="odt__notes">{{ order.order_notes }}</div>
             </div>
           </div>
           {% endif %}
 
           {% if order.verification_notes %}
-          <div class="odt-card">
-            <div class="odt-card__header">
+          <div class="odt__card">
+            <div class="odt__card__header">
               <i class="fa-solid fa-clipboard-check"></i>
               <span>Verification Notes</span>
             </div>
-            <div class="odt-card__body">
-              <div class="odt-notes">{{ order.verification_notes }}</div>
+            <div class="odt__card__body">
+              <div class="odt__notes">{{ order.verification_notes }}</div>
             </div>
           </div>
           {% endif %}
@@ -546,53 +546,53 @@
         <div class="col-lg-5">
 
           <!-- Payment Card -->
-          <div class="odt-card" id="order_details_card_payment">
-            <div class="odt-card__header">
+          <div class="odt__card" id="order_details_card_payment">
+            <div class="odt__card__header">
               <i class="fa-solid fa-money-bill-wave"></i>
               <span>Payment</span>
             </div>
-            <div class="odt-card__body">
+            <div class="odt__card__body">
               {% if order.cod_amount %}
-              <div class="odt-cod-hero">
-                <div class="odt-cod-hero__amount">
-                  <span class="odt-cod-hero__currency">QAR</span>
-                  <span class="odt-cod-hero__value">{{ order.cod_amount }}</span>
+              <div class="odt__cod-hero">
+                <div class="odt__cod-hero__amount">
+                  <span class="odt__cod-hero__currency">QAR</span>
+                  <span class="odt__cod-hero__value">{{ order.cod_amount }}</span>
                 </div>
-                <span class="ob ob--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
+                <span class="ob__ ob__--cod-{% if order.cod_status_by_staff == 'fully_paid' %}collected{% elif order.cod_status_by_staff == 'partially_collected' %}partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}settled{% else %}pending{% endif %}">
                   <i class="fa-solid {% if order.cod_status_by_staff == 'fully_paid' %}fa-check{% elif order.cod_status_by_staff == 'partially_collected' %}fa-adjust{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}fa-handshake{% else %}fa-hourglass-half{% endif %}"></i>
                   {% if order.cod_status_by_staff == 'fully_paid' %}Collected{% elif order.cod_status_by_staff == 'partially_collected' %}Partial{% elif order.cod_status_by_staff == 'cod_settled_with_business' %}Settled{% else %}Pending{% endif %}
                 </span>
               </div>
               {% endif %}
-              <div class="odt-field">
-                <span class="odt-field__label">COD Amount</span>
-                <span class="odt-field__value odt-field__value--bold">{% if order.cod_amount %}QAR {{ order.cod_amount }}{% else %}-{% endif %}</span>
+              <div class="odt__field">
+                <span class="odt__field__label">COD Amount</span>
+                <span class="odt__field__value odt__field__value--bold">{% if order.cod_amount %}QAR {{ order.cod_amount }}{% else %}-{% endif %}</span>
               </div>
-              <div class="odt-field">
-                <span class="odt-field__label">Delivery Fee</span>
-                <span class="odt-field__value">{% if order.dl_amount %}QAR {{ order.dl_amount }}{% else %}-{% endif %}</span>
+              <div class="odt__field">
+                <span class="odt__field__label">Delivery Fee</span>
+                <span class="odt__field__value">{% if order.dl_amount %}QAR {{ order.dl_amount }}{% else %}-{% endif %}</span>
               </div>
               {% if delivery_task and delivery_task.payment_method %}
-              <div class="odt-field">
-                <span class="odt-field__label">Payment Method</span>
-                <span class="odt-field__value">
+              <div class="odt__field">
+                <span class="odt__field__label">Payment Method</span>
+                <span class="odt__field__value">
                   {% if delivery_task.payment_method == 'cash' %}
-                    <span class="odt-badge odt-badge--success"><i class="fa-solid fa-money-bill"></i> Cash</span>
+                    <span class="odt__badge odt__badge--success"><i class="fa-solid fa-money-bill"></i> Cash</span>
                   {% elif delivery_task.payment_method == 'fawran' %}
-                    <span class="odt-badge odt-badge--info"><i class="fa-solid fa-mobile-screen"></i> Fawran</span>
+                    <span class="odt__badge odt__badge--info"><i class="fa-solid fa-mobile-screen"></i> Fawran</span>
                   {% else %}
                     {{ delivery_task.get_payment_method_display }}
                   {% endif %}
                 </span>
               </div>
               {% endif %}
-              <div class="odt-field">
-                <span class="odt-field__label">Delivery Included</span>
-                <span class="odt-field__value">
+              <div class="odt__field">
+                <span class="odt__field__label">Delivery Included</span>
+                <span class="odt__field__value">
                   {% if order.dl_included %}
-                  <span class="odt-badge odt-badge--success"><i class="fa-solid fa-check"></i> Yes</span>
+                  <span class="odt__badge odt__badge--success"><i class="fa-solid fa-check"></i> Yes</span>
                   {% else %}
-                  <span class="odt-badge odt-badge--muted">No</span>
+                  <span class="odt__badge odt__badge--muted">No</span>
                   {% endif %}
                 </span>
               </div>
@@ -601,56 +601,56 @@
 
           <!-- Delivery Task Card -->
           {% if delivery_task %}
-          <div class="odt-card" id="order_details_card_delivery">
-            <div class="odt-card__header">
+          <div class="odt__card" id="order_details_card_delivery">
+            <div class="odt__card__header">
               <i class="fa-solid fa-truck-fast"></i>
               <span>Delivery Task</span>
             </div>
-            <div class="odt-card__body">
-              <div class="odt-dl-status-row">
-                <span class="ob ob--dl-{{ delivery_task.dl_task_status }}">
+            <div class="odt__card__body">
+              <div class="odt__dl-status-row">
+                <span class="ob__ ob__--dl-{{ delivery_task.dl_task_status }}">
                   <i class="fa-solid {% if delivery_task.dl_task_status == 'delivered' %}fa-check{% elif delivery_task.dl_task_status == 'assigned' %}fa-user{% elif delivery_task.dl_task_status == 'accepted' %}fa-user-check{% elif delivery_task.dl_task_status == 'picked_up' %}fa-box-open{% elif delivery_task.dl_task_status == 'out_for_delivery' or delivery_task.dl_task_status == 'in_transit' or delivery_task.dl_task_status == 'start_ride' %}fa-truck{% elif delivery_task.dl_task_status == 'failed' or delivery_task.dl_task_status == 'non_reachable' %}fa-times{% elif delivery_task.dl_task_status == 'cancelled' or delivery_task.dl_task_status == 'rejected' %}fa-ban{% else %}fa-clock{% endif %}"></i>
                   {{ delivery_task.get_dl_task_status_display }}
                 </span>
                 {% if delivery_task.dl_task_number %}
-                <span class="odt-task-num">{{ delivery_task.dl_task_number }}</span>
+                <span class="odt__task-num">{{ delivery_task.dl_task_number }}</span>
                 {% endif %}
               </div>
               {% if delivery_task.driver %}
-              <div class="odt-driver-card">
-                <div class="odt-driver-card__avatar">
+              <div class="odt__driver-card">
+                <div class="odt__driver-card__avatar">
                   <i class="fa-solid fa-user-helmet-safety"></i>
                 </div>
-                <div class="odt-driver-card__info">
-                  <span class="odt-driver-card__name">{{ delivery_task.driver }}</span>
+                <div class="odt__driver-card__info">
+                  <span class="odt__driver-card__name">{{ delivery_task.driver }}</span>
                   {% if delivery_task.driver.driver_phone %}
-                  <a href="tel:{{ delivery_task.driver.driver_phone }}" class="odt-driver-card__phone" hx-boost="false">
+                  <a href="tel:{{ delivery_task.driver.driver_phone }}" class="odt__driver-card__phone" hx-boost="false">
                     <i class="fa-solid fa-phone"></i> {{ delivery_task.driver.driver_phone }}
                   </a>
                   {% endif %}
                 </div>
               </div>
               {% endif %}
-              <div class="odt-field">
-                <span class="odt-field__label">Speed</span>
-                <span class="odt-field__value">{{ delivery_task.dl_speed|default:"Normal" }}</span>
+              <div class="odt__field">
+                <span class="odt__field__label">Speed</span>
+                <span class="odt__field__value">{{ delivery_task.dl_speed|default:"Normal" }}</span>
               </div>
               {% if delivery_task.cod_collected %}
-              <div class="odt-field">
-                <span class="odt-field__label">COD Collected</span>
-                <span class="odt-field__value">
-                  <span class="odt-badge odt-badge--success"><i class="fa-solid fa-check"></i> QAR {{ delivery_task.cod_collected_amount }}</span>
+              <div class="odt__field">
+                <span class="odt__field__label">COD Collected</span>
+                <span class="odt__field__value">
+                  <span class="odt__badge odt__badge--success"><i class="fa-solid fa-check"></i> QAR {{ delivery_task.cod_collected_amount }}</span>
                 </span>
               </div>
               {% endif %}
               {% if delivery_task.completed_at %}
-              <div class="odt-field">
-                <span class="odt-field__label">Completed</span>
-                <span class="odt-field__value">{{ delivery_task.completed_at|date:"d M Y, H:i" }}</span>
+              <div class="odt__field">
+                <span class="odt__field__label">Completed</span>
+                <span class="odt__field__value">{{ delivery_task.completed_at|date:"d M Y, H:i" }}</span>
               </div>
               {% endif %}
               {% if delivery_task.dl_task_description %}
-              <div class="odt-dl-notes">
+              <div class="odt__dl-notes">
                 <i class="fa-solid fa-note-sticky"></i>
                 {{ delivery_task.dl_task_description }}
               </div>

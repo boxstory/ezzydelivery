@@ -6,14 +6,14 @@
 {% endblock extra_css %}
 
 {% block content %}
-<div class="api-test-container" id="client_api_test_container_main">
+<div class="bapi__test-container" id="client_api_test_container_main">
     <!-- Header -->
-    <div class="api-test-header" id="client_api_test_section_header">
+    <div class="bapi__test-header" id="client_api_test_section_header">
         <h1 id="client_api_test_title_main">
             <i class="fa-solid fa-flask"></i>
             API Test Console
         </h1>
-        <a href="{% url 'business:business_settings' business.business_id %}" class="back-link">
+        <a href="{% url 'business:business_settings' business.business_id %}" class="bapi__back-link">
             <i class="fa-solid fa-arrow-left"></i>
             Back to Settings
         </a>
@@ -23,69 +23,69 @@
     <div class="row g-4" id="client_api_test_section_content">
         <!-- API Configuration Panel -->
         <div class="col-lg-5 col-12">
-            <div class="api-panel" id="client_api_test_card_settings">
-                <div class="config-panel-header">
+            <div class="bapi__panel" id="client_api_test_card_settings">
+                <div class="bapi__config-header">
                     <h2 id="client_api_test_title_card">
                         <i class="fa-solid fa-plug-circle-check"></i>
                         {{ api.api_type|upper }} API
                     </h2>
                     {% if api.is_verify_api %}
-                    <span class="status-badge verified">
+                    <span class="bapi__status-badge bapi__status-badge--verified">
                         <i class="fa-solid fa-check"></i> Verified
                     </span>
                     {% else %}
-                    <span class="status-badge pending">
+                    <span class="bapi__status-badge bapi__status-badge--pending">
                         <i class="fa-solid fa-clock"></i> Pending
                     </span>
                     {% endif %}
                 </div>
-                <div class="config-panel-body">
-                    <div class="config-item">
-                        <span class="config-label">Business Name</span>
-                        <div class="config-value">{{ api.business }}</div>
+                <div class="bapi__config-body">
+                    <div class="bapi__config-item">
+                        <span class="bapi__config-label">Business Name</span>
+                        <div class="bapi__config-value">{{ api.business }}</div>
                     </div>
-                    <div class="config-item">
-                        <span class="config-label">API Provider</span>
-                        <div class="config-value">{{ api.api_type|upper }}</div>
+                    <div class="bapi__config-item">
+                        <span class="bapi__config-label">API Provider</span>
+                        <div class="bapi__config-value">{{ api.api_type|upper }}</div>
                     </div>
-                    <div class="config-item">
-                        <span class="config-label">Orders Endpoint</span>
-                        <div class="config-value monospace {% if not api.order_api_endpoint %}empty{% endif %}">
+                    <div class="bapi__config-item">
+                        <span class="bapi__config-label">Orders Endpoint</span>
+                        <div class="bapi__config-value bapi__config-value--monospace {% if not api.order_api_endpoint %}bapi__config-value--empty{% endif %}">
                             {{ api.order_api_endpoint|default:"Not configured" }}
                         </div>
                     </div>
-                    <div class="config-item">
-                        <span class="config-label">Products Endpoint</span>
-                        <div class="config-value monospace {% if not api.product_api_endpoint %}empty{% endif %}">
+                    <div class="bapi__config-item">
+                        <span class="bapi__config-label">Products Endpoint</span>
+                        <div class="bapi__config-value bapi__config-value--monospace {% if not api.product_api_endpoint %}bapi__config-value--empty{% endif %}">
                             {{ api.product_api_endpoint|default:"Not configured" }}
                         </div>
                     </div>
                     {% if not api.is_verify_api %}
-                    <div class="warning-alert">
+                    <div class="bapi__warning-alert">
                         <i class="fa-solid fa-triangle-exclamation"></i>
-                        <span class="warning-alert-text">
+                        <span class="bapi__warning-text">
                             This API configuration is pending verification. Please contact admin for approval.
                         </span>
                     </div>
                     {% endif %}
                 </div>
-                <div class="action-buttons">
+                <div class="bapi__action-buttons">
                     <a hx-post="{% url 'business:business_settings_api_test_result' business.business_id api.id %}"
                        hx-trigger="click"
                        hx-target="#api-response-div"
                        hx-swap="innerHTML"
-                       class="btn-run-test"
+                       class="bapi__btn-run-test"
                        id="client_api_test_btn_run">
                         <i class="fa-solid fa-play"></i>
                         Run API Test
                     </a>
                     <a href="{% url 'business:business_settings_api_update' business.business_id api.id %}"
-                       class="btn-action edit"
+                       class="bapi__btn-action bapi__btn-action--edit"
                        title="Edit API Settings">
                         <i class="fa-solid fa-pen"></i>
                     </a>
                     <a href="{% url 'business:business_settings_api_delete' business.business_id api.id %}"
-                       class="btn-action delete"
+                       class="bapi__btn-action bapi__btn-action--delete"
                        title="Delete API"
                        onclick="return confirm('Are you sure you want to delete this API configuration?');">
                         <i class="fa-solid fa-trash"></i>
@@ -96,21 +96,21 @@
 
         <!-- Response Panel -->
         <div class="col-lg-7 col-12">
-            <div class="api-panel" id="client_api_test_card_response">
-                <div class="response-panel-header">
+            <div class="bapi__panel" id="client_api_test_card_response">
+                <div class="bapi__response-header">
                     <h2 id="client_api_test_title_response">
                         <i class="fa-solid fa-terminal"></i>
                         Response Output
                     </h2>
-                    <div class="response-status ready" id="response-status-badge">
-                        <span class="dot"></span>
-                        <span class="status-text">Ready</span>
+                    <div class="bapi__response-status bapi__response-status--ready" id="response-status-badge">
+                        <span class="bapi__dot"></span>
+                        <span class="bapi__status-text">Ready</span>
                     </div>
                 </div>
-                <div class="response-body">
+                <div class="bapi__response-body">
                     <div id="api-response-div">
-                        <div class="response-placeholder">
-                            <div class="response-placeholder-icon">
+                        <div class="bapi__response-placeholder">
+                            <div class="bapi__response-placeholder-icon">
                                 <i class="fa-solid fa-satellite-dish"></i>
                             </div>
                             <h3>Ready to Test</h3>
@@ -123,11 +123,11 @@
     </div>
 
     <!-- Info Card -->
-    <div class="info-card">
-        <div class="info-card-icon">
+    <div class="bapi__info-card">
+        <div class="bapi__info-card-icon">
             <i class="fa-solid fa-lightbulb"></i>
         </div>
-        <div class="info-card-content">
+        <div class="bapi__info-card-content">
             <h4>API Integration Info</h4>
             <p>Each store can have only one API integration configured. Test your connection to ensure proper communication with your e-commerce platform.</p>
         </div>
@@ -137,13 +137,13 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const statusBadge = document.getElementById('response-status-badge');
-    const statusText = statusBadge.querySelector('.status-text');
+    const statusText = statusBadge.querySelector('.bapi__status-text');
     const responseDiv = document.getElementById('api-response-div');
 
     // Update status to loading when request starts
     document.body.addEventListener('htmx:beforeRequest', function(evt) {
         if (evt.detail.target && evt.detail.target.id === 'api-response-div') {
-            statusBadge.className = 'response-status loading';
+            statusBadge.className = 'bapi__response-status bapi__response-status--loading';
             statusText.textContent = 'Testing...';
         }
     });
@@ -161,12 +161,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update badge based on actual API status code
                     if (apiStatus >= 200 && apiStatus < 300) {
                         // 2xx Success
-                        statusBadge.className = 'response-status success';
+                        statusBadge.className = 'bapi__response-status bapi__response-status--success';
                         statusText.textContent = apiStatus + ' Success';
                     }
                     else if (apiStatus >= 400 && apiStatus < 500) {
                         // 4xx Business Errors
-                        statusBadge.className = 'response-status error';
+                        statusBadge.className = 'bapi__response-status bapi__response-status--error';
                         if (apiStatus === 400) {
                             statusText.textContent = '400 Bad Request';
                         } else if (apiStatus === 401) {
@@ -185,7 +185,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     else if (apiStatus >= 500) {
                         // 5xx Server Errors
-                        statusBadge.className = 'response-status error';
+                        statusBadge.className = 'bapi__response-status bapi__response-status--error';
                         if (apiStatus === 500) {
                             statusText.textContent = '500 Server Error';
                         } else if (apiStatus === 502) {
@@ -200,17 +200,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     else if (apiStatus === 0) {
                         // Connection or parsing issue
-                        statusBadge.className = 'response-status error';
+                        statusBadge.className = 'bapi__response-status bapi__response-status--error';
                         statusText.textContent = 'Connection Error';
                     }
                     else {
                         // Other status codes
-                        statusBadge.className = 'response-status ready';
+                        statusBadge.className = 'bapi__response-status bapi__response-status--ready';
                         statusText.textContent = apiStatus + ' Response';
                     }
                 } else {
                     // No status data found - fallback to error
-                    statusBadge.className = 'response-status error';
+                    statusBadge.className = 'bapi__response-status bapi__response-status--error';
                     statusText.textContent = 'Parse Error';
                 }
             }, 50);
@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const xhr = evt.detail.xhr;
             const httpStatus = xhr ? xhr.status : 0;
 
-            statusBadge.className = 'response-status error';
+            statusBadge.className = 'bapi__response-status bapi__response-status--error';
             if (httpStatus === 0) {
                 statusText.textContent = 'Connection Failed';
             } else {
@@ -235,7 +235,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle send error (before request even goes out)
     document.body.addEventListener('htmx:sendError', function(evt) {
         if (evt.detail.target && evt.detail.target.id === 'api-response-div') {
-            statusBadge.className = 'response-status error';
+            statusBadge.className = 'bapi__response-status bapi__response-status--error';
             statusText.textContent = 'Send Failed';
         }
     });
@@ -243,7 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle timeout
     document.body.addEventListener('htmx:timeout', function(evt) {
         if (evt.detail.target && evt.detail.target.id === 'api-response-div') {
-            statusBadge.className = 'response-status error';
+            statusBadge.className = 'bapi__response-status bapi__response-status--error';
             statusText.textContent = 'Timeout';
         }
     });

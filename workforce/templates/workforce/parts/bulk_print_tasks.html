@@ -8,24 +8,24 @@
     @media print {
         body { margin: 0; padding: 0; }
         .no-print { display: none !important; }
-        .task-print-card { page-break-inside: avoid; }
+        .bpt__card { page-break-inside: avoid; }
     }
 
-    .print-header {
+    .bpt__header {
         text-align: center;
         padding: 1rem;
         border-bottom: 2px solid #333;
         margin-bottom: 1rem;
     }
 
-    .print-actions {
+    .bpt__print-actions {
         text-align: center;
         padding: 1rem;
         background: #f5f5f5;
         margin-bottom: 1rem;
     }
 
-    .task-print-card {
+    .bpt__card {
         border: 1px solid #ddd;
         border-radius: 4px;
         padding: 1rem;
@@ -33,7 +33,7 @@
         background: #fff;
     }
 
-    .task-print-header {
+    .bpt__card-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -42,30 +42,30 @@
         margin-bottom: 0.5rem;
     }
 
-    .task-number {
+    .bpt__task-number {
         
         font-weight: bold;
     }
 
-    .task-date {
+    .bpt__task-date {
         color: #666;
         font-size: 0.9rem;
     }
 
-    .task-details {
+    .bpt__task-details {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 0.75rem;
         margin-bottom: 0.75rem;
     }
 
-    .detail-group {
+    .bpt__detail-group {
         padding: 0.5rem;
         background: #f9f9f9;
         border-radius: 4px;
     }
 
-    .detail-label {
+    .bpt__detail-label {
         font-size: 0.7rem;
         font-weight: 600;
         color: #666;
@@ -73,30 +73,30 @@
         margin-bottom: 0.25rem;
     }
 
-    .detail-value {
+    .bpt__detail-value {
         font-size: 0.85rem;
     }
 
-    .address-section {
+    .bpt__address-section {
         background: #f0f7ff;
         padding: 0.75rem;
         border-radius: 4px;
         margin-top: 0.5rem;
     }
 
-    .address-label {
+    .bpt__address-label {
         font-size: 0.7rem;
         font-weight: 600;
         color: #0066cc;
         text-transform: uppercase;
     }
 
-    .address-value {
+    .bpt__address-value {
         font-size: 0.9rem;
         margin-top: 0.25rem;
     }
 
-    .status-badge {
+    .bpt__status-badge {
         display: inline-block;
         padding: 0.25rem 0.5rem;
         border-radius: 3px;
@@ -104,13 +104,13 @@
         font-weight: 500;
     }
 
-    .status-pending { background: #fff3cd; color: #856404; }
-    .status-assigned { background: #cce5ff; color: #004085; }
-    .status-delivered { background: #d4edda; color: #155724; }
-    .status-rejected { background: #f8d7da; color: #721c24; }
+    .bpt__status-badge--pending { background: #fff3cd; color: #856404; }
+    .bpt__status-badge--assigned { background: #cce5ff; color: #004085; }
+    .bpt__status-badge--delivered { background: #d4edda; color: #155724; }
+    .bpt__status-badge--rejected { background: #f8d7da; color: #721c24; }
 
     @media print {
-        .task-print-card {
+        .bpt__card {
             border: 1px solid #000;
         }
     }
@@ -118,12 +118,12 @@
 {% endblock %}
 
 {% block content %}
-<div class="print-header no-print">
+<div class="bpt__header no-print">
     <h1>Delivery Tasks Print View</h1>
     <p>{{ tasks|length }} task(s) selected</p>
 </div>
 
-<div class="print-actions no-print">
+<div class="bpt__print-actions no-print">
     <button onclick="window.print()" class="btn btn-primary">
         <i class="fa-solid fa-print me-2"></i>Print
     </button>
@@ -132,31 +132,31 @@
     </button>
 </div>
 
-<div class="tasks-print-container">
+<div class="bpt__container">
     {% for task in tasks %}
-    <div class="task-print-card">
-        <div class="task-print-header">
-            <div class="task-number">#{{ task.dl_task_number }}</div>
-            <div class="task-date">{{ task.dl_task_date|date:"d M Y" }}</div>
+    <div class="bpt__card">
+        <div class="bpt__card-header">
+            <div class="bpt__task-number">#{{ task.dl_task_number }}</div>
+            <div class="bpt__task-date">{{ task.dl_task_date|date:"d M Y" }}</div>
         </div>
 
-        <div class="task-details">
-            <div class="detail-group">
-                <div class="detail-label">Customer</div>
-                <div class="detail-value">{{ task.order.customer_name|default:"N/A" }}</div>
+        <div class="bpt__task-details">
+            <div class="bpt__detail-group">
+                <div class="bpt__detail-label">Customer</div>
+                <div class="bpt__detail-value">{{ task.order.customer_name|default:"N/A" }}</div>
             </div>
-            <div class="detail-group">
-                <div class="detail-label">Phone</div>
-                <div class="detail-value">{{ task.order.customer_phone|default:"N/A" }}</div>
+            <div class="bpt__detail-group">
+                <div class="bpt__detail-label">Phone</div>
+                <div class="bpt__detail-value">{{ task.order.customer_phone|default:"N/A" }}</div>
             </div>
-            <div class="detail-group">
-                <div class="detail-label">Driver</div>
-                <div class="detail-value">{{ task.driver|default:"Unassigned" }}</div>
+            <div class="bpt__detail-group">
+                <div class="bpt__detail-label">Driver</div>
+                <div class="bpt__detail-value">{{ task.driver|default:"Unassigned" }}</div>
             </div>
-            <div class="detail-group">
-                <div class="detail-label">Status</div>
-                <div class="detail-value">
-                    <span class="status-badge status-{{ task.dl_task_status_client }}">
+            <div class="bpt__detail-group">
+                <div class="bpt__detail-label">Status</div>
+                <div class="bpt__detail-value">
+                    <span class="bpt__status-badge bpt__status-badge--{{ task.dl_task_status_client }}">
                         {{ task.get_dl_task_status_client_display|default:"Pending" }}
                     </span>
                 </div>
@@ -164,23 +164,23 @@
         </div>
 
         {% if task.pickup_location %}
-        <div class="address-section">
-            <div class="address-label">Pickup Location</div>
-            <div class="address-value">{{ task.pickup_location.pickup_location_title }}</div>
+        <div class="bpt__address-section">
+            <div class="bpt__address-label">Pickup Location</div>
+            <div class="bpt__address-value">{{ task.pickup_location.pickup_location_title }}</div>
         </div>
         {% endif %}
 
         {% if task.order.customer_address %}
-        <div class="address-section">
-            <div class="address-label">Delivery Address</div>
-            <div class="address-value">{{ task.order.customer_address }}</div>
+        <div class="bpt__address-section">
+            <div class="bpt__address-label">Delivery Address</div>
+            <div class="bpt__address-value">{{ task.order.customer_address }}</div>
         </div>
         {% endif %}
 
         {% if task.order.cod_amount %}
-        <div class="detail-group" style="margin-top: 0.5rem; background: #fff3cd;">
-            <div class="detail-label">COD Amount</div>
-            <div class="detail-value" style="font-weight: bold;">AED {{ task.order.cod_amount }}</div>
+        <div class="bpt__detail-group" style="margin-top: 0.5rem; background: #fff3cd;">
+            <div class="bpt__detail-label">COD Amount</div>
+            <div class="bpt__detail-value" style="font-weight: bold;">AED {{ task.order.cod_amount }}</div>
         </div>
         {% endif %}
     </div>

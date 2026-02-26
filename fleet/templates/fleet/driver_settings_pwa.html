@@ -20,7 +20,7 @@
 
 {% if messages %}
 {% for msg in messages %}
-<div class="fade-in" style="background:{% if msg.tags == 'success' %}var(--fleet-success){% elif msg.tags == 'warning' %}var(--fleet-warning){% else %}var(--fleet-info){% endif %};
+<div class="fleet-fade-in" style="background:{% if msg.tags == 'success' %}var(--fleet-success){% elif msg.tags == 'warning' %}var(--fleet-warning){% else %}var(--fleet-info){% endif %};
      color:#fff; border-radius:var(--radius-sm); padding:var(--spacing-md) var(--spacing-lg);
      margin-bottom:var(--spacing-md); font-weight:600; font-size:var(--font-size-sm);">
     {{ msg }}
@@ -29,7 +29,7 @@
 {% endif %}
 
 <!-- Availability Status -->
-<div class="fleet-card fade-in">
+<div class="fleet-card fleet-fade-in">
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">
             <i class="fa-solid fa-circle-dot me-2" style="color:var(--fleet-success);"></i>
@@ -44,7 +44,7 @@
             {% csrf_token %}
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--spacing-sm);">
                 {% for value, label in availability_choices %}
-                <label class="avail-option {% if driver.driver_availability == value %}avail-option--active{% endif %}"
+                <label class="fleet-avail__option {% if driver.driver_availability == value %}fleet-avail__option--active{% endif %}"
                        style="display:flex; align-items:center; gap:var(--spacing-sm);
                               padding:var(--spacing-md); border-radius:var(--radius-sm);
                               border:2px solid {% if driver.driver_availability == value %}var(--fleet-primary){% else %}var(--fleet-grey-200){% endif %};
@@ -71,7 +71,7 @@
 </div>
 
 <!-- Account Settings -->
-<div class="fleet-card slide-up" style="animation-delay:0.1s;">
+<div class="fleet-card fleet-slide-up" style="animation-delay:0.1s;">
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">
             <i class="fa-solid fa-user-gear me-2"></i>
@@ -129,7 +129,7 @@
 </div>
 
 <!-- App Info -->
-<div class="fleet-card slide-up" style="animation-delay:0.2s;">
+<div class="fleet-card fleet-slide-up" style="animation-delay:0.2s;">
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">
             <i class="fa-solid fa-circle-info me-2"></i>

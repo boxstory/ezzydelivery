@@ -16,20 +16,20 @@
 {% endblock %}
 
 {% block account_content %}
-<div class="auth-container" id="account_signup_container_main">
-    <div class="auth-card" id="account_signup_card_main">
-        <div class="auth-header" id="account_signup_header">
-            <div class="auth-logo">
+<div class="auth__container" id="account_signup_container_main">
+    <div class="auth__card" id="account_signup_card_main">
+        <div class="auth__header" id="account_signup_header">
+            <div class="auth__logo">
                 <i class="fa-solid fa-truck-fast"></i>
             </div>
             <h1 id="account_signup_title_main">{% trans "Create Account" %}</h1>
             <p id="account_signup_subtitle">{% trans "Join Ezzy Delivery today" %}</p>
         </div>
 
-        <div class="auth-body" id="account_signup_section_body">
+        <div class="auth__body" id="account_signup_section_body">
             {% if messages %}
                 {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }}">
+                    <div class="auth__alert auth__alert--{{ message.tags }}">
                         {{ message }}
                     </div>
                 {% endfor %}
@@ -38,17 +38,17 @@
             <form method="POST" action="{% url 'account_signup' %}" id="account_signup_form_main" novalidate>
                 {% csrf_token %}
 
-                <div class="form-group" id="account_signup_form_group_first_name">
+                <div class="auth__form-group" id="account_signup_form_group_first_name">
                     <label for="{{ form.first_name.id_for_label }}">
                         <i class="fa-solid fa-user me-1"></i>
                         {{ form.first_name.label }}
                     </label>
                     {{ form.first_name }}
                     {% if form.first_name.help_text %}
-                        <span class="helptext">{{ form.first_name.help_text }}</span>
+                        <span class="auth__helptext">{{ form.first_name.help_text }}</span>
                     {% endif %}
                     {% if form.first_name.errors %}
-                        <ul class="errorlist">
+                        <ul class="auth__errorlist">
                             {% for error in form.first_name.errors %}
                                 <li>{{ error }}</li>
                             {% endfor %}
@@ -56,17 +56,17 @@
                     {% endif %}
                 </div>
 
-                <div class="form-group" id="account_signup_form_group_last_name">
+                <div class="auth__form-group" id="account_signup_form_group_last_name">
                     <label for="{{ form.last_name.id_for_label }}">
                         <i class="fa-solid fa-user me-1"></i>
                         {{ form.last_name.label }}
                     </label>
                     {{ form.last_name }}
                     {% if form.last_name.help_text %}
-                        <span class="helptext">{{ form.last_name.help_text }}</span>
+                        <span class="auth__helptext">{{ form.last_name.help_text }}</span>
                     {% endif %}
                     {% if form.last_name.errors %}
-                        <ul class="errorlist">
+                        <ul class="auth__errorlist">
                             {% for error in form.last_name.errors %}
                                 <li>{{ error }}</li>
                             {% endfor %}
@@ -74,17 +74,17 @@
                     {% endif %}
                 </div>
 
-                <div class="form-group" id="account_signup_form_group_email">
+                <div class="auth__form-group" id="account_signup_form_group_email">
                     <label for="{{ form.email.id_for_label }}">
                         <i class="fa-solid fa-envelope me-1"></i>
                         {{ form.email.label }}
                     </label>
                     {{ form.email }}
                     {% if form.email.help_text %}
-                        <span class="helptext">{{ form.email.help_text }}</span>
+                        <span class="auth__helptext">{{ form.email.help_text }}</span>
                     {% endif %}
                     {% if form.email.errors %}
-                        <ul class="errorlist">
+                        <ul class="auth__errorlist">
                             {% for error in form.email.errors %}
                                 <li>{{ error }}</li>
                             {% endfor %}
@@ -93,17 +93,17 @@
                 </div>
 
                 {% if form.username %}
-                <div class="form-group" id="account_signup_form_group_username">
+                <div class="auth__form-group" id="account_signup_form_group_username">
                     <label for="{{ form.username.id_for_label }}">
                         <i class="fa-solid fa-user me-1"></i>
                         {{ form.username.label }}
                     </label>
                     {{ form.username }}
                     {% if form.username.help_text %}
-                        <span class="helptext">{{ form.username.help_text }}</span>
+                        <span class="auth__helptext">{{ form.username.help_text }}</span>
                     {% endif %}
                     {% if form.username.errors %}
-                        <ul class="errorlist">
+                        <ul class="auth__errorlist">
                             {% for error in form.username.errors %}
                                 <li>{{ error }}</li>
                             {% endfor %}
@@ -112,42 +112,42 @@
                 </div>
                 {% endif %}
 
-                <div class="form-group" id="account_signup_form_group_password1">
+                <div class="auth__form-group" id="account_signup_form_group_password1">
                     <label for="{{ form.password1.id_for_label }}">
                         <i class="fa-solid fa-lock me-1"></i>
                         {{ form.password1.label }}
                     </label>
                     {{ form.password1 }}
                     {% if form.password1.help_text %}
-                        <span class="helptext">{{ form.password1.help_text }}</span>
+                        <span class="auth__helptext">{{ form.password1.help_text }}</span>
                     {% endif %}
 
                     <!-- Password Requirements (Custom Validation) -->
-                    <div class="password-requirements" id="account_signup_password_requirements_container">
-                        <div class="password-requirements-title" id="account_signup_password_requirements_title">
+                    <div class="auth__pwd-requirements" id="account_signup_password_requirements_container">
+                        <div class="auth__pwd-requirements-title" id="account_signup_password_requirements_title">
                             <i class="fa-solid fa-shield-halved" id="account_signup_password_requirements_icon"></i>
                             Password Requirements
                         </div>
-                        <div class="password-requirement" id="account_signup_password_requirement_length" data-requirement="length">
+                        <div class="auth__pwd-requirement" id="account_signup_password_requirement_length" data-requirement="length">
                             <i class="fa-solid fa-circle" id="account_signup_password_requirement_length_icon"></i>
                             <span id="account_signup_password_requirement_length_text">At least 8 characters long</span>
                         </div>
-                        <div class="password-requirement" id="account_signup_password_requirement_similarity" data-requirement="similarity">
+                        <div class="auth__pwd-requirement" id="account_signup_password_requirement_similarity" data-requirement="similarity">
                             <i class="fa-solid fa-circle" id="account_signup_password_requirement_similarity_icon"></i>
                             <span id="account_signup_password_requirement_similarity_text">Not too similar to your other personal information</span>
                         </div>
-                        <div class="password-requirement" id="account_signup_password_requirement_common" data-requirement="common">
+                        <div class="auth__pwd-requirement" id="account_signup_password_requirement_common" data-requirement="common">
                             <i class="fa-solid fa-circle" id="account_signup_password_requirement_common_icon"></i>
                             <span id="account_signup_password_requirement_common_text">Not a commonly used password</span>
                         </div>
-                        <div class="password-requirement" id="account_signup_password_requirement_numeric" data-requirement="numeric">
+                        <div class="auth__pwd-requirement" id="account_signup_password_requirement_numeric" data-requirement="numeric">
                             <i class="fa-solid fa-circle" id="account_signup_password_requirement_numeric_icon"></i>
                             <span id="account_signup_password_requirement_numeric_text">Can't be entirely numeric</span>
                         </div>
                     </div>
 
                     {% if form.password1.errors %}
-                        <ul class="errorlist">
+                        <ul class="auth__errorlist">
                             {% for error in form.password1.errors %}
                                 <li>{{ error }}</li>
                             {% endfor %}
@@ -155,17 +155,17 @@
                     {% endif %}
                 </div>
 
-                <div class="form-group" id="account_signup_form_group_password2">
+                <div class="auth__form-group" id="account_signup_form_group_password2">
                     <label for="{{ form.password2.id_for_label }}">
                         <i class="fa-solid fa-lock me-1"></i>
                         {{ form.password2.label }}
                     </label>
                     {{ form.password2 }}
                     {% if form.password2.help_text %}
-                        <span class="helptext">{{ form.password2.help_text }}</span>
+                        <span class="auth__helptext">{{ form.password2.help_text }}</span>
                     {% endif %}
                     {% if form.password2.errors %}
-                        <ul class="errorlist">
+                        <ul class="auth__errorlist">
                             {% for error in form.password2.errors %}
                                 <li>{{ error }}</li>
                             {% endfor %}
@@ -177,27 +177,27 @@
                     <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
                 {% endif %}
 
-                <button id="account_signup_btn_submit" type="submit" class="btn-signup">
+                <button id="account_signup_btn_submit" type="submit" class="auth__btn--signup">
                     <i class="fa-solid fa-user-plus me-2"></i>
                     {% trans "Sign Up" %}
                 </button>
             </form>
 
-            <div class="divider" id="account_signup_divider">
+            <div class="auth__divider" id="account_signup_divider">
                 <span>{% trans "Or sign up with" %}</span>
             </div>
 
-            <div class="social-auth" id="account_signup_section_social">
+            <div class="auth__social" id="account_signup_section_social">
                 {% get_providers as socialaccount_providers %}
                 {% if socialaccount_providers %}
                     {% for provider in socialaccount_providers %}
                         {% if provider.id == "google" %}
-                            <a id="account_signup_btn_google" href="{% provider_login_url provider.id process='signup' %}" class="social-btn google">
+                            <a id="account_signup_btn_google" href="{% provider_login_url provider.id process='signup' %}" class="auth__social-btn google">
                                 <i class="fa-brands fa-google"></i>
                                 <span>{% trans "Sign up with Google" %}</span>
                             </a>
                         {% elif provider.id == "facebook" %}
-                            <a id="account_signup_btn_facebook" href="{% provider_login_url provider.id process='signup' %}" class="social-btn facebook">
+                            <a id="account_signup_btn_facebook" href="{% provider_login_url provider.id process='signup' %}" class="auth__social-btn facebook">
                                 <i class="fa-brands fa-facebook"></i>
                                 <span>{% trans "Sign up with Facebook" %}</span>
                             </a>
@@ -205,11 +205,11 @@
                     {% endfor %}
                 {% else %}
                     <!-- Placeholder buttons for when social auth is not configured -->
-                    <button id="account_signup_btn_google_disabled" class="social-btn google" disabled>
+                    <button id="account_signup_btn_google_disabled" class="auth__social-btn google" disabled>
                         <i class="fa-brands fa-google"></i>
                         <span>{% trans "Sign up with Google" %}</span>
                     </button>
-                    <button id="account_signup_btn_facebook_disabled" class="social-btn facebook" disabled>
+                    <button id="account_signup_btn_facebook_disabled" class="auth__social-btn facebook" disabled>
                         <i class="fa-brands fa-facebook"></i>
                         <span>{% trans "Sign up with Facebook" %}</span>
                     </button>
@@ -217,7 +217,7 @@
             </div>
         </div>
 
-        <div class="auth-footer" id="account_signup_footer">
+        <div class="auth__footer" id="account_signup_footer">
             <p>
                 {% trans "Already have an account?" %}
                 <a id="account_signup_link_login" href="{{ login_url }}">{% trans "Sign In" %}</a>

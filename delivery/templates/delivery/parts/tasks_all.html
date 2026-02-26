@@ -11,43 +11,43 @@
   <div class="pwa-content d-md-none">
 
     <!-- Task Tabs -->
-    <div class="task-tabs task-tabs--four">
+    <div class="dtk__tabs dtk__tabs--four">
       <a href="?tab=all&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}"
-         class="task-tab {% if current_tab == 'all' %}task-tab--active{% endif %}">
-        <span class="task-tab__label">New</span>
-        <span class="task-tab__badge">{{ all_count }}</span>
+         class="dtk__tab {% if current_tab == 'all' %}dtk__tab--active{% endif %}">
+        <span class="dtk__tab-label">New</span>
+        <span class="dtk__tab-badge">{{ all_count }}</span>
       </a>
       <a href="?tab=assigned&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}"
-         class="task-tab {% if current_tab == 'assigned' %}task-tab--active{% endif %}">
-        <span class="task-tab__label">Assigned</span>
-        <span class="task-tab__badge">{{ assigned_count }}</span>
+         class="dtk__tab {% if current_tab == 'assigned' %}dtk__tab--active{% endif %}">
+        <span class="dtk__tab-label">Assigned</span>
+        <span class="dtk__tab-badge">{{ assigned_count }}</span>
       </a>
       <a href="?tab=accepted&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}"
-         class="task-tab {% if current_tab == 'accepted' %}task-tab--active{% endif %}">
-        <span class="task-tab__label">Active</span>
-        <span class="task-tab__badge">{{ accepted_count }}</span>
+         class="dtk__tab {% if current_tab == 'accepted' %}dtk__tab--active{% endif %}">
+        <span class="dtk__tab-label">Active</span>
+        <span class="dtk__tab-badge">{{ accepted_count }}</span>
       </a>
       <a href="?tab=history&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}"
-         class="task-tab {% if current_tab == 'history' %}task-tab--active{% endif %}">
-        <span class="task-tab__label">History</span>
-        <span class="task-tab__badge">{{ history_count }}</span>
+         class="dtk__tab {% if current_tab == 'history' %}dtk__tab--active{% endif %}">
+        <span class="dtk__tab-label">History</span>
+        <span class="dtk__tab-badge">{{ history_count }}</span>
       </a>
     </div>
 
     <!-- Area & Type Filters - 3 buttons in one row -->
-    <div class="delivery-filters">
-      <div class="delivery-filters__row">
+    <div class="dtk__filters">
+      <div class="dtk__filters-row">
         <a href="?tab={{ current_tab }}&area=all&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}"
-           class="filter-chip {% if area_filter == 'all' and not zone_filter %}filter-chip--active{% endif %}">
+           class="dtk__filter-chip {% if area_filter == 'all' and not zone_filter %}dtk__filter-chip--active{% endif %}">
           <i class="fa-solid fa-globe"></i>All
         </a>
         <a href="?tab={{ current_tab }}&area=my_zone&type={{ type_filter }}&status={{ status_filter }}&sort={{ sort_by }}"
-           class="filter-chip {% if area_filter == 'my_zone' and not zone_filter %}filter-chip--active{% endif %}">
+           class="dtk__filter-chip {% if area_filter == 'my_zone' and not zone_filter %}dtk__filter-chip--active{% endif %}">
           My Zone
         </a>
         <!-- Zone Dropdown -->
-        <div class="dropdown zone-dropdown">
-          <button class="filter-chip {% if zone_filter %}filter-chip--primary{% endif %} dropdown-toggle"
+        <div class="dropdown dtk__zone-dropdown">
+          <button class="dtk__filter-chip {% if zone_filter %}dtk__filter-chip--primary{% endif %} dropdown-toggle"
                   type="button" data-bs-toggle="dropdown">
             <i class="fa-solid fa-map-marker-alt"></i>{% if zone_filter %}Z{{ zone_filter }}{% else %}Zone{% endif %}
           </button>
@@ -73,52 +73,52 @@
     </div>
     {% if current_tab == 'accepted' %}
     <!-- Status Filters for Active Tasks -->
-    <div class="delivery-filters">
-      <div class="delivery-filters__row">
+    <div class="dtk__filters">
+      <div class="dtk__filters-row">
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all&sort={{ sort_by }}&zone={{ zone_filter }}"
-           class="filter-chip {% if status_filter == 'all' %}filter-chip--active{% endif %}">All</a>
+           class="dtk__filter-chip {% if status_filter == 'all' %}dtk__filter-chip--active{% endif %}">All</a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=accepted&sort={{ sort_by }}&zone={{ zone_filter }}"
-           class="filter-chip {% if status_filter == 'accepted' %}filter-chip--active{% endif %}">Accepted</a>
+           class="dtk__filter-chip {% if status_filter == 'accepted' %}dtk__filter-chip--active{% endif %}">Accepted</a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=picked_up&sort={{ sort_by }}&zone={{ zone_filter }}"
-           class="filter-chip {% if status_filter == 'picked_up' %}filter-chip--active{% endif %}">Picked</a>
+           class="dtk__filter-chip {% if status_filter == 'picked_up' %}dtk__filter-chip--active{% endif %}">Picked</a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=in_transit&sort={{ sort_by }}&zone={{ zone_filter }}"
-           class="filter-chip {% if status_filter == 'in_transit' or status_filter == 'out_for_delivery' %}filter-chip--active{% endif %}">Transit</a>
+           class="dtk__filter-chip {% if status_filter == 'in_transit' or status_filter == 'out_for_delivery' %}dtk__filter-chip--active{% endif %}">Transit</a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=contacted&sort={{ sort_by }}&zone={{ zone_filter }}"
-           class="filter-chip {% if status_filter == 'contacted' %}filter-chip--active{% endif %}">Contacted</a>
+           class="dtk__filter-chip {% if status_filter == 'contacted' %}dtk__filter-chip--active{% endif %}">Contacted</a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=non_reachable&sort={{ sort_by }}&zone={{ zone_filter }}"
-           class="filter-chip {% if status_filter == 'non_reachable' %}filter-chip--active{% endif %}">Non Reach</a>
+           class="dtk__filter-chip {% if status_filter == 'non_reachable' %}dtk__filter-chip--active{% endif %}">Non Reach</a>
       </div>
     </div>
     {% elif current_tab == 'history' %}
     <!-- Status Filters for History/Completed Tasks -->
-    <div class="delivery-filters">
-      <div class="delivery-filters__row">
+    <div class="dtk__filters">
+      <div class="dtk__filters-row">
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=all&sort={{ sort_by }}&zone={{ zone_filter }}"
-           class="filter-chip {% if status_filter == 'all' %}filter-chip--active{% endif %}">All</a>
+           class="dtk__filter-chip {% if status_filter == 'all' %}dtk__filter-chip--active{% endif %}">All</a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=delivered&sort={{ sort_by }}&zone={{ zone_filter }}"
-           class="filter-chip {% if status_filter == 'delivered' %}filter-chip--active{% endif %}">Delivered</a>
+           class="dtk__filter-chip {% if status_filter == 'delivered' %}dtk__filter-chip--active{% endif %}">Delivered</a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status=failed&sort={{ sort_by }}&zone={{ zone_filter }}"
-           class="filter-chip {% if status_filter == 'failed' or status_filter == 'cancelled' %}filter-chip--active{% endif %}">Failed</a>
+           class="dtk__filter-chip {% if status_filter == 'failed' or status_filter == 'cancelled' %}dtk__filter-chip--active{% endif %}">Failed</a>
       </div>
     </div>
     {% endif %}
 
     <!-- Task Count Header with Sort Options -->
-    <div class="delivery-sort">
-      <span class="delivery-sort__count">{{ cards|length }} {% if current_tab == 'all' %}new{% elif current_tab == 'assigned' %}assigned{% elif current_tab == 'accepted' %}active{% else %}completed{% endif %} task{{ cards|length|pluralize }}</span>
-      <div class="delivery-sort__controls">
+    <div class="dtk__sort">
+      <span class="dtk__sort-count">{{ cards|length }} {% if current_tab == 'all' %}new{% elif current_tab == 'assigned' %}assigned{% elif current_tab == 'accepted' %}active{% else %}completed{% endif %} task{{ cards|length|pluralize }}</span>
+      <div class="dtk__sort-controls">
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort=date&zone={{ zone_filter }}"
-           class="sort-btn {% if sort_by == 'date' or not sort_by %}sort-btn--active{% endif %}"
+           class="dtk__sort-btn {% if sort_by == 'date' or not sort_by %}dtk__sort-btn--active{% endif %}"
            title="Sort by date">
           <i class="fa-solid fa-calendar"></i>
         </a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort=zone&zone={{ zone_filter }}"
-           class="sort-btn {% if sort_by == 'zone' %}sort-btn--active{% endif %}"
+           class="dtk__sort-btn {% if sort_by == 'zone' %}dtk__sort-btn--active{% endif %}"
            title="Sort by zone">
           <i class="fa-solid fa-location-dot"></i>
         </a>
         <a href="?tab={{ current_tab }}&area={{ area_filter }}&type={{ type_filter }}&status={{ status_filter }}&sort=status&zone={{ zone_filter }}"
-           class="sort-btn {% if sort_by == 'status' %}sort-btn--active{% endif %}"
+           class="dtk__sort-btn {% if sort_by == 'status' %}dtk__sort-btn--active{% endif %}"
            title="Sort by status">
           <i class="fa-solid fa-circle-check"></i>
         </a>

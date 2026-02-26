@@ -10,18 +10,18 @@
 {% endblock %}
 
 {% block account_content %}
-<div class="auth-container" id="social_connections_container_main">
-    <div class="auth-card connections-card" id="social_connections_card_main">
-        <div class="auth-header" id="social_connections_header">
-            <div class="auth-logo">
+<div class="auth__container" id="social_connections_container_main">
+    <div class="auth__card auth__card--connections" id="social_connections_card_main">
+        <div class="auth__header" id="social_connections_header">
+            <div class="auth__logo">
                 <i class="fa-solid fa-link"></i>
             </div>
             <h1 id="social_connections_title_main">{% trans "Account Connections" %}</h1>
         </div>
 
-        <div class="auth-body" id="social_connections_section_body">
+        <div class="auth__body" id="social_connections_section_body">
             {% if form.accounts %}
-                <p class="intro-message" id="social_connections_message_intro">
+                <p class="auth__intro-message" id="social_connections_message_intro">
                     {% trans "You can sign in to your account using any of the following third party accounts:" %}
                 </p>
 
@@ -29,18 +29,18 @@
                     {% csrf_token %}
 
                     {% if form.non_field_errors %}
-                        <div class="error-alert" id="social_connections_alert_error">
+                        <div class="auth__error-alert" id="social_connections_alert_error">
                             {{ form.non_field_errors }}
                         </div>
                     {% endif %}
 
-                    <div class="account-list">
+                    <div class="auth__account-list">
                         {% for base_account in form.accounts %}
                             {% with base_account.get_provider_account as account %}
-                                <div class="account-item">
+                                <div class="auth__account-item">
                                     <label for="id_account_{{ base_account.id }}">
                                         <input id="id_account_{{ base_account.id }}" type="radio" name="account" value="{{ base_account.id }}"/>
-                                        <span class="provider-badge {{ base_account.provider }} {{ account.get_brand.id }}">
+                                        <span class="auth__provider-badge {{ base_account.provider }} {{ account.get_brand.id }}">
                                             {% if base_account.provider == "google" %}
                                                 <i class="fa-brands fa-google"></i>
                                             {% elif base_account.provider == "facebook" %}
@@ -55,24 +55,24 @@
                         {% endfor %}
                     </div>
 
-                    <button id="social_connections_btn_remove" type="submit" class="btn-remove">
+                    <button id="social_connections_btn_remove" type="submit" class="auth__btn--remove">
                         <i class="fa-solid fa-unlink me-2"></i>
                         {% trans 'Remove Selected Account' %}
                     </button>
                 </form>
 
-                <div class="divider"></div>
+                <div class="auth__divider"></div>
             {% else %}
-                <p class="empty-message" id="social_connections_message_empty">
+                <p class="auth__empty-message" id="social_connections_message_empty">
                     {% trans 'You currently have no social network accounts connected to this account.' %}
                 </p>
             {% endif %}
 
-            <h2 class="section-title" id="social_connections_title_add">
+            <h2 class="auth__section-title" id="social_connections_title_add">
                 {% trans 'Add a 3rd Party Account' %}
             </h2>
 
-            <ul class="provider-list" id="social_connections_list_providers">
+            <ul class="auth__provider-list" id="social_connections_list_providers">
                 {% include "socialaccount/snippets/provider_list.html" with process="connect" %}
             </ul>
 

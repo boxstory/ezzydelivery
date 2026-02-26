@@ -2,18 +2,19 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'business/css/business-all.css' %}">
 {% endblock extra_css %}
 {% block title %}
 Cateloges
 {% endblock title %}
 {% block content %}
-<div class="p-md-5 p-2 col-12 " id="client_all_business_container_main">
+<div class="bab p-md-5 p-2 col-12" id="client_all_business_container_main">
   <div class="h2 pt-3 mx-3" id="client_all_business_title_main">Qatar Business Cateloges</div>
   <hr class="pt-0" />
   <div class="row row-cols-1 row-cols-md-2" id="client_all_business_section_list">
     {% for business in all_business %}
     <div class="p-2" onclick="window.location='/business/{{ business.business_id }}/'">
-      <div class="d-flex border border-1 bg-light rounded-3">
+      <div class="bab__card d-flex border border-1 bg-light rounded-3">
         <!-- Add your card image here -->
         <div class="col-8 p-3">
           <h5 class="card-title fw-bold pb-3">{{ business.business_name }}</h5>
@@ -41,10 +42,10 @@ Cateloges
         <div class="col-4">
           {% if business.business_logo is not None %}
           <img src="{{ business.business_logo.all.0.business_logo.url }}" loading="lazy" alt="{{ business.business_name }} logo" title="{{ business.business_name }}"
-            class="img-fluid text-center" />
+            class="bab__logo img-fluid text-center" />
           {% else %}
           <img src="/media/business/avatar.png" loading="lazy" title="{{ business.business_name }}" alt="{{ business.business_name }} logo"
-            class="img-fluid text-center" />
+            class="bab__logo img-fluid text-center" />
           {% endif %}
         </div>
       </div>
@@ -56,7 +57,7 @@ Cateloges
     {% endfor %}
   </div>
   <hr class="p-0 text-dark" />
-  <div class="pt-2 text-end">
+  <div class="bab__footer pt-2 text-end">
     <a href="{% url 'business:all_business' %}">
       <div class="btn btn-dark">
         <i class="fa-solid fa-chevron-left me-2"></i> Back

@@ -4,23 +4,23 @@
 {% block title %}Inbound Product Requests{% endblock %}
 
 {% block extra_css %}
-<link type="text/css" rel="stylesheet" href="{% static 'business/css/business-inbound-requests.css' %}?v=20260214a" />
+<link type="text/css" rel="stylesheet" href="{% static 'business/css/business-inbound-requests.css' %}?v=20260226a" />
 {% endblock extra_css %}
 
 {% block content %}
-<div class="inbound-requests-page">
+<div class="bir">
   <!-- Page Header -->
-  <div class="page-header">
-    <div class="page-header__content">
-      <div class="page-header__text">
-        <h1 class="page-header__title">
+  <div class="bir__header">
+    <div class="bir__header-content">
+      <div class="bir__header-text">
+        <h1 class="bir__title">
           <i class="fa-solid fa-arrow-right-to-bracket"></i>
           Inbound Requests
         </h1>
-        <p class="page-header__subtitle">Send products to warehouse for storage and fulfillment</p>
+        <p class="bir__subtitle">Send products to warehouse for storage and fulfillment</p>
       </div>
-      <div class="page-header__actions">
-        <a href="#" class="btn-action btn-action--primary">
+      <div class="bir__header-actions">
+        <a href="#" class="bir__btn bir__btn--primary">
           <i class="fa-solid fa-plus"></i>
           <span>New Request</span>
         </a>
@@ -29,55 +29,55 @@
   </div>
 
   <!-- Stats Grid -->
-  <div class="stats-grid">
-    <div class="stat-card stat-card--warning">
-      <div class="stat-card__icon">
+  <div class="bir__stats">
+    <div class="bir__stat-card bir__stat-card--warning">
+      <div class="bir__stat-icon">
         <i class="fa-solid fa-clock"></i>
       </div>
-      <div class="stat-card__content">
-        <p class="stat-card__label">Pending Review</p>
-        <h3 class="stat-card__value">{{ stats.pending }}</h3>
+      <div class="bir__stat-content">
+        <p class="bir__stat-label">Pending Review</p>
+        <h3 class="bir__stat-value">{{ stats.pending }}</h3>
       </div>
     </div>
 
-    <div class="stat-card stat-card--info">
-      <div class="stat-card__icon">
+    <div class="bir__stat-card bir__stat-card--info">
+      <div class="bir__stat-icon">
         <i class="fa-solid fa-circle-check"></i>
       </div>
-      <div class="stat-card__content">
-        <p class="stat-card__label">Approved</p>
-        <h3 class="stat-card__value">{{ stats.approved }}</h3>
+      <div class="bir__stat-content">
+        <p class="bir__stat-label">Approved</p>
+        <h3 class="bir__stat-value">{{ stats.approved }}</h3>
       </div>
     </div>
 
-    <div class="stat-card stat-card--success">
-      <div class="stat-card__icon">
+    <div class="bir__stat-card bir__stat-card--success">
+      <div class="bir__stat-icon">
         <i class="fa-solid fa-box-check"></i>
       </div>
-      <div class="stat-card__content">
-        <p class="stat-card__label">Completed</p>
-        <h3 class="stat-card__value">{{ stats.completed }}</h3>
+      <div class="bir__stat-content">
+        <p class="bir__stat-label">Completed</p>
+        <h3 class="bir__stat-value">{{ stats.completed }}</h3>
       </div>
     </div>
 
-    <div class="stat-card stat-card--neutral">
-      <div class="stat-card__icon">
+    <div class="bir__stat-card bir__stat-card--neutral">
+      <div class="bir__stat-icon">
         <i class="fa-solid fa-boxes-stacked"></i>
       </div>
-      <div class="stat-card__content">
-        <p class="stat-card__label">Total Requests</p>
-        <h3 class="stat-card__value">{{ stats.total }}</h3>
+      <div class="bir__stat-content">
+        <p class="bir__stat-label">Total Requests</p>
+        <h3 class="bir__stat-value">{{ stats.total }}</h3>
       </div>
     </div>
   </div>
 
   <!-- Filters Section -->
-  <div class="filters-card">
-    <form method="GET" class="filters-form" id="business_inbound_requests_form_filter">
-      <div class="filters-form__row">
-        <div class="filters-form__group">
-          <label class="filters-form__label" for="business_inbound_requests_input_status">Filter by Status</label>
-          <select name="status" id="business_inbound_requests_input_status" class="filters-form__select">
+  <div class="bir__filter-bar">
+    <form method="GET" class="bir__filter-form" id="business_inbound_requests_form_filter">
+      <div class="bir__filter-row">
+        <div class="bir__filter-group">
+          <label class="bir__filter-label" for="business_inbound_requests_input_status">Filter by Status</label>
+          <select name="status" id="business_inbound_requests_input_status" class="bir__filter-select">
             <option value="">All Status</option>
             <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending Review</option>
             <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
@@ -85,13 +85,13 @@
             <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
           </select>
         </div>
-        <div class="filters-form__actions">
-          <button type="submit" class="btn-filter">
+        <div class="bir__filter-actions">
+          <button type="submit" class="bir__filter-btn">
             <i class="fa-solid fa-filter"></i>
             Apply Filters
           </button>
           {% if status_filter %}
-          <a href="{% url 'business:inbound_requests_list' %}" class="btn-filter btn-filter--clear">
+          <a href="{% url 'business:inbound_requests_list' %}" class="bir__filter-btn bir__filter-btn--clear">
             <i class="fa-solid fa-xmark"></i>
             Clear
           </a>
@@ -102,86 +102,86 @@
   </div>
 
   <!-- Requests Table -->
-  <div class="requests-card">
-    <div class="requests-card__header">
-      <h2 class="requests-card__title">
+  <div class="bir__card">
+    <div class="bir__card-header">
+      <h2 class="bir__card-title">
         <i class="fa-solid fa-list"></i>
         Request History
       </h2>
-      <div class="requests-card__meta">
+      <div class="bir__card-meta">
         Showing {{ page_obj.start_index|default:0 }}-{{ page_obj.end_index|default:0 }} of {{ page_obj.paginator.count|default:0 }}
       </div>
     </div>
-    <div class="requests-card__body">
+    <div class="bir__card-body">
       {% if page_obj %}
-      <div class="requests-table-wrapper">
-        <table class="requests-table" id="business_inbound_requests_table_main">
+      <div class="bir__table-wrap">
+        <table class="bir__table" id="business_inbound_requests_table_main">
           <thead>
             <tr>
-              <th>Request Number</th>
-              <th>Warehouse</th>
-              <th>Items</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Expected Delivery</th>
-              <th>Actions</th>
+              <th class="bir__th">Request Number</th>
+              <th class="bir__th">Warehouse</th>
+              <th class="bir__th">Items</th>
+              <th class="bir__th">Status</th>
+              <th class="bir__th">Created</th>
+              <th class="bir__th">Expected Delivery</th>
+              <th class="bir__th">Actions</th>
             </tr>
           </thead>
           <tbody>
             {% for request in page_obj %}
-            <tr>
-              <td>
-                <code class="request-number">{{ request.request_number }}</code>
+            <tr class="bir__row">
+              <td class="bir__td">
+                <code class="bir__req-num">{{ request.request_number }}</code>
               </td>
-              <td>
-                <div class="warehouse-info">
+              <td class="bir__td">
+                <div class="bir__warehouse-info">
                   <i class="fa-solid fa-warehouse"></i>
                   <span>{{ request.warehouse.name }}</span>
                 </div>
               </td>
-              <td>
-                <span class="items-count">{{ request.items.count }} item{{ request.items.count|pluralize }}</span>
+              <td class="bir__td">
+                <span class="bir__item-count">{{ request.items.count }} item{{ request.items.count|pluralize }}</span>
               </td>
-              <td>
+              <td class="bir__td">
                 {% if request.status == 'pending' %}
-                <span class="status-badge status-badge--warning">
+                <span class="bir__badge bir__badge--warning">
                   <i class="fa-solid fa-clock"></i>
                   Pending
                 </span>
                 {% elif request.status == 'approved' %}
-                <span class="status-badge status-badge--info">
+                <span class="bir__badge bir__badge--info">
                   <i class="fa-solid fa-circle-check"></i>
                   Approved
                 </span>
                 {% elif request.status == 'completed' %}
-                <span class="status-badge status-badge--success">
+                <span class="bir__badge bir__badge--success">
                   <i class="fa-solid fa-box-check"></i>
                   Completed
                 </span>
                 {% elif request.status == 'cancelled' %}
-                <span class="status-badge status-badge--danger">
+                <span class="bir__badge bir__badge--danger">
                   <i class="fa-solid fa-circle-xmark"></i>
                   Cancelled
                 </span>
                 {% else %}
-                <span class="status-badge status-badge--neutral">
+                <span class="bir__badge bir__badge--neutral">
                   {{ request.status|title }}
                 </span>
                 {% endif %}
               </td>
-              <td>
-                <span class="date-text">{{ request.created_at|date:"d M Y" }}</span>
+              <td class="bir__td">
+                <span class="bir__date">{{ request.created_at|date:"d M Y" }}</span>
               </td>
-              <td>
+              <td class="bir__td">
                 {% if request.expected_delivery_date %}
-                <span class="date-text">{{ request.expected_delivery_date|date:"d M Y" }}</span>
+                <span class="bir__date">{{ request.expected_delivery_date|date:"d M Y" }}</span>
                 {% else %}
                 <span class="text-muted">—</span>
                 {% endif %}
               </td>
-              <td>
-                <div class="table-actions">
-                  <button class="btn-icon btn-icon--view" title="View Details">
+              <td class="bir__td">
+                <div class="bir__actions">
+                  <button class="bir__btn-icon bir__btn-icon--view" title="View Details">
                     <i class="fa-solid fa-eye"></i>
                   </button>
                 </div>
@@ -192,11 +192,11 @@
         </table>
       </div>
       {% else %}
-      <div class="empty-state">
+      <div class="bir__empty">
         <i class="fa-solid fa-inbox"></i>
-        <p class="empty-state__title">No inbound requests found</p>
-        <p class="empty-state__text">Start by creating a new inbound request to send products to the warehouse</p>
-        <a href="#" class="btn-action btn-action--primary">
+        <p class="bir__empty-title">No inbound requests found</p>
+        <p class="bir__empty-text">Start by creating a new inbound request to send products to the warehouse</p>
+        <a href="#" class="bir__btn bir__btn--primary">
           <i class="fa-solid fa-plus"></i>
           Create First Request
         </a>
@@ -205,41 +205,41 @@
     </div>
 
     {% if page_obj.has_other_pages %}
-    <div class="requests-card__footer">
-      <nav class="pagination-nav">
-        <ul class="pagination">
+    <div class="bir__card-footer">
+      <nav class="bir__pagination-nav">
+        <ul class="bir__pagination">
           {% if page_obj.has_previous %}
-          <li class="pagination__item">
-            <a href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="pagination__link">
+          <li class="bir__pagination-item">
+            <a href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="bir__pagination-link">
               <i class="fa-solid fa-chevron-left"></i>
               Previous
             </a>
           </li>
           {% else %}
-          <li class="pagination__item pagination__item--disabled">
-            <span class="pagination__link">
+          <li class="bir__pagination-item bir__pagination-item--disabled">
+            <span class="bir__pagination-link">
               <i class="fa-solid fa-chevron-left"></i>
               Previous
             </span>
           </li>
           {% endif %}
 
-          <li class="pagination__item pagination__item--active">
-            <span class="pagination__link">
+          <li class="bir__pagination-item bir__pagination-item--active">
+            <span class="bir__pagination-link">
               Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
             </span>
           </li>
 
           {% if page_obj.has_next %}
-          <li class="pagination__item">
-            <a href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="pagination__link">
+          <li class="bir__pagination-item">
+            <a href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="bir__pagination-link">
               Next
               <i class="fa-solid fa-chevron-right"></i>
             </a>
           </li>
           {% else %}
-          <li class="pagination__item pagination__item--disabled">
-            <span class="pagination__link">
+          <li class="bir__pagination-item bir__pagination-item--disabled">
+            <span class="bir__pagination-link">
               Next
               <i class="fa-solid fa-chevron-right"></i>
             </span>

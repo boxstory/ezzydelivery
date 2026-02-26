@@ -20,7 +20,7 @@ class OrdersKanban {
 
   init() {
     // Make all cards draggable
-    document.querySelectorAll('.kanban-card').forEach(card => {
+    document.querySelectorAll('.okb__card').forEach(card => {
       this.makeCardDraggable(card);
     });
 
@@ -42,19 +42,19 @@ class OrdersKanban {
 
     card.addEventListener('dragstart', (e) => {
       this.draggedCard = card;
-      card.classList.add('kanban-card--dragging');
+      card.classList.add('okb__card--dragging');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/html', card.innerHTML);
     });
 
     card.addEventListener('dragend', () => {
-      card.classList.remove('kanban-card--dragging');
+      card.classList.remove('okb__card--dragging');
       this.draggedCard = null;
     });
   }
 
   makeColumnDroppable(column) {
-    const cardsContainer = column.querySelector('.kanban-cards');
+    const cardsContainer = column.querySelector('.okb__cards');
     if (!cardsContainer) return;
 
     cardsContainer.addEventListener('dragover', (e) => {
@@ -85,7 +85,7 @@ class OrdersKanban {
   }
 
   getDragAfterElement(container, y) {
-    const draggableElements = [...container.querySelectorAll('.kanban-card:not(.kanban-card--dragging)')];
+    const draggableElements = [...container.querySelectorAll('.okb__card:not(.okb__card--dragging)')];
 
     return draggableElements.reduce((closest, child) => {
       const box = child.getBoundingClientRect();
@@ -129,7 +129,7 @@ class OrdersKanban {
       this.showToast('Failed to update order: ' + error.message, 'error');
 
       // Revert card to old column
-      const oldColumn = document.querySelector(`[data-status="${oldStatus}"] .kanban-cards`);
+      const oldColumn = document.querySelector(`[data-status="${oldStatus}"] .okb__cards`);
       if (oldColumn && this.draggedCard) {
         oldColumn.appendChild(this.draggedCard);
         this.updateAllCounts();
@@ -138,7 +138,7 @@ class OrdersKanban {
   }
 
   updateCardBadge(card, status) {
-    const badge = card.querySelector('.kanban-card__badge');
+    const badge = card.querySelector('.okb__card-badge');
     if (badge) {
       const statusLabels = {
         'to_review': 'To Review',
@@ -153,9 +153,9 @@ class OrdersKanban {
   updateAllCounts() {
     Object.entries(this.columns).forEach(([status, column]) => {
       if (column) {
-        const cardsContainer = column.querySelector('.kanban-cards');
-        const count = cardsContainer ? cardsContainer.querySelectorAll('.kanban-card').length : 0;
-        const countBadge = column.querySelector('.kanban-column__count');
+        const cardsContainer = column.querySelector('.okb__cards');
+        const count = cardsContainer ? cardsContainer.querySelectorAll('.okb__card').length : 0;
+        const countBadge = column.querySelector('.okb__col-count');
         if (countBadge) {
           countBadge.textContent = count;
         }
@@ -164,13 +164,13 @@ class OrdersKanban {
   }
 
   showToast(message, type = 'info') {
-    const existingToast = document.querySelector('.kanban-toast');
+    const existingToast = document.querySelector('.okb__toast');
     if (existingToast) {
       existingToast.remove();
     }
 
     const toast = document.createElement('div');
-    toast.className = 'kanban-toast kanban-toast--' + type;
+    toast.className = 'okb__toast okb__toast--' + type;
 
     const colors = {
       success: 'var(--ez-success)',

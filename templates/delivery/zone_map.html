@@ -192,7 +192,7 @@
   function createMarkerIcon(zoneNumber, color = '#001f3f') {
     return L.divIcon({
       className: 'custom-marker',
-      html: `<div class="zone-marker" style="background: ${color};">${zoneNumber}</div>`,
+      html: `<div class="znm__marker" style="background: ${color};">${zoneNumber}</div>`,
       iconSize: [28, 28],
       iconAnchor: [14, 14],
       popupAnchor: [0, -14]
@@ -213,18 +213,18 @@
     const groupList = zone.groups.join(', ') || 'Unassigned';
 
     const popupContent = `
-      <div class="zone-popup">
-        <div class="zone-popup__title">Zone ${zone.zone_number} - ${zone.name}</div>
-        ${zone.name_arabic ? `<div class="zone-popup__arabic">${zone.name_arabic}</div>` : ''}
-        <div class="zone-popup__info"><i class="fa-solid fa-map-pin me-1"></i> ${zone.lat.toFixed(5)}, ${zone.lng.toFixed(5)}</div>
-        <div class="zone-popup__info"><i class="fa-solid fa-layer-group me-1"></i> ${groupList}</div>
-        <div class="zone-popup__info"><i class="fa-solid fa-draw-polygon me-1"></i> Polygon: ${zone.has_polygon ? zone.polygon.length + ' points' : 'Not set'}</div>
-        <div class="zone-popup__neighbours">
-          <div class="zone-popup__neighbours-title"><i class="fa-solid fa-diagram-project me-1"></i> Neighbours (${zone.neighbour_count})</div>
-          <div class="zone-popup__neighbour-list">${neighbourList}</div>
+      <div class="znm__popup">
+        <div class="znm__popup-title">Zone ${zone.zone_number} - ${zone.name}</div>
+        ${zone.name_arabic ? `<div class="znm__popup-arabic">${zone.name_arabic}</div>` : ''}
+        <div class="znm__popup-info"><i class="fa-solid fa-map-pin me-1"></i> ${zone.lat.toFixed(5)}, ${zone.lng.toFixed(5)}</div>
+        <div class="znm__popup-info"><i class="fa-solid fa-layer-group me-1"></i> ${groupList}</div>
+        <div class="znm__popup-info"><i class="fa-solid fa-draw-polygon me-1"></i> Polygon: ${zone.has_polygon ? zone.polygon.length + ' points' : 'Not set'}</div>
+        <div class="znm__popup-neighbours">
+          <div class="znm__popup-neighbours-title"><i class="fa-solid fa-diagram-project me-1"></i> Neighbours (${zone.neighbour_count})</div>
+          <div class="znm__popup-neighbour-list">${neighbourList}</div>
         </div>
-        <div class="zone-popup__actions">
-          <a href="/delivery/zones/edit-polygon/${zone.zone_number}/" class="zone-popup__btn zone-popup__btn--edit">
+        <div class="znm__popup-actions">
+          <a href="/delivery/zones/edit-polygon/${zone.zone_number}/" class="znm__popup-btn znm__popup-btn--edit">
             <i class="fa-solid fa-draw-polygon me-1"></i> Edit Polygon
           </a>
         </div>

@@ -25,7 +25,7 @@
 
 {% block content %}
 <!-- Total Earnings Card -->
-<div class="fleet-wallet fade-in">
+<div class="fleet-wallet fleet-fade-in">
     <div class="fleet-wallet__label">Total Earnings</div>
     <div class="fleet-wallet__balance">
         {{ total_earnings|floatformat:2|default:"0.00" }} <small>QR</small>
@@ -47,7 +47,7 @@
 </div>
 
 <!-- Period Tabs -->
-<div class="fleet-tabs slide-up" style="animation-delay: 0.1s;">
+<div class="fleet-tabs fleet-slide-up" style="animation-delay: 0.1s;">
     <button type="button" class="fleet-tab {% if not filter_days or filter_days == '7' %}active{% endif %}" onclick="filterByDays(7)">
         Week
     </button>
@@ -63,7 +63,7 @@
 </div>
 
 <!-- Earnings Breakdown -->
-<div class="fleet-stats slide-up" style="animation-delay: 0.2s;">
+<div class="fleet-stats fleet-slide-up" style="animation-delay: 0.2s;">
     <div class="fleet-stat">
         <div class="fleet-stat__icon fleet-stat__icon--success">
             <i class="fa-solid fa-truck-fast"></i>
@@ -82,7 +82,7 @@
 </div>
 
 <!-- Daily Earnings Chart -->
-<div class="fleet-card slide-up" style="animation-delay: 0.3s;">
+<div class="fleet-card fleet-slide-up" style="animation-delay: 0.3s;">
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">
             <i class="fa-solid fa-chart-line me-2"></i>
@@ -113,7 +113,7 @@
 </div>
 
 <!-- Earnings Timeline -->
-<div class="fleet-card slide-up" style="animation-delay: 0.4s;">
+<div class="fleet-card fleet-slide-up" style="animation-delay: 0.4s;">
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">
             <i class="fa-solid fa-clock-rotate-left me-2"></i>
@@ -219,29 +219,29 @@
 </script>
 
 <!-- Filter Modal -->
-<div id="filterOverlay" class="filter-overlay" onclick="closeFilterModal()"></div>
-<div id="filterModal" class="filter-modal">
-    <div class="filter-modal__handle"></div>
-    <div class="filter-modal__header">
-        <h3 class="filter-modal__title">Filter Earnings</h3>
+<div id="filterOverlay" class="fleet-filter-overlay" onclick="closeFilterModal()"></div>
+<div id="filterModal" class="fleet-filter-modal">
+    <div class="fleet-filter-modal__handle"></div>
+    <div class="fleet-filter-modal__header">
+        <h3 class="fleet-filter-modal__title">Filter Earnings</h3>
         <button type="button" onclick="closeFilterModal()" class="fleet-btn-icon" style="width:32px;height:32px;">
             <i class="fa-solid fa-xmark"></i>
         </button>
     </div>
 
     <!-- Delivery Status -->
-    <div class="filter-modal__section">
-        <div class="filter-modal__label">Delivery Status</div>
-        <div class="filter-radio-group">
-            <label class="filter-radio {% if selected_status == 'all' or not selected_status %}filter-radio--active{% endif %}">
+    <div class="fleet-filter-modal__section">
+        <div class="fleet-filter-modal__label">Delivery Status</div>
+        <div class="fleet-filter-radio-group">
+            <label class="fleet-filter-radio {% if selected_status == 'all' or not selected_status %}fleet-filter-radio--active{% endif %}">
                 <input type="radio" name="status_filter" value="all" {% if selected_status == 'all' or not selected_status %}checked{% endif %}>
                 All
             </label>
-            <label class="filter-radio {% if selected_status == 'delivered' %}filter-radio--active{% endif %}">
+            <label class="fleet-filter-radio {% if selected_status == 'delivered' %}fleet-filter-radio--active{% endif %}">
                 <input type="radio" name="status_filter" value="delivered" {% if selected_status == 'delivered' %}checked{% endif %}>
                 Delivered
             </label>
-            <label class="filter-radio {% if selected_status == 'returned' %}filter-radio--active{% endif %}">
+            <label class="fleet-filter-radio {% if selected_status == 'returned' %}fleet-filter-radio--active{% endif %}">
                 <input type="radio" name="status_filter" value="returned" {% if selected_status == 'returned' %}checked{% endif %}>
                 Returned
             </label>
@@ -249,18 +249,18 @@
     </div>
 
     <!-- Settlement Status -->
-    <div class="filter-modal__section">
-        <div class="filter-modal__label">Settlement</div>
-        <div class="filter-radio-group">
-            <label class="filter-radio {% if selected_settlement == 'all' or not selected_settlement %}filter-radio--active{% endif %}">
+    <div class="fleet-filter-modal__section">
+        <div class="fleet-filter-modal__label">Settlement</div>
+        <div class="fleet-filter-radio-group">
+            <label class="fleet-filter-radio {% if selected_settlement == 'all' or not selected_settlement %}fleet-filter-radio--active{% endif %}">
                 <input type="radio" name="settlement_filter" value="all" {% if selected_settlement == 'all' or not selected_settlement %}checked{% endif %}>
                 All
             </label>
-            <label class="filter-radio {% if selected_settlement == 'pending' %}filter-radio--active{% endif %}">
+            <label class="fleet-filter-radio {% if selected_settlement == 'pending' %}fleet-filter-radio--active{% endif %}">
                 <input type="radio" name="settlement_filter" value="pending" {% if selected_settlement == 'pending' %}checked{% endif %}>
                 Pending
             </label>
-            <label class="filter-radio {% if selected_settlement == 'settled' %}filter-radio--active{% endif %}">
+            <label class="fleet-filter-radio {% if selected_settlement == 'settled' %}fleet-filter-radio--active{% endif %}">
                 <input type="radio" name="settlement_filter" value="settled" {% if selected_settlement == 'settled' %}checked{% endif %}>
                 Settled
             </label>

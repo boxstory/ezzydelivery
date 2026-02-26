@@ -8,18 +8,18 @@
 {% endblock extra_css %}
 
 {% block content %}
-<div class="completion-container" id="core_driver_register_container_main">
+<div class="cdr__container" id="core_driver_register_container_main">
     <!-- Completion Header -->
-    <div class="completion-header" id="core_driver_register_header">
-        <div class="completion-circle">
+    <div class="cdr__header" id="core_driver_register_header">
+        <div class="cdr__circle">
             <svg width="100" height="100" viewBox="0 0 100 100">
-                <circle class="circle-bg" cx="50" cy="50" r="42"></circle>
-                <circle class="circle-progress" cx="50" cy="50" r="42"
+                <circle class="cdr__circle-bg" cx="50" cy="50" r="42"></circle>
+                <circle class="cdr__circle-progress" cx="50" cy="50" r="42"
                         stroke-dasharray="263.89"
                         style="stroke-dashoffset: calc(263.89 - (263.89 * {{ completion_percentage }} / 100));">
                 </circle>
             </svg>
-            <div class="completion-text">{{ completion_percentage }}%</div>
+            <div class="cdr__text">{{ completion_percentage }}%</div>
         </div>
         <h2>
             <i class="fa-solid fa-car me-2"></i>Driver Registration
@@ -28,32 +28,32 @@
     </div>
 
     <!-- Form Card -->
-    <div class="form-card" id="core_driver_register_card_form">
+    <div class="cdr__form-card" id="core_driver_register_card_form">
         {% if profile.verification_status == 'verified' %}
         <!-- VERIFIED USER - Show Dashboard Link and Role Change Option -->
-        <div class="verified-alert">
+        <div class="cdr__alert--verified">
             <i class="fa-solid fa-check-circle me-2"></i>
             <strong>Congratulations!</strong> Your driver account is verified and active.
         </div>
 
-        <div class="action-buttons-wrapper">
-            <a href="{% url 'fleet:fleet_dashboard' %}" class="btn btn-action btn-dashboard">
+        <div class="cdr__action-buttons">
+            <a href="{% url 'fleet:fleet_dashboard' %}" class="btn cdr__btn-action cdr__btn-dashboard">
                 <i class="fa-solid fa-gauge me-2"></i>Go to Driver Dashboard
             </a>
-            <a href="{% url 'core:profile_view' %}" class="btn btn-action btn-change-role">
+            <a href="{% url 'core:profile_view' %}" class="btn cdr__btn-action cdr__btn-change-role">
                 <i class="fa-solid fa-user-gear me-2"></i>Change Role / View Profile
             </a>
         </div>
 
         {% elif profile.verification_status == 'pending' or profile.verification_status == 'under_review' %}
         <!-- PENDING VERIFICATION -->
-        <div class="warning-alert">
+        <div class="cdr__alert--warning">
             <i class="fa-solid fa-clock me-2"></i>
             <strong>Application Pending:</strong> Your driver verification is under review. We'll notify you once it's approved!
         </div>
 
-        <div class="action-buttons-wrapper">
-            <a href="{% url 'core:profile_view' %}" class="btn btn-action btn-save">
+        <div class="cdr__action-buttons">
+            <a href="{% url 'core:profile_view' %}" class="btn cdr__btn-action cdr__btn-save">
                 <i class="fa-solid fa-user me-2"></i>View Profile
             </a>
         </div>
@@ -61,12 +61,12 @@
         {% else %}
         <!-- NOT YET VERIFIED - Show Form -->
         {% if completion_percentage >= 100 %}
-        <div class="success-alert">
+        <div class="cdr__alert--success">
             <i class="fa-solid fa-check-circle me-2"></i>
             <strong>Ready to Apply!</strong> Your driver information is complete. Click "Apply for Verification" to submit your application.
         </div>
         {% else %}
-        <div class="warning-alert">
+        <div class="cdr__alert--warning">
             <i class="fa-solid fa-exclamation-triangle me-2"></i>
             <strong>Incomplete Information:</strong> Please fill in all required fields before applying for verification.
         </div>
@@ -76,7 +76,7 @@
             {% csrf_token %}
 
             <!-- Contact Information -->
-            <div class="section-title">
+            <div class="cdr__section-title">
                 <i class="fa-solid fa-phone me-2"></i>Contact Information
             </div>
 
@@ -99,7 +99,7 @@
             </div>
 
             <!-- Driver Details -->
-            <div class="section-title">
+            <div class="cdr__section-title">
                 <i class="fa-solid fa-id-card me-2"></i>Driver Details
             </div>
 
@@ -130,13 +130,13 @@
             </div>
 
             <!-- Action Buttons -->
-            <div class="action-buttons-wrapper">
-                <button id="core_driver_register_btn_save" type="submit" name="action" value="save" class="btn btn-action btn-save">
+            <div class="cdr__action-buttons">
+                <button id="core_driver_register_btn_save" type="submit" name="action" value="save" class="btn cdr__btn-action cdr__btn-save">
                     <i class="fa-solid fa-floppy-disk me-2"></i>Save Progress
                 </button>
 
                 <button id="core_driver_register_btn_apply" type="submit" name="action" value="apply_verification"
-                        class="btn btn-action btn-apply"
+                        class="btn cdr__btn-action cdr__btn-apply"
                         {% if completion_percentage < 100 %}disabled{% endif %}>
                     <i class="fa-solid fa-paper-plane me-2"></i>Apply for Verification
                 </button>

@@ -20,10 +20,10 @@ Parameters:
 {% with current_per_page=per_page|default:"10" %}
 
 {% if page_obj.has_other_pages or page_obj.paginator.count > 0 %}
-<nav aria-label="Page navigation" class="pagination-wrapper {{ variant|default:'' }}">
+<nav aria-label="Page navigation" class="pgn {% if variant %}pgn--{{ variant }}{% endif %}">
 
     <!-- Previous Button -->
-    <ul class="pagination-nav">
+    <ul class="pgn__nav">
         <li class="page-item prev {% if not page_obj.has_previous %}disabled{% endif %}">
             {% if page_obj.has_previous %}
             <a class="page-link"
@@ -98,7 +98,7 @@ Parameters:
 
     {% if show_per_page != 'false' %}
     <!-- Per Page Selector -->
-    <div class="pagination-per-page">
+    <div class="pgn__per-page">
         <select id="pagination-per-page-select-{{ pagination_id|default:'default' }}"
                 {% if htmx_target %}
                 hx-get=""
@@ -121,7 +121,7 @@ Parameters:
 
     {% if show_goto != 'false' %}
     <!-- Go To Page -->
-    <div class="pagination-goto">
+    <div class="pgn__goto">
         <label for="pagination-goto-input-{{ pagination_id|default:'default' }}">Go to</label>
         <input type="number"
                id="pagination-goto-input-{{ pagination_id|default:'default' }}"
@@ -140,12 +140,12 @@ Parameters:
                onkeypress="if(event.key==='Enter'){var p=Math.min(Math.max(1,this.value),{{ page_obj.paginator.num_pages }});window.location.href='?page='+p+'&per_page={{ current_per_page }}{% if filter_params %}&{{ filter_params }}{% endif %}';}"
                {% endif %}
                aria-label="Go to page number">
-        <span class="pagination-goto-suffix">Page</span>
+        <span class="pgn__goto-suffix">Page</span>
     </div>
     {% endif %}
 
     <!-- Page Info -->
-    <div class="pagination-info">
+    <div class="pgn__info">
         Page <strong>{{ page_obj.number }}</strong> of <strong>{{ page_obj.paginator.num_pages }}</strong>
         <span class="d-none d-sm-inline">
             &bull; <strong>{{ page_obj.paginator.count }}</strong> total items

@@ -15,7 +15,7 @@ Parameters:
 {% endcomment %}
 
 {% if link_url %}
-<a href="{{ link_url }}" class="stat-card stat-card-{{ variant|default:'primary' }} text-decoration-none"
+<a href="{{ link_url }}" class="stat-card stat-card--{{ variant|default:'primary' }} text-decoration-none"
    {% if htmx %}
    hx-get="{{ link_url }}"
    hx-target="#main-content"
@@ -26,21 +26,21 @@ Parameters:
    role="button"
    aria-label="{{ title }}: {{ value }}">
 {% else %}
-<article class="stat-card stat-card-{{ variant|default:'primary' }}" aria-label="{{ title }}">
+<article class="stat-card stat-card--{{ variant|default:'primary' }}" aria-label="{{ title }}">
 {% endif %}
-    <div class="stat-card-header">
+    <div class="stat-card__header">
         <div>
-            <p class="stat-card-title">{{ title }}</p>
-            <h2 class="stat-card-value" aria-live="polite">{{ value|default:0 }}</h2>
+            <p class="stat-card__title">{{ title }}</p>
+            <h2 class="stat-card__value" aria-live="polite">{{ value|default:0 }}</h2>
         </div>
-        <div class="stat-card-icon" aria-hidden="true">
+        <div class="stat-card__icon" aria-hidden="true">
             <i class="fa-solid {{ icon }}"></i>
         </div>
     </div>
-    <div class="stat-card-meta">
+    <div class="stat-card__meta">
         <span>{{ subtitle|default:"" }}</span>
         {% if trend_value %}
-        <span class="trend trend-{{ trend_direction|default:'up' }}">
+        <span class="stat-card__trend stat-card__trend--{{ trend_direction|default:'up' }}">
             <i class="fa-solid fa-arrow-{{ trend_direction|default:'up' }}" aria-hidden="true"></i>
             <span class="visually-hidden">{{ trend_direction|default:'up' }} by</span>
             {{ trend_value }}%

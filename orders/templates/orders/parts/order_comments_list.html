@@ -1,20 +1,20 @@
 <!-- Comments Chain -->
-<div class="comments-chain" id="comments-chain-{{ order.id }}">
+<div class="ocm__chain" id="comments-chain-{{ order.id }}">
   {% if comments %}
     {% for comment in comments %}
-    <div class="comment-item">
-      <div class="comment-header">
-        <span class="comment-author">
+    <div class="ocm__item">
+      <div class="ocm__header">
+        <span class="ocm__author">
           <i class="fa-solid fa-user-circle"></i>
           {{ comment.name }}
         </span>
-        <span class="comment-time">{{ comment.created_at|timesince }} ago</span>
+        <span class="ocm__time">{{ comment.created_at|timesince }} ago</span>
       </div>
-      <div class="comment-body">{{ comment.body }}</div>
+      <div class="ocm__body">{{ comment.body }}</div>
     </div>
     {% endfor %}
   {% else %}
-    <div class="no-comments">
+    <div class="ocm__empty">
       <i class="fa-regular fa-comment-dots"></i>
       <span>No comments yet</span>
     </div>
@@ -22,18 +22,18 @@
 </div>
 
 <!-- Add Comment Form -->
-<form class="comment-form"
+<form class="ocm__form"
       hx-post="{% url 'orders:add_order_comment' order.id %}"
       hx-target="#comments-container-{{ order.id }}"
       hx-swap="innerHTML">
   {% csrf_token %}
-  <div class="comment-input-wrapper">
+  <div class="ocm__input-wrapper">
     <input type="text"
            name="comment"
-           class="comment-input"
+           class="ocm__input"
            placeholder="Write a comment..."
            autocomplete="off">
-    <button type="submit" class="comment-send-btn" title="Send comment">
+    <button type="submit" class="ocm__send-btn" title="Send comment">
       <i class="fa-solid fa-paper-plane"></i>
     </button>
   </div>

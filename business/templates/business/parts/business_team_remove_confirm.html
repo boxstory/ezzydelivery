@@ -1,5 +1,10 @@
 {% extends "business_dashboard_base.html" %}
 {% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'business/css/business-team-remove.css' %}">
+{% endblock extra_css %}
+
 {% block content %}
 <div class="p-3 col-12">
   <section>
@@ -10,8 +15,7 @@
             <strong>Remove Team Member</strong>
           </div>
           <div class="card-body text-center">
-            <img src="{% if team_member.team_logo %}{{ team_member.team_logo.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}" alt="{{ team_member.team_name|default:team_member.user.username }} avatar" class="rounded-circle mb-3"
-                 style="width: 80px; height: 80px; object-fit: cover;">
+            <img src="{% if team_member.team_logo %}{{ team_member.team_logo.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}" alt="{{ team_member.team_name|default:team_member.user.username }} avatar" class="btrc__avatar rounded-circle mb-3">
             <h5 class="mb-1">{{ team_member.team_name|default:team_member.user.username }}</h5>
             <p class="text-muted mb-3">{{ team_member.team_email|default:team_member.user.email }}</p>
 

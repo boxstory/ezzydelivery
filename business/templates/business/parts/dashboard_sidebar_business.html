@@ -1,15 +1,15 @@
 {% load static %}
 {% with current_url=request.resolver_match.url_name %}
 
-<div class="min-vh-100 d-none d-md-flex flex-column flex-shrink-0 p-3 col-md-3 col-lg-2 the-sidebar dashboard-sidebar" id="client_sidebar_container_main">
+<div class="min-vh-100 d-none d-md-flex flex-column flex-shrink-0 p-3 col-md-3 col-lg-2 bsb__container bsb__sidebar" id="client_sidebar_container_main">
   <!-- Sidebar Toggle Button -->
-  <button type="button" class="btn btn-sm sidebar-toggle-btn" id="sidebar_toggle_btn" title="Toggle sidebar">
+  <button type="button" class="btn btn-sm bsb__toggle-btn" id="sidebar_toggle_btn" title="Toggle sidebar">
     <i class="fas fa-chevron-left" id="sidebar_toggle_icon"></i>
   </button>
 
   <!-- Brand Header -->
-  <div class="text-center sidebar-header" id="client_sidebar_header">
-    <a class="nav-link dashboard-title w-100"
+  <div class="text-center bsb__header" id="client_sidebar_header">
+    <a class="nav-link bsb__dashboard-title w-100"
        href="{% url 'business:business_dashboard' %}"
        data-title="Dashboard"
        id="client_sidebar_link_dashboard">
@@ -22,7 +22,7 @@
     <ul class="navbar-nav ms-auto" id="client_sidebar_nav_main">
 
       <!-- ORDERS SECTION -->
-      <li class="dsb-section">Orders</li>
+      <li class="bsb__section">Orders</li>
       <li class="nav-item {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'bulk_import_orders' %}active{% endif %}">
         <div class="nav-link d-flex align-items-center {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'bulk_import_orders' %}active{% endif %}"
              data-bs-toggle="collapse"
@@ -33,7 +33,7 @@
           <span class="flex-fill text-start">Orders</span>
           <i class="fa-solid fa-caret-down ms-auto"></i>
         </div>
-        <div class="multi-level collapse {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'bulk_import_orders' %}show{% endif %}"
+        <div class="bsb__submenu collapse {% if current_url == 'orders_all_list' or current_url == 'orders_list' or current_url == 'orders_pending_list' or current_url == 'orders_successfull_list' or current_url == 'get_orders_by_base_api' or current_url == 'add_order' or current_url == 'bulk_import_orders' %}show{% endif %}"
              role="list"
              id="submenu-orders">
           <ul class="flex-column nav">
@@ -84,7 +84,7 @@
       </li>
 
       <!-- PRODUCTS SECTION -->
-      <li class="dsb-section">Catalog</li>
+      <li class="bsb__section">Catalog</li>
       <li class="nav-item {% if current_url == 'product_all_list' or current_url == 'product_single_add' or current_url == 'product_categories' %}active{% endif %}">
         <div class="nav-link d-flex align-items-center {% if current_url == 'product_all_list' or current_url == 'product_single_add' or current_url == 'product_categories' %}active{% endif %}"
              data-bs-toggle="collapse"
@@ -95,7 +95,7 @@
           <span class="flex-fill text-start">Products</span>
           <i class="fa-solid fa-caret-down ms-auto"></i>
         </div>
-        <div class="multi-level collapse {% if current_url == 'product_all_list' or current_url == 'product_single_add' or current_url == 'product_categories' %}show{% endif %}"
+        <div class="bsb__submenu collapse {% if current_url == 'product_all_list' or current_url == 'product_single_add' or current_url == 'product_categories' %}show{% endif %}"
              role="list"
              id="submenu-product">
           <ul class="flex-column nav">
@@ -134,7 +134,7 @@
       </li>
 
       <!-- OPERATIONS SECTION -->
-      <li class="dsb-section">Operations</li>
+      <li class="bsb__section">Operations</li>
       <li class="nav-item {% if current_url == 'product_inventory' %}active{% endif %}">
         <a class="nav-link d-flex align-items-center {% if current_url == 'product_inventory' %}active{% endif %}"
            href="{% url 'product:product_inventory' %}"
@@ -172,7 +172,7 @@
       </li>
 
       <!-- FINANCE SECTION -->
-      <li class="dsb-section">Finance</li>
+      <li class="bsb__section">Finance</li>
       <li class="nav-item {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}active{% endif %}">
         <div class="nav-link d-flex align-items-center {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}active{% endif %}"
              data-bs-toggle="collapse"
@@ -183,7 +183,7 @@
           <span class="flex-fill text-start">Finance</span>
           <i class="fa-solid fa-caret-down ms-auto"></i>
         </div>
-        <div class="multi-level collapse {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}show{% endif %}"
+        <div class="bsb__submenu collapse {% if current_url == 'business_finance_dashboard' or current_url == 'business_transactions' or current_url == 'business_cod_statement' %}show{% endif %}"
              role="list"
              id="submenu-finance">
           <ul class="flex-column nav">
@@ -221,7 +221,7 @@
 
       <!-- SETTINGS SECTION - Only visible to business owner -->
       {% if is_business_owner %}
-      <li class="dsb-section">Settings</li>
+      <li class="bsb__section">Settings</li>
       <li class="nav-item {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}active{% endif %}">
         <div class="nav-link d-flex align-items-center {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}active{% endif %}"
              data-bs-toggle="collapse"
@@ -232,7 +232,7 @@
           <span class="flex-fill text-start">Settings</span>
           <i class="fa-solid fa-caret-down ms-auto"></i>
         </div>
-        <div class="multi-level collapse {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}show{% endif %}"
+        <div class="bsb__submenu collapse {% if current_url == 'business_settings' or current_url == 'business_teams' or current_url == 'business_settings_api_list' or current_url == 'business_teams_add' or current_url == 'business_teams_update' or current_url == 'business_settings_api_add' or current_url == 'business_settings_api_update' %}show{% endif %}"
              role="list"
              id="submenu-settings">
           <ul class="flex-column nav">
@@ -266,7 +266,7 @@
 
       <!-- BUSINESS SWITCHER -->
       {% if show_business_switcher and request.resolver_match.url_name == 'business_dashboard' %}
-      <li class="dsb-section">Account</li>
+      <li class="bsb__section">Account</li>
       <li class="nav-item">
         <div class="nav-link d-flex align-items-center"
              data-bs-toggle="collapse"
@@ -277,7 +277,7 @@
           <span class="flex-fill text-start">Switch Business</span>
           <i class="fa-solid fa-caret-down ms-auto"></i>
         </div>
-        <div class="multi-level collapse"
+        <div class="bsb__submenu collapse"
              role="list"
              id="submenu-business-switcher"
              data-bs-parent="#client_sidebar_nav_main">
@@ -295,7 +295,7 @@
                 </div>
                 <div class="flex-fill">
                   <div class="small fw-bold">{{ business_info.business.business_name|truncatechars:15 }}</div>
-                  <span class="dsb-switcher-role">
+                  <span class="bsb__switcher-role">
                     {% if business_info.access_type == 'owner' %}Owner{% else %}{{ business_info.team_profile.get_team_role_display }}{% endif %}
                   </span>
                 </div>
@@ -318,7 +318,7 @@
       {% endif %}
 
       <!-- HELP -->
-      <li class="dsb-section">Support</li>
+      <li class="bsb__section">Support</li>
       <li class="nav-item {% if current_url == 'help_center' %}active{% endif %}">
         <a class="nav-link d-flex align-items-center {% if current_url == 'help_center' %}active{% endif %}"
            href="{% url 'webpages:help_center' %}"

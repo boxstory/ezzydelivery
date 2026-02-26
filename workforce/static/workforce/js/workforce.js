@@ -108,7 +108,7 @@
 
         bindEvents: function() {
             // Filter toggle animation
-            const filterToggle = document.querySelector('.filter-toggle');
+            const filterToggle = document.querySelector('.pg-filter__toggle');
             const filterCollapse = document.getElementById('filterCollapse');
 
             if (filterToggle && filterCollapse) {
@@ -228,7 +228,7 @@
                             }
                         }
                         const tag = document.createElement('span');
-                        tag.className = 'filter-tag';
+                        tag.className = 'pg-filter__tag';
                         tag.innerHTML = `
                             <strong>${this.filterLabels[key]}:</strong> ${displayValue}
                             <button type="button" class="btn-close btn-close-sm ms-1"
@@ -882,7 +882,7 @@
     function initSidebar() {
         const currentPath = window.location.pathname;
         const savedState = getSavedState();
-        const submenuLinks = document.querySelectorAll('.submenu-link');
+        const submenuLinks = document.querySelectorAll('.wf-sidebar__submenu-link');
         let activeCollapseId = null;
 
         // Find active link and mark it
@@ -911,7 +911,7 @@
         });
 
         // Initialize collapse states
-        const allCollapses = document.querySelectorAll('.sidebar-nav .collapse');
+        const allCollapses = document.querySelectorAll('.wf-sidebar__nav .collapse');
 
         allCollapses.forEach(collapse => {
             const collapseId = collapse.getAttribute('id');
@@ -977,7 +977,7 @@
         const sidebar = document.getElementById('workforce_sidebar_main');
         if (!sidebar) return;
 
-        const navLinks = sidebar.querySelectorAll('.nav-link, .submenu-link');
+        const navLinks = sidebar.querySelectorAll('.nav-link, .wf-sidebar__submenu-link');
 
         navLinks.forEach((link, index) => {
             link.addEventListener('keydown', function(e) {

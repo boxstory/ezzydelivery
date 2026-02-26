@@ -10,35 +10,35 @@
 {% endblock %}
 
 {% block content %}
-<div class="verification-container" id="orders_update_location_container_main">
+<div class="ulv__container" id="orders_update_location_container_main">
 
     {% if step == 'success' %}
     {# ============ STEP 3: SUCCESS ============ #}
-    <div class="verification-card" id="orders_update_location_card_success">
-        <div class="verification-header">
-            <i class="fa-solid fa-circle-check verify-title" style="color: var(--brand-success, #28a745);"></i>
+    <div class="ulv__card" id="orders_update_location_card_success">
+        <div class="ulv__header">
+            <i class="fa-solid fa-circle-check ulv__title-icon" style="color: var(--brand-success, #28a745);"></i>
             <h1>Location Updated Successfully!</h1>
             <p>Order #{{ order.order_number }}</p>
         </div>
-        <div class="order-info">
-            <div class="info-grid">
-                <div class="info-item">
-                    <div class="info-icon"><i class="fa-solid fa-user"></i></div>
-                    <div class="info-content">
+        <div class="ulv__order-info">
+            <div class="ulv__info-grid">
+                <div class="ulv__info-item">
+                    <div class="ulv__info-icon"><i class="fa-solid fa-user"></i></div>
+                    <div class="ulv__info-content">
                         <h3>Customer</h3>
                         <p>{{ order.customer_name }}</p>
                     </div>
                 </div>
-                <div class="info-item">
-                    <div class="info-icon"><i class="fa-solid fa-map"></i></div>
-                    <div class="info-content">
+                <div class="ulv__info-item">
+                    <div class="ulv__info-icon"><i class="fa-solid fa-map"></i></div>
+                    <div class="ulv__info-content">
                         <h3>Zone / Street / Building</h3>
                         <p>{{ order.dl_zone|default:"—" }} / {{ order.dl_street|default:"—" }} / {{ order.dl_building|default:"—" }}</p>
                     </div>
                 </div>
-                <div class="info-item full-width-column">
-                    <div class="info-icon"><i class="fa-solid fa-location-dot"></i></div>
-                    <div class="info-content">
+                <div class="ulv__info-item ulv__info-item--full">
+                    <div class="ulv__info-icon"><i class="fa-solid fa-location-dot"></i></div>
+                    <div class="ulv__info-content">
                         <h3>Address</h3>
                         <p>{{ order.customer_address }}</p>
                     </div>
@@ -247,9 +247,9 @@
 
     {% else %}
     {# ============ STEP 1: LOOKUP FORM ============ #}
-    <div class="verification-card" id="orders_update_location_card_lookup">
-        <div class="verification-header">
-            <i class="fa-solid fa-map-location-dot verify-title"></i>
+    <div class="ulv__card" id="orders_update_location_card_lookup">
+        <div class="ulv__header">
+            <i class="fa-solid fa-map-location-dot ulv__title-icon"></i>
             <h1>Update Delivery Location</h1>
             <p>Enter your order details to update your delivery address</p>
         </div>
@@ -260,12 +260,12 @@
         </div>
         {% endif %}
 
-        <form method="post" class="form-section" id="orders_update_location_form_lookup" novalidate>
+        <form method="post" class="ulv__form-section" id="orders_update_location_form_lookup" novalidate>
             {% csrf_token %}
             <input type="hidden" name="step" value="lookup">
 
-            <div class="form-group">
-                <label class="form-label" for="id_order_number">
+            <div class="ulv__form-group">
+                <label class="ulv__form-label" for="id_order_number">
                     <i class="fa-solid fa-hashtag"></i> Order Number
                 </label>
                 {{ lookup_form.order_number }}
@@ -274,8 +274,8 @@
                 {% endif %}
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="id_phone_last4">
+            <div class="ulv__form-group">
+                <label class="ulv__form-label" for="id_phone_last4">
                     <i class="fa-solid fa-phone"></i> Last 4 Digits of Phone
                 </label>
                 {{ lookup_form.phone_last4 }}
@@ -285,7 +285,7 @@
                 <small class="text-muted">Enter the last 4 digits of the phone number used for this order</small>
             </div>
 
-            <button type="submit" class="btn-verify" id="orders_update_location_btn_lookup">
+            <button type="submit" class="ulv__btn-verify" id="orders_update_location_btn_lookup">
                 <i class="fa-solid fa-search me-2"></i> Find My Order
             </button>
         </form>

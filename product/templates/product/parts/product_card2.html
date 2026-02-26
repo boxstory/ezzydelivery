@@ -1,22 +1,22 @@
 {% load custom_filters %}
 <!-- Modern Product Card Component -->
 <div class="col-lg-4 col-md-6 col-sm-6 mb-3">
-    <div class="modern-product-card">
+    <div class="ppc2__card">
         <!-- Image Section -->
-        <div class="product-image-wrapper">
-            <div class="product-image-container">
+        <div class="ppc2__image-wrapper">
+            <div class="ppc2__image-container">
                 <img src="{{ product.product_image|safe_image_url }}"
                      loading="lazy"
                      alt="{{ product.item_name }}"
-                     class="product-main-img">
+                     class="ppc2__main-img">
             </div>
             <!-- Brand Logo Badge -->
-            <div class="brand-logo-badge">
+            <div class="ppc2__brand-badge">
                 <img src="{{ product.brand_logo|safe_brand_logo_url }}" loading="lazy" alt="{{ product.brand_name }}" onerror="this.parentElement.style.display='none';">
             </div>
             <!-- Category Badge -->
             {% if product.product_category %}
-            <div class="stock-badge in-stock">
+            <div class="ppc2__stock-badge in-stock">
                 <i class="fas fa-tag"></i>
                 {{ product.product_category.category_name }}
             </div>
@@ -24,10 +24,10 @@
         </div>
 
         <!-- Card Body -->
-        <div class="product-card-body">
+        <div class="ppc2__body">
             <!-- Brand & Category -->
             <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="product-brand-name">{{ product.brand_name|default:"No Brand" }}</span>
+                <span class="ppc2__brand-name">{{ product.brand_name|default:"No Brand" }}</span>
                 {% if product.color %}
                 <span class="badge" style="background-color: {{ product.color.short_code|default:'#6c757d' }}; color: #fff; font-size: 0.7rem;">
                     {{ product.color.color_variant }}
@@ -36,7 +36,7 @@
             </div>
 
             <!-- Product Title -->
-            <h6 class="product-card-title">{{ product.item_name }}</h6>
+            <h6 class="ppc2__title">{{ product.item_name }}</h6>
 
             <!-- Product ID -->
             {% if product.product_id %}
@@ -48,20 +48,20 @@
             {% endif %}
 
             <!-- Product Description -->
-            <p class="product-card-description">
+            <p class="ppc2__description">
                 {{ product.item_discription|default:"No description available"|truncatewords:12 }}
             </p>
 
             <!-- Price & Details Section -->
-            <div class="product-price-section">
+            <div class="ppc2__price-section">
                 <div class="row">
                     <div class="col-6">
-                        <span class="product-price-label">Price</span>
-                        <span class="product-price-value">QAR {{ product.item_price|default:"0" }}</span>
+                        <span class="ppc2__price-label">Price</span>
+                        <span class="ppc2__price-value">QAR {{ product.item_price|default:"0" }}</span>
                     </div>
                     <div class="col-6 text-end">
-                        <span class="product-stock-label">SKU</span>
-                        <span class="product-stock-value text-muted" style="font-size: 0.9rem;">{{ product.item_sku|default:"-" }}</span>
+                        <span class="ppc2__stock-label">SKU</span>
+                        <span class="ppc2__stock-value text-muted" style="font-size: 0.9rem;">{{ product.item_sku|default:"-" }}</span>
                     </div>
                 </div>
             </div>
@@ -86,12 +86,12 @@
             </div>
 
             <!-- Action Buttons -->
-            <div class="product-card-actions">
-                <a href="{% url 'product:product_single_update' product.pk %}" class="action-btn action-btn-primary">
+            <div class="ppc2__actions">
+                <a href="{% url 'product:product_single_update' product.pk %}" class="ppc2__btn ppc2__btn--primary">
                     <i class="fas fa-edit"></i>
                     <span>Edit</span>
                 </a>
-                <a href="{% url 'product:product_single_delete' product.pk %}" class="action-btn action-btn-secondary">
+                <a href="{% url 'product:product_single_delete' product.pk %}" class="ppc2__btn ppc2__btn--secondary">
                     <i class="fas fa-trash"></i>
                 </a>
             </div>

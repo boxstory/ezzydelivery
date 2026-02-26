@@ -20,24 +20,24 @@ Parameters:
 {% endcomment %}
 
 {% if zone and street %}
-<div class="qnas-verify-wrapper {% if show_inline == 'false' %}mt-2{% endif %}">
+<div class="qnas-verify {% if show_inline == 'false' %}mt-2{% endif %}">
     <div class="d-flex align-items-center gap-2 flex-wrap">
         <button type="button"
-                class="btn btn-sm btn-outline-primary qnas-verify-btn"
+                class="btn btn-sm btn-outline-primary qnas-verify__btn"
                 onclick="verifyQNAS({{ zone }}, {{ street }}, '{{ building|default:"" }}', {{ record_id }}, {{ order_id|default:record_id }})"
                 id="qnasVerifyBtn{{ record_id }}"
                 {% if auto_verify %}data-auto-verify="true" data-zone="{{ zone }}" data-street="{{ street }}" data-building="{{ building|default:"" }}" data-record-id="{{ record_id }}" data-order-id="{{ order_id|default:record_id }}"{% endif %}>
             <i class="fa-solid fa-check-circle me-1"></i>Verify QNAS
         </button>
         {% if qnas_status and qnas_status != 'not_checked' %}
-        <span class="odp__qnas-status odp__qnas-status--{{ qnas_status }}" data-qnas-badge="{{ order_id|default:record_id }}">
+        <span class="qnas-verify__status qnas-verify__status--{{ qnas_status }}" data-qnas-badge="{{ order_id|default:record_id }}">
             {% if qnas_status == 'verified' %}<i class="fa-solid fa-check-circle me-1"></i>Verified{% elif qnas_status == 'not_found' %}<i class="fa-solid fa-exclamation-triangle me-1"></i>Not Found{% elif qnas_status == 'error' %}<i class="fa-solid fa-times-circle me-1"></i>Error{% endif %}
         </span>
         {% else %}
-        <span class="odp__qnas-status odp__qnas-status--not_checked" data-qnas-badge="{{ order_id|default:record_id }}" style="display:none;"></span>
+        <span class="qnas-verify__status qnas-verify__status--not_checked" data-qnas-badge="{{ order_id|default:record_id }}" style="display:none;"></span>
         {% endif %}
     </div>
-    <div id="qnasResult{{ record_id }}" class="mt-1"></div>
-    <div id="qnasCoords{{ record_id }}" class="qnas-coords-display mt-1"></div>
+    <div id="qnasResult{{ record_id }}" class="qnas-verify__result mt-1"></div>
+    <div id="qnasCoords{{ record_id }}" class="qnas-verify__coords mt-1"></div>
 </div>
 {% endif %}

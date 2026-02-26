@@ -1,6 +1,6 @@
 {% load static %}
 <!-- Navbar -->
-<nav class="navbar navbar-expand-md modern-navbar">
+<nav class="navbar navbar-expand-md site-nav">
   <div class="container-fluid px-3">
     <a class="navbar-brand m-0 p-0" href="{% url 'webpages:index' %}">
       <img src="{% static 'webpages/img/ezzy-logo-long-white.png' %}" alt="Ezzy Delivery" width="200" height="50" />
@@ -12,33 +12,33 @@
     <div class="collapse navbar-collapse w-100" id="navbarNav">
       <ul class="navbar-nav ms-auto align-items-center">
         <li class="nav-item d-none d-lg-block">
-          <a class="nav-link-modern" href="{% url 'webpages:index' %}">
+          <a class="site-nav__link" href="{% url 'webpages:index' %}">
             Home
           </a>
         </li>
         <li class="nav-item d-lg-none">
-          <a class="nav-link-icon" href="{% url 'webpages:index' %}" title="Home">
+          <a class="site-nav__link--icon" href="{% url 'webpages:index' %}" title="Home">
             <i class="fa-solid fa-house"></i>
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link-modern" href="{% url 'webpages:services' %}">Services</a>
+          <a class="site-nav__link" href="{% url 'webpages:services' %}">Services</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link-modern" href="{% url 'webpages:delivery_pricing' %}">Pricing</a>
+          <a class="site-nav__link" href="{% url 'webpages:delivery_pricing' %}">Pricing</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link-modern" href="{% url 'webpages:contactus' %}">Contact</a>
+          <a class="site-nav__link" href="{% url 'webpages:contactus' %}">Contact</a>
         </li>
         <li class="nav-item">
           <div class="dropdown">
             {% if user.is_authenticated %}
-              <div class="user-dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+              <div class="site-nav__avatar" data-bs-toggle="dropdown" aria-expanded="false">
                 <img src="{% static 'webpages/img/avatar.png' %}" alt="{{ user.username }}" title="{{ user.username }}" />
               </div>
-              <ul class="dropdown-menu dropdown-menu-modern dropdown-menu-end">
+              <ul class="dropdown-menu site-nav__dropdown dropdown-menu-end">
                 <li>
-                  <a class="dropdown-item-modern" href="{% url 'core:profile_view' %}">
+                  <a class="site-nav__dropdown-item" href="{% url 'core:profile_view' %}">
                     <i class="fa-solid fa-user me-2"></i>
                     Profile
                   </a>
@@ -46,12 +46,12 @@
                 <li><hr class="dropdown-divider"></li>
                 <li>
                   {% if user_profile.is_staff %}
-                    <a class="dropdown-item-modern" href="{% url 'workforce:wf_dashboard' %}">
+                    <a class="site-nav__dropdown-item" href="{% url 'workforce:wf_dashboard' %}">
                       <i class="fa-solid fa-gauge-high me-2"></i>
                       Dashboard
                     </a>
                   {% else %}
-                    <a class="dropdown-item-modern" href="{% url 'core:main_dashboard' %}">
+                    <a class="site-nav__dropdown-item" href="{% url 'core:main_dashboard' %}">
                       <i class="fa-solid fa-gauge-high me-2"></i>
                       Dashboard
                     </a>
@@ -59,26 +59,26 @@
                 </li>
                 <li><hr class="dropdown-divider"></li>
                 <li>
-                  <a class="dropdown-item-modern" href="{% url 'account_logout' %}">
+                  <a class="site-nav__dropdown-item" href="{% url 'account_logout' %}">
                     <i class="fa-solid fa-right-from-bracket me-2"></i>
                     Log Out
                   </a>
                 </li>
               </ul>
             {% else %}
-              <div class="user-dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+              <div class="site-nav__avatar" data-bs-toggle="dropdown" aria-expanded="false">
                 <img src="{% static 'webpages/img/avatar.png' %}" alt="User" />
               </div>
-              <ul class="dropdown-menu dropdown-menu-modern dropdown-menu-end">
+              <ul class="dropdown-menu site-nav__dropdown dropdown-menu-end">
                 <li>
-                  <a class="dropdown-item-modern" href="{% url 'account_login' %}">
+                  <a class="site-nav__dropdown-item" href="{% url 'account_login' %}">
                     <i class="fa-solid fa-right-to-bracket me-2"></i>
                     Log In
                   </a>
                 </li>
                 <li><hr class="dropdown-divider"></li>
                 <li>
-                  <a class="dropdown-item-modern" href="{% url 'account_signup' %}">
+                  <a class="site-nav__dropdown-item" href="{% url 'account_signup' %}">
                     <i class="fa-solid fa-user-plus me-2"></i>
                     Sign Up
                   </a>

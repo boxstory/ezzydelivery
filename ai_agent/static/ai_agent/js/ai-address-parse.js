@@ -80,16 +80,16 @@
 
         _modalEl = document.createElement('div');
         _modalEl.id = MODAL_ID;
-        _modalEl.className = 'ai-modal';
+        _modalEl.className = 'aim__modal';
         _modalEl.innerHTML =
-            '<div class="ai-modal-overlay" onclick="EzzyAIParse.close()"></div>' +
-            '<div class="ai-modal-content">' +
-                '<div class="ai-modal-header">' +
+            '<div class="aim__modal-overlay" onclick="EzzyAIParse.close()"></div>' +
+            '<div class="aim__modal-content">' +
+                '<div class="aim__modal-header">' +
                     '<h5><i class="fa-solid fa-wand-magic-sparkles"></i> <span id="ezzyAiParseTitle">AI Address Parse</span></h5>' +
                     '<button type="button" class="btn-close" onclick="EzzyAIParse.close()"></button>' +
                 '</div>' +
-                '<div class="ai-modal-body" id="ezzyAiParseBody"></div>' +
-                '<div class="ai-modal-footer" id="ezzyAiParseFooter">' +
+                '<div class="aim__modal-body" id="ezzyAiParseBody"></div>' +
+                '<div class="aim__modal-footer" id="ezzyAiParseFooter">' +
                     '<button class="btn btn-secondary" onclick="EzzyAIParse.close()">Close</button>' +
                 '</div>' +
             '</div>';
@@ -360,14 +360,14 @@
         var conf = Math.round((result.confidence || 0) * 100);
         var confClass = conf > 70 ? 'success' : conf > 40 ? 'warning' : 'secondary';
 
-        var html = '<div class="ai-result-card">';
-        html += '<div class="ai-result-card-header">';
+        var html = '<div class="aim__result-card">';
+        html += '<div class="aim__result-card-header">';
         html += '<i class="fa-solid fa-location-dot"></i>';
         html += '<strong>Parsed Address</strong>';
         html += '<span class="ms-auto badge bg-' + confClass + '">' + conf + '% confidence</span>';
         html += '</div>';
 
-        html += '<div class="ai-result-grid">';
+        html += '<div class="aim__result-grid">';
         var fields = [
             ['Zone', result.zone_number],
             ['Zone Name', result.zone_name],
@@ -378,7 +378,7 @@
         ];
         for (var i = 0; i < fields.length; i++) {
             var val = fields[i][1];
-            html += '<div class="ai-result-item">';
+            html += '<div class="aim__result-item">';
             html += '<span class="label">' + fields[i][0] + '</span>';
             html += '<span class="value' + (fields[i][0] === 'Zone' && val ? ' success' : '') + '">' + (val != null && val !== '' ? _escapeHtml(String(val)) : '-') + '</span>';
             html += '</div>';
@@ -545,26 +545,26 @@
                     step.status === 'active' ? '<i class="fa-solid fa-gear fa-spin"></i>' :
                     String(i + 1);
 
-                var statusContent = step.status === 'active' ? '<span class="ai-step-spinner"></span>' + _escapeHtml(step.activeText) :
+                var statusContent = step.status === 'active' ? '<span class="aim__step-spinner"></span>' + _escapeHtml(step.activeText) :
                     step.status === 'completed' ? '<i class="fa-solid fa-check text-success me-1"></i>Complete' :
                     step.status === 'error' ? '<i class="fa-solid fa-times text-danger me-1"></i>Error' :
                     'Waiting...';
 
-                return '<div class="ai-process-step ' + (step.status || 'pending') + '">' +
-                    '<div class="ai-step-indicator">' + indicatorContent + '</div>' +
-                    '<div class="ai-step-content">' +
-                        '<div class="ai-step-title">' + _escapeHtml(step.title) + '</div>' +
-                        '<div class="ai-step-status">' + statusContent + '</div>' +
+                return '<div class="aim__process-step ' + (step.status || 'pending') + '">' +
+                    '<div class="aim__step-indicator">' + indicatorContent + '</div>' +
+                    '<div class="aim__step-content">' +
+                        '<div class="aim__step-title">' + _escapeHtml(step.title) + '</div>' +
+                        '<div class="aim__step-status">' + statusContent + '</div>' +
                     '</div></div>';
             }).join('');
         },
 
         renderLogsHtml: function() {
             if (this.logs.length === 0) return '';
-            return '<div class="ai-process-details">' +
-                '<div class="ai-process-details-header"><span><i class="fa-solid fa-terminal me-1"></i>Process Log</span>' +
+            return '<div class="aim__process-details">' +
+                '<div class="aim__process-details-header"><span><i class="fa-solid fa-terminal me-1"></i>Process Log</span>' +
                 '<span class="text-muted">' + this.logs.length + ' entries</span></div>' +
-                '<div class="ai-process-log">' +
+                '<div class="aim__process-log">' +
                 this.logs.map(function(log) {
                     return '<div class="log-entry ' + (log.type || '') + '">' +
                         '<span class="log-time">[' + _escapeHtml(log.time) + ']</span>' +
@@ -578,19 +578,19 @@
             var isProcessing = this.steps.some(function(s) { return s.status === 'active'; });
 
             _setBody(
-                '<div class="ai-process-container">' +
-                    '<div class="ai-process-header">' +
-                        '<div class="ai-process-icon' + (progress === 100 ? ' success' : '') + '">' +
+                '<div class="aim__process-container">' +
+                    '<div class="aim__process-header">' +
+                        '<div class="aim__process-icon' + (progress === 100 ? ' success' : '') + '">' +
                             '<i class="fa-solid ' + (progress === 100 ? 'fa-check' : 'fa-robot') + '"></i>' +
                         '</div>' +
-                        '<div class="ai-process-title">' + (isProcessing ? 'AI Processing...' : progress === 100 ? 'Analysis Complete' : 'Preparing...') + '</div>' +
-                        '<div class="ai-process-subtitle">' + (isProcessing ? 'Please wait while AI analyzes the data' : progress === 100 ? 'Results ready' : '') + '</div>' +
+                        '<div class="aim__process-title">' + (isProcessing ? 'AI Processing...' : progress === 100 ? 'Analysis Complete' : 'Preparing...') + '</div>' +
+                        '<div class="aim__process-subtitle">' + (isProcessing ? 'Please wait while AI analyzes the data' : progress === 100 ? 'Results ready' : '') + '</div>' +
                     '</div>' +
-                    '<div class="ai-progress-container">' +
-                        '<div class="ai-progress-bar"><div class="ai-progress-fill" style="width:' + progress + '%"></div></div>' +
-                        '<div class="ai-progress-text"><span>Step ' + (this.stepIndex + 1) + ' of ' + this.steps.length + '</span><span>' + progress + '% complete</span></div>' +
+                    '<div class="aim__progress-container">' +
+                        '<div class="aim__progress-bar"><div class="aim__progress-fill" style="width:' + progress + '%"></div></div>' +
+                        '<div class="aim__progress-text"><span>Step ' + (this.stepIndex + 1) + ' of ' + this.steps.length + '</span><span>' + progress + '% complete</span></div>' +
                     '</div>' +
-                    '<div class="ai-process-steps">' + this.renderStepsHtml() + '</div>' +
+                    '<div class="aim__process-steps">' + this.renderStepsHtml() + '</div>' +
                     this.renderLogsHtml() +
                 '</div>'
             );
@@ -598,19 +598,19 @@
 
         showResult: function(resultHtml) {
             _setBody(
-                '<div class="ai-process-container">' +
-                    '<div class="ai-process-header">' +
-                        '<div class="ai-process-icon success"><i class="fa-solid fa-check"></i></div>' +
-                        '<div class="ai-process-title">Analysis Complete</div>' +
-                        '<div class="ai-process-subtitle">Results ready</div>' +
+                '<div class="aim__process-container">' +
+                    '<div class="aim__process-header">' +
+                        '<div class="aim__process-icon success"><i class="fa-solid fa-check"></i></div>' +
+                        '<div class="aim__process-title">Analysis Complete</div>' +
+                        '<div class="aim__process-subtitle">Results ready</div>' +
                     '</div>' +
-                    '<div class="ai-progress-container">' +
-                        '<div class="ai-progress-bar"><div class="ai-progress-fill" style="width:100%"></div></div>' +
-                        '<div class="ai-progress-text"><span>Step ' + this.steps.length + ' of ' + this.steps.length + '</span><span>100% complete</span></div>' +
+                    '<div class="aim__progress-container">' +
+                        '<div class="aim__progress-bar"><div class="aim__progress-fill" style="width:100%"></div></div>' +
+                        '<div class="aim__progress-text"><span>Step ' + this.steps.length + ' of ' + this.steps.length + '</span><span>100% complete</span></div>' +
                     '</div>' +
-                    '<div class="ai-process-steps">' + this.renderStepsHtml() + '</div>' +
+                    '<div class="aim__process-steps">' + this.renderStepsHtml() + '</div>' +
                     this.renderLogsHtml() +
-                    '<div class="ai-result-output mt-3">' + resultHtml + '</div>' +
+                    '<div class="aim__result-output mt-3">' + resultHtml + '</div>' +
                 '</div>'
             );
         },
@@ -618,17 +618,17 @@
         showError: function(message) {
             var progress = this.getProgress();
             _setBody(
-                '<div class="ai-process-container">' +
-                    '<div class="ai-process-header">' +
-                        '<div class="ai-process-icon error"><i class="fa-solid fa-times"></i></div>' +
-                        '<div class="ai-process-title">Analysis Failed</div>' +
+                '<div class="aim__process-container">' +
+                    '<div class="aim__process-header">' +
+                        '<div class="aim__process-icon error"><i class="fa-solid fa-times"></i></div>' +
+                        '<div class="aim__process-title">Analysis Failed</div>' +
                     '</div>' +
-                    '<div class="ai-progress-container">' +
-                        '<div class="ai-progress-bar"><div class="ai-progress-fill" style="width:' + progress + '%"></div></div>' +
-                        '<div class="ai-progress-text"><span>Failed at step ' + (this.stepIndex + 1) + '</span><span>' + progress + '% complete</span></div>' +
+                    '<div class="aim__progress-container">' +
+                        '<div class="aim__progress-bar"><div class="aim__progress-fill" style="width:' + progress + '%"></div></div>' +
+                        '<div class="aim__progress-text"><span>Failed at step ' + (this.stepIndex + 1) + '</span><span>' + progress + '% complete</span></div>' +
                     '</div>' +
-                    '<div class="ai-process-steps">' + this.renderStepsHtml() + '</div>' +
-                    '<div class="ai-error-output mt-3"><div class="alert alert-danger mb-0"><i class="fa-solid fa-exclamation-circle me-2"></i>' + _escapeHtml(message) + '</div></div>' +
+                    '<div class="aim__process-steps">' + this.renderStepsHtml() + '</div>' +
+                    '<div class="aim__error-output mt-3"><div class="alert alert-danger mb-0"><i class="fa-solid fa-exclamation-circle me-2"></i>' + _escapeHtml(message) + '</div></div>' +
                 '</div>'
             );
         }
@@ -905,17 +905,17 @@
         var startTime = Date.now();
 
         _setBody(
-            '<div class="ai-process-container">' +
-                '<div class="ai-process-header">' +
-                    '<div class="ai-process-icon"><i class="fa-solid fa-robot"></i></div>' +
-                    '<div class="ai-process-title">Processing ' + orders.length + ' orders...</div>' +
-                    '<div class="ai-process-subtitle">AI Parse + QNAS Lookup</div>' +
+            '<div class="aim__process-container">' +
+                '<div class="aim__process-header">' +
+                    '<div class="aim__process-icon"><i class="fa-solid fa-robot"></i></div>' +
+                    '<div class="aim__process-title">Processing ' + orders.length + ' orders...</div>' +
+                    '<div class="aim__process-subtitle">AI Parse + QNAS Lookup</div>' +
                 '</div>' +
-                '<div class="ai-progress-container">' +
-                    '<div class="ai-progress-bar"><div class="ai-progress-fill" id="ezzyBulkProgressFill" style="width:0%"></div></div>' +
-                    '<div class="ai-progress-text"><span id="ezzyBulkProgressLabel">0 / ' + orders.length + '</span><span id="ezzyBulkProgressPct">0%</span></div>' +
+                '<div class="aim__progress-container">' +
+                    '<div class="aim__progress-bar"><div class="aim__progress-fill" id="ezzyBulkProgressFill" style="width:0%"></div></div>' +
+                    '<div class="aim__progress-text"><span id="ezzyBulkProgressLabel">0 / ' + orders.length + '</span><span id="ezzyBulkProgressPct">0%</span></div>' +
                 '</div>' +
-                '<div id="ezzyBulkSteps" class="ai-process-steps"></div>' +
+                '<div id="ezzyBulkSteps" class="aim__process-steps"></div>' +
             '</div>'
         );
 
@@ -932,11 +932,11 @@
 
             var stepsEl = document.getElementById('ezzyBulkSteps');
             if (stepsEl) {
-                stepsEl.innerHTML = '<div class="ai-process-step active">' +
-                    '<div class="ai-step-indicator"><i class="fa-solid fa-gear fa-spin"></i></div>' +
-                    '<div class="ai-step-content">' +
-                        '<div class="ai-step-title">' + _escapeHtml(order.orderNumber) + '</div>' +
-                        '<div class="ai-step-status"><span class="ai-step-spinner"></span>Parsing address...</div>' +
+                stepsEl.innerHTML = '<div class="aim__process-step active">' +
+                    '<div class="aim__step-indicator"><i class="fa-solid fa-gear fa-spin"></i></div>' +
+                    '<div class="aim__step-content">' +
+                        '<div class="aim__step-title">' + _escapeHtml(order.orderNumber) + '</div>' +
+                        '<div class="aim__step-status"><span class="aim__step-spinner"></span>Parsing address...</div>' +
                     '</div></div>';
             }
 
@@ -961,14 +961,14 @@
                         }
                     }
 
-                    var cardHtml = '<div class="ai-result-card"><div class="ai-result-card-header">' +
+                    var cardHtml = '<div class="aim__result-card"><div class="aim__result-card-header">' +
                         '<i class="fa-solid fa-location-dot"></i><strong>' + _escapeHtml(order.orderNumber) + '</strong>' +
                         '<span class="ms-auto badge bg-' + (r.confidence > 0.7 ? 'success' : 'warning') + '">' + Math.round(r.confidence * 100) + '%</span></div>' +
-                        '<div class="ai-result-grid">' +
-                        '<div class="ai-result-item"><span class="label">Zone</span><span class="value' + (r.zone_number ? ' success' : '') + '">' + (r.zone_number || '-') + '</span></div>' +
-                        '<div class="ai-result-item"><span class="label">Street</span><span class="value">' + (r.street_number || '-') + '</span></div>' +
-                        '<div class="ai-result-item"><span class="label">Building</span><span class="value">' + (r.building_number || '-') + '</span></div>' +
-                        '<div class="ai-result-item"><span class="label">Area</span><span class="value">' + _escapeHtml(r.area_name || '-') + '</span></div>' +
+                        '<div class="aim__result-grid">' +
+                        '<div class="aim__result-item"><span class="label">Zone</span><span class="value' + (r.zone_number ? ' success' : '') + '">' + (r.zone_number || '-') + '</span></div>' +
+                        '<div class="aim__result-item"><span class="label">Street</span><span class="value">' + (r.street_number || '-') + '</span></div>' +
+                        '<div class="aim__result-item"><span class="label">Building</span><span class="value">' + (r.building_number || '-') + '</span></div>' +
+                        '<div class="aim__result-item"><span class="label">Area</span><span class="value">' + _escapeHtml(r.area_name || '-') + '</span></div>' +
                         '</div>';
 
                     // Show QNAS result
@@ -995,7 +995,7 @@
         var elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
         var allCardsHtml = results.map(function(r) {
             if (r.success) return r.html;
-            return '<div class="ai-result-card"><div class="ai-result-card-header">' +
+            return '<div class="aim__result-card"><div class="aim__result-card-header">' +
                 '<i class="fa-solid fa-triangle-exclamation text-warning"></i>' +
                 '<strong>' + _escapeHtml(r.order.orderNumber) + '</strong>' +
                 '<span class="ms-auto badge bg-danger">Failed</span></div>' +
@@ -1003,14 +1003,14 @@
         }).join('');
 
         _setBody(
-            '<div class="ai-process-container">' +
-                '<div class="ai-process-header">' +
-                    '<div class="ai-process-icon success"><i class="fa-solid fa-check"></i></div>' +
-                    '<div class="ai-process-title">Bulk Parse Complete</div>' +
-                    '<div class="ai-process-subtitle">' + successCount + ' succeeded, ' + errorCount + ' failed in ' + elapsed + 's</div>' +
+            '<div class="aim__process-container">' +
+                '<div class="aim__process-header">' +
+                    '<div class="aim__process-icon success"><i class="fa-solid fa-check"></i></div>' +
+                    '<div class="aim__process-title">Bulk Parse Complete</div>' +
+                    '<div class="aim__process-subtitle">' + successCount + ' succeeded, ' + errorCount + ' failed in ' + elapsed + 's</div>' +
                 '</div>' +
-                '<div class="ai-progress-container">' +
-                    '<div class="ai-progress-bar"><div class="ai-progress-fill" style="width:100%"></div></div>' +
+                '<div class="aim__progress-container">' +
+                    '<div class="aim__progress-bar"><div class="aim__progress-fill" style="width:100%"></div></div>' +
                 '</div>' +
                 '<div class="mt-3">' + allCardsHtml + '</div>' +
             '</div>'

@@ -339,19 +339,19 @@
           </p>
 
           {% if zone_groups %}
-          <div class="zone-group-list">
+          <div class="fpm__zone-list">
             {% for group in zone_groups %}
-            <div class="zone-group-card {% if group.id in preferred_group_ids %}zone-group-card--selected{% endif %}">
+            <div class="fpm__zone-card {% if group.id in preferred_group_ids %}fpm__zone-card--selected{% endif %}">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="preferred_zone_groups"
                        value="{{ group.id }}" id="group_{{ group.id }}"
                        {% if group.id in preferred_group_ids %}checked{% endif %}>
                 <label class="form-check-label" for="group_{{ group.id }}">
-                  <div class="zone-group-name">{{ group.name }}</div>
+                  <div class="fpm__zone-name">{{ group.name }}</div>
                   {% if group.description %}
-                  <div class="zone-group-desc">{{ group.description|truncatechars:50 }}</div>
+                  <div class="fpm__zone-desc">{{ group.description|truncatechars:50 }}</div>
                   {% endif %}
-                  <div class="zone-group-zones">
+                  <div class="fpm__zone-zones">
                     <i class="fas fa-map-pin"></i>
                     <span>Zones: {{ group.zone_numbers_display|truncatechars:40 }}</span>
                   </div>
@@ -471,15 +471,15 @@
         </div>
 
         <!-- Vehicles -->
-        <div class="listing-container mb-4">
-          <div class="listing-header">
-            <h6 class="listing-title"><i class="fas fa-car text-primary"></i>My Vehicles</h6>
+        <div class="fdp__listing-container mb-4">
+          <div class="fdp__listing-header">
+            <h6><i class="fas fa-car text-primary"></i>My Vehicles</h6>
             <a href="{% url 'fleet:vehicle_add' %}" class="btn btn-sm btn-primary">
               <i class="fas fa-plus"></i> Add
             </a>
           </div>
           {% if driver_vehicles %}
-          <table class="listing-table">
+          <table class="fdp__listing-table">
             <thead>
               <tr>
                 <th>Type</th>
@@ -493,14 +493,14 @@
               {% for vehicle in driver_vehicles %}
               <tr>
                 <td>
-                  <span class="listing-status primary"><i class="fa-solid fa-car"></i></span>
+                  <span class="fdp__status fdp__status--primary"><i class="fa-solid fa-car"></i></span>
                   {{ vehicle.get_vehicle_type_display }}
                 </td>
                 <td>{{ vehicle.vehicle_model|default:"-" }}</td>
                 <td><code>{{ vehicle.vehicle_no }}</code></td>
                 <td>{{ vehicle.vehicle_color|default:"-" }}</td>
                 <td>
-                  <span class="listing-status {% if vehicle.vehicle_status == 'active' %}success{% else %}warning{% endif %}">
+                  <span class="fdp__status {% if vehicle.vehicle_status == 'active' %}fdp__status--success{% else %}fdp__status--warning{% endif %}">
                     {{ vehicle.get_vehicle_status_display }}
                   </span>
                 </td>
@@ -509,7 +509,7 @@
             </tbody>
           </table>
           {% else %}
-          <div class="listing-empty">
+          <div class="fva__empty">
             <i class="fa-solid fa-car"></i>
             <p>No vehicles registered</p>
           </div>

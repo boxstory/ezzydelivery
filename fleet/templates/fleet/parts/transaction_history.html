@@ -13,41 +13,41 @@
 {% block content %}
 
 <!-- Balance Hero -->
-<div class="txn-hero fade-in">
-    <div class="txn-hero__item">
-        <span class="txn-hero__label">Wallet Balance</span>
-        <span class="txn-hero__val txn-hero__val--green">QR {{ wallet_status.wallet_balance|default:0|floatformat:0 }}</span>
+<div class="fth__hero fleet-fade-in">
+    <div class="fth__hero-item">
+        <span class="fth__hero-label">Wallet Balance</span>
+        <span class="fth__hero-val fth__hero-val--green">QR {{ wallet_status.wallet_balance|default:0|floatformat:0 }}</span>
     </div>
-    <div class="txn-hero__divider"></div>
-    <div class="txn-hero__item">
-        <span class="txn-hero__label">COD In-Hand</span>
-        <span class="txn-hero__val txn-hero__val--orange">QR {{ wallet_status.cod_in_hand|default:0|floatformat:0 }}</span>
+    <div class="fth__hero-divider"></div>
+    <div class="fth__hero-item">
+        <span class="fth__hero-label">COD In-Hand</span>
+        <span class="fth__hero-val fth__hero-val--orange">QR {{ wallet_status.cod_in_hand|default:0|floatformat:0 }}</span>
     </div>
-    <div class="txn-hero__divider"></div>
-    <div class="txn-hero__item">
-        <span class="txn-hero__label">Pending</span>
-        <span class="txn-hero__val">QR {{ wallet_status.pending_earnings|default:0|floatformat:0 }}</span>
+    <div class="fth__hero-divider"></div>
+    <div class="fth__hero-item">
+        <span class="fth__hero-label">Pending</span>
+        <span class="fth__hero-val">QR {{ wallet_status.pending_earnings|default:0|floatformat:0 }}</span>
     </div>
 </div>
 
 <!-- Type Tabs -->
-<div class="txn-tabs slide-up">
-    <a href="?type=all&days={{ selected_days }}" class="txn-tab {% if selected_type == 'all' %}txn-tab--active{% endif %}">All</a>
-    <a href="?type=earning&days={{ selected_days }}" class="txn-tab {% if selected_type == 'earning' %}txn-tab--active{% endif %}">Earned</a>
-    <a href="?type=cod_collection&days={{ selected_days }}" class="txn-tab {% if selected_type == 'cod_collection' %}txn-tab--active{% endif %}">COD In</a>
-    <a href="?type=cod_deposit&days={{ selected_days }}" class="txn-tab {% if selected_type == 'cod_deposit' or selected_type == 'cod_driver_settle' %}txn-tab--active{% endif %}">COD Out</a>
-    <a href="?type=cod_return&days={{ selected_days }}" class="txn-tab {% if selected_type == 'cod_return' %}txn-tab--active{% endif %}">Returns</a>
+<div class="fth__tabs fleet-slide-up">
+    <a href="?type=all&days={{ selected_days }}" class="fth__tab {% if selected_type == 'all' %}fth__tab--active{% endif %}">All</a>
+    <a href="?type=earning&days={{ selected_days }}" class="fth__tab {% if selected_type == 'earning' %}fth__tab--active{% endif %}">Earned</a>
+    <a href="?type=cod_collection&days={{ selected_days }}" class="fth__tab {% if selected_type == 'cod_collection' %}fth__tab--active{% endif %}">COD In</a>
+    <a href="?type=cod_deposit&days={{ selected_days }}" class="fth__tab {% if selected_type == 'cod_deposit' or selected_type == 'cod_driver_settle' %}fth__tab--active{% endif %}">COD Out</a>
+    <a href="?type=cod_return&days={{ selected_days }}" class="fth__tab {% if selected_type == 'cod_return' %}fth__tab--active{% endif %}">Returns</a>
 </div>
 
 <!-- Period Selector -->
-<div class="txn-period slide-up">
-    <a href="?type={{ selected_type }}&days=7" class="txn-period__btn {% if selected_days == 7 %}txn-period__btn--active{% endif %}">7 Days</a>
-    <a href="?type={{ selected_type }}&days=30" class="txn-period__btn {% if selected_days == 30 %}txn-period__btn--active{% endif %}">30 Days</a>
-    <a href="?type={{ selected_type }}&days=90" class="txn-period__btn {% if selected_days == 90 %}txn-period__btn--active{% endif %}">90 Days</a>
+<div class="fth__period fleet-slide-up">
+    <a href="?type={{ selected_type }}&days=7" class="fth__period-btn {% if selected_days == 7 %}fth__period-btn--active{% endif %}">7 Days</a>
+    <a href="?type={{ selected_type }}&days=30" class="fth__period-btn {% if selected_days == 30 %}fth__period-btn--active{% endif %}">30 Days</a>
+    <a href="?type={{ selected_type }}&days=90" class="fth__period-btn {% if selected_days == 90 %}fth__period-btn--active{% endif %}">90 Days</a>
 </div>
 
 <!-- Transaction List -->
-<div class="fleet-card slide-up">
+<div class="fleet-card fleet-slide-up">
     {% if transactions %}
     <div class="fleet-card__header">
         <h3 class="fleet-card__title">{{ transactions|length }} Transaction{{ transactions|length|pluralize }}</h3>
@@ -56,8 +56,8 @@
     <div class="fleet-card__body" style="padding: 0;">
         {% for txn in transactions %}
         {% with ttype=txn.transaction_type %}
-        <div class="txn-row {% if not forloop.last %}txn-row--border{% endif %}">
-            <div class="txn-row__icon txn-row__icon--{% if ttype == 'earning' %}green{% elif ttype == 'bonus' %}blue{% elif ttype == 'cod_collection' or ttype == 'cod_return' %}orange{% elif ttype == 'cod_deposit' or ttype == 'cod_driver_settle' %}yellow{% elif ttype == 'settlement' %}purple{% elif ttype == 'deduction' %}red{% elif ttype == 'delivery_charge' or ttype == 'fulfillment_charge' %}blue{% else %}grey{% endif %}">
+        <div class="fth__row {% if not forloop.last %}fth__row--border{% endif %}">
+            <div class="fth__row-icon fth__row-icon--{% if ttype == 'earning' %}green{% elif ttype == 'bonus' %}blue{% elif ttype == 'cod_collection' or ttype == 'cod_return' %}orange{% elif ttype == 'cod_deposit' or ttype == 'cod_driver_settle' %}yellow{% elif ttype == 'settlement' %}purple{% elif ttype == 'deduction' %}red{% elif ttype == 'delivery_charge' or ttype == 'fulfillment_charge' %}blue{% else %}grey{% endif %}">
                 {% if ttype == 'earning' %}<i class="fa-solid fa-coins"></i>
                 {% elif ttype == 'bonus' %}<i class="fa-solid fa-gift"></i>
                 {% elif ttype == 'cod_collection' %}<i class="fa-solid fa-arrow-down"></i>
@@ -70,14 +70,14 @@
                 {% elif ttype == 'fulfillment_charge' %}<i class="fa-solid fa-box"></i>
                 {% else %}<i class="fa-solid fa-arrow-right-arrow-left"></i>{% endif %}
             </div>
-            <div class="txn-row__body">
-                <span class="txn-row__title">{{ txn.get_transaction_type_display }}</span>
-                <span class="txn-row__meta">
-                    {% if txn.transaction_code %}<span class="txn-row__code">{{ txn.transaction_code }}</span> · {% endif %}
+            <div class="fth__row-body">
+                <span class="fth__row-title">{{ txn.get_transaction_type_display }}</span>
+                <span class="fth__row-meta">
+                    {% if txn.transaction_code %}<span class="fth__row-code">{{ txn.transaction_code }}</span> · {% endif %}
                     {{ txn.created_at|date:"d M, Y" }}
                 </span>
             </div>
-            <div class="txn-row__amount {% if txn.amount >= 0 %}txn-row__amount--plus{% else %}txn-row__amount--minus{% endif %}">
+            <div class="fth__row-amount {% if txn.amount >= 0 %}fth__row-amount--plus{% else %}fth__row-amount--minus{% endif %}">
                 {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }}<small> QR</small>
             </div>
         </div>
@@ -97,45 +97,4 @@
     {% endif %}
 </div>
 
-<style>
-    .txn-hero {
-        background: var(--fleet-dark); border-radius: var(--radius-md);
-        display: flex; align-items: stretch;
-        margin-bottom: var(--spacing-md); overflow: hidden;
-    }
-    .txn-hero__item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--spacing-sm) var(--spacing-xs); gap: 2px; }
-    .txn-hero__divider { width: 1px; background: rgba(255,255,255,0.12); margin: var(--spacing-md) 0; }
-    .txn-hero__label { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.05em; }
-    .txn-hero__val { font-size: var(--font-size-base); font-weight: 800; color: #fff; }
-    .txn-hero__val--green { color: var(--fleet-success); }
-    .txn-hero__val--orange { color: var(--fleet-warning); }
-
-    .txn-tabs { display: flex; gap: var(--spacing-xs); overflow-x: auto; margin-bottom: var(--spacing-sm); padding-bottom: 2px; scrollbar-width: none; }
-    .txn-tabs::-webkit-scrollbar { display: none; }
-    .txn-tab { padding: 6px 14px; border-radius: var(--radius-sm); font-size: var(--font-size-xs); font-weight: 600; white-space: nowrap; text-decoration: none; flex-shrink: 0; background: var(--fleet-grey-100); color: var(--fleet-grey-600); border: 1px solid var(--fleet-grey-200); transition: all 0.15s; }
-    .txn-tab--active { background: var(--fleet-dark); color: #fff; border-color: var(--fleet-dark); }
-
-    .txn-period { display: flex; gap: var(--spacing-xs); margin-bottom: var(--spacing-md); }
-    .txn-period__btn { flex: 1; padding: 5px; border-radius: var(--radius-sm); font-size: var(--font-size-xs); font-weight: 600; text-align: center; text-decoration: none; background: var(--fleet-grey-100); color: var(--fleet-grey-600); border: 1px solid var(--fleet-grey-200); }
-    .txn-period__btn--active { background: var(--fleet-primary); color: #fff; border-color: var(--fleet-primary); }
-
-    .txn-row { display: flex; align-items: center; gap: var(--spacing-sm); padding: 7px var(--spacing-md); }
-    .txn-row--border { border-bottom: 1px solid var(--fleet-grey-100); }
-    .txn-row__icon { width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: var(--font-size-sm); flex-shrink: 0; }
-    .txn-row__icon--green { background: var(--fleet-success-light); color: var(--fleet-success); }
-    .txn-row__icon--blue { background: #e8f0fe; color: var(--fleet-primary); }
-    .txn-row__icon--orange { background: #fff4e5; color: #e07b00; }
-    .txn-row__icon--yellow { background: #fffbeb; color: #b45309; }
-    .txn-row__icon--purple { background: #f5f3ff; color: #7c3aed; }
-    .txn-row__icon--red { background: var(--fleet-danger-light); color: var(--fleet-danger); }
-    .txn-row__icon--grey { background: var(--fleet-grey-100); color: var(--fleet-grey-500); }
-    .txn-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-    .txn-row__title { font-size: var(--font-size-sm); font-weight: 700; color: var(--fleet-dark); }
-    .txn-row__meta { font-size: var(--font-size-xs); color: var(--fleet-grey-500); }
-    .txn-row__code { font-family: monospace; background: var(--fleet-grey-100); padding: 1px 5px; border-radius: var(--radius-sm); font-size: 10px; }
-    .txn-row__amount { font-size: var(--font-size-sm); font-weight: 800; white-space: nowrap; flex-shrink: 0; }
-    .txn-row__amount small { font-size: 10px; font-weight: 500; }
-    .txn-row__amount--plus { color: var(--fleet-success); }
-    .txn-row__amount--minus { color: var(--fleet-danger); }
-</style>
 {% endblock %}

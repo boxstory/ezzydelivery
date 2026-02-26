@@ -11,7 +11,7 @@
 <div class="container-fluid py-4">
 
   <!-- Page Header -->
-  <div class="warehouse-header">
+  <div class="wle__header">
     <h1>
       <i class="fa-solid fa-warehouse me-2"></i>
       Warehouse Management
@@ -23,34 +23,34 @@
   </div>
 
   <!-- Summary Statistics -->
-  <div class="warehouse-stats-grid">
-    <div class="warehouse-stat-card">
-      <div class="warehouse-stat-icon warehouse-stat-icon--primary">
+  <div class="wle__stats-grid">
+    <div class="wle__stat-card">
+      <div class="wle__stat-icon wle__stat-icon--primary">
         <i class="fa-solid fa-warehouse"></i>
       </div>
-      <div class="warehouse-stat-label">Total Warehouses</div>
-      <div class="warehouse-stat-value">{{ total_warehouses }}</div>
+      <div class="wle__stat-label">Total Warehouses</div>
+      <div class="wle__stat-value">{{ total_warehouses }}</div>
     </div>
 
-    <div class="warehouse-stat-card">
-      <div class="warehouse-stat-icon warehouse-stat-icon--success">
+    <div class="wle__stat-card">
+      <div class="wle__stat-icon wle__stat-icon--success">
         <i class="fa-solid fa-check-circle"></i>
       </div>
-      <div class="warehouse-stat-label">Active Warehouses</div>
-      <div class="warehouse-stat-value text-success">{{ active_warehouses }}</div>
+      <div class="wle__stat-label">Active Warehouses</div>
+      <div class="wle__stat-value text-success">{{ active_warehouses }}</div>
     </div>
 
-    <div class="warehouse-stat-card">
-      <div class="warehouse-stat-icon warehouse-stat-icon--info">
+    <div class="wle__stat-card">
+      <div class="wle__stat-icon wle__stat-icon--info">
         <i class="fa-solid fa-link"></i>
       </div>
-      <div class="warehouse-stat-label">Active Links</div>
-      <div class="warehouse-stat-value text-info">{{ total_links }}</div>
+      <div class="wle__stat-label">Active Links</div>
+      <div class="wle__stat-value text-info">{{ total_links }}</div>
     </div>
   </div>
 
   <!-- Search & Filter -->
-  <div class="warehouse-filter-card">
+  <div class="wle__filter-card">
     <form method="GET" class="row g-3">
       <div class="col-md-7">
         <label for="searchInput" class="form-label">
@@ -96,42 +96,42 @@
 
   <!-- Warehouses List -->
   {% for warehouse in warehouses %}
-  <div class="warehouse-card">
+  <div class="wle__card">
 
     <!-- Card Header -->
-    <div class="warehouse-card-header {% if not warehouse.is_active %}inactive{% endif %} d-flex align-items-center justify-content-between">
+    <div class="wle__card-header {% if not warehouse.is_active %}inactive{% endif %} d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center flex-grow-1">
-        <div class="warehouse-icon {% if not warehouse.is_active %}inactive{% endif %}">
+        <div class="wle__icon {% if not warehouse.is_active %}inactive{% endif %}">
           <i class="fa-solid fa-warehouse"></i>
         </div>
 
         <div>
-          <h2 class="warehouse-title">{{ warehouse.name }}</h2>
-          <div class="warehouse-meta">
-            <div class="warehouse-meta-item">
+          <h2 class="wle__title">{{ warehouse.name }}</h2>
+          <div class="wle__meta">
+            <div class="wle__meta-item">
               <i class="fa-solid fa-barcode"></i>
               <span>{{ warehouse.code }}</span>
             </div>
             {% if warehouse.city %}
-            <div class="warehouse-meta-item">
+            <div class="wle__meta-item">
               <i class="fa-solid fa-location-dot"></i>
               <span>{{ warehouse.city }}</span>
             </div>
             {% endif %}
-            <div class="warehouse-meta-item">
+            <div class="wle__meta-item">
               {% if warehouse.is_active %}
-              <span class="warehouse-badge warehouse-badge--active">
+              <span class="wle__badge wle__badge--active">
                 <i class="fa-solid fa-check-circle me-1"></i>
                 Active
               </span>
               {% else %}
-              <span class="warehouse-badge warehouse-badge--inactive">
+              <span class="wle__badge wle__badge--inactive">
                 <i class="fa-solid fa-circle me-1"></i>
                 Inactive
               </span>
               {% endif %}
               {% if warehouse.is_default %}
-              <span class="warehouse-badge warehouse-badge--default">
+              <span class="wle__badge wle__badge--default">
                 <i class="fa-solid fa-star me-1"></i>
                 Default
               </span>
@@ -142,7 +142,7 @@
       </div>
 
       <button
-        class="warehouse-link-btn"
+        class="wle__link-btn"
         type="button"
         data-bs-toggle="collapse"
         data-bs-target="#warehouse-link-form-{{ warehouse.pk }}"
@@ -154,7 +154,7 @@
 
     <!-- Link Business Form (Collapsed) -->
     <div class="collapse" id="warehouse-link-form-{{ warehouse.pk }}">
-      <div class="warehouse-link-form-wrapper">
+      <div class="wle__link-form-wrapper">
         <form
           id="warehouse_link_form_{{ warehouse.pk }}"
           class="row g-3 align-items-end"
@@ -178,7 +178,7 @@
           </div>
 
           <div class="col-md-3">
-            <button type="submit" class="warehouse-link-submit-btn w-100">
+            <button type="submit" class="wle__link-submit-btn w-100">
               <i class="fa-solid fa-link"></i>
               Link to {{ warehouse.name }}
             </button>
@@ -188,10 +188,10 @@
     </div>
 
     <!-- Linked Businesses Table -->
-    <div class="warehouse-links-container">
+    <div class="wle__links-container">
       {% with links=warehouse.seller_links.all %}
       {% if links %}
-      <table class="warehouse-links-table">
+      <table class="wle__links-table">
         <thead>
           <tr>
             <th>Business</th>
@@ -206,13 +206,13 @@
           {% for link in links %}
           <tr id="warehouse_link_row_{{ link.pk }}">
             <td>
-              <div class="business-cell">
-                <div class="business-icon">
+              <div class="wle__business-cell">
+                <div class="wle__business-icon">
                   <i class="fa-solid fa-store"></i>
                 </div>
                 <div>
-                  <span class="business-name">{{ link.business.business_name }}</span>
-                  <span class="business-code">{{ link.business.business_code }}</span>
+                  <span class="wle__business-name">{{ link.business.business_name }}</span>
+                  <span class="wle__business-code">{{ link.business.business_code }}</span>
                 </div>
               </div>
             </td>
@@ -221,12 +221,12 @@
             </td>
             <td>
               {% if link.is_active %}
-              <span class="warehouse-badge warehouse-badge--active">
+              <span class="wle__badge wle__badge--active">
                 <i class="fa-solid fa-check-circle me-1"></i>
                 Active
               </span>
               {% else %}
-              <span class="warehouse-badge warehouse-badge--inactive">
+              <span class="wle__badge wle__badge--inactive">
                 <i class="fa-solid fa-circle me-1"></i>
                 Inactive
               </span>
@@ -234,7 +234,7 @@
             </td>
             <td>
               {% if link.is_default %}
-              <span class="warehouse-badge warehouse-badge--default">
+              <span class="wle__badge wle__badge--default">
                 <i class="fa-solid fa-star me-1"></i>
                 Default
               </span>
@@ -249,13 +249,13 @@
               <div class="btn-group" role="group">
                 <a
                   href="{% url 'workforce:seller_detail' link.business.pk %}"
-                  class="warehouse-action-btn warehouse-action-btn--view"
+                  class="wle__action-btn wle__action-btn--view"
                   title="View Business Details">
                   <i class="fa-solid fa-eye"></i>
                 </a>
                 <button
                   type="button"
-                  class="warehouse-action-btn warehouse-action-btn--unlink"
+                  class="wle__action-btn wle__action-btn--unlink"
                   title="Unlink Business from Warehouse"
                   onclick="unlinkBusiness({{ link.pk }}, '{{ link.business.business_name|escapejs }}', '{{ warehouse.name|escapejs }}')">
                   <i class="fa-solid fa-unlink"></i>
@@ -267,9 +267,9 @@
         </tbody>
       </table>
       {% else %}
-      <div class="warehouse-no-links">
-        <i class="fa-solid fa-link-slash warehouse-no-links-icon"></i>
-        <p class="warehouse-no-links-text">
+      <div class="wle__no-links">
+        <i class="fa-solid fa-link-slash wle__no-links-icon"></i>
+        <p class="wle__no-links-text">
           No businesses linked to this warehouse yet.
           <br>
           <small>Click "Link Business" above to create a connection.</small>
@@ -283,9 +283,9 @@
   {% empty %}
 
   <!-- Empty State -->
-  <div class="warehouse-empty-state">
-    <i class="fa-solid fa-warehouse warehouse-empty-icon"></i>
-    <p class="warehouse-empty-text">
+  <div class="wle__empty-state">
+    <i class="fa-solid fa-warehouse wle__empty-icon"></i>
+    <p class="wle__empty-text">
       {% if search or status_filter %}
         No warehouses match your search criteria.
         <br>

@@ -4,25 +4,26 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'business/css/business.css' %}">
+<link rel="stylesheet" href="{% static 'business/css/business-teams-add.css' %}">
 {% endblock extra_css %}
 
 {% block content %}
-<div class="form-container" id="client_teams_add_container_main">
+<div class="bta" id="client_teams_add_container_main">
     <!-- Header -->
-    <div class="form-header" id="client_teams_add_section_header">
-        <h1 id="client_teams_add_title_form">
+    <div class="bta__header" id="client_teams_add_section_header">
+        <h1 class="bta__title" id="client_teams_add_title_form">
             <i class="fa-solid fa-user-plus"></i>
             {{ form_title|default:"Add Team Member" }}
         </h1>
-        <a href="{% url 'business:business_teams' business.business_id %}" class="back-link">
+        <a href="{% url 'business:business_teams' business.business_id %}" class="bta__back-link">
             <i class="fa-solid fa-arrow-left"></i>
             Back to Team
         </a>
     </div>
 
     <!-- Form Card -->
-    <div class="form-card">
-        <div class="form-card-header">
+    <div class="bta__card">
+        <div class="bta__card-header">
             <i class="fa-solid fa-user-gear"></i>
             <h2>Member Details</h2>
         </div>
@@ -35,7 +36,7 @@
                 {% endfor %}
             </div>
             {% endif %}
-            <div class="form-card-body">
+            <div class="bta__card-body">
                 {% for field in form %}
                     {% if field.name != 'accept_terms' and field.name != 'permissions' %}
                     <div class="mb-3">
@@ -49,15 +50,15 @@
             </div>
 
             <!-- Permissions -->
-            <div class="form-card-body border-top pt-3">
+            <div class="bta__card-body border-top pt-3">
                 <h6 class="mb-1"><i class="fa-solid fa-shield-halved"></i> Permissions</h6>
                 <small class="form-text text-muted d-block mb-3">Select additional permissions for this member. Each role comes with default permissions — check extras as needed.</small>
                 {% for error in form.permissions.errors %}<div class="text-danger small mb-2">{{ error }}</div>{% endfor %}
                 <div class="row g-3">
                     {% for group_name, group_perms in permission_groups.items %}
                     <div class="col-12 col-md-6">
-                        <div class="p-2 rounded border">
-                            <h6 class="mb-2 small fw-bold text-uppercase" style="color: var(--brand-primary, #0d6efd);">
+                        <div class="bta__perm-group">
+                            <h6 class="bta__perm-group-title">
                                 <i class="fa-solid fa-folder me-1"></i>{{ group_name }}
                             </h6>
                             {% for perm_code, perm_label in group_perms %}
@@ -74,10 +75,10 @@
             </div>
 
             <!-- Terms & Conditions -->
-            <div class="form-card-body border-top pt-3">
-                <div class="p-3 rounded" style="background: var(--brand-light, #f8f9fa);">
+            <div class="bta__card-body border-top pt-3">
+                <div class="bta__terms-wrap">
                     <h6 class="mb-2"><i class="fa-solid fa-file-contract"></i> Terms & Conditions</h6>
-                    <div class="small mb-3" style="max-height: 200px; overflow-y: auto; padding: 10px; background: #fff; border: 1px solid var(--brand-border, #dee2e6); border-radius: 6px;">
+                    <div class="bta__terms-scroll">
                         <p class="mb-2"><strong>By adding a team member, you acknowledge and agree to the following:</strong></p>
                         <ol class="mb-0 ps-3">
                             <li class="mb-1"><strong>Access & Responsibility</strong> — You are granting this person access to your business data on EzzyDelivery. You are responsible for their actions within your business account.</li>
@@ -98,12 +99,12 @@
                 </div>
             </div>
 
-            <div class="form-card-footer">
-                <a href="{% url 'business:business_teams' business.business_id %}" class="btn-cancel" id="client_teams_add_btn_back">
+            <div class="bta__card-footer">
+                <a href="{% url 'business:business_teams' business.business_id %}" class="bta__btn-cancel" id="client_teams_add_btn_back">
                     <i class="fa-solid fa-xmark"></i>
                     Cancel
                 </a>
-                <button type="submit" class="btn-submit" id="client_teams_add_btn_submit">
+                <button type="submit" class="bta__btn-submit" id="client_teams_add_btn_submit">
                     <i class="fa-solid fa-user-plus"></i>
                     Add Member
                 </button>
@@ -112,12 +113,12 @@
     </div>
 
     <!-- Help Section -->
-    <div class="form-info-note">
-        <div class="form-info-note-title">
+    <div class="bta__info-note">
+        <div class="bta__info-note-title">
             <i class="fa-solid fa-circle-info"></i>
             How to Add a Team Member
         </div>
-        <div class="form-info-note-text">
+        <div class="bta__info-note-text">
             <p class="mb-2"><strong>Step 1:</strong> Find the person you want to add using one of these:</p>
             <ul class="mb-2 ps-3">
                 <li><strong>Email</strong> — Their registered email (e.g. <code>john@example.com</code>)</li>

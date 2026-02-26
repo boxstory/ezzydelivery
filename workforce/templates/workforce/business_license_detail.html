@@ -12,169 +12,169 @@
 <div class="col-12 p-3">
 
 <!-- Back Navigation -->
-<a href="{% url 'workforce:business_licenses_list' %}" class="biz-back-link">
+<a href="{% url 'workforce:business_licenses_list' %}" class="bld__back-link">
     <i class="fa-solid fa-arrow-left"></i> All Businesses
 </a>
 
 <!-- Hero Header -->
-<div class="biz-hero">
-    <div class="biz-hero__glow"></div>
-    <div class="biz-hero__content">
-        <div class="biz-hero__avatar">
+<div class="bld__hero">
+    <div class="bld__hero__glow"></div>
+    <div class="bld__hero__content">
+        <div class="bld__hero__avatar">
             <span>{{ business.business_name|default:"?"|truncatechars:1 }}</span>
         </div>
-        <div class="biz-hero__info">
-            <h1 class="biz-hero__name">{{ business.business_name|default:"Unknown Business" }}</h1>
-            <div class="biz-hero__meta">
-                <span class="biz-hero__code"><i class="fa-solid fa-fingerprint"></i> {{ business.business_code|default:"N/A" }}</span>
-                <span class="biz-hero__badge biz-hero__badge--{{ business.business_status }}">
+        <div class="bld__hero__info">
+            <h1 class="bld__hero__name">{{ business.business_name|default:"Unknown Business" }}</h1>
+            <div class="bld__hero__meta">
+                <span class="bld__hero__code"><i class="fa-solid fa-fingerprint"></i> {{ business.business_code|default:"N/A" }}</span>
+                <span class="bld__hero__badge bld__hero__badge--{{ business.business_status }}">
                     <i class="fa-solid fa-circle"></i> {{ business.business_status|title }}
                 </span>
-                <span class="biz-hero__badge biz-hero__badge--fulfillment-{{ business.fulfillment_service_status }}">
+                <span class="bld__hero__badge bld__hero__badge--fulfillment-{{ business.fulfillment_service_status }}">
                     <i class="fa-solid fa-boxes-stacked"></i> Fulfillment: {{ business.get_fulfillment_service_status_display }}
                 </span>
             </div>
-            <div class="biz-hero__id">ID: {{ business.business_id }}</div>
+            <div class="bld__hero__id">ID: {{ business.business_id }}</div>
         </div>
     </div>
 </div>
 
 <!-- Stats Row -->
-<div class="biz-stats">
-    <div class="biz-stats__card">
-        <div class="biz-stats__icon biz-stats__icon--primary"><i class="fa-solid fa-box"></i></div>
-        <div class="biz-stats__data">
-            <div class="biz-stats__number">{{ order_stats.total|default:0 }}</div>
-            <div class="biz-stats__label">Total Orders</div>
+<div class="bld__stats">
+    <div class="bld__stats__card">
+        <div class="bld__stats__icon bld__stats__icon--primary"><i class="fa-solid fa-box"></i></div>
+        <div class="bld__stats__data">
+            <div class="bld__stats__number">{{ order_stats.total|default:0 }}</div>
+            <div class="bld__stats__label">Total Orders</div>
         </div>
     </div>
-    <div class="biz-stats__card">
-        <div class="biz-stats__icon biz-stats__icon--success"><i class="fa-solid fa-circle-check"></i></div>
-        <div class="biz-stats__data">
-            <div class="biz-stats__number">{{ order_stats.delivered|default:0 }}</div>
-            <div class="biz-stats__label">Delivered</div>
+    <div class="bld__stats__card">
+        <div class="bld__stats__icon bld__stats__icon--success"><i class="fa-solid fa-circle-check"></i></div>
+        <div class="bld__stats__data">
+            <div class="bld__stats__number">{{ order_stats.delivered|default:0 }}</div>
+            <div class="bld__stats__label">Delivered</div>
         </div>
     </div>
-    <div class="biz-stats__card">
-        <div class="biz-stats__icon biz-stats__icon--warning"><i class="fa-solid fa-clock"></i></div>
-        <div class="biz-stats__data">
-            <div class="biz-stats__number">{{ order_stats.pending|default:0 }}</div>
-            <div class="biz-stats__label">Pending</div>
+    <div class="bld__stats__card">
+        <div class="bld__stats__icon bld__stats__icon--warning"><i class="fa-solid fa-clock"></i></div>
+        <div class="bld__stats__data">
+            <div class="bld__stats__number">{{ order_stats.pending|default:0 }}</div>
+            <div class="bld__stats__label">Pending</div>
         </div>
     </div>
-    <div class="biz-stats__card">
-        <div class="biz-stats__icon biz-stats__icon--info"><i class="fa-solid fa-calendar-days"></i></div>
-        <div class="biz-stats__data">
-            <div class="biz-stats__number">{{ business.created_at|date:"d M Y" }}</div>
-            <div class="biz-stats__label">Registered</div>
+    <div class="bld__stats__card">
+        <div class="bld__stats__icon bld__stats__icon--info"><i class="fa-solid fa-calendar-days"></i></div>
+        <div class="bld__stats__data">
+            <div class="bld__stats__number">{{ business.created_at|date:"d M Y" }}</div>
+            <div class="bld__stats__label">Registered</div>
         </div>
     </div>
 </div>
 
 <!-- Main Grid -->
-<div class="biz-grid">
+<div class="bld__grid">
 
     <!-- Left Column -->
-    <div class="biz-grid__left">
+    <div class="bld__grid__left">
 
         <!-- License Info Panel -->
-        <div class="biz-panel" data-panel="license">
-            <div class="biz-panel__header">
+        <div class="bld__panel" data-panel="license">
+            <div class="bld__panel__header">
                 <i class="fa-solid fa-certificate"></i>
                 <h3>License Information</h3>
-                <button type="button" class="biz-panel__edit-btn" data-panel="license" title="Edit">
+                <button type="button" class="bld__panel__edit-btn" data-panel="license" title="Edit">
                     <i class="fa-solid fa-pen"></i>
                 </button>
             </div>
-            <div class="biz-panel__body">
-                <form class="biz-form" data-section="license">
+            <div class="bld__panel__body">
+                <form class="bld__form" data-section="license">
                     {% csrf_token %}
-                    <div class="biz-form__group">
-                        <label class="biz-form__label">Business Name</label>
-                        <input type="text" name="business_name" value="{{ business.business_name|default:'' }}" class="biz-form__input" disabled required>
+                    <div class="bld__form__group">
+                        <label class="bld__form__label">Business Name</label>
+                        <input type="text" name="business_name" value="{{ business.business_name|default:'' }}" class="bld__form__input" disabled required>
                     </div>
-                    <div class="biz-form__row">
-                        <div class="biz-form__group">
-                            <label class="biz-form__label">Business Code</label>
-                            <input type="text" value="{{ business.business_code|default:'N/A' }}" class="biz-form__input biz-form__input--mono" disabled readonly>
+                    <div class="bld__form__row">
+                        <div class="bld__form__group">
+                            <label class="bld__form__label">Business Code</label>
+                            <input type="text" value="{{ business.business_code|default:'N/A' }}" class="bld__form__input bld__form__input--mono" disabled readonly>
                         </div>
-                        <div class="biz-form__group">
-                            <label class="biz-form__label">QID</label>
-                            <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="biz-form__input biz-form__input--mono" disabled>
-                        </div>
-                    </div>
-                    <div class="biz-form__row">
-                        <div class="biz-form__group">
-                            <label class="biz-form__label">Category</label>
-                            <input type="text" name="business_product_category" value="{{ business.business_product_category|default:'' }}" class="biz-form__input" disabled>
-                        </div>
-                        <div class="biz-form__group">
-                            <label class="biz-form__label">Business Since</label>
-                            <input type="date" name="business_since" value="{{ business.business_since|date:'Y-m-d' }}" class="biz-form__input" disabled>
+                        <div class="bld__form__group">
+                            <label class="bld__form__label">QID</label>
+                            <input type="text" name="business_qid" value="{{ business.business_qid|default:'' }}" class="bld__form__input bld__form__input--mono" disabled>
                         </div>
                     </div>
-                    <div class="biz-form__group">
-                        <label class="biz-form__label">Last Updated</label>
-                        <input type="text" value="{{ business.updated_at|date:'d M Y, h:i A' }}" class="biz-form__input" disabled readonly>
+                    <div class="bld__form__row">
+                        <div class="bld__form__group">
+                            <label class="bld__form__label">Category</label>
+                            <input type="text" name="business_product_category" value="{{ business.business_product_category|default:'' }}" class="bld__form__input" disabled>
+                        </div>
+                        <div class="bld__form__group">
+                            <label class="bld__form__label">Business Since</label>
+                            <input type="date" name="business_since" value="{{ business.business_since|date:'Y-m-d' }}" class="bld__form__input" disabled>
+                        </div>
                     </div>
-                    <div class="biz-form__actions biz-form__actions--hidden" data-panel="license">
-                        <button type="submit" class="biz-btn biz-btn--primary">
+                    <div class="bld__form__group">
+                        <label class="bld__form__label">Last Updated</label>
+                        <input type="text" value="{{ business.updated_at|date:'d M Y, h:i A' }}" class="bld__form__input" disabled readonly>
+                    </div>
+                    <div class="bld__form__actions bld__form__actions--hidden" data-panel="license">
+                        <button type="submit" class="bld__btn bld__btn--primary">
                             <i class="fa-solid fa-save"></i> Save
                         </button>
-                        <button type="button" class="biz-btn biz-btn--ghost biz-cancel-btn" data-panel="license">
+                        <button type="button" class="bld__btn bld__btn--ghost bld__cancel-btn" data-panel="license">
                             Cancel
                         </button>
                     </div>
-                    <div class="biz-toast biz-section-msg" data-panel="license"></div>
+                    <div class="bld__toast bld__section-msg" data-panel="license"></div>
                 </form>
             </div>
         </div>
 
         <!-- Contact Panel -->
-        <div class="biz-panel" data-panel="contact">
-            <div class="biz-panel__header">
+        <div class="bld__panel" data-panel="contact">
+            <div class="bld__panel__header">
                 <i class="fa-solid fa-address-book"></i>
                 <h3>Contact</h3>
-                <button type="button" class="biz-panel__edit-btn" data-panel="contact" title="Edit">
+                <button type="button" class="bld__panel__edit-btn" data-panel="contact" title="Edit">
                     <i class="fa-solid fa-pen"></i>
                 </button>
             </div>
-            <div class="biz-panel__body">
-                <form class="biz-form" data-section="contact">
+            <div class="bld__panel__body">
+                <form class="bld__form" data-section="contact">
                     {% csrf_token %}
-                    <div class="biz-form__row">
-                        <div class="biz-form__group">
-                            <label class="biz-form__label"><i class="fa-solid fa-phone"></i> Phone</label>
-                            <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="biz-form__input" disabled placeholder="—">
+                    <div class="bld__form__row">
+                        <div class="bld__form__group">
+                            <label class="bld__form__label"><i class="fa-solid fa-phone"></i> Phone</label>
+                            <input type="text" name="business_phone" value="{{ business.business_phone|default:'' }}" class="bld__form__input" disabled placeholder="—">
                         </div>
-                        <div class="biz-form__group">
-                            <label class="biz-form__label"><i class="fa-brands fa-whatsapp"></i> WhatsApp</label>
-                            <input type="text" name="business_whatsapp" value="{{ business.business_whatsapp|default:'' }}" class="biz-form__input" disabled placeholder="—">
-                        </div>
-                    </div>
-                    <div class="biz-form__group">
-                        <label class="biz-form__label"><i class="fa-solid fa-envelope"></i> Email</label>
-                        <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="biz-form__input" disabled placeholder="—">
-                    </div>
-                    <div class="biz-form__row">
-                        <div class="biz-form__group">
-                            <label class="biz-form__label"><i class="fa-brands fa-facebook"></i> Facebook</label>
-                            <input type="url" name="business_facebook_page" value="{{ business.business_facebook_page|default:'' }}" class="biz-form__input" disabled placeholder="—">
-                        </div>
-                        <div class="biz-form__group">
-                            <label class="biz-form__label"><i class="fa-brands fa-instagram"></i> Instagram</label>
-                            <input type="url" name="business_instagram" value="{{ business.business_instagram|default:'' }}" class="biz-form__input" disabled placeholder="—">
+                        <div class="bld__form__group">
+                            <label class="bld__form__label"><i class="fa-brands fa-whatsapp"></i> WhatsApp</label>
+                            <input type="text" name="business_whatsapp" value="{{ business.business_whatsapp|default:'' }}" class="bld__form__input" disabled placeholder="—">
                         </div>
                     </div>
-                    <div class="biz-form__actions biz-form__actions--hidden" data-panel="contact">
-                        <button type="submit" class="biz-btn biz-btn--primary">
+                    <div class="bld__form__group">
+                        <label class="bld__form__label"><i class="fa-solid fa-envelope"></i> Email</label>
+                        <input type="email" name="business_email" value="{{ business.business_email|default:'' }}" class="bld__form__input" disabled placeholder="—">
+                    </div>
+                    <div class="bld__form__row">
+                        <div class="bld__form__group">
+                            <label class="bld__form__label"><i class="fa-brands fa-facebook"></i> Facebook</label>
+                            <input type="url" name="business_facebook_page" value="{{ business.business_facebook_page|default:'' }}" class="bld__form__input" disabled placeholder="—">
+                        </div>
+                        <div class="bld__form__group">
+                            <label class="bld__form__label"><i class="fa-brands fa-instagram"></i> Instagram</label>
+                            <input type="url" name="business_instagram" value="{{ business.business_instagram|default:'' }}" class="bld__form__input" disabled placeholder="—">
+                        </div>
+                    </div>
+                    <div class="bld__form__actions bld__form__actions--hidden" data-panel="contact">
+                        <button type="submit" class="bld__btn bld__btn--primary">
                             <i class="fa-solid fa-save"></i> Save
                         </button>
-                        <button type="button" class="biz-btn biz-btn--ghost biz-cancel-btn" data-panel="contact">
+                        <button type="button" class="bld__btn bld__btn--ghost bld__cancel-btn" data-panel="contact">
                             Cancel
                         </button>
                     </div>
-                    <div class="biz-toast biz-section-msg" data-panel="contact"></div>
+                    <div class="bld__toast bld__section-msg" data-panel="contact"></div>
                 </form>
             </div>
         </div>
@@ -182,96 +182,96 @@
     </div>
 
     <!-- Right Column -->
-    <div class="biz-grid__right">
+    <div class="bld__grid__right">
 
         <!-- Address Panel -->
-        <div class="biz-panel" data-panel="address">
-            <div class="biz-panel__header">
+        <div class="bld__panel" data-panel="address">
+            <div class="bld__panel__header">
                 <i class="fa-solid fa-location-dot"></i>
                 <h3>Address</h3>
-                <button type="button" class="biz-panel__edit-btn" data-panel="address" title="Edit">
+                <button type="button" class="bld__panel__edit-btn" data-panel="address" title="Edit">
                     <i class="fa-solid fa-pen"></i>
                 </button>
             </div>
-            <div class="biz-panel__body">
-                <form class="biz-form" data-section="address">
+            <div class="bld__panel__body">
+                <form class="bld__form" data-section="address">
                     {% csrf_token %}
-                    <div class="biz-form__group">
-                        <label class="biz-form__label">Full Address</label>
-                        <input type="text" name="business_address" value="{{ business_profile.business_address|default:'' }}" class="biz-form__input" disabled placeholder="—">
+                    <div class="bld__form__group">
+                        <label class="bld__form__label">Full Address</label>
+                        <input type="text" name="business_address" value="{{ business_profile.business_address|default:'' }}" class="bld__form__input" disabled placeholder="—">
                     </div>
-                    <div class="biz-form__row">
-                        <div class="biz-form__group">
-                            <label class="biz-form__label">City</label>
-                            <input type="text" name="business_city" value="{{ business_profile.business_city|default:'' }}" class="biz-form__input" disabled placeholder="—">
+                    <div class="bld__form__row">
+                        <div class="bld__form__group">
+                            <label class="bld__form__label">City</label>
+                            <input type="text" name="business_city" value="{{ business_profile.business_city|default:'' }}" class="bld__form__input" disabled placeholder="—">
                         </div>
-                        <div class="biz-form__group">
-                            <label class="biz-form__label">Country</label>
-                            <input type="text" name="business_country" value="{{ business_profile.business_country|default:'Qatar' }}" class="biz-form__input" disabled placeholder="—">
+                        <div class="bld__form__group">
+                            <label class="bld__form__label">Country</label>
+                            <input type="text" name="business_country" value="{{ business_profile.business_country|default:'Qatar' }}" class="bld__form__input" disabled placeholder="—">
                         </div>
                     </div>
-                    <div class="biz-form__actions biz-form__actions--hidden" data-panel="address">
-                        <button type="submit" class="biz-btn biz-btn--primary">
+                    <div class="bld__form__actions bld__form__actions--hidden" data-panel="address">
+                        <button type="submit" class="bld__btn bld__btn--primary">
                             <i class="fa-solid fa-save"></i> Save
                         </button>
-                        <button type="button" class="biz-btn biz-btn--ghost biz-cancel-btn" data-panel="address">
+                        <button type="button" class="bld__btn bld__btn--ghost bld__cancel-btn" data-panel="address">
                             Cancel
                         </button>
                     </div>
-                    <div class="biz-toast biz-section-msg" data-panel="address"></div>
+                    <div class="bld__toast bld__section-msg" data-panel="address"></div>
                 </form>
             </div>
         </div>
 
         <!-- Status Panel -->
-        <div class="biz-panel" data-panel="status">
-            <div class="biz-panel__header">
+        <div class="bld__panel" data-panel="status">
+            <div class="bld__panel__header">
                 <i class="fa-solid fa-shield-halved"></i>
                 <h3>Account Status</h3>
-                <button type="button" class="biz-panel__edit-btn" data-panel="status" title="Edit">
+                <button type="button" class="bld__panel__edit-btn" data-panel="status" title="Edit">
                     <i class="fa-solid fa-pen"></i>
                 </button>
             </div>
-            <div class="biz-panel__body">
-                <form class="biz-form" data-section="status">
+            <div class="bld__panel__body">
+                <form class="bld__form" data-section="status">
                     {% csrf_token %}
-                    <div class="biz-form__group">
-                        <label class="biz-form__label">Account Status</label>
-                        <select name="business_status" class="biz-form__input" disabled>
+                    <div class="bld__form__group">
+                        <label class="bld__form__label">Account Status</label>
+                        <select name="business_status" class="bld__form__input" disabled>
                             <option value="active" {% if business.business_status == 'active' %}selected{% endif %}>Active</option>
                             <option value="inactive" {% if business.business_status == 'inactive' %}selected{% endif %}>Inactive</option>
                             <option value="pending" {% if business.business_status == 'pending' %}selected{% endif %}>Pending</option>
                             <option value="suspended" {% if business.business_status == 'suspended' %}selected{% endif %}>Suspended</option>
                         </select>
                     </div>
-                    <div class="biz-form__actions biz-form__actions--hidden" data-panel="status">
-                        <button type="submit" class="biz-btn biz-btn--primary">
+                    <div class="bld__form__actions bld__form__actions--hidden" data-panel="status">
+                        <button type="submit" class="bld__btn bld__btn--primary">
                             <i class="fa-solid fa-save"></i> Save
                         </button>
-                        <button type="button" class="biz-btn biz-btn--ghost biz-cancel-btn" data-panel="status">
+                        <button type="button" class="bld__btn bld__btn--ghost bld__cancel-btn" data-panel="status">
                             Cancel
                         </button>
                     </div>
-                    <div class="biz-toast biz-section-msg" data-panel="status"></div>
+                    <div class="bld__toast bld__section-msg" data-panel="status"></div>
                 </form>
             </div>
         </div>
 
         <!-- Fulfillment Service Panel -->
-        <div class="biz-panel" data-panel="fulfillment">
-            <div class="biz-panel__header">
+        <div class="bld__panel" data-panel="fulfillment">
+            <div class="bld__panel__header">
                 <i class="fa-solid fa-warehouse"></i>
                 <h3>Fulfillment Service</h3>
-                <button type="button" class="biz-panel__edit-btn" data-panel="fulfillment" title="Edit">
+                <button type="button" class="bld__panel__edit-btn" data-panel="fulfillment" title="Edit">
                     <i class="fa-solid fa-pen"></i>
                 </button>
             </div>
-            <div class="biz-panel__body">
-                <form class="biz-form" data-section="fulfillment">
+            <div class="bld__panel__body">
+                <form class="bld__form" data-section="fulfillment">
                     {% csrf_token %}
-                    <div class="biz-form__group">
-                        <label class="biz-form__label">Service Status</label>
-                        <select name="fulfillment_service_status" id="fulfillment_status_select" class="biz-form__input" disabled>
+                    <div class="bld__form__group">
+                        <label class="bld__form__label">Service Status</label>
+                        <select name="fulfillment_service_status" id="fulfillment_status_select" class="bld__form__input" disabled>
                             <option value="none" {% if business.fulfillment_service_status == 'none' %}selected{% endif %}>Not Requested</option>
                             <option value="requested" {% if business.fulfillment_service_status == 'requested' %}selected{% endif %}>Requested</option>
                             <option value="active" {% if business.fulfillment_service_status == 'active' %}selected{% endif %}>Active</option>
@@ -279,8 +279,8 @@
                     </div>
 
                     {% if linked_warehouse %}
-                    <div class="biz-form__group" id="linked_warehouse_display">
-                        <label class="biz-form__label">Linked Warehouse</label>
+                    <div class="bld__form__group" id="linked_warehouse_display">
+                        <label class="bld__form__label">Linked Warehouse</label>
                         <div style="background: var(--brand-grey-50); border: 1px solid var(--brand-grey-200); border-radius: var(--brand-radius-sm); padding: 0.75rem;">
                             <div style="display: flex; align-items: start; gap: 0.75rem;">
                                 <div style="width: 32px; height: 32px; border-radius: var(--brand-radius-sm); background: var(--brand-primary); color: var(--brand-grey-800); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -302,69 +302,69 @@
                     </div>
                     {% endif %}
 
-                    <div class="biz-form__group" id="warehouse_select_group" style="display: none;">
-                        <label class="biz-form__label">Select Warehouse Location <span style="color: var(--brand-danger);">*</span></label>
-                        <select name="warehouse_location_id" id="warehouse_location_select" class="biz-form__input">
+                    <div class="bld__form__group" id="warehouse_select_group" style="display: none;">
+                        <label class="bld__form__label">Select Warehouse Location <span style="color: var(--brand-danger);">*</span></label>
+                        <select name="warehouse_location_id" id="warehouse_location_select" class="bld__form__input">
                             <option value="">— Select Warehouse —</option>
                         </select>
                         <p style="font-size: 0.8125rem; color: var(--brand-grey-600); margin-top: 0.5rem;">
                             <i class="fa-solid fa-info-circle"></i> Required when activating fulfillment service
                         </p>
                     </div>
-                    <div class="biz-form__actions biz-form__actions--hidden" data-panel="fulfillment">
-                        <button type="submit" class="biz-btn biz-btn--primary">
+                    <div class="bld__form__actions bld__form__actions--hidden" data-panel="fulfillment">
+                        <button type="submit" class="bld__btn bld__btn--primary">
                             <i class="fa-solid fa-save"></i> Save & Link Warehouse
                         </button>
-                        <button type="button" class="biz-btn biz-btn--ghost biz-cancel-btn" data-panel="fulfillment">
+                        <button type="button" class="bld__btn bld__btn--ghost bld__cancel-btn" data-panel="fulfillment">
                             Cancel
                         </button>
                     </div>
-                    <div class="biz-toast biz-section-msg" data-panel="fulfillment"></div>
+                    <div class="bld__toast bld__section-msg" data-panel="fulfillment"></div>
                 </form>
             </div>
         </div>
 
         <!-- Products Panel -->
-        <div class="biz-panel {% if business.fulfillment_service_status != 'active' %}biz-panel--disabled{% endif %}" data-panel="products">
-            <div class="biz-panel__header">
+        <div class="bld__panel {% if business.fulfillment_service_status != 'active' %}bld__panel--disabled{% endif %}" data-panel="products">
+            <div class="bld__panel__header">
                 <i class="fa-solid fa-box-open"></i>
                 <h3>Products</h3>
                 {% if business.fulfillment_service_status == 'active' %}
-                <a href="{% url 'workforce:workforce_pickup_location_add' business.business_id %}" class="biz-panel__link-btn" title="Manage Products">
+                <a href="{% url 'workforce:workforce_pickup_location_add' business.business_id %}" class="bld__panel__link-btn" title="Manage Products">
                     <i class="fa-solid fa-arrow-right"></i>
                 </a>
                 {% else %}
-                <span class="biz-panel__disabled-badge">
+                <span class="bld__panel__disabled-badge">
                     <i class="fa-solid fa-lock"></i> Requires Fulfillment
                 </span>
                 {% endif %}
             </div>
-            <div class="biz-panel__body">
+            <div class="bld__panel__body">
                 {% if business.fulfillment_service_status == 'active' %}
-                <div class="biz-info-grid">
-                    <div class="biz-info-item">
-                        <label class="biz-info-label">Total Products</label>
-                        <div class="biz-info-value">{{ product_stats.total_products|default:0 }}</div>
+                <div class="bld__info-grid">
+                    <div class="bld__info-item">
+                        <label class="bld__info-label">Total Products</label>
+                        <div class="bld__info-value">{{ product_stats.total_products|default:0 }}</div>
                     </div>
-                    <div class="biz-info-item">
-                        <label class="biz-info-label">Active SKUs</label>
-                        <div class="biz-info-value">{{ product_stats.active_skus|default:0 }}</div>
+                    <div class="bld__info-item">
+                        <label class="bld__info-label">Active SKUs</label>
+                        <div class="bld__info-value">{{ product_stats.active_skus|default:0 }}</div>
                     </div>
-                    <div class="biz-info-item">
-                        <label class="biz-info-label">Total Stock</label>
-                        <div class="biz-info-value">{{ product_stats.total_stock|default:0 }} units</div>
+                    <div class="bld__info-item">
+                        <label class="bld__info-label">Total Stock</label>
+                        <div class="bld__info-value">{{ product_stats.total_stock|default:0 }} units</div>
                     </div>
-                    <div class="biz-info-item">
-                        <label class="biz-info-label">Low Stock Items</label>
-                        <div class="biz-info-value biz-info-value--warning">{{ product_stats.low_stock_items|default:0 }}</div>
+                    <div class="bld__info-item">
+                        <label class="bld__info-label">Low Stock Items</label>
+                        <div class="bld__info-value bld__info-value--warning">{{ product_stats.low_stock_items|default:0 }}</div>
                     </div>
                 </div>
-                <div class="biz-panel__note">
+                <div class="bld__panel__note">
                     <i class="fa-solid fa-info-circle"></i>
                     Product management is available through the fulfillment service. Click the arrow to manage products.
                 </div>
                 {% else %}
-                <div class="biz-panel__empty-state">
+                <div class="bld__panel__empty-state">
                     <i class="fa-solid fa-boxes-stacked"></i>
                     <p>Activate fulfillment service to manage products</p>
                     <small>Products section will be enabled once fulfillment service is active and a warehouse is linked.</small>
@@ -390,14 +390,14 @@
     var originalValues = {};
 
     function storeOriginals(panelName) {
-        var panel = document.querySelector('.biz-panel[data-panel="' + panelName + '"]');
+        var panel = document.querySelector('.bld__panel[data-panel="' + panelName + '"]');
         var fields = panel.querySelectorAll('input[name], select[name]');
         originalValues[panelName] = {};
         fields.forEach(function(f) { originalValues[panelName][f.name] = f.value; });
     }
 
     function restoreOriginals(panelName) {
-        var panel = document.querySelector('.biz-panel[data-panel="' + panelName + '"]');
+        var panel = document.querySelector('.bld__panel[data-panel="' + panelName + '"]');
         var fields = panel.querySelectorAll('input[name], select[name]');
         if (!originalValues[panelName]) return;
         fields.forEach(function(f) {
@@ -408,17 +408,17 @@
     }
 
     function togglePanel(panelName, editing) {
-        var panel = document.querySelector('.biz-panel[data-panel="' + panelName + '"]');
-        var btn = panel.querySelector('.biz-panel__edit-btn');
-        var actions = panel.querySelector('.biz-form__actions');
+        var panel = document.querySelector('.bld__panel[data-panel="' + panelName + '"]');
+        var btn = panel.querySelector('.bld__panel__edit-btn');
+        var actions = panel.querySelector('.bld__form__actions');
         // Get only editable fields (those with a name attr, excluding readonly)
         var fields = panel.querySelectorAll('input[name]:not([readonly]), select[name]');
 
         if (editing) {
             storeOriginals(panelName);
-            panel.classList.add('biz-panel--editing');
-            btn.classList.add('biz-panel__edit-btn--active');
-            actions.classList.remove('biz-form__actions--hidden');
+            panel.classList.add('bld__panel--editing');
+            btn.classList.add('bld__panel__edit-btn--active');
+            actions.classList.remove('bld__form__actions--hidden');
             fields.forEach(function(f) { f.disabled = false; });
 
             // Load warehouses when editing fulfillment panel
@@ -431,13 +431,13 @@
                 checkFulfillmentStatus();
             }
         } else {
-            panel.classList.remove('biz-panel--editing');
-            btn.classList.remove('biz-panel__edit-btn--active');
-            actions.classList.add('biz-form__actions--hidden');
+            panel.classList.remove('bld__panel--editing');
+            btn.classList.remove('bld__panel__edit-btn--active');
+            actions.classList.add('bld__form__actions--hidden');
             fields.forEach(function(f) { f.disabled = true; });
             restoreOriginals(panelName);
             // Hide any toast
-            var msg = panel.querySelector('.biz-section-msg');
+            var msg = panel.querySelector('.bld__section-msg');
             if (msg) msg.style.display = 'none';
 
             // Hide warehouse select when closing fulfillment panel
@@ -515,10 +515,10 @@
     }
 
     function showSectionMsg(panelName, ok, text) {
-        var el = document.querySelector('.biz-section-msg[data-panel="' + panelName + '"]');
+        var el = document.querySelector('.bld__section-msg[data-panel="' + panelName + '"]');
         if (!el) return;
         el.style.display = 'flex';
-        el.className = 'biz-toast biz-section-msg ' + (ok ? 'biz-toast--success' : 'biz-toast--error');
+        el.className = 'bld__toast bld__section-msg ' + (ok ? 'bld__toast--success' : 'bld__toast--error');
         el.textContent = '';
         var icon = document.createElement('i');
         icon.className = ok ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation';
@@ -528,23 +528,23 @@
     }
 
     // Edit buttons
-    document.querySelectorAll('.biz-panel__edit-btn').forEach(function(btn) {
+    document.querySelectorAll('.bld__panel__edit-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var panel = this.dataset.panel;
-            var isEditing = this.classList.contains('biz-panel__edit-btn--active');
+            var isEditing = this.classList.contains('bld__panel__edit-btn--active');
             togglePanel(panel, !isEditing);
         });
     });
 
     // Cancel buttons
-    document.querySelectorAll('.biz-cancel-btn').forEach(function(btn) {
+    document.querySelectorAll('.bld__cancel-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             togglePanel(this.dataset.panel, false);
         });
     });
 
     // Form submissions
-    document.querySelectorAll('.biz-form[data-section]').forEach(function(form) {
+    document.querySelectorAll('.bld__form[data-section]').forEach(function(form) {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             var section = this.dataset.section;

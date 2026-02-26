@@ -245,26 +245,26 @@
     <section class="d-block" id="orders_all_list_section_main">
       <div class="col-12 pb-2">
         <div class="px-2 px-md-3">
-          <div class="oal-header" id="orders_all_list_header">
-            <div class="oal-header__left">
-              <h1 class="oal-header__title" id="orders_all_list_title">
+          <div class="oal__header" id="orders_all_list_header">
+            <div class="oal__header-left">
+              <h1 class="oal__header-title" id="orders_all_list_title">
                 <i class="fa-solid fa-basket-shopping"></i>
                 Orders
-                <span class="oal-header__count">{{ len }}</span>
+                <span class="oal__header-count">{{ len }}</span>
               </h1>
             </div>
-            <div class="oal-header__actions" id="orders_all_list_nav_actions">
-              <a class="oal-btn oal-btn--outline"
+            <div class="oal__header-actions" id="orders_all_list_nav_actions">
+              <a class="oal__btn oal__btn--outline"
                  href="{% url 'orders:get_order_by_api' %}"
                  id="orders_all_list_btn_api_upload">
                 <i class="fa-solid fa-code"></i> API
               </a>
-              <a class="oal-btn oal-btn--outline"
+              <a class="oal__btn oal__btn--outline"
                  href="{% url 'orders:order_upload_file' %}"
                  id="orders_all_list_btn_upload_bulk">
                 <i class="fa-solid fa-file-import"></i> Bulk
               </a>
-              <a class="oal-btn oal-btn--primary"
+              <a class="oal__btn oal__btn--primary"
                  href="{% url 'orders:add_order' %}"
                  id="orders_all_list_btn_add_orders">
                 <i class="fa-solid fa-plus"></i> Add Order
@@ -273,47 +273,47 @@
           </div>
 
           <!-- Filter Section -->
-          <div class="filter-section mb-2">
+          <div class="ofb__section mb-2">
             <form id="filterForm" method="get" hx-boost="false">
               <input type="hidden" name="sort" id="sortField" value="{{ sort_by }}">
               <input type="hidden" name="dir" id="sortDir" value="{{ sort_dir }}">
-              <div class="filter-bar">
+              <div class="ofb">
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                   <div class="d-flex align-items-center gap-3">
-                    <div class="filter-bar__toggle" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+                    <div class="ofb__toggle" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
                       <i class="fa-solid fa-filter"></i>
                       <span>Filters</span>
-                      <span class="filter-bar__count" id="filterCountBadge" style="display: none;">0</span>
+                      <span class="ofb__count" id="filterCountBadge" style="display: none;">0</span>
                       <i class="fa-solid fa-chevron-down"></i>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                      <button type="submit" class="oal-filter-btn oal-filter-btn--search">
+                      <button type="submit" class="oal__filter-btn oal__filter-btn--search">
                         <i class="fa-solid fa-search"></i> Search
                       </button>
-                      <button type="button" class="oal-filter-btn oal-filter-btn--clear" id="clearFilter">
+                      <button type="button" class="oal__filter-btn oal__filter-btn--clear" id="clearFilter">
                         <i class="fa-solid fa-times"></i> Clear
                       </button>
-                      <button type="button" class="oal-filter-btn oal-filter-btn--save" id="saveFilter" title="Save Filter">
+                      <button type="button" class="oal__filter-btn oal__filter-btn--save" id="saveFilter" title="Save Filter">
                         <i class="fa-solid fa-bookmark"></i> Save
                       </button>
                       <div class="dropdown" id="savedFiltersDropdown" style="display: none;">
-                        <button class="oal-filter-btn oal-filter-btn--load dropdown-toggle" type="button" data-bs-toggle="dropdown" title="Load Saved Filter">
+                        <button class="oal__filter-btn oal__filter-btn--load dropdown-toggle" type="button" data-bs-toggle="dropdown" title="Load Saved Filter">
                           <i class="fa-solid fa-folder-open"></i> Load
                         </button>
                         <ul class="dropdown-menu" id="savedFiltersList"></ul>
                       </div>
                     </div>
                   </div>
-                  <div class="filter-bar__pills">
-                    <button type="button" class="oal-quick-pill btn-quick-filter" data-filter="today">Today</button>
-                    <button type="button" class="oal-quick-pill btn-quick-filter" data-filter="pending">Pending</button>
-                    <button type="button" class="oal-quick-pill btn-quick-filter" data-filter="with_cod">COD</button>
+                  <div class="ofb__pills">
+                    <button type="button" class="oal__quick-pill btn-quick-filter" data-filter="today">Today</button>
+                    <button type="button" class="oal__quick-pill btn-quick-filter" data-filter="pending">Pending</button>
+                    <button type="button" class="oal__quick-pill btn-quick-filter" data-filter="with_cod">COD</button>
                   </div>
                 </div>
               </div>
               <!-- Search Filters -->
               <div class="collapse{% if filters.orderNumber or filters.mobile or filters.customerName or filters.zone or filters.cStatus or filters.dateRange or filters.codStatus or filters.dlStatus or filters.deliveredRange %} show{% endif %}" id="filterCollapse">
-                <div class="filter-body">
+                <div class="ofb__body">
                   <div class="row g-2">
                     <div class="col-6 col-md-4 col-lg-2">
                       <label for="orderNumber" class="form-label mb-0">Order #</label>
@@ -413,8 +413,8 @@
                   </div>
                   <!-- Active Filters Display -->
                   <div id="activeFilterTags" style="display: none;">
-                    <div class="filter-tags">
-                      <span class="filter-tags__label">Active:</span>
+                    <div class="ofb__tags">
+                      <span class="ofb__tags-label">Active:</span>
                       <div id="filterTagsContainer" class="d-flex gap-1 flex-wrap"></div>
                     </div>
                   </div>
@@ -796,9 +796,9 @@
         let value = entry[1];
         if (key === 'dateRange' || key === 'deliveredRange') value = dateRangeLabels[value] || value;
         const tag = document.createElement('span');
-        tag.className = 'filter-tag';
+        tag.className = 'ofb__tag';
         tag.innerHTML = filterLabels[key] + ': ' + value +
-          ' <i class="fa fa-times filter-tag__remove" onclick="removeFilter(\'' + key + '\')"></i>';
+          ' <i class="fa fa-times ofb__tag-remove" onclick="removeFilter(\'' + key + '\')"></i>';
         tagsContainer.appendChild(tag);
       });
     } else {

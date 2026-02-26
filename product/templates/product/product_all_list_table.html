@@ -9,7 +9,7 @@ Products - Table View
 {% block extra_css %}{% endblock extra_css %}
 
 {% block content %}
-<div class="products-container" id="product_table_container">
+<div class="pal__container" id="product_table_container">
     <!-- Navy Hero Header -->
     <div class="plt__header" id="product_table_header">
         <div class="plt__header-left">
@@ -38,8 +38,8 @@ Products - Table View
 
     <!-- Products Table -->
     {% if products %}
-    <div class="products-table-container" id="product_table_wrapper">
-        <table class="products-table" id="product_table">
+    <div class="plt__table-container" id="product_table_wrapper">
+        <table class="plt__table" id="product_table">
             <thead>
                 <tr>
                     <th class="plt__th-img">Image</th>
@@ -61,9 +61,9 @@ Products - Table View
                     <!-- Product Image -->
                     <td>
                         {% if product.product_image %}
-                            <img src="{{ product.product_image.url }}" loading="lazy" alt="{{ product.item_name }}" class="product-thumb">
+                            <img src="{{ product.product_image.url }}" loading="lazy" alt="{{ product.item_name }}" class="plt__thumb">
                         {% else %}
-                            <div class="product-thumb-placeholder">
+                            <div class="plt__thumb-placeholder">
                                 <i class="fas fa-box"></i>
                             </div>
                         {% endif %}
@@ -79,52 +79,52 @@ Products - Table View
                     </td>
 
                     <!-- Product Name (Editable) -->
-                    <td class="editable-cell" data-field="item_name" data-product-id="{{ product.id }}">
-                        <span class="cell-value">{{ product.item_name }}</span>
-                        <div class="edit-input-wrapper">
-                            <input type="text" class="edit-input" value="{{ product.item_name }}">
-                            <div class="edit-actions">
-                                <button class="edit-btn edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="edit-btn edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
+                    <td class="plt__editable-cell" data-field="item_name" data-product-id="{{ product.id }}">
+                        <span class="plt__cell-value">{{ product.item_name }}</span>
+                        <div class="plt__edit-wrapper">
+                            <input type="text" class="plt__edit-input" value="{{ product.item_name }}">
+                            <div class="plt__edit-actions">
+                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
+                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
                             </div>
                         </div>
                     </td>
 
                     <!-- Brand (Editable) -->
-                    <td class="editable-cell" data-field="brand_name" data-product-id="{{ product.id }}">
-                        <span class="cell-value">{{ product.brand_name|default:"-" }}</span>
-                        <div class="edit-input-wrapper">
-                            <input type="text" class="edit-input" value="{{ product.brand_name|default:'' }}">
-                            <div class="edit-actions">
-                                <button class="edit-btn edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="edit-btn edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
+                    <td class="plt__editable-cell" data-field="brand_name" data-product-id="{{ product.id }}">
+                        <span class="plt__cell-value">{{ product.brand_name|default:"-" }}</span>
+                        <div class="plt__edit-wrapper">
+                            <input type="text" class="plt__edit-input" value="{{ product.brand_name|default:'' }}">
+                            <div class="plt__edit-actions">
+                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
+                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
                             </div>
                         </div>
                     </td>
 
                     <!-- SKU (Editable) -->
-                    <td class="editable-cell" data-field="item_sku" data-product-id="{{ product.id }}">
-                        <span class="cell-value">{{ product.item_sku|default:"-" }}</span>
-                        <div class="edit-input-wrapper">
-                            <input type="text" class="edit-input" value="{{ product.item_sku|default:'' }}">
-                            <div class="edit-actions">
-                                <button class="edit-btn edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="edit-btn edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
+                    <td class="plt__editable-cell" data-field="item_sku" data-product-id="{{ product.id }}">
+                        <span class="plt__cell-value">{{ product.item_sku|default:"-" }}</span>
+                        <div class="plt__edit-wrapper">
+                            <input type="text" class="plt__edit-input" value="{{ product.item_sku|default:'' }}">
+                            <div class="plt__edit-actions">
+                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
+                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
                             </div>
                         </div>
                     </td>
 
                     <!-- Category (Editable Dropdown) -->
-                    <td class="editable-cell" data-field="product_category" data-type="select" data-product-id="{{ product.id }}">
-                        <span class="cell-value">
+                    <td class="plt__editable-cell" data-field="product_category" data-type="select" data-product-id="{{ product.id }}">
+                        <span class="plt__cell-value">
                             {% if product.product_category %}
-                                <span class="table-badge table-badge-category">{{ product.product_category.category_name }}</span>
+                                <span class="plt__badge plt__badge-category">{{ product.product_category.category_name }}</span>
                             {% else %}
                                 -
                             {% endif %}
                         </span>
-                        <div class="edit-input-wrapper">
-                            <select class="edit-select">
+                        <div class="plt__edit-wrapper">
+                            <select class="plt__edit-select">
                                 <option value="">-- None --</option>
                                 {% for cat in categories %}
                                     <option value="{{ cat.id }}" {% if product.product_category and product.product_category.id == cat.id %}selected{% endif %}>
@@ -132,42 +132,42 @@ Products - Table View
                                     </option>
                                 {% endfor %}
                             </select>
-                            <div class="edit-actions">
-                                <button class="edit-btn edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="edit-btn edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
+                            <div class="plt__edit-actions">
+                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
+                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
                             </div>
                         </div>
                     </td>
 
                     <!-- Price (Editable) -->
-                    <td class="editable-cell" data-field="item_price" data-product-id="{{ product.id }}">
-                        <span class="cell-value price-value">QAR {{ product.item_price|default:"0" }}</span>
-                        <div class="edit-input-wrapper">
-                            <input type="number" class="edit-input" value="{{ product.item_price|default:'0' }}" min="0">
-                            <div class="edit-actions">
-                                <button class="edit-btn edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="edit-btn edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
+                    <td class="plt__editable-cell" data-field="item_price" data-product-id="{{ product.id }}">
+                        <span class="plt__cell-value plt__price-value">QAR {{ product.item_price|default:"0" }}</span>
+                        <div class="plt__edit-wrapper">
+                            <input type="number" class="plt__edit-input" value="{{ product.item_price|default:'0' }}" min="0">
+                            <div class="plt__edit-actions">
+                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
+                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
                             </div>
                         </div>
                     </td>
 
                     <!-- Size (Editable) -->
-                    <td class="editable-cell" data-field="size" data-product-id="{{ product.id }}">
-                        <span class="cell-value">{{ product.size|default:"-" }}</span>
-                        <div class="edit-input-wrapper">
-                            <input type="text" class="edit-input" value="{{ product.size|default:'' }}">
-                            <div class="edit-actions">
-                                <button class="edit-btn edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="edit-btn edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
+                    <td class="plt__editable-cell" data-field="size" data-product-id="{{ product.id }}">
+                        <span class="plt__cell-value">{{ product.size|default:"-" }}</span>
+                        <div class="plt__edit-wrapper">
+                            <input type="text" class="plt__edit-input" value="{{ product.size|default:'' }}">
+                            <div class="plt__edit-actions">
+                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
+                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
                             </div>
                         </div>
                     </td>
 
                     <!-- Color (Editable Dropdown) -->
-                    <td class="editable-cell" data-field="color" data-type="select" data-product-id="{{ product.id }}">
-                        <span class="cell-value">{{ product.color.color_variant|default:"-" }}</span>
-                        <div class="edit-input-wrapper">
-                            <select class="edit-select">
+                    <td class="plt__editable-cell" data-field="color" data-type="select" data-product-id="{{ product.id }}">
+                        <span class="plt__cell-value">{{ product.color.color_variant|default:"-" }}</span>
+                        <div class="plt__edit-wrapper">
+                            <select class="plt__edit-select">
                                 <option value="">-- None --</option>
                                 {% for color in colors %}
                                     <option value="{{ color.id }}" {% if product.color and product.color.id == color.id %}selected{% endif %}>
@@ -175,18 +175,18 @@ Products - Table View
                                     </option>
                                 {% endfor %}
                             </select>
-                            <div class="edit-actions">
-                                <button class="edit-btn edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="edit-btn edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
+                            <div class="plt__edit-actions">
+                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
+                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
                             </div>
                         </div>
                     </td>
 
                     <!-- Unit (Editable Dropdown) -->
-                    <td class="editable-cell" data-field="unit" data-type="select" data-product-id="{{ product.id }}">
-                        <span class="cell-value">{{ product.unit.unit_variant|default:"-" }}</span>
-                        <div class="edit-input-wrapper">
-                            <select class="edit-select">
+                    <td class="plt__editable-cell" data-field="unit" data-type="select" data-product-id="{{ product.id }}">
+                        <span class="plt__cell-value">{{ product.unit.unit_variant|default:"-" }}</span>
+                        <div class="plt__edit-wrapper">
+                            <select class="plt__edit-select">
                                 <option value="">-- None --</option>
                                 {% for unit in units %}
                                     <option value="{{ unit.id }}" {% if product.unit and product.unit.id == unit.id %}selected{% endif %}>
@@ -194,20 +194,20 @@ Products - Table View
                                     </option>
                                 {% endfor %}
                             </select>
-                            <div class="edit-actions">
-                                <button class="edit-btn edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
-                                <button class="edit-btn edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
+                            <div class="plt__edit-actions">
+                                <button class="plt__edit-btn plt__edit-btn-save" title="Save"><i class="fas fa-check"></i></button>
+                                <button class="plt__edit-btn plt__edit-btn-cancel" title="Cancel"><i class="fas fa-times"></i></button>
                             </div>
                         </div>
                     </td>
 
                     <!-- Actions -->
                     <td>
-                        <div class="table-actions">
-                            <a href="{% url 'product:product_single_update' product_id=product.id %}" class="table-action-btn table-action-btn-edit" title="Full Edit">
+                        <div class="plt__actions">
+                            <a href="{% url 'product:product_single_update' product_id=product.id %}" class="plt__action-btn plt__action-btn-edit" title="Full Edit">
                                 <i class="fas fa-expand"></i>
                             </a>
-                            <a href="{% url 'product:product_single_delete' product_id=product.id %}" class="table-action-btn table-action-btn-delete" title="Delete">
+                            <a href="{% url 'product:product_single_delete' product_id=product.id %}" class="plt__action-btn plt__action-btn-delete" title="Delete">
                                 <i class="fas fa-trash"></i>
                             </a>
                         </div>
@@ -226,11 +226,11 @@ Products - Table View
 
     {% else %}
     <!-- Empty State -->
-    <div class="products-empty" id="product_table_empty_state">
+    <div class="pal__products-empty" id="product_table_empty_state">
         <i class="fa-solid fa-box-open"></i>
         <h3 id="product_table_empty_title">No Products Found</h3>
         <p id="product_table_empty_text">Start adding products to your inventory</p>
-        <a href="{% url 'product:product_single_add' %}" class="add-product-btn" id="product_table_btn_add_first">
+        <a href="{% url 'product:product_single_add' %}" class="pal__add-product-btn" id="product_table_btn_add_first">
             <i class="fa-solid fa-plus"></i>
             Add Your First Product
         </a>
@@ -242,13 +242,13 @@ Products - Table View
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const editableCells = document.querySelectorAll('.editable-cell');
+    const editableCells = document.querySelectorAll('.plt__editable-cell');
 
     editableCells.forEach(cell => {
-        const cellValue = cell.querySelector('.cell-value');
-        const input = cell.querySelector('.edit-input, .edit-select');
-        const saveBtn = cell.querySelector('.edit-btn-save');
-        const cancelBtn = cell.querySelector('.edit-btn-cancel');
+        const cellValue = cell.querySelector('.plt__cell-value');
+        const input = cell.querySelector('.plt__edit-input, .plt__edit-select');
+        const saveBtn = cell.querySelector('.plt__edit-btn-save');
+        const cancelBtn = cell.querySelector('.plt__edit-btn-cancel');
 
         // Store original value
         let originalValue = input ? input.value : '';
@@ -302,7 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const productId = cell.dataset.productId;
         const field = cell.dataset.field;
         const value = input.value;
-        const cellValue = cell.querySelector('.cell-value');
+        const cellValue = cell.querySelector('.plt__cell-value');
 
         cell.classList.remove('editing');
         cell.classList.add('loading');
@@ -325,9 +325,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 // Update display value
                 if (field === 'product_category' && value) {
-                    cellValue.innerHTML = `<span class="table-badge table-badge-category">${data.value}</span>`;
+                    cellValue.innerHTML = `<span class="plt__badge plt__badge-category">${data.value}</span>`;
                 } else if (field === 'item_price') {
-                    cellValue.innerHTML = `<span class="price-value">${data.value}</span>`;
+                    cellValue.innerHTML = `<span class="plt__price-value">${data.value}</span>`;
                 } else {
                     cellValue.textContent = data.value;
                 }

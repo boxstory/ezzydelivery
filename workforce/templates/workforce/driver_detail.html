@@ -5,58 +5,58 @@
 
 {% block content %}
 <div class="col-12 p-3">
-<div class="drv-page">
+<div class="wdd__page">
 
 <!-- Breadcrumb -->
-<nav class="drv-breadcrumb">
-    <a href="{% url 'workforce:drivers_list' %}" class="drv-breadcrumb__link">
+<nav class="wdd__breadcrumb">
+    <a href="{% url 'workforce:drivers_list' %}" class="wdd__breadcrumb__link">
         <i class="fa-solid fa-users"></i> Drivers
     </a>
-    <i class="fa-solid fa-chevron-right drv-breadcrumb__sep"></i>
-    <span class="drv-breadcrumb__current">{{ driver.user.first_name }} {{ driver.user.last_name }}</span>
+    <i class="fa-solid fa-chevron-right wdd__breadcrumb__sep"></i>
+    <span class="wdd__breadcrumb__current">{{ driver.user.first_name }} {{ driver.user.last_name }}</span>
 </nav>
 
 <!-- Hero Card -->
-<div class="drv-hero">
-    <div class="drv-hero__left">
-        <div class="drv-hero__avatar">
+<div class="wdd__hero">
+    <div class="wdd__hero__left">
+        <div class="wdd__hero__avatar">
             <i class="fa-solid fa-motorcycle"></i>
         </div>
-        <div class="drv-hero__info">
-            <h1 class="drv-hero__name">{{ driver.user.first_name }} {{ driver.user.last_name }}</h1>
-            <div class="drv-hero__meta">
-                <span class="drv-hero__code"><i class="fa-solid fa-hashtag"></i>{{ driver.driver_code|default:"N/A" }}</span>
-                <span class="drv-hero__id">ID {{ driver.driver_id }}</span>
+        <div class="wdd__hero__info">
+            <h1 class="wdd__hero__name">{{ driver.user.first_name }} {{ driver.user.last_name }}</h1>
+            <div class="wdd__hero__meta">
+                <span class="wdd__hero__code"><i class="fa-solid fa-hashtag"></i>{{ driver.driver_code|default:"N/A" }}</span>
+                <span class="wdd__hero__id">ID {{ driver.driver_id }}</span>
                 {% if driver.driver_code_dms %}
-                <span class="drv-hero__dms">DMS: {{ driver.driver_code_dms }}</span>
+                <span class="wdd__hero__dms">DMS: {{ driver.driver_code_dms }}</span>
                 {% endif %}
             </div>
-            <div class="drv-hero__contacts">
+            <div class="wdd__hero__contacts">
                 {% if driver.driver_phone %}
-                <a href="tel:{{ driver.driver_phone }}" class="drv-hero__contact-chip">
+                <a href="tel:{{ driver.driver_phone }}" class="wdd__hero__contact-chip">
                     <i class="fa-solid fa-phone"></i> {{ driver.driver_phone }}
                 </a>
                 {% endif %}
                 {% if driver.driver_whatsapp %}
-                <a href="https://wa.me/974{{ driver.driver_whatsapp }}" target="_blank" class="drv-hero__contact-chip drv-hero__contact-chip--wa">
+                <a href="https://wa.me/974{{ driver.driver_whatsapp }}" target="_blank" class="wdd__hero__contact-chip wdd__hero__contact-chip--wa">
                     <i class="fa-brands fa-whatsapp"></i> {{ driver.driver_whatsapp }}
                 </a>
                 {% endif %}
                 {% if driver.user.email %}
-                <a href="mailto:{{ driver.user.email }}" class="drv-hero__contact-chip">
+                <a href="mailto:{{ driver.user.email }}" class="wdd__hero__contact-chip">
                     <i class="fa-solid fa-envelope"></i> {{ driver.user.email }}
                 </a>
                 {% endif %}
             </div>
         </div>
     </div>
-    <div class="drv-hero__right">
-        <span class="drv-hero__status drv-hero__status--{% if driver.driver_status == 'approved' %}approved{% elif driver.driver_status == 'rejected' or driver.driver_status == 'blocked' or driver.driver_status == 'suspended' %}rejected{% else %}pending{% endif %}">
+    <div class="wdd__hero__right">
+        <span class="wdd__hero__status wdd__hero__status--{% if driver.driver_status == 'approved' %}approved{% elif driver.driver_status == 'rejected' or driver.driver_status == 'blocked' or driver.driver_status == 'suspended' %}rejected{% else %}pending{% endif %}">
             <i class="fa-solid fa-circle"></i>
             {{ driver.driver_status }}
         </span>
         {% if driver.driver_rating > 0 %}
-        <span class="drv-hero__rating">
+        <span class="wdd__hero__rating">
             <i class="fa-solid fa-star"></i> {{ driver.driver_rating }}/5
             <small>({{ driver.driver_rating_count }})</small>
         </span>
@@ -65,117 +65,117 @@
 </div>
 
 <!-- Stats Strip -->
-<div class="drv-stats">
-    <div class="drv-stats__item">
-        <div class="drv-stats__icon drv-stats__icon--blue"><i class="fa-solid fa-truck-fast"></i></div>
-        <div class="drv-stats__data">
-            <span class="drv-stats__value">{{ delivery_stats.total_tasks|default:0 }}</span>
-            <span class="drv-stats__label">Total Tasks</span>
+<div class="wdd__stats">
+    <div class="wdd__stats__item">
+        <div class="wdd__stats__icon wdd__stats__icon--blue"><i class="fa-solid fa-truck-fast"></i></div>
+        <div class="wdd__stats__data">
+            <span class="wdd__stats__value">{{ delivery_stats.total_tasks|default:0 }}</span>
+            <span class="wdd__stats__label">Total Tasks</span>
         </div>
     </div>
-    <div class="drv-stats__item">
-        <div class="drv-stats__icon drv-stats__icon--green"><i class="fa-solid fa-circle-check"></i></div>
-        <div class="drv-stats__data">
-            <span class="drv-stats__value">{{ delivery_stats.completed_tasks|default:0 }}</span>
-            <span class="drv-stats__label">Delivered</span>
+    <div class="wdd__stats__item">
+        <div class="wdd__stats__icon wdd__stats__icon--green"><i class="fa-solid fa-circle-check"></i></div>
+        <div class="wdd__stats__data">
+            <span class="wdd__stats__value">{{ delivery_stats.completed_tasks|default:0 }}</span>
+            <span class="wdd__stats__label">Delivered</span>
         </div>
     </div>
-    <div class="drv-stats__item">
-        <div class="drv-stats__icon drv-stats__icon--red"><i class="fa-solid fa-circle-xmark"></i></div>
-        <div class="drv-stats__data">
-            <span class="drv-stats__value">{{ delivery_stats.failed_tasks|default:0 }}</span>
-            <span class="drv-stats__label">Failed</span>
+    <div class="wdd__stats__item">
+        <div class="wdd__stats__icon wdd__stats__icon--red"><i class="fa-solid fa-circle-xmark"></i></div>
+        <div class="wdd__stats__data">
+            <span class="wdd__stats__value">{{ delivery_stats.failed_tasks|default:0 }}</span>
+            <span class="wdd__stats__label">Failed</span>
         </div>
     </div>
-    <div class="drv-stats__item">
-        <div class="drv-stats__icon drv-stats__icon--amber"><i class="fa-solid fa-percent"></i></div>
-        <div class="drv-stats__data">
-            <span class="drv-stats__value">{{ success_rate }}%</span>
-            <span class="drv-stats__label">Success Rate</span>
+    <div class="wdd__stats__item">
+        <div class="wdd__stats__icon wdd__stats__icon--amber"><i class="fa-solid fa-percent"></i></div>
+        <div class="wdd__stats__data">
+            <span class="wdd__stats__value">{{ success_rate }}%</span>
+            <span class="wdd__stats__label">Success Rate</span>
         </div>
     </div>
-    <div class="drv-stats__item">
-        <div class="drv-stats__icon drv-stats__icon--purple"><i class="fa-solid fa-calendar-week"></i></div>
-        <div class="drv-stats__data">
-            <span class="drv-stats__value">{{ recent_tasks_count|default:0 }}</span>
-            <span class="drv-stats__label">Last 30 Days</span>
+    <div class="wdd__stats__item">
+        <div class="wdd__stats__icon wdd__stats__icon--purple"><i class="fa-solid fa-calendar-week"></i></div>
+        <div class="wdd__stats__data">
+            <span class="wdd__stats__value">{{ recent_tasks_count|default:0 }}</span>
+            <span class="wdd__stats__label">Last 30 Days</span>
         </div>
     </div>
-    <div class="drv-stats__item">
-        <div class="drv-stats__icon drv-stats__icon--teal"><i class="fa-solid fa-wallet"></i></div>
-        <div class="drv-stats__data">
-            <span class="drv-stats__value">{{ driver.wallet_balance|floatformat:0 }}<small> QR</small></span>
-            <span class="drv-stats__label">Wallet</span>
+    <div class="wdd__stats__item">
+        <div class="wdd__stats__icon wdd__stats__icon--teal"><i class="fa-solid fa-wallet"></i></div>
+        <div class="wdd__stats__data">
+            <span class="wdd__stats__value">{{ driver.wallet_balance|floatformat:0 }}<small> QR</small></span>
+            <span class="wdd__stats__label">Wallet</span>
         </div>
     </div>
-    <div class="drv-stats__item">
-        <div class="drv-stats__icon drv-stats__icon--orange"><i class="fa-solid fa-hand-holding-dollar"></i></div>
-        <div class="drv-stats__data">
-            <span class="drv-stats__value">{{ driver.cod_in_hand|floatformat:0|default:"0" }}<small> QR</small></span>
-            <span class="drv-stats__label">COD In Hand</span>
+    <div class="wdd__stats__item">
+        <div class="wdd__stats__icon wdd__stats__icon--orange"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+        <div class="wdd__stats__data">
+            <span class="wdd__stats__value">{{ driver.cod_in_hand|floatformat:0|default:"0" }}<small> QR</small></span>
+            <span class="wdd__stats__label">COD In Hand</span>
         </div>
     </div>
 </div>
 
 <!-- Tab Navigation -->
-<div class="drv-tabs" role="tablist">
-    <button class="drv-tabs__btn active" data-tab="overview" role="tab" aria-selected="true">
+<div class="wdd__tabs" role="tablist">
+    <button class="wdd__tabs__btn active" data-tab="overview" role="tab" aria-selected="true">
         <i class="fa-solid fa-gauge-high"></i> Overview
     </button>
-    <button class="drv-tabs__btn" data-tab="deliveries" role="tab" aria-selected="false">
+    <button class="wdd__tabs__btn" data-tab="deliveries" role="tab" aria-selected="false">
         <i class="fa-solid fa-truck"></i> Deliveries
-        <span class="drv-tabs__count">{{ delivery_stats.total_tasks|default:0 }}</span>
+        <span class="wdd__tabs__count">{{ delivery_stats.total_tasks|default:0 }}</span>
     </button>
-    <button class="drv-tabs__btn" data-tab="details" role="tab" aria-selected="false">
+    <button class="wdd__tabs__btn" data-tab="details" role="tab" aria-selected="false">
         <i class="fa-solid fa-id-badge"></i> Details
     </button>
-    <button class="drv-tabs__btn" data-tab="vehicles" role="tab" aria-selected="false">
+    <button class="wdd__tabs__btn" data-tab="vehicles" role="tab" aria-selected="false">
         <i class="fa-solid fa-car"></i> Vehicles
-        <span class="drv-tabs__count">{{ vehicles.count|default:0 }}</span>
+        <span class="wdd__tabs__count">{{ vehicles.count|default:0 }}</span>
     </button>
-    <button class="drv-tabs__btn" data-tab="documents" role="tab" aria-selected="false">
+    <button class="wdd__tabs__btn" data-tab="documents" role="tab" aria-selected="false">
         <i class="fa-solid fa-folder-open"></i> Documents
-        <span class="drv-tabs__count">{{ documents|length }}</span>
+        <span class="wdd__tabs__count">{{ documents|length }}</span>
     </button>
-    <button class="drv-tabs__btn" data-tab="settings" role="tab" aria-selected="false">
+    <button class="wdd__tabs__btn" data-tab="settings" role="tab" aria-selected="false">
         <i class="fa-solid fa-gear"></i> Settings
     </button>
 </div>
 
 <!-- Tab: Overview -->
-<div id="panel-overview" class="drv-panel active" role="tabpanel">
-    <div class="drv-grid-2col">
+<div id="panel-overview" class="wdd__panel active" role="tabpanel">
+    <div class="wdd__grid-2col">
         <div>
             <!-- Delivery Summary -->
-            <div class="drv-card">
-                <div class="drv-card__header">
+            <div class="wdd__card">
+                <div class="wdd__card__header">
                     <i class="fa-solid fa-chart-pie"></i> Delivery Summary
                 </div>
-                <div class="drv-card__body">
-                    <div class="drv-summary-grid">
-                        <div class="drv-summary__cell">
-                            <span class="drv-summary__num drv-summary__num--green">{{ delivery_stats.completed_tasks|default:0 }}</span>
-                            <span class="drv-summary__text">Completed</span>
+                <div class="wdd__card__body">
+                    <div class="wdd__summary-grid">
+                        <div class="wdd__summary__cell">
+                            <span class="wdd__summary__num wdd__summary__num--green">{{ delivery_stats.completed_tasks|default:0 }}</span>
+                            <span class="wdd__summary__text">Completed</span>
                         </div>
-                        <div class="drv-summary__cell">
-                            <span class="drv-summary__num drv-summary__num--blue">{{ delivery_stats.in_transit|default:0 }}</span>
-                            <span class="drv-summary__text">In Transit</span>
+                        <div class="wdd__summary__cell">
+                            <span class="wdd__summary__num wdd__summary__num--blue">{{ delivery_stats.in_transit|default:0 }}</span>
+                            <span class="wdd__summary__text">In Transit</span>
                         </div>
-                        <div class="drv-summary__cell">
-                            <span class="drv-summary__num drv-summary__num--red">{{ delivery_stats.failed_tasks|default:0 }}</span>
-                            <span class="drv-summary__text">Failed</span>
+                        <div class="wdd__summary__cell">
+                            <span class="wdd__summary__num wdd__summary__num--red">{{ delivery_stats.failed_tasks|default:0 }}</span>
+                            <span class="wdd__summary__text">Failed</span>
                         </div>
-                        <div class="drv-summary__cell">
-                            <span class="drv-summary__num">{{ delivery_stats.total_tasks|default:0 }}</span>
-                            <span class="drv-summary__text">Total</span>
+                        <div class="wdd__summary__cell">
+                            <span class="wdd__summary__num">{{ delivery_stats.total_tasks|default:0 }}</span>
+                            <span class="wdd__summary__text">Total</span>
                         </div>
                     </div>
                     {% if delivery_stats.total_tasks > 0 %}
-                    <div class="drv-progress">
+                    <div class="wdd__progress">
                         {% with c=delivery_stats.completed_tasks|default:0 i=delivery_stats.in_transit|default:0 f=delivery_stats.failed_tasks|default:0 t=delivery_stats.total_tasks %}
-                        <div class="drv-progress__fill drv-progress__fill--green" style="width: {% widthratio c t 100 %}%;"></div>
-                        <div class="drv-progress__fill drv-progress__fill--blue" style="width: {% widthratio i t 100 %}%;"></div>
-                        <div class="drv-progress__fill drv-progress__fill--red" style="width: {% widthratio f t 100 %}%;"></div>
+                        <div class="wdd__progress__fill wdd__progress__fill--green" style="width: {% widthratio c t 100 %}%;"></div>
+                        <div class="wdd__progress__fill wdd__progress__fill--blue" style="width: {% widthratio i t 100 %}%;"></div>
+                        <div class="wdd__progress__fill wdd__progress__fill--red" style="width: {% widthratio f t 100 %}%;"></div>
                         {% endwith %}
                     </div>
                     {% endif %}
@@ -184,23 +184,23 @@
 
             <!-- COD Summary -->
             {% if cod_stats.total_cod_tasks > 0 %}
-            <div class="drv-card">
-                <div class="drv-card__header">
+            <div class="wdd__card">
+                <div class="wdd__card__header">
                     <i class="fa-solid fa-money-bill-wave"></i> COD Summary
                 </div>
-                <div class="drv-card__body">
-                    <div class="drv-cod-grid">
-                        <div class="drv-cod__item">
-                            <span class="drv-cod__val">{{ cod_stats.total_cod_tasks|default:0 }}</span>
-                            <span class="drv-cod__lbl">COD Tasks</span>
+                <div class="wdd__card__body">
+                    <div class="wdd__cod-grid">
+                        <div class="wdd__cod__item">
+                            <span class="wdd__cod__val">{{ cod_stats.total_cod_tasks|default:0 }}</span>
+                            <span class="wdd__cod__lbl">COD Tasks</span>
                         </div>
-                        <div class="drv-cod__item">
-                            <span class="drv-cod__val">{{ cod_stats.total_cod_amount|default:0|floatformat:0 }} <small>QR</small></span>
-                            <span class="drv-cod__lbl">Total Amount</span>
+                        <div class="wdd__cod__item">
+                            <span class="wdd__cod__val">{{ cod_stats.total_cod_amount|default:0|floatformat:0 }} <small>QR</small></span>
+                            <span class="wdd__cod__lbl">Total Amount</span>
                         </div>
-                        <div class="drv-cod__item">
-                            <span class="drv-cod__val drv-cod__val--green">{{ cod_stats.collected_cod|default:0|floatformat:0 }} <small>QR</small></span>
-                            <span class="drv-cod__lbl">Collected</span>
+                        <div class="wdd__cod__item">
+                            <span class="wdd__cod__val wdd__cod__val--green">{{ cod_stats.collected_cod|default:0|floatformat:0 }} <small>QR</small></span>
+                            <span class="wdd__cod__lbl">Collected</span>
                         </div>
                     </div>
                 </div>
@@ -208,23 +208,23 @@
             {% endif %}
 
             <!-- Quick Actions -->
-            <div class="drv-card">
-                <div class="drv-card__header">
+            <div class="wdd__card">
+                <div class="wdd__card__header">
                     <i class="fa-solid fa-bolt"></i> Quick Actions
                 </div>
-                <div class="drv-card__body">
-                    <div class="drv-actions">
-                        <a href="{% url 'workforce:dl_list_all' %}?driver={{ driver.driver_id }}" class="drv-action-btn">
+                <div class="wdd__card__body">
+                    <div class="wdd__actions">
+                        <a href="{% url 'workforce:dl_list_all' %}?driver={{ driver.driver_id }}" class="wdd__action-btn">
                             <i class="fa-solid fa-truck"></i> View Deliveries
                         </a>
-                        <a href="{% url 'workforce:driver_document_detail' driver.driver_id %}" class="drv-action-btn">
+                        <a href="{% url 'workforce:driver_document_detail' driver.driver_id %}" class="wdd__action-btn">
                             <i class="fa-solid fa-id-card"></i> Documents
                         </a>
-                        <button class="drv-action-btn" onclick="document.querySelector('[data-tab=settings]').click();">
+                        <button class="wdd__action-btn" onclick="document.querySelector('[data-tab=settings]').click();">
                             <i class="fa-solid fa-pen-to-square"></i> Edit Info
                         </button>
                         {% if driver.driver_whatsapp %}
-                        <a href="https://wa.me/974{{ driver.driver_whatsapp }}" target="_blank" class="drv-action-btn drv-action-btn--wa">
+                        <a href="https://wa.me/974{{ driver.driver_whatsapp }}" target="_blank" class="wdd__action-btn wdd__action-btn--wa">
                             <i class="fa-brands fa-whatsapp"></i> WhatsApp
                         </a>
                         {% endif %}
@@ -235,20 +235,20 @@
 
         <div>
             <!-- Recent Activity -->
-            <div class="drv-card">
-                <div class="drv-card__header">
+            <div class="wdd__card">
+                <div class="wdd__card__header">
                     <i class="fa-solid fa-clock-rotate-left"></i> Recent Activity
                 </div>
-                <div class="drv-card__body drv-card__body--no-pad">
+                <div class="wdd__card__body wdd__card__body--no-pad">
                     {% if recent_tasks %}
-                    <ul class="drv-timeline">
+                    <ul class="wdd__timeline">
                         {% for task in recent_tasks %}
-                        <li class="drv-timeline__item">
-                            <span class="drv-timeline__dot drv-timeline__dot--{% if task.dl_task_status == 'delivered' %}green{% elif task.dl_task_status == 'in_transit' or task.dl_task_status == 'out_for_delivery' %}amber{% elif task.dl_task_status == 'failed' or task.dl_task_status == 'cancelled' %}red{% else %}grey{% endif %}"></span>
-                            <div class="drv-timeline__body">
-                                <span class="drv-timeline__title">#{{ task.dl_task_number|default:task.id }}</span>
-                                <span class="drv-timeline__meta">
-                                    <span class="drv-timeline__badge drv-timeline__badge--{% if task.dl_task_status == 'delivered' %}green{% elif task.dl_task_status == 'in_transit' or task.dl_task_status == 'out_for_delivery' %}amber{% elif task.dl_task_status == 'failed' or task.dl_task_status == 'cancelled' %}red{% else %}grey{% endif %}">{{ task.dl_task_status|title }}</span>
+                        <li class="wdd__timeline__item">
+                            <span class="wdd__timeline__dot wdd__timeline__dot--{% if task.dl_task_status == 'delivered' %}green{% elif task.dl_task_status == 'in_transit' or task.dl_task_status == 'out_for_delivery' %}amber{% elif task.dl_task_status == 'failed' or task.dl_task_status == 'cancelled' %}red{% else %}grey{% endif %}"></span>
+                            <div class="wdd__timeline__body">
+                                <span class="wdd__timeline__title">#{{ task.dl_task_number|default:task.id }}</span>
+                                <span class="wdd__timeline__meta">
+                                    <span class="wdd__timeline__badge wdd__timeline__badge--{% if task.dl_task_status == 'delivered' %}green{% elif task.dl_task_status == 'in_transit' or task.dl_task_status == 'out_for_delivery' %}amber{% elif task.dl_task_status == 'failed' or task.dl_task_status == 'cancelled' %}red{% else %}grey{% endif %}">{{ task.dl_task_status|title }}</span>
                                     {{ task.created_at|timesince }} ago
                                 </span>
                             </div>
@@ -256,7 +256,7 @@
                         {% endfor %}
                     </ul>
                     {% else %}
-                    <div class="drv-empty">
+                    <div class="wdd__empty">
                         <i class="fa-solid fa-inbox"></i>
                         <span>No recent deliveries</span>
                     </div>
@@ -265,20 +265,20 @@
             </div>
 
             <!-- Recent Transactions -->
-            <div class="drv-card">
-                <div class="drv-card__header">
+            <div class="wdd__card">
+                <div class="wdd__card__header">
                     <i class="fa-solid fa-receipt"></i> Recent Transactions
                 </div>
-                <div class="drv-card__body drv-card__body--no-pad">
+                <div class="wdd__card__body wdd__card__body--no-pad">
                     {% if recent_transactions %}
-                    <ul class="drv-timeline">
+                    <ul class="wdd__timeline">
                         {% for txn in recent_transactions %}
-                        <li class="drv-timeline__item">
-                            <span class="drv-timeline__dot drv-timeline__dot--{% if txn.amount > 0 %}green{% else %}red{% endif %}"></span>
-                            <div class="drv-timeline__body">
-                                <span class="drv-timeline__title">{{ txn.transaction_type|title }}</span>
-                                <span class="drv-timeline__meta">
-                                    <span class="{% if txn.amount > 0 %}drv-text--green{% else %}drv-text--red{% endif %}" style="font-weight:600;">
+                        <li class="wdd__timeline__item">
+                            <span class="wdd__timeline__dot wdd__timeline__dot--{% if txn.amount > 0 %}green{% else %}red{% endif %}"></span>
+                            <div class="wdd__timeline__body">
+                                <span class="wdd__timeline__title">{{ txn.transaction_type|title }}</span>
+                                <span class="wdd__timeline__meta">
+                                    <span class="{% if txn.amount > 0 %}wdd__text--green{% else %}wdd__text--red{% endif %}" style="font-weight:600;">
                                         {% if txn.amount > 0 %}+{% endif %}{{ txn.amount|floatformat:2 }} QR
                                     </span>
                                     &middot; {{ txn.created_at|timesince }} ago
@@ -288,7 +288,7 @@
                         {% endfor %}
                     </ul>
                     {% else %}
-                    <div class="drv-empty">
+                    <div class="wdd__empty">
                         <i class="fa-solid fa-receipt"></i>
                         <span>No transactions yet</span>
                     </div>
@@ -300,18 +300,18 @@
 </div>
 
 <!-- Tab: Deliveries -->
-<div id="panel-deliveries" class="drv-panel" role="tabpanel">
-    <div class="drv-card">
-        <div class="drv-card__header">
+<div id="panel-deliveries" class="wdd__panel" role="tabpanel">
+    <div class="wdd__card">
+        <div class="wdd__card__header">
             <i class="fa-solid fa-list"></i> Recent Deliveries
-            <a href="{% url 'workforce:dl_list_all' %}?driver={{ driver.driver_id }}" class="drv-card__link">
+            <a href="{% url 'workforce:dl_list_all' %}?driver={{ driver.driver_id }}" class="wdd__card__link">
                 View All <i class="fa-solid fa-arrow-right"></i>
             </a>
         </div>
-        <div class="drv-card__body drv-card__body--no-pad">
+        <div class="wdd__card__body wdd__card__body--no-pad">
             {% if recent_tasks %}
             <div class="table-responsive">
-                <table class="drv-dtable">
+                <table class="wdd__dtable">
                     <thead>
                         <tr>
                             <th>Task #</th>
@@ -323,21 +323,21 @@
                     <tbody>
                         {% for task in recent_tasks %}
                         <tr onclick="window.location.href='/workforce/delivery-task/{{ task.id }}/'" style="cursor:pointer;">
-                            <td><strong class="drv-dtable__task-num">#{{ task.dl_task_number|default:task.id }}</strong></td>
+                            <td><strong class="wdd__dtable__task-num">#{{ task.dl_task_number|default:task.id }}</strong></td>
                             <td>{{ task.business.business_name|default:"N/A" }}</td>
                             <td>
-                                <span class="drv-status-pill drv-status-pill--{% if task.dl_task_status == 'delivered' %}green{% elif task.dl_task_status == 'in_transit' or task.dl_task_status == 'out_for_delivery' %}amber{% elif task.dl_task_status == 'failed' or task.dl_task_status == 'cancelled' %}red{% else %}grey{% endif %}">
+                                <span class="wdd__status-pill wdd__status-pill--{% if task.dl_task_status == 'delivered' %}green{% elif task.dl_task_status == 'in_transit' or task.dl_task_status == 'out_for_delivery' %}amber{% elif task.dl_task_status == 'failed' or task.dl_task_status == 'cancelled' %}red{% else %}grey{% endif %}">
                                     {{ task.get_dl_task_status_display|default:task.dl_task_status|title }}
                                 </span>
                             </td>
-                            <td class="drv-dtable__date">{{ task.created_at|date:"d M Y" }}</td>
+                            <td class="wdd__dtable__date">{{ task.created_at|date:"d M Y" }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
             {% else %}
-            <div class="drv-empty">
+            <div class="wdd__empty">
                 <i class="fa-solid fa-truck"></i>
                 <span>No deliveries yet</span>
             </div>
@@ -347,61 +347,61 @@
 </div>
 
 <!-- Tab: Details -->
-<div id="panel-details" class="drv-panel" role="tabpanel">
-    <div class="drv-grid-2col">
+<div id="panel-details" class="wdd__panel" role="tabpanel">
+    <div class="wdd__grid-2col">
         <div>
-            <div class="drv-card">
-                <div class="drv-card__header">
+            <div class="wdd__card">
+                <div class="wdd__card__header">
                     <i class="fa-solid fa-user"></i> Driver Information
                 </div>
-                <div class="drv-card__body drv-card__body--no-pad">
-                    <div class="drv-info-table">
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">Full Name</span>
-                            <span class="drv-info-row__value">{{ driver.user.first_name }} {{ driver.user.last_name }}</span>
+                <div class="wdd__card__body wdd__card__body--no-pad">
+                    <div class="wdd__info-table">
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">Full Name</span>
+                            <span class="wdd__info-row__value">{{ driver.user.first_name }} {{ driver.user.last_name }}</span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">Username</span>
-                            <span class="drv-info-row__value">{{ driver.user.username|default:"N/A" }}</span>
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">Username</span>
+                            <span class="wdd__info-row__value">{{ driver.user.username|default:"N/A" }}</span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">Driver Code</span>
-                            <span class="drv-info-row__value"><code>{{ driver.driver_code|default:"N/A" }}</code></span>
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">Driver Code</span>
+                            <span class="wdd__info-row__value"><code>{{ driver.driver_code|default:"N/A" }}</code></span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">DMS Code</span>
-                            <span class="drv-info-row__value"><code>{{ driver.driver_code_dms|default:"N/A" }}</code></span>
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">DMS Code</span>
+                            <span class="wdd__info-row__value"><code>{{ driver.driver_code_dms|default:"N/A" }}</code></span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">License No</span>
-                            <span class="drv-info-row__value">{{ driver.driver_license_number|default:"N/A" }}</span>
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">License No</span>
+                            <span class="wdd__info-row__value">{{ driver.driver_license_number|default:"N/A" }}</span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">Languages</span>
-                            <span class="drv-info-row__value">{{ driver.driver_languages|title|default:"N/A" }}</span>
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">Languages</span>
+                            <span class="wdd__info-row__value">{{ driver.driver_languages|title|default:"N/A" }}</span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">Status</span>
-                            <span class="drv-info-row__value">
-                                <span class="drv-status-pill drv-status-pill--{% if driver.driver_status == 'approved' %}green{% elif driver.driver_status == 'rejected' or driver.driver_status == 'blocked' or driver.driver_status == 'suspended' %}red{% else %}amber{% endif %}">
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">Status</span>
+                            <span class="wdd__info-row__value">
+                                <span class="wdd__status-pill wdd__status-pill--{% if driver.driver_status == 'approved' %}green{% elif driver.driver_status == 'rejected' or driver.driver_status == 'blocked' or driver.driver_status == 'suspended' %}red{% else %}amber{% endif %}">
                                     {{ driver.get_driver_status_display }}
                                 </span>
                             </span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">Date Joined</span>
-                            <span class="drv-info-row__value">{{ driver.user.date_joined|date:"d M Y" }}</span>
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">Date Joined</span>
+                            <span class="wdd__info-row__value">{{ driver.user.date_joined|date:"d M Y" }}</span>
                         </div>
                     </div>
                 </div>
             </div>
 
             {% if driver.driver_bio %}
-            <div class="drv-card">
-                <div class="drv-card__header">
+            <div class="wdd__card">
+                <div class="wdd__card__header">
                     <i class="fa-solid fa-quote-left"></i> Bio
                 </div>
-                <div class="drv-card__body">
+                <div class="wdd__card__body">
                     <p style="margin:0; color:var(--brand-grey-600); font-size:0.8125rem; line-height:1.6;">{{ driver.driver_bio }}</p>
                 </div>
             </div>
@@ -409,42 +409,42 @@
         </div>
 
         <div>
-            <div class="drv-card">
-                <div class="drv-card__header">
+            <div class="wdd__card">
+                <div class="wdd__card__header">
                     <i class="fa-solid fa-wallet"></i> Financial Overview
                 </div>
-                <div class="drv-card__body drv-card__body--no-pad">
-                    <div class="drv-info-table">
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">Wallet Balance</span>
-                            <span class="drv-info-row__value"><strong>{{ driver.wallet_balance|floatformat:2 }} QR</strong></span>
+                <div class="wdd__card__body wdd__card__body--no-pad">
+                    <div class="wdd__info-table">
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">Wallet Balance</span>
+                            <span class="wdd__info-row__value"><strong>{{ driver.wallet_balance|floatformat:2 }} QR</strong></span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">COD In Hand</span>
-                            <span class="drv-info-row__value"><strong>{{ driver.cod_in_hand|floatformat:2|default:"0.00" }} QR</strong></span>
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">COD In Hand</span>
+                            <span class="wdd__info-row__value"><strong>{{ driver.cod_in_hand|floatformat:2|default:"0.00" }} QR</strong></span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">Credit Limit</span>
-                            <span class="drv-info-row__value">{{ driver.credit_limit|floatformat:0 }} QR</span>
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">Credit Limit</span>
+                            <span class="wdd__info-row__value">{{ driver.credit_limit|floatformat:0 }} QR</span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">Rating</span>
-                            <span class="drv-info-row__value">
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">Rating</span>
+                            <span class="wdd__info-row__value">
                                 <span style="color:#f59e0b;"><i class="fa-solid fa-star"></i></span>
                                 {{ driver.driver_rating|default:0 }} ({{ driver.driver_rating_count }} reviews)
                             </span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">Email</span>
-                            <span class="drv-info-row__value">{{ driver.user.email|default:"N/A" }}</span>
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">Email</span>
+                            <span class="wdd__info-row__value">{{ driver.user.email|default:"N/A" }}</span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">Phone</span>
-                            <span class="drv-info-row__value">{{ driver.driver_phone|default:"N/A" }}</span>
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">Phone</span>
+                            <span class="wdd__info-row__value">{{ driver.driver_phone|default:"N/A" }}</span>
                         </div>
-                        <div class="drv-info-row">
-                            <span class="drv-info-row__label">WhatsApp</span>
-                            <span class="drv-info-row__value">{{ driver.driver_whatsapp|default:"N/A" }}</span>
+                        <div class="wdd__info-row">
+                            <span class="wdd__info-row__label">WhatsApp</span>
+                            <span class="wdd__info-row__value">{{ driver.driver_whatsapp|default:"N/A" }}</span>
                         </div>
                     </div>
                 </div>
@@ -454,27 +454,27 @@
 </div>
 
 <!-- Tab: Vehicles -->
-<div id="panel-vehicles" class="drv-panel" role="tabpanel">
-    <div class="drv-card">
-        <div class="drv-card__header">
+<div id="panel-vehicles" class="wdd__panel" role="tabpanel">
+    <div class="wdd__card">
+        <div class="wdd__card__header">
             <i class="fa-solid fa-car"></i> Registered Vehicles
         </div>
-        <div class="drv-card__body">
+        <div class="wdd__card__body">
             {% if vehicles %}
-            <div class="drv-vehicles-grid">
+            <div class="wdd__vehicles-grid">
                 {% for vehicle in vehicles %}
-                <div class="drv-vehicle">
-                    <div class="drv-vehicle__icon">
+                <div class="wdd__vehicle">
+                    <div class="wdd__vehicle__icon">
                         <i class="fa-solid {% if vehicle.vehicle_type == '2wheeler' %}fa-motorcycle{% elif vehicle.vehicle_type == '4wheeler' %}fa-car{% else %}fa-truck{% endif %}"></i>
                     </div>
-                    <div class="drv-vehicle__body">
-                        <div class="drv-vehicle__top">
-                            <span class="drv-vehicle__type">{{ vehicle.vehicle_type|title }}</span>
-                            <span class="drv-status-pill drv-status-pill--{% if vehicle.vehicle_status == 'active' %}green{% else %}grey{% endif %}">
+                    <div class="wdd__vehicle__body">
+                        <div class="wdd__vehicle__top">
+                            <span class="wdd__vehicle__type">{{ vehicle.vehicle_type|title }}</span>
+                            <span class="wdd__status-pill wdd__status-pill--{% if vehicle.vehicle_status == 'active' %}green{% else %}grey{% endif %}">
                                 {{ vehicle.vehicle_status|title }}
                             </span>
                         </div>
-                        <div class="drv-vehicle__details">
+                        <div class="wdd__vehicle__details">
                             <span><i class="fa-solid fa-hashtag"></i> {{ vehicle.vehicle_no|default:"N/A" }}</span>
                             <span><i class="fa-solid fa-car-side"></i> {{ vehicle.vehicle_model|default:"N/A" }}</span>
                             <span><i class="fa-solid fa-palette"></i> {{ vehicle.vehicle_color|default:"N/A" }}</span>
@@ -485,7 +485,7 @@
                 {% endfor %}
             </div>
             {% else %}
-            <div class="drv-empty">
+            <div class="wdd__empty">
                 <i class="fa-solid fa-car"></i>
                 <span>No vehicles registered</span>
             </div>
@@ -495,39 +495,39 @@
 </div>
 
 <!-- Tab: Documents -->
-<div id="panel-documents" class="drv-panel" role="tabpanel">
-    <div class="drv-card">
-        <div class="drv-card__header">
+<div id="panel-documents" class="wdd__panel" role="tabpanel">
+    <div class="wdd__card">
+        <div class="wdd__card__header">
             <i class="fa-solid fa-folder-open"></i> Driver Documents
         </div>
-        <div class="drv-card__body">
+        <div class="wdd__card__body">
             {% if documents %}
-            <div class="drv-docs-grid">
+            <div class="wdd__docs-grid">
                 {% for doc in documents %}
-                <div class="drv-doc">
-                    <div class="drv-doc__icon">
+                <div class="wdd__doc">
+                    <div class="wdd__doc__icon">
                         <i class="fa-solid fa-id-card"></i>
                     </div>
-                    <div class="drv-doc__body">
-                        <span class="drv-doc__type">{{ doc.document_type|default:"Document" }}</span>
-                        <span class="drv-doc__number">{{ doc.document_no }}</span>
+                    <div class="wdd__doc__body">
+                        <span class="wdd__doc__type">{{ doc.document_type|default:"Document" }}</span>
+                        <span class="wdd__doc__number">{{ doc.document_no }}</span>
                         {% if doc.document_expiry_date %}
-                        <span class="drv-doc__expiry">
+                        <span class="wdd__doc__expiry">
                             Expires: {{ doc.document_expiry_date|date:"d M Y" }}
                             {% if doc.document_expiry_date < now %}
-                            <span class="drv-status-pill drv-status-pill--red" style="margin-left:4px;">Expired</span>
+                            <span class="wdd__status-pill wdd__status-pill--red" style="margin-left:4px;">Expired</span>
                             {% endif %}
                         </span>
                         {% endif %}
                     </div>
                     {% if doc.document_file and doc.document_file.name %}
-                    <button type="button" class="drv-doc__view-btn drv-doc__view-btn--available"
+                    <button type="button" class="wdd__doc__view-btn wdd__doc__view-btn--available"
                             data-doc-url="{{ doc.document_file.url }}"
                             data-doc-title="{{ doc.document_type|default:'Document' }} - {{ doc.document_no }}">
                         <i class="fa-solid fa-eye"></i> View
                     </button>
                     {% else %}
-                    <span class="drv-doc__view-btn drv-doc__view-btn--unavailable">
+                    <span class="wdd__doc__view-btn wdd__doc__view-btn--unavailable">
                         <i class="fa-solid fa-eye-slash"></i> No File
                     </span>
                     {% endif %}
@@ -535,7 +535,7 @@
                 {% endfor %}
             </div>
             {% else %}
-            <div class="drv-empty">
+            <div class="wdd__empty">
                 <i class="fa-solid fa-folder-open"></i>
                 <span>No documents uploaded</span>
             </div>
@@ -545,20 +545,20 @@
 </div>
 
 <!-- Document Modal -->
-<div id="docModal" class="drv-modal-overlay" role="dialog" aria-modal="true">
-    <div class="drv-modal">
-        <div class="drv-modal__header">
-            <h4 class="drv-modal__title" id="docModalTitle">Document</h4>
-            <button type="button" class="drv-modal__close" id="docModalClose"><i class="fa-solid fa-xmark"></i></button>
+<div id="docModal" class="wdd__modal-overlay" role="dialog" aria-modal="true">
+    <div class="wdd__modal">
+        <div class="wdd__modal__header">
+            <h4 class="wdd__modal__title" id="docModalTitle">Document</h4>
+            <button type="button" class="wdd__modal__close" id="docModalClose"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <div class="drv-modal__body">
+        <div class="wdd__modal__body">
             <img id="docModalImage" src="" alt="Document">
         </div>
-        <div class="drv-modal__footer">
-            <a href="#" id="docModalDownload" class="drv-action-btn" target="_blank">
+        <div class="wdd__modal__footer">
+            <a href="#" id="docModalDownload" class="wdd__action-btn" target="_blank">
                 <i class="fa-solid fa-download"></i> Open in New Tab
             </a>
-            <button type="button" class="drv-action-btn" id="docModalCloseBtn">
+            <button type="button" class="wdd__action-btn" id="docModalCloseBtn">
                 <i class="fa-solid fa-xmark"></i> Close
             </button>
         </div>
@@ -566,26 +566,26 @@
 </div>
 
 <!-- Tab: Settings -->
-<div id="panel-settings" class="drv-panel" role="tabpanel">
-    <div class="drv-card" style="max-width:700px;">
-        <div class="drv-card__header">
+<div id="panel-settings" class="wdd__panel" role="tabpanel">
+    <div class="wdd__card" style="max-width:700px;">
+        <div class="wdd__card__header">
             <i class="fa-solid fa-gear"></i> Update Driver Information
         </div>
-        <div class="drv-card__body">
+        <div class="wdd__card__body">
             <form id="workforce_driver_detail_form_update">
                 {% csrf_token %}
-                <div class="drv-form-grid">
-                    <div class="drv-form-group">
-                        <label class="drv-form-label">Phone</label>
-                        <input type="text" name="driver_phone" value="{{ driver.driver_phone|default:'' }}" class="drv-form-input">
+                <div class="wdd__form-grid">
+                    <div class="wdd__form-group">
+                        <label class="wdd__form-label">Phone</label>
+                        <input type="text" name="driver_phone" value="{{ driver.driver_phone|default:'' }}" class="wdd__form-input">
                     </div>
-                    <div class="drv-form-group">
-                        <label class="drv-form-label">WhatsApp</label>
-                        <input type="text" name="driver_whatsapp" value="{{ driver.driver_whatsapp|default:'' }}" class="drv-form-input">
+                    <div class="wdd__form-group">
+                        <label class="wdd__form-label">WhatsApp</label>
+                        <input type="text" name="driver_whatsapp" value="{{ driver.driver_whatsapp|default:'' }}" class="wdd__form-input">
                     </div>
-                    <div class="drv-form-group">
-                        <label class="drv-form-label">Status</label>
-                        <select name="driver_status" class="drv-form-input">
+                    <div class="wdd__form-group">
+                        <label class="wdd__form-label">Status</label>
+                        <select name="driver_status" class="wdd__form-input">
                             <option value="pending" {% if driver.driver_status == 'pending' %}selected{% endif %}>Pending</option>
                             <option value="processing" {% if driver.driver_status == 'processing' %}selected{% endif %}>Processing</option>
                             <option value="approved" {% if driver.driver_status == 'approved' %}selected{% endif %}>Approved</option>
@@ -594,24 +594,24 @@
                             <option value="suspended" {% if driver.driver_status == 'suspended' %}selected{% endif %}>Suspended</option>
                         </select>
                     </div>
-                    <div class="drv-form-group">
-                        <label class="drv-form-label">Bio</label>
-                        <input type="text" name="driver_bio" value="{{ driver.driver_bio|default:'' }}" class="drv-form-input">
+                    <div class="wdd__form-group">
+                        <label class="wdd__form-label">Bio</label>
+                        <input type="text" name="driver_bio" value="{{ driver.driver_bio|default:'' }}" class="wdd__form-input">
                     </div>
-                    <div class="drv-form-group drv-form-group--full">
-                        <label class="drv-form-label">Wallet Limit (QAR)</label>
-                        <input type="number" name="credit_limit" value="{{ driver.credit_limit|floatformat:0 }}" class="drv-form-input" min="0" step="100">
-                        <small class="drv-form-help">Maximum COD amount driver can hold. Current: {{ driver.cod_in_hand|floatformat:0 }} QR in hand.</small>
+                    <div class="wdd__form-group wdd__form-group--full">
+                        <label class="wdd__form-label">Wallet Limit (QAR)</label>
+                        <input type="number" name="credit_limit" value="{{ driver.credit_limit|floatformat:0 }}" class="wdd__form-input" min="0" step="100">
+                        <small class="wdd__form-help">Maximum COD amount driver can hold. Current: {{ driver.cod_in_hand|floatformat:0 }} QR in hand.</small>
                     </div>
                 </div>
-                <div class="drv-form-actions">
-                    <button type="submit" class="drv-btn drv-btn--primary">
+                <div class="wdd__form-actions">
+                    <button type="submit" class="wdd__btn wdd__btn--primary">
                         <i class="fa-solid fa-save"></i> Save Changes
                     </button>
-                    <a href="{% url 'workforce:drivers_list' %}" class="drv-btn drv-btn--secondary">Cancel</a>
+                    <a href="{% url 'workforce:drivers_list' %}" class="wdd__btn wdd__btn--secondary">Cancel</a>
                 </div>
             </form>
-            <div id="updateMessage" class="drv-toast"></div>
+            <div id="updateMessage" class="wdd__toast"></div>
         </div>
     </div>
 </div>
@@ -623,13 +623,13 @@
 {% block extra_js %}
 <script>
 // Tab switching
-document.querySelectorAll('.drv-tabs__btn').forEach(function(btn) {
+document.querySelectorAll('.wdd__tabs__btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
-        document.querySelectorAll('.drv-tabs__btn').forEach(function(b) {
+        document.querySelectorAll('.wdd__tabs__btn').forEach(function(b) {
             b.classList.remove('active');
             b.setAttribute('aria-selected', 'false');
         });
-        document.querySelectorAll('.drv-panel').forEach(function(p) { p.classList.remove('active'); });
+        document.querySelectorAll('.wdd__panel').forEach(function(p) { p.classList.remove('active'); });
         this.classList.add('active');
         this.setAttribute('aria-selected', 'true');
         document.getElementById('panel-' + this.getAttribute('data-tab')).classList.add('active');
@@ -656,7 +656,7 @@ function closeDocModal() {
     docModalImage.src = '';
 }
 
-document.querySelectorAll('.drv-doc__view-btn--available').forEach(function(btn) {
+document.querySelectorAll('.wdd__doc__view-btn--available').forEach(function(btn) {
     btn.addEventListener('click', function() {
         openDocModal(this.getAttribute('data-doc-url'), this.getAttribute('data-doc-title'));
     });
@@ -684,13 +684,13 @@ document.getElementById('workforce_driver_detail_form_update').addEventListener(
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        msg.className = 'drv-toast show ' + (data.success ? 'success' : 'error');
+        msg.className = 'wdd__toast show ' + (data.success ? 'success' : 'error');
         msg.innerHTML = '<i class="fa-solid fa-' + (data.success ? 'check-circle' : 'exclamation-circle') + '"></i> ' + (data.message || data.error || 'Done');
         if (data.success) setTimeout(function() { location.reload(); }, 1500);
         else { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes'; }
     })
     .catch(function() {
-        msg.className = 'drv-toast show error';
+        msg.className = 'wdd__toast show error';
         msg.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Error saving';
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Changes';

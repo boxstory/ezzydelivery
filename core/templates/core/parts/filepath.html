@@ -1,24 +1,24 @@
 {% load static %}
 <link href="{% static 'core/css/core.css' %}" rel="stylesheet" type="text/css" />
 
-<section class="breadcrumb-wrapper" id="core_breadcrumb_section_main">
+<section class="cnav__wrapper" id="core_breadcrumb_section_main">
     <nav aria-label="breadcrumb" id="core_breadcrumb_nav">
-        <ol class="breadcrumb" id="core_breadcrumb_list">
-            <li class="breadcrumb-item">
-                <a class="breadcrumb-link" href="/">
+        <ol class="cnav__list breadcrumb" id="core_breadcrumb_list">
+            <li class="cnav__item breadcrumb-item">
+                <a class="cnav__link" href="/">
                     <i class="fa-solid fa-house me-1"></i>
                     Home
                 </a>
             </li>
-            <li class="breadcrumb-item">
+            <li class="cnav__item breadcrumb-item">
                 <a href="{% url 'core:profile_view' %}"
-                   class="breadcrumb-link {% if '/profile/' in request.path %}active{% endif %}">
+                   class="cnav__link {% if '/profile/' in request.path %}cnav__link--active{% endif %}">
                     <i class="fa-solid fa-user me-1"></i>
                     User Profile
                 </a>
             </li>
-            <li class="breadcrumb-item">
-                <a class="breadcrumb-link {% if '/join_us/' == request.path %}active{% endif %}"
+            <li class="cnav__item breadcrumb-item">
+                <a class="cnav__link {% if '/join_us/' == request.path %}cnav__link--active{% endif %}"
                    href="{% url 'core:join_us' %}">
                     <i class="fa-solid fa-user-tag me-1"></i>
                     {% if profile.is_business %}Role: Business{% elif profile.is_driver %}Role: Driver{% else %}Apply Role{% endif %}
@@ -26,31 +26,31 @@
             </li>
 
             {% if profile.is_business and user_business %}
-                <li class="breadcrumb-item">
+                <li class="cnav__item breadcrumb-item">
                     <a href="{% url 'business:business_profile_update' user_business.business_id %}"
-                       class="breadcrumb-link {% if '/join_us/business/' in request.path %}active{% endif %}">
+                       class="cnav__link {% if '/join_us/business/' in request.path %}cnav__link--active{% endif %}">
                         <i class="fa-solid fa-building me-1"></i>
                         Business Info
                     </a>
                 </li>
             {% elif profile.is_driver %}
-                <li class="breadcrumb-item">
+                <li class="cnav__item breadcrumb-item">
                     <a href="{% url 'core:update_driver' %}"
-                       class="breadcrumb-link {% if '/dashboard/' in request.path %}active{% endif %}">
+                       class="cnav__link {% if '/dashboard/' in request.path %}cnav__link--active{% endif %}">
                         <i class="fa-solid fa-id-card me-1"></i>
                         Driver Info
                     </a>
                 </li>
-                <li class="breadcrumb-item">
+                <li class="cnav__item breadcrumb-item">
                     <a href="{% url 'fleet:vehicle_add' %}"
-                       class="breadcrumb-link {% if '/vehicle_add/' in request.path %}active{% endif %}">
+                       class="cnav__link {% if '/vehicle_add/' in request.path %}cnav__link--active{% endif %}">
                         <i class="fa-solid fa-truck me-1"></i>
                         Add Vehicle
                     </a>
                 </li>
-                <li class="breadcrumb-item">
+                <li class="cnav__item breadcrumb-item">
                     <a href="{% url 'fleet:driver_documents_upload' request.user.id %}"
-                       class="breadcrumb-link {% if '/documents/' in request.path %}active{% endif %}">
+                       class="cnav__link {% if '/documents/' in request.path %}cnav__link--active{% endif %}">
                         <i class="fa-solid fa-file-upload me-1"></i>
                         Documents
                     </a>

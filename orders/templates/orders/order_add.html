@@ -162,24 +162,24 @@
 </div>
 
 <!-- ==================== DESKTOP VIEW ==================== -->
-<div class="order-add-page d-none d-md-block" id="orders_add_container_main">
+<div class="oap__page d-none d-md-block" id="orders_add_container_main">
   <!-- Page Header -->
-  <div class="order-add-header">
-    <div class="order-add-header-content">
-      <div class="order-add-title-section">
-        <h1 class="order-add-title">
+  <div class="oap__header-bar">
+    <div class="oap__header-bar-content">
+      <div class="oap__title-section">
+        <h1 class="oap__title-main">
           <i class="fas fa-plus-circle me-2"></i>Create New Order
         </h1>
-        <p class="order-add-subtitle">Fill in the details below to create a delivery order</p>
+        <p class="oap__subtitle-main">Fill in the details below to create a delivery order</p>
       </div>
 
       <!-- View Toggle -->
-      <div class="order-add-view-toggle" id="view_toggle_container">
-        <button type="button" class="view-toggle-btn active" id="btn_form_view">
+      <div class="oap__view-toggle" id="view_toggle_container">
+        <button type="button" class="oap__toggle-btn active" id="btn_form_view">
           <i class="fas fa-wpforms"></i>
           <span>Form</span>
         </button>
-        <button type="button" class="view-toggle-btn" id="btn_table_view">
+        <button type="button" class="oap__toggle-btn" id="btn_table_view">
           <i class="fas fa-table"></i>
           <span>Bulk Entry</span>
         </button>
@@ -187,16 +187,16 @@
     </div>
 
     <!-- Quick Actions -->
-    <div class="order-add-quick-actions">
-      <a href="{% url 'orders:order_upload_file' %}" class="quick-action-btn">
+    <div class="oap__quick-actions">
+      <a href="{% url 'orders:order_upload_file' %}" class="oap__quick-btn">
         <i class="fas fa-file-upload"></i>
         <span>Upload CSV</span>
       </a>
-      <a href="{% url 'business:pickup_location_list' %}" class="quick-action-btn">
+      <a href="{% url 'business:pickup_location_list' %}" class="oap__quick-btn">
         <i class="fas fa-map-marker-alt"></i>
         <span>Pickup Locations</span>
       </a>
-      <a href="{% url 'orders:orders_all_list' %}" class="quick-action-btn">
+      <a href="{% url 'orders:orders_all_list' %}" class="oap__quick-btn">
         <i class="fas fa-arrow-left"></i>
         <span>Back to Orders</span>
       </a>
@@ -204,8 +204,8 @@
   </div>
 
   <!-- Form View (Default) -->
-  <div class="order-add-form-container" id="form_view_container">
-    <form method="POST" id="orders_add_form_main" class="order-form" novalidate>
+  <div class="oap__form-wrap" id="form_view_container">
+    <form method="POST" id="orders_add_form_main" class="oap__form" novalidate>
       {% csrf_token %}
 
       {% if form.non_field_errors %}
@@ -217,12 +217,12 @@
       {% endif %}
 
       <!-- Order Information Section -->
-      <div class="form-section">
-        <div class="form-section-header">
+      <div class="oap__form-section">
+        <div class="oap__form-section-header">
           <i class="fas fa-file-alt"></i>
           <h3>Order Information</h3>
         </div>
-        <div class="form-section-body">
+        <div class="oap__form-section-body">
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label" for="id_client_order_code">
@@ -255,12 +255,12 @@
       </div>
 
       <!-- Customer Details Section -->
-      <div class="form-section">
-        <div class="form-section-header">
+      <div class="oap__form-section">
+        <div class="oap__form-section-header">
           <i class="fas fa-user"></i>
           <h3>Customer Details</h3>
         </div>
-        <div class="form-section-body">
+        <div class="oap__form-section-body">
           <div class="row g-3">
             <div class="col-md-12">
               <label class="form-label" for="id_customer_name">
@@ -289,12 +289,12 @@
       </div>
 
       <!-- Delivery Address Section -->
-      <div class="form-section">
-        <div class="form-section-header">
+      <div class="oap__form-section">
+        <div class="oap__form-section-header">
           <i class="fas fa-map-marker-alt"></i>
           <h3>Delivery Address</h3>
         </div>
-        <div class="form-section-body">
+        <div class="oap__form-section-body">
           <div class="row g-3">
             <div class="col-12">
               <label class="form-label" for="id_customer_address">
@@ -358,12 +358,12 @@
       </div>
 
       <!-- Payment Section -->
-      <div class="form-section">
-        <div class="form-section-header">
+      <div class="oap__form-section">
+        <div class="oap__form-section-header">
           <i class="fas fa-money-bill-wave"></i>
           <h3>Payment (COD)</h3>
         </div>
-        <div class="form-section-body">
+        <div class="oap__form-section-body">
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label" for="id_cod_status_by_client">
@@ -385,12 +385,12 @@
       </div>
 
       <!-- Notes Section -->
-      <div class="form-section">
-        <div class="form-section-header">
+      <div class="oap__form-section">
+        <div class="oap__form-section-header">
           <i class="fas fa-sticky-note"></i>
           <h3>Notes</h3>
         </div>
-        <div class="form-section-body">
+        <div class="oap__form-section-body">
           <div class="row g-3">
             <div class="col-12">
               <label class="form-label" for="id_order_notes">
@@ -404,7 +404,7 @@
       </div>
 
       <!-- Submit Section -->
-      <div class="order-form-submit">
+      <div class="oap__form-submit">
         <button type="button" class="ofu__back-btn" onclick="history.back()">
           <i class="fas fa-times"></i> Cancel
         </button>
@@ -471,7 +471,7 @@
 
           <div class="mt-3 d-flex justify-content-between">
             <div>
-              <span class="obr__badge obr__badge--muted" id="row_count_badge">0 orders</span>
+              <span class="bor__badge bor__badge--muted" id="row_count_badge">0 orders</span>
             </div>
             <div class="btn-group">
               <button type="button" class="ofu__back-btn" id="btn_save_draft">
@@ -505,7 +505,7 @@
       btnTableView.classList.remove('active');
       formViewContainer.classList.remove('d-none');
       tableViewContainer.classList.add('d-none');
-      orderAddPage.classList.remove('table-view-active');
+      orderAddPage.classList.remove('oap__page--table-active');
       localStorage.setItem('orderAddView', 'form');
     });
 
@@ -515,7 +515,7 @@
       btnFormView.classList.remove('active');
       tableViewContainer.classList.remove('d-none');
       formViewContainer.classList.add('d-none');
-      orderAddPage.classList.add('table-view-active');
+      orderAddPage.classList.add('oap__page--table-active');
       localStorage.setItem('orderAddView', 'table');
 
       // Initialize table if empty

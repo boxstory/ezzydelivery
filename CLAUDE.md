@@ -177,6 +177,25 @@ All styling must use the Brand Kit variables from `static/webpages/css/brand-kit
 .my-flex-row { display: flex; flex-direction: row; gap: 0.5rem; margin-top: 1rem; }
 ```
 
+- **Bootstrap-First BEM Rule**: When Bootstrap 5 already provides a component (btn, form-control, card, modal, nav-item, badge, alert, table), use the Bootstrap class as the base. Do NOT override Bootstrap defaults with custom BEM CSS that duplicates what Bootstrap already provides. Only add a BEM class alongside Bootstrap when you need custom modifications Bootstrap does not cover.
+
+```html
+<!-- Correct: Bootstrap base + BEM for custom brand tweaks only -->
+<button class="btn bapi__btn-primary">Submit</button>
+<input class="form-control bapi__form-input" type="text">
+
+<!-- Wrong: BEM class that re-declares Bootstrap defaults -->
+<button class="bapi__btn">Submit</button>
+```
+
+```css
+/* RIGHT: BEM only adds what Bootstrap doesn't provide */
+.bapi__btn-primary { background: var(--brand-primary); }
+
+/* WRONG: Duplicating Bootstrap's .btn base styles */
+.bapi__btn { display: inline-block; padding: 0.5rem; border: none; }
+```
+
 ### Template IDs
 
 Follow naming pattern: `{app}_{section}_{element_type}_{descriptor}`

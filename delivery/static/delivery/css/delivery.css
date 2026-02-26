@@ -9,245 +9,6 @@
    Uses variables from brand-kit.css
    ======================================== */
 
-/* ========================================
-   1. DELIVERY TASKS
-   ======================================== */
-
-.delivery-task-card {
-    background: var(--bg-primary, #fff);
-    border: 1px solid var(--border-color, #e5e7eb);
-    border-radius: var(--radius-lg, 0.5rem);
-    padding: var(--spacing-lg, 1.5rem);
-    margin-bottom: var(--spacing-md, 1rem);
-    transition: all var(--transition-base, 0.2s) ease;
-}
-
-.delivery-task-card:hover {
-    border-color: var(--brand-primary, #ffde00);
-    box-shadow: var(--shadow-lg, 0 0.625rem 0.9375rem -0.1875rem rgba(0, 0, 0, 0.1));
-}
-
-.delivery-task-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--spacing-md, 1rem);
-}
-
-.delivery-task-number {
-    
-    font-weight: 600;
-    color: var(--text-primary, #1f2937);
-}
-
-/* ========================================
-   2. DRIVER ASSIGNMENT
-   ======================================== */
-
-.driver-card {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md, 1rem);
-    padding: var(--spacing-md, 1rem);
-    background: var(--bg-primary, #fff);
-    border: 0.125rem solid var(--border-color, #e5e7eb);
-    border-radius: var(--radius-md, 0.375rem);
-    cursor: pointer;
-    transition: all var(--transition-base, 0.2s) ease;
-}
-
-.driver-card:hover {
-    border-color: var(--brand-secondary, #667eea);
-    background: var(--bg-secondary, #f9fafb);
-}
-
-.driver-card.selected {
-    border-color: var(--brand-primary, #ffde00);
-    background: var(--brand-primary-light, #fff4b3);
-}
-
-.driver-avatar {
-    width: 3.125rem;
-    height: 3.125rem;
-    border-radius: 50%;
-    object-fit: cover;
-}
-
-.driver-status-indicator {
-    width: 0.75rem;
-    height: 0.75rem;
-    border-radius: 50%;
-    display: inline-block;
-}
-
-.driver-status-indicator.available {
-    background: var(--status-success, #38ef7d);
-}
-
-.driver-status-indicator.busy {
-    background: var(--status-warning, #ffde00);
-}
-
-.driver-status-indicator.offline {
-    background: var(--border-color, #9ca3af);
-}
-
-/* ========================================
-   3. DELIVERY MAP
-   ======================================== */
-
-.delivery-map-container {
-    width: 100%;
-    height: 31.25rem;
-    border-radius: var(--radius-lg, 0.5rem);
-    overflow: hidden;
-    box-shadow: var(--shadow-md, 0 0.25rem 0.375rem -1px rgba(0, 0, 0, 0.1));
-}
-
-.delivery-route-info {
-    background: var(--bg-primary, #fff);
-    padding: var(--spacing-md, 1rem);
-    border-radius: var(--radius-md, 0.375rem);
-    margin-top: var(--spacing-md, 1rem);
-}
-
-/* ========================================
-   4. DELIVERY STATUS TIMELINE
-   ======================================== */
-
-.delivery-timeline {
-    position: relative;
-    padding: var(--spacing-lg, 1.5rem) 0;
-}
-
-.delivery-timeline-step {
-    position: relative;
-    padding-left: 3rem;
-    padding-bottom: var(--spacing-lg, 1.5rem);
-}
-
-.delivery-timeline-step:last-child {
-    padding-bottom: 0;
-}
-
-.delivery-timeline-step::before {
-    content: '';
-    position: absolute;
-    left: 0.75rem;
-    top: 0;
-    bottom: 0;
-    width: 0.125rem;
-    background: var(--border-color, #e5e7eb);
-}
-
-.delivery-timeline-step:last-child::before {
-    display: none;
-}
-
-.delivery-timeline-icon {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 1.75rem;
-    height: 1.75rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-primary, #fff);
-    border: 0.125rem solid var(--border-color, #e5e7eb);
-    color: var(--text-secondary, #6b7280);
-}
-
-.delivery-timeline-step.completed .delivery-timeline-icon {
-    background: var(--status-success, #38ef7d);
-    border-color: var(--status-success, #38ef7d);
-    color: var(--color-white, #fff);
-}
-
-.delivery-timeline-step.active .delivery-timeline-icon {
-    background: var(--brand-primary, #ffde00);
-    border-color: var(--brand-primary, #ffde00);
-    color: var(--text-primary, #1f2937);
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        box-shadow: 0 0 0 0 rgba(255, 222, 0, 0.7);
-    }
-    50% {
-        box-shadow: 0 0 0 0.625rem rgba(255, 222, 0, 0);
-    }
-}
-
-/* ========================================
-   5. DELIVERY STATISTICS
-   ======================================== */
-
-.delivery-stat-card {
-    background: linear-gradient(135deg, var(--brand-secondary, #667eea) 0%, var(--brand-secondary-hover, #764ba2) 100%);
-    color: var(--color-white, #fff);
-    padding: var(--spacing-lg, 1.5rem);
-    border-radius: var(--radius-lg, 0.5rem);
-    text-align: center;
-}
-
-.delivery-stat-value {
-    font-size: 2.5rem;
-    font-weight: 700;
-    line-height: 1;
-    margin-bottom: var(--spacing-sm, 0.5rem);
-}
-
-.delivery-stat-label {
-    font-size: .75rem;
-    opacity: 0.9;
-}
-
-/* ========================================
-   6. RESPONSIVE ADJUSTMENTS
-   ======================================== */
-
-@media (max-width: 768px) {
-    .delivery-map-container {
-        height: 21.875rem;
-    }
-
-    .delivery-task-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .driver-card {
-        flex-direction: column;
-        text-align: center;
-    }
-}
-
-/* ---------- DELIVERY MAIN ---------- */
-.blueboardaddress {
-  border-radius: 2rem;
-  background-color: #0750bd;
-  color: #ffffff;
-  font-size: .75rem;
-}
-
-.card-glassmorphic {
-  background: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 0.25rem 0.375rem rgba(254, 195, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-.card-glassmorphic:hover {
-  transform: scale(1.02);
-  box-shadow: 0 0.375rem 0.5rem rgba(0, 0, 0, 0.15);
-}
-
-.addressboard {
-  background: rgba(42, 110, 245, 0.822);
-}
-
 /* ========================================================================
    ALL DELIVERY TASKS LIST (adt__)
    ======================================================================== */
@@ -3049,8 +2810,8 @@
     color: var(--brand-grey-500, #6c757d);
 }
 
-/* Zone popup inside Leaflet */
-.zone-marker {
+/* --- Zone Marker & Popup (Leaflet) --- */
+.znm__marker {
     background: var(--brand-navy, #001f3f);
     color: #fff;
     border-radius: 50%;
@@ -3064,45 +2825,45 @@
     border: 2px solid #fff;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
-.zone-popup { text-align: left; }
-.zone-popup__title {
+.znm__popup { text-align: left; }
+.znm__popup-title {
     font-size: 0.9375rem;
     font-weight: 700;
     color: var(--brand-navy, #001f3f);
     margin-bottom: 0.25rem;
 }
-.zone-popup__arabic {
+.znm__popup-arabic {
     font-size: 0.875rem;
     color: var(--brand-grey-500, #6c757d);
     margin-bottom: 0.5rem;
     direction: rtl;
 }
-.zone-popup__info {
+.znm__popup-info {
     font-size: 0.75rem;
     color: var(--brand-grey-700, #333);
     margin-bottom: 0.25rem;
 }
-.zone-popup__neighbours {
+.znm__popup-neighbours {
     margin-top: 0.5rem;
     padding-top: 0.5rem;
     border-top: 1px solid var(--brand-grey-200, #f0f0f0);
 }
-.zone-popup__neighbours-title {
+.znm__popup-neighbours-title {
     font-size: 0.6875rem;
     font-weight: 600;
     color: var(--brand-grey-500, #6c757d);
     margin-bottom: 0.25rem;
 }
-.zone-popup__neighbour-list {
+.znm__popup-neighbour-list {
     font-size: 0.6875rem;
     color: var(--brand-grey-400, #b0b0b0);
 }
-.zone-popup__actions {
+.znm__popup-actions {
     margin-top: 0.625rem;
     padding-top: 0.625rem;
     border-top: 1px solid var(--brand-grey-200, #f0f0f0);
 }
-.zone-popup__btn {
+.znm__popup-btn {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
@@ -3114,11 +2875,11 @@
     cursor: pointer;
     transition: all 0.2s ease;
 }
-.zone-popup__btn--edit {
+.znm__popup-btn--edit {
     background: var(--brand-navy, #001f3f);
     color: #fff;
 }
-.zone-popup__btn--edit:hover {
+.znm__popup-btn--edit:hover {
     background: var(--brand-navy-light, #003366);
     color: #fff;
 }

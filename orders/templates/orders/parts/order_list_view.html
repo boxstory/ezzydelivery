@@ -2,52 +2,52 @@
 {% load custom_filters %}
 
 {% if not orders %}
-<div class="oal-empty">
-  <div class="oal-empty__icon"><i class="fa-solid fa-box-open"></i></div>
-  <p class="oal-empty__title">No orders found</p>
-  <p class="oal-empty__subtitle">Start by adding your first order</p>
+<div class="oal__empty">
+  <div class="oal__empty-icon"><i class="fa-solid fa-box-open"></i></div>
+  <p class="oal__empty-title">No orders found</p>
+  <p class="oal__empty-subtitle">Start by adding your first order</p>
 </div>
 {% endif %}
 
 {% for order in orders %}
-  <div class="order-card my-2" id="order-card-{{ order.id }}" data-card-id="orders_list_card_order">
+  <div class="ocl__card my-2" id="order-card-{{ order.id }}" data-card-id="orders_list_card_order">
     <!-- Order Card Header (Clickable) -->
-    <div class="order-card-header" onclick="toggleOrderCard({{ order.id }})" data-header-id="orders_list_header_order_card">
+    <div class="ocl__header" onclick="toggleOrderCard({{ order.id }})" data-header-id="orders_list_header_order_card">
       <div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
-        <div class="order-number">
+        <div class="ocl__number">
           <i class="fa-solid fa-receipt"></i>
           <span class="td-order-number" onclick="event.stopPropagation(); openOrderDetailPanel({{ order.id }});">{{ order.order_number }}</span>
-          <span class="expand-toggle">
+          <span class="ocl__expand">
             <i class="fa-solid fa-chevron-down"></i>
           </span>
         </div>
         <div class="d-flex flex-wrap align-items-center gap-2">
           {% with delivery=order.delivery_task.first %}
             {% if delivery and delivery.dl_task_status == 'delivered' %}
-              <span class="order-status-badge status-delivered">Delivered</span>
+              <span class="ocl__badge ocl__badge--delivered">Delivered</span>
             {% elif delivery and delivery.dl_task_status == 'assigned' %}
-              <span class="order-status-badge status-created">Assigned</span>
+              <span class="ocl__badge ocl__badge--created">Assigned</span>
             {% elif delivery and delivery.dl_task_status == 'accepted' %}
-              <span class="order-status-badge status-created">Accepted</span>
+              <span class="ocl__badge ocl__badge--created">Accepted</span>
             {% elif delivery and delivery.dl_task_status == 'picked_up' %}
-              <span class="order-status-badge status-pending">Picked Up</span>
+              <span class="ocl__badge ocl__badge--pending">Picked Up</span>
             {% elif delivery and delivery.dl_task_status == 'out_for_delivery' or delivery.dl_task_status == 'in_transit' or delivery.dl_task_status == 'start_ride' %}
-              <span class="order-status-badge status-pending">In Transit</span>
+              <span class="ocl__badge ocl__badge--pending">In Transit</span>
             {% elif delivery and delivery.dl_task_status == 'failed' or delivery.dl_task_status == 'non_reachable' %}
-              <span class="order-status-badge status-cancelled">Failed</span>
+              <span class="ocl__badge ocl__badge--cancelled">Failed</span>
             {% elif delivery and delivery.dl_task_status == 'cancelled' or delivery.dl_task_status == 'rejected' %}
-              <span class="order-status-badge status-cancelled">Cancelled</span>
+              <span class="ocl__badge ocl__badge--cancelled">Cancelled</span>
             {% elif order.task_created %}
-              <span class="order-status-badge status-created">Task Created</span>
+              <span class="ocl__badge ocl__badge--created">Task Created</span>
             {% else %}
-              <span class="order-status-badge status-pending">{{ order.get_order_status_display }}</span>
+              <span class="ocl__badge ocl__badge--pending">{{ order.get_order_status_display }}</span>
             {% endif %}
           {% endwith %}
-          <div class="order-date">
+          <div class="ocl__date">
             <i class="fa-regular fa-calendar"></i>
             <span>{{ order.order_date|date:"d/m" }}</span>
           </div>
-          <div class="order-id">
+          <div class="ocl__id">
             <i class="fa-solid fa-hashtag"></i>
             <span>{{ order.id }}</span>
           </div>
@@ -56,41 +56,41 @@
     </div>
 
     <!-- Compact Summary (Always Visible) -->
-    <div class="order-summary" data-summary-id="orders_list_section_summary">
-      <div class="summary-item">
+    <div class="ocl__summary" data-summary-id="orders_list_section_summary">
+      <div class="ocl__summary-item">
         <i class="fa-solid fa-user"></i>
         <strong>{{ order.customer_name }}</strong>
       </div>
-      <div class="summary-item">
+      <div class="ocl__summary-item">
         <i class="fa-solid fa-phone"></i>
         <span>{{ order.customer_phone }}</span>
       </div>
-      <div class="summary-item">
+      <div class="ocl__summary-item">
         <i class="fa-solid fa-location-dot"></i>
         <span>{% get_zone_display order %}</span>
       </div>
       {% if order.cod_amount %}
-      <div class="summary-item">
+      <div class="ocl__summary-item">
         <i class="fa-solid fa-money-bill-wave"></i>
-        <strong class="oal-cod-amount">Qr {{ order.cod_amount }}</strong>
+        <strong class="oal__cod-amount">Qr {{ order.cod_amount }}</strong>
       </div>
       {% endif %}
     </div>
 
     <!-- Order Card Body -->
-    <div class="order-card-body" data-body-id="orders_list_section_body">
+    <div class="ocl__body" data-body-id="orders_list_section_body">
       <!-- Order Details Section -->
-      <div class="order-details" data-details-id="orders_list_section_details">
+      <div class="ocl__details" data-details-id="orders_list_section_details">
         <!-- Customer Information -->
-        <div class="detail-row">
-          <span class="detail-label">Customer</span>
-          <span class="detail-value">{{ order.customer_name }}</span>
+        <div class="ocl__row">
+          <span class="ocl__label">Customer</span>
+          <span class="ocl__value">{{ order.customer_name }}</span>
         </div>
 
-        <div class="detail-row">
-          <span class="detail-label">Contact</span>
-          <div class="detail-value">
-            <a class="contact-link" href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank">
+        <div class="ocl__row">
+          <span class="ocl__label">Contact</span>
+          <div class="ocl__value">
+            <a class="ocl__link" href="https://wa.me/{{ order.customer_whatsapp|whatsapp_number }}?text=Hi%20{{ order.customer_name|urlencode }},%20this%20is%20regarding%20your%20order%20{{ order.order_number|urlencode }}.%20{% if order.whatsapp_product_summary %}Items:%20{{ order.whatsapp_product_summary|urlencode }}.%20{% endif %}{% if order.cod_amount %}COD:%20{{ order.cod_amount }}%20QR.%20{% endif %}Please%20confirm%20your%20delivery%20details%20and%20availability.%0A%0A📌%20Verify%20your%20location:%20https://ezzydelivery.qa/orders/verify/?order={{ order.order_number|urlencode }}%26key={{ order|verify_key }}" target="_blank">
               <i class="fa-brands fa-whatsapp"></i>
               <span>{{ order.customer_phone }}</span>
             </a>
@@ -98,29 +98,29 @@
         </div>
 
         <!-- Location Information -->
-        <div class="detail-row">
-          <span class="detail-label">Locations</span>
-          <div class="detail-value">
-            <div class="location-info">
+        <div class="ocl__row">
+          <span class="ocl__label">Locations</span>
+          <div class="ocl__value">
+            <div class="ocl__locations">
               <!-- Pickup Location -->
-              <div class="location-item pickup">
-                <div class="location-icon pickup">
+              <div class="ocl__loc ocl__loc--pickup">
+                <div class="ocl__loc-icon ocl__loc-icon--pickup">
                   <i class="fa-solid fa-arrow-up"></i>
                 </div>
-                <div class="location-text">
-                  <div class="location-name">Pickup</div>
-                  <div class="location-address">{{ order.pickup_location }}</div>
+                <div class="ocl__loc-text">
+                  <div class="ocl__loc-name">Pickup</div>
+                  <div class="ocl__loc-addr">{{ order.pickup_location }}</div>
                 </div>
               </div>
 
               <!-- Dropoff Location -->
-              <div class="location-item dropoff">
-                <div class="location-icon dropoff">
+              <div class="ocl__loc ocl__loc--dropoff">
+                <div class="ocl__loc-icon ocl__loc-icon--dropoff">
                   <i class="fa-solid fa-arrow-down"></i>
                 </div>
-                <div class="location-text">
-                  <div class="location-name">Drop-off</div>
-                  <div class="location-address">
+                <div class="ocl__loc-text">
+                  <div class="ocl__loc-name">Drop-off</div>
+                  <div class="ocl__loc-addr">
                     {% get_zone_display order %}{% if order.dl_street %}, Street {{ order.dl_street }}{% endif %}{% if order.dl_building %}, Building {{ order.dl_building }}{% endif %}<br>
                     {{ order.customer_address }}
                   </div>
@@ -131,15 +131,15 @@
         </div>
 
         <!-- Category and Status -->
-        <div class="detail-row">
-          <span class="detail-label">Category</span>
-          <span class="detail-value">{{ order.product_sub_catgory }}</span>
+        <div class="ocl__row">
+          <span class="ocl__label">Category</span>
+          <span class="ocl__value">{{ order.product_sub_catgory }}</span>
         </div>
 
-        <div class="detail-row">
-          <span class="detail-label">Order Status</span>
-          <span class="detail-value d-flex align-items-center gap-2">
-            <span class="status-value">{{ order.get_order_status_display }}</span>
+        <div class="ocl__row">
+          <span class="ocl__label">Order Status</span>
+          <span class="ocl__value d-flex align-items-center gap-2">
+            <span class="ocl__status-value">{{ order.get_order_status_display }}</span>
             {% if order.order_status != 'published' and order.order_status != 'delivered' and order.order_status != 'cancelled' %}
             <button type="button" class="btn btn-link btn-sm p-0 text-primary"
                     data-bs-toggle="modal" data-bs-target="#orderStatusModal"
@@ -157,34 +157,34 @@
         <!-- Delivery Task Details -->
         {% with delivery=order.delivery_task.first %}
         {% if delivery %}
-        <div class="detail-row delivery-task-section">
-          <span class="detail-label">Delivery Details</span>
-          <div class="detail-value">
-            <div class="delivery-task-info">
-              <div class="delivery-info-item">
+        <div class="ocl__row ocl__delivery">
+          <span class="ocl__label">Delivery Details</span>
+          <div class="ocl__value">
+            <div class="ocl__delivery-info">
+              <div class="ocl__delivery-item">
                 <i class="fa-solid fa-truck"></i>
-                <span class="delivery-info-label">Status:</span>
-                <span class="delivery-info-value">{{ delivery.get_dl_task_status_display }}</span>
+                <span class="ocl__delivery-label">Status:</span>
+                <span class="ocl__delivery-value">{{ delivery.get_dl_task_status_display }}</span>
               </div>
               {% if delivery.completed_at %}
-              <div class="delivery-info-item">
+              <div class="ocl__delivery-item">
                 <i class="fa-solid fa-clock"></i>
-                <span class="delivery-info-label">Delivered:</span>
-                <span class="delivery-info-value">{{ delivery.completed_at|date:"d/m/Y H:i" }}</span>
+                <span class="ocl__delivery-label">Delivered:</span>
+                <span class="ocl__delivery-value">{{ delivery.completed_at|date:"d/m/Y H:i" }}</span>
               </div>
               {% endif %}
               {% if delivery.driver %}
-              <div class="delivery-info-item">
+              <div class="ocl__delivery-item">
                 <i class="fa-solid fa-user"></i>
-                <span class="delivery-info-label">Driver:</span>
-                <span class="delivery-info-value">{{ delivery.driver.driver_name }}</span>
+                <span class="ocl__delivery-label">Driver:</span>
+                <span class="ocl__delivery-value">{{ delivery.driver.driver_name }}</span>
               </div>
               {% endif %}
               {% if delivery.dl_task_description %}
-              <div class="delivery-info-item">
+              <div class="ocl__delivery-item">
                 <i class="fa-solid fa-note-sticky"></i>
-                <span class="delivery-info-label">Notes:</span>
-                <span class="delivery-info-value">{{ delivery.dl_task_description }}</span>
+                <span class="ocl__delivery-label">Notes:</span>
+                <span class="ocl__delivery-value">{{ delivery.dl_task_description }}</span>
               </div>
               {% endif %}
             </div>
@@ -195,10 +195,10 @@
 
         <!-- COD Amount -->
         {% if order.cod_amount %}
-        <div class="detail-row">
-          <span class="detail-label">COD Amount</span>
-          <div class="detail-value">
-            <div class="cod-amount">
+        <div class="ocl__row">
+          <span class="ocl__label">COD Amount</span>
+          <div class="ocl__value">
+            <div class="ocl__cod">
               <i class="fa-solid fa-money-bill-wave"></i>
               <span>Qr {{ order.cod_amount }}</span>
             </div>
@@ -208,13 +208,13 @@
 
         <!-- Comments Section (visible when published) -->
         {% if order.order_status == 'publish' %}
-        <div class="detail-row comments-section">
-          <span class="detail-label">Comments</span>
-          <div class="detail-value" id="comments-container-{{ order.id }}"
+        <div class="ocl__row ocm__section">
+          <span class="ocl__label">Comments</span>
+          <div class="ocl__value" id="comments-container-{{ order.id }}"
                hx-get="{% url 'orders:get_order_comments' order.id %}"
                hx-trigger="load"
                hx-swap="innerHTML">
-            <div class="comments-loading">
+            <div class="ocm__loading">
               <i class="fa-solid fa-spinner fa-spin"></i>
               <span>Loading comments...</span>
             </div>
@@ -223,23 +223,23 @@
         {% endif %}
 
         <!-- Action Buttons -->
-        <div class="detail-row order-actions-row">
-          <div class="order-actions d-flex flex-wrap gap-2">
+        <div class="ocl__row ocl__actions-row">
+          <div class="ocl__actions d-flex flex-wrap gap-2">
             {% if order.order_status == 'publish' or order.order_status == 'delivered' or order.order_status == 'cancelled' %}
-            <span class="contact-link disabled" title="Cannot edit {{ order.get_order_status_display }} orders">
+            <span class="ocl__link ocl__link--disabled" title="Cannot edit {{ order.get_order_status_display }} orders">
               <i class="fa fa-edit"></i>
               <span>Edit Order</span>
             </span>
-            <span class="contact-link disabled" title="Cannot delete {{ order.get_order_status_display }} orders">
+            <span class="ocl__link ocl__link--disabled" title="Cannot delete {{ order.get_order_status_display }} orders">
               <i class="fa fa-trash"></i>
               <span>Delete</span>
             </span>
             {% else %}
-            <a href="{% url 'orders:order_update' order.id %}" class="contact-link">
+            <a href="{% url 'orders:order_update' order.id %}" class="ocl__link">
               <i class="fa fa-edit"></i>
               <span>Edit Order</span>
             </a>
-            <a href="{% url 'orders:delete_order' order.id %}" class="contact-link delete-link">
+            <a href="{% url 'orders:delete_order' order.id %}" class="ocl__link delete-link">
               <i class="fa fa-trash"></i>
               <span>Delete</span>
             </a>
@@ -249,15 +249,15 @@
       </div>
 
       <!-- Products Section -->
-      <div class="order-products" id="product-section-{{ order.id }}" data-section-id="orders_list_section_products">
-        <div class="products-header">
+      <div class="ocl__products" id="product-section-{{ order.id }}" data-section-id="orders_list_section_products">
+        <div class="ocl__products-head">
           <i class="fa-solid fa-box-open"></i>
           <span>Order Items</span>
         </div>
 
         <div class="text-center py-3" id="product-placeholder-{{ order.id }}">
-          <p class="mb-3 oal-muted">Click to load products</p>
-          <button class="load-products-btn"
+          <p class="mb-3 oal__muted">Click to load products</p>
+          <button class="ocl__load-btn"
                   onclick="loadProducts({{ order.id }}, event)"
                   hx-get="{% url 'orders:order_product_list' order.id %}"
                   hx-target="#product-content-{{ order.id }}"
@@ -311,7 +311,7 @@
 <script>
 function toggleOrderCard(orderId) {
   const card = document.getElementById('order-card-' + orderId);
-  card.classList.toggle('expanded');
+  card.classList.toggle('ocl__card--expanded');
 }
 
 function loadProducts(orderId, event) {
@@ -320,7 +320,7 @@ function loadProducts(orderId, event) {
   const content = document.getElementById('product-content-' + orderId);
 
   // Show loading state
-  placeholder.innerHTML = '<div class="text-center py-3"><i class="fa-solid fa-spinner fa-spin oal-spinner"></i><p class="mt-2 oal-muted">Loading products...</p></div>';
+  placeholder.innerHTML = '<div class="text-center py-3"><i class="fa-solid fa-spinner fa-spin oal__spinner"></i><p class="mt-2 oal__muted">Loading products...</p></div>';
 
   // After HTMX loads, hide placeholder and show content
   document.body.addEventListener('htmx:afterSwap', function handler(evt) {

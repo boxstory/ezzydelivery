@@ -31,14 +31,14 @@ async function _saveQnasStatus(orderId, status) {
 function _updateQnasStatusBadges(orderId, status) {
     const badges = document.querySelectorAll(`[data-qnas-badge="${orderId}"]`);
     const config = {
-        verified:  { cls: 'odp__qnas-status--verified',   icon: 'fa-check-circle',        label: 'Verified' },
-        not_found: { cls: 'odp__qnas-status--not_found',  icon: 'fa-exclamation-triangle', label: 'Not Found' },
-        error:     { cls: 'odp__qnas-status--error',      icon: 'fa-times-circle',         label: 'Error' },
+        verified:  { cls: 'qnas-verify__status--verified',   icon: 'fa-check-circle',        label: 'Verified' },
+        not_found: { cls: 'qnas-verify__status--not_found',  icon: 'fa-exclamation-triangle', label: 'Not Found' },
+        error:     { cls: 'qnas-verify__status--error',      icon: 'fa-times-circle',         label: 'Error' },
     };
     const c = config[status];
     if (!c) return;
     badges.forEach(badge => {
-        badge.className = 'odp__qnas-status ' + c.cls;
+        badge.className = 'qnas-verify__status ' + c.cls;
         badge.innerHTML = `<i class="fa-solid ${c.icon} me-1"></i>${c.label}`;
         badge.style.display = '';
     });

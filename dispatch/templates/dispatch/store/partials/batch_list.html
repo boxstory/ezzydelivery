@@ -1,19 +1,19 @@
 {% if active_batches %}
 {% for batch in active_batches %}
-<div class="batch-card {{ batch.status }}">
-    <div class="batch-header">
-        <span class="batch-code">{{ batch.batch_code }}</span>
-        <span class="batch-status {{ batch.status }}">{{ batch.get_status_display }}</span>
+<div class="dsp__batch-card dsp__batch-card--{{ batch.status }}">
+    <div class="dsp__batch-header">
+        <span class="dsp__batch-code">{{ batch.batch_code }}</span>
+        <span class="dsp__batch-status dsp__batch-status--{{ batch.status }}">{{ batch.get_status_display }}</span>
     </div>
 
-    <div class="batch-meta">
+    <div class="dsp__batch-meta">
         <span><i class="fa-solid fa-location-dot me-1"></i>Zone {{ batch.destination_zone }}</span>
         <span><i class="fa-solid fa-box me-1"></i>{{ batch.order_count }}/2 orders</span>
         {% if batch.total_cod > 0 %}
         <span><i class="fa-solid fa-money-bill me-1"></i>{{ batch.total_cod }} QR</span>
         {% endif %}
         {% if batch.status == 'holding' %}
-        <span class="hold-timer">
+        <span class="dsp__hold-timer">
             <i class="fa-solid fa-clock me-1"></i>
             <span data-expires="{{ batch.hold_expires_at|date:'c' }}">{{ batch.hold_remaining_seconds }}s</span>
         </span>
@@ -23,9 +23,9 @@
         {% endif %}
     </div>
 
-    <div class="batch-orders">
+    <div class="dsp__batch-orders">
         {% for batch_order in batch.batch_orders.all %}
-        <div class="order-item">
+        <div class="dsp__order-item">
             <div>
                 <strong>#{{ batch_order.sequence }}</strong>
                 {{ batch_order.order.customer_name }}

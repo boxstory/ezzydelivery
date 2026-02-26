@@ -10,10 +10,10 @@
 {% endblock %}
 
 {% block account_content %}
-<div class="auth-container" id="socialaccount_login_container_main">
-    <div class="auth-card" id="socialaccount_login_card_main">
-        <div class="auth-header" id="socialaccount_login_header">
-            <div class="auth-logo">
+<div class="auth__container" id="socialaccount_login_container_main">
+    <div class="auth__card" id="socialaccount_login_card_main">
+        <div class="auth__header" id="socialaccount_login_header">
+            <div class="auth__logo">
                 {% if provider.id == "google" %}
                     <i class="fa-brands fa-google"></i>
                 {% elif provider.id == "facebook" %}
@@ -30,8 +30,8 @@
             <p id="socialaccount_login_subtitle">{% trans "Continue to authenticate with your account" %}</p>
         </div>
 
-        <div class="auth-body" id="socialaccount_login_section_body">
-            <div class="provider-info" id="socialaccount_login_provider_info">
+        <div class="auth__body" id="socialaccount_login_section_body">
+            <div class="auth__provider-info" id="socialaccount_login_provider_info">
                 <p>
                     {% blocktrans with provider_name=provider.name %}
                     You will be redirected to {{ provider_name }} to continue signing in.
@@ -50,13 +50,13 @@
                     <input type="hidden" name="next" value="{{ next }}" />
                 {% endif %}
 
-                <button id="socialaccount_login_btn_submit" type="submit" class="btn-continue">
+                <button id="socialaccount_login_btn_submit" type="submit" class="auth__btn--continue">
                     <i class="fa-solid fa-arrow-right me-2"></i>
                     {% trans "Continue" %}
                 </button>
             </form>
 
-            <a href="{% url 'account_login' %}" class="btn-cancel">
+            <a href="{% url 'account_login' %}" class="auth__btn--cancel">
                 <i class="fa-solid fa-xmark me-2"></i>
                 {% trans "Cancel" %}
             </a>

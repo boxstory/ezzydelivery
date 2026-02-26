@@ -4,45 +4,45 @@
 {% block title %}Warehouse Management - Business Links{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'workforce/css/workforce-warehouse-compact.css' %}?v=20260214c">
+<link rel="stylesheet" href="{% static 'workforce/css/workforce-warehouse-compact.css' %}?v=20260226b">
 {% endblock %}
 
 {% block content %}
-<div class="wh-compact-page">
+<div class="wh__page">
 
   <!-- Page Header -->
-  <div class="wh-page-header">
+  <div class="wh__header">
     <div>
-      <h1 class="wh-page-title">
+      <h1 class="wh__title">
         <i class="fa-solid fa-warehouse"></i>
         Warehouse-Business Links
       </h1>
-      <p class="wh-page-subtitle">{{ total_warehouses }} Warehouses • {{ total_links }} Active Links</p>
+      <p class="wh__subtitle">{{ total_warehouses }} Warehouses • {{ total_links }} Active Links</p>
     </div>
   </div>
 
   <!-- Search & Filter Compact -->
-  <div class="wh-filters-compact">
-    <form method="GET" class="wh-filters-form" id="wh_links_form_filter">
-      <div class="wh-filters-row">
+  <div class="wh__filters">
+    <form method="GET" class="wh__filters-form" id="wh_links_form_filter">
+      <div class="wh__filters-row">
         <input
           type="text"
           name="search"
-          class="wh-search-input"
+          class="wh__search-input"
           placeholder="Search warehouses..."
           value="{{ search }}">
 
-        <select name="status" class="wh-filter-select" id="wh_links_select_status">
+        <select name="status" class="wh__filter-select" id="wh_links_select_status">
           <option value="">All Status</option>
           <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
           <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
         </select>
 
-        <button type="submit" class="wh-btn wh-btn--primary">
+        <button type="submit" class="wh__btn wh__btn--primary">
           <i class="fa-solid fa-search"></i>
         </button>
         {% if search or status_filter %}
-        <a href="{% url 'workforce:warehouses_list' %}" class="wh-btn wh-btn--clear" title="Clear">
+        <a href="{% url 'workforce:warehouses_list' %}" class="wh__btn wh__btn--clear" title="Clear">
           <i class="fa-solid fa-xmark"></i>
         </a>
         {% endif %}
@@ -52,53 +52,53 @@
 
   <!-- Warehouses Compact List -->
   {% for warehouse in warehouses %}
-  <div class="wh-card" id="wh_card_{{ warehouse.pk }}">
+  <div class="wh__card" id="wh_card_{{ warehouse.pk }}">
 
     <!-- Warehouse Header Row -->
-    <div class="wh-card-header" onclick="toggleLinks({{ warehouse.pk }})">
-      <div class="wh-info">
-        <div class="wh-name">
+    <div class="wh__card-header" onclick="toggleLinks({{ warehouse.pk }})">
+      <div class="wh__info">
+        <div class="wh__name">
           <i class="fa-solid fa-warehouse"></i>
           {{ warehouse.name }}
           {% if warehouse.is_default %}
-          <span class="wh-tag wh-tag--star"><i class="fa-solid fa-star"></i></span>
+          <span class="wh__tag wh__tag--star"><i class="fa-solid fa-star"></i></span>
           {% endif %}
         </div>
-        <div class="wh-meta">
+        <div class="wh__meta">
           <span>{{ warehouse.code }}</span>
           {% if warehouse.city %}<span>{{ warehouse.city }}</span>{% endif %}
-          <span class="wh-badge {% if warehouse.is_active %}wh-badge--active{% else %}wh-badge--inactive{% endif %}">
+          <span class="wh__badge {% if warehouse.is_active %}wh__badge--active{% else %}wh__badge--inactive{% endif %}">
             {{ warehouse.is_active|yesno:"Active,Inactive" }}
           </span>
         </div>
       </div>
 
-      <div class="wh-actions">
-        <span class="wh-link-count">{{ warehouse.seller_links.count }} linked</span>
+      <div class="wh__actions">
+        <span class="wh__link-count">{{ warehouse.seller_links.count }} linked</span>
         <button
           type="button"
-          class="wh-btn wh-btn--link"
+          class="wh__btn wh__btn--link"
           onclick="event.stopPropagation(); toggleForm({{ warehouse.pk }})"
           title="Link Business">
           <i class="fa-solid fa-plus"></i>
           Link
         </button>
-        <i class="fa-solid fa-chevron-down wh-expand-icon" id="wh_expand_icon_{{ warehouse.pk }}"></i>
+        <i class="fa-solid fa-chevron-down wh__expand-icon" id="wh_expand_icon_{{ warehouse.pk }}"></i>
       </div>
     </div>
 
     <!-- Link Form (Hidden by default) -->
-    <div class="wh-link-form" id="wh_link_form_{{ warehouse.pk }}" style="display: none;">
+    <div class="wh__link-form" id="wh_link_form_{{ warehouse.pk }}" style="display: none;">
       <form onsubmit="return linkBusiness(event, {{ warehouse.pk }})">
         {% csrf_token %}
         <input type="hidden" name="warehouse_id" value="{{ warehouse.pk }}">
-        <select name="business_id" class="wh-form-select" required>
+        <select name="business_id" class="wh__form-select" required>
           <option value="">-- Select Business --</option>
           {% for biz in linkable_businesses %}
           <option value="{{ biz.pk }}">{{ biz.business_name }} ({{ biz.business_code }})</option>
           {% endfor %}
         </select>
-        <button type="submit" class="wh-btn wh-btn--submit">
+        <button type="submit" class="wh__btn wh__btn--submit">
           <i class="fa-solid fa-link"></i>
           Link
         </button>
@@ -106,38 +106,38 @@
     </div>
 
     <!-- Linked Businesses Table -->
-    <div class="wh-links-table" id="wh_links_{{ warehouse.pk }}" style="display: none;">
+    <div class="wh__links-table" id="wh_links_{{ warehouse.pk }}" style="display: none;">
       {% with links=warehouse.seller_links.all %}
       {% if links %}
-      <table class="wh-table">
+      <table class="wh__table">
         <tbody>
           {% for link in links %}
           <tr id="wh_link_row_{{ link.pk }}">
-            <td class="wh-table-business">
+            <td class="wh__table-business">
               <i class="fa-solid fa-store"></i>
               <div>
-                <div class="wh-business-name">{{ link.business.business_name }}</div>
-                <div class="wh-business-code">{{ link.business.business_code }}</div>
+                <div class="wh__business-name">{{ link.business.business_name }}</div>
+                <div class="wh__business-code">{{ link.business.business_code }}</div>
               </div>
             </td>
-            <td class="wh-table-status">
-              <span class="wh-badge {% if link.is_active %}wh-badge--active{% else %}wh-badge--inactive{% endif %}">
+            <td class="wh__table-status">
+              <span class="wh__badge {% if link.is_active %}wh__badge--active{% else %}wh__badge--inactive{% endif %}">
                 {{ link.is_active|yesno:"Active,Inactive" }}
               </span>
               {% if link.is_default %}
-              <span class="wh-tag wh-tag--default">Default</span>
+              <span class="wh__tag wh__tag--default">Default</span>
               {% endif %}
             </td>
-            <td class="wh-table-date">{{ link.linked_at|date:"d M Y" }}</td>
-            <td class="wh-table-actions">
+            <td class="wh__table-date">{{ link.linked_at|date:"d M Y" }}</td>
+            <td class="wh__table-actions">
               <a href="{% url 'workforce:business_license_detail' link.business.pk %}"
-                 class="wh-icon-btn wh-icon-btn--view"
+                 class="wh__icon-btn wh__icon-btn--view"
                  title="View">
                 <i class="fa-solid fa-eye"></i>
               </a>
               <button
                 type="button"
-                class="wh-icon-btn wh-icon-btn--unlink"
+                class="wh__icon-btn wh__icon-btn--unlink"
                 title="Unlink"
                 onclick="unlinkBusiness({{ link.pk }}, '{{ link.business.business_name|escapejs }}', '{{ warehouse.name|escapejs }}')">
                 <i class="fa-solid fa-unlink"></i>
@@ -148,7 +148,7 @@
         </tbody>
       </table>
       {% else %}
-      <div class="wh-no-links">
+      <div class="wh__no-links">
         <i class="fa-solid fa-link-slash"></i>
         <span>No businesses linked yet</span>
       </div>
@@ -160,7 +160,7 @@
   {% empty %}
 
   <!-- Empty State -->
-  <div class="wh-empty-state">
+  <div class="wh__empty">
     <i class="fa-solid fa-warehouse"></i>
     <p>
       {% if search or status_filter %}

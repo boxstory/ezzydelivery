@@ -8,15 +8,15 @@
 {% endblock extra_css %}
 
 {% block content %}
-<div class="pending-container" id="core_verification_pending_container_main">
-    <div class="pending-card" id="core_verification_pending_card_main">
+<div class="cve__container" id="core_verification_pending_container_main">
+    <div class="cve__card" id="core_verification_pending_card_main">
         <!-- Status Icon -->
-        <div class="status-icon" id="core_verification_pending_icon">
+        <div class="cve__status-icon" id="core_verification_pending_icon">
             <i class="fa-solid fa-clock"></i>
         </div>
 
         <!-- Status Title -->
-        <h1 class="status-title">
+        <h1 class="cve__status-title">
             {% if profile.verification_status == 'pending' %}
                 Verification Pending
             {% else %}
@@ -25,7 +25,7 @@
         </h1>
 
         <!-- Status Badge -->
-        <div class="status-badge {% if profile.verification_status == 'pending' %}badge-pending{% else %}badge-review{% endif %}">
+        <div class="cve__status-badge {% if profile.verification_status == 'pending' %}cve__badge--pending{% else %}cve__badge--review{% endif %}">
             <i class="fa-solid fa-hourglass-half me-2"></i>
             {% if profile.verification_status == 'pending' %}
                 Awaiting Review
@@ -35,7 +35,7 @@
         </div>
 
         <!-- Status Message -->
-        <p class="status-message">
+        <p class="cve__status-message">
             {% if profile.verification_status == 'pending' %}
                 Thank you for submitting your application! Our verification team will review your information and get back to you soon.
             {% else %}
@@ -44,19 +44,19 @@
         </p>
 
         <!-- Profile Summary -->
-        <div class="profile-summary">
+        <div class="cve__profile-summary">
             <h5>
                 <i class="fa-solid fa-user-check me-2"></i>Application Details
             </h5>
-            <div class="profile-detail">
+            <div class="cve__profile-detail">
                 <strong>Name:</strong>
                 <span>{{ profile.first_name }} {{ profile.last_name }}</span>
             </div>
-            <div class="profile-detail">
+            <div class="cve__profile-detail">
                 <strong>Email:</strong>
                 <span>{{ profile.email }}</span>
             </div>
-            <div class="profile-detail">
+            <div class="cve__profile-detail">
                 <strong>Role:</strong>
                 <span>
                     {% if profile.is_business %}
@@ -66,7 +66,7 @@
                     {% endif %}
                 </span>
             </div>
-            <div class="profile-detail">
+            <div class="cve__profile-detail">
                 <strong>Submitted:</strong>
                 <span>
                     {% if profile.verification_applied_at %}
@@ -79,7 +79,7 @@
         </div>
 
         <!-- Info Box -->
-        <div class="info-box">
+        <div class="cve__info-box">
             <h4>
                 <i class="fa-solid fa-lightbulb me-2"></i>What Happens Next?
             </h4>
@@ -104,7 +104,7 @@
         </div>
 
         <!-- Action Button -->
-        <a href="{% url 'webpages:index' %}" class="btn-home" id="core_verification_pending_btn_home">
+        <a href="{% url 'webpages:index' %}" class="cve__btn-home" id="core_verification_pending_btn_home">
             <i class="fa-solid fa-home me-2"></i>Return to Homepage
         </a>
 

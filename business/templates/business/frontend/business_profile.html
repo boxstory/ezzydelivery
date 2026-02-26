@@ -9,34 +9,34 @@
 
 {% block content %}
 <!-- Hero Section -->
-<section class="profile-hero">
-    <div class="hero-grid"></div>
-    <div class="hero-content">
-        <div class="profile-logo-wrapper">
-            <div class="profile-logo-ring"></div>
+<section class="bpf__hero">
+    <div class="bpf__hero-grid"></div>
+    <div class="bpf__hero-content">
+        <div class="bpf__logo-wrapper">
+            <div class="bpf__logo-ring"></div>
             {% if business_logo_img %}
-                <img src="{{ business_logo_img }}" loading="lazy" alt="{{ business.business_name }}" class="profile-logo">
+                <img src="{{ business_logo_img }}" loading="lazy" alt="{{ business.business_name }}" class="bpf__logo">
             {% else %}
-                <img src="{% static 'webpages/img/ezzy-logo-sqr-round.png' %}" loading="lazy" alt="{{ business.business_name }}" class="profile-logo">
+                <img src="{% static 'webpages/img/ezzy-logo-sqr-round.png' %}" loading="lazy" alt="{{ business.business_name }}" class="bpf__logo">
             {% endif %}
         </div>
 
-        <h1 class="profile-business-name">{{ business.business_name }}</h1>
-        <p class="profile-tagline">{{ business.business_bio|default:"Welcome to our business profile" }}</p>
+        <h1 class="bpf__business-name">{{ business.business_name }}</h1>
+        <p class="bpf__tagline">{{ business.business_bio|default:"Welcome to our business profile" }}</p>
 
-        <div class="profile-meta-badges">
-            <span class="meta-badge">
+        <div class="bpf__meta-badges">
+            <span class="bpf__meta-badge">
                 <i class="fa-solid fa-calendar-days"></i>
                 Since {{ business.business_since|date:"Y"|default:"N/A" }}
             </span>
             {% if business.business_id %}
-            <span class="meta-badge">
+            <span class="bpf__meta-badge">
                 <i class="fa-solid fa-fingerprint"></i>
                 ID: {{ business.business_id }}
             </span>
             {% endif %}
             {% if business.business_product_category %}
-            <span class="meta-badge">
+            <span class="bpf__meta-badge">
                 <i class="fa-solid fa-tag"></i>
                 {{ business.business_product_category }}
             </span>
@@ -44,7 +44,7 @@
         </div>
 
         {% if user_business.business_id == business.business_id %}
-        <a href="{% url 'business:business_profile_info_update' business.business_id %}" class="btn-edit-profile">
+        <a href="{% url 'business:business_profile_info_update' business.business_id %}" class="bpf__btn-edit">
             <i class="fa-solid fa-pen-to-square"></i>
             Edit Profile
         </a>
@@ -53,65 +53,65 @@
 </section>
 
 <!-- Content Section -->
-<div class="profile-content">
+<div class="bpf__content">
     <div class="row g-4">
         <!-- Business Information -->
         <div class="col-lg-6">
-            <div class="futuristic-card">
-                <div class="card-header-futuristic">
-                    <div class="card-header-icon">
+            <div class="bpf__card">
+                <div class="bpf__card-header">
+                    <div class="bpf__card-icon">
                         <i class="fa-solid fa-briefcase"></i>
                     </div>
-                    <h2 class="card-header-title">Business Information</h2>
+                    <h2 class="bpf__card-title">Business Information</h2>
                 </div>
-                <div class="card-body-futuristic">
+                <div class="bpf__card-body">
                     {% if business_profile %}
                         {% if business_profile.business_description %}
-                        <p class="description-text">{{ business_profile.business_description }}</p>
+                        <p class="bpf__desc-text">{{ business_profile.business_description }}</p>
                         {% endif %}
 
-                        <div class="info-row-futuristic">
-                            <div class="info-label-futuristic">Founders</div>
-                            <div class="info-value-futuristic">{{ business_profile.business_founters_name|default:"Not specified" }}</div>
+                        <div class="bpf__info-row">
+                            <div class="bpf__info-label">Founders</div>
+                            <div class="bpf__info-value">{{ business_profile.business_founters_name|default:"Not specified" }}</div>
                         </div>
-                        <div class="info-row-futuristic">
-                            <div class="info-label-futuristic">Category</div>
-                            <div class="info-value-futuristic">
+                        <div class="bpf__info-row">
+                            <div class="bpf__info-label">Category</div>
+                            <div class="bpf__info-value">
                                 {% if business_profile.business_catagory_main %}
-                                    <span class="category-badge">{{ business_profile.business_catagory_main }}</span>
+                                    <span class="bpf__category-badge">{{ business_profile.business_catagory_main }}</span>
                                 {% else %}
                                     Not specified
                                 {% endif %}
                             </div>
                         </div>
                         {% if business_profile.business_catagory_detailed %}
-                        <div class="info-row-futuristic">
-                            <div class="info-label-futuristic">Industry Details</div>
-                            <div class="info-value-futuristic">{{ business_profile.business_catagory_detailed }}</div>
+                        <div class="bpf__info-row">
+                            <div class="bpf__info-label">Industry Details</div>
+                            <div class="bpf__info-value">{{ business_profile.business_catagory_detailed }}</div>
                         </div>
                         {% endif %}
-                        <div class="info-row-futuristic">
-                            <div class="info-label-futuristic">Mission</div>
-                            <div class="info-value-futuristic">{{ business_profile.business_mision|default:"Not specified" }}</div>
+                        <div class="bpf__info-row">
+                            <div class="bpf__info-label">Mission</div>
+                            <div class="bpf__info-value">{{ business_profile.business_mision|default:"Not specified" }}</div>
                         </div>
                         {% if business_profile.business_start_date %}
-                        <div class="info-row-futuristic">
-                            <div class="info-label-futuristic">Established</div>
-                            <div class="info-value-futuristic">{{ business_profile.business_start_date|date:"F d, Y" }}</div>
+                        <div class="bpf__info-row">
+                            <div class="bpf__info-label">Established</div>
+                            <div class="bpf__info-value">{{ business_profile.business_start_date|date:"F d, Y" }}</div>
                         </div>
                         {% endif %}
                         {% if business_profile.business_uniqueness_title %}
-                        <div class="info-row-futuristic">
-                            <div class="info-label-futuristic">What Makes Us Unique</div>
-                            <div class="info-value-futuristic">{{ business_profile.business_uniqueness_title }}</div>
+                        <div class="bpf__info-row">
+                            <div class="bpf__info-label">What Makes Us Unique</div>
+                            <div class="bpf__info-value">{{ business_profile.business_uniqueness_title }}</div>
                         </div>
                         {% endif %}
                     {% else %}
-                        <div class="empty-state-futuristic">
-                            <div class="empty-state-icon">
+                        <div class="bpf__empty-state">
+                            <div class="bpf__empty-icon">
                                 <i class="fa-solid fa-circle-info"></i>
                             </div>
-                            <p class="empty-state-text">No detailed business information available</p>
+                            <p class="bpf__empty-text">No detailed business information available</p>
                         </div>
                     {% endif %}
                 </div>
@@ -120,58 +120,58 @@
 
         <!-- About & Details -->
         <div class="col-lg-6">
-            <div class="futuristic-card">
-                <div class="card-header-futuristic">
-                    <div class="card-header-icon">
+            <div class="bpf__card">
+                <div class="bpf__card-header">
+                    <div class="bpf__card-icon">
                         <i class="fa-solid fa-circle-info"></i>
                     </div>
-                    <h2 class="card-header-title">About Us</h2>
+                    <h2 class="bpf__card-title">About Us</h2>
                 </div>
-                <div class="card-body-futuristic">
+                <div class="bpf__card-body">
                     {% if business_profile %}
                         {% if business_profile.business_about_part_1 %}
-                        <p class="description-text">{{ business_profile.business_about_part_1 }}</p>
+                        <p class="bpf__desc-text">{{ business_profile.business_about_part_1 }}</p>
                         {% endif %}
 
                         {% if business_profile.business_about_part_2 %}
-                        <p class="description-text">{{ business_profile.business_about_part_2 }}</p>
+                        <p class="bpf__desc-text">{{ business_profile.business_about_part_2 }}</p>
                         {% endif %}
 
                         {% if business_profile.business_mision_detailed %}
-                        <div class="info-row-futuristic">
-                            <div class="info-label-futuristic">Our Mission</div>
-                            <div class="info-value-futuristic">{{ business_profile.business_mision_detailed }}</div>
+                        <div class="bpf__info-row">
+                            <div class="bpf__info-label">Our Mission</div>
+                            <div class="bpf__info-value">{{ business_profile.business_mision_detailed }}</div>
                         </div>
                         {% endif %}
 
                         {% if business_profile.business_uniqueness_description %}
-                        <div class="info-row-futuristic">
-                            <div class="info-label-futuristic">Why Choose Us</div>
-                            <div class="info-value-futuristic">{{ business_profile.business_uniqueness_description }}</div>
+                        <div class="bpf__info-row">
+                            <div class="bpf__info-label">Why Choose Us</div>
+                            <div class="bpf__info-value">{{ business_profile.business_uniqueness_description }}</div>
                         </div>
                         {% endif %}
 
                         {% if business_profile.business_founters_bio %}
-                        <div class="info-row-futuristic">
-                            <div class="info-label-futuristic">Founder's Story</div>
-                            <div class="info-value-futuristic">{{ business_profile.business_founters_bio }}</div>
+                        <div class="bpf__info-row">
+                            <div class="bpf__info-label">Founder's Story</div>
+                            <div class="bpf__info-value">{{ business_profile.business_founters_bio }}</div>
                         </div>
                         {% endif %}
 
                         {% if not business_profile.business_about_part_1 and not business_profile.business_about_part_2 and not business_profile.business_mision_detailed and not business_profile.business_uniqueness_description and not business_profile.business_founters_bio %}
-                        <div class="empty-state-futuristic">
-                            <div class="empty-state-icon">
+                        <div class="bpf__empty-state">
+                            <div class="bpf__empty-icon">
                                 <i class="fa-solid fa-book-open"></i>
                             </div>
-                            <p class="empty-state-text">No about information available</p>
+                            <p class="bpf__empty-text">No about information available</p>
                         </div>
                         {% endif %}
                     {% else %}
-                        <div class="empty-state-futuristic">
-                            <div class="empty-state-icon">
+                        <div class="bpf__empty-state">
+                            <div class="bpf__empty-icon">
                                 <i class="fa-solid fa-book-open"></i>
                             </div>
-                            <p class="empty-state-text">No about information available</p>
+                            <p class="bpf__empty-text">No about information available</p>
                         </div>
                     {% endif %}
                 </div>
@@ -180,24 +180,24 @@
 
         <!-- Location Information -->
         <div class="col-lg-6">
-            <div class="futuristic-card">
-                <div class="card-header-futuristic">
-                    <div class="card-header-icon">
+            <div class="bpf__card">
+                <div class="bpf__card-header">
+                    <div class="bpf__card-icon">
                         <i class="fa-solid fa-location-dot"></i>
                     </div>
-                    <h2 class="card-header-title">Location</h2>
+                    <h2 class="bpf__card-title">Location</h2>
                 </div>
-                <div class="card-body-futuristic">
+                <div class="bpf__card-body">
                     {% if business_profile.business_address or business_profile.business_city or business_profile.business_country %}
-                        <div class="location-address">
-                            <div class="location-icon">
+                        <div class="bpf__location-address">
+                            <div class="bpf__location-icon">
                                 <i class="fa-solid fa-map-marker-alt"></i>
                             </div>
-                            <div class="location-details">
+                            <div class="bpf__location-details">
                                 {% if business_profile.business_address %}
                                 <p>{{ business_profile.business_address }}</p>
                                 {% endif %}
-                                <p class="city-line">
+                                <p class="bpf__city-line">
                                     {% if business_profile.business_city %}{{ business_profile.business_city }}{% endif %}{% if business_profile.business_state %}, {{ business_profile.business_state }}{% endif %}{% if business_profile.business_zip_code %} {{ business_profile.business_zip_code }}{% endif %}
                                 </p>
                                 {% if business_profile.business_country %}
@@ -206,11 +206,11 @@
                             </div>
                         </div>
                     {% else %}
-                        <div class="empty-state-futuristic">
-                            <div class="empty-state-icon">
+                        <div class="bpf__empty-state">
+                            <div class="bpf__empty-icon">
                                 <i class="fa-solid fa-map-location-dot"></i>
                             </div>
-                            <p class="empty-state-text">No location information available</p>
+                            <p class="bpf__empty-text">No location information available</p>
                         </div>
                     {% endif %}
                 </div>
@@ -219,78 +219,78 @@
 
         <!-- Contact Information -->
         <div class="col-lg-6">
-            <div class="futuristic-card">
-                <div class="card-header-futuristic">
-                    <div class="card-header-icon">
+            <div class="bpf__card">
+                <div class="bpf__card-header">
+                    <div class="bpf__card-icon">
                         <i class="fa-solid fa-address-card"></i>
                     </div>
-                    <h2 class="card-header-title">Contact Details</h2>
+                    <h2 class="bpf__card-title">Contact Details</h2>
                 </div>
-                <div class="card-body-futuristic">
+                <div class="bpf__card-body">
                     {% if business.business_phone or business.business_email or business.business_whatsapp or business_profile.business_phone or business_profile.business_email %}
-                        <div class="social-grid">
+                        <div class="bpf__social-grid">
                             {% if business.business_phone %}
-                            <a href="tel:{{ business.business_phone }}" class="social-card">
-                                <div class="social-icon">
+                            <a href="tel:{{ business.business_phone }}" class="bpf__social-card">
+                                <div class="bpf__social-icon">
                                     <i class="fa-solid fa-phone"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">Phone</div>
-                                    <div class="social-value">{{ business.business_phone }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">Phone</div>
+                                    <div class="bpf__social-value">{{ business.business_phone }}</div>
                                 </div>
                             </a>
                             {% elif business_profile.business_phone %}
-                            <a href="tel:{{ business_profile.business_phone }}" class="social-card">
-                                <div class="social-icon">
+                            <a href="tel:{{ business_profile.business_phone }}" class="bpf__social-card">
+                                <div class="bpf__social-icon">
                                     <i class="fa-solid fa-phone"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">Phone</div>
-                                    <div class="social-value">{{ business_profile.business_phone }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">Phone</div>
+                                    <div class="bpf__social-value">{{ business_profile.business_phone }}</div>
                                 </div>
                             </a>
                             {% endif %}
 
                             {% if business.business_email %}
-                            <a href="mailto:{{ business.business_email }}" class="social-card">
-                                <div class="social-icon">
+                            <a href="mailto:{{ business.business_email }}" class="bpf__social-card">
+                                <div class="bpf__social-icon">
                                     <i class="fa-solid fa-envelope"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">Email</div>
-                                    <div class="social-value">{{ business.business_email }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">Email</div>
+                                    <div class="bpf__social-value">{{ business.business_email }}</div>
                                 </div>
                             </a>
                             {% elif business_profile.business_email %}
-                            <a href="mailto:{{ business_profile.business_email }}" class="social-card">
-                                <div class="social-icon">
+                            <a href="mailto:{{ business_profile.business_email }}" class="bpf__social-card">
+                                <div class="bpf__social-icon">
                                     <i class="fa-solid fa-envelope"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">Email</div>
-                                    <div class="social-value">{{ business_profile.business_email }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">Email</div>
+                                    <div class="bpf__social-value">{{ business_profile.business_email }}</div>
                                 </div>
                             </a>
                             {% endif %}
 
                             {% if business.business_whatsapp %}
-                            <a href="https://wa.me/{{ business.business_whatsapp }}" class="social-card" target="_blank" rel="noopener">
-                                <div class="social-icon">
+                            <a href="https://wa.me/{{ business.business_whatsapp }}" class="bpf__social-card" target="_blank" rel="noopener">
+                                <div class="bpf__social-icon">
                                     <i class="fa-brands fa-whatsapp"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">WhatsApp</div>
-                                    <div class="social-value">{{ business.business_whatsapp }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">WhatsApp</div>
+                                    <div class="bpf__social-value">{{ business.business_whatsapp }}</div>
                                 </div>
                             </a>
                             {% endif %}
                         </div>
                     {% else %}
-                        <div class="empty-state-futuristic">
-                            <div class="empty-state-icon">
+                        <div class="bpf__empty-state">
+                            <div class="bpf__empty-icon">
                                 <i class="fa-solid fa-phone-slash"></i>
                             </div>
-                            <p class="empty-state-text">No contact details available</p>
+                            <p class="bpf__empty-text">No contact details available</p>
                         </div>
                     {% endif %}
                 </div>
@@ -299,138 +299,138 @@
 
         <!-- Social Media Links -->
         <div class="col-12">
-            <div class="futuristic-card">
-                <div class="card-header-futuristic">
-                    <div class="card-header-icon">
+            <div class="bpf__card">
+                <div class="bpf__card-header">
+                    <div class="bpf__card-icon">
                         <i class="fa-solid fa-share-nodes"></i>
                     </div>
-                    <h2 class="card-header-title">Connect With Us</h2>
+                    <h2 class="bpf__card-title">Connect With Us</h2>
                 </div>
-                <div class="card-body-futuristic">
+                <div class="bpf__card-body">
                     {% if business_profile.business_website or business_profile.business_instagram or business_profile.business_facebook_page or business_profile.business_tiktok or business_profile.business_youtube or business_profile.business_twitter or business_profile.business_linkedin or business_profile.business_snapchat or business.business_instagram or business.business_facebook_page %}
-                        <div class="social-grid">
+                        <div class="bpf__social-grid">
                             {% if business_profile.business_website %}
-                            <a href="http://{{ business_profile.business_website }}" class="social-card" target="_blank" rel="noopener">
-                                <div class="social-icon">
+                            <a href="http://{{ business_profile.business_website }}" class="bpf__social-card" target="_blank" rel="noopener">
+                                <div class="bpf__social-icon">
                                     <i class="fa-solid fa-globe"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">Website</div>
-                                    <div class="social-value">{{ business_profile.business_website }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">Website</div>
+                                    <div class="bpf__social-value">{{ business_profile.business_website }}</div>
                                 </div>
                             </a>
                             {% endif %}
 
                             {% if business_profile.business_instagram %}
-                            <a href="https://www.instagram.com/{{ business_profile.business_instagram }}" class="social-card" target="_blank" rel="noopener">
-                                <div class="social-icon">
+                            <a href="https://www.instagram.com/{{ business_profile.business_instagram }}" class="bpf__social-card" target="_blank" rel="noopener">
+                                <div class="bpf__social-icon">
                                     <i class="fa-brands fa-instagram"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">Instagram</div>
-                                    <div class="social-value">@{{ business_profile.business_instagram }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">Instagram</div>
+                                    <div class="bpf__social-value">@{{ business_profile.business_instagram }}</div>
                                 </div>
                             </a>
                             {% elif business.business_instagram %}
-                            <a href="https://www.instagram.com/{{ business.business_instagram }}" class="social-card" target="_blank" rel="noopener">
-                                <div class="social-icon">
+                            <a href="https://www.instagram.com/{{ business.business_instagram }}" class="bpf__social-card" target="_blank" rel="noopener">
+                                <div class="bpf__social-icon">
                                     <i class="fa-brands fa-instagram"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">Instagram</div>
-                                    <div class="social-value">@{{ business.business_instagram }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">Instagram</div>
+                                    <div class="bpf__social-value">@{{ business.business_instagram }}</div>
                                 </div>
                             </a>
                             {% endif %}
 
                             {% if business_profile.business_facebook_page %}
-                            <a href="https://www.facebook.com/{{ business_profile.business_facebook_page }}" class="social-card" target="_blank" rel="noopener">
-                                <div class="social-icon">
+                            <a href="https://www.facebook.com/{{ business_profile.business_facebook_page }}" class="bpf__social-card" target="_blank" rel="noopener">
+                                <div class="bpf__social-icon">
                                     <i class="fa-brands fa-facebook"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">Facebook</div>
-                                    <div class="social-value">{{ business_profile.business_facebook_page }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">Facebook</div>
+                                    <div class="bpf__social-value">{{ business_profile.business_facebook_page }}</div>
                                 </div>
                             </a>
                             {% elif business.business_facebook_page %}
-                            <a href="https://www.facebook.com/{{ business.business_facebook_page }}" class="social-card" target="_blank" rel="noopener">
-                                <div class="social-icon">
+                            <a href="https://www.facebook.com/{{ business.business_facebook_page }}" class="bpf__social-card" target="_blank" rel="noopener">
+                                <div class="bpf__social-icon">
                                     <i class="fa-brands fa-facebook"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">Facebook</div>
-                                    <div class="social-value">{{ business.business_facebook_page }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">Facebook</div>
+                                    <div class="bpf__social-value">{{ business.business_facebook_page }}</div>
                                 </div>
                             </a>
                             {% endif %}
 
                             {% if business_profile.business_tiktok %}
-                            <a href="https://www.tiktok.com/@{{ business_profile.business_tiktok }}" class="social-card" target="_blank" rel="noopener">
-                                <div class="social-icon">
+                            <a href="https://www.tiktok.com/@{{ business_profile.business_tiktok }}" class="bpf__social-card" target="_blank" rel="noopener">
+                                <div class="bpf__social-icon">
                                     <i class="fa-brands fa-tiktok"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">TikTok</div>
-                                    <div class="social-value">@{{ business_profile.business_tiktok }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">TikTok</div>
+                                    <div class="bpf__social-value">@{{ business_profile.business_tiktok }}</div>
                                 </div>
                             </a>
                             {% endif %}
 
                             {% if business_profile.business_youtube %}
-                            <a href="https://www.youtube.com/{{ business_profile.business_youtube }}" class="social-card" target="_blank" rel="noopener">
-                                <div class="social-icon">
+                            <a href="https://www.youtube.com/{{ business_profile.business_youtube }}" class="bpf__social-card" target="_blank" rel="noopener">
+                                <div class="bpf__social-icon">
                                     <i class="fa-brands fa-youtube"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">YouTube</div>
-                                    <div class="social-value">{{ business_profile.business_youtube }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">YouTube</div>
+                                    <div class="bpf__social-value">{{ business_profile.business_youtube }}</div>
                                 </div>
                             </a>
                             {% endif %}
 
                             {% if business_profile.business_twitter %}
-                            <a href="https://www.twitter.com/{{ business_profile.business_twitter }}" class="social-card" target="_blank" rel="noopener">
-                                <div class="social-icon">
+                            <a href="https://www.twitter.com/{{ business_profile.business_twitter }}" class="bpf__social-card" target="_blank" rel="noopener">
+                                <div class="bpf__social-icon">
                                     <i class="fa-brands fa-x-twitter"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">X (Twitter)</div>
-                                    <div class="social-value">@{{ business_profile.business_twitter }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">X (Twitter)</div>
+                                    <div class="bpf__social-value">@{{ business_profile.business_twitter }}</div>
                                 </div>
                             </a>
                             {% endif %}
 
                             {% if business_profile.business_linkedin %}
-                            <a href="https://www.linkedin.com/company/{{ business_profile.business_linkedin }}" class="social-card" target="_blank" rel="noopener">
-                                <div class="social-icon">
+                            <a href="https://www.linkedin.com/company/{{ business_profile.business_linkedin }}" class="bpf__social-card" target="_blank" rel="noopener">
+                                <div class="bpf__social-icon">
                                     <i class="fa-brands fa-linkedin"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">LinkedIn</div>
-                                    <div class="social-value">{{ business_profile.business_linkedin }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">LinkedIn</div>
+                                    <div class="bpf__social-value">{{ business_profile.business_linkedin }}</div>
                                 </div>
                             </a>
                             {% endif %}
 
                             {% if business_profile.business_snapchat %}
-                            <a href="https://www.snapchat.com/add/{{ business_profile.business_snapchat }}" class="social-card" target="_blank" rel="noopener">
-                                <div class="social-icon">
+                            <a href="https://www.snapchat.com/add/{{ business_profile.business_snapchat }}" class="bpf__social-card" target="_blank" rel="noopener">
+                                <div class="bpf__social-icon">
                                     <i class="fa-brands fa-snapchat"></i>
                                 </div>
-                                <div class="social-info">
-                                    <div class="social-label">Snapchat</div>
-                                    <div class="social-value">{{ business_profile.business_snapchat }}</div>
+                                <div class="bpf__social-info">
+                                    <div class="bpf__social-label">Snapchat</div>
+                                    <div class="bpf__social-value">{{ business_profile.business_snapchat }}</div>
                                 </div>
                             </a>
                             {% endif %}
                         </div>
                     {% else %}
-                        <div class="empty-state-futuristic">
-                            <div class="empty-state-icon">
+                        <div class="bpf__empty-state">
+                            <div class="bpf__empty-icon">
                                 <i class="fa-solid fa-link-slash"></i>
                             </div>
-                            <p class="empty-state-text">No social media links available</p>
+                            <p class="bpf__empty-text">No social media links available</p>
                         </div>
                     {% endif %}
                 </div>
@@ -439,23 +439,23 @@
 
         <!-- Products/Services Section -->
         <div class="col-12">
-            <div class="futuristic-card">
-                <div class="card-header-futuristic">
-                    <div class="card-header-icon">
+            <div class="bpf__card">
+                <div class="bpf__card-header">
+                    <div class="bpf__card-icon">
                         <i class="fa-solid fa-box-open"></i>
                     </div>
-                    <h2 class="card-header-title">Products & Services</h2>
+                    <h2 class="bpf__card-title">Products & Services</h2>
                 </div>
-                <div class="card-body-futuristic">
-                    <div class="empty-state-futuristic">
-                        <div class="empty-state-icon">
+                <div class="bpf__card-body">
+                    <div class="bpf__empty-state">
+                        <div class="bpf__empty-icon">
                             <i class="fa-solid fa-boxes-stacked"></i>
                         </div>
-                        <p class="empty-state-text">Product showcase coming soon</p>
+                        <p class="bpf__empty-text">Product showcase coming soon</p>
                         {% if user_business.business_id == business.business_id %}
-                        <p class="empty-state-subtext">Add products from your dashboard to display them here</p>
+                        <p class="bpf__empty-subtext">Add products from your dashboard to display them here</p>
                         {% endif %}
-                        <span class="coming-soon-badge">
+                        <span class="bpf__coming-soon-badge">
                             <i class="fa-solid fa-rocket"></i>
                             Coming Soon
                         </span>
