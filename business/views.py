@@ -437,6 +437,11 @@ def pickup_location_add(request):
                 pickup_location = form.save(commit=False)
                 # IDOR FIX: Use verified business_id
                 pickup_location.business_id = business.business_id
+                # Enforce single default: clear is_default on all other locations first
+                if pickup_location.is_default:
+                    business_models.PickupLocation.objects.filter(
+                        business_id=business.business_id, is_default=True
+                    ).update(is_default=False)
                 pickup_location.save()
                 logger.info(f"User {request.user.id} added pickup location for business {business.business_id}")
                 messages.success(request, "Pickup location added successfully")
@@ -506,7 +511,13 @@ def pickup_location_update(request, pickup_location_id):
 
         if request.method == 'POST':
             if form.is_valid():
-                form.save()
+                updated = form.save(commit=False)
+                # Enforce single default: clear is_default on all other locations first
+                if updated.is_default:
+                    business_models.PickupLocation.objects.filter(
+                        business_id=business.business_id, is_default=True
+                    ).exclude(id=pickup_location_id).update(is_default=False)
+                updated.save()
                 logger.info(f"Pickup location {pickup_location_id} updated successfully")
                 messages.success(request, "Pickup location updated successfully")
                 return redirect("business:pickup_location_list")
@@ -874,8 +885,10 @@ def business_settings_api_test(request, business_id, api_id):
 
     business = user_business
     business_apis = business_models.BusinessApiSettings.objects.filter(business_id=business_id, id=api_id).first()
-    
-    
+
+    if not business_apis:
+        messages.error(request, "API settings not found.")
+        return redirect('business:business_settings_api_list', business_id=business_id)
 
     context = {
         'business': business,
@@ -1684,7 +1697,12 @@ def business_finance_dashboard(request):
         messages.error(request, "No business associated with your account")
         return redirect('core:main_dashboard')
 
-    days = int(request.GET.get('days', 30))
+    try:
+        days = int(request.GET.get('days', 30))
+        if days <= 0 or days > 365:
+            days = 30
+    except (ValueError, TypeError):
+        days = 30
     start_date = timezone.now() - timedelta(days=days)
 
     # Transactions linked to this business
@@ -1726,7 +1744,7 @@ def business_finance_dashboard(request):
         count=Count('id')
     )
 
-    total_charges = sum(abs(c['total']) for c in charges) if charges else Decimal('0')
+    total_charges = sum(abs(c['total'] or Decimal('0')) for c in charges) if charges else Decimal('0')
 
     # Bills for this business
     bills_payable = abs(txns.filter(
@@ -1780,7 +1798,12 @@ def business_transactions(request):
         messages.error(request, "No business associated with your account")
         return redirect('core:main_dashboard')
 
-    days = int(request.GET.get('days', 30))
+    try:
+        days = int(request.GET.get('days', 30))
+        if days <= 0 or days > 365:
+            days = 30
+    except (ValueError, TypeError):
+        days = 30
     txn_type = request.GET.get('type', 'all')
     start_date = timezone.now() - timedelta(days=days)
 
@@ -1829,13 +1852,18 @@ def business_cod_statement(request):
         messages.error(request, "No business associated with your account")
         return redirect('core:main_dashboard')
 
-    days = int(request.GET.get('days', 30))
+    try:
+        days = int(request.GET.get('days', 30))
+        if days <= 0 or days > 365:
+            days = 30
+    except (ValueError, TypeError):
+        days = 30
     start_date = timezone.now() - timedelta(days=days)
 
     # COD deliveries for this business
     cod_deliveries = delivery_models.DeliveryTask.objects.filter(
         business=business.business_id,
-        has_cod=True,
+        cod_collected_amount__gt=0,
         dl_task_date__gte=start_date.date()
     ).select_related('driver__user', 'order').order_by('-dl_task_date')
 

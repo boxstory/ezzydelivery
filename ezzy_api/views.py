@@ -553,6 +553,154 @@ def driver_statistics(request):
             {'error': 'Driver profile not found'},
             status=status.HTTP_404_NOT_FOUND
         )
+# ==================== HUB PICKUP BATCH APIs ====================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_hub_batches(request):
+    """List active hub pickup batches assigned to the requesting driver."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    batches = delivery_models.HubPickupBatch.objects.filter(
+        driver=driver,
+    ).exclude(
+        status__in=['at_hub', 'cancelled'],
+    ).select_related(
+        'pickup_location',
+        'hub_warehouse',
+        'hub_warehouse__warehouse',
+    ).prefetch_related('orders').order_by('-created_at')
+
+    data = []
+    for batch in batches:
+        pickup_loc = batch.pickup_location
+        hub_wh = batch.hub_warehouse
+        data.append({
+            'id': batch.id,
+            'batch_number': batch.batch_number,
+            'status': batch.status,
+            'order_count': batch.order_count,
+            'driver_earnings': str(batch.driver_earnings),
+            'pickup_location_title': pickup_loc.pickup_location_title if pickup_loc else None,
+            'pickup_lat': str(pickup_loc.pickup_lat) if pickup_loc and pickup_loc.pickup_lat else None,
+            'pickup_lon': str(pickup_loc.pickup_lon) if pickup_loc and pickup_loc.pickup_lon else None,
+            'hub_warehouse_name': f"{hub_wh.warehouse.name} / {hub_wh.name}" if hub_wh else None,
+            'hub_warehouse_address': hub_wh.address if hub_wh else None,
+            'hub_lat': str(hub_wh.latitude) if hub_wh and hub_wh.latitude else None,
+            'hub_lng': str(hub_wh.longitude) if hub_wh and hub_wh.longitude else None,
+            'orders': [{'order_number': o.order_number, 'customer_name': o.customer_name} for o in batch.orders.all()],
+        })
+    return Response(data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def driver_hub_batch_detail(request, batch_id):
+    """Get detail for a single hub pickup batch."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        batch = delivery_models.HubPickupBatch.objects.select_related(
+            'pickup_location', 'hub_warehouse', 'hub_warehouse__warehouse'
+        ).prefetch_related('orders').get(id=batch_id, driver=driver)
+    except delivery_models.HubPickupBatch.DoesNotExist:
+        return Response({'error': 'Batch not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    pickup_loc = batch.pickup_location
+    hub_wh = batch.hub_warehouse
+    return Response({
+        'id': batch.id,
+        'batch_number': batch.batch_number,
+        'status': batch.status,
+        'order_count': batch.order_count,
+        'driver_earnings': str(batch.driver_earnings),
+        'notes': batch.notes,
+        'pickup_location_title': pickup_loc.pickup_location_title if pickup_loc else None,
+        'pickup_lat': str(pickup_loc.pickup_lat) if pickup_loc and pickup_loc.pickup_lat else None,
+        'pickup_lon': str(pickup_loc.pickup_lon) if pickup_loc and pickup_loc.pickup_lon else None,
+        'hub_warehouse_name': f"{hub_wh.warehouse.name} / {hub_wh.name}" if hub_wh else None,
+        'hub_warehouse_address': hub_wh.address if hub_wh else None,
+        'hub_lat': str(hub_wh.latitude) if hub_wh and hub_wh.latitude else None,
+        'hub_lng': str(hub_wh.longitude) if hub_wh and hub_wh.longitude else None,
+        'orders': [
+            {
+                'order_number': o.order_number,
+                'customer_name': o.customer_name,
+                'customer_address': o.customer_address,
+                'cod_amount': o.cod_amount,
+            }
+            for o in batch.orders.all()
+        ],
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def driver_hub_batch_accept(request, batch_id):
+    """Driver accepts a hub pickup batch."""
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        batch = delivery_models.HubPickupBatch.objects.get(id=batch_id, driver=driver)
+    except delivery_models.HubPickupBatch.DoesNotExist:
+        return Response({'error': 'Batch not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if batch.status != 'assigned':
+        return Response({'error': f'Cannot accept batch in status: {batch.status}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    batch._old_batch_status = batch.status
+    batch.status = 'accepted'
+    batch.save(update_fields=['status'])
+    return Response({'success': True, 'status': 'accepted'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def driver_hub_batch_status(request, batch_id):
+    """Driver updates hub pickup batch status."""
+    DRIVER_ALLOWED_TRANSITIONS = {
+        'accepted':    'in_progress',
+        'in_progress': 'arrived',
+        'arrived':     'collected',
+        'collected':   'at_hub',
+    }
+
+    try:
+        driver = fleet_models.Driver.objects.get(user=request.user)
+    except fleet_models.Driver.DoesNotExist:
+        return Response({'error': 'Driver profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        batch = delivery_models.HubPickupBatch.objects.get(id=batch_id, driver=driver)
+    except delivery_models.HubPickupBatch.DoesNotExist:
+        return Response({'error': 'Batch not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    new_status = request.data.get('status')
+    if not new_status:
+        return Response({'error': 'status field required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    allowed_next = DRIVER_ALLOWED_TRANSITIONS.get(batch.status)
+    if new_status != allowed_next:
+        return Response(
+            {'error': f"Invalid transition '{batch.status}' → '{new_status}'. Allowed next: {allowed_next or 'none (terminal)'}"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    batch._old_batch_status = batch.status
+    batch.status = new_status
+    batch.save(update_fields=['status'])
+    return Response({'success': True, 'status': new_status}, status=status.HTTP_200_OK)
+
+
 # ==================== ENHANCED DRIVER APP TASK APIs ====================
 
 @api_view(['POST'])

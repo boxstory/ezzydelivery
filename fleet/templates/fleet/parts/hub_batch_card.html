@@ -1,0 +1,75 @@
+{% comment %}
+── Hub Pickup Batch Card ─────────────────────────────────────────────────
+Renders a single hub pickup batch as a task card in the driver PWA.
+Pass: batch — HubPickupBatch instance with select_related(pickup_location, hub_warehouse, hub_warehouse__warehouse)
+{% endcomment %}
+{% load static %}
+
+<div class="task-card task-card--hub-pickup"
+     data-batch-id="{{ batch.id }}"
+     data-batch-number="{{ batch.batch_number }}"
+     data-status="{{ batch.status }}"
+     data-order-count="{{ batch.order_count }}"
+     data-pickup="{{ batch.pickup_location.pickup_location_title|default:'' }}"
+     data-pickup-lat="{{ batch.pickup_location.pickup_lat|default:'' }}"
+     data-pickup-lng="{{ batch.pickup_location.pickup_lon|default:'' }}"
+     data-hub="{{ batch.hub_warehouse.warehouse.name|default:'' }} / {{ batch.hub_warehouse.name|default:'' }}"
+     data-hub-address="{{ batch.hub_warehouse.address|default:'' }}"
+     data-hub-lat="{{ batch.hub_warehouse.latitude|default:'' }}"
+     data-hub-lng="{{ batch.hub_warehouse.longitude|default:'' }}"
+     data-earnings="{{ batch.driver_earnings }}"
+     onclick="openHubBatchDetail(event, this)">
+
+    <div class="task-card__header">
+        <div class="task-card__header-left">
+            <span class="fleet-badge fleet-badge--warning">
+                <i class="fa-solid fa-warehouse me-1"></i> Hub Pickup
+            </span>
+            <span class="task-card__num ms-2">{{ batch.batch_number }}</span>
+        </div>
+        <div class="task-card__header-right">
+            <span class="fleet-badge fleet-badge--secondary">
+                <i class="fa-solid fa-boxes-stacked me-1"></i>{{ batch.order_count }} order{{ batch.order_count|pluralize }}
+            </span>
+        </div>
+    </div>
+
+    <div class="task-card__route mt-2">
+        <!-- Pickup from seller -->
+        <div class="task-card__route-point task-card__route-point--pickup">
+            <i class="fa-solid fa-circle-dot task-card__route-pin task-card__route-pin--green"></i>
+            <div class="task-card__route-info">
+                <span class="task-card__route-label">Collect From</span>
+                <span class="task-card__route-value">{{ batch.pickup_location.pickup_location_title|default:"—" }}</span>
+                <span class="task-card__route-sub text-muted small">{{ batch.pickup_location.locality|default:"" }}</span>
+            </div>
+        </div>
+
+        <div class="task-card__route-line"></div>
+
+        <!-- Drop off at hub -->
+        <div class="task-card__route-point task-card__route-point--dropoff">
+            <i class="fa-solid fa-warehouse task-card__route-pin task-card__route-pin--blue"></i>
+            <div class="task-card__route-info">
+                <span class="task-card__route-label">Drop at Hub</span>
+                <span class="task-card__route-value">{{ batch.hub_warehouse.warehouse.name|default:"—" }}</span>
+                <span class="task-card__route-sub text-muted small">{{ batch.hub_warehouse.name|default:"" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="task-card__footer mt-2">
+        <span class="task-card__earnings">
+            <i class="fa-solid fa-coins me-1"></i> {{ batch.driver_earnings }} QAR
+        </span>
+        <span class="task-card__status-dot
+            {% if batch.status == 'assigned' %}task-card__status-dot--info
+            {% elif batch.status == 'accepted' %}task-card__status-dot--primary
+            {% elif batch.status in 'in_progress,arrived,collected' %}task-card__status-dot--warning
+            {% elif batch.status == 'at_hub' %}task-card__status-dot--success
+            {% else %}task-card__status-dot--secondary{% endif %}">
+            {{ batch.get_status_display }}
+        </span>
+    </div>
+
+</div>

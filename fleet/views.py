@@ -611,7 +611,7 @@ def cod_submission(request):
         from orders.models import Order
         selected_orders = Order.objects.filter(
             id__in=cod_in_hand_list.values_list('order_id', flat=True)
-        ).select_related('delivery_task').order_by('-created_at')
+        ).prefetch_related('delivery_task').order_by('-created_at')
 
         context = {
             'driver': driver,
@@ -2312,6 +2312,17 @@ def driver_tasks(request):
         for zone in available_zones
     }
 
+    # Hub pickup batches assigned to this driver (active only)
+    hub_batches = delivery_models.HubPickupBatch.objects.filter(
+        driver=driver,
+    ).exclude(
+        status__in=['at_hub', 'cancelled'],
+    ).select_related(
+        'pickup_location',
+        'hub_warehouse',
+        'hub_warehouse__warehouse',
+    ).prefetch_related('orders').order_by('-created_at')
+
     context = {
         'driver': driver,
         'cards': cards,
@@ -2328,6 +2339,7 @@ def driver_tasks(request):
         'available_zones': available_zones,
         'zone_group_map': zone_group_map,
         'zone_name_map': zone_name_map,
+        'hub_batches': hub_batches,
     }
     return render(request, 'fleet/driver_tasks_pwa.html', context)
 

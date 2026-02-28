@@ -8,8 +8,9 @@ from delivery.state_machine import can_transition
 import uuid
 import logging
 
-# Local alias for commonly used model
+# Local aliases for commonly used models
 DeliveryTask = delivery_models.DeliveryTask
+HubPickupBatch = delivery_models.HubPickupBatch
 
 logger = logging.getLogger(__name__)
 
@@ -245,3 +246,107 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
         new_dl = instance.dl_task_status
         if created or (old_dl is not None and old_dl != new_dl):
             _sync_driver_availability(instance)
+
+
+# =============================================================================
+# HUB PICKUP BATCH SIGNALS
+# =============================================================================
+
+
+@receiver(pre_save, sender=HubPickupBatch)
+def hub_batch_pre_save(sender, instance, **kwargs):
+    """Track old batch status for change detection in post_save."""
+    if instance.pk:
+        try:
+            old = HubPickupBatch.objects.get(pk=instance.pk)
+            instance._old_batch_status = old.status
+        except HubPickupBatch.DoesNotExist:
+            pass
+
+
+@receiver(post_save, sender=HubPickupBatch)
+def hub_batch_post_save(sender, instance, created, **kwargs):
+    """
+    When a hub pickup batch reaches 'at_hub':
+    - Auto-create hub_delivery DeliveryTask for each order in the batch
+    - Process driver earnings for the batch pickup ride
+    """
+    old_status = getattr(instance, '_old_batch_status', None)
+
+    if not created and old_status != 'at_hub' and instance.status == 'at_hub':
+        _create_hub_delivery_tasks(instance)
+
+
+def _create_hub_delivery_tasks(batch):
+    """
+    Auto-create a hub_delivery DeliveryTask (Leg 2) for each order in the batch.
+    Tasks start as 'for_review' and are NOT published — staff publishes each
+    delivery individually after reviewing.
+
+    Also records batch pickup earnings for the driver via WalletService.
+    """
+    from decimal import Decimal
+
+    created_count = 0
+    for order in batch.orders.select_related('business', 'pickup_location').all():
+        # Skip if delivery task already exists for this order
+        if order.delivery_task.filter(task_leg='hub_delivery').exists():
+            logger.info(f"Hub delivery task already exists for order {order.order_number}, skipping.")
+            continue
+
+        # Get address update created at publish time
+        address_update = order.dl_address_update.first()
+        if not address_update:
+            logger.warning(
+                f"No DlAddressUpdate found for hub order {order.order_number} — "
+                f"delivery task created without address."
+            )
+
+        try:
+            task = DeliveryTask.objects.create(
+                dl_task_number=f"{order.order_number}-D",
+                dl_task_description=f"Hub Delivery — {order.order_number}",
+                order=order,
+                business=order.business,
+                dl_address_update=address_update,
+                dl_task_status='for_review',
+                dl_task_status_client='for_review',
+                pickup_location=None,   # pickup origin is the hub, not a PickupLocation
+                task_leg='hub_delivery',
+                hub_pickup_batch=batch,
+                hub_warehouse=batch.hub_warehouse,
+            )
+
+            # Mark order as ready for last-mile dispatch
+            order.order_status = 'ready_to_pickup'
+            order.save(update_fields=['order_status'])
+
+            created_count += 1
+            logger.info(
+                f"Hub delivery task {task.dl_task_number} created for order "
+                f"{order.order_number} (batch {batch.batch_number})"
+            )
+
+        except Exception as e:
+            logger.exception(
+                f"Error creating hub delivery task for order {order.order_number}: {e}"
+            )
+
+    # Record batch pickup earnings for the driver
+    if batch.driver_id and not batch.earnings_processed and batch.driver_earnings > 0:
+        try:
+            from fleet.wallet_service import WalletService
+            WalletService.record_earnings_from_batch_pickup(batch)
+        except Exception as e:
+            logger.exception(
+                f"Error recording batch pickup earnings for batch {batch.batch_number}: {e}"
+            )
+
+    # Mark batch completed_at
+    if created_count > 0:
+        HubPickupBatch.objects.filter(pk=batch.pk).update(completed_at=timezone.now())
+
+    logger.info(
+        f"Hub batch {batch.batch_number}: created {created_count} delivery tasks, "
+        f"earnings_processed={batch.earnings_processed}"
+    )

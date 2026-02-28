@@ -535,6 +535,7 @@ class PickupLocationsAddForm(forms.ModelForm):
             'pickup_lon',
             'pickup_status',
             'is_fulfilment_center',
+            'is_default',
         ]
         exclude = ['business', 'updated_at', 'created_at']
 

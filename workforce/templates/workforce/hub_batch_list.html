@@ -1,0 +1,104 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% block title %}Hub Pickup Batches – EzzyDelivery{% endblock %}
+{% block content %}
+<div class="hub-bl">
+
+    <div class="wfd__hero">
+        <div class="wfd__hero-content">
+            <h1 class="wfd__hero-title"><i class="fa-solid fa-warehouse"></i> Hub Pickup Batches</h1>
+            <p class="wfd__hero-subtitle">Manage two-leg hub delivery batches</p>
+        </div>
+        <div class="wfd__hero-actions">
+            <a href="{% url 'workforce:hub_batch_create' %}" class="btn btn-primary">
+                <i class="fa-solid fa-plus me-1"></i> New Batch
+            </a>
+        </div>
+    </div>
+
+    <!-- Status filter tabs -->
+    <div class="hub-bl__tabs mb-3">
+        <a href="?status=" class="btn btn-sm {% if not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
+        {% for val, label in status_choices %}
+        <a href="?status={{ val }}" class="btn btn-sm {% if status_filter == val %}btn-primary{% else %}btn-outline-secondary{% endif %} ms-1">
+            {{ label|truncatechars:20 }}
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Batch table -->
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Batch #</th>
+                        <th>Pickup Location</th>
+                        <th>Hub Warehouse</th>
+                        <th>Driver</th>
+                        <th>Orders</th>
+                        <th>Earnings</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for batch in batches %}
+                    <tr>
+                        <td><code>{{ batch.batch_number }}</code></td>
+                        <td>
+                            {% if batch.pickup_location %}
+                                <span class="fw-semibold">{{ batch.pickup_location.pickup_location_title }}</span>
+                                <br><small class="text-muted">{{ batch.pickup_location.locality }}</small>
+                            {% else %}<span class="text-muted">—</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if batch.hub_warehouse %}
+                                {{ batch.hub_warehouse.warehouse.name }}<br>
+                                <small class="text-muted">{{ batch.hub_warehouse.name }}</small>
+                            {% else %}<span class="text-muted">—</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if batch.driver %}
+                                {{ batch.driver.user.get_full_name|default:batch.driver.driver_code }}
+                            {% else %}<span class="badge bg-warning text-dark">Unassigned</span>{% endif %}
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-secondary">{{ batch.order_count }}</span>
+                        </td>
+                        <td>{{ batch.driver_earnings }} QAR</td>
+                        <td>
+                            {% if batch.status == 'pending' %}<span class="badge bg-secondary">Pending</span>
+                            {% elif batch.status == 'assigned' %}<span class="badge bg-info text-dark">Assigned</span>
+                            {% elif batch.status == 'accepted' %}<span class="badge bg-primary">Accepted</span>
+                            {% elif batch.status == 'in_progress' %}<span class="badge bg-warning text-dark">In Progress</span>
+                            {% elif batch.status == 'arrived' %}<span class="badge bg-warning text-dark">Arrived</span>
+                            {% elif batch.status == 'collected' %}<span class="badge bg-warning text-dark">Collected</span>
+                            {% elif batch.status == 'at_hub' %}<span class="badge bg-success">At Hub</span>
+                            {% elif batch.status == 'cancelled' %}<span class="badge bg-danger">Cancelled</span>
+                            {% else %}<span class="badge bg-secondary">{{ batch.status }}</span>{% endif %}
+                        </td>
+                        <td><small class="text-muted">{{ batch.created_at|date:"d M Y" }}</small></td>
+                        <td>
+                            <a href="{% url 'workforce:hub_batch_detail' batch.id %}" class="btn btn-sm btn-outline-primary">
+                                <i class="fa-solid fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            <i class="fa-solid fa-box-open fa-2x mb-2 d-block opacity-25"></i>
+                            No hub pickup batches found.
+                            <a href="{% url 'workforce:hub_batch_create' %}">Create one now</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

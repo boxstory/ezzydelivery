@@ -195,6 +195,26 @@ class Order(models.Model):
         help_text="Staff member who cancelled the order"
     )
 
+    # Hub delivery tracking
+    is_hub_delivery = models.BooleanField(
+        default=False,
+        help_text="When True, order goes through hub warehouse before last-mile delivery."
+    )
+    hub_warehouse = models.ForeignKey(
+        'warehouse.WarehouseLocation',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='hub_orders',
+        help_text="Hub warehouse used as handoff point for hub deliveries."
+    )
+    hub_pickup_batch = models.ForeignKey(
+        'delivery.HubPickupBatch',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='orders',
+        help_text="Pickup batch this order belongs to (assigned by staff)."
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -369,6 +369,32 @@ def _create_delivery_task_from_order(order):
     from decimal import Decimal
 
     try:
+        # Hub delivery orders: delivery task created later when batch arrives at hub.
+        # Ensure address update and geocode are still created, but skip task creation.
+        if order.is_hub_delivery:
+            DlAddressUpdate.objects.get_or_create(
+                order=order,
+                defaults={
+                    'full_name': order.customer_name,
+                    'dl_task_number': order.order_number,
+                    'mobile_no': order.customer_phone,
+                    'dl_zone': order.dl_zone,
+                    'dl_street': order.dl_street,
+                    'dl_building': order.dl_building,
+                    'dl_longitude': Decimal('0'),
+                    'dl_latitude': Decimal('0'),
+                    'dl_unit': '0',
+                }
+            )
+            logger.info(
+                f"Order {order.order_number}: hub delivery — "
+                f"delivery task will be created after hub pickup batch arrives at hub."
+            )
+            order.task_created = False
+            order.task_status = 'awaiting_hub_pickup'
+            order.save(update_fields=['task_created', 'task_status'])
+            return None
+
         # Get or create address update
         address_update, created = DlAddressUpdate.objects.get_or_create(
             order=order,
@@ -406,6 +432,7 @@ def _create_delivery_task_from_order(order):
             dl_task_status='for_review',
             dl_task_status_client='for_review',
             pickup_location=order.pickup_location,
+            task_leg='single',
         )
 
         # Update order

@@ -645,6 +645,10 @@ class PickupLocation(models.Model):
     pickup_status = models.CharField(
         max_length=100, choices=status_choices, default='active')
     is_fulfilment_center = models.BooleanField(default=False)
+    is_default = models.BooleanField(
+        default=False,
+        help_text="Pre-selected as pickup location when creating new orders"
+    )
     warehouse = models.ForeignKey(
         'warehouse.Warehouse', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='linked_pickup_locations',

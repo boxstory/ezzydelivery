@@ -205,4 +205,11 @@ urlpatterns = [
     path('forms/whatsapp-inquiries/', workforce_views.whatsapp_inquiries_list, name='whatsapp_inquiries_list'),
     path('forms/whatsapp-inquiries/<int:inquiry_id>/', workforce_views.whatsapp_inquiry_detail, name='whatsapp_inquiry_detail'),
 
+    # Hub Operations
+    path('hub/batches/', workforce_views.hub_batch_list, name='hub_batch_list'),
+    path('hub/batches/create/', workforce_views.hub_batch_create, name='hub_batch_create'),
+    path('hub/batches/<int:batch_id>/', workforce_views.hub_batch_detail, name='hub_batch_detail'),
+    path('hub/batches/<int:batch_id>/assign-driver/', workforce_views.hub_batch_assign_driver, name='hub_batch_assign_driver'),
+    path('hub/batches/<int:batch_id>/update-status/', workforce_views.hub_batch_update_status, name='hub_batch_update_status'),
+
 ]

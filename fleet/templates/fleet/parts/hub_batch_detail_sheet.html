@@ -1,0 +1,189 @@
+{% load static %}
+{% comment %}
+── Hub Batch Detail Bottom Sheet ────────────────────────────────────────────
+Include alongside task_detail_sheet.html in any PWA page that shows hub batches.
+openHubBatchDetail(event, cardEl) reads data-* attributes from the hub_batch_card.
+{% endcomment %}
+
+<div id="hubBatchOverlay" class="td-overlay" onclick="closeHubBatchDetail()"></div>
+<div id="hubBatchSheet" class="td-sheet">
+    <div class="td-sheet__handle"></div>
+    <div class="td-sheet__header">
+        <div>
+            <span class="fleet-badge fleet-badge--warning">
+                <i class="fa-solid fa-warehouse me-1"></i> Hub Pickup
+            </span>
+            <span id="hbStatus" class="fleet-badge ms-1"></span>
+        </div>
+        <button class="td-sheet__close" onclick="closeHubBatchDetail()" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <div class="td-sheet__body">
+
+        <!-- Batch meta -->
+        <div class="td-row td-row--meta">
+            <div class="td-meta-item">
+                <span class="td-label">Batch #</span>
+                <strong id="hbBatchNum"></strong>
+            </div>
+            <div class="td-meta-item">
+                <span class="td-label">Orders</span>
+                <strong id="hbOrderCount"></strong>
+            </div>
+            <div class="td-meta-item">
+                <span class="td-label">Earnings</span>
+                <strong id="hbEarnings"></strong>
+            </div>
+        </div>
+
+        <!-- Route -->
+        <div class="td-section">
+            <div class="td-section__icon td-section__icon--green">
+                <i class="fa-solid fa-circle-dot"></i>
+            </div>
+            <div class="td-section__content">
+                <span class="td-label">Collect From</span>
+                <strong id="hbPickup"></strong>
+            </div>
+            <a id="hbPickupMapBtn" href="#" target="_blank" class="td-map-tile td-map-tile--grey" title="Open in Maps">
+                <i class="fa-solid fa-location-pin td-map-tile__pin"></i>
+                <span class="td-map-tile__label">Maps</span>
+            </a>
+        </div>
+
+        <div class="td-section">
+            <div class="td-section__icon td-section__icon--blue">
+                <i class="fa-solid fa-warehouse"></i>
+            </div>
+            <div class="td-section__content">
+                <span class="td-label">Drop at Hub</span>
+                <strong id="hbHub"></strong>
+                <span id="hbHubAddress" class="td-sub"></span>
+            </div>
+            <a id="hbHubMapBtn" href="#" target="_blank" class="td-map-tile td-map-tile--grey" title="Open Hub in Maps">
+                <i class="fa-solid fa-location-pin td-map-tile__pin"></i>
+                <span class="td-map-tile__label">Maps</span>
+            </a>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="td-actions" id="hbActions">
+            <!-- Rendered by JS based on status -->
+        </div>
+
+    </div>
+</div>
+
+<script>
+let _currentBatchId = null;
+
+function openHubBatchDetail(event, card) {
+    event.stopPropagation();
+    const d = card.dataset;
+    _currentBatchId = d.batchId;
+
+    document.getElementById('hbBatchNum').textContent = d.batchNumber || '—';
+    document.getElementById('hbOrderCount').textContent = (d.orderCount || '0') + ' order' + (d.orderCount == 1 ? '' : 's');
+    document.getElementById('hbEarnings').textContent = (d.earnings || '0') + ' QAR';
+    document.getElementById('hbPickup').textContent = d.pickup || '—';
+    document.getElementById('hbHub').textContent = d.hub || '—';
+    document.getElementById('hbHubAddress').textContent = d.hubAddress || '';
+
+    // Status badge
+    const statusMap = {
+        pending: ['secondary', 'Pending'],
+        assigned: ['info', 'Assigned'],
+        accepted: ['primary', 'Accepted'],
+        in_progress: ['warning', 'In Progress'],
+        arrived: ['warning', 'Arrived'],
+        collected: ['warning', 'Collected'],
+        at_hub: ['success', 'At Hub'],
+        cancelled: ['danger', 'Cancelled'],
+    };
+    const [cls, label] = statusMap[d.status] || ['secondary', d.status];
+    const statusEl = document.getElementById('hbStatus');
+    statusEl.className = `fleet-badge fleet-badge--${cls} ms-1`;
+    statusEl.textContent = label;
+
+    // Map buttons
+    const pickupMapBtn = document.getElementById('hbPickupMapBtn');
+    if (d.pickupLat && d.pickupLng && parseFloat(d.pickupLat) !== 0) {
+        pickupMapBtn.href = 'https://www.google.com/maps?q=' + d.pickupLat + ',' + d.pickupLng;
+        pickupMapBtn.className = 'td-map-tile td-map-tile--green';
+    } else {
+        pickupMapBtn.removeAttribute('href');
+        pickupMapBtn.className = 'td-map-tile td-map-tile--grey';
+    }
+    const hubMapBtn = document.getElementById('hbHubMapBtn');
+    if (d.hubLat && d.hubLng && parseFloat(d.hubLat) !== 0) {
+        hubMapBtn.href = 'https://www.google.com/maps?q=' + d.hubLat + ',' + d.hubLng;
+        hubMapBtn.className = 'td-map-tile td-map-tile--blue';
+    } else {
+        hubMapBtn.removeAttribute('href');
+        hubMapBtn.className = 'td-map-tile td-map-tile--grey';
+    }
+
+    // Action buttons based on status
+    const actionsEl = document.getElementById('hbActions');
+    actionsEl.innerHTML = '';
+    if (d.status === 'assigned') {
+        actionsEl.innerHTML = `
+            <button class="btn btn-success w-100" onclick="updateHubBatchStatus('accepted')">
+                <i class="fa-solid fa-check me-1"></i> Accept Batch
+            </button>`;
+    } else if (d.status === 'accepted') {
+        actionsEl.innerHTML = `
+            <button class="btn btn-primary w-100" onclick="updateHubBatchStatus('in_progress')">
+                <i class="fa-solid fa-motorcycle me-1"></i> Start Pickup Ride
+            </button>`;
+    } else if (d.status === 'in_progress') {
+        actionsEl.innerHTML = `
+            <button class="btn btn-warning w-100" onclick="updateHubBatchStatus('arrived')">
+                <i class="fa-solid fa-map-pin me-1"></i> Arrived at Pickup
+            </button>`;
+    } else if (d.status === 'arrived') {
+        actionsEl.innerHTML = `
+            <button class="btn btn-warning w-100" onclick="updateHubBatchStatus('collected')">
+                <i class="fa-solid fa-boxes-stacked me-1"></i> All Packages Collected
+            </button>`;
+    } else if (d.status === 'collected') {
+        actionsEl.innerHTML = `
+            <button class="btn btn-success w-100" onclick="updateHubBatchStatus('at_hub')">
+                <i class="fa-solid fa-warehouse me-1"></i> Delivered to Hub
+            </button>`;
+    }
+
+    document.getElementById('hubBatchOverlay').style.display = 'block';
+    document.getElementById('hubBatchSheet').classList.add('td-sheet--open');
+}
+
+function closeHubBatchDetail() {
+    document.getElementById('hubBatchOverlay').style.display = 'none';
+    document.getElementById('hubBatchSheet').classList.remove('td-sheet--open');
+    _currentBatchId = null;
+}
+
+async function updateHubBatchStatus(newStatus) {
+    if (!_currentBatchId) return;
+    const csrfToken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+
+    try {
+        const resp = await fetch(`/api/driver/hub-batches/${_currentBatchId}/status/`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            body: JSON.stringify({status: newStatus}),
+        });
+        const data = await resp.json();
+        if (data.success) {
+            closeHubBatchDetail();
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (e) {
+        alert('Network error. Please try again.');
+    }
+}
+</script>

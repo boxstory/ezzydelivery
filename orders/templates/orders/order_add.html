@@ -128,6 +128,22 @@
       </div>
     </div>
 
+    <!-- Products Section (Mobile) -->
+    <div class="pwa-form-section" id="mobile_products_section">
+      <div class="pwa-form-section__header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#mobile_products_collapse" aria-expanded="false" style="cursor:pointer;">
+        <span><i class="fas fa-boxes-stacked me-1"></i> Products <span class="badge bg-secondary fw-normal ms-1" style="font-size:0.65rem;">Optional</span></span>
+        <i class="fas fa-chevron-down"></i>
+      </div>
+      <div class="collapse" id="mobile_products_collapse">
+        <div id="mobile_product_rows" class="mt-2">
+          <!-- rows injected by JS -->
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-2" id="mobile_add_product_row">
+          <i class="fas fa-plus me-1"></i>Add Product
+        </button>
+      </div>
+    </div>
+
     <!-- Pickup & Notes Section -->
     <div class="pwa-form-section">
       <div class="pwa-form-section__header">
@@ -137,7 +153,7 @@
         <label class="pwa-form-group__label">Pickup Location</label>
         <select name="pickup_location" id="mobile_pickup_location" class="pwa-form-group__input">
           {% for location in pickup_locations %}
-          <option value="{{ location.id }}">{{ location.pickup_location_title }}</option>
+          <option value="{{ location.id }}"{% if location.id == default_pickup_id %} selected{% endif %}>{{ location.pickup_location_title }}{% if location.is_default %} ★{% endif %}{% if location.is_fulfilment_center %} (Fulfillment){% endif %}</option>
           {% endfor %}
         </select>
       </div>
@@ -215,6 +231,28 @@
         {% endfor %}
       </div>
       {% endif %}
+
+      <!-- AI Auto-fill Section -->
+      <div class="oap__form-section oap__form-section--ai" id="oap_ai_autofill_section">
+        <div class="oap__form-section-header oap__form-section-header--ai">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <h3>AI Auto-fill</h3>
+          <span class="oap__ai-badge">BETA</span>
+        </div>
+        <div class="oap__form-section-body">
+          <div class="oap__ai-wrap">
+            <textarea id="oap_ai_text_input" class="oap__ai-textarea form-control"
+              rows="3" placeholder="Paste order text here — e.g. Ahmed 55512345 zone 44 street 12 building 8 West Bay COD 150 QR, leave at reception..."></textarea>
+            <div class="oap__ai-actions">
+              <button type="button" class="btn btn-primary oap__ai-btn" id="oap_ai_autofill_btn">
+                <span class="oap__ai-btn-idle"><i class="fa-solid fa-wand-magic-sparkles me-1"></i> Auto-fill Fields</span>
+                <span class="oap__ai-btn-loading d-none"><span class="spinner-border spinner-border-sm me-1"></span> Extracting...</span>
+              </button>
+              <div id="oap_ai_autofill_status" class="oap__ai-status"></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Order Information Section -->
       <div class="oap__form-section">
@@ -398,6 +436,29 @@
               </label>
               {{ form.order_notes }}
               <div class="form-text">Any special instructions or notes for this order</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Products Section -->
+      <div class="oap__form-section" id="oap_products_section">
+        <div class="oap__form-section-header oap__form-section-header--toggle" data-bs-toggle="collapse" data-bs-target="#oap_products_collapse" aria-expanded="false" aria-controls="oap_products_collapse" style="cursor:pointer;">
+          <i class="fas fa-boxes-stacked"></i>
+          <h3>Products <span class="badge bg-secondary ms-1 fw-normal" id="oap_inline_product_badge" style="font-size:0.7rem;">Optional</span></h3>
+          <i class="fas fa-chevron-down ms-auto oap__toggle-chevron"></i>
+        </div>
+        <div class="collapse" id="oap_products_collapse">
+          <div class="oap__form-section-body">
+            <div id="oap_inline_rows">
+              <!-- Product rows injected by JS -->
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="oap_inline_add_row">
+              <i class="fas fa-plus me-1"></i>Add Product
+            </button>
+            <div class="oap__inline-total mt-3 d-flex justify-content-end align-items-center gap-2">
+              <span class="text-muted small"><i class="fas fa-calculator me-1"></i>Products Total:</span>
+              <strong id="oap_inline_total_display">0.00 QAR</strong>
             </div>
           </div>
         </div>
@@ -927,5 +988,334 @@
       }
     });
   })();
+</script>
+
+<script>
+  // ========== DESKTOP AI AUTO-FILL ==========
+  (function() {
+    const btn = document.getElementById('oap_ai_autofill_btn');
+    const textarea = document.getElementById('oap_ai_text_input');
+    const status = document.getElementById('oap_ai_autofill_status');
+    if (!btn || !textarea) return;
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    btn.addEventListener('click', async function() {
+      const text = textarea.value.trim();
+      if (!text) { textarea.focus(); return; }
+
+      const idleSpan = btn.querySelector('.oap__ai-btn-idle');
+      const loadSpan = btn.querySelector('.oap__ai-btn-loading');
+      btn.disabled = true;
+      idleSpan.classList.add('d-none');
+      loadSpan.classList.remove('d-none');
+      status.innerHTML = '';
+      status.className = 'oap__ai-status';
+
+      try {
+        const resp = await fetch('/api/ai-agent/tools/extract-order/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+          body: JSON.stringify({ text: text })
+        });
+        const result = await resp.json();
+
+        if (result.success && result.data) {
+          const d = result.data;
+          const fieldMap = {
+            'customer_name':    'id_customer_name',
+            'customer_phone':   'id_customer_phone',
+            'customer_address': 'id_customer_address',
+            'dl_zone':          'id_dl_zone',
+            'dl_street':        'id_dl_street',
+            'dl_building':      'id_dl_building',
+            'cod_amount':       'id_cod_amount',
+            'order_notes':      'id_order_notes'
+          };
+
+          let filledCount = 0;
+          for (const [key, elId] of Object.entries(fieldMap)) {
+            const val = String(d[key] || '').trim();
+            const el = document.getElementById(elId);
+            if (val && el) {
+              el.value = val;
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              filledCount++;
+            }
+          }
+
+          // Auto-fill WhatsApp from phone
+          if (d.customer_phone) {
+            const wa = document.getElementById('id_customer_whatsapp');
+            if (wa) wa.value = '974' + d.customer_phone;
+          }
+
+          // Auto-set COD status if amount extracted
+          if (d.cod_amount && parseFloat(d.cod_amount) > 0) {
+            const codStatus = document.getElementById('id_cod_status_by_client');
+            if (codStatus && codStatus.value === 'no_cod') codStatus.value = 'pending';
+          }
+
+          status.innerHTML = '<i class="fas fa-check-circle me-1"></i> ' + filledCount + ' fields filled';
+          status.className = 'oap__ai-status oap__ai-status--success';
+          textarea.value = '';
+        } else {
+          status.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i>' + (result.error || 'Could not extract fields');
+          status.className = 'oap__ai-status oap__ai-status--error';
+        }
+      } catch (err) {
+        status.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i> Network error';
+        status.className = 'oap__ai-status oap__ai-status--error';
+      } finally {
+        btn.disabled = false;
+        idleSpan.classList.remove('d-none');
+        loadSpan.classList.add('d-none');
+      }
+    });
+  })();
+</script>
+
+<script>
+// ========== INLINE PRODUCT ROWS ==========
+(function () {
+  const productSearchUrl = '{% url "orders:product_search_api" %}';
+  const inventoryEnabled = {{ business.fulfillment_service_enabled|yesno:"true,false" }};
+
+  // ---- Desktop ----
+  const desktopContainer = document.getElementById('oap_inline_rows');
+  const desktopBadge = document.getElementById('oap_inline_product_badge');
+  const desktopTotal = document.getElementById('oap_inline_total_display');
+  let desktopRowCount = 0;
+
+  function buildDesktopRow(idx) {
+    const div = document.createElement('div');
+    div.className = 'oap__inline-row d-flex flex-wrap gap-2 align-items-end border rounded p-2 mb-2';
+    div.dataset.rowIndex = idx;
+    div.innerHTML = `
+      <div class="flex-grow-1" style="min-width:200px;">
+        <label class="form-label form-label-sm mb-1">Product</label>
+        <select name="inline_product_id[]" class="form-select form-select-sm oap__inline-product-sel">
+          <option value="">Search…</option>
+        </select>
+        <div class="oap__inline-meta text-muted" style="font-size:0.72rem;min-height:1rem;"></div>
+      </div>
+      <div style="width:70px;">
+        <label class="form-label form-label-sm mb-1">Qty</label>
+        <input type="number" name="inline_quantity[]" class="form-control form-control-sm oap__inline-qty" value="1" min="1">
+      </div>
+      <div style="width:100px;">
+        <label class="form-label form-label-sm mb-1">Price (QAR)</label>
+        <input type="number" name="inline_unit_price[]" class="form-control form-control-sm oap__inline-price" step="0.01" min="0" placeholder="Auto">
+      </div>
+      <div style="width:90px;">
+        <label class="form-label form-label-sm mb-1">Line Total</label>
+        <div class="oap__inline-line-total text-end fw-semibold" style="padding:0.25rem 0.5rem;background:var(--brand-grey-100,#f5f5f5);border-radius:4px;font-size:0.85rem;">0.00</div>
+      </div>
+      <div style="width:110px;">
+        <label class="form-label form-label-sm mb-1">Notes</label>
+        <input type="text" name="inline_notes[]" class="form-control form-control-sm" placeholder="Optional">
+      </div>
+      <div class="d-flex align-items-end">
+        <button type="button" class="btn btn-sm btn-outline-danger oap__inline-remove" title="Remove">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    `;
+    return div;
+  }
+
+  function initDesktopSelect2(sel) {
+    if (typeof jQuery === 'undefined' || typeof jQuery.fn.select2 === 'undefined') return;
+    $(sel).select2({
+      placeholder: 'Search products…',
+      minimumInputLength: 0,
+      allowClear: true,
+      dropdownParent: $(sel).closest('.oap__inline-row'),
+      ajax: {
+        url: productSearchUrl,
+        dataType: 'json',
+        delay: 200,
+        data: p => ({ q: p.term || '' }),
+        processResults: d => ({ results: d.results }),
+        cache: true
+      },
+      templateResult: function(p) {
+        if (!p.id) return p.text;
+        return $(`<div><span>${p.text}</span> <small class="text-muted">${p.sku} — ${p.price} QAR</small></div>`);
+      },
+      templateSelection: s => s.text || 'Search products…'
+    });
+    $(sel).on('select2:select', function(e) {
+      const d = e.params.data;
+      const row = $(this).closest('.oap__inline-row');
+      row.find('.oap__inline-price').val(d.price);
+      row.find('.oap__inline-meta').text('SKU: ' + d.sku + (inventoryEnabled && d.inventory !== null ? '  · Stock: ' + d.inventory : ''));
+      recalcDesktopRow(row);
+    });
+    $(sel).on('select2:clear', function() {
+      const row = $(this).closest('.oap__inline-row');
+      row.find('.oap__inline-price').val('');
+      row.find('.oap__inline-meta').text('');
+      recalcDesktopRow(row);
+    });
+  }
+
+  function recalcDesktopRow(row) {
+    const qty = parseFloat($(row).find('.oap__inline-qty').val()) || 0;
+    const price = parseFloat($(row).find('.oap__inline-price').val()) || 0;
+    $(row).find('.oap__inline-line-total').text((qty * price).toFixed(2));
+    recalcDesktopTotal();
+  }
+
+  function recalcDesktopTotal() {
+    let total = 0;
+    document.querySelectorAll('#oap_inline_rows .oap__inline-row').forEach(row => {
+      total += (parseFloat(row.querySelector('.oap__inline-qty').value) || 0)
+             * (parseFloat(row.querySelector('.oap__inline-price').value) || 0);
+    });
+    if (desktopTotal) desktopTotal.textContent = total.toFixed(2) + ' QAR';
+  }
+
+  function addDesktopRow() {
+    const row = buildDesktopRow(desktopRowCount++);
+    desktopContainer.appendChild(row);
+    initDesktopSelect2(row.querySelector('.oap__inline-product-sel'));
+    updateDesktopBadge();
+    // Open select2 on new row
+    setTimeout(() => $(row.querySelector('.oap__inline-product-sel')).select2('open'), 200);
+  }
+
+  function updateDesktopBadge() {
+    const count = desktopContainer.querySelectorAll('.oap__inline-row').length;
+    if (desktopBadge) {
+      desktopBadge.textContent = count > 0 ? count + ' item' + (count !== 1 ? 's' : '') : 'Optional';
+      desktopBadge.className = count > 0 ? 'badge bg-primary ms-1 fw-normal' : 'badge bg-secondary ms-1 fw-normal';
+    }
+  }
+
+  // Add row button
+  const addRowBtn = document.getElementById('oap_inline_add_row');
+  if (addRowBtn) {
+    addRowBtn.addEventListener('click', addDesktopRow);
+    // Start with one row when section is opened
+    const collapse = document.getElementById('oap_products_collapse');
+    if (collapse) {
+      collapse.addEventListener('show.bs.collapse', function() {
+        if (desktopContainer.querySelectorAll('.oap__inline-row').length === 0) {
+          addDesktopRow();
+        }
+      });
+    }
+  }
+
+  // Remove row (delegated)
+  if (desktopContainer) {
+    desktopContainer.addEventListener('click', function(e) {
+      const btn = e.target.closest('.oap__inline-remove');
+      if (!btn) return;
+      btn.closest('.oap__inline-row').remove();
+      updateDesktopBadge();
+      recalcDesktopTotal();
+    });
+    desktopContainer.addEventListener('input', function(e) {
+      if (e.target.matches('.oap__inline-qty, .oap__inline-price')) {
+        recalcDesktopRow(e.target.closest('.oap__inline-row'));
+      }
+    });
+  }
+
+  // Chevron rotation for section toggle
+  const sectionHeader = document.querySelector('#oap_products_section .oap__form-section-header--toggle');
+  const chevron = sectionHeader ? sectionHeader.querySelector('.oap__toggle-chevron') : null;
+  if (chevron) {
+    document.getElementById('oap_products_collapse').addEventListener('show.bs.collapse', () => chevron.style.transform = 'rotate(180deg)');
+    document.getElementById('oap_products_collapse').addEventListener('hide.bs.collapse', () => chevron.style.transform = '');
+  }
+
+  // ---- Mobile ----
+  const mobileContainer = document.getElementById('mobile_product_rows');
+  let mobileRowCount = 0;
+
+  function buildMobileRow(idx) {
+    const div = document.createElement('div');
+    div.className = 'border rounded p-2 mb-2';
+    div.dataset.rowIndex = idx;
+    div.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="pwa-form-group__label">Product #${idx + 1}</span>
+        <button type="button" class="btn btn-sm btn-outline-danger mobile-product-remove p-1" style="line-height:1;"><i class="fas fa-times"></i></button>
+      </div>
+      <select name="inline_product_id[]" class="pwa-form-group__input mobile-product-sel mb-1" style="width:100%;">
+        <option value="">Search products…</option>
+      </select>
+      <div class="d-flex gap-2">
+        <div style="flex:1;">
+          <label class="pwa-form-group__label">Qty</label>
+          <input type="number" name="inline_quantity[]" class="pwa-form-group__input mobile-product-qty" value="1" min="1">
+        </div>
+        <div style="flex:1;">
+          <label class="pwa-form-group__label">Price (QAR)</label>
+          <input type="number" name="inline_unit_price[]" class="pwa-form-group__input mobile-product-price" step="0.01" min="0" placeholder="Auto">
+        </div>
+      </div>
+      <input type="hidden" name="inline_notes[]" value="">
+    `;
+    return div;
+  }
+
+  function initMobileSelect2(sel) {
+    if (typeof jQuery === 'undefined' || typeof jQuery.fn.select2 === 'undefined') return;
+    $(sel).select2({
+      placeholder: 'Search products…',
+      minimumInputLength: 0,
+      allowClear: true,
+      ajax: {
+        url: productSearchUrl,
+        dataType: 'json',
+        delay: 200,
+        data: p => ({ q: p.term || '' }),
+        processResults: d => ({ results: d.results }),
+        cache: true
+      },
+      templateResult: function(p) {
+        if (!p.id) return p.text;
+        return $(`<div>${p.text} <small class="text-muted">${p.price} QAR</small></div>`);
+      },
+      templateSelection: s => s.text || 'Select…'
+    });
+    $(sel).on('select2:select', function(e) {
+      const d = e.params.data;
+      $(this).closest('[data-row-index]').find('.mobile-product-price').val(d.price);
+    });
+  }
+
+  function addMobileRow() {
+    const row = buildMobileRow(mobileRowCount++);
+    mobileContainer.appendChild(row);
+    initMobileSelect2(row.querySelector('.mobile-product-sel'));
+  }
+
+  const mobileAddBtn = document.getElementById('mobile_add_product_row');
+  if (mobileAddBtn) {
+    mobileAddBtn.addEventListener('click', addMobileRow);
+    const mobileCollapse = document.getElementById('mobile_products_collapse');
+    if (mobileCollapse) {
+      mobileCollapse.addEventListener('show.bs.collapse', function() {
+        if (mobileContainer.querySelectorAll('[data-row-index]').length === 0) {
+          addMobileRow();
+        }
+      });
+    }
+  }
+
+  if (mobileContainer) {
+    mobileContainer.addEventListener('click', function(e) {
+      const btn = e.target.closest('.mobile-product-remove');
+      if (!btn) return;
+      btn.closest('[data-row-index]').remove();
+    });
+  }
+})();
 </script>
 {% endblock extra_js %}

@@ -108,6 +108,82 @@ class DlAddressUpdate(models.Model):
         app_label = 'delivery'
 
 
+class HubPickupBatch(models.Model):
+    """
+    Represents a single driver ride that collects goods from one pickup location
+    and brings them to a hub warehouse. May cover one or many orders.
+
+    Leg 1 of the hub model — the driver sees one task card for the entire batch.
+    After the driver marks the batch 'at_hub', individual DeliveryTask records
+    (Leg 2, task_leg='hub_delivery') are auto-created per order.
+    """
+
+    batch_number = models.CharField(max_length=50, unique=True, db_index=True,
+                                    help_text="e.g. BATCH-20260228-001")
+
+    pickup_location = models.ForeignKey(
+        business_models.PickupLocation,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='hub_batches',
+        help_text="Seller location where driver collects goods."
+    )
+    hub_warehouse = models.ForeignKey(
+        'warehouse.WarehouseLocation',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='pickup_batches',
+        help_text="Hub warehouse where driver drops off all goods."
+    )
+    driver = models.ForeignKey(
+        fleet_models.Driver,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='hub_pickup_batches',
+    )
+
+    BATCH_STATUS_CHOICES = [
+        ('pending',     'Pending — awaiting driver assignment'),
+        ('assigned',    'Assigned to driver'),
+        ('accepted',    'Accepted by driver'),
+        ('in_progress', 'Driver on the way to pickup'),
+        ('arrived',     'Driver at pickup location'),
+        ('collected',   'All packages collected'),
+        ('at_hub',      'Delivered to hub'),
+        ('cancelled',   'Cancelled'),
+    ]
+    status = models.CharField(
+        max_length=20, choices=BATCH_STATUS_CHOICES, default='pending'
+    )
+
+    notes = models.TextField(blank=True, null=True)
+    created_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_hub_batches'
+    )
+
+    driver_earnings = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Total earnings for this pickup ride (set by staff)."
+    )
+    earnings_processed = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'delivery_hubpickupbatch'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.batch_number} ({self.status})"
+
+    @property
+    def order_count(self):
+        return self.orders.count()
+
+
 class DeliveryTask(models.Model):
     dl_task_status_client = (
         ('for_review', 'For Review'),
@@ -326,6 +402,30 @@ class DeliveryTask(models.Model):
         help_text="When COD was settled with the business client"
     )
 
+    # --- Hub Model (Two-Leg Delivery) ---
+    TASK_LEG_CHOICES = [
+        ('single',       'Single Leg (Standard)'),
+        ('hub_delivery', 'Hub Delivery — Leg 2 (To Customer)'),
+    ]
+    task_leg = models.CharField(
+        max_length=20, choices=TASK_LEG_CHOICES, default='single',
+        help_text="Leg type: 'single' = standard delivery. 'hub_delivery' = Leg 2 of hub model."
+    )
+    hub_pickup_batch = models.ForeignKey(
+        HubPickupBatch,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='delivery_tasks',
+        help_text="Batch that delivered this order's goods to hub (Leg 1 reference)."
+    )
+    hub_warehouse = models.ForeignKey(
+        'warehouse.WarehouseLocation',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='hub_delivery_tasks',
+        help_text="Hub warehouse this delivery leg originates from (for hub_delivery tasks)."
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -351,12 +451,16 @@ class DeliveryTask(models.Model):
         """
         from decimal import Decimal
 
+        # Hub delivery leg (Leg 2): same as normal delivery
+        if self.task_leg == 'hub_delivery':
+            return Decimal('10.00')
+
         # Pick & Drop orders: 80% of delivery price
         if self.order and self.order.order_type == 'pick_and_drop':
             delivery_charge = Decimal(str(self.dl_price or 0))
             return delivery_charge * Decimal('0.80')
 
-        # Normal orders: Fixed QAR 10
+        # Normal single-leg orders: Fixed QAR 10
         return Decimal('10.00')
 
     def is_long_distance(self):

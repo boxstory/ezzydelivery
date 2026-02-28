@@ -1,0 +1,204 @@
+{% extends "wf_dashboard_base.html" %}
+{% load static %}
+{% block title %}Create Hub Pickup Batch – EzzyDelivery{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workforce/css/hub_batch.css' %}">
+{% endblock %}
+{% block content %}
+<div class="hub-bc">
+
+    <div class="wfd__hero">
+        <div class="wfd__hero-content">
+            <h1 class="wfd__hero-title"><i class="fa-solid fa-warehouse"></i> Create Hub Pickup Batch</h1>
+            <p class="wfd__hero-subtitle">Group orders for a single pickup ride to the hub</p>
+        </div>
+        <div class="wfd__hero-actions">
+            <a href="{% url 'workforce:hub_batch_list' %}" class="btn btn-outline-secondary">
+                <i class="fa-solid fa-arrow-left me-1"></i> Back to Batches
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- Left: Batch config -->
+        <div class="col-12 col-lg-5">
+            <div class="card">
+                <div class="card-header fw-semibold">
+                    <i class="fa-solid fa-sliders me-1"></i> Batch Configuration
+                </div>
+                <div class="card-body">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Pickup Location <span class="text-danger">*</span></label>
+                        <select id="batchPickupLocation" class="form-select" required>
+                            <option value="">-- Select pickup location --</option>
+                            {% for loc in pickup_locations %}
+                            <option value="{{ loc.id }}" data-business="{{ loc.business.business_name }}">
+                                {{ loc.pickup_location_title }} — {{ loc.business.business_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Orders will be filtered by this location.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Hub Warehouse <span class="text-danger">*</span></label>
+                        <select id="batchHubWarehouse" class="form-select" required>
+                            <option value="">-- Select hub warehouse --</option>
+                            {% for wl in hub_warehouses %}
+                            <option value="{{ wl.id }}">{{ wl.warehouse.name }} / {{ wl.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Assign Driver</label>
+                        <select id="batchDriver" class="form-select">
+                            <option value="">-- Unassigned (assign later) --</option>
+                            {% for driver in approved_drivers %}
+                            <option value="{{ driver.driver_id }}">
+                                {{ driver.user.get_full_name|default:driver.driver_code }} ({{ driver.driver_code }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Driver Earnings (QAR)</label>
+                        <input type="number" id="batchEarnings" class="form-control" value="5" min="0" step="1">
+                        <div class="form-text">Total earnings for this pickup ride. Default: 5 QAR.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Notes</label>
+                        <textarea id="batchNotes" class="form-control" rows="2" placeholder="Optional notes for driver or staff"></textarea>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Order selection -->
+        <div class="col-12 col-lg-7">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold"><i class="fa-solid fa-boxes-stacked me-1"></i> Select Orders</span>
+                    <span class="badge bg-primary" id="selectedCount">0 selected</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height:420px;overflow-y:auto;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th width="40"><input type="checkbox" id="selectAll" class="form-check-input"></th>
+                                    <th>Order #</th>
+                                    <th>Business</th>
+                                    <th>Pickup Location</th>
+                                    <th>Customer</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orderTableBody">
+                                {% for order in eligible_orders %}
+                                <tr class="hub-bc__order-row" data-pickup-id="{{ order.pickup_location_id|default:'' }}">
+                                    <td><input type="checkbox" class="form-check-input order-select" value="{{ order.id }}"></td>
+                                    <td><code>{{ order.order_number }}</code></td>
+                                    <td>{{ order.business.business_name }}</td>
+                                    <td>{{ order.pickup_location.pickup_location_title|default:"—" }}</td>
+                                    <td>{{ order.customer_name }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-3">
+                                        No eligible hub delivery orders found.<br>
+                                        <small>Orders must be hub delivery, verified, and not yet in a batch.</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end mt-3 gap-2">
+                <a href="{% url 'workforce:hub_batch_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                <button id="createBatchBtn" class="btn btn-primary" disabled>
+                    <i class="fa-solid fa-plus me-1"></i> Create Batch
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+
+// Select all
+document.getElementById('selectAll').addEventListener('change', function() {
+    document.querySelectorAll('.order-select').forEach(cb => {
+        if (!cb.closest('tr').classList.contains('d-none')) cb.checked = this.checked;
+    });
+    updateCount();
+});
+
+document.querySelectorAll('.order-select').forEach(cb => cb.addEventListener('change', updateCount));
+
+function updateCount() {
+    const selected = document.querySelectorAll('.order-select:checked').length;
+    document.getElementById('selectedCount').textContent = selected + ' selected';
+    document.getElementById('createBatchBtn').disabled = selected === 0;
+}
+
+document.getElementById('createBatchBtn').addEventListener('click', async function() {
+    const orderIds = [...document.querySelectorAll('.order-select:checked')].map(cb => parseInt(cb.value));
+    const pickupLocationId = document.getElementById('batchPickupLocation').value;
+    const hubWarehouseId = document.getElementById('batchHubWarehouse').value;
+    const driverId = document.getElementById('batchDriver').value || null;
+    const driverEarnings = document.getElementById('batchEarnings').value || 0;
+    const notes = document.getElementById('batchNotes').value;
+
+    if (!pickupLocationId || !hubWarehouseId) {
+        alert('Please select a pickup location and hub warehouse.');
+        return;
+    }
+    if (orderIds.length === 0) {
+        alert('Please select at least one order.');
+        return;
+    }
+
+    this.disabled = true;
+    this.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Creating...';
+
+    try {
+        const resp = await fetch('{% url "workforce:hub_batch_create" %}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            body: JSON.stringify({
+                pickup_location_id: parseInt(pickupLocationId),
+                hub_warehouse_id: parseInt(hubWarehouseId),
+                order_ids: orderIds,
+                driver_id: driverId ? parseInt(driverId) : null,
+                driver_earnings: parseFloat(driverEarnings),
+                notes: notes,
+            }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+            window.location.href = data.redirect_url;
+        } else {
+            alert('Error: ' + (data.errors || [data.error]).join('\n'));
+            this.disabled = false;
+            this.innerHTML = '<i class="fa-solid fa-plus me-1"></i> Create Batch';
+        }
+    } catch (e) {
+        alert('Network error. Please try again.');
+        this.disabled = false;
+        this.innerHTML = '<i class="fa-solid fa-plus me-1"></i> Create Batch';
+    }
+});
+</script>
+{% endblock %}

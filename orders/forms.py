@@ -172,11 +172,19 @@ class AddOrderForm(forms.ModelForm):
 
             self.fields['pickup_location'].queryset = pickup_locations
 
-            # If fulfillment is active, set fulfillment center as default
+            # Priority for default pre-selection:
+            # 1. Active fulfillment center (if fulfillment service is active)
+            # 2. Location marked as is_default
+            # 3. First location in the list
+            default_location = None
             if business and business.fulfillment_service_status == 'active':
-                fulfillment_location = pickup_locations.filter(is_fulfilment_center=True).first()
-                if fulfillment_location:
-                    self.fields['pickup_location'].initial = fulfillment_location.id
+                default_location = pickup_locations.filter(is_fulfilment_center=True).first()
+            if not default_location:
+                default_location = pickup_locations.filter(is_default=True).first()
+            if not default_location:
+                default_location = pickup_locations.first()
+            if default_location:
+                self.fields['pickup_location'].initial = default_location.id
             
         
 

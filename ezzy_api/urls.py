@@ -21,6 +21,12 @@ urlpatterns = [
     path('driver/tasks/<int:task_id>/documents/upload/', ezzy_api_views.driver_upload_task_document, name='driver_upload_task_document'),
     path('driver/location/', ezzy_api_views.driver_update_location, name='driver_update_location'),
     path('driver/statistics/', ezzy_api_views.driver_statistics, name='driver_statistics'),
+
+    # Hub pickup batch endpoints (driver app)
+    path('driver/hub-batches/', ezzy_api_views.driver_hub_batches, name='driver_hub_batches'),
+    path('driver/hub-batches/<int:batch_id>/', ezzy_api_views.driver_hub_batch_detail, name='driver_hub_batch_detail'),
+    path('driver/hub-batches/<int:batch_id>/accept/', ezzy_api_views.driver_hub_batch_accept, name='driver_hub_batch_accept'),
+    path('driver/hub-batches/<int:batch_id>/status/', ezzy_api_views.driver_hub_batch_status, name='driver_hub_batch_status'),
     
     # ==================== API KEY MANAGEMENT APIs ====================
     path('api-keys/', ezzy_api_views.list_api_keys, name='list_api_keys'),

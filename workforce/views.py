@@ -7056,3 +7056,237 @@ def whatsapp_inquiry_detail(request, inquiry_id):
         'inquiry': inquiry,
     }
     return render(request, 'workforce/forms/whatsapp_inquiry_detail.html', context)
+
+
+# =============================================================================
+# HUB OPERATIONS — Hub Pickup Batch Management
+# =============================================================================
+
+@login_required
+@staff_required
+def hub_batch_list(request):
+    """List all hub pickup batches with status filters."""
+    from warehouse.models import WarehouseLocation
+
+    status_filter = request.GET.get('status', '')
+    batches = (
+        delivery_models.HubPickupBatch.objects
+        .select_related('pickup_location', 'hub_warehouse', 'hub_warehouse__warehouse', 'driver', 'driver__user', 'created_by')
+        .prefetch_related('orders')
+        .order_by('-created_at')
+    )
+    if status_filter:
+        batches = batches.filter(status=status_filter)
+
+    context = {
+        'page_title': 'Hub Pickup Batches',
+        'batches': batches,
+        'status_filter': status_filter,
+        'status_choices': delivery_models.HubPickupBatch.BATCH_STATUS_CHOICES,
+    }
+    return render(request, 'workforce/hub_batch_list.html', context)
+
+
+@login_required
+@staff_required
+def hub_batch_create(request):
+    """Create a new hub pickup batch from selected orders."""
+    from warehouse.models import WarehouseLocation
+    from django.utils.timezone import now as tz_now
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+        except (json.JSONDecodeError, ValueError):
+            data = request.POST
+
+        pickup_location_id = data.get('pickup_location_id')
+        hub_warehouse_id = data.get('hub_warehouse_id')
+        order_ids = data.get('order_ids', [])
+        driver_id = data.get('driver_id') or None
+        driver_earnings = data.get('driver_earnings') or 0
+        notes = data.get('notes', '')
+
+        errors = []
+        if not pickup_location_id:
+            errors.append("Pickup location is required.")
+        if not hub_warehouse_id:
+            errors.append("Hub warehouse is required.")
+        if not order_ids:
+            errors.append("At least one order must be selected.")
+
+        if errors:
+            return JsonResponse({'success': False, 'errors': errors}, status=400)
+
+        try:
+            pickup_location = business_models.PickupLocation.objects.get(id=pickup_location_id)
+            hub_warehouse = WarehouseLocation.objects.get(id=hub_warehouse_id, is_active=True)
+        except (business_models.PickupLocation.DoesNotExist, WarehouseLocation.DoesNotExist) as e:
+            return JsonResponse({'success': False, 'errors': [str(e)]}, status=400)
+
+        driver = None
+        if driver_id:
+            try:
+                driver = fleet_models.Driver.objects.get(driver_id=driver_id, driver_status='approved')
+            except fleet_models.Driver.DoesNotExist:
+                return JsonResponse({'success': False, 'errors': ['Driver not found or not approved.']}, status=400)
+
+        # Generate batch number
+        today = tz_now().strftime('%Y%m%d')
+        existing_count = delivery_models.HubPickupBatch.objects.filter(
+            batch_number__startswith=f'BATCH-{today}-'
+        ).count()
+        batch_number = f'BATCH-{today}-{existing_count + 1:03d}'
+
+        from decimal import Decimal as _Decimal
+        try:
+            earnings = _Decimal(str(driver_earnings))
+        except Exception:
+            earnings = _Decimal('0')
+
+        batch = delivery_models.HubPickupBatch.objects.create(
+            batch_number=batch_number,
+            pickup_location=pickup_location,
+            hub_warehouse=hub_warehouse,
+            driver=driver,
+            driver_earnings=earnings,
+            notes=notes,
+            created_by=request.user,
+            status='assigned' if driver else 'pending',
+        )
+
+        # Assign orders to batch
+        orders = orders_models.Order.objects.filter(
+            id__in=order_ids,
+            is_hub_delivery=True,
+            hub_pickup_batch__isnull=True,
+        )
+        orders.update(hub_pickup_batch=batch)
+
+        return JsonResponse({
+            'success': True,
+            'batch_id': batch.id,
+            'batch_number': batch_number,
+            'order_count': orders.count(),
+            'redirect_url': f'/workforce/hub/batches/{batch.id}/',
+        })
+
+    # GET — render create form
+    from warehouse.models import WarehouseLocation
+    hub_warehouses = WarehouseLocation.objects.filter(is_active=True).select_related('warehouse').order_by('warehouse__name', 'name')
+    pickup_locations = business_models.PickupLocation.objects.filter(
+        pickup_status='active'
+    ).select_related('business').order_by('business__business_name', 'pickup_location_title')
+    eligible_orders = orders_models.Order.objects.filter(
+        is_hub_delivery=True,
+        hub_pickup_batch__isnull=True,
+        verification_status='verified',
+    ).select_related('business', 'pickup_location').order_by('-created_at')
+    approved_drivers = fleet_models.Driver.objects.filter(
+        driver_status='approved'
+    ).select_related('user').order_by('user__first_name')
+
+    context = {
+        'page_title': 'Create Hub Pickup Batch',
+        'hub_warehouses': hub_warehouses,
+        'pickup_locations': pickup_locations,
+        'eligible_orders': eligible_orders,
+        'approved_drivers': approved_drivers,
+    }
+    return render(request, 'workforce/hub_batch_create.html', context)
+
+
+@login_required
+@staff_required
+def hub_batch_detail(request, batch_id):
+    """Show hub pickup batch detail — orders, status, driver assignment."""
+    from warehouse.models import WarehouseLocation
+
+    batch = get_object_or_404(
+        delivery_models.HubPickupBatch.objects.select_related(
+            'pickup_location', 'hub_warehouse', 'hub_warehouse__warehouse',
+            'driver', 'driver__user', 'created_by',
+        ).prefetch_related('orders', 'orders__delivery_task', 'delivery_tasks'),
+        id=batch_id,
+    )
+    approved_drivers = fleet_models.Driver.objects.filter(
+        driver_status='approved'
+    ).select_related('user').order_by('user__first_name')
+
+    context = {
+        'page_title': f'Hub Batch — {batch.batch_number}',
+        'batch': batch,
+        'approved_drivers': approved_drivers,
+    }
+    return render(request, 'workforce/hub_batch_detail.html', context)
+
+
+@login_required
+@staff_required
+@require_POST
+def hub_batch_assign_driver(request, batch_id):
+    """Assign or reassign a driver to a hub pickup batch."""
+    batch = get_object_or_404(delivery_models.HubPickupBatch, id=batch_id)
+
+    if batch.status in ('at_hub', 'cancelled'):
+        return JsonResponse({'success': False, 'error': f'Cannot assign driver to batch in status: {batch.status}'}, status=400)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        data = request.POST
+
+    driver_id = data.get('driver_id')
+    driver_earnings = data.get('driver_earnings')
+
+    try:
+        driver = fleet_models.Driver.objects.get(driver_id=driver_id, driver_status='approved')
+    except fleet_models.Driver.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Driver not found or not approved.'}, status=400)
+
+    update_fields = ['driver', 'status']
+    batch.driver = driver
+    if batch.status == 'pending':
+        batch.status = 'assigned'
+    if driver_earnings is not None:
+        from decimal import Decimal as _Decimal
+        try:
+            batch.driver_earnings = _Decimal(str(driver_earnings))
+            update_fields.append('driver_earnings')
+        except Exception:
+            pass
+    batch.save(update_fields=update_fields)
+
+    return JsonResponse({
+        'success': True,
+        'driver_name': driver.user.get_full_name() or driver.user.username,
+        'batch_status': batch.status,
+    })
+
+
+@login_required
+@staff_required
+@require_POST
+def hub_batch_update_status(request, batch_id):
+    """Staff updates hub batch status (e.g. cancel, mark at_hub manually)."""
+    batch = get_object_or_404(delivery_models.HubPickupBatch, id=batch_id)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        data = request.POST
+
+    new_status = data.get('status')
+    valid_statuses = [s[0] for s in delivery_models.HubPickupBatch.BATCH_STATUS_CHOICES]
+
+    if new_status not in valid_statuses:
+        return JsonResponse({'success': False, 'error': f'Invalid status: {new_status}'}, status=400)
+
+    if batch.status in ('at_hub', 'cancelled'):
+        return JsonResponse({'success': False, 'error': f'Batch already in terminal status: {batch.status}'}, status=400)
+
+    batch._old_batch_status = batch.status
+    batch.status = new_status
+    batch.save(update_fields=['status'])
+
+    return JsonResponse({'success': True, 'status': new_status})

@@ -792,8 +792,44 @@ def add_order(request):
                 logger.debug(f"Order business_id: {order.business_id}")
                 order = form.save()
                 logger.info(f"Order created with id: {order.id}")
-                # Only redirect to add products if fulfillment service is enabled
-                if business.fulfillment_service_enabled:
+
+                # Save inline products if any were submitted
+                inline_product_ids = request.POST.getlist('inline_product_id[]')
+                inline_quantities = request.POST.getlist('inline_quantity[]')
+                inline_unit_prices = request.POST.getlist('inline_unit_price[]')
+                inline_notes_list = request.POST.getlist('inline_notes[]')
+
+                if any(pid for pid in inline_product_ids if pid):
+                    from product import models as product_models
+                    valid_pids = [pid for pid in inline_product_ids if pid]
+                    products_map = {
+                        str(p.id): p for p in product_models.Product.objects.filter(
+                            id__in=valid_pids, business=business
+                        )
+                    }
+                    items_saved = 0
+                    for i, pid in enumerate(inline_product_ids):
+                        if not pid:
+                            continue
+                        product = products_map.get(str(pid))
+                        if not product:
+                            continue
+                        try:
+                            qty = int(inline_quantities[i]) if i < len(inline_quantities) and inline_quantities[i] else 1
+                            price = float(inline_unit_prices[i]) if i < len(inline_unit_prices) and inline_unit_prices[i] else float(product.item_price)
+                            notes = inline_notes_list[i] if i < len(inline_notes_list) else ''
+                            orders_models.OrderItem.objects.create(
+                                order=order, product=product,
+                                quantity=qty, unit_price=price, notes=notes
+                            )
+                            items_saved += 1
+                        except (ValueError, IndexError) as e:
+                            logger.warning(f"Inline product save error: {e}")
+                    if items_saved:
+                        logger.info(f"{items_saved} inline product(s) saved for order {order.id}")
+
+                # Only redirect to add products page if fulfillment service is enabled AND no inline products were added
+                if business.fulfillment_service_enabled and not any(pid for pid in inline_product_ids if pid):
                     return redirect('orders:add_order_product', order_id=order.id)
                 else:
                     messages.success(request, 'Order created successfully.')
@@ -820,11 +856,26 @@ def add_order(request):
             }
         pickup_locations_json = json.dumps(pickup_locations_dict)
 
+        # Determine default pickup ID for mobile pre-selection
+        # Priority: active fulfillment center > is_default flag > first
+        default_pickup_id = None
+        if business.fulfillment_service_status == 'active':
+            fc = next((loc for loc in pickup_locations if loc.is_fulfilment_center), None)
+            if fc:
+                default_pickup_id = fc.id
+        if not default_pickup_id:
+            df = next((loc for loc in pickup_locations if loc.is_default), None)
+            if df:
+                default_pickup_id = df.id
+        if not default_pickup_id and pickup_locations:
+            default_pickup_id = pickup_locations[0].id
+
     return render(request, 'orders/order_add.html', {
         'form': form,
         'business': business,
         'pickup_locations': pickup_locations,
         'pickup_locations_json': pickup_locations_json,
+        'default_pickup_id': default_pickup_id,
     })
 
 

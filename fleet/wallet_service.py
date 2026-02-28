@@ -636,6 +636,44 @@ class WalletService:
             'pending_earnings': driver.pending_earnings
         }
 
+    @staticmethod
+    def record_earnings_from_batch_pickup(batch):
+        """
+        Record driver earnings for a completed hub pickup batch ride.
+        Called when HubPickupBatch.status → 'at_hub'.
+
+        Args:
+            batch: HubPickupBatch instance
+
+        Returns:
+            dict with transaction details
+        """
+        if batch.earnings_processed:
+            return {'status': 'error', 'message': 'Batch earnings already processed'}
+        if not batch.driver:
+            return {'status': 'error', 'message': 'No driver assigned to batch'}
+        if not batch.driver_earnings or batch.driver_earnings <= 0:
+            return {'status': 'skipped', 'message': 'No earnings to record (driver_earnings = 0)'}
+
+        with transaction.atomic():
+            earning_trans = WalletService.record_transaction(
+                driver=batch.driver,
+                transaction_type='earning',
+                amount=batch.driver_earnings,
+                description=f"Hub pickup batch earnings — {batch.batch_number} "
+                            f"({batch.order_count} order{'s' if batch.order_count != 1 else ''})",
+                created_by=None,
+                reference_number=batch.batch_number
+            )
+            from delivery.models import HubPickupBatch as _HubPickupBatch
+            _HubPickupBatch.objects.filter(pk=batch.pk).update(earnings_processed=True)
+
+        return {
+            'status': 'success',
+            'driver_earnings': batch.driver_earnings,
+            'transaction': earning_trans,
+        }
+
 
 class WalletAlertService:
     """Service for wallet-related alerts and notifications"""
