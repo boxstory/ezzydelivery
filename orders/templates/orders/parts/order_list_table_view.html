@@ -22,7 +22,7 @@
           Customer <i class="fa-solid fa-sort oal__table-sort-icon"></i>
         </th>
         <th class="oal__table-th sortable-header" data-sort="dl_zone">
-          Zone <i class="fa-solid fa-sort oal__table-sort-icon"></i>
+          Location <i class="fa-solid fa-sort oal__table-sort-icon"></i>
         </th>
         <th class="oal__table-th sortable-header" data-sort="cod_amount">
           COD <i class="fa-solid fa-sort oal__table-sort-icon"></i>
@@ -55,11 +55,14 @@
           </div>
         </td>
 
-        <!-- Zone -->
-        <td class="oal__table-td" title="{% if order.dl_street %}St {{ order.dl_street }}{% endif %}{% if order.dl_building %}, Bldg {{ order.dl_building }}{% endif %}{% if not order.dl_street and not order.dl_building %}{{ order.customer_address }}{% endif %}">
+        <!-- Location -->
+        <td class="oal__table-td" title="{{ order.customer_address }}">
           <div class="oal__table-zone-cell">
-            <span class="oal__table-zone-name">{% get_zone_display order %}</span>
-            <span class="oal__table-zone-addr">{% if order.dl_street %}St {{ order.dl_street }}{% endif %}{% if order.dl_building %}, Bldg {{ order.dl_building }}{% endif %}{% if not order.dl_street and not order.dl_building %}{{ order.customer_address|truncatechars:35 }}{% endif %}</span>
+            <span class="oal__table-zone-name">
+              {% get_zone_display order %}{% if order.dl_zone %} <span class="oal__table-zone-nums">· Z{{ order.dl_zone }}{% if order.dl_street %} St {{ order.dl_street }}{% endif %}{% if order.dl_building %} B{{ order.dl_building }}{% endif %}</span>{% endif %}
+            </span>
+            <span class="oal__table-zone-addr">{{ order.customer_address|truncatechars:45 }}</span>
+            <span class="oal__table-zone-coords">{% if order.latitude and order.longitude %}{{ order.latitude|floatformat:5 }}, {{ order.longitude|floatformat:5 }}{% if order.coords_accuracy %} · <span class="oal__table-zone-accuracy oal__table-zone-accuracy--{{ order.coords_accuracy }}"><i class="fa-solid fa-crosshairs"></i> {{ order.get_coords_accuracy_display }}</span>{% endif %}{% else %}<span class="oal__table-zone-no-coords"><i class="fa-solid fa-location-dot-slash"></i> No coords</span>{% endif %}</span>
           </div>
         </td>
 
