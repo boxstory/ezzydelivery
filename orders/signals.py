@@ -222,6 +222,15 @@ def order_post_save_receiver(sender, instance,  created, *args, **kwargs):
             else:
                 _create_delivery_task_from_order(instance)
 
+        # Send customer WhatsApp notification on order cancellation
+        old_order_status = getattr(instance, '_old_order_status', '')
+        if instance.order_status == 'cancelled' and old_order_status != 'cancelled':
+            try:
+                from core.order_notifications import notify_order_event
+                notify_order_event('order_cancelled', order=instance)
+            except Exception as e:
+                logger.warning(f"Cancellation notification failed for order {instance.order_number}: {e}")
+
         # Clean up stored old status from instance
         for attr in ('_old_verification_status', '_old_order_status', '_old_task_status', '_old_cod_status_by_staff'):
             if hasattr(instance, attr):

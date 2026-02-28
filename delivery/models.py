@@ -277,6 +277,55 @@ class DeliveryTask(models.Model):
         help_text="Staff notes about earnings verification"
     )
 
+    # --- Failure & Retry Tracking ---
+    FAILURE_REASON_CHOICES = [
+        ('customer_not_home', 'Customer Not Home'),
+        ('address_not_found', 'Address Not Found'),
+        ('customer_refused', 'Customer Refused Delivery'),
+        ('customer_unreachable', 'Customer Unreachable'),
+        ('vehicle_issue', 'Vehicle / Driver Issue'),
+        ('wrong_address', 'Wrong Address on Order'),
+        ('customer_requested_reschedule', 'Customer Requested Reschedule'),
+        ('cod_amount_dispute', 'COD Amount Disputed'),
+        ('other', 'Other'),
+    ]
+    failure_reason = models.CharField(
+        max_length=50, choices=FAILURE_REASON_CHOICES, blank=True, null=True,
+        help_text="Why the delivery failed"
+    )
+    failure_notes = models.TextField(
+        blank=True, null=True,
+        help_text="Additional notes about the failure"
+    )
+    failed_attempt_count = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Number of failed delivery attempts for this task"
+    )
+    reschedule_date = models.DateField(
+        blank=True, null=True,
+        help_text="Rescheduled delivery date after failure"
+    )
+    reschedule_reason = models.CharField(
+        max_length=255, blank=True, null=True,
+        help_text="Reason for rescheduling"
+    )
+
+    # --- Driver Rejection Tracking ---
+    rejection_reason = models.TextField(
+        blank=True, null=True,
+        help_text="Reason driver rejected this task"
+    )
+
+    # --- COD Client Settlement ---
+    cod_client_settled = models.BooleanField(
+        default=False,
+        help_text="Whether COD has been settled with the business client"
+    )
+    cod_client_settled_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When COD was settled with the business client"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

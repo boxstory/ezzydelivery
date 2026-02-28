@@ -171,6 +171,30 @@ class Order(models.Model):
     delivered_at = models.DateTimeField(blank=True, null=True, help_text="When the order was delivered")
     fulfilled_at = models.DateTimeField(blank=True, null=True, help_text="When the order was marked as fulfilled")
 
+    # Cancellation tracking
+    CANCELLATION_REASON_CHOICES = [
+        ('client_request', 'Client Request'),
+        ('address_issue', 'Address Issue'),
+        ('customer_unreachable', 'Customer Unreachable'),
+        ('duplicate_order', 'Duplicate Order'),
+        ('out_of_stock', 'Out of Stock'),
+        ('driver_issue', 'Driver Issue'),
+        ('other', 'Other'),
+    ]
+    cancellation_reason = models.CharField(
+        max_length=50, choices=CANCELLATION_REASON_CHOICES, blank=True, null=True,
+        help_text="Why the order was cancelled"
+    )
+    cancellation_notes = models.TextField(
+        blank=True, null=True,
+        help_text="Additional notes about the cancellation"
+    )
+    cancelled_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='cancelled_orders',
+        help_text="Staff member who cancelled the order"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

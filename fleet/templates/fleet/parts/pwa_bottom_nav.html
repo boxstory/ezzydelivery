@@ -1,0 +1,29 @@
+{% load static %}
+{% url 'fleet:fleet_dashboard' as url_dashboard %}
+{% url 'fleet:driver_tasks' as url_tasks %}
+{% url 'fleet:cod_collection' as url_cod %}
+{% url 'fleet:driver_earnings' as url_earnings %}
+{% url 'fleet:driver_profile_mobile' as url_profile %}
+<!-- PWA Mobile Bottom Navigation - Only visible on mobile (< 768px) -->
+<nav class="pwa-bottom-nav d-md-none" aria-label="Mobile navigation">
+  <a href="{{ url_dashboard }}" class="pwa-bottom-nav__item {% if request.path == url_dashboard %}pwa-bottom-nav__item--active{% endif %}">
+    <i class="fa-solid fa-house"></i>
+    <span>Home</span>
+  </a>
+  <a href="{{ url_tasks }}" class="pwa-bottom-nav__item {% if '/tasks' in request.path %}pwa-bottom-nav__item--active{% endif %}">
+    <i class="fa-solid fa-clipboard-list"></i>
+    <span>Tasks</span>
+  </a>
+  <a href="{{ url_cod }}" class="pwa-bottom-nav__item {% if '/cod' in request.path %}pwa-bottom-nav__item--active{% endif %}">
+    <i class="fa-solid fa-hand-holding-dollar"></i>
+    <span>COD</span>
+  </a>
+  <a href="{{ url_earnings }}" class="pwa-bottom-nav__item {% if '/earnings' in request.path %}pwa-bottom-nav__item--active{% endif %}">
+    <i class="fa-solid fa-wallet"></i>
+    <span>Earnings</span>
+  </a>
+  <a href="{{ url_profile }}" class="pwa-bottom-nav__item {% if '/profile' in request.path %}pwa-bottom-nav__item--active{% endif %}">
+    <i class="fa-solid fa-user"></i>
+    <span>Profile</span>
+  </a>
+</nav>

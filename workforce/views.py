@@ -1863,32 +1863,67 @@ def cancel_order(request, order_id):
             id=order_id
         )
 
-        if order.order_status in ('publish', 'published'):
+        # Cannot cancel already delivered or already cancelled orders
+        if order.order_status == 'delivered':
             return JsonResponse({
                 'success': False,
-                'error': 'Cannot cancel a published order'
+                'error': 'Cannot cancel a delivered order'
             }, status=400)
+
+        if order.order_status == 'cancelled':
+            return JsonResponse({
+                'success': False,
+                'error': 'Order is already cancelled'
+            }, status=400)
+
+        # Block cancellation if driver has already physically picked up the package
+        delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
+        active_pickup_statuses = ('picked_up', 'start_ride', 'in_transit', 'out_for_delivery', 'contacted')
+        if delivery_task and delivery_task.dl_task_status in active_pickup_statuses:
+            return JsonResponse({
+                'success': False,
+                'error': f'Cannot cancel — driver has already picked up this order (status: {delivery_task.get_dl_task_status_display()}). Contact the driver directly.'
+            }, status=400)
+
+        # Collect optional cancellation reason from request body
+        cancellation_reason = None
+        cancellation_notes = None
+        try:
+            body = json.loads(request.body)
+            cancellation_reason = body.get('cancellation_reason')
+            cancellation_notes = body.get('cancellation_notes')
+        except (json.JSONDecodeError, AttributeError):
+            pass
 
         # Update order status
         old_status = order.order_status
         order.order_status = 'cancelled'
+        order.cancelled_by = request.user
+        if cancellation_reason:
+            order.cancellation_reason = cancellation_reason
+        if cancellation_notes:
+            order.cancellation_notes = cancellation_notes
         order.save()
 
-        # Cancel related delivery task
-        delivery_task = delivery_models.DeliveryTask.objects.filter(order=order).first()
+        # Cancel related delivery task (if not already picked up — already guarded above)
         if delivery_task and delivery_task.dl_task_status != 'cancelled':
             delivery_task.dl_task_status = 'cancelled'
-            delivery_task.dl_task_status_client = '9'  # Cancel for client
+            delivery_task.dl_task_status_client = '9'
             delivery_task.save(update_fields=['dl_task_status', 'dl_task_status_client'])
 
         # Log the cancellation
+        notes_text = f'Order cancelled by {request.user.username}'
+        if cancellation_reason:
+            notes_text += f' | Reason: {cancellation_reason}'
+        if cancellation_notes:
+            notes_text += f' | Notes: {cancellation_notes}'
         orders_models.OrderVerificationLog.objects.create(
             order=order,
             verified_by=request.user,
             action='order_cancelled',
             old_status=old_status,
             new_status='cancelled',
-            notes=f'Order cancelled by {request.user.username}'
+            notes=notes_text
         )
 
         # Return updated row HTML for HTMX
@@ -2463,6 +2498,13 @@ def publish_task_to_fleets(request, task_id):
                 'error': 'Cannot publish — order is cancelled'
             }, status=400)
 
+        # Block if order is not verified
+        if task.order and task.order.verification_status != 'verified':
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot publish — order must be verified before publishing to fleet'
+            }, status=400)
+
         # Mark task as published to fleet (pending = visible to all fleet drivers)
         task.dl_task_status = 'pending'
         task.dl_task_publish = True
@@ -2517,18 +2559,9 @@ def unpublish_task_from_fleets(request, task_id):
 @staff_required
 def assign_driver_to_task(request, task_id):
     """AJAX endpoint to assign driver to delivery task"""
+    from django.db import transaction
     try:
-        task = get_object_or_404(
-            delivery_models.DeliveryTask.objects.select_related('order'), id=task_id)
-
-        # Block if order is cancelled
-        if task.order and task.order.order_status == 'cancelled':
-            return JsonResponse({
-                'success': False,
-                'error': 'Cannot assign driver — order is cancelled'
-            }, status=400)
-
-        # Parse JSON body
+        # Parse JSON body first (before locking)
         data = json.loads(request.body)
         driver_id = data.get('driver_id')
 
@@ -2548,9 +2581,38 @@ def assign_driver_to_task(request, task_id):
                 'error': f'Driver {driver_id} not found or not approved'
             }, status=400)
 
-        task.driver = driver
-        task.dl_task_status = 'assigned'
-        task.save()
+        with transaction.atomic():
+            # Lock the task row to prevent race conditions
+            task = get_object_or_404(
+                delivery_models.DeliveryTask.objects.select_related('order').select_for_update(),
+                id=task_id)
+
+            # Block if order is cancelled
+            if task.order and task.order.order_status == 'cancelled':
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Cannot assign driver — order is cancelled'
+                }, status=400)
+
+            # Block if order is not verified
+            if task.order and task.order.verification_status != 'verified':
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Cannot assign driver — order is not verified'
+                }, status=400)
+
+            # Block if task already assigned to a different driver
+            if task.driver_id and task.driver_id != driver.driver_id:
+                existing_name = task.driver.user.get_full_name() if task.driver and task.driver.user else str(task.driver_id)
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Task already assigned to {existing_name}. Unassign first.'
+                }, status=400)
+
+            task.driver = driver
+            task.dl_task_status = 'assigned'
+            task._status_actor = 'staff'
+            task.save()
 
         driver_name = driver.user.get_full_name() if driver.user else driver.driver_code
 
@@ -6487,6 +6549,7 @@ def bulk_assign_driver(request):
             # Update status to assigned if currently pending/for_review
             if task.dl_task_status in ['for_review', 'pending', None]:
                 task.dl_task_status = 'assigned'
+                task._status_actor = 'staff'
             task.save()
             assigned_count += 1
 

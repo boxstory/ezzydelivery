@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from orders import models as orders_models
 from delivery import models as delivery_models
+from delivery.state_machine import can_transition
 import uuid
 import logging
 
@@ -19,31 +20,37 @@ TERMINAL_ORDER_STATUSES = ['delivered', 'cancelled']
 @receiver(pre_save, sender=DeliveryTask)
 def delivery_task_pre_save(sender, instance, **kwargs):
     """Track old delivery task status for change detection in post_save.
-    Also block status changes when order is cancelled."""
+    Enforces state machine rules and blocks invalid transitions."""
     if instance.pk:
         try:
             old = DeliveryTask.objects.get(pk=instance.pk)
             instance._old_dl_task_status = old.dl_task_status
 
-            # Lock delivery statuses based on order state
-            if instance.order_id:
-                order = instance.order
-                # Block when order is cancelled (allow setting to cancelled only)
-                if order.order_status == 'cancelled':
-                    if instance.dl_task_status != 'cancelled' and instance.dl_task_status != old.dl_task_status:
+            if instance.dl_task_status != old.dl_task_status:
+
+                # Hard block: order is cancelled — only 'cancelled' is allowed
+                if instance.order_id:
+                    order = instance.order
+                    if order.order_status == 'cancelled' and instance.dl_task_status != 'cancelled':
                         logger.warning(
                             f"Blocked delivery status change '{old.dl_task_status}' -> '{instance.dl_task_status}' "
                             f"for task {instance.dl_task_number}: order is cancelled"
                         )
                         instance.dl_task_status = old.dl_task_status
+                        return
 
-                # Log when order is NOT verified (but allow status changes)
-                elif order.verification_status != 'verified':
-                    if instance.dl_task_status != old.dl_task_status:
-                        logger.info(
-                            f"Delivery status change '{old.dl_task_status}' -> '{instance.dl_task_status}' "
-                            f"for task {instance.dl_task_number}: order not yet verified (status={order.verification_status})"
-                        )
+                # State machine: determine actor from instance flag set by callers
+                # Callers set instance._status_actor = 'staff' or 'driver' (default: 'staff')
+                actor = getattr(instance, '_status_actor', 'staff')
+                allowed, reason = can_transition(old.dl_task_status, instance.dl_task_status, actor=actor)
+                if not allowed:
+                    logger.warning(
+                        f"Blocked invalid status transition [{actor}] "
+                        f"'{old.dl_task_status}' -> '{instance.dl_task_status}' "
+                        f"for task {instance.dl_task_number}: {reason}"
+                    )
+                    instance.dl_task_status = old.dl_task_status
+
         except DeliveryTask.DoesNotExist:
             pass
 
@@ -133,6 +140,30 @@ def _sync_driver_availability(task):
         logger.exception(f"Error syncing driver availability from task {task.id}: {e}")
 
 
+def _send_customer_notification(task, old_status, new_status):
+    """
+    Fire WhatsApp notification to customer on key status changes.
+    Runs in a try/except so it never blocks the main save flow.
+    """
+    # Map status transitions → notification events
+    EVENT_MAP = {
+        'assigned':         'driver_assigned',
+        'out_for_delivery': 'out_for_delivery',
+        'in_transit':       'out_for_delivery',   # same message for in_transit
+        'delivered':        'delivered',
+        'failed':           'delivery_failed',
+    }
+    event = EVENT_MAP.get(new_status)
+    if not event:
+        return
+
+    try:
+        from core.order_notifications import notify_order_event
+        notify_order_event(event, task=task)
+    except Exception as e:
+        logger.warning(f"Customer notification failed for task {task.pk} event={event}: {e}")
+
+
 @receiver(post_save, sender=DeliveryTask)
 def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs):
     """Handle delivery task creation/update side effects"""
@@ -179,6 +210,34 @@ def delivery_task_post_save_receiver(sender, instance, created, *args, **kwargs)
         new_status = instance.dl_task_status
         if old_status is not None and old_status != new_status and instance.order_id:
             _sync_order_status_from_task(instance)
+
+        # Increment failed_attempt_count when task transitions to 'failed'
+        if old_status is not None and old_status != 'failed' and new_status == 'failed':
+            try:
+                DeliveryTask.objects.filter(pk=instance.pk).update(
+                    failed_attempt_count=instance.failed_attempt_count + 1
+                )
+                logger.info(f"Task {instance.dl_task_number} failed_attempt_count → {instance.failed_attempt_count + 1}")
+            except Exception as e:
+                logger.exception(f"Error incrementing failed_attempt_count for task {instance.pk}: {e}")
+
+        # Notify driver when task is assigned to them
+        if old_status is not None and new_status == 'assigned' and instance.driver_id:
+            try:
+                from fleet.models import DriverNotification
+                DriverNotification.objects.create(
+                    driver=instance.driver,
+                    title='New Task Assigned',
+                    message=f'You have been assigned task {instance.dl_task_number} for order {instance.order.order_number if instance.order_id else ""}.',
+                    notification_type='delivery_assigned',
+                )
+                logger.info(f"DriverNotification created for driver {instance.driver_id} — task {instance.dl_task_number} assigned")
+            except Exception as e:
+                logger.warning(f"Could not create driver notification for task assignment {instance.pk}: {e}")
+
+        # --- Customer WhatsApp notifications ---
+        if old_status is not None and old_status != new_status:
+            _send_customer_notification(instance, old_status, new_status)
 
     # Sync delivery task status → driver availability
     if instance.driver_id:

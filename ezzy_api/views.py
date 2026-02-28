@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from orders import models as orders_models
 from fleet import models as fleet_models
 from delivery import models as delivery_models
+from delivery.state_machine import can_transition as task_can_transition
 from core import models as core_models
 from business import models as business_models
 from ezzy_api import models as ezzy_api_models
@@ -284,6 +285,7 @@ def driver_accept_task(request, task_id):
 
             task.driver = driver
             task.dl_task_status = 'accepted'
+            task._status_actor = 'driver'
             task.save()
 
             # Create AssignedDriver record
@@ -346,6 +348,7 @@ def driver_reject_task(request, task_id):
             }, status=status.HTTP_403_FORBIDDEN)
 
         task.dl_task_status = 'rejected'
+        task._status_actor = 'driver'
         task.driver = None
         task.save()
 
@@ -423,8 +426,14 @@ def driver_update_task_status(request, task_id):
                 return Response({
                     'error': f'Invalid status: {new_status}. Valid statuses: {", ".join(VALID_DRIVER_STATUSES)}'
                 }, status=status.HTTP_400_BAD_REQUEST)
-            task.dl_task_status = new_status
 
+            # State machine validation
+            allowed, reason = task_can_transition(task.dl_task_status, new_status, actor='driver')
+            if not allowed:
+                return Response({'error': reason}, status=status.HTTP_400_BAD_REQUEST)
+
+            task.dl_task_status = new_status
+            task._status_actor = 'driver'
 
         task.save()
         
