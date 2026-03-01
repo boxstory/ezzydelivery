@@ -38,6 +38,7 @@
     <input type="hidden" name="client_order_code" id="mobile_client_order_code" value="">
     <input type="hidden" name="order_number_preview" value="">
     <input type="hidden" name="cod_status_by_client" id="mobile_cod_status" value="pending">
+    <input type="hidden" name="order_source_text" id="mobile_order_source_text" value="">
 
     <!-- Customer Section -->
     <div class="pwa-form-section">
@@ -82,13 +83,20 @@
             class="pwa-form-group__input" placeholder="0" value="0">
         </div>
       </div>
+      <div class="pwa-form-group mb-2">
+        <button type="button" class="btn btn-sm btn-outline-warning w-100" id="mobileQnasBtn"
+                onclick="qnasValidateAndFill({zoneId:'mobile_dl_zone', streetId:'mobile_dl_street', buildingId:'mobile_dl_building', latId:'mobile_latitude', lngId:'mobile_longitude', zoneNameId:'mobile_zone_name_display', resultId:'mobileQnasResult', btnId:'mobileQnasBtn', mapId:'mobileMapLink'})">
+          <i class="fa-solid fa-satellite-dish me-1"></i>Validate Address
+        </button>
+        <div id="mobileQnasResult" class="mt-1"></div>
+      </div>
       <div class="pwa-form-group" id="fg_customer_address">
         <label class="pwa-form-group__label">Address</label>
         <div class="d-flex gap-2">
           <input type="text" name="customer_address" id="mobile_customer_address"
             class="pwa-form-group__input flex-grow-1" placeholder="Full address or area name">
           <button type="button" class="btn btn-sm btn-outline-info" id="mobileAiParseBtn" style="height: 38px; white-space: nowrap;"
-                  onclick="aiParseAddress('mobile_customer_address', 'mobile_dl_zone', 'mobile_dl_street', 'mobile_dl_building', 'mobileAiParseBtn', 'mobileAiParseResult', {qnasOpts: {zoneId:'mobile_dl_zone', streetId:'mobile_dl_street', buildingId:'mobile_dl_building', latId:'mobile_latitude', lngId:'mobile_longitude', resultId:'mobileQnasResult', btnId:'mobileQnasBtn', mapId:'mobileMapLink'}})">
+                  onclick="aiParseAddress('mobile_customer_address', 'mobile_dl_zone', 'mobile_dl_street', 'mobile_dl_building', 'mobileAiParseBtn', 'mobileAiParseResult', {qnasOpts: {zoneId:'mobile_dl_zone', streetId:'mobile_dl_street', buildingId:'mobile_dl_building', latId:'mobile_latitude', lngId:'mobile_longitude', zoneNameId:'mobile_zone_name_display', resultId:'mobileQnasResult', btnId:'mobileQnasBtn', mapId:'mobileMapLink'}})">
             <i class="fa-solid fa-wand-magic-sparkles"></i>
           </button>
         </div>
@@ -103,17 +111,16 @@
           <label class="pwa-form-group__label">Lng</label>
           <input type="text" id="mobile_longitude" class="pwa-form-group__input" placeholder="--" readonly>
         </div>
-        <div class="pwa-form-group d-flex align-items-end gap-2">
-          <a id="mobileMapLink" href="#" target="_blank" class="btn btn-sm btn-outline-secondary disabled" style="height: 38px; line-height: 28px;" title="Map">
-            <i class="fa-solid fa-map-location-dot"></i>
-          </a>
-          <button type="button" class="btn btn-sm btn-outline-warning flex-grow-1" id="mobileQnasBtn" style="height: 38px;"
-                  onclick="qnasValidateAndFill({zoneId:'mobile_dl_zone', streetId:'mobile_dl_street', buildingId:'mobile_dl_building', latId:'mobile_latitude', lngId:'mobile_longitude', resultId:'mobileQnasResult', btnId:'mobileQnasBtn', mapId:'mobileMapLink'})">
-            <i class="fa-solid fa-satellite-dish me-1"></i>Validate
-          </button>
+        <div class="pwa-form-group">
+          <label class="pwa-form-group__label">Zone Name</label>
+          <input type="text" id="mobile_zone_name_display" class="pwa-form-group__input" placeholder="Auto-filled" readonly>
         </div>
       </div>
-      <div id="mobileQnasResult" class="mb-2"></div>
+      <div class="d-flex gap-2 align-items-center">
+        <a id="mobileMapLink" href="#" target="_blank" class="btn btn-sm btn-outline-secondary disabled" style="height: 32px; line-height: 22px;" title="Map">
+          <i class="fa-solid fa-map-location-dot"></i>
+        </a>
+      </div>
     </div>
 
     <!-- Payment Section -->
@@ -126,21 +133,51 @@
         <input type="number" name="cod_amount" id="mobile_cod_amount"
           class="pwa-form-group__input" placeholder="0.00" min="0" step="0.01" value="0">
       </div>
+      <div id="mobile_cod_mismatch_alert" class="oap__cod-mismatch" style="display:none;">
+        <i class="fas fa-triangle-exclamation"></i>
+        COD <strong id="mobile_cod_mismatch_cod">0.00</strong> QAR doesn't match products total <strong id="mobile_cod_mismatch_total">0.00</strong> QAR
+      </div>
     </div>
 
     <!-- Products Section (Mobile) -->
     <div class="pwa-form-section" id="mobile_products_section">
-      <div class="pwa-form-section__header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#mobile_products_collapse" aria-expanded="false" style="cursor:pointer;">
-        <span><i class="fas fa-boxes-stacked me-1"></i> Products <span class="badge bg-secondary fw-normal ms-1" style="font-size:0.65rem;">Optional</span></span>
-        <i class="fas fa-chevron-down"></i>
+      <div class="pwa-form-section__header">
+        <i class="fas fa-boxes-stacked me-1"></i> Products <span class="badge bg-secondary fw-normal ms-1" id="mobile_product_badge">Optional</span>
       </div>
-      <div class="collapse" id="mobile_products_collapse">
-        <div id="mobile_product_rows" class="mt-2">
-          <!-- rows injected by JS -->
+      <div id="mobile_product_rows" class="mt-2">
+        <div class="oap__inline-row oap__inline-row--mobile" data-row-index="0">
+          <div class="oap__inline-row-header">
+            <span class="oap__inline-row-num">Product #1</span>
+            <button type="button" class="oap__inline-remove mobile-product-remove" title="Remove"><i class="fas fa-times"></i></button>
+          </div>
+          <select name="inline_product_id[]" class="pwa-form-group__input mobile-product-sel mb-2">
+            <option value="">Search products…</option>
+          </select>
+          <div class="d-flex gap-2 mb-1">
+            <div class="flex-fill">
+              <label class="form-label form-label-sm mb-1">Qty</label>
+              <input type="number" name="inline_quantity[]" class="form-control form-control-sm mobile-product-qty" value="1" min="1">
+            </div>
+            <div class="flex-fill">
+              <label class="form-label form-label-sm mb-1">Price <span class="text-muted fw-normal">QAR</span></label>
+              <input type="number" name="inline_unit_price[]" class="form-control form-control-sm mobile-product-price" step="0.01" min="0" placeholder="Auto">
+            </div>
+            <div style="width:72px;">
+              <label class="form-label form-label-sm mb-1">Total</label>
+              <div class="oap__inline-line-total mobile-product-line-total">0.00</div>
+            </div>
+          </div>
+          <input type="hidden" name="inline_notes[]" value="">
         </div>
-        <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-2" id="mobile_add_product_row">
-          <i class="fas fa-plus me-1"></i>Add Product
+      </div>
+      <div class="oap__inline-add-area mt-1">
+        <button type="button" class="oap__inline-add-btn w-100 justify-content-center" id="mobile_add_product_row">
+          <i class="fas fa-plus"></i> Add Product
         </button>
+      </div>
+      <div class="oap__inline-total-bar mt-2" id="mobile_product_total_bar" style="display:none;">
+        <span class="oap__inline-total-label"><i class="fas fa-calculator me-1"></i>Total</span>
+        <span class="oap__inline-total-value" id="mobile_product_total_display">0.00 QAR</span>
       </div>
     </div>
 
@@ -167,11 +204,7 @@
     <!-- Submit -->
     <div class="pwa-form-submit">
       <button type="submit" class="pwa-form-submit__btn" id="mobile_submit_btn">
-        {% if business.fulfillment_service_enabled %}
-        <i class="fas fa-arrow-right"></i> Save & Add Products
-        {% else %}
-        <i class="fas fa-paper-plane"></i> Create Order
-        {% endif %}
+        <i class="fas fa-save"></i> Save Order
       </button>
     </div>
   </form>
@@ -223,6 +256,7 @@
   <div class="oap__form-wrap" id="form_view_container">
     <form method="POST" id="orders_add_form_main" class="oap__form" novalidate>
       {% csrf_token %}
+      {{ form.order_source_text }}
 
       {% if form.non_field_errors %}
       <div class="alert alert-danger mb-4">
@@ -317,7 +351,7 @@
             </div>
             <div class="col-md-6">
               <label class="form-label" for="id_customer_whatsapp">
-                <i class="fab fa-whatsapp me-1 text-success"></i>WhatsApp
+                 WhatsApp
               </label>
               {{ form.customer_whatsapp }}
               <div class="form-text">Auto-filled from phone number</div>
@@ -341,7 +375,7 @@
               <div class="d-flex gap-2">
                 <div class="flex-grow-1">{{ form.customer_address }}</div>
                 <button type="button" class="btn btn-sm btn-outline-info" id="addOrderAiParseBtn" style="height: 38px; white-space: nowrap;"
-                        onclick="aiParseAddress('id_customer_address', 'id_dl_zone', 'id_dl_street', 'id_dl_building', 'addOrderAiParseBtn', 'addOrderAiParseResult', {qnasOpts: {zoneId:'id_dl_zone', streetId:'id_dl_street', buildingId:'id_dl_building', latId:'id_latitude', lngId:'id_longitude', resultId:'addOrderQnasResult', btnId:'addOrderQnasBtn', mapId:'addOrderMapLink', accuracyId:'id_coords_accuracy', accuracyBadgeId:'addOrderAccuracyBadge'}})">
+                        onclick="aiParseAddress('id_customer_address', 'id_dl_zone', 'id_dl_street', 'id_dl_building', 'addOrderAiParseBtn', 'addOrderAiParseResult', {qnasOpts: {zoneId:'id_dl_zone', streetId:'id_dl_street', buildingId:'id_dl_building', latId:'id_latitude', lngId:'id_longitude', zoneNameId:'id_zone_name_display', resultId:'addOrderQnasResult', btnId:'addOrderQnasBtn', mapId:'addOrderMapLink', accuracyId:'id_coords_accuracy', accuracyBadgeId:'addOrderAccuracyBadge'}})">
                   <i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI Parse
                 </button>
               </div>
@@ -367,6 +401,12 @@
               </label>
               {{ form.dl_building }}
             </div>
+            <div class="col-4 col-md-auto d-flex align-items-end">
+              <button type="button" class="btn btn-sm btn-outline-warning" id="addOrderQnasBtn" style="height: 38px; white-space: nowrap;"
+                      onclick="qnasValidateAndFill({zoneId:'id_dl_zone', streetId:'id_dl_street', buildingId:'id_dl_building', latId:'id_latitude', lngId:'id_longitude', zoneNameId:'id_zone_name_display', resultId:'addOrderQnasResult', btnId:'addOrderQnasBtn', mapId:'addOrderMapLink', accuracyId:'id_coords_accuracy', accuracyBadgeId:'addOrderAccuracyBadge'})">
+                <i class="fa-solid fa-satellite-dish me-1"></i>Validate
+              </button>
+            </div>
           </div>
           <div class="row g-3 mt-0">
             <div class="col-4 col-md-2">
@@ -377,15 +417,15 @@
               <label class="form-label" for="id_longitude">Longitude</label>
               {{ form.longitude }}
             </div>
-            <div class="col-4 col-md-2 d-flex align-items-end gap-2">
+            <div class="col-4 col-md-2">
+              <label class="form-label" for="id_zone_name_display">Zone Name</label>
+              <input type="text" id="id_zone_name_display" class="form-control form-control-sm" placeholder="Auto-filled" readonly tabindex="-1">
+            </div>
+            <div class="col-auto d-flex align-items-end gap-2">
               <a id="addOrderMapLink" href="#" target="_blank" class="btn btn-sm btn-outline-secondary disabled" style="height: 38px; line-height: 28px;" title="View on Google Maps">
                 <i class="fa-solid fa-map-location-dot"></i>
               </a>
               {{ form.coords_accuracy }}
-              <button type="button" class="btn btn-sm btn-outline-warning flex-grow-1" id="addOrderQnasBtn" style="height: 38px;"
-                      onclick="qnasValidateAndFill({zoneId:'id_dl_zone', streetId:'id_dl_street', buildingId:'id_dl_building', latId:'id_latitude', lngId:'id_longitude', resultId:'addOrderQnasResult', btnId:'addOrderQnasBtn', mapId:'addOrderMapLink', accuracyId:'id_coords_accuracy', accuracyBadgeId:'addOrderAccuracyBadge'})">
-                <i class="fa-solid fa-satellite-dish me-1"></i>Validate
-              </button>
             </div>
           </div>
           <div class="d-flex gap-2 mt-1">
@@ -419,6 +459,10 @@
               </div>
             </div>
           </div>
+          <div id="oap_cod_mismatch_alert" class="oap__cod-mismatch" style="display:none;">
+            <i class="fas fa-triangle-exclamation"></i>
+            COD amount <strong id="oap_cod_mismatch_cod">0.00</strong> QAR doesn't match products total <strong id="oap_cod_mismatch_total">0.00</strong> QAR
+          </div>
         </div>
       </div>
 
@@ -443,23 +487,53 @@
 
       <!-- Products Section -->
       <div class="oap__form-section" id="oap_products_section">
-        <div class="oap__form-section-header oap__form-section-header--toggle" data-bs-toggle="collapse" data-bs-target="#oap_products_collapse" aria-expanded="false" aria-controls="oap_products_collapse" style="cursor:pointer;">
+        <div class="oap__form-section-header">
           <i class="fas fa-boxes-stacked"></i>
-          <h3>Products <span class="badge bg-secondary ms-1 fw-normal" id="oap_inline_product_badge" style="font-size:0.7rem;">Optional</span></h3>
-          <i class="fas fa-chevron-down ms-auto oap__toggle-chevron"></i>
+          <h3>Products <span class="badge bg-secondary ms-1 fw-normal" id="oap_inline_product_badge">Optional</span></h3>
         </div>
-        <div class="collapse" id="oap_products_collapse">
-          <div class="oap__form-section-body">
-            <div id="oap_inline_rows">
-              <!-- Product rows injected by JS -->
+        <div class="oap__form-section-body">
+          <div id="oap_inline_rows">
+            <div class="oap__inline-row" data-row-index="0">
+              <div class="oap__inline-col--num">
+                <span class="oap__inline-col-label">&nbsp;</span>
+                <span class="oap__inline-row-num">#1</span>
+              </div>
+              <div class="oap__inline-col--product">
+                <span class="oap__inline-col-label">Product</span>
+                <select name="inline_product_id[]" class="form-select form-select-sm oap__inline-product-sel">
+                  <option value="">Search…</option>
+                </select>
+                <div class="oap__inline-meta"></div>
+              </div>
+              <div class="oap__inline-col--qty">
+                <span class="oap__inline-col-label">Qty</span>
+                <input type="number" name="inline_quantity[]" class="form-control form-control-sm oap__inline-qty" value="1" min="1">
+              </div>
+              <div class="oap__inline-col--price">
+                <span class="oap__inline-col-label">Price-QAR  </span>
+                <input type="number" name="inline_unit_price[]" class="form-control form-control-sm oap__inline-price" step="0.01" min="0" placeholder="Auto">
+              </div>
+              <div class="oap__inline-col--total">
+                <span class="oap__inline-col-label">Total</span>
+                <div class="oap__inline-line-total">0.00</div>
+              </div>
+              <div class="oap__inline-col--remove">
+                <span class="oap__inline-col-label">&nbsp;</span>
+                <button type="button" class="oap__inline-remove" title="Remove">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+              <input type="hidden" name="inline_notes[]" value="">
             </div>
-            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="oap_inline_add_row">
-              <i class="fas fa-plus me-1"></i>Add Product
+          </div>
+          <div class="oap__inline-add-area">
+            <button type="button" class="oap__inline-add-btn" id="oap_inline_add_row">
+              <i class="fas fa-plus"></i> Add Product
             </button>
-            <div class="oap__inline-total mt-3 d-flex justify-content-end align-items-center gap-2">
-              <span class="text-muted small"><i class="fas fa-calculator me-1"></i>Products Total:</span>
-              <strong id="oap_inline_total_display">0.00 QAR</strong>
-            </div>
+          </div>
+          <div class="oap__inline-total-bar" id="oap_inline_total_bar" style="display:none;">
+            <span class="oap__inline-total-label"><i class="fas fa-calculator me-1"></i>Products Total</span>
+            <span class="oap__inline-total-value" id="oap_inline_total_display">0.00 QAR</span>
           </div>
         </div>
       </div>
@@ -470,11 +544,7 @@
           <i class="fas fa-times"></i> Cancel
         </button>
         <button type="submit" class="ofu__submit" id="orders_add_btn_submit">
-          {% if business.fulfillment_service_enabled %}
-          <i class="fas fa-save"></i> Save & Add Products
-          {% else %}
-          <i class="fas fa-save"></i> Create Order
-          {% endif %}
+          <i class="fas fa-save"></i> Save Order
         </button>
       </div>
     </form>
@@ -553,6 +623,14 @@
 {% block extra_js %}
 <script>
   $(document).ready(function () {
+    // ========== SOURCE TEXT SYNC ==========
+    // Copy AI textarea content into hidden order_source_text before desktop form submit
+    $('#orders_add_form_main').on('submit', function() {
+      const aiText = $('#oap_ai_text_input').val().trim();
+      const sourceField = document.getElementById('id_order_source_text');
+      if (sourceField && aiText) sourceField.value = aiText;
+    });
+
     // ========== VIEW TOGGLE LOGIC ==========
     const btnFormView = document.getElementById('btn_form_view');
     const btnTableView = document.getElementById('btn_table_view');
@@ -896,6 +974,16 @@
     const ts = Math.floor(Date.now() / 1000);
     document.getElementById('mobile_client_order_code').value = 'ORD-' + ts;
 
+    // Source text: copy paste textarea into hidden field before submit
+    const mobileForm = document.getElementById('orders_add_form_mobile');
+    if (mobileForm) {
+      mobileForm.addEventListener('submit', function() {
+        const pasteText = document.getElementById('ai_extract_textarea')?.value?.trim() || '';
+        const srcField = document.getElementById('mobile_order_source_text');
+        if (srcField && pasteText) srcField.value = pasteText;
+      });
+    }
+
     // Phone → WhatsApp auto-copy
     const phoneInput = document.getElementById('mobile_customer_phone');
     const waInput = document.getElementById('mobile_customer_whatsapp');
@@ -1078,7 +1166,7 @@
 
 <script>
 // ========== INLINE PRODUCT ROWS ==========
-(function () {
+$(document).ready(function () {
   const productSearchUrl = '{% url "orders:product_search_api" %}';
   const inventoryEnabled = {{ business.fulfillment_service_enabled|yesno:"true,false" }};
 
@@ -1090,37 +1178,38 @@
 
   function buildDesktopRow(idx) {
     const div = document.createElement('div');
-    div.className = 'oap__inline-row d-flex flex-wrap gap-2 align-items-end border rounded p-2 mb-2';
+    div.className = 'oap__inline-row';
     div.dataset.rowIndex = idx;
     div.innerHTML = `
-      <div class="flex-grow-1" style="min-width:200px;">
-        <label class="form-label form-label-sm mb-1">Product</label>
+      <div class="oap__inline-col--num">
+        <span class="oap__inline-col-label">&nbsp;</span>
+        <span class="oap__inline-row-num">#${idx + 1}</span>
+      </div>
+      <div class="oap__inline-col--product">
+        <span class="oap__inline-col-label">Product</span>
         <select name="inline_product_id[]" class="form-select form-select-sm oap__inline-product-sel">
           <option value="">Search…</option>
         </select>
-        <div class="oap__inline-meta text-muted" style="font-size:0.72rem;min-height:1rem;"></div>
+        <div class="oap__inline-meta"></div>
       </div>
-      <div style="width:70px;">
-        <label class="form-label form-label-sm mb-1">Qty</label>
+      <div class="oap__inline-col--qty">
+        <span class="oap__inline-col-label">Qty</span>
         <input type="number" name="inline_quantity[]" class="form-control form-control-sm oap__inline-qty" value="1" min="1">
       </div>
-      <div style="width:100px;">
-        <label class="form-label form-label-sm mb-1">Price (QAR)</label>
+      <div class="oap__inline-col--price">
+        <span class="oap__inline-col-label">Price <small class="fw-normal text-muted">QAR</small></span>
         <input type="number" name="inline_unit_price[]" class="form-control form-control-sm oap__inline-price" step="0.01" min="0" placeholder="Auto">
       </div>
-      <div style="width:90px;">
-        <label class="form-label form-label-sm mb-1">Line Total</label>
-        <div class="oap__inline-line-total text-end fw-semibold" style="padding:0.25rem 0.5rem;background:var(--brand-grey-100,#f5f5f5);border-radius:4px;font-size:0.85rem;">0.00</div>
+      <div class="oap__inline-col--total">
+        <span class="oap__inline-col-label">Total</span>
+        <div class="oap__inline-line-total">0.00</div>
       </div>
-      <div style="width:110px;">
-        <label class="form-label form-label-sm mb-1">Notes</label>
-        <input type="text" name="inline_notes[]" class="form-control form-control-sm" placeholder="Optional">
-      </div>
-      <div class="d-flex align-items-end">
-        <button type="button" class="btn btn-sm btn-outline-danger oap__inline-remove" title="Remove">
+      <div class="oap__inline-col--remove">
+        <button type="button" class="oap__inline-remove" title="Remove">
           <i class="fas fa-times"></i>
         </button>
       </div>
+      <input type="hidden" name="inline_notes[]" value="">
     `;
     return div;
   }
@@ -1150,13 +1239,16 @@
       const d = e.params.data;
       const row = $(this).closest('.oap__inline-row');
       row.find('.oap__inline-price').val(d.price);
-      row.find('.oap__inline-meta').text('SKU: ' + d.sku + (inventoryEnabled && d.inventory !== null ? '  · Stock: ' + d.inventory : ''));
+      const metaEl = row.find('.oap__inline-meta');
+      metaEl.text('SKU: ' + d.sku + (inventoryEnabled && d.inventory !== null ? '  · Stock: ' + d.inventory : ''));
+      metaEl.addClass('is-visible');
       recalcDesktopRow(row);
     });
     $(sel).on('select2:clear', function() {
       const row = $(this).closest('.oap__inline-row');
       row.find('.oap__inline-price').val('');
-      row.find('.oap__inline-meta').text('');
+      const metaEl = row.find('.oap__inline-meta');
+      metaEl.text('').removeClass('is-visible');
       recalcDesktopRow(row);
     });
   }
@@ -1175,6 +1267,22 @@
              * (parseFloat(row.querySelector('.oap__inline-price').value) || 0);
     });
     if (desktopTotal) desktopTotal.textContent = total.toFixed(2) + ' QAR';
+    checkDesktopCodMismatch(total);
+  }
+
+  function checkDesktopCodMismatch(productsTotal) {
+    const codInput = document.getElementById('id_cod_amount');
+    const alert = document.getElementById('oap_cod_mismatch_alert');
+    if (!codInput || !alert) return;
+    const cod = parseFloat(codInput.value) || 0;
+    // Only warn when products total > 0 and there's a mismatch
+    if (productsTotal > 0 && Math.abs(cod - productsTotal) > 0.001) {
+      alert.querySelector('#oap_cod_mismatch_cod').textContent = cod.toFixed(2);
+      alert.querySelector('#oap_cod_mismatch_total').textContent = productsTotal.toFixed(2);
+      alert.style.display = 'flex';
+    } else {
+      alert.style.display = 'none';
+    }
   }
 
   function addDesktopRow() {
@@ -1192,22 +1300,13 @@
       desktopBadge.textContent = count > 0 ? count + ' item' + (count !== 1 ? 's' : '') : 'Optional';
       desktopBadge.className = count > 0 ? 'badge bg-primary ms-1 fw-normal' : 'badge bg-secondary ms-1 fw-normal';
     }
+    const totalBar = document.getElementById('oap_inline_total_bar');
+    if (totalBar) totalBar.style.display = count > 0 ? 'flex' : 'none';
   }
 
   // Add row button
   const addRowBtn = document.getElementById('oap_inline_add_row');
-  if (addRowBtn) {
-    addRowBtn.addEventListener('click', addDesktopRow);
-    // Start with one row when section is opened
-    const collapse = document.getElementById('oap_products_collapse');
-    if (collapse) {
-      collapse.addEventListener('show.bs.collapse', function() {
-        if (desktopContainer.querySelectorAll('.oap__inline-row').length === 0) {
-          addDesktopRow();
-        }
-      });
-    }
-  }
+  if (addRowBtn) addRowBtn.addEventListener('click', addDesktopRow);
 
   // Remove row (delegated)
   if (desktopContainer) {
@@ -1223,45 +1322,93 @@
         recalcDesktopRow(e.target.closest('.oap__inline-row'));
       }
     });
-  }
-
-  // Chevron rotation for section toggle
-  const sectionHeader = document.querySelector('#oap_products_section .oap__form-section-header--toggle');
-  const chevron = sectionHeader ? sectionHeader.querySelector('.oap__toggle-chevron') : null;
-  if (chevron) {
-    document.getElementById('oap_products_collapse').addEventListener('show.bs.collapse', () => chevron.style.transform = 'rotate(180deg)');
-    document.getElementById('oap_products_collapse').addEventListener('hide.bs.collapse', () => chevron.style.transform = '');
+    // Init Select2 on server-rendered row(s), then count them
+    desktopContainer.querySelectorAll('.oap__inline-product-sel').forEach(sel => {
+      initDesktopSelect2(sel);
+      desktopRowCount++;
+    });
+    updateDesktopBadge();
   }
 
   // ---- Mobile ----
   const mobileContainer = document.getElementById('mobile_product_rows');
+  const mobileBadge = document.getElementById('mobile_product_badge');
+  const mobileTotalBar = document.getElementById('mobile_product_total_bar');
+  const mobileTotalDisplay = document.getElementById('mobile_product_total_display');
   let mobileRowCount = 0;
 
   function buildMobileRow(idx) {
     const div = document.createElement('div');
-    div.className = 'border rounded p-2 mb-2';
+    div.className = 'oap__inline-row oap__inline-row--mobile';
     div.dataset.rowIndex = idx;
     div.innerHTML = `
-      <div class="d-flex justify-content-between align-items-center mb-1">
-        <span class="pwa-form-group__label">Product #${idx + 1}</span>
-        <button type="button" class="btn btn-sm btn-outline-danger mobile-product-remove p-1" style="line-height:1;"><i class="fas fa-times"></i></button>
+      <div class="oap__inline-row-header">
+        <span class="oap__inline-row-num">Product #${idx + 1}</span>
+        <button type="button" class="oap__inline-remove mobile-product-remove" title="Remove"><i class="fas fa-times"></i></button>
       </div>
-      <select name="inline_product_id[]" class="pwa-form-group__input mobile-product-sel mb-1" style="width:100%;">
+      <select name="inline_product_id[]" class="pwa-form-group__input mobile-product-sel mb-2">
         <option value="">Search products…</option>
       </select>
-      <div class="d-flex gap-2">
-        <div style="flex:1;">
-          <label class="pwa-form-group__label">Qty</label>
-          <input type="number" name="inline_quantity[]" class="pwa-form-group__input mobile-product-qty" value="1" min="1">
+      <div class="d-flex gap-2 mb-1">
+        <div class="flex-fill">
+          <label class="form-label form-label-sm mb-1">Qty</label>
+          <input type="number" name="inline_quantity[]" class="form-control form-control-sm mobile-product-qty" value="1" min="1">
         </div>
-        <div style="flex:1;">
-          <label class="pwa-form-group__label">Price (QAR)</label>
-          <input type="number" name="inline_unit_price[]" class="pwa-form-group__input mobile-product-price" step="0.01" min="0" placeholder="Auto">
+        <div class="flex-fill">
+          <label class="form-label form-label-sm mb-1">Price <span class="text-muted fw-normal">QAR</span></label>
+          <input type="number" name="inline_unit_price[]" class="form-control form-control-sm mobile-product-price" step="0.01" min="0" placeholder="Auto">
+        </div>
+        <div style="width:72px;">
+          <label class="form-label form-label-sm mb-1">Total</label>
+          <div class="oap__inline-line-total mobile-product-line-total">0.00</div>
         </div>
       </div>
       <input type="hidden" name="inline_notes[]" value="">
     `;
     return div;
+  }
+
+  function recalcMobileRow(row) {
+    const qty = parseFloat(row.querySelector('.mobile-product-qty').value) || 0;
+    const price = parseFloat(row.querySelector('.mobile-product-price').value) || 0;
+    const total = row.querySelector('.mobile-product-line-total');
+    if (total) total.textContent = (qty * price).toFixed(2);
+    recalcMobileTotal();
+  }
+
+  function recalcMobileTotal() {
+    let total = 0;
+    if (mobileContainer) {
+      mobileContainer.querySelectorAll('.oap__inline-row--mobile').forEach(row => {
+        total += (parseFloat(row.querySelector('.mobile-product-qty').value) || 0)
+               * (parseFloat(row.querySelector('.mobile-product-price').value) || 0);
+      });
+    }
+    if (mobileTotalDisplay) mobileTotalDisplay.textContent = total.toFixed(2) + ' QAR';
+    checkMobileCodMismatch(total);
+  }
+
+  function checkMobileCodMismatch(productsTotal) {
+    const codInput = document.getElementById('mobile_cod_amount');
+    const alert = document.getElementById('mobile_cod_mismatch_alert');
+    if (!codInput || !alert) return;
+    const cod = parseFloat(codInput.value) || 0;
+    if (productsTotal > 0 && Math.abs(cod - productsTotal) > 0.001) {
+      alert.querySelector('#mobile_cod_mismatch_cod').textContent = cod.toFixed(2);
+      alert.querySelector('#mobile_cod_mismatch_total').textContent = productsTotal.toFixed(2);
+      alert.style.display = 'flex';
+    } else {
+      alert.style.display = 'none';
+    }
+  }
+
+  function updateMobileBadge() {
+    const count = mobileContainer ? mobileContainer.querySelectorAll('.oap__inline-row--mobile').length : 0;
+    if (mobileBadge) {
+      mobileBadge.textContent = count > 0 ? count + ' item' + (count !== 1 ? 's' : '') : 'Optional';
+      mobileBadge.className = count > 0 ? 'badge bg-primary fw-normal ms-1' : 'badge bg-secondary fw-normal ms-1';
+    }
+    if (mobileTotalBar) mobileTotalBar.style.display = count > 0 ? 'flex' : 'none';
   }
 
   function initMobileSelect2(sel) {
@@ -1286,7 +1433,14 @@
     });
     $(sel).on('select2:select', function(e) {
       const d = e.params.data;
-      $(this).closest('[data-row-index]').find('.mobile-product-price').val(d.price);
+      const row = $(this).closest('.oap__inline-row--mobile')[0];
+      $(this).closest('.oap__inline-row--mobile').find('.mobile-product-price').val(d.price);
+      if (row) recalcMobileRow(row);
+    });
+    $(sel).on('select2:clear', function() {
+      const row = $(this).closest('.oap__inline-row--mobile')[0];
+      $(this).closest('.oap__inline-row--mobile').find('.mobile-product-price').val('');
+      if (row) recalcMobileRow(row);
     });
   }
 
@@ -1294,28 +1448,51 @@
     const row = buildMobileRow(mobileRowCount++);
     mobileContainer.appendChild(row);
     initMobileSelect2(row.querySelector('.mobile-product-sel'));
+    updateMobileBadge();
   }
 
   const mobileAddBtn = document.getElementById('mobile_add_product_row');
-  if (mobileAddBtn) {
-    mobileAddBtn.addEventListener('click', addMobileRow);
-    const mobileCollapse = document.getElementById('mobile_products_collapse');
-    if (mobileCollapse) {
-      mobileCollapse.addEventListener('show.bs.collapse', function() {
-        if (mobileContainer.querySelectorAll('[data-row-index]').length === 0) {
-          addMobileRow();
-        }
-      });
-    }
+  if (mobileAddBtn) mobileAddBtn.addEventListener('click', addMobileRow);
+
+  // Init Select2 on server-rendered mobile row(s)
+  if (mobileContainer) {
+    mobileContainer.querySelectorAll('.mobile-product-sel').forEach(sel => {
+      initMobileSelect2(sel);
+      mobileRowCount++;
+    });
+    updateMobileBadge();
   }
 
   if (mobileContainer) {
     mobileContainer.addEventListener('click', function(e) {
       const btn = e.target.closest('.mobile-product-remove');
       if (!btn) return;
-      btn.closest('[data-row-index]').remove();
+      btn.closest('.oap__inline-row--mobile').remove();
+      updateMobileBadge();
+      recalcMobileTotal();
+    });
+    mobileContainer.addEventListener('input', function(e) {
+      if (e.target.matches('.mobile-product-qty, .mobile-product-price')) {
+        recalcMobileRow(e.target.closest('.oap__inline-row--mobile'));
+      }
     });
   }
-})();
+
+  // Re-check COD mismatch whenever COD amount is edited
+  const desktopCodInput = document.getElementById('id_cod_amount');
+  if (desktopCodInput) {
+    desktopCodInput.addEventListener('input', function() {
+      const total = parseFloat(desktopTotal ? desktopTotal.textContent : '0') || 0;
+      checkDesktopCodMismatch(total);
+    });
+  }
+  const mobileCodInput = document.getElementById('mobile_cod_amount');
+  if (mobileCodInput) {
+    mobileCodInput.addEventListener('input', function() {
+      const total = parseFloat(mobileTotalDisplay ? mobileTotalDisplay.textContent : '0') || 0;
+      checkMobileCodMismatch(total);
+    });
+  }
+});
 </script>
 {% endblock extra_js %}
